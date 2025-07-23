@@ -1,140 +1,68 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <title>Parent Panel - Blooming Kids House</title>
-  <style>
-    body {
-      font-family: Arial, sans-serif;
-      padding: 20px;
-      background-color: #f8fdf8;
-    }
-    h2 {
-      color: #2e7d32;
-    }
-    .form-section {
-      margin-bottom: 20px;
-    }
-    label, input {
-      display: block;
-      margin-bottom: 10px;
-    }
-    input[type="text"], input[type="email"] {
-      padding: 8px;
-      width: 300px;
-    }
-    button {
-      padding: 8px 16px;
-      background-color: #4CAF50;
-      color: white;
-      border: none;
-      cursor: pointer;
-    }
-    .report {
-      border: 1px solid #ccc;
-      padding: 15px;
-      margin-bottom: 15px;
-      background-color: #fff;
-    }
-  </style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Parent Panel – Blooming Kids House</title>
+  <link rel="stylesheet" href="css/styles.css" />
 </head>
 <body>
-  <h2>Parent Panel</h2>
-  <div class="form-section">
-    <label for="name">Student Name:</label>
-    <input type="text" id="name" placeholder="Enter student's full name" required>
+  <h1>Parent Panel</h1>
 
-    <label for="email">Student Email:</label>
-    <input type="email" id="email" placeholder="Enter student's email" required>
+  <form id="parentLoginForm">
+    <label>Student Name:
+      <input type="text" id="parentStudentName" required />
+    </label><br/>
+    <label>Student Email:
+      <input type="email" id="parentStudentEmail" required />
+    </label><br/>
+    <button type="submit">View Report</button>
+  </form>
 
-    <button onclick="loadReports()">View Reports</button>
+  <div id="reportContainer" style="display:none; margin-top: 20px;">
+    <h2>Assessment Report</h2>
+    <table border="1" cellpadding="10">
+      <thead>
+        <tr>
+          <th>Subject</th>
+          <th>Score</th>
+          <th>Total</th>
+          <th>Date</th>
+        </tr>
+      </thead>
+      <tbody id="reportTableBody"></tbody>
+    </table>
   </div>
 
-  <div id="reportList"></div>
-
   <script>
-    // Sample data — this is just for testing since step 1 was skipped
-    if (!localStorage.getItem("studentReports")) {
-      const sampleReports = [
-        {
-          name: "John Doe",
-          email: "john@example.com",
-          subject: "Math",
-          score: 24,
-          total: 30,
-          grade: "Grade 3",
-          date: "July 23, 2025"
-        },
-        {
-          name: "John Doe",
-          email: "john@example.com",
-          subject: "English",
-          score: 26,
-          total: 30,
-          grade: "Grade 3",
-          date: "July 23, 2025"
-        },
-        {
-          name: "Lola James",
-          email: "lola@example.com",
-          subject: "Math",
-          score: 20,
-          total: 30,
-          grade: "Grade 3",
-          date: "July 21, 2025"
-        }
-      ];
-      localStorage.setItem("studentReports", JSON.stringify(sampleReports));
-    }
+    document.getElementById("parentLoginForm").addEventListener("submit", function (e) {
+      e.preventDefault();
+      const name = document.getElementById("parentStudentName").value.trim();
+      const email = document.getElementById("parentStudentEmail").value.trim();
 
-    function loadReports() {
-      const name = document.getElementById("name").value.trim();
-      const email = document.getElementById("email").value.trim();
       const reports = JSON.parse(localStorage.getItem("studentReports") || "[]");
+      const filtered = reports.filter(r => r.name === name && r.email === email);
 
-      const studentReports = reports.filter(r => r.name === name && r.email === email);
+      const tableBody = document.getElementById("reportTableBody");
+      tableBody.innerHTML = "";
 
-      const reportList = document.getElementById("reportList");
-      reportList.innerHTML = "";
+      if (filtered.length > 0) {
+        document.getElementById("reportContainer").style.display = "block";
 
-      if (studentReports.length === 0) {
-        reportList.innerHTML = "<p>No reports found for this student.</p>";
-        return;
+        filtered.forEach(r => {
+          const row = `<tr>
+            <td>${r.subject}</td>
+            <td>${r.score}</td>
+            <td>${r.total}</td>
+            <td>${r.date}</td>
+          </tr>`;
+          tableBody.innerHTML += row;
+        });
+      } else {
+        alert("No report found for this student.");
+        document.getElementById("reportContainer").style.display = "none";
       }
-
-      studentReports.forEach((r, index) => {
-        const div = document.createElement("div");
-        div.className = "report";
-        div.innerHTML = `
-          <strong>Subject:</strong> ${r.subject}<br>
-          <strong>Score:</strong> ${r.score} / ${r.total}<br>
-          <strong>Grade:</strong> ${r.grade}<br>
-          <strong>Date:</strong> ${r.date}<br><br>
-          <button onclick="downloadReport(${index})">Download PDF</button>
-        `;
-        reportList.appendChild(div);
-      });
-    }
-
-    function downloadReport(index) {
-      const reports = JSON.parse(localStorage.getItem("studentReports") || "[]");
-      const report = reports[index];
-
-      const reportWindow = window.open('', '', 'width=800,height=600');
-      reportWindow.document.write(`
-        <html><head><title>Report</title></head><body>
-        <h2>Student Test Report</h2>
-        <p><strong>Name:</strong> ${report.name}</p>
-        <p><strong>Email:</strong> ${report.email}</p>
-        <p><strong>Grade:</strong> ${report.grade}</p>
-        <p><strong>Subject:</strong> ${report.subject}</p>
-        <p><strong>Score:</strong> ${report.score} / ${report.total}</p>
-        <p><strong>Date:</strong> ${report.date}</p>
-        </body></html>
-      `);
-      reportWindow.document.close();
-      reportWindow.print();
-    }
+    });
   </script>
 </body>
 </html>
