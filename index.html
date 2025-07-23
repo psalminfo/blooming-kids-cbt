@@ -2,144 +2,97 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>BLOOMING KIDS HOUSE ASSESSMENT TEST</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Blooming Kids House - Assessment</title>
   <style>
-    * { box-sizing: border-box; }
     body {
-      margin: 0;
       font-family: Arial, sans-serif;
-      background: #f5f5f5;
+      margin: 0;
+      padding: 40px 20px;
+      background-color: #f8f8f8;
     }
-    header {
-      background-color: #2e7d32;
-      color: white;
-      padding: 20px;
-      text-align: center;
-    }
+
     .container {
-      display: flex;
-      justify-content: space-around;
-      margin: 30px auto;
-      max-width: 1200px;
+      max-width: 500px;
+      margin: auto;
+      background-color: #ffffff;
+      padding: 30px;
+      border-radius: 8px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
     }
-    .panel {
-      background-color: white;
-      border: 2px solid #cddc39;
-      border-radius: 10px;
-      width: 30%;
-      padding: 20px;
-      box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
-    }
-    .panel h2 {
+
+    h2 {
       text-align: center;
-      color: #2e7d32;
+      margin-bottom: 25px;
+      color: #2c3e50;
     }
-    .panel form {
-      display: flex;
-      flex-direction: column;
+
+    label {
+      display: block;
+      margin-top: 15px;
+      font-weight: bold;
     }
-    .panel input,
-    .panel select,
-    .panel button {
-      margin: 8px 0;
-      padding: 10px;
-      font-size: 14px;
+
+    input, select, button {
+      width: 100%;
+      padding: 12px;
+      margin-top: 8px;
+      box-sizing: border-box;
+      border: 1px solid #ccc;
+      border-radius: 4px;
     }
-    .panel button {
-      background-color: #2e7d32;
+
+    button {
+      background-color: #27ae60;
       color: white;
       border: none;
       cursor: pointer;
+      margin-top: 25px;
     }
-    .panel button:hover {
-      background-color: #1b5e20;
-    }
-    @media screen and (max-width: 768px) {
-      .container {
-        flex-direction: column;
-        align-items: center;
-      }
-      .panel {
-        width: 90%;
-        margin-bottom: 20px;
-      }
+
+    button:hover {
+      background-color: #219150;
     }
   </style>
 </head>
 <body>
-  <header>
-    <h1>BLOOMING KIDS HOUSE ASSESSMENT TEST</h1>
-  </header>
-
   <div class="container">
-    <!-- Student Panel -->
-    <div class="panel">
-      <h2>Student Panel</h2>
-      <form id="studentForm">
-        <input type="text" id="studentName" placeholder="Student Name" required />
-        <input type="text" id="parentName" placeholder="Parent Name" required />
-        <input type="text" id="tutorName" placeholder="Tutor's Name" required />
-        <input type="text" id="location" placeholder="Location" required />
-        <input type="email" id="parentEmail" placeholder="Parent's Email Address" required />
-        <input type="text" id="accessCode" placeholder="Access Code" required />
-        <select id="gradeSelect" required>
-          <option value="">Select Grade</option>
-          <option value="3">Grade 3</option>
-          <option value="4">Grade 4</option>
-          <option value="5">Grade 5</option>
-          <option value="6">Grade 6</option>
-          <option value="7">Grade 7</option>
-          <option value="8">Grade 8</option>
-          <option value="9">Grade 9</option>
-          <option value="10">Grade 10</option>
-          <option value="11">Grade 11</option>
-          <option value="12">Grade 12</option>
-        </select>
-        <button type="submit">Start Test</button>
-      </form>
-    </div>
+    <h2>Blooming Kids House Assessment</h2>
+    <label for="studentName">Student Name:</label>
+    <input type="text" id="studentName" required />
 
-    <!-- Admin Panel -->
-    <div class="panel">
-      <h2>Admin Panel</h2>
-      <form id="adminLogin">
-        <input type="text" id="adminCode" placeholder="Admin Access Code" required />
-        <button type="submit">Login</button>
-      </form>
-    </div>
+    <label for="grade">Select Grade:</label>
+    <select id="grade" required>
+      <option value="">--Select Grade--</option>
+      <option value="3">Grade 3</option>
+      <option value="4">Grade 4</option>
+    </select>
 
-    <!-- Parent Panel -->
-    <div class="panel">
-      <h2>Parent Panel</h2>
-      <form id="parentLogin">
-        <input type="text" placeholder="Student Name" required />
-        <input type="email" placeholder="Parent's Email Address" required />
-        <button type="submit">Login</button>
-      </form>
-    </div>
+    <label for="parentEmail">Parent Email:</label>
+    <input type="email" id="parentEmail" required />
+
+    <button onclick="startTest()">Start Test</button>
   </div>
 
-<script>
-  function startTest() {
-    const name = document.getElementById('name').value.trim();
-    const grade = document.getElementById('grade').value;
-    const email = document.getElementById('email').value.trim();
+  <script>
+    function startTest() {
+      const studentName = document.getElementById('studentName').value.trim();
+      const grade = document.getElementById('grade').value;
+      const parentEmail = document.getElementById('parentEmail').value.trim();
 
-    if (!name || !grade || !email) {
-      alert('Please fill all the fields.');
-      return;
+      if (!studentName || !grade || !parentEmail) {
+        alert("Please fill all fields.");
+        return;
+      }
+
+      // Save to sessionStorage
+      sessionStorage.setItem('studentName', studentName);
+      sessionStorage.setItem('selectedGrade', grade);
+      sessionStorage.setItem('parentEmail', parentEmail);
+
+      // Go to subject selection
+      window.location.href = "select-subject.html";
     }
-
-    // Save to sessionStorage (or localStorage if you prefer)
-    sessionStorage.setItem('studentName', name);
-    sessionStorage.setItem('selectedGrade', grade);
-    sessionStorage.setItem('parentEmail', email);
-
-    // Redirect to subject selection page
-    window.location.href = 'select-subject.html';
-  }
-</script>
-
+  </script>
 </body>
 </html>
