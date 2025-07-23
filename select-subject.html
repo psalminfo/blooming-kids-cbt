@@ -27,6 +27,7 @@
       border: 2px solid #2e7d32;
       border-radius: 10px;
       width: 300px;
+      display: none;
     }
     button {
       padding: 10px 20px;
@@ -46,89 +47,69 @@
 <body>
   <h2>Select a Subject to Begin Your Test</h2>
 
-  <div class="subject-buttons">
-    <!-- Repeat this block for each grade -->
-    
-    <!-- Grade 3 -->
-    <div class="grade-block">
+  <div class="subject-buttons" id="subject-container">
+
+    <!-- Grade blocks -->
+    <div class="grade-block" id="grade3">
       <h3>Grade 3</h3>
       <a href="grade3-maths.html"><button>Maths</button></a>
       <a href="grade3-english.html"><button>English</button></a>
       <button disabled>Biology (Not available)</button>
     </div>
 
-    <!-- Grade 4 -->
-    <div class="grade-block">
+    <div class="grade-block" id="grade4">
       <h3>Grade 4</h3>
       <a href="grade4-maths.html"><button>Maths</button></a>
       <a href="grade4-english.html"><button>English</button></a>
       <button disabled>Biology (Not available)</button>
     </div>
 
-    <!-- Grade 5 -->
-    <div class="grade-block">
+    <div class="grade-block" id="grade5">
       <h3>Grade 5</h3>
       <a href="grade5-maths.html"><button>Maths</button></a>
       <a href="grade5-english.html"><button>English</button></a>
       <button disabled>Biology (Not available)</button>
     </div>
 
-    <!-- Grade 6 -->
-    <div class="grade-block">
+    <div class="grade-block" id="grade6">
       <h3>Grade 6</h3>
       <a href="grade6-maths.html"><button>Maths</button></a>
       <a href="grade6-english.html"><button>English</button></a>
       <a href="grade6-biology.html"><button>Biology</button></a>
     </div>
 
-    <!-- Grade 7 -->
-    <div class="grade-block">
+    <div class="grade-block" id="grade7">
       <h3>Grade 7</h3>
       <a href="grade7-maths.html"><button>Maths</button></a>
       <a href="grade7-english.html"><button>English</button></a>
       <a href="grade7-biology.html"><button>Biology</button></a>
     </div>
 
-    <!-- Grade 8 -->
-    <div class="grade-block">
+    <div class="grade-block" id="grade8">
       <h3>Grade 8</h3>
       <a href="grade8-maths.html"><button>Maths</button></a>
       <a href="grade8-english.html"><button>English</button></a>
       <a href="grade8-biology.html"><button>Biology</button></a>
     </div>
 
-    <!-- Grade 9 -->
-    <div class="grade-block">
-      <h3>Grade 9</h3>
-      <a href="grade9-maths.html"><button>Maths</button></a>
-      <a href="grade9-english.html"><button>English</button></a>
-      <a href="grade9-biology.html"><button>Biology</button></a>
-    </div>
-
-    <!-- Grade 10 -->
-    <div class="grade-block">
-      <h3>Grade 10</h3>
-      <a href="grade10-maths.html"><button>Maths</button></a>
-      <a href="grade10-english.html"><button>English</button></a>
-      <a href="grade10-biology.html"><button>Biology</button></a>
-    </div>
-
-    <!-- Grade 11 -->
-    <div class="grade-block">
-      <h3>Grade 11</h3>
-      <a href="grade11-maths.html"><button>Maths</button></a>
-      <a href="grade11-english.html"><button>English</button></a>
-      <a href="grade11-biology.html"><button>Biology</button></a>
-    </div>
-
-    <!-- Grade 12 -->
-    <div class="grade-block">
-      <h3>Grade 12</h3>
-      <a href="grade12-maths.html"><button>Maths</button></a>
-      <a href="grade12-english.html"><button>English</button></a>
-      <a href="grade12-biology.html"><button>Biology</button></a>
-    </div>
-
+    <!-- Add more grades as needed -->
   </div>
+
+  <script>
+    // Get grade from URL parameter
+    const params = new URLSearchParams(window.location.search);
+    const selectedGrade = params.get("grade");
+
+    if (selectedGrade) {
+      const gradeDiv = document.getElementById(`grade${selectedGrade}`);
+      if (gradeDiv) {
+        gradeDiv.style.display = "block";
+      } else {
+        document.getElementById("subject-container").innerHTML = "<p>Invalid grade selected.</p>";
+      }
+    } else {
+      document.getElementById("subject-container").innerHTML = "<p>No grade selected.</p>";
+    }
+  </script>
 </body>
 </html>
