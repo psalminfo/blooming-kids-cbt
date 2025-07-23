@@ -8,35 +8,24 @@
     body {
       font-family: Arial, sans-serif;
       background-color: #f1f1f1;
-      padding: 20px;
       text-align: center;
+      padding: 40px;
     }
     h2 {
       color: #2e7d32;
     }
     .subject-buttons {
-      display: flex;
-      flex-wrap: wrap;
-      justify-content: center;
       margin-top: 30px;
     }
-    .grade-block {
-      margin: 20px;
-      padding: 20px;
-      background-color: white;
-      border: 2px solid #2e7d32;
-      border-radius: 10px;
-      width: 300px;
-      display: none;
-    }
     button {
-      padding: 10px 20px;
-      margin: 5px;
+      padding: 15px 25px;
+      margin: 10px;
       background-color: #ffcc00;
       border: none;
-      border-radius: 5px;
-      cursor: pointer;
+      border-radius: 8px;
+      font-size: 16px;
       font-weight: bold;
+      cursor: pointer;
     }
     button:disabled {
       background-color: #ccc;
@@ -45,71 +34,40 @@
   </style>
 </head>
 <body>
-  <h2>Select a Subject to Begin Your Test</h2>
 
-  <div class="subject-buttons" id="subject-container">
-
-    <!-- Grade blocks -->
-    <div class="grade-block" id="grade3">
-      <h3>Grade 3</h3>
-      <a href="grade3-maths.html"><button>Maths</button></a>
-      <a href="grade3-english.html"><button>English</button></a>
-      <button disabled>Biology (Not available)</button>
-    </div>
-
-    <div class="grade-block" id="grade4">
-      <h3>Grade 4</h3>
-      <a href="grade4-maths.html"><button>Maths</button></a>
-      <a href="grade4-english.html"><button>English</button></a>
-      <button disabled>Biology (Not available)</button>
-    </div>
-
-    <div class="grade-block" id="grade5">
-      <h3>Grade 5</h3>
-      <a href="grade5-maths.html"><button>Maths</button></a>
-      <a href="grade5-english.html"><button>English</button></a>
-      <button disabled>Biology (Not available)</button>
-    </div>
-
-    <div class="grade-block" id="grade6">
-      <h3>Grade 6</h3>
-      <a href="grade6-maths.html"><button>Maths</button></a>
-      <a href="grade6-english.html"><button>English</button></a>
-      <a href="grade6-biology.html"><button>Biology</button></a>
-    </div>
-
-    <div class="grade-block" id="grade7">
-      <h3>Grade 7</h3>
-      <a href="grade7-maths.html"><button>Maths</button></a>
-      <a href="grade7-english.html"><button>English</button></a>
-      <a href="grade7-biology.html"><button>Biology</button></a>
-    </div>
-
-    <div class="grade-block" id="grade8">
-      <h3>Grade 8</h3>
-      <a href="grade8-maths.html"><button>Maths</button></a>
-      <a href="grade8-english.html"><button>English</button></a>
-      <a href="grade8-biology.html"><button>Biology</button></a>
-    </div>
-
-    <!-- Add more grades as needed -->
-  </div>
+  <h2>Select a Subject</h2>
+  <div id="subject-buttons" class="subject-buttons"></div>
 
   <script>
-    // Get grade from URL parameter
-    const params = new URLSearchParams(window.location.search);
-    const selectedGrade = params.get("grade");
+    const grade = new URLSearchParams(window.location.search).get("grade");
 
-    if (selectedGrade) {
-      const gradeDiv = document.getElementById(`grade${selectedGrade}`);
-      if (gradeDiv) {
-        gradeDiv.style.display = "block";
-      } else {
-        document.getElementById("subject-container").innerHTML = "<p>Invalid grade selected.</p>";
-      }
+    const subjectsPerGrade = {
+      3: ["Maths", "English"],
+      4: ["Maths", "English"],
+      5: ["Maths", "English"],
+      6: ["Maths", "English", "Biology"],
+      7: ["Maths", "English", "Biology"],
+      8: ["Maths", "English", "Biology"],
+      9: ["Maths", "English", "Biology"],
+      10: ["Maths", "English", "Biology"],
+      11: ["Maths", "English", "Biology"],
+      12: ["Maths", "English", "Biology"],
+    };
+
+    const container = document.getElementById("subject-buttons");
+
+    if (!grade || !subjectsPerGrade[grade]) {
+      container.innerHTML = "<p>Invalid or missing grade. Please go back and select your grade.</p>";
     } else {
-      document.getElementById("subject-container").innerHTML = "<p>No grade selected.</p>";
+      subjectsPerGrade[grade].forEach(subject => {
+        const file = `grade${grade.toLowerCase()}-${subject.toLowerCase()}.html`;
+        const btn = document.createElement("a");
+        btn.href = file;
+        btn.innerHTML = `<button>${subject}</button>`;
+        container.appendChild(btn);
+      });
     }
   </script>
+
 </body>
 </html>
