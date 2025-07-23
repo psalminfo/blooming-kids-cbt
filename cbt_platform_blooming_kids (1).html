@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>BLOOMING KIDS HOUSE ASSESSMENT TEST</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+      background: #f5f5f5;
+    }
+    header {
+      background-color: #2e7d32;
+      color: white;
+      padding: 20px;
+      text-align: center;
+    }
+    .container {
+      display: flex;
+      justify-content: space-around;
+      margin: 30px auto;
+      max-width: 1200px;
+    }
+    .panel {
+      background-color: white;
+      border: 2px solid #cddc39;
+      border-radius: 10px;
+      width: 30%;
+      padding: 20px;
+      box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+    }
+    .panel h2 {
+      text-align: center;
+      color: #2e7d32;
+    }
+    .panel form {
+      display: flex;
+      flex-direction: column;
+    }
+    .panel input,
+    .panel select,
+    .panel button {
+      margin: 8px 0;
+      padding: 10px;
+      font-size: 14px;
+    }
+    .panel button {
+      background-color: #2e7d32;
+      color: white;
+      border: none;
+      cursor: pointer;
+    }
+    .panel button:hover {
+      background-color: #1b5e20;
+    }
+    @media screen and (max-width: 768px) {
+      .container {
+        flex-direction: column;
+        align-items: center;
+      }
+      .panel {
+        width: 90%;
+        margin-bottom: 20px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>BLOOMING KIDS HOUSE ASSESSMENT TEST</h1>
+  </header>
+
+  <div class="container">
+    <!-- Student Panel -->
+    <div class="panel">
+      <h2>Student Panel</h2>
+      <form id="studentForm">
+        <input type="text" placeholder="Student Name" required />
+        <input type="text" placeholder="Parent Name" required />
+        <input type="text" placeholder="Tutor's Name" required />
+        <input type="text" placeholder="Location" required />
+        <input type="email" placeholder="Parent's Email Address" required />
+        <input type="text" id="accessCode" placeholder="Access Code" required />
+        <select required>
+          <option value="">Select Grade</option>
+          <option>Grade 3</option>
+          <option>Grade 4</option>
+          <option>Grade 5</option>
+          <option>Grade 6</option>
+          <option>Grade 7</option>
+          <option>Grade 8</option>
+          <option>Grade 9</option>
+          <option>Grade 10</option>
+          <option>Grade 11</option>
+          <option>Grade 12</option>
+        </select>
+        <button type="submit">Start Test</button>
+      </form>
+    </div>
+
+    <!-- Admin Panel -->
+    <div class="panel">
+      <h2>Admin Panel</h2>
+      <form id="adminLogin">
+        <input type="text" id="adminCode" placeholder="Admin Access Code" required />
+        <button type="submit">Login</button>
+      </form>
+    </div>
+
+    <!-- Parent Panel -->
+    <div class="panel">
+      <h2>Parent Panel</h2>
+      <form id="parentLogin">
+        <input type="text" placeholder="Student Name" required />
+        <input type="email" placeholder="Parent's Email Address" required />
+        <button type="submit">Login</button>
+      </form>
+    </div>
+  </div>
+
+  <script>
+    const studentAccessCode = "BKH-STUDENT-2025";
+    const adminAccessCode = "BKH-ADMIN-2025";
+
+    document.getElementById('studentForm').addEventListener('submit', function(e) {
+      e.preventDefault();
+      const enteredCode = document.getElementById('accessCode').value.trim();
+
+      if (enteredCode !== studentAccessCode) {
+        alert('Invalid Student Access Code. Please check and try again.');
+        return;
+      }
+
+      alert('Access Code verified. Proceed to subject selection.');
+      // Redirect to subject/test interface here
+    });
+
+    document.getElementById('adminLogin').addEventListener('submit', function(e) {
+      e.preventDefault();
+      const enteredAdminCode = document.getElementById('adminCode').value.trim();
+
+      if (enteredAdminCode !== adminAccessCode) {
+        alert('Invalid Admin Access Code. Please check and try again.');
+        return;
+      }
+
+      alert('Admin Access Code verified. Welcome to Admin Panel.');
+      // Redirect to admin dashboard here
+    });
+
+    document.getElementById('parentLogin').addEventListener('submit', function(e) {
+      e.preventDefault();
+      alert('Parent login submitted.');
+    });
+  </script>
+</body>
+</html>
