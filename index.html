@@ -141,8 +141,12 @@
         return;
       }
 
-      const query = `?name=${encodeURIComponent(studentName)}&grade=${encodeURIComponent(grade)}&email=${encodeURIComponent(parentEmail)}`;
-      window.location.href = `select-subject.html${query}`;
+      // Store info in sessionStorage
+      sessionStorage.setItem('studentName', studentName);
+      sessionStorage.setItem('grade', grade);
+      sessionStorage.setItem('parentEmail', parentEmail);
+
+      window.location.href = "select-subject.html";
     });
 
     document.getElementById('adminLogin').addEventListener('submit', function(e) {
