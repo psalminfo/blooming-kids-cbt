@@ -39,7 +39,13 @@
   <div id="subject-buttons" class="subject-buttons"></div>
 
   <script>
-    const grade = new URLSearchParams(window.location.search).get("grade");
+    // Get the grade from the URL
+    let rawGrade = new URLSearchParams(window.location.search).get("grade");
+    if (!rawGrade) rawGrade = ""; // in case nothing was passed
+
+    // Extract the number from input like "Grade 6" or "6"
+    const match = rawGrade.match(/\d+/); 
+    const grade = match ? parseInt(match[0]) : null;
 
     const subjectsPerGrade = {
       3: ["Maths", "English"],
@@ -60,7 +66,7 @@
       container.innerHTML = "<p>Invalid or missing grade. Please go back and select your grade.</p>";
     } else {
       subjectsPerGrade[grade].forEach(subject => {
-        const file = `grade${grade.toLowerCase()}-${subject.toLowerCase()}.html`;
+        const file = `grade${grade}-${subject.toLowerCase()}.html`;
         const btn = document.createElement("a");
         btn.href = file;
         btn.innerHTML = `<button>${subject}</button>`;
