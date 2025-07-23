@@ -1,23 +1,140 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <title>Parent Panel – Blooming Kids House</title>
-  <script src="js/report-handler.js" defer></script>
+  <meta charset="UTF-8">
+  <title>Parent Panel - Blooming Kids House</title>
   <style>
-    body { font-family: Arial; background: #f9fff9; color: #333; padding: 20px; }
-    h1 { color: green; }
-    .report-box { border: 1px solid green; margin: 10px 0; padding: 10px; background: #eaffea; }
+    body {
+      font-family: Arial, sans-serif;
+      padding: 20px;
+      background-color: #f8fdf8;
+    }
+    h2 {
+      color: #2e7d32;
+    }
+    .form-section {
+      margin-bottom: 20px;
+    }
+    label, input {
+      display: block;
+      margin-bottom: 10px;
+    }
+    input[type="text"], input[type="email"] {
+      padding: 8px;
+      width: 300px;
+    }
+    button {
+      padding: 8px 16px;
+      background-color: #4CAF50;
+      color: white;
+      border: none;
+      cursor: pointer;
+    }
+    .report {
+      border: 1px solid #ccc;
+      padding: 15px;
+      margin-bottom: 15px;
+      background-color: #fff;
+    }
   </style>
 </head>
 <body>
-  <h1>Parent Panel</h1>
-  <div>
-    <label>Student Name: <input type="text" id="studentNameInput"></label><br><br>
-    <label>Email: <input type="email" id="studentEmailInput"></label><br><br>
-    <button onclick="loadParentReport()">View Report</button>
+  <h2>Parent Panel</h2>
+  <div class="form-section">
+    <label for="name">Student Name:</label>
+    <input type="text" id="name" placeholder="Enter student's full name" required>
+
+    <label for="email">Student Email:</label>
+    <input type="email" id="email" placeholder="Enter student's email" required>
+
+    <button onclick="loadReports()">View Reports</button>
   </div>
-  <hr>
-  <div id="parentReport"></div>
+
+  <div id="reportList"></div>
+
+  <script>
+    // Sample data — this is just for testing since step 1 was skipped
+    if (!localStorage.getItem("studentReports")) {
+      const sampleReports = [
+        {
+          name: "John Doe",
+          email: "john@example.com",
+          subject: "Math",
+          score: 24,
+          total: 30,
+          grade: "Grade 3",
+          date: "July 23, 2025"
+        },
+        {
+          name: "John Doe",
+          email: "john@example.com",
+          subject: "English",
+          score: 26,
+          total: 30,
+          grade: "Grade 3",
+          date: "July 23, 2025"
+        },
+        {
+          name: "Lola James",
+          email: "lola@example.com",
+          subject: "Math",
+          score: 20,
+          total: 30,
+          grade: "Grade 3",
+          date: "July 21, 2025"
+        }
+      ];
+      localStorage.setItem("studentReports", JSON.stringify(sampleReports));
+    }
+
+    function loadReports() {
+      const name = document.getElementById("name").value.trim();
+      const email = document.getElementById("email").value.trim();
+      const reports = JSON.parse(localStorage.getItem("studentReports") || "[]");
+
+      const studentReports = reports.filter(r => r.name === name && r.email === email);
+
+      const reportList = document.getElementById("reportList");
+      reportList.innerHTML = "";
+
+      if (studentReports.length === 0) {
+        reportList.innerHTML = "<p>No reports found for this student.</p>";
+        return;
+      }
+
+      studentReports.forEach((r, index) => {
+        const div = document.createElement("div");
+        div.className = "report";
+        div.innerHTML = `
+          <strong>Subject:</strong> ${r.subject}<br>
+          <strong>Score:</strong> ${r.score} / ${r.total}<br>
+          <strong>Grade:</strong> ${r.grade}<br>
+          <strong>Date:</strong> ${r.date}<br><br>
+          <button onclick="downloadReport(${index})">Download PDF</button>
+        `;
+        reportList.appendChild(div);
+      });
+    }
+
+    function downloadReport(index) {
+      const reports = JSON.parse(localStorage.getItem("studentReports") || "[]");
+      const report = reports[index];
+
+      const reportWindow = window.open('', '', 'width=800,height=600');
+      reportWindow.document.write(`
+        <html><head><title>Report</title></head><body>
+        <h2>Student Test Report</h2>
+        <p><strong>Name:</strong> ${report.name}</p>
+        <p><strong>Email:</strong> ${report.email}</p>
+        <p><strong>Grade:</strong> ${report.grade}</p>
+        <p><strong>Subject:</strong> ${report.subject}</p>
+        <p><strong>Score:</strong> ${report.score} / ${report.total}</p>
+        <p><strong>Date:</strong> ${report.date}</p>
+        </body></html>
+      `);
+      reportWindow.document.close();
+      reportWindow.print();
+    }
+  </script>
 </body>
 </html>
