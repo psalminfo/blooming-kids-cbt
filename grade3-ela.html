@@ -332,31 +332,26 @@
     <button onclick="submitTest()">Submit Test</button>
 
     <script>
-        let timeLeft = 30 * 60; // 30 minutes in seconds
-        let timerInterval = null; // Store the interval ID
-        const timerDisplay = document.getElementById('timer');
+  function submitTest() {
+    // Collect the necessary details (e.g., score or completion flag)
+    // You can replace this with your actual logic
+    const studentName = new URLSearchParams(window.location.search).get("name");
+    const grade = new URLSearchParams(window.location.search).get("grade");
+    const email = new URLSearchParams(window.location.search).get("email");
 
-        function updateTimer() {
-            const minutes = Math.floor(timeLeft / 60);
-            const seconds = timeLeft % 60;
-            timerDisplay.textContent = `Time Remaining: ${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
-            if (timeLeft > 0) {
-                timeLeft--;
-            } else {
-                clearInterval(timerInterval);
-                timerDisplay.textContent = 'Time is up!';
-                window.location.href = 'select_subject.html'; // Redirect when time expires
-            }
-        }
+    // Optional: Save score logic here
 
-        function submitTest() {
-            clearInterval(timerInterval); // Stop the timer
-            timerDisplay.textContent = 'Test Submitted!';
-            window.location.href = 'select_subject.html'; // Redirect to subject selection page
-        }
+    // Redirect to subject selection page
+    const redirectUrl = `select-subject.html?name=${encodeURIComponent(studentName)}&grade=${encodeURIComponent(grade)}&email=${encodeURIComponent(email)}`;
+    window.location.href = redirectUrl;
+  }
 
-        timerInterval = setInterval(updateTimer, 1000);
-        updateTimer(); // Initial call to display timer immediately
-    </script>
+  // Trigger test submission manually from a "Submit" button
+  document.getElementById("submitButton").addEventListener("click", function(e) {
+    e.preventDefault();
+    submitTest();
+  });
+</script>
+
 </body>
 </html>
