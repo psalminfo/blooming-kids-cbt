@@ -1,43 +1,4 @@
-<script type="text/javascript">
-        var gk_isXlsx = false;
-        var gk_xlsxFileLookup = {};
-        var gk_fileData = {};
-        function filledCell(cell) {
-          return cell !== '' && cell != null;
-        }
-        function loadFileData(filename) {
-        if (gk_isXlsx && gk_xlsxFileLookup[filename]) {
-            try {
-                var workbook = XLSX.read(gk_fileData[filename], { type: 'base64' });
-                var firstSheetName = workbook.SheetNames[0];
-                var worksheet = workbook.Sheets[firstSheetName];
-
-                // Convert sheet to JSON to filter blank rows
-                var jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, blankrows: false, defval: '' });
-                // Filter out blank rows (rows where all cells are empty, null, or undefined)
-                var filteredData = jsonData.filter(row => row.some(filledCell));
-
-                // Heuristic to find the header row by ignoring rows with fewer filled cells than the next row
-                var headerRowIndex = filteredData.findIndex((row, index) =>
-                  row.filter(filledCell).length >= filteredData[index + 1]?.filter(filledCell).length
-                );
-                // Fallback
-                if (headerRowIndex === -1 || headerRowIndex > 25) {
-                  headerRowIndex = 0;
-                }
-
-                // Convert filtered JSON back to CSV
-                var csv = XLSX.utils.aoa_to_sheet(filteredData.slice(headerRowIndex)); // Create a new sheet from filtered array of arrays
-                csv = XLSX.utils.sheet_to_csv(csv, { header: 1 });
-                return csv;
-            } catch (e) {
-                console.error(e);
-                return "";
-            }
-        }
-        return gk_fileData[filename] || "";
-        }
-        </script><!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -66,7 +27,7 @@
             border-radius: 5px;
             font-weight: bold;
         }
-        .passage, .question {
+        .problem-set, .question {
             background-color: #fff;
             padding: 15px;
             margin: 15px 0;
@@ -76,12 +37,6 @@
         .question label {
             display: block;
             margin: 10px 0;
-        }
-        img {
-            max-width: 100%;
-            height: auto;
-            display: block;
-            margin: 10px auto;
         }
         button {
             display: block;
@@ -111,246 +66,235 @@
     <h1>Blooming Kids House: Grade 3 – English Language Arts Test</h1>
     <div id="timer">Time Remaining: 30:00</div>
 
-    <!-- Passage 1: Fiction -->
-    <div class="passage">
+    <!-- Problem Set 1: Reading Comprehension -->
+    <div class="problem-set">
         <h2>The Lost Kitten</h2>
-        <p>One sunny morning, Mia found a tiny kitten hiding under her porch. It had soft gray fur and big blue eyes. The kitten looked scared and hungry. Mia gently picked it up and gave it some milk. She named it Whiskers. Every day, Mia played with Whiskers in the garden. They chased butterflies and rolled in the grass. But one day, Whiskers didn’t come back after playing outside. Mia searched everywhere, calling, “Whiskers! Where are you?” She felt sad and worried. Finally, she heard a soft meow from the neighbor’s tree. Whiskers was stuck! Mia’s dad got a ladder and rescued the kitten. Mia hugged Whiskers tightly, happy to have her friend back.</p>
+        <p>Sam found a kitten in his yard. It was small and fluffy with gray fur. He gave it milk and a soft blanket. The kitten purred and stayed close to Sam. The next day, Sam made posters to find the kitten’s owner. He wrote, “Found: Gray kitten near Oak Street. Call Sam.” Use the passage to answer the questions below.</p>
     </div>
     <div class="question">
         <p><strong>1. What is the main idea of the passage?</strong></p>
-        <label><input type="radio" name="q1" value="a"> Mia finds a kitten and loses it forever.</label>
-        <label><input type="radio" name="q1" value="b"> Mia finds a kitten, loses it, and then finds it again.</label>
-        <label><input type="radio" name="q1" value="c"> Mia’s dad climbs a tree to find a butterfly.</label>
-        <label><input type="radio" name="q1" value="d"> Mia plays with butterflies in the garden.</label>
+        <label><input type="radio" name="q1" value="a"> Sam lost his kitten.</label>
+        <label><input type="radio" name="q1" value="b"> Sam found a kitten and tried to find its owner.</label>
+        <label><input type="radio" name="q1" value="c"> Sam made posters for fun.</label>
+        <label><input type="radio" name="q1" value="d"> The kitten did not like Sam.</label>
     </div>
     <div class="question">
-        <p><strong>2. What does the word “gently” mean in the sentence, “Mia gently picked it up”?</strong></p>
-        <label><input type="radio" name="q2" value="a"> Quickly</label>
-        <label><input type="radio" name="q2" value="b"> Carefully</label>
-        <label><input type="radio" name="q2" value="c"> Loudly</label>
-        <label><input type="radio" name="q2" value="d"> Roughly</label>
+        <p><strong>2. What does the word “purred” mean in the passage?</strong></p>
+        <label><input type="radio" name="q2" value="a"> Ran away</label>
+        <label><input type="radio" name="q2" value="b"> Made a happy sound</label>
+        <label><input type="radio" name="q2" value="c"> Ate food</label>
+        <label><input type="radio" name="q2" value="d"> Slept quietly</label>
     </div>
     <div class="question">
-        <p><strong>3. Why does the author include the detail about Mia calling for Whiskers?</strong></p>
-        <label><input type="radio" name="q3" value="a"> To show that Mia was worried</label>
-        <label><input type="radio" name="q3" value="b"> To describe the garden</label>
-        <label><input type="radio" name="q3" value="c"> To explain how kittens meow</label>
-        <label><input type="radio" name="q3" value="d"> To show that Mia was angry</label>
+        <p><strong>3. Why did Sam make posters?</strong></p>
+        <label><input type="radio" name="q3" value="a"> To sell the kitten</label>
+        <label><input type="radio" name="q3" value="b"> To give away blankets</label>
+        <label><input type="radio" name="q3" value="c"> To find the kitten’s owner</label>
+        <label><input type="radio" name="q3" value="d"> To decorate his yard</label>
     </div>
     <div class="question">
-        <p><strong>4. What can you infer about Mia’s feelings when she hugs Whiskers at the end?</strong></p>
-        <label><input type="radio" name="q4" value="a"> She is angry.</label>
-        <label><input type="radio" name="q4" value="b"> She is relieved and happy.</label>
-        <label><input type="radio" name="q4" value="c"> She is tired.</label>
-        <label><input type="radio" name="q4" value="d"> She is bored.</label>
+        <p><strong>4. What did Sam give the kitten?</strong></p>
+        <label><input type="radio" name="q4" value="a"> A toy and water</label>
+        <label><input type="radio" name="q4" value="b"> Milk and a blanket</label>
+        <label><input type="radio" name="q4" value="c"> A bed and food</label>
+        <label><input type="radio" name="q4" value="d"> A collar and a leash</label>
+    </div>
+    <div class="question">
+        <p><strong>5. Which word best describes Sam?</strong></p>
+        <label><input type="radio" name="q5" value="a"> Careless</label>
+        <label><input type="radio" name="q5" value="b"> Kind</label>
+        <label><input type="radio" name="q5" value="c"> Angry</label>
+        <label><input type="radio" name="q5" value="d"> Tired</label>
+    </div>
+    <div class="question">
+        <p><strong>6. What happened after Sam gave the kitten milk and a blanket?</strong></p>
+        <label><input type="radio" name="q6" value="a"> The kitten ran away.</label>
+        <label><input type="radio" name="q6" value="b"> The kitten purred and stayed close.</label>
+        <label><input type="radio" name="q6" value="c"> Sam made posters.</label>
+        <label><input type="radio" name="q6" value="d"> The owner called Sam.</label>
     </div>
 
-    <!-- Passage 2: Nonfiction -->
-    <div class="passage">
-        <h2>Honey Bees and Their Hives</h2>
-        <p>Honey bees are amazing insects that live in hives. A hive is like a busy city for bees. It is made of wax and has many tiny rooms called cells. Bees store honey and raise baby bees in these cells. The queen bee lays eggs, and worker bees do jobs like collecting nectar and guarding the hive. Bees communicate by dancing to tell each other where to find flowers. Honey bees help plants grow by spreading pollen. Without bees, we wouldn’t have many fruits and vegetables!</p>
-        <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/9/99/Bees_Collecting_Pollen_2004-08-14.jpg/320px-Bees_Collecting_Pollen_2004-08-14.jpg" alt="Honey bees on a honeycomb">
+    <!-- Problem Set 2: Writing and Editing -->
+    <div class="problem-set">
+        <h2>Lila’s Story</h2>
+        <p>Lila wrote a story about her dog, Max. Here is a part of her story: “Max run fast in the park. He chase a ball and bring it back to me. I loves Max.” Use the passage to answer the questions below.</p>
     </div>
     <div class="question">
-        <p><strong>5. What is the main purpose of this passage?</strong></p>
-        <label><input type="radio" name="q5" value="a"> To entertain with a story about bees</label>
-        <label><input type="radio" name="q5" value="b"> To inform about honey bees and their hives</label>
-        <label><input type="radio" name="q5" value="c"> To persuade people to eat honey</label>
-        <label><input type="radio" name="q5" value="d"> To describe a beehive’s color</label>
+        <p><strong>7. Which sentence has a grammar mistake?</strong></p>
+        <label><input type="radio" name="q7" value="a"> Max run fast in the park.</label>
+        <label><input type="radio" name="q7" value="b"> He chase a ball.</label>
+        <label><input type="radio" name="q7" value="c"> I loves Max.</label>
+        <label><input type="radio" name="q7" value="d"> All of the above.</label>
     </div>
     <div class="question">
-        <p><strong>6. What does the word “nectar” mean in the passage?</strong></p>
-        <label><input type="radio" name="q6" value="a"> A type of dance</label>
-        <label><input type="radio" name="q6" value="b"> A sweet liquid from flowers</label>
-        <label><input type="radio" name="q6" value="c"> A kind of bee</label>
-        <label><input type="radio" name="q6" value="d"> A part of the hive</label>
+        <p><strong>8. How should “Max run fast in the park” be corrected?</strong></p>
+        <label><input type="radio" name="q8" value="a"> Max runs fast in the park.</label>
+        <label><input type="radio" name="q8" value="b"> Max running fast in the park.</label>
+        <label><input type="radio" name="q8" value="c"> Max runned fast in the park.</label>
+        <label><input type="radio" name="q8" value="d"> Max run fastly in the park.</label>
     </div>
     <div class="question">
-        <p><strong>7. Why are honey bees important to plants?</strong></p>
-        <label><input type="radio" name="q7" value="a"> They build hives for plants.</label>
-        <label><input type="radio" name="q7" value="b"> They spread pollen to help plants grow.</label>
-        <label><input type="radio" name="q7" value="c"> They eat harmful insects.</label>
-        <label><input type="radio" name="q7" value="d"> They make wax for plants.</label>
+        <p><strong>9. How should “I loves Max” be corrected?</strong></p>
+        <label><input type="radio" name="q9" value="a"> I love Max.</label>
+        <label><input type="radio" name="q9" value="b"> I loving Max.</label>
+        <label><input type="radio" name="q9" value="c"> I loved Max.</label>
+        <label><input type="radio" name="q9" value="d"> I loves Maxes.</label>
     </div>
     <div class="question">
-        <p><strong>8. What text feature does the passage include to help readers understand bees?</strong></p>
-        <label><input type="radio" name="q8" value="a"> A map</label>
-        <label><input type="radio" name="q8" value="b"> A diagram</label>
-        <label><input type="radio" name="q8" value="c"> An image</label>
-        <label><input type="radio" name="q8" value="d"> A table</label>
+        <p><strong>10. Which word in the story is a verb?</strong></p>
+        <label><input type="radio" name="q10" value="a"> Dog</label>
+        <label><input type="radio" name="q10" value="b"> Chase</label>
+        <label><input type="radio" name="q10" value="c"> Ball</label>
+        <label><input type="radio" name="q10" value="d"> Park</label>
     </div>
     <div class="question">
-        <p><strong>9. Which sentence best summarizes the passage?</strong></p>
-        <label><input type="radio" name="q9" value="a"> Honey bees live in hives and help plants by spreading pollen.</label>
-        <label><input type="radio" name="q9" value="b"> Honey bees dance to make honey.</label>
-        <label><input type="radio" name="q9" value="c"> Honey bees only live in wax cells.</label>
-        <label><input type="radio" name="q9" value="d"> Honey bees eat fruits and vegetables.</label>
+        <p><strong>11. What is the best way to combine these sentences: “He chase a ball. He bring it back to me.”?</strong></p>
+        <label><input type="radio" name="q11" value="a"> He chase a ball and bring it back to me.</label>
+        <label><input type="radio" name="q11" value="b"> He chases a ball and brings it back to me.</label>
+        <label><input type="radio" name="q11" value="c"> He chase a ball, he bring it back to me.</label>
+        <label><input type="radio" name="q11" value="d"> He chases a ball but bring it back to me.</label>
     </div>
     <div class="question">
-        <p><strong>10. What can you infer about the queen bee’s role in the hive?</strong></p>
-        <label><input type="radio" name="q10" value="a"> She collects nectar.</label>
-        <label><input type="radio" name="q10" value="b"> She lays eggs.</label>
-        <label><input type="radio" name="q10" value="c"> She guards the hive.</label>
-        <label><input type="radio" name="q10" value="d"> She dances to communicate.</label>
-    </div>
-
-    <!-- Passage 3: Poetry -->
-    <div class="passage">
-        <h2>The Dancing Wind</h2>
-        <p>The wind twirls through the leafy trees,<br>
-        It hums a tune with such great ease.<br>
-        The branches sway, the flowers nod,<br>
-        Like dancers on a grassy sod.<br>
-        It spins the leaves in circles bright,<br>
-        And lifts a kite to soaring height.</p>
-    </div>
-    <div class="question">
-        <p><strong>11. What is the main idea of the poem?</strong></p>
-        <label><input type="radio" name="q11" value="a"> The wind moves things like leaves and kites.</label>
-        <label><input type="radio" name="q11" value="b"> The wind grows flowers.</label>
-        <label><input type="radio" name="q11" value="c"> The wind makes trees grow tall.</label>
-        <label><input type="radio" name="q11" value="d"> The wind stops kites from flying.</label>
-    </div>
-    <div class="question">
-        <p><strong>12. What does the word “twirls” mean in the first line?</strong></p>
-        <label><input type="radio" name="q12" value="a"> Sings loudly</label>
-        <label><input type="radio" name="q12" value="b"> Spins quickly</label>
-        <label><input type="radio" name="q12" value="c"> Falls slowly</label>
-        <label><input type="radio" name="q12" value="d"> Stays still</label>
-    </div>
-    <div class="question">
-        <p><strong>13. Why does the author compare the wind to a dancer?</strong></p>
-        <label><input type="radio" name="q13" value="a"> To show how the wind moves gracefully</label>
-        <label><input type="radio" name="q13" value="b"> To explain how the wind grows plants</label>
-        <label><input type="radio" name="q13" value="c"> To describe the wind’s color</label>
-        <label><input type="radio" name="q13" value="d"> To show the wind is loud</label>
-    </div>
-    <div class="question">
-        <p><strong>14. What can you infer about the wind from the poem?</strong></p>
-        <label><input type="radio" name="q14" value="a"> It is always calm.</label>
-        <label><input type="radio" name="q14" value="b"> It moves things in a lively way.</label>
-        <label><input type="radio" name="q14" value="c"> It stops kites from flying.</label>
-        <label><input type="radio" name="q14" value="d"> It only blows at night.</label>
-    </div>
-    <div class="question">
-        <p><strong>15. Which line in the poem shows imagery?</strong></p>
-        <label><input type="radio" name="q15" value="a"> The wind twirls through the leafy trees</label>
-        <label><input type="radio" name="q15" value="b"> The wind is strong</label>
-        <label><input type="radio" name="q15" value="c"> The wind blows every day</label>
-        <label><input type="radio" name="q15" value="d"> The wind is cold</label>
-    </div>
-    <div class="question">
-        <p><strong>16. How is the poem organized?</strong></p>
-        <label><input type="radio" name="q16" value="a"> By comparing two types of wind</label>
-        <label><input type="radio" name="q16" value="b"> By describing the wind’s actions</label>
-        <label><input type="radio" name="q16" value="c"> By listing types of trees</label>
-        <label><input type="radio" name="q16" value="d"> By explaining a problem</label>
+        <p><strong>12. Which word should replace “fast” to make the story more descriptive?</strong></p>
+        <label><input type="radio" name="q12" value="a"> Big</label>
+        <label><input type="radio" name="q12" value="b"> Quickly</label>
+        <label><input type="radio" name="q12" value="c"> Happy</label>
+        <label><input type="radio" name="q12" value="d"> Loud</label>
     </div>
 
     <!-- Standalone Questions -->
     <div class="question">
-        <p><strong>17. Read this sentence: “The sun sparkled on the calm lake.” What does “sparkled” mean?</strong></p>
-        <label><input type="radio" name="q17" value="a"> Shined brightly</label>
-        <label><input type="radio" name="q17" value="b"> Felt warm</label>
-        <label><input type="radio" name="q17" value="c"> Moved quickly</label>
-        <label><input type="radio" name="q17" value="d"> Made noise</label>
+        <p><strong>13. Which sentence is written correctly?</strong></p>
+        <label><input type="radio" name="q13" value="a"> The dog run in the yard.</label>
+        <label><input type="radio" name="q13" value="b"> The dog runs in the yard.</label>
+        <label><input type="radio" name="q13" value="c"> The dog running in the yard.</label>
+        <label><input type="radio" name="q13" value="d"> The dog runned in the yard.</label>
     </div>
     <div class="question">
-        <p><strong>18. The word “unhappy” means not happy. What does the prefix “un-” mean?</strong></p>
-        <label><input type="radio" name="q18" value="a"> Again</label>
-        <label><input type="radio" name="q18" value="b"> Not</label>
-        <label><input type="radio" name="q18" value="c"> Before</label>
-        <label><input type="radio" name="q18" value="d"> More</label>
+        <p><strong>14. What is the meaning of the word “brave” in the sentence: “The brave firefighter saved the cat”?</strong></p>
+        <label><input type="radio" name="q14" value="a"> Scared</label>
+        <label><input type="radio" name="q14" value="b"> Courageous</label>
+        <label><input type="radio" name="q14" value="c"> Tired</label>
+        <label><input type="radio" name="q14" value="d"> Quiet</label>
     </div>
     <div class="question">
-        <p><strong>19. Why might an author write a book about animals?</strong></p>
-        <label><input type="radio" name="q19" value="a"> To teach about animals</label>
-        <label><input type="radio" name="q19" value="b"> To sell toys</label>
-        <label><input type="radio" name="q19" value="c"> To draw pictures</label>
-        <label><input type="radio" name="q19" value="d"> To make a movie</label>
+        <p><strong>15. Which word is a synonym for “big”?</strong></p>
+        <label><input type="radio" name="q15" value="a"> Small</label>
+        <label><input type="radio" name="q15" value="b"> Large</label>
+        <label><input type="radio" name="q15" value="c"> Fast</label>
+        <label><input type="radio" name="q15" value="d"> Soft</label>
     </div>
     <div class="question">
-        <p><strong>20. In a story, a boy learns to ride a bike after falling. What can you infer?</strong></p>
-        <label><input type="radio" name="q20" value="a"> He gives up.</label>
-        <label><input type="radio" name="q20" value="b"> He keeps trying.</label>
-        <label><input type="radio" name="q20" value="c"> He buys a new bike.</label>
-        <label><input type="radio" name="q20" value="d"> He stops riding.</label>
+        <p><strong>16. Which sentence uses a comma correctly?</strong></p>
+        <label><input type="radio" name="q16" value="a"> I have a cat dog, and fish.</label>
+        <label><input type="radio" name="q16" value="b"> I have a cat, dog, and fish.</label>
+        <label><input type="radio" name="q16" value="c"> I have a cat dog and, fish.</label>
+        <label><input type="radio" name="q16" value="d"> I have a, cat dog and fish.</label>
     </div>
     <div class="question">
-        <p><strong>21. What is the main idea of a story about a girl planting a garden?</strong></p>
-        <label><input type="radio" name="q21" value="a"> The girl learns to grow plants.</label>
-        <label><input type="radio" name="q21" value="b"> The girl buys new tools.</label>
-        <label><input type="radio" name="q21" value="c"> The girl paints her garden.</label>
-        <label><input type="radio" name="q21" value="d"> The girl loses her seeds.</label>
+        <p><strong>17. What is the correct plural form of “child”?</strong></p>
+        <label><input type="radio" name="q17" value="a"> Childs</label>
+        <label><input type="radio" name="q17" value="b"> Childes</label>
+        <label><input type="radio" name="q17" value="c"> Children</label>
+        <label><input type="radio" name="q17" value="d"> Childrens</label>
     </div>
     <div class="question">
-        <p><strong>22. Read this recipe: “1. Mix flour and sugar. 2. Add eggs. 3. Bake for 20 minutes.” How is it organized?</strong></p>
-        <label><input type="radio" name="q22" value="a"> By comparing ingredients</label>
-        <label><input type="radio" name="q22" value="b"> By listing steps in order</label>
-        <label><input type="radio" name="q22" value="c"> By describing flavors</label>
-        <label><input type="radio" name="q22" value="d"> By telling a story</label>
+        <p><strong>18. Which sentence is in the past tense?</strong></p>
+        <label><input type="radio" name="q18" value="a"> I walk to school.</label>
+        <label><input type="radio" name="q18" value="b"> I will walk to school.</label>
+        <label><input type="radio" name="q18" value="c"> I walked to school.</label>
+        <label><input type="radio" name="q18" value="d"> I am walking to school.</label>
     </div>
     <div class="question">
-        <p><strong>23. In a story, a character shares her toy. What can you infer?</strong></p>
-        <label><input type="radio" name="q23" value="a"> She is selfish.</label>
-        <label><input type="radio" name="q23" value="b"> She is kind.</label>
-        <label><input type="radio" name="q23" value="c"> She is tired.</label>
-        <label><input type="radio" name="q23" value="d"> She is angry.</label>
+        <p><strong>19. What is the best topic sentence for a paragraph about a fun day at the park?</strong></p>
+        <label><input type="radio" name="q19" value="a"> I like to eat snacks.</label>
+        <label><input type="radio" name="q19" value="b"> My day at the park was full of fun activities.</label>
+        <label><input type="radio" name="q19" value="c"> The park is far away.</label>
+        <label><input type="radio" name="q19" value="d"> I have a dog.</label>
     </div>
     <div class="question">
-        <p><strong>24. The word “rewrite” means to write again. What does the prefix “re-” mean?</strong></p>
-        <label><input type="radio" name="q24" value="a"> Not</label>
-        <label><input type="radio" name="q24" value="b"> Again</label>
-        <label><input type="radio" name="q24" value="c"> Before</label>
-        <label><input type="radio" name="q24" value="d"> More</label>
+        <p><strong>20. Which word is an adjective in the sentence: “The shiny red apple fell from the tree”?</strong></p>
+        <label><input type="radio" name="q20" value="a"> Apple</label>
+        <label><input type="radio" name="q20" value="b"> Fell</label>
+        <label><input type="radio" name="q20" value="c"> Shiny</label>
+        <label><input type="radio" name="q20" value="d"> Tree</label>
     </div>
     <div class="question">
-        <p><strong>25. Why might an author use a heading in a nonfiction book?</strong></p>
-        <label><input type="radio" name="q25" value="a"> To tell a story</label>
-        <label><input type="radio" name="q25" value="b"> To organize information</label>
-        <label><input type="radio" name="q25" value="c"> To draw a picture</label>
-        <label><input type="radio" name="q25" value="d"> To list page numbers</label>
+        <p><strong>21. Which sentence uses the correct form of “their”?</strong></p>
+        <label><input type="radio" name="q21" value="a"> The kids lost there book.</label>
+        <label><input type="radio" name="q21" value="b"> The kids lost their book.</label>
+        <label><input type="radio" name="q21" value="c"> The kids lost they’re book.</label>
+        <label><input type="radio" name="q21" value="d"> The kids lost there’s book.</label>
     </div>
     <div class="question">
-        <p><strong>26. Read this sentence: “The rabbit scampered away.” What does “scampered” mean?</strong></p>
-        <label><input type="radio" name="q26" value="a"> Moved slowly</label>
-        <label><input type="radio" name="q26" value="b"> Ran quickly</label>
-        <label><input type="radio" name="q26" value="c"> Sat still</label>
-        <label><input type="radio" name="q26" value="d"> Flew high</label>
+        <p><strong>22. What is the prefix in the word “unhappy”?</strong></p>
+        <label><input type="radio" name="q22" value="a"> Un</label>
+        <label><input type="radio" name="q22" value="b"> Happy</label>
+        <label><input type="radio" name="q22" value="c"> Hap</label>
+        <label><input type="radio" name="q22" value="d"> Py</label>
     </div>
     <div class="question">
-        <p><strong>27. In a story, a boy finds a lost dog and returns it to its owner. Which sentence best summarizes the story?</strong></p>
-        <label><input type="radio" name="q27" value="a"> The boy helps a lost dog find its home.</label>
-        <label><input type="radio" name="q27" value="b"> The boy buys a new dog.</label>
-        <label><input type="radio" name="q27" value="c"> The boy plays with a dog.</label>
-        <label><input type="radio" name="q27" value="d"> The boy loses his dog.</label>
+        <p><strong>23. Which sentence is a question?</strong></p>
+        <label><input type="radio" name="q23" value="a"> The sun is shining.</label>
+        <label><input type="radio" name="q23" value="b"> Is the sun shining?</label>
+        <label><input type="radio" name="q23" value="c"> The sun shines brightly.</label>
+        <label><input type="radio" name="q23" value="d"> I like the sun.</label>
     </div>
     <div class="question">
-        <p><strong>28. Why might an author write a poem about the ocean?</strong></p>
-        <label><input type="radio" name="q28" value="a"> To describe its beauty</label>
-        <label><input type="radio" name="q28" value="b"> To explain how to swim</label>
-        <label><input type="radio" name="q28" value="c"> To list types of boats</label>
-        <label><input type="radio" name="q28" value="d"> To teach about fish</label>
+        <p><strong>24. Which word should be capitalized in the sentence: “i went to paris with my family”?</strong></p>
+        <label><input type="radio" name="q24" value="a"> Went</label>
+        <label><input type="radio" name="q24" value="b"> I</label>
+        <label><input type="radio" name="q24" value="c"> Family</label>
+        <label><input type="radio" name="q24" value="d"> With</label>
     </div>
     <div class="question">
-        <p><strong>29. What is the purpose of a table of contents in a book?</strong></p>
-        <label><input type="radio" name="q29" value="a"> To show pictures</label>
-        <label><input type="radio" name="q29" value="b"> To list chapters and pages</label>
-        <label><input type="radio" name="q29" value="c"> To tell the story</label>
-        <label><input type="radio" name="q29" value="d"> To explain words</label>
+        <p><strong>25. What is the main purpose of a story about a talking animal?</strong></p>
+        <label><input type="radio" name="q25" value="a"> To inform</label>
+        <label><input type="radio" name="q25" value="b"> To persuade</label>
+        <label><input type="radio" name="q25" value="c"> To entertain</label>
+        <label><input type="radio" name="q25" value="d"> To explain</label>
     </div>
     <div class="question">
-        <p><strong>30. In a story, a girl paints a picture and feels proud. What can you infer about her feelings?</strong></p>
-        <label><input type="radio" name="q30" value="a"> She is sad.</label>
-        <label><input type="radio" name="q30" value="b"> She is happy.</label>
-        <label><input type="radio" name="q30" value="c"> She is tired.</label>
-        <label><input type="radio" name="q30" value="d"> She is angry.</label>
+        <p><strong>26. Which sentence uses quotation marks correctly?</strong></p>
+        <label><input type="radio" name="q26" value="a"> I said, I want to play.</label>
+        <label><input type="radio" name="q26" value="b"> I said, “I want to play.”</label>
+        <label><input type="radio" name="q26" value="c"> I said “I want to play”.</label>
+        <label><input type="radio" name="q26" value="d"> I said, I want to play”.</label>
+    </div>
+    <div class="question">
+        <p><strong>27. Which word is a noun in the sentence: “The bird sings a sweet song”?</strong></p>
+        <label><input type="radio" name="q27" value="a"> Sings</label>
+        <label><input type="radio" name="q27" value="b"> Sweet</label>
+        <label><input type="radio" name="q27" value="c"> Bird</label>
+        <label><input type="radio" name="q27" value="d"> A</label>
+    </div>
+    <div class="question">
+        <p><strong>28. What is the suffix in the word “kindness”?</strong></p>
+        <label><input type="radio" name="q28" value="a"> Kind</label>
+        <label><input type="radio" name="q28" value="b"> Ness</label>
+        <label><input type="radio" name="q28" value="c"> Kin</label>
+        <label><input type="radio" name="q28" value="d"> Dness</label>
+    </div>
+    <div class="question">
+        <p><strong>29. Which sentence is an example of a complete sentence?</strong></p>
+        <label><input type="radio" name="q29" value="a"> Running in the park.</label>
+        <label><input type="radio" name="q29" value="b"> The girl runs in the park.</label>
+        <label><input type="radio" name="q29" value="c"> In the park with a dog.</label>
+        <label><input type="radio" name="q29" value="d"> Quickly runs away.</label>
+    </div>
+    <div class="question">
+        <p><strong>30. What is the best closing sentence for a letter to a friend?</strong></p>
+        <label><input type="radio" name="q30" value="a"> Buy a new toy.</label>
+        <label><input type="radio" name="q30" value="b"> I hope to see you soon.</label>
+        <label><input type="radio" name="q30" value="c"> The weather is cold.</label>
+        <label><input type="radio" name="q30" value="d"> I have a dog.</label>
     </div>
 
-    <button>Submit Test</button>
+    <button onclick="submitTest()">Submit Test</button>
 
     <script>
         let timeLeft = 30 * 60; // 30 minutes in seconds
+        let timerInterval = null; // Store the interval ID
         const timerDisplay = document.getElementById('timer');
 
         function updateTimer() {
@@ -362,10 +306,17 @@
             } else {
                 clearInterval(timerInterval);
                 timerDisplay.textContent = 'Time is up!';
+                window.location.href = 'select_subject.html'; // Redirect when time expires
             }
         }
 
-        const timerInterval = setInterval(updateTimer, 1000);
+        function submitTest() {
+            clearInterval(timerInterval); // Stop the timer
+            timerDisplay.textContent = 'Test Submitted!';
+            window.location.href = 'select_subject.html'; // Redirect to subject selection page
+        }
+
+        timerInterval = setInterval(updateTimer, 1000);
         updateTimer(); // Initial call to display timer immediately
     </script>
 </body>
