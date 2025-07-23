@@ -1,43 +1,4 @@
-<script type="text/javascript">
-        var gk_isXlsx = false;
-        var gk_xlsxFileLookup = {};
-        var gk_fileData = {};
-        function filledCell(cell) {
-          return cell !== '' && cell != null;
-        }
-        function loadFileData(filename) {
-        if (gk_isXlsx && gk_xlsxFileLookup[filename]) {
-            try {
-                var workbook = XLSX.read(gk_fileData[filename], { type: 'base64' });
-                var firstSheetName = workbook.SheetNames[0];
-                var worksheet = workbook.Sheets[firstSheetName];
-
-                // Convert sheet to JSON to filter blank rows
-                var jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, blankrows: false, defval: '' });
-                // Filter out blank rows (rows where all cells are empty, null, or undefined)
-                var filteredData = jsonData.filter(row => row.some(filledCell));
-
-                // Heuristic to find the header row by ignoring rows with fewer filled cells than the next row
-                var headerRowIndex = filteredData.findIndex((row, index) =>
-                  row.filter(filledCell).length >= filteredData[index + 1]?.filter(filledCell).length
-                );
-                // Fallback
-                if (headerRowIndex === -1 || headerRowIndex > 25) {
-                  headerRowIndex = 0;
-                }
-
-                // Convert filtered JSON back to CSV
-                var csv = XLSX.utils.aoa_to_sheet(filteredData.slice(headerRowIndex)); // Create a new sheet from filtered array of arrays
-                csv = XLSX.utils.sheet_to_csv(csv, { header: 1 });
-                return csv;
-            } catch (e) {
-                console.error(e);
-                return "";
-            }
-        }
-        return gk_fileData[filename] || "";
-        }
-        </script><!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -77,12 +38,6 @@
             display: block;
             margin: 10px 0;
         }
-        img {
-            max-width: 100%;
-            height: auto;
-            display: block;
-            margin: 10px auto;
-        }
         button {
             display: block;
             margin: 20px auto;
@@ -114,8 +69,7 @@
     <!-- Problem Set 1: Number and Operations -->
     <div class="problem-set">
         <h2>At the Bakery</h2>
-        <p>Mrs. Lee’s bakery makes cookies. On Monday, she bakes 245 cookies. On Tuesday, she bakes 318 more cookies. She puts 12 cookies in each box to sell. Use the number line below to help answer some questions.</p>
-        <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/0/0f/Number_line_0_to_1000.svg/320px-Number_line_0_to_1000.svg.png" alt="Number line from 0 to 1000">
+        <p>Mrs. Lee’s bakery makes cookies. On Monday, she bakes 245 cookies. On Tuesday, she bakes 318 more cookies. She puts 12 cookies in each box to sell. Use addition and division to answer the questions below.</p>
     </div>
     <div class="question">
         <p><strong>1. How many cookies does Mrs. Lee bake in total on Monday and Tuesday?</strong></p>
@@ -163,8 +117,7 @@
     <!-- Problem Set 2: Data Analysis -->
     <div class="problem-set">
         <h2>Favorite Fruits</h2>
-        <p>The students in a class voted for their favorite fruit. The bar graph below shows the results.</p>
-        <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/7/7d/Bar_chart_example.svg/320px-Bar_chart_example.svg.png" alt="Bar graph of favorite fruits">
+        <p>The students in a class voted for their favorite fruit. The results are: Apples (6 votes), Bananas (8 votes), Oranges (5 votes), Grapes (7 votes). Use this information to answer the questions below.</p>
     </div>
     <div class="question">
         <p><strong>7. How many students voted for apples?</strong></p>
@@ -211,7 +164,7 @@
 
     <!-- Standalone Questions -->
     <div class="question">
-        <p><strong>13. Which fraction represents the shaded part of the circle divided into 4 equal parts, with 1 part shaded?</strong></p>
+        <p><strong>13. Which fraction represents the shaded part of a circle divided into 4 equal parts, with 1 part shaded?</strong></p>
         <label><input type="radio" name="q13" value="a"> 1/2</label>
         <label><input type="radio" name="q13" value="b"> 1/3</label>
         <label><input type="radio" name="q13" value="c"> 1/4</label>
@@ -337,10 +290,11 @@
         <label><input type="radio" name="q30" value="d"> Spending</label>
     </div>
 
-    <button>Submit Test</button>
+    <button onclick="submitTest()">Submit Test</button>
 
     <script>
         let timeLeft = 30 * 60; // 30 minutes in seconds
+        let timerInterval = null; // Store the interval ID
         const timerDisplay = document.getElementById('timer');
 
         function updateTimer() {
@@ -352,10 +306,17 @@
             } else {
                 clearInterval(timerInterval);
                 timerDisplay.textContent = 'Time is up!';
+                alert('Time is up! Your test has been submitted.');
             }
         }
 
-        const timerInterval = setInterval(updateTimer, 1000);
+        function submitTest() {
+            clearInterval(timerInterval); // Stop the timer
+            timerDisplay.textContent = 'Test Submitted!';
+            alert('Your test has been submitted successfully!');
+        }
+
+        timerInterval = setInterval(updateTimer, 1000);
         updateTimer(); // Initial call to display timer immediately
     </script>
 </body>
