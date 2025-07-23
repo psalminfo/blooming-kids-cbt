@@ -55,14 +55,6 @@
     .panel button:hover {
       background-color: #1b5e20;
     }
-    .subjects {
-      margin-top: 15px;
-    }
-    .subjects button {
-      margin: 5px;
-      background: #cddc39;
-      color: #333;
-    }
     @media screen and (max-width: 768px) {
       .container {
         flex-direction: column;
@@ -86,10 +78,10 @@
       <h2>Student Panel</h2>
       <form id="studentForm">
         <input type="text" id="studentName" placeholder="Student Name" required />
-        <input type="text" placeholder="Parent Name" required />
-        <input type="text" placeholder="Tutor's Name" required />
-        <input type="text" placeholder="Location" required />
-        <input type="email" placeholder="Parent's Email Address" required />
+        <input type="text" id="parentName" placeholder="Parent Name" required />
+        <input type="text" id="tutorName" placeholder="Tutor's Name" required />
+        <input type="text" id="location" placeholder="Location" required />
+        <input type="email" id="parentEmail" placeholder="Parent's Email Address" required />
         <input type="text" id="accessCode" placeholder="Access Code" required />
         <select id="gradeSelect" required>
           <option value="">Select Grade</option>
@@ -106,7 +98,6 @@
         </select>
         <button type="submit">Start Test</button>
       </form>
-      <div class="subjects" id="subjectButtons"></div>
     </div>
 
     <!-- Admin Panel -->
@@ -132,62 +123,42 @@
   <script>
     const studentAccessCode = "BKH-STUDENT-2025";
     const adminAccessCode = "BKH-ADMIN-2025";
-    let subjectData = {};
-
-    // Load subjects.json
-    fetch("subjects.json")
-      .then(res => res.json())
-      .then(data => subjectData = data)
-      .catch(() => alert("Could not load subjects list. Please contact admin."));
 
     document.getElementById('studentForm').addEventListener('submit', function(e) {
       e.preventDefault();
-      const code = document.getElementById('accessCode').value.trim();
+      const accessCode = document.getElementById('accessCode').value.trim();
+      const studentName = document.getElementById('studentName').value.trim();
       const grade = document.getElementById('gradeSelect').value;
 
-      if (code !== studentAccessCode) {
-        alert("Invalid Student Access Code.");
+      if (accessCode !== studentAccessCode) {
+        alert('Invalid Student Access Code. Please check and try again.');
         return;
       }
 
-      if (!subjectData[grade]) {
-        alert("No subjects available for selected grade yet.");
-        return;
-      }
+      // Store selected grade and student name
+      localStorage.setItem('selectedGrade', grade);
+      localStorage.setItem('studentName', studentName);
 
-      const container = document.getElementById('subjectButtons');
-      container.innerHTML = '<h3>Select Subject</h3>';
-
-      const subjects = subjectData[grade];
-      ["Maths", "English", "Biology"].forEach(subject => {
-        const btn = document.createElement("button");
-        btn.innerText = subject;
-        btn.onclick = () => {
-          if (subjects.includes(subject.toLowerCase())) {
-            window.location.href = `${grade.toLowerCase().replace(" ", "")}-${subject.toLowerCase()}.html`;
-          } else {
-            alert("Questions Unavailable for this subject.");
-          }
-        };
-        container.appendChild(btn);
-      });
+      // Redirect to subject selection page
+      window.location.href = 'select-subject.html';
     });
 
     document.getElementById('adminLogin').addEventListener('submit', function(e) {
       e.preventDefault();
-      const code = document.getElementById('adminCode').value.trim();
-      if (code !== adminAccessCode) {
-        alert("Invalid Admin Access Code.");
+      const enteredAdminCode = document.getElementById('adminCode').value.trim();
+
+      if (enteredAdminCode !== adminAccessCode) {
+        alert('Invalid Admin Access Code. Please check and try again.');
         return;
       }
-      alert("Admin Access Code verified.");
-      // Redirect to admin dashboard if needed
+
+      alert('Admin Access Code verified. Welcome to Admin Panel.');
+      // Redirect to admin dashboard here
     });
 
     document.getElementById('parentLogin').addEventListener('submit', function(e) {
       e.preventDefault();
-      alert("Parent login submitted.");
-      // Add parent logic here if needed
+      alert('Parent login submitted.');
     });
   </script>
 </body>
