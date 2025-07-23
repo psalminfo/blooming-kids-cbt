@@ -3,196 +3,56 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>BLOOMING KIDS HOUSE ASSESSMENT TEST</title>
+  <title>Blooming Kids House - Home</title>
   <style>
-    * { box-sizing: border-box; }
     body {
-      margin: 0;
       font-family: Arial, sans-serif;
-      background: #f5f5f5;
-    }
-    header {
-      background-color: #2e7d32;
-      color: white;
-      padding: 20px;
-      text-align: center;
-    }
-    .container {
-      display: flex;
-      justify-content: space-around;
-      margin: 30px auto;
-      max-width: 1200px;
-      flex-wrap: wrap;
-    }
-    .panel {
-      background-color: white;
-      border: 2px solid #cddc39;
-      border-radius: 10px;
-      width: 30%;
-      min-width: 280px;
-      padding: 20px;
-      margin-bottom: 20px;
-      box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
-    }
-    .panel h2 {
-      text-align: center;
-      color: #2e7d32;
-    }
-    .panel form {
-      display: flex;
-      flex-direction: column;
-    }
-    .panel input,
-    .panel select,
-    .panel button {
-      margin: 8px 0;
-      padding: 10px;
-      font-size: 14px;
-    }
-    .panel button {
-      background-color: #2e7d32;
-      color: white;
-      border: none;
-      cursor: pointer;
-    }
-    .panel button:hover {
-      background-color: #1b5e20;
-    }
-    .subjects {
-      margin-top: 15px;
-      text-align: center;
-    }
-    .subjects button {
-      margin: 5px;
-      padding: 10px 15px;
-      background: #cddc39;
-      border: none;
-      border-radius: 5px;
+      background-color: #fff;
       color: #333;
-      font-weight: bold;
-      cursor: pointer;
+      text-align: center;
+      padding: 40px;
     }
-    .subjects button:hover {
-      background: #afb42b;
+
+    input, button {
+      padding: 10px;
+      margin: 10px;
+      font-size: 16px;
+    }
+
+    button {
+      background-color: green;
+      color: white;
+      border: none;
     }
   </style>
+  <script>
+    function startTest(event) {
+      event.preventDefault();
+
+      const name = document.getElementById("studentName").value;
+      const grade = document.getElementById("studentGrade").value;
+      const email = document.getElementById("studentEmail").value;
+
+      if (!name || !grade || !email) {
+        alert("Please fill in all fields.");
+        return;
+      }
+
+      sessionStorage.setItem("studentName", name);
+      sessionStorage.setItem("studentGrade", grade);
+      sessionStorage.setItem("studentEmail", email);
+
+      window.location.href = "select-subject.html";
+    }
+  </script>
 </head>
 <body>
-
-<header>
-  <h1>BLOOMING KIDS HOUSE ASSESSMENT TEST</h1>
-</header>
-
-<div class="container">
-  <!-- Student Panel -->
-  <div class="panel">
-    <h2>Student Panel</h2>
-    <form id="studentForm">
-      <input type="text" id="studentName" placeholder="Student Name" required />
-      <input type="text" placeholder="Parent Name" required />
-      <input type="text" placeholder="Tutor's Name" required />
-      <input type="text" placeholder="Location" required />
-      <input type="email" placeholder="Parent's Email Address" required />
-      <input type="text" id="accessCode" placeholder="Access Code" required />
-      <select id="gradeSelect" required>
-        <option value="">Select Grade</option>
-        <option>Grade 3</option>
-        <option>Grade 4</option>
-        <option>Grade 5</option>
-        <option>Grade 6</option>
-        <option>Grade 7</option>
-        <option>Grade 8</option>
-        <option>Grade 9</option>
-        <option>Grade 10</option>
-        <option>Grade 11</option>
-        <option>Grade 12</option>
-      </select>
-      <button type="submit">Start Test</button>
-    </form>
-    <div class="subjects" id="subjectButtons"></div>
-  </div>
-
-  <!-- Admin Panel -->
-  <div class="panel">
-    <h2>Admin Panel</h2>
-    <form id="adminLogin">
-      <input type="text" id="adminCode" placeholder="Admin Access Code" required />
-      <button type="submit">Login</button>
-    </form>
-  </div>
-
-  <!-- Parent Panel -->
-  <div class="panel">
-    <h2>Parent Panel</h2>
-    <form id="parentLogin">
-      <input type="text" placeholder="Student Name" required />
-      <input type="email" placeholder="Parent's Email Address" required />
-      <button type="submit">Login</button>
-    </form>
-  </div>
-</div>
-
-<script>
-  const studentAccessCode = "BKH-STUDENT-2025";
-  const adminAccessCode = "BKH-ADMIN-2025";
-  let subjectData = {};
-
-  // Load subjects from external JSON file
-  fetch("subjects.json")
-    .then(res => res.json())
-    .then(data => subjectData = data)
-    .catch(() => alert("Could not load subjects. Contact support."));
-
-  document.getElementById('studentForm').addEventListener('submit', function(e) {
-    e.preventDefault();
-    const code = document.getElementById('accessCode').value.trim();
-    const grade = document.getElementById('gradeSelect').value;
-    const container = document.getElementById('subjectButtons');
-    container.innerHTML = "";
-
-    if (code !== studentAccessCode) {
-      alert("Invalid Student Access Code.");
-      return;
-    }
-
-    if (!subjectData[grade]) {
-      alert("Subjects not available for selected grade.");
-      return;
-    }
-
-    container.innerHTML = "<h3>Select Subject</h3>";
-    ["Maths", "English", "Biology"].forEach(subject => {
-      const btn = document.createElement("button");
-      btn.innerText = subject;
-      btn.onclick = () => {
-        if (subjectData[grade].includes(subject.toLowerCase())) {
-          const fileName = `${grade.toLowerCase().replace(" ", "")}-${subject.toLowerCase()}.html`;
-          window.location.href = fileName;
-        } else {
-          alert(`${subject} is not available for this grade yet.`);
-        }
-      };
-      container.appendChild(btn);
-    });
-  });
-
-  document.getElementById('adminLogin').addEventListener('submit', function(e) {
-    e.preventDefault();
-    const code = document.getElementById('adminCode').value.trim();
-    if (code === adminAccessCode) {
-      alert("Admin access granted.");
-      // window.location.href = "admin-dashboard.html"; // Uncomment when ready
-    } else {
-      alert("Invalid Admin Access Code.");
-    }
-  });
-
-  document.getElementById('parentLogin').addEventListener('submit', function(e) {
-    e.preventDefault();
-    alert("Parent login received.");
-    // window.location.href = "parent-portal.html"; // Uncomment when ready
-  });
-</script>
-
+  <h1>Welcome to Blooming Kids House Assessment</h1>
+  <form onsubmit="startTest(event)">
+    <input type="text" id="studentName" placeholder="Student Name" required><br>
+    <input type="text" id="studentGrade" placeholder="Grade" required><br>
+    <input type="email" id="studentEmail" placeholder="Parent Email" required><br>
+    <button type="submit">Start Test</button>
+  </form>
 </body>
 </html>
