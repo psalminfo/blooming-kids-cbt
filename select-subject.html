@@ -7,112 +7,94 @@
   <style>
     body {
       font-family: Arial, sans-serif;
-      background-color: #f7f7f7;
+      background: #f2f2f2;
       margin: 0;
-      padding: 0;
+      padding: 20px;
       text-align: center;
     }
-
-    header {
-      background-color: #2e7d32;
-      color: white;
-      padding: 20px 0;
-    }
-
-    h1 {
-      margin: 0;
-      font-size: 28px;
-    }
-
-    .container {
-      padding: 30px 20px;
-    }
-
     h2 {
-      font-size: 22px;
-      margin-bottom: 20px;
-      color: #333;
+      color: #2e7d32;
     }
-
+    .subject-container {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      margin-top: 20px;
+    }
     .subject-box {
-      background-color: #ffeb3b;
-      color: #000;
-      padding: 15px;
-      margin: 10px auto;
-      width: 250px;
+      background-color: #fff;
+      border: 2px solid #2e7d32;
       border-radius: 8px;
+      padding: 20px;
+      margin: 10px;
       cursor: pointer;
-      transition: 0.3s;
-      box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+      width: 150px;
+      transition: background-color 0.3s;
     }
-
     .subject-box:hover {
-      background-color: #fdd835;
+      background-color: #dcedc8;
     }
-
-    footer {
-      margin-top: 40px;
-      font-size: 14px;
-      color: #888;
+    .logout-btn {
+      margin-top: 30px;
+      padding: 10px 20px;
+      background-color: #c62828;
+      color: white;
+      border: none;
+      border-radius: 5px;
+      font-size: 16px;
+      cursor: pointer;
+    }
+    .logout-btn:hover {
+      background-color: #b71c1c;
     }
   </style>
 </head>
 <body>
+  <h2>Select a Subject</h2>
+  <div id="subjectContainer" class="subject-container"></div>
 
-  <header>
-    <h1>Blooming Kids House Assessment</h1>
-  </header>
-
-  <div class="container" id="subjectContainer">
-    <h2>Select a Subject</h2>
-    <!-- Subject buttons will be injected here -->
-  </div>
-
-  <footer>
-    &copy; 2025 Blooming Kids House. All rights reserved.
-  </footer>
+  <button class="logout-btn" onclick="logout()">Logout</button>
 
   <script>
-    const grade = localStorage.getItem('selectedGrade');
-    const studentName = localStorage.getItem('studentName');
-
-    if (!grade) {
-      alert('Invalid or missing grade. Please go back and select your grade.');
-      window.location.href = 'index.html';
-    }
-
-    const subjectContainer = document.getElementById("subjectContainer");
-
     const subjectMap = {
-      "Grade 3": ["Math", "English"],
-      "Grade 4": ["Math", "English"],
-      "Grade 5": ["Math", "English", "Science"],
-      "Grade 6": ["Math", "English", "Science", "Biology"],
-      "Grade 7": ["Math", "English", "Science", "Biology"],
-      "Grade 8": ["Math", "English", "Science", "Biology"],
-      "Grade 9": ["Math", "English", "Science", "Biology"],
-      "Grade 10": ["Math", "English", "Biology", "Chemistry"],
-      "Grade 11": ["Math", "English", "Biology", "Chemistry", "Physics"],
-      "Grade 12": ["Math", "English", "Biology", "Chemistry", "Physics"]
+      "grade3": ["Math", "English"],
+      "grade4": ["Math", "English"],
+      "grade5": ["Math", "English", "Science"],
+      "grade6": ["Math", "English", "Science", "Biology"],
+      "grade7": ["Math", "English", "Science", "Biology"],
+      "grade8": ["Math", "English", "Science", "Biology"],
+      "grade9": ["Math", "English", "Science", "Biology"],
+      "grade10": ["Math", "English", "Science", "Biology"],
+      "grade11": ["Math", "English", "Science", "Biology"],
+      "grade12": ["Math", "English", "Science", "Biology"]
     };
 
-    const subjects = subjectMap[grade] || [];
+    function logout() {
+      localStorage.clear(); // Clear saved student info
+      window.location.href = "index.html";
+    }
 
-    subjects.forEach(subject => {
-      const button = document.createElement("div");
-      button.className = "subject-box";
-      button.textContent = subject;
+    const urlParams = new URLSearchParams(window.location.search);
+    const grade = urlParams.get("grade");
 
-      const cleanGrade = grade.toLowerCase().replace(/\s/g, "");
-      const cleanSubject = subject.toLowerCase();
-      const filename = `${cleanGrade}-${cleanSubject}.html`;
+    if (!grade || !subjectMap[grade]) {
+      document.getElementById("subjectContainer").innerHTML = "<p style='color:red;'>Invalid or missing grade. Please go back and select your grade.</p>";
+    } else {
+      const subjects = subjectMap[grade];
+      const container = document.getElementById("subjectContainer");
 
-      button.onclick = () => {
-        window.location.href = filename;
-      };
-
-      subjectContainer.appendChild(button);
-    });
+      subjects.forEach(subject => {
+        const button = document.createElement("div");
+        button.className = "subject-box";
+        button.textContent = subject;
+        button.onclick = () => {
+          // Subject file naming pattern: grade3-math.html, grade4-english.html etc.
+          const fileName = `${grade}-${subject.toLowerCase()}.html`;
+          window.location.href = fileName;
+        };
+        container.appendChild(button);
+      });
+    }
   </script>
 </body>
 </html>
