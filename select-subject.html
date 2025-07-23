@@ -3,94 +3,94 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Select Subject - Blooming Kids House Assessment</title>
+  <title>Select Subject - Blooming Kids House</title>
   <style>
     body {
       font-family: Arial, sans-serif;
-      background-color: #f5f5f5;
       margin: 0;
-      padding: 20px;
+      padding: 40px 20px;
+      background-color: #f1f1f1;
+    }
+
+    h2 {
       text-align: center;
+      color: #2c3e50;
     }
-    h1 {
-      color: #2e7d32;
+
+    .container {
+      max-width: 600px;
+      margin: auto;
     }
-    .subjects {
-      display: flex;
-      flex-wrap: wrap;
-      justify-content: center;
-      gap: 20px;
+
+    .subject-box {
+      background-color: #ffffff;
+      padding: 20px;
+      margin: 15px 0;
+      border-left: 10px solid #27ae60;
+      border-radius: 5px;
+      cursor: pointer;
+      transition: 0.3s ease;
+    }
+
+    .subject-box:hover {
+      background-color: #ecf0f1;
+    }
+
+    .logout-btn {
+      background-color: #c0392b;
+      color: #ffffff;
+      padding: 15px;
+      text-align: center;
+      border-radius: 5px;
+      cursor: pointer;
       margin-top: 30px;
     }
-    .subject {
-      background-color: white;
-      border: 2px solid #cddc39;
-      border-radius: 10px;
-      padding: 20px;
-      width: 200px;
-      cursor: pointer;
-      transition: 0.3s;
-    }
-    .subject:hover {
-      background-color: #e6f4ea;
-    }
-    .logout-btn {
-      margin-top: 40px;
-      padding: 10px 20px;
-      background-color: #2e7d32;
-      color: white;
-      border: none;
-      cursor: pointer;
-      font-size: 16px;
-    }
+
     .logout-btn:hover {
-      background-color: #1b5e20;
+      background-color: #e74c3c;
     }
   </style>
 </head>
 <body>
-  <h1>Select a Subject to Begin</h1>
-  <div id="studentInfo"></div>
+  <div class="container">
+    <h2>Choose a Subject</h2>
 
-  <div class="subjects" id="subjectsContainer"></div>
+    <div id="subjectContainer"></div>
+
+    <div class="logout-btn" onclick="logout()">Log Out</div>
+  </div>
 
   <script>
-    const urlParams = new URLSearchParams(window.location.search);
-    const studentName = urlParams.get('name');
-    const grade = urlParams.get('grade');
-    const parentEmail = urlParams.get('email');
+    const grade = sessionStorage.getItem('selectedGrade');
+    const studentName = sessionStorage.getItem('studentName');
+    const email = sessionStorage.getItem('parentEmail');
 
-    if (!studentName || !grade || !parentEmail) {
-      alert("Missing student info. Returning to home page.");
-      window.location.href = "index.html";
+    if (!grade || !studentName || !email) {
+      alert('Missing student info. Returning to home page.');
+      window.location.href = 'index.html';
     }
 
-    // Store student data in session
-    sessionStorage.setItem("studentName", studentName);
-    sessionStorage.setItem("grade", grade);
-    sessionStorage.setItem("parentEmail", parentEmail);
-
-    const studentInfo = document.getElementById("studentInfo");
-    studentInfo.innerHTML = `<p><strong>Student:</strong> ${studentName} | <strong>Grade:</strong> ${grade}</p>`;
-
-    const subjects = [
-      { name: "Mathematics", file: "math" },
-      { name: "English Language Arts", file: "ela" },
-      { name: "Science", file: "science" }
-    ];
-
-    const subjectsContainer = document.getElementById("subjectsContainer");
+    const subjects = ['math', 'ela']; // Add more subjects if needed
+    const container = document.getElementById('subjectContainer');
 
     subjects.forEach(subject => {
-      const btn = document.createElement("div");
-      btn.className = "subject";
-      btn.textContent = subject.name;
-      btn.onclick = () => {
-        const file = `grade${grade}-${subject.file}.html?name=${encodeURIComponent(studentName)}&grade=${grade}&email=${encodeURIComponent(parentEmail)}`;
-        window.location.href = file;
+      const subjectBox = document.createElement('div');
+      subjectBox.className = 'subject-box';
+      subjectBox.innerText = subject.toUpperCase();
+
+      subjectBox.onclick = () => {
+        // Redirect to test page, e.g. grade3-math.html
+        const page = `grade${grade}-${subject}.html`;
+        window.location.href = page;
       };
-      subjectsContainer.appendChild(btn);
+
+      container.appendChild(subjectBox);
     });
+
+    function logout() {
+      sessionStorage.clear();
+      window.location.href = 'index.html';
+    }
   </script>
 </body>
 </html>
