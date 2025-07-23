@@ -121,52 +121,51 @@
   </div>
 
   <script>
-    const studentAccessCode = "BKH-STUDENT-2025";
-    const adminAccessCode = "BKH-ADMIN-2025";
+  const studentAccessCode = "BKH-STUDENT-2025";
+  const adminAccessCode = "BKH-ADMIN-2025";
 
-    document.getElementById('studentForm').addEventListener('submit', function(e) {
-      e.preventDefault();
-      const accessCode = document.getElementById('accessCode').value.trim();
+  document.getElementById('studentForm').addEventListener('submit', function(e) {
+    e.preventDefault();
 
-      if (accessCode !== studentAccessCode) {
-        alert('Invalid Student Access Code. Please check and try again.');
-        return;
-      }
+    const studentName = this.elements[0].value.trim();
+    const parentName = this.elements[1].value.trim();
+    const tutorName = this.elements[2].value.trim();
+    const location = this.elements[3].value.trim();
+    const parentEmail = this.elements[4].value.trim();
+    const accessCode = this.elements[5].value.trim();
+    const grade = this.elements[6].value;
 
-      // Save details to sessionStorage
-      sessionStorage.setItem('studentName', document.getElementById('studentName').value.trim());
-      sessionStorage.setItem('parentName', document.getElementById('parentName').value.trim());
-      sessionStorage.setItem('tutorName', document.getElementById('tutorName').value.trim());
-      sessionStorage.setItem('location', document.getElementById('location').value.trim());
-      sessionStorage.setItem('parentEmail', document.getElementById('parentEmail').value.trim());
-      sessionStorage.setItem('grade', document.getElementById('grade').value.trim());
+    if (accessCode !== studentAccessCode) {
+      alert('Invalid Student Access Code. Please check and try again.');
+      return;
+    }
 
-      // Redirect to subject selection page
-      window.location.href = "select-subject.html";
-    });
+    // Store data in sessionStorage
+    sessionStorage.setItem("studentName", studentName);
+    sessionStorage.setItem("studentEmail", parentEmail);
+    sessionStorage.setItem("studentGrade", grade);
 
-    document.getElementById('adminLogin').addEventListener('submit', function(e) {
-      e.preventDefault();
-      const enteredAdminCode = document.getElementById('adminCode').value.trim();
+    // Redirect to subject selection
+    window.location.href = "select-subject.html";
+  });
 
-      if (enteredAdminCode !== adminAccessCode) {
-        alert('Invalid Admin Access Code. Please check and try again.');
-        return;
-      }
+  document.getElementById('adminLogin').addEventListener('submit', function(e) {
+    e.preventDefault();
+    const enteredAdminCode = document.getElementById('adminCode').value.trim();
 
-      window.location.href = "admin-panel.html";
-    });
+    if (enteredAdminCode !== adminAccessCode) {
+      alert('Invalid Admin Access Code. Please check and try again.');
+      return;
+    }
 
-    document.getElementById('parentLogin').addEventListener('submit', function(e) {
-      e.preventDefault();
-      const studentName = document.getElementById('parentStudentName').value.trim();
-      const parentEmail = document.getElementById('parentEmailLogin').value.trim();
+    alert('Admin Access Code verified. Welcome to Admin Panel.');
+    // You can redirect to admin dashboard here
+  });
 
-      sessionStorage.setItem('parentLoginName', studentName);
-      sessionStorage.setItem('parentLoginEmail', parentEmail);
-
-      window.location.href = "parent-panel.html";
-    });
-  </script>
+  document.getElementById('parentLogin').addEventListener('submit', function(e) {
+    e.preventDefault();
+    alert('Parent login submitted.');
+  });
+</script>
 </body>
 </html>
