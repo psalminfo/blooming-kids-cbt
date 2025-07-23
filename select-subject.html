@@ -7,7 +7,7 @@
   <style>
     body {
       font-family: Arial, sans-serif;
-      background-color: #f9fff9;
+      background-color: #f0fff0;
       padding: 20px;
       color: #333;
     }
@@ -21,6 +21,14 @@
       max-width: 600px;
       margin: 0 auto;
       text-align: center;
+    }
+
+    .student-info {
+      background-color: #eaffea;
+      padding: 15px;
+      margin-bottom: 20px;
+      border: 1px solid green;
+      border-radius: 5px;
     }
 
     .button {
@@ -47,12 +55,12 @@
 <body>
   <div class="container">
     <h1>Select Subject</h1>
-    <div id="studentInfo"></div>
+    <div id="studentInfo" class="student-info"></div>
 
     <button class="button" onclick="startSubject('grade3-ela.html')">English</button>
     <button class="button" onclick="startSubject('grade3-math.html')">Math</button>
-    <!-- Add more subject buttons here if needed -->
 
+    <br><br>
     <button class="button logout-button" onclick="logout()">Logout</button>
   </div>
 
@@ -72,7 +80,7 @@
     }
 
     function startSubject(subjectPage) {
-      window.open(subjectPage, '_blank'); // Opens test in new tab
+      window.open(subjectPage, '_blank'); // Open subject test in a new tab
     }
 
     function logout() {
