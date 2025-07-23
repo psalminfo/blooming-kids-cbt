@@ -2,163 +2,127 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>BLOOMING KIDS HOUSE ASSESSMENT TEST</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Blooming Kids House Assessment</title>
   <style>
-    * { box-sizing: border-box; }
     body {
-      margin: 0;
       font-family: Arial, sans-serif;
-      background: #f5f5f5;
+      padding: 40px;
+      background-color: #f5f5f5;
+      color: #333;
     }
-    header {
-      background-color: #2e7d32;
-      color: white;
-      padding: 20px;
+
+    h1 {
       text-align: center;
+      color: green;
     }
-    .container {
-      display: flex;
-      justify-content: space-around;
-      margin: 30px auto;
-      max-width: 1200px;
+
+    form {
+      max-width: 500px;
+      margin: auto;
+      background: white;
+      padding: 30px;
+      border-radius: 8px;
+      box-shadow: 0 0 10px rgba(0,0,0,0.1);
     }
-    .panel {
-      background-color: white;
-      border: 2px solid #cddc39;
-      border-radius: 10px;
-      width: 30%;
-      padding: 20px;
-      box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+
+    label {
+      display: block;
+      margin-top: 15px;
     }
-    .panel h2 {
-      text-align: center;
-      color: #2e7d32;
-    }
-    .panel form {
-      display: flex;
-      flex-direction: column;
-    }
-    .panel input,
-    .panel select,
-    .panel button {
-      margin: 8px 0;
+
+    input, select, button {
+      width: 100%;
       padding: 10px;
-      font-size: 14px;
+      margin-top: 5px;
+      border-radius: 4px;
+      border: 1px solid #ccc;
+      box-sizing: border-box;
     }
-    .panel button {
-      background-color: #2e7d32;
+
+    button {
+      background-color: green;
       color: white;
       border: none;
+      margin-top: 20px;
       cursor: pointer;
     }
-    .panel button:hover {
-      background-color: #1b5e20;
-    }
-    @media screen and (max-width: 768px) {
-      .container {
-        flex-direction: column;
-        align-items: center;
-      }
-      .panel {
-        width: 90%;
-        margin-bottom: 20px;
-      }
+
+    button:hover {
+      background-color: darkgreen;
     }
   </style>
 </head>
 <body>
-  <header>
-    <h1>BLOOMING KIDS HOUSE ASSESSMENT TEST</h1>
-  </header>
+  <h1>Blooming Kids House Assessment</h1>
 
-  <div class="container">
-    <!-- Student Panel -->
-    <div class="panel">
-      <h2>Student Panel</h2>
-      <form id="studentForm">
-        <input type="text" id="studentName" placeholder="Student Name" required />
-        <input type="text" id="parentName" placeholder="Parent Name" required />
-        <input type="text" id="tutorName" placeholder="Tutor's Name" required />
-        <input type="text" id="location" placeholder="Location" required />
-        <input type="email" id="parentEmail" placeholder="Parent's Email Address" required />
-        <input type="text" id="accessCode" placeholder="Access Code" required />
-        <select id="gradeSelect" required>
-          <option value="">Select Grade</option>
-          <option>Grade 3</option>
-          <option>Grade 4</option>
-          <option>Grade 5</option>
-          <option>Grade 6</option>
-          <option>Grade 7</option>
-          <option>Grade 8</option>
-          <option>Grade 9</option>
-          <option>Grade 10</option>
-          <option>Grade 11</option>
-          <option>Grade 12</option>
-        </select>
-        <button type="submit">Start Test</button>
-      </form>
-    </div>
+  <form id="student-form">
+    <label for="student-name">Student Name:</label>
+    <input type="text" id="student-name" required />
 
-    <!-- Admin Panel -->
-    <div class="panel">
-      <h2>Admin Panel</h2>
-      <form id="adminLogin">
-        <input type="text" id="adminCode" placeholder="Admin Access Code" required />
-        <button type="submit">Login</button>
-      </form>
-    </div>
+    <label for="parent-name">Parent Name:</label>
+    <input type="text" id="parent-name" required />
 
-    <!-- Parent Panel -->
-    <div class="panel">
-      <h2>Parent Panel</h2>
-      <form id="parentLogin">
-        <input type="text" placeholder="Student Name" required />
-        <input type="email" placeholder="Parent's Email Address" required />
-        <button type="submit">Login</button>
-      </form>
-    </div>
-  </div>
+    <label for="tutor-name">Tutor Name:</label>
+    <input type="text" id="tutor-name" required />
+
+    <label for="location">Location:</label>
+    <input type="text" id="location" required />
+
+    <label for="parent-email">Parent Email:</label>
+    <input type="email" id="parent-email" required />
+
+    <label for="access-code">Access Code:</label>
+    <input type="text" id="access-code" required />
+
+    <label for="grade">Select Grade:</label>
+    <select id="grade" required>
+      <option value="">-- Choose Grade --</option>
+      <option value="grade3">Grade 3</option>
+      <option value="grade4">Grade 4</option>
+      <option value="grade5">Grade 5</option>
+      <option value="grade6">Grade 6</option>
+      <option value="grade7">Grade 7</option>
+      <option value="grade8">Grade 8</option>
+      <option value="grade9">Grade 9</option>
+      <option value="grade10">Grade 10</option>
+      <option value="grade11">Grade 11</option>
+      <option value="grade12">Grade 12</option>
+    </select>
+
+    <button type="submit">Start Test</button>
+  </form>
 
   <script>
-    const studentAccessCode = "BKH-STUDENT-2025";
-    const adminAccessCode = "BKH-ADMIN-2025";
-
-    document.getElementById('studentForm').addEventListener('submit', function(e) {
+    document.getElementById("student-form").addEventListener("submit", function (e) {
       e.preventDefault();
-      const accessCode = document.getElementById('accessCode').value.trim();
-      const studentName = document.getElementById('studentName').value.trim();
-      const grade = document.getElementById('gradeSelect').value;
 
-      if (accessCode !== studentAccessCode) {
-        alert('Invalid Student Access Code. Please check and try again.');
+      const studentName = document.getElementById("student-name").value;
+      const parentName = document.getElementById("parent-name").value;
+      const tutorName = document.getElementById("tutor-name").value;
+      const location = document.getElementById("location").value;
+      const parentEmail = document.getElementById("parent-email").value;
+      const accessCode = document.getElementById("access-code").value;
+      const grade = document.getElementById("grade").value;
+
+      if (!grade) {
+        alert("Please select a grade.");
         return;
       }
 
-      // Store selected grade and student name
-      localStorage.setItem('selectedGrade', grade);
-      localStorage.setItem('studentName', studentName);
+      const studentData = {
+        studentName,
+        parentName,
+        tutorName,
+        location,
+        parentEmail,
+        accessCode,
+        grade
+      };
 
-      // Redirect to subject selection page
-      window.location.href = 'select-subject.html';
-    });
+      localStorage.setItem("studentData", JSON.stringify(studentData));
 
-    document.getElementById('adminLogin').addEventListener('submit', function(e) {
-      e.preventDefault();
-      const enteredAdminCode = document.getElementById('adminCode').value.trim();
-
-      if (enteredAdminCode !== adminAccessCode) {
-        alert('Invalid Admin Access Code. Please check and try again.');
-        return;
-      }
-
-      alert('Admin Access Code verified. Welcome to Admin Panel.');
-      // Redirect to admin dashboard here
-    });
-
-    document.getElementById('parentLogin').addEventListener('submit', function(e) {
-      e.preventDefault();
-      alert('Parent login submitted.');
+      window.location.href = "select-subject.html";
     });
   </script>
 </body>
