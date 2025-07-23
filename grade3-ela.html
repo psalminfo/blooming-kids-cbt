@@ -1,0 +1,362 @@
+<script type="text/javascript">
+        var gk_isXlsx = false;
+        var gk_xlsxFileLookup = {};
+        var gk_fileData = {};
+        function filledCell(cell) {
+          return cell !== '' && cell != null;
+        }
+        function loadFileData(filename) {
+        if (gk_isXlsx && gk_xlsxFileLookup[filename]) {
+            try {
+                var workbook = XLSX.read(gk_fileData[filename], { type: 'base64' });
+                var firstSheetName = workbook.SheetNames[0];
+                var worksheet = workbook.Sheets[firstSheetName];
+
+                // Convert sheet to JSON to filter blank rows
+                var jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, blankrows: false, defval: '' });
+                // Filter out blank rows (rows where all cells are empty, null, or undefined)
+                var filteredData = jsonData.filter(row => row.some(filledCell));
+
+                // Heuristic to find the header row by ignoring rows with fewer filled cells than the next row
+                var headerRowIndex = filteredData.findIndex((row, index) =>
+                  row.filter(filledCell).length >= filteredData[index + 1]?.filter(filledCell).length
+                );
+                // Fallback
+                if (headerRowIndex === -1 || headerRowIndex > 25) {
+                  headerRowIndex = 0;
+                }
+
+                // Convert filtered JSON back to CSV
+                var csv = XLSX.utils.aoa_to_sheet(filteredData.slice(headerRowIndex)); // Create a new sheet from filtered array of arrays
+                csv = XLSX.utils.sheet_to_csv(csv, { header: 1 });
+                return csv;
+            } catch (e) {
+                console.error(e);
+                return "";
+            }
+        }
+        return gk_fileData[filename] || "";
+        }
+        </script><!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Grade 3 – English Language Arts Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f0f8f0;
+            color: #333;
+        }
+        h1 {
+            text-align: center;
+            color: #2e7d32;
+        }
+        #timer {
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            background-color: #ffeb3b;
+            padding: 10px;
+            border: 2px solid #2e7d32;
+            border-radius: 5px;
+            font-weight: bold;
+        }
+        .problem-set, .question {
+            background-color: #fff;
+            padding: 15px;
+            margin: 15px 0;
+            border: 1px solid #2e7d32;
+            border-radius: 5px;
+        }
+        .question label {
+            display: block;
+            margin: 10px 0;
+        }
+        button {
+            display: block;
+            margin: 20px auto;
+            padding: 10px 20px;
+            background-color: #2e7d32;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #1b5e20;
+        }
+        @media (max-width: 600px) {
+            body {
+                padding: 10px;
+            }
+            #timer {
+                font-size: 14px;
+                padding: 8px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <h1>Blooming Kids House: Grade 3 – English Language Arts Test</h1>
+    <div id="timer">Time Remaining: 30:00</div>
+
+    <!-- Problem Set 1: Reading Comprehension -->
+    <div class="problem-set">
+        <h2>The Missing Book</h2>
+        <p>Anna loved reading. One day, her favorite book was missing from her shelf. She looked under her bed and found dust bunnies. She checked her backpack and found pencils. Finally, she looked in the living room and found the book under a cushion. Anna smiled and started reading. Use the passage to answer the questions below.</p>
+    </div>
+    <div class="question">
+        <p><strong>1. What is the main idea of the passage?</strong></p>
+        <label><input type="radio" name="q1" value="a"> Anna cleaned her room.</label>
+        <label><input type="radio" name="q1" value="b"> Anna found her missing book.</label>
+        <label><input type="radio" name="q1" value="c"> Anna bought a new book.</label>
+        <label><input type="radio" name="q1" value="d"> Anna lost her pencils.</label>
+    </div>
+    <div class="question">
+        <p><strong>2. Where did Anna find her book?</strong></p>
+        <label><input type="radio" name="q2" value="a"> Under her bed</label>
+        <label><input type="radio" name="q2" value="b"> In her backpack</label>
+        <label><input type="radio" name="q2" value="c"> Under a cushion</label>
+        <label><input type="radio" name="q2" value="d"> On her shelf</label>
+    </div>
+    <div class="question">
+        <p><strong>3. What does the word “cushion” mean in the passage?</strong></p>
+        <label><input type="radio" name="q3" value="a"> A type of book</label>
+        <label><input type="radio" name="q3" value="b"> A soft pillow on furniture</label>
+        <label><input type="radio" name="q3" value="c"> A kind of pencil</label>
+        <label><input type="radio" name="q3" value="d"> A shelf for books</label>
+    </div>
+    <div class="question">
+        <p><strong>4. Why did Anna smile at the end?</strong></p>
+        <label><input type="radio" name="q4" value="a"> She found her book.</label>
+        <label><input type="radio" name="q4" value="b"> She cleaned her room.</label>
+        <label><input type="radio" name="q4" value="c"> She found pencils.</label>
+        <label><input type="radio" name="q4" value="d"> She bought a cushion.</label>
+    </div>
+    <div class="question">
+        <p><strong>5. Which word best describes Anna?</strong></p>
+        <label><input type="radio" name="q5" value="a"> Angry</label>
+        <label><input type="radio" name="q5" value="b"> Curious</label>
+        <label><input type="radio" name="q5" value="c"> Tired</label>
+        <label><input type="radio" name="q5" value="d"> Sad</label>
+    </div>
+    <div class="question">
+        <p><strong>6. What did Anna find under her bed?</strong></p>
+        <label><input type="radio" name="q6" value="a"> Her book</label>
+        <label><input type="radio" name="q6" value="b"> Dust bunnies</label>
+        <label><input type="radio" name="q6" value="c"> Pencils</label>
+        <label><input type="radio" name="q6" value="d"> A cushion</label>
+    </div>
+
+    <!-- Problem Set 2: Writing and Editing -->
+    <div class="problem-set">
+        <h2>Tom’s Letter</h2>
+        <p>Tom wrote a letter to his friend: “I has a new bike. It go fast on the hill. I rides it every day.” Use the letter to answer the questions below.</p>
+    </div>
+    <div class="question">
+        <p><strong>7. Which sentence has a grammar mistake?</strong></p>
+        <label><input type="radio" name="q7" value="a"> I has a new bike.</label>
+        <label><input type="radio" name="q7" value="b"> It go fast on the hill.</label>
+        <label><input type="radio" name="q7" value="c"> I rides it every day.</label>
+        <label><input type="radio" name="q7" value="d"> All of the above.</label>
+    </div>
+    <div class="question">
+        <p><strong>8. How should “I has a new bike” be corrected?</strong></p>
+        <label><input type="radio" name="q8" value="a"> I have a new bike.</label>
+        <label><input type="radio" name="q8" value="b"> I has new bike.</label>
+        <label><input type="radio" name="q8" value="c"> I had a new bike.</label>
+        <label><input type="radio" name="q8" value="d"> I having a new bike.</label>
+    </div>
+    <div class="question">
+        <p><strong>9. How should “It go fast on the hill” be corrected?</strong></p>
+        <label><input type="radio" name="q9" value="a"> It goes fast on the hill.</label>
+        <label><input type="radio" name="q9" value="b"> It going fast on the hill.</label>
+        <label><input type="radio" name="q9" value="c"> It gone fast on the hill.</label>
+        <label><input type="radio" name="q9" value="d"> It go fastly on the hill.</label>
+    </div>
+    <div class="question">
+        <p><strong>10. Which word in the letter is a verb?</strong></p>
+        <label><input type="radio" name="q10" value="a"> Bike</label>
+        <label><input type="radio" name="q10" value="b"> Rides</label>
+        <label><input type="radio" name="q10" value="c"> Hill</label>
+        <label><input type="radio" name="q10" value="d"> New</label>
+    </div>
+    <div class="question">
+        <p><strong>11. What is the best way to combine these sentences: “I rides it every day. It go fast on the hill.”?</strong></p>
+        <label><input type="radio" name="q11" value="a"> I ride it every day, and it goes fast on the hill.</label>
+        <label><input type="radio" name="q11" value="b"> I rides it every day and it go fast on the hill.</label>
+        <label><input type="radio" name="q11" value="c"> I rides it every day but it go fast on the hill.</label>
+        <label><input type="radio" name="q11" value="d"> I ride it every day, it goes fast on the hill.</label>
+    </div>
+    <div class="question">
+        <p><strong>12. Which word should replace “fast” to make the letter more descriptive?</strong></p>
+        <label><input type="radio" name="q12" value="a"> Big</label>
+        <label><input type="radio" name="q12" value="b"> Swiftly</label>
+        <label><input type="radio" name="q12" value="c"> Red</label>
+        <label><input type="radio" name="q12" value="d"> Slow</label>
+    </div>
+
+    <!-- Standalone Questions -->
+    <div class="question">
+        <p><strong>13. Which sentence is written correctly?</strong></p>
+        <label><input type="radio" name="q13" value="a"> The cat sleep on the mat.</label>
+        <label><input type="radio" name="q13" value="b"> The cat sleeps on the mat.</label>
+        <label><input type="radio" name="q13" value="c"> The cat sleeping on the mat.</label>
+        <label><input type="radio" name="q13" value="d"> The cat sleeped on the mat.</label>
+    </div>
+    <div class="question">
+        <p><strong>14. What is the meaning of “glad” in the sentence: “She was glad to see her friend”?</strong></p>
+        <label><input type="radio" name="q14" value="a"> Sad</label>
+        <label><input type="radio" name="q14" value="b"> Happy</label>
+        <label><input type="radio" name="q14" value="c"> Angry</label>
+        <label><input type="radio" name="q14" value="d"> Tired</label>
+    </div>
+    <div class="question">
+        <p><strong>15. Which word is a synonym for “small”?</strong></p>
+        <label><input type="radio" name="q15" value="a"> Big</label>
+        <label><input type="radio" name="q15" value="b"> Tiny</label>
+        <label><input type="radio" name="q15" value="c"> Fast</label>
+        <label><input type="radio" name="q15" value="d"> Loud</label>
+    </div>
+    <div class="question">
+        <p><strong>16. Which sentence uses a comma correctly?</strong></p>
+        <label><input type="radio" name="q16" value="a"> I like apples bananas, and oranges.</label>
+        <label><input type="radio" name="q16" value="b"> I like apples, bananas, and oranges.</label>
+        <label><input type="radio" name="q16" value="c"> I like apples bananas and, oranges.</label>
+        <label><input type="radio" name="q16" value="d"> I like, apples bananas and oranges.</label>
+    </div>
+    <div class="question">
+        <p><strong>17. What is the correct plural form of “box”?</strong></p>
+        <label><input type="radio" name="q17" value="a"> Boxs</label>
+        <label><input type="radio" name="q17" value="b"> Boxes</label>
+        <label><input type="radio" name="q17" value="c"> Boxen</label>
+        <label><input type="radio" name="q17" value="d"> Boxies</label>
+    </div>
+    <div class="question">
+        <p><strong>18. Which sentence is in the future tense?</strong></p>
+        <label><input type="radio" name="q18" value="a"> I read a book.</label>
+        <label><input type="radio" name="q18" value="b"> I am reading a book.</label>
+        <label><input type="radio" name="q18" value="c"> I will read a book.</label>
+        <label><input type="radio" name="q18" value="d"> I was reading a book.</label>
+    </div>
+    <div class="question">
+        <p><strong>19. What is the best topic sentence for a paragraph about a trip to the zoo?</strong></p>
+        <label><input type="radio" name="q19" value="a"> I saw many animals at the zoo.</label>
+        <label><input type="radio" name="q19" value="b"> I like to eat popcorn.</label>
+        <label><input type="radio" name="q19" value="c"> The zoo is far away.</label>
+        <label><input type="radio" name="q19" value="d"> I have a pet fish.</label>
+    </div>
+    <div class="question">
+        <p><strong>20. Which word is an adjective in the sentence: “The bright sun shines above”?</strong></p>
+        <label><input type="radio" name="q20" value="a"> Sun</label>
+        <label><input type="radio" name="q20" value="b"> Shines</label>
+        <label><input type="radio" name="q20" value="c"> Bright</label>
+        <label><input type="radio" name="q20" value="d"> Above</label>
+    </div>
+    <div class="question">
+        <p><strong>21. Which sentence uses the correct form of “your”?</strong></p>
+        <label><input type="radio" name="q21" value="a"> Is this you’re book?</label>
+        <label><input type="radio" name="q21" value="b"> Is this your book?</label>
+        <label><input type="radio" name="q21" value="c"> Is this yore book?</label>
+        <label><input type="radio" name="q21" value="d"> Is this yours book?</label>
+    </div>
+    <div class="question">
+        <p><strong>22. What is the prefix in the word “rewrite”?</strong></p>
+        <label><input type="radio" name="q22" value="a"> Re</label>
+        <label><input type="radio" name="q22" value="b"> Write</label>
+        <label><input type="radio" name="q22" value="c"> Writ</label>
+        <label><input type="radio" name="q22" value="d"> Te</label>
+    </div>
+    <div class="question">
+        <p><strong>23. Which sentence is an exclamation?</strong></p>
+        <label><input type="radio" name="q23" value="a"> I have a new puppy!</label>
+        <label><input type="radio" name="q23" value="b"> I have a new puppy.</label>
+        <label><input type="radio" name="q23" value="c"> Do I have a new puppy?</label>
+        <label><input type="radio" name="q23" value="d"> I have a new puppy, too.</label>
+    </div>
+    <div class="question">
+        <p><strong>24. Which word should be capitalized in the sentence: “we visited texas last summer”?</strong></p>
+        <label><input type="radio" name="q24" value="a"> Visited</label>
+        <label><input type="radio" name="q24" value="b"> We</label>
+        <label><input type="radio" name="q24" value="c"> Summer</label>
+        <label><input type="radio" name="q24" value="d"> Last</label>
+    </div>
+    <div class="question">
+        <p><strong>25. What is the main purpose of a poem about a sunny day?</strong></p>
+        <label><input type="radio" name="q25" value="a"> To explain</label>
+        <label><input type="radio" name="q25" value="b"> To persuade</label>
+        <label><input type="radio" name="q25" value="c"> To entertain</label>
+        <label><input type="radio" name="q25" value="d"> To inform</label>
+    </div>
+    <div class="question">
+        <p><strong>26. Which sentence uses quotation marks correctly?</strong></p>
+        <label><input type="radio" name="q26" value="a"> She said, I love to read.</label>
+        <label><input type="radio" name="q26" value="b"> She said “I love to read.”</label>
+        <label><input type="radio" name="q26" value="c"> She said, “I love to read.”</label>
+        <label><input type="radio" name="q26" value="d"> She said, I love to read”.</label>
+    </div>
+    <div class="question">
+        <p><strong>27. Which word is a noun in the sentence: “The dog barks loudly”?</strong></p>
+        <label><input type="radio" name="q27" value="a"> Barks</label>
+        <label><input type="radio" name="q27" value="b"> Loudly</label>
+        <label><input type="radio" name="q27" value="c"> Dog</label>
+        <label><input type="radio" name="q27" value="d"> The</label>
+    </div>
+    <div class="question">
+        <p><strong>28. What is the suffix in the word “helpful”?</strong></p>
+        <label><input type="radio" name="q28" value="a"> Help</label>
+        <label><input type="radio" name="q28" value="b"> Ful</label>
+        <label><input type="radio" name="q28" value="c"> Hel</label>
+        <label><input type="radio" name="q28" value="d"> Pful</label>
+    </div>
+    <div class="question">
+        <p><strong>29. Which sentence is a complete sentence?</strong></p>
+        <label><input type="radio" name="q29" value="a"> Jumping in the yard.</label>
+        <label><input type="radio" name="q29" value="b"> The boy jumps in the yard.</label>
+        <label><input type="radio" name="q29" value="c"> In the yard with a ball.</label>
+        <label><input type="radio" name="q29" value="d"> Quickly jumps high.</label>
+    </div>
+    <div class="question">
+        <p><strong>30. What is the best closing sentence for a story about a lost toy?</strong></p>
+        <label><input type="radio" name="q30" value="a"> I found my toy and was happy.</label>
+        <label><input type="radio" name="q30" value="b"> I like to play games.</label>
+        <label><input type="radio" name="q30" value="c"> The toy was red.</label>
+        <label><input type="radio" name="q30" value="d"> I have a new shirt.</label>
+    </div>
+
+    <button onclick="submitTest()">Submit Test</button>
+
+    <script>
+        let timeLeft = 30 * 60; // 30 minutes in seconds
+        let timerInterval = null; // Store the interval ID
+        const timerDisplay = document.getElementById('timer');
+
+        function updateTimer() {
+            const minutes = Math.floor(timeLeft / 60);
+            const seconds = timeLeft % 60;
+            timerDisplay.textContent = `Time Remaining: ${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
+            if (timeLeft > 0) {
+                timeLeft--;
+            } else {
+                clearInterval(timerInterval);
+                timerDisplay.textContent = 'Time is up!';
+                window.location.href = 'select_subject.html'; // Redirect when time expires
+            }
+        }
+
+        function submitTest() {
+            clearInterval(timerInterval); // Stop the timer
+            timerDisplay.textContent = 'Test Submitted!';
+            window.location.href = 'select_subject.html'; // Redirect to subject selection page
+        }
+
+        timerInterval = setInterval(updateTimer, 1000);
+        updateTimer(); // Initial call to display timer immediately
+    </script>
+</body>
+</html>
