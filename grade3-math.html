@@ -292,32 +292,78 @@
 
     <button onclick="submitTest()">Submit Test</button>
 
-    <script>
-        let timeLeft = 30 * 60; // 30 minutes in seconds
-        let timerInterval = null; // Store the interval ID
-        const timerDisplay = document.getElementById('timer');
+   <script>
+    let timeLeft = 30 * 60; // 30 minutes in seconds
+    let timerInterval = null;
+    const timerDisplay = document.getElementById('timer');
 
-        function updateTimer() {
-            const minutes = Math.floor(timeLeft / 60);
-            const seconds = timeLeft % 60;
-            timerDisplay.textContent = `Time Remaining: ${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
-            if (timeLeft > 0) {
-                timeLeft--;
-            } else {
-                clearInterval(timerInterval);
-                timerDisplay.textContent = 'Time is up!';
-                window.location.href = 'select_subject.html'; // Redirect when time expires
+    function updateTimer() {
+        const minutes = Math.floor(timeLeft / 60);
+        const seconds = timeLeft % 60;
+        timerDisplay.textContent = `Time Remaining: ${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
+        if (timeLeft > 0) {
+            timeLeft--;
+        } else {
+            clearInterval(timerInterval);
+            finishTest(true); // auto-submit
+        }
+    }
+
+    function submitTest() {
+        clearInterval(timerInterval);
+        finishTest(false); // manual submit
+    }
+
+    function finishTest(isAuto) {
+        let score = 0;
+        const answers = {
+            q1: 'b',
+            q2: 'b',
+            q3: 'c',
+            q4: 'c',
+            q5: 'b',
+            q6: 'c',
+            q7: 'b',
+            q8: 'b',
+            q9: 'c',
+            q10: 'c',
+            q11: 'd',
+            q12: 'c',
+            q13: 'c',
+            q14: 'a',
+            q15: 'c',
+            q16: 'b',
+            q17: 'c',
+            q18: 'c',
+            q19: 'c',
+            q20: 'b',
+            q21: 'b',
+            q22: 'b',
+            q23: 'b',
+            q24: 'b',
+            q25: 'c',
+            q26: 'b',
+            q27: 'c',
+            q28: 'b',
+            q29: 'c',
+            q30: 'b'
+        };
+
+        for (let q in answers) {
+            const selected = document.querySelector(`input[name="${q}"]:checked`);
+            if (selected && selected.value === answers[q]) {
+                score++;
             }
         }
 
-        function submitTest() {
-            clearInterval(timerInterval); // Stop the timer
-            timerDisplay.textContent = 'Test Submitted!';
-            window.location.href = 'select_subject.html'; // Redirect to subject selection page
-        }
+        localStorage.setItem("math_grade3_score", score);
+        localStorage.setItem("math_grade3_total", Object.keys(answers).length);
 
-        timerInterval = setInterval(updateTimer, 1000);
-        updateTimer(); // Initial call to display timer immediately
-    </script>
-</body>
-</html>
+        alert(`Test ${isAuto ? 'auto-' : ''}submitted! Your score: ${score}/${Object.keys(answers).length}`);
+        window.location.href = 'select-subject.html';
+    }
+
+    timerInterval = setInterval(updateTimer, 1000);
+    updateTimer(); // Show initial timer immediately
+</script>
+
