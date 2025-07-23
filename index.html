@@ -83,18 +83,18 @@
         <input type="text" placeholder="Location" required />
         <input type="email" placeholder="Parent's Email Address" required />
         <input type="text" id="accessCode" placeholder="Access Code" required />
-        <select required>
+        <select id="gradeSelect" required>
           <option value="">Select Grade</option>
-          <option>Grade 3</option>
-          <option>Grade 4</option>
-          <option>Grade 5</option>
-          <option>Grade 6</option>
-          <option>Grade 7</option>
-          <option>Grade 8</option>
-          <option>Grade 9</option>
-          <option>Grade 10</option>
-          <option>Grade 11</option>
-          <option>Grade 12</option>
+          <option value="grade3">Grade 3</option>
+          <option value="grade4">Grade 4</option>
+          <option value="grade5">Grade 5</option>
+          <option value="grade6">Grade 6</option>
+          <option value="grade7">Grade 7</option>
+          <option value="grade8">Grade 8</option>
+          <option value="grade9">Grade 9</option>
+          <option value="grade10">Grade 10</option>
+          <option value="grade11">Grade 11</option>
+          <option value="grade12">Grade 12</option>
         </select>
         <button type="submit">Start Test</button>
       </form>
@@ -124,17 +124,30 @@
     const studentAccessCode = "BKH-STUDENT-2025";
     const adminAccessCode = "BKH-ADMIN-2025";
 
+    const gradeRedirectMap = {
+      grade3: "grade3_english.html",
+      grade4: "grade4_english.html", // Add file when ready
+      grade5: "grade5_english.html", // Add file when ready
+      // Extend this map as you create new test files
+    };
+
     document.getElementById('studentForm').addEventListener('submit', function(e) {
       e.preventDefault();
       const enteredCode = document.getElementById('accessCode').value.trim();
+      const selectedGrade = document.getElementById('gradeSelect').value;
 
       if (enteredCode !== studentAccessCode) {
         alert('Invalid Student Access Code. Please check and try again.');
         return;
       }
 
-      alert('Access Code verified. Proceed to subject selection.');
-      // Redirect to subject/test interface here
+      if (!gradeRedirectMap[selectedGrade]) {
+        alert('This grade is not available yet.');
+        return;
+      }
+
+      // Redirect to appropriate grade test file
+      window.location.href = gradeRedirectMap[selectedGrade];
     });
 
     document.getElementById('adminLogin').addEventListener('submit', function(e) {
@@ -147,12 +160,14 @@
       }
 
       alert('Admin Access Code verified. Welcome to Admin Panel.');
-      // Redirect to admin dashboard here
+      // Replace with actual admin dashboard file when ready
+      window.location.href = "admin_panel.html";
     });
 
     document.getElementById('parentLogin').addEventListener('submit', function(e) {
       e.preventDefault();
       alert('Parent login submitted.');
+      // Replace with actual parent dashboard file if needed
     });
   </script>
 </body>
