@@ -1,55 +1,72 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Select Subject</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Select Subject - Blooming Kids House</title>
   <style>
     body {
       font-family: Arial, sans-serif;
-      background-color: #eefaf0;
+      background-color: #f7f7f7;
       margin: 0;
-      padding: 20px;
+      padding: 0;
       text-align: center;
     }
 
-    h1 {
+    header {
       background-color: #2e7d32;
       color: white;
-      margin: 0;
-      padding: 20px;
+      padding: 20px 0;
     }
 
-    .subject-btn, .logout-btn {
+    h1 {
+      margin: 0;
+      font-size: 28px;
+    }
+
+    .container {
+      padding: 30px 20px;
+    }
+
+    h2 {
+      font-size: 22px;
+      margin-bottom: 20px;
+      color: #333;
+    }
+
+    .subject-box {
       background-color: #ffeb3b;
-      border: none;
-      padding: 15px 30px;
-      margin: 15px auto;
-      display: block;
-      font-size: 18px;
-      font-weight: bold;
+      color: #000;
+      padding: 15px;
+      margin: 10px auto;
+      width: 250px;
       border-radius: 8px;
       cursor: pointer;
-      width: 280px;
       transition: 0.3s;
       box-shadow: 0 4px 6px rgba(0,0,0,0.1);
     }
 
-    .subject-btn:hover,
-    .logout-btn:hover {
+    .subject-box:hover {
       background-color: #fdd835;
     }
 
     footer {
       margin-top: 40px;
       font-size: 14px;
-      color: #666;
+      color: #888;
     }
   </style>
 </head>
 <body>
-  <h1>Select a Subject</h1>
-  <div id="subject-buttons"></div>
+
+  <header>
+    <h1>Blooming Kids House Assessment</h1>
+  </header>
+
+  <div class="container" id="subjectContainer">
+    <h2>Select a Subject</h2>
+    <!-- Subject buttons will be injected here -->
+  </div>
 
   <footer>
     &copy; 2025 Blooming Kids House. All rights reserved.
@@ -59,11 +76,12 @@
     const grade = localStorage.getItem('selectedGrade');
     const studentName = localStorage.getItem('studentName');
 
-    // Redirect to home if info missing
-    if (!grade || !studentName) {
-      alert('Missing student info. Returning to home page.');
+    if (!grade) {
+      alert('Invalid or missing grade. Please go back and select your grade.');
       window.location.href = 'index.html';
     }
+
+    const subjectContainer = document.getElementById("subjectContainer");
 
     const subjectMap = {
       "Grade 3": ["Math", "English"],
@@ -79,34 +97,22 @@
     };
 
     const subjects = subjectMap[grade] || [];
-    const container = document.getElementById('subject-buttons');
 
     subjects.forEach(subject => {
-      const btn = document.createElement('button');
-      btn.className = 'subject-btn';
-      btn.innerText = subject;
+      const button = document.createElement("div");
+      button.className = "subject-box";
+      button.textContent = subject;
 
-      const cleanGrade = grade.toLowerCase().replace(/\s/g, '');
+      const cleanGrade = grade.toLowerCase().replace(/\s/g, "");
       const cleanSubject = subject.toLowerCase();
       const filename = `${cleanGrade}-${cleanSubject}.html`;
 
-      btn.onclick = () => {
+      button.onclick = () => {
         window.location.href = filename;
       };
 
-      container.appendChild(btn);
+      subjectContainer.appendChild(button);
     });
-
-    // Log Out Button
-    const logout = document.createElement('button');
-    logout.className = 'logout-btn';
-    logout.innerText = 'Log Out';
-    logout.onclick = () => {
-      localStorage.removeItem('selectedGrade');
-      localStorage.removeItem('studentName');
-      window.location.href = 'index.html';
-    };
-    container.appendChild(logout);
   </script>
 </body>
 </html>
