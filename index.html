@@ -55,6 +55,14 @@
     .panel button:hover {
       background-color: #1b5e20;
     }
+    .subjects {
+      margin-top: 15px;
+    }
+    .subjects button {
+      margin: 5px;
+      background: #cddc39;
+      color: #333;
+    }
     @media screen and (max-width: 768px) {
       .container {
         flex-direction: column;
@@ -77,7 +85,7 @@
     <div class="panel">
       <h2>Student Panel</h2>
       <form id="studentForm">
-        <input type="text" placeholder="Student Name" required />
+        <input type="text" id="studentName" placeholder="Student Name" required />
         <input type="text" placeholder="Parent Name" required />
         <input type="text" placeholder="Tutor's Name" required />
         <input type="text" placeholder="Location" required />
@@ -85,19 +93,20 @@
         <input type="text" id="accessCode" placeholder="Access Code" required />
         <select id="gradeSelect" required>
           <option value="">Select Grade</option>
-          <option value="grade3">Grade 3</option>
-          <option value="grade4">Grade 4</option>
-          <option value="grade5">Grade 5</option>
-          <option value="grade6">Grade 6</option>
-          <option value="grade7">Grade 7</option>
-          <option value="grade8">Grade 8</option>
-          <option value="grade9">Grade 9</option>
-          <option value="grade10">Grade 10</option>
-          <option value="grade11">Grade 11</option>
-          <option value="grade12">Grade 12</option>
+          <option>Grade 3</option>
+          <option>Grade 4</option>
+          <option>Grade 5</option>
+          <option>Grade 6</option>
+          <option>Grade 7</option>
+          <option>Grade 8</option>
+          <option>Grade 9</option>
+          <option>Grade 10</option>
+          <option>Grade 11</option>
+          <option>Grade 12</option>
         </select>
         <button type="submit">Start Test</button>
       </form>
+      <div class="subjects" id="subjectButtons"></div>
     </div>
 
     <!-- Admin Panel -->
@@ -123,51 +132,62 @@
   <script>
     const studentAccessCode = "BKH-STUDENT-2025";
     const adminAccessCode = "BKH-ADMIN-2025";
+    let subjectData = {};
 
-    const gradeRedirectMap = {
-      grade3: "grade3_english.html",
-      grade4: "grade4_english.html", // Add file when ready
-      grade5: "grade5_english.html", // Add file when ready
-      // Extend this map as you create new test files
-    };
+    // Load subjects.json
+    fetch("subjects.json")
+      .then(res => res.json())
+      .then(data => subjectData = data)
+      .catch(() => alert("Could not load subjects list. Please contact admin."));
 
     document.getElementById('studentForm').addEventListener('submit', function(e) {
       e.preventDefault();
-      const enteredCode = document.getElementById('accessCode').value.trim();
-      const selectedGrade = document.getElementById('gradeSelect').value;
+      const code = document.getElementById('accessCode').value.trim();
+      const grade = document.getElementById('gradeSelect').value;
 
-      if (enteredCode !== studentAccessCode) {
-        alert('Invalid Student Access Code. Please check and try again.');
+      if (code !== studentAccessCode) {
+        alert("Invalid Student Access Code.");
         return;
       }
 
-      if (!gradeRedirectMap[selectedGrade]) {
-        alert('This grade is not available yet.');
+      if (!subjectData[grade]) {
+        alert("No subjects available for selected grade yet.");
         return;
       }
 
-      // Redirect to appropriate grade test file
-      window.location.href = gradeRedirectMap[selectedGrade];
+      const container = document.getElementById('subjectButtons');
+      container.innerHTML = '<h3>Select Subject</h3>';
+
+      const subjects = subjectData[grade];
+      ["Maths", "English", "Biology"].forEach(subject => {
+        const btn = document.createElement("button");
+        btn.innerText = subject;
+        btn.onclick = () => {
+          if (subjects.includes(subject.toLowerCase())) {
+            window.location.href = `${grade.toLowerCase().replace(" ", "")}-${subject.toLowerCase()}.html`;
+          } else {
+            alert("Questions Unavailable for this subject.");
+          }
+        };
+        container.appendChild(btn);
+      });
     });
 
     document.getElementById('adminLogin').addEventListener('submit', function(e) {
       e.preventDefault();
-      const enteredAdminCode = document.getElementById('adminCode').value.trim();
-
-      if (enteredAdminCode !== adminAccessCode) {
-        alert('Invalid Admin Access Code. Please check and try again.');
+      const code = document.getElementById('adminCode').value.trim();
+      if (code !== adminAccessCode) {
+        alert("Invalid Admin Access Code.");
         return;
       }
-
-      alert('Admin Access Code verified. Welcome to Admin Panel.');
-      // Replace with actual admin dashboard file when ready
-      window.location.href = "admin_panel.html";
+      alert("Admin Access Code verified.");
+      // Redirect to admin dashboard if needed
     });
 
     document.getElementById('parentLogin').addEventListener('submit', function(e) {
       e.preventDefault();
-      alert('Parent login submitted.');
-      // Replace with actual parent dashboard file if needed
+      alert("Parent login submitted.");
+      // Add parent logic here if needed
     });
   </script>
 </body>
