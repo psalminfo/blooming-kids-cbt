@@ -65,22 +65,26 @@
   </div>
 
   <script>
-    const studentName = sessionStorage.getItem('studentName');
-    const studentGrade = sessionStorage.getItem('studentGrade');
-    const studentEmail = sessionStorage.getItem('studentEmail');
+    document.addEventListener("DOMContentLoaded", function() {
+      const studentName = sessionStorage.getItem("studentName");
+      const studentGrade = sessionStorage.getItem("studentGrade");
+      const studentEmail = sessionStorage.getItem("studentEmail");
 
-    if (!studentName || !studentGrade || !studentEmail) {
-      alert("Missing student info. Returning to home page.");
-      window.location.href = "index.html";
-    } else {
-      document.getElementById("studentInfo").innerHTML =
-        `<p><strong>Name:</strong> ${studentName}</p>
-         <p><strong>Grade:</strong> ${studentGrade}</p>
-         <p><strong>Email:</strong> ${studentEmail}</p>`;
-    }
+      if (!studentName || !studentGrade || !studentEmail) {
+        alert("Missing student info. Returning to home page.");
+        window.location.href = "index.html";
+        return;
+      }
+
+      document.getElementById("studentInfo").innerHTML = `
+        <p><strong>Name:</strong> ${studentName}</p>
+        <p><strong>Grade:</strong> ${studentGrade}</p>
+        <p><strong>Email:</strong> ${studentEmail}</p>
+      `;
+    });
 
     function startSubject(subjectPage) {
-      window.open(subjectPage, '_blank'); // Open subject test in a new tab
+      window.location.href = subjectPage; // You can change to window.open if you prefer a new tab
     }
 
     function logout() {
