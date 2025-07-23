@@ -1,49 +1,40 @@
-// Store the score after each test
-function saveSubjectScore(subject, score) {
-  const studentName = sessionStorage.getItem("studentName");
-  const studentEmail = sessionStorage.getItem("studentEmail");
+// js/report-handler.js
 
-  if (!studentName || !studentEmail) return;
+// Save a test report to localStorage
+function saveReportToLocalStorage(name, grade, subject, score) {
+  const existingReports = JSON.parse(localStorage.getItem("studentReports") || "[]");
 
-  const reportKey = `${studentName}_${studentEmail}_report`;
-  let reportData = JSON.parse(localStorage.getItem(reportKey)) || {};
-
-  reportData[subject] = {
+  const newReport = {
+    name: name.trim(),
+    grade: grade,
+    subject: subject,
     score: score,
     date: new Date().toLocaleString()
   };
 
-  localStorage.setItem(reportKey, JSON.stringify(reportData));
+  // Add new report to the array
+  existingReports.push(newReport);
+
+  // Save back to localStorage
+  localStorage.setItem("studentReports", JSON.stringify(existingReports));
 }
 
-// Generate report for one student
-function getStudentReport(name, email) {
-  const reportKey = `${name}_${email}_report`;
-  const report = JSON.parse(localStorage.getItem(reportKey));
-  return report || null;
+// Fetch all reports from localStorage
+function getAllReportsFromLocalStorage() {
+  return JSON.parse(localStorage.getItem("studentReports") || "[]");
 }
 
-// Generate all student reports for admin
-function getAllReports() {
-  const allReports = [];
+// Filter reports by student name and email (used in parent panel)
+function getStudentReports(name, email) {
+  const allReports = getAllReportsFromLocalStorage();
 
-  for (let key in localStorage) {
-    if (key.includes("_report")) {
-      const [studentName, studentEmail] = key.split("_report")[0].split("_");
-      const data = JSON.parse(localStorage.getItem(key));
-      allReports.push({
-        name: studentName,
-        email: studentEmail,
-        subjects: data
-      });
-    }
-  }
-
-  return allReports;
+  return allReports.filter(
+    (report) => report.name.toLowerCase() === name.toLowerCase() &&
+                (report.email ? report.email.toLowerCase() === email.toLowerCase() : true)
+  );
 }
 
-// Clear a student's report (optional)
-function clearStudentReport(name, email) {
-  const reportKey = `${name}_${email}_report`;
-  localStorage.removeItem(reportKey);
+// Optional: Clear all reports (for admin use)
+function clearAllReports() {
+  localStorage.removeItem("studentReports");
 }
