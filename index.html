@@ -120,52 +120,26 @@
     </div>
   </div>
 
-  <script>
-    const studentAccessCode = "BKH-STUDENT-2025";
-    const adminAccessCode = "BKH-ADMIN-2025";
+<script>
+  function startTest() {
+    const name = document.getElementById('name').value.trim();
+    const grade = document.getElementById('grade').value;
+    const email = document.getElementById('email').value.trim();
 
-    document.getElementById('studentForm').addEventListener('submit', function(e) {
-      e.preventDefault();
-      const accessCode = document.getElementById('accessCode').value.trim();
-      const studentName = document.getElementById('studentName').value.trim();
-      const grade = document.getElementById('gradeSelect').value;
-      const parentEmail = document.getElementById('parentEmail').value.trim();
+    if (!name || !grade || !email) {
+      alert('Please fill all the fields.');
+      return;
+    }
 
-      if (accessCode !== studentAccessCode) {
-        alert('Invalid Student Access Code. Please check and try again.');
-        return;
-      }
+    // Save to sessionStorage (or localStorage if you prefer)
+    sessionStorage.setItem('studentName', name);
+    sessionStorage.setItem('selectedGrade', grade);
+    sessionStorage.setItem('parentEmail', email);
 
-      if (!grade) {
-        alert('Please select a grade.');
-        return;
-      }
+    // Redirect to subject selection page
+    window.location.href = 'select-subject.html';
+  }
+</script>
 
-      // Store info in sessionStorage
-      sessionStorage.setItem('studentName', studentName);
-      sessionStorage.setItem('grade', grade);
-      sessionStorage.setItem('parentEmail', parentEmail);
-
-      window.location.href = "select-subject.html";
-    });
-
-    document.getElementById('adminLogin').addEventListener('submit', function(e) {
-      e.preventDefault();
-      const enteredAdminCode = document.getElementById('adminCode').value.trim();
-
-      if (enteredAdminCode !== adminAccessCode) {
-        alert('Invalid Admin Access Code. Please check and try again.');
-        return;
-      }
-
-      alert('Admin Access Code verified. Welcome to Admin Panel.');
-      // Redirect to admin dashboard here
-    });
-
-    document.getElementById('parentLogin').addEventListener('submit', function(e) {
-      e.preventDefault();
-      alert('Parent login submitted.');
-    });
-  </script>
 </body>
 </html>
