@@ -366,4 +366,26 @@
     timerInterval = setInterval(updateTimer, 1000);
     updateTimer(); // Show initial timer immediately
 </script>
+// Get subject automatically from the filename
+const url = window.location.pathname;
+const filename = url.substring(url.lastIndexOf('/') + 1); // e.g. "grade3-math.html"
+const subject = filename.split('-')[1].split('.')[0].toUpperCase(); // "MATH"
+
+// Store test result after submission
+const testResult = {
+  subject: subject,
+  score: studentScore,
+  total: totalQuestions,
+  grade: sessionStorage.getItem('studentGrade'),
+  name: sessionStorage.getItem('studentName'),
+  email: sessionStorage.getItem('studentEmail'),
+  date: new Date().toLocaleString()
+};
+
+let reports = JSON.parse(localStorage.getItem("studentReports") || "[]");
+reports.push(testResult);
+localStorage.setItem("studentReports", JSON.stringify(reports));
+
+// Redirect back to subject selection
+window.location.href = "select-subject.html";
 
