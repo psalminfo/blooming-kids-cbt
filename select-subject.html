@@ -61,6 +61,7 @@
   <h2>Select a Subject</h2>
   <div id="subject-list" class="subjects-container"></div>
 
+  <!-- Logout button appears separately below subjects -->
   <button class="logout-btn" onclick="logoutAndGenerateReport()">Logout</button>
 
   <script>
@@ -87,7 +88,6 @@
     };
 
     const subjects = subjectsPerGrade[grade.toLowerCase()];
-
     const container = document.getElementById("subject-list");
 
     if (subjects && subjects.length > 0) {
@@ -112,9 +112,8 @@
     }
 
     function generateReport() {
-      // Plug in your actual report generation code here
-      console.log(`Generating report for ${studentName}...`);
-      // e.g., generatePDF(); or sendReportToAdmin();
+      // Placeholder — plug your report sending logic here
+      console.log(`Generating joint report for ${studentName}...`);
     }
   </script>
 </body>
