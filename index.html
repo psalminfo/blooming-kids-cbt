@@ -3,56 +3,94 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Blooming Kids House - Home</title>
+  <title>Select Subject</title>
   <style>
     body {
       font-family: Arial, sans-serif;
-      background-color: #fff;
+      background-color: #f0fff0;
+      padding: 20px;
       color: #333;
+    }
+
+    h1 {
       text-align: center;
-      padding: 40px;
+      color: green;
     }
 
-    input, button {
-      padding: 10px;
-      margin: 10px;
-      font-size: 16px;
+    .container {
+      max-width: 600px;
+      margin: 0 auto;
+      text-align: center;
     }
 
-    button {
+    .student-info {
+      background-color: #eaffea;
+      padding: 15px;
+      margin-bottom: 20px;
+      border: 1px solid green;
+      border-radius: 5px;
+    }
+
+    .button {
       background-color: green;
       color: white;
+      padding: 15px 25px;
+      margin: 10px;
       border: none;
+      border-radius: 5px;
+      font-size: 16px;
+      cursor: pointer;
+    }
+
+    .button:hover {
+      background-color: darkgreen;
+    }
+
+    .logout-button {
+      background-color: yellow;
+      color: black;
     }
   </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Select Subject</h1>
+    <div id="studentInfo" class="student-info"></div>
+
+    <button class="button" onclick="startSubject('grade3-ela.html')">English</button>
+    <button class="button" onclick="startSubject('grade3-math.html')">Math</button>
+
+    <br><br>
+    <button class="button logout-button" onclick="logout()">Logout</button>
+  </div>
+
   <script>
-    function startTest(event) {
-      event.preventDefault();
+    document.addEventListener("DOMContentLoaded", function() {
+      const studentName = sessionStorage.getItem("studentName");
+      const studentGrade = sessionStorage.getItem("studentGrade");
+      const studentEmail = sessionStorage.getItem("studentEmail");
 
-      const name = document.getElementById("studentName").value;
-      const grade = document.getElementById("studentGrade").value;
-      const email = document.getElementById("studentEmail").value;
-
-      if (!name || !grade || !email) {
-        alert("Please fill in all fields.");
+      if (!studentName || !studentGrade || !studentEmail) {
+        alert("Missing student info. Returning to home page.");
+        window.location.href = "index.html";
         return;
       }
 
-      sessionStorage.setItem("studentName", name);
-      sessionStorage.setItem("studentGrade", grade);
-      sessionStorage.setItem("studentEmail", email);
+      document.getElementById("studentInfo").innerHTML = `
+        <p><strong>Name:</strong> ${studentName}</p>
+        <p><strong>Grade:</strong> ${studentGrade}</p>
+        <p><strong>Email:</strong> ${studentEmail}</p>
+      `;
+    });
 
-      window.location.href = "select-subject.html";
+    function startSubject(subjectPage) {
+      window.location.href = subjectPage;
+    }
+
+    function logout() {
+      sessionStorage.clear();
+      window.location.href = "index.html";
     }
   </script>
-</head>
-<body>
-  <h1>Welcome to Blooming Kids House Assessment</h1>
-  <form onsubmit="startTest(event)">
-    <input type="text" id="studentName" placeholder="Student Name" required><br>
-    <input type="text" id="studentGrade" placeholder="Grade" required><br>
-    <input type="email" id="studentEmail" placeholder="Parent Email" required><br>
-    <button type="submit">Start Test</button>
-  </form>
 </body>
 </html>
