@@ -2,16 +2,76 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Admin Panel – Blooming Kids House</title>
-  <script src="js/report-handler.js" defer></script>
-  <style>
-    body { font-family: Arial; background: #f9fff9; color: #333; padding: 20px; }
-    h1 { color: green; }
-    .report-box { border: 1px solid green; margin: 10px 0; padding: 10px; background: #eaffea; }
-  </style>
+  <link rel="stylesheet" href="css/styles.css" />
 </head>
 <body>
   <h1>Admin Panel</h1>
-  <div id="allReports"></div>
+
+  <div id="accessContainer">
+    <p>Enter admin access code:</p>
+    <input type="password" id="accessCodeInput" placeholder="Enter code" />
+    <button onclick="checkAccess()">Submit</button>
+    <p id="accessError" style="color: red;"></p>
+  </div>
+
+  <div id="reportContainer" style="display:none;">
+    <h2>All Student Reports</h2>
+    <table border="1" cellpadding="10">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Email</th>
+          <th>Grade</th>
+          <th>Subject</th>
+          <th>Score</th>
+          <th>Total</th>
+          <th>Date</th>
+        </tr>
+      </thead>
+      <tbody id="reportTableBody"></tbody>
+    </table>
+  </div>
+
+  <script>
+    const ACCESS_CODE = "BKHA2025"; // Set your access code here
+
+    function checkAccess() {
+      const enteredCode = document.getElementById("accessCodeInput").value;
+      const errorText = document.getElementById("accessError");
+
+      if (enteredCode === ACCESS_CODE) {
+        document.getElementById("accessContainer").style.display = "none";
+        document.getElementById("reportContainer").style.display = "block";
+        loadReports();
+      } else {
+        errorText.textContent = "Invalid access code. Please try again.";
+      }
+    }
+
+    function loadReports() {
+      const reports = JSON.parse(localStorage.getItem("studentReports") || "[]");
+      const tableBody = document.getElementById("reportTableBody");
+
+      if (reports.length === 0) {
+        tableBody.innerHTML = `<tr><td colspan="7">No reports found</td></tr>`;
+        return;
+      }
+
+      reports.forEach(r => {
+        const row = `<tr>
+          <td>${r.name}</td>
+          <td>${r.email}</td>
+          <td>${r.grade}</td>
+          <td>${r.subject}</td>
+          <td>${r.score}</td>
+          <td>${r.total}</td>
+          <td>${r.date}</td>
+        </tr>`;
+        tableBody.innerHTML += row;
+      });
+    }
+  </script>
 </body>
 </html>
