@@ -2,95 +2,171 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Select Subject</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>BLOOMING KIDS HOUSE ASSESSMENT TEST</title>
   <style>
+    * { box-sizing: border-box; }
     body {
+      margin: 0;
       font-family: Arial, sans-serif;
-      background-color: #f0fff0;
-      padding: 20px;
-      color: #333;
+      background: #f5f5f5;
     }
-
-    h1 {
-      text-align: center;
-      color: green;
-    }
-
-    .container {
-      max-width: 600px;
-      margin: 0 auto;
-      text-align: center;
-    }
-
-    .student-info {
-      background-color: #eaffea;
-      padding: 15px;
-      margin-bottom: 20px;
-      border: 1px solid green;
-      border-radius: 5px;
-    }
-
-    .button {
-      background-color: green;
+    header {
+      background-color: #2e7d32;
       color: white;
-      padding: 15px 25px;
-      margin: 10px;
+      padding: 20px;
+      text-align: center;
+    }
+    .container {
+      display: flex;
+      justify-content: space-around;
+      margin: 30px auto;
+      max-width: 1200px;
+    }
+    .panel {
+      background-color: white;
+      border: 2px solid #cddc39;
+      border-radius: 10px;
+      width: 30%;
+      padding: 20px;
+      box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+    }
+    .panel h2 {
+      text-align: center;
+      color: #2e7d32;
+    }
+    .panel form {
+      display: flex;
+      flex-direction: column;
+    }
+    .panel input,
+    .panel select,
+    .panel button {
+      margin: 8px 0;
+      padding: 10px;
+      font-size: 14px;
+    }
+    .panel button {
+      background-color: #2e7d32;
+      color: white;
       border: none;
-      border-radius: 5px;
-      font-size: 16px;
       cursor: pointer;
     }
-
-    .button:hover {
-      background-color: darkgreen;
+    .panel button:hover {
+      background-color: #1b5e20;
     }
-
-    .logout-button {
-      background-color: yellow;
-      color: black;
+    @media screen and (max-width: 768px) {
+      .container {
+        flex-direction: column;
+        align-items: center;
+      }
+      .panel {
+        width: 90%;
+        margin-bottom: 20px;
+      }
     }
   </style>
 </head>
 <body>
+  <header>
+    <h1>BLOOMING KIDS HOUSE ASSESSMENT TEST</h1>
+  </header>
+
   <div class="container">
-    <h1>Select Subject</h1>
-    <div id="studentInfo" class="student-info"></div>
+    <!-- Student Panel -->
+    <div class="panel">
+      <h2>Student Panel</h2>
+      <form id="studentForm">
+        <input type="text" id="studentName" placeholder="Student Name" required />
+        <input type="text" id="parentName" placeholder="Parent Name" required />
+        <input type="text" id="tutorName" placeholder="Tutor's Name" required />
+        <input type="text" id="location" placeholder="Location" required />
+        <input type="email" id="parentEmail" placeholder="Parent's Email Address" required />
+        <input type="text" id="accessCode" placeholder="Access Code" required />
+        <select id="grade" required>
+          <option value="">Select Grade</option>
+          <option>Grade 3</option>
+          <option>Grade 4</option>
+          <option>Grade 5</option>
+          <option>Grade 6</option>
+          <option>Grade 7</option>
+          <option>Grade 8</option>
+          <option>Grade 9</option>
+          <option>Grade 10</option>
+          <option>Grade 11</option>
+          <option>Grade 12</option>
+        </select>
+        <button type="submit">Start Test</button>
+      </form>
+    </div>
 
-    <button class="button" onclick="startSubject('grade3-ela.html')">English</button>
-    <button class="button" onclick="startSubject('grade3-math.html')">Math</button>
+    <!-- Admin Panel -->
+    <div class="panel">
+      <h2>Admin Panel</h2>
+      <form id="adminLogin">
+        <input type="text" id="adminCode" placeholder="Admin Access Code" required />
+        <button type="submit">Login</button>
+      </form>
+    </div>
 
-    <br><br>
-    <button class="button logout-button" onclick="logout()">Logout</button>
+    <!-- Parent Panel -->
+    <div class="panel">
+      <h2>Parent Panel</h2>
+      <form id="parentLogin">
+        <input type="text" id="parentStudentName" placeholder="Student Name" required />
+        <input type="email" id="parentEmailLogin" placeholder="Parent's Email Address" required />
+        <button type="submit">Login</button>
+      </form>
+    </div>
   </div>
 
   <script>
-    document.addEventListener("DOMContentLoaded", function() {
-      const studentName = sessionStorage.getItem("studentName");
-      const studentGrade = sessionStorage.getItem("studentGrade");
-      const studentEmail = sessionStorage.getItem("studentEmail");
+    const studentAccessCode = "BKH-STUDENT-2025";
+    const adminAccessCode = "BKH-ADMIN-2025";
 
-      if (!studentName || !studentGrade || !studentEmail) {
-        alert("Missing student info. Returning to home page.");
-        window.location.href = "index.html";
+    document.getElementById('studentForm').addEventListener('submit', function(e) {
+      e.preventDefault();
+      const accessCode = document.getElementById('accessCode').value.trim();
+
+      if (accessCode !== studentAccessCode) {
+        alert('Invalid Student Access Code. Please check and try again.');
         return;
       }
 
-      document.getElementById("studentInfo").innerHTML = `
-        <p><strong>Name:</strong> ${studentName}</p>
-        <p><strong>Grade:</strong> ${studentGrade}</p>
-        <p><strong>Email:</strong> ${studentEmail}</p>
-      `;
+      // Save details to sessionStorage
+      sessionStorage.setItem('studentName', document.getElementById('studentName').value.trim());
+      sessionStorage.setItem('parentName', document.getElementById('parentName').value.trim());
+      sessionStorage.setItem('tutorName', document.getElementById('tutorName').value.trim());
+      sessionStorage.setItem('location', document.getElementById('location').value.trim());
+      sessionStorage.setItem('parentEmail', document.getElementById('parentEmail').value.trim());
+      sessionStorage.setItem('grade', document.getElementById('grade').value.trim());
+
+      // Redirect to subject selection page
+      window.location.href = "select-subject.html";
     });
 
-    function startSubject(subjectPage) {
-      window.location.href = subjectPage;
-    }
+    document.getElementById('adminLogin').addEventListener('submit', function(e) {
+      e.preventDefault();
+      const enteredAdminCode = document.getElementById('adminCode').value.trim();
 
-    function logout() {
-      sessionStorage.clear();
-      window.location.href = "index.html";
-    }
+      if (enteredAdminCode !== adminAccessCode) {
+        alert('Invalid Admin Access Code. Please check and try again.');
+        return;
+      }
+
+      window.location.href = "admin-panel.html";
+    });
+
+    document.getElementById('parentLogin').addEventListener('submit', function(e) {
+      e.preventDefault();
+      const studentName = document.getElementById('parentStudentName').value.trim();
+      const parentEmail = document.getElementById('parentEmailLogin').value.trim();
+
+      sessionStorage.setItem('parentLoginName', studentName);
+      sessionStorage.setItem('parentLoginEmail', parentEmail);
+
+      window.location.href = "parent-panel.html";
+    });
   </script>
 </body>
 </html>
