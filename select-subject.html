@@ -50,22 +50,6 @@
       background-color: #fdd835;
     }
 
-    .logout-box {
-      background-color: #e53935;
-      color: white;
-      padding: 15px;
-      margin: 20px auto 0;
-      width: 250px;
-      border-radius: 8px;
-      cursor: pointer;
-      transition: 0.3s;
-      box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-    }
-
-    .logout-box:hover {
-      background-color: #c62828;
-    }
-
     footer {
       margin-top: 40px;
       font-size: 14px;
@@ -83,8 +67,6 @@
     <h2>Select a Subject</h2>
     <!-- Subject buttons will be injected here -->
   </div>
-
-  <div class="logout-box" onclick="logout()">Log Out</div>
 
   <footer>
     &copy; 2025 Blooming Kids House. All rights reserved.
@@ -131,12 +113,6 @@
 
       subjectContainer.appendChild(button);
     });
-
-    function logout() {
-      localStorage.removeItem('studentName');
-      localStorage.removeItem('selectedGrade');
-      window.location.href = 'index.html';
-    }
   </script>
 </body>
 </html>
