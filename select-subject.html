@@ -3,77 +3,86 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Select Subject - Blooming Kids House</title>
+  <title>Select Subject - Blooming Kids House Assessment</title>
   <style>
     body {
       font-family: Arial, sans-serif;
-      background-color: #f1f1f1;
-      text-align: center;
       padding: 40px;
+      background-color: #f9f9f9;
+      color: #333;
     }
+
     h2 {
-      color: #2e7d32;
+      text-align: center;
+      color: green;
     }
-    .subject-buttons {
-      margin-top: 30px;
+
+    .subject-container {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 20px;
+      margin-top: 40px;
     }
-    button {
-      padding: 15px 25px;
-      margin: 10px;
-      background-color: #ffcc00;
-      border: none;
+
+    .subject-box {
+      background-color: #fff;
+      border: 2px solid green;
       border-radius: 8px;
-      font-size: 16px;
-      font-weight: bold;
+      padding: 20px 40px;
+      text-align: center;
+      font-size: 20px;
       cursor: pointer;
+      color: green;
+      transition: background-color 0.3s, color 0.3s;
     }
-    button:disabled {
-      background-color: #ccc;
-      cursor: not-allowed;
+
+    .subject-box:hover {
+      background-color: green;
+      color: white;
     }
   </style>
 </head>
 <body>
-
-  <h2>Select a Subject</h2>
-  <div id="subject-buttons" class="subject-buttons"></div>
+  <h2>Select Subject</h2>
+  <div class="subject-container" id="subjectContainer"></div>
 
   <script>
-    // Get the grade from the URL
-    let rawGrade = new URLSearchParams(window.location.search).get("grade");
-    if (!rawGrade) rawGrade = ""; // in case nothing was passed
-
-    // Extract the number from input like "Grade 6" or "6"
-    const match = rawGrade.match(/\d+/); 
-    const grade = match ? parseInt(match[0]) : null;
-
-    const subjectsPerGrade = {
-      3: ["Maths", "English"],
-      4: ["Maths", "English"],
-      5: ["Maths", "English"],
-      6: ["Maths", "English", "Biology"],
-      7: ["Maths", "English", "Biology"],
-      8: ["Maths", "English", "Biology"],
-      9: ["Maths", "English", "Biology"],
-      10: ["Maths", "English", "Biology"],
-      11: ["Maths", "English", "Biology"],
-      12: ["Maths", "English", "Biology"],
+    const subjectsByGrade = {
+      grade3: ["Maths", "English"],
+      grade4: ["Maths", "English"],
+      grade5: ["Maths", "English"],
+      grade6: ["Maths", "English", "Biology"],
+      grade7: ["Maths", "English", "Biology"],
+      grade8: ["Maths", "English", "Biology"],
+      grade9: ["Maths", "English", "Biology"],
+      grade10: ["Maths", "English", "Biology"],
+      grade11: ["Maths", "English", "Biology"],
+      grade12: ["Maths", "English", "Biology"]
     };
 
-    const container = document.getElementById("subject-buttons");
+    const studentData = JSON.parse(localStorage.getItem("studentData"));
+    const subjectContainer = document.getElementById("subjectContainer");
 
-    if (!grade || !subjectsPerGrade[grade]) {
-      container.innerHTML = "<p>Invalid or missing grade. Please go back and select your grade.</p>";
+    if (!studentData || !studentData.grade || !subjectsByGrade[studentData.grade]) {
+      alert("Invalid or missing grade. Please go back and select your grade.");
+      window.location.href = "index.html";
     } else {
-      subjectsPerGrade[grade].forEach(subject => {
-        const file = `grade${grade}-${subject.toLowerCase()}.html`;
-        const btn = document.createElement("a");
-        btn.href = file;
-        btn.innerHTML = `<button>${subject}</button>`;
-        container.appendChild(btn);
+      const grade = studentData.grade;
+      const subjects = subjectsByGrade[grade];
+
+      subjects.forEach(subject => {
+        const button = document.createElement("div");
+        button.className = "subject-box";
+        button.textContent = subject;
+        button.onclick = () => {
+          // Adjust these file names based on your actual subject test file names
+          const fileName = `${grade}-${subject.toLowerCase()}.html`;
+          window.location.href = fileName;
+        };
+        subjectContainer.appendChild(button);
       });
     }
   </script>
-
 </body>
 </html>
