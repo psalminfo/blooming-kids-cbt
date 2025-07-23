@@ -1,100 +1,118 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <title>Select Subject</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Select Subject - Blooming Kids House</title>
   <style>
     body {
       font-family: Arial, sans-serif;
-      background: #f0f4f8;
-      padding: 40px;
+      background-color: #f7f7f7;
+      margin: 0;
+      padding: 0;
+      text-align: center;
     }
+
+    header {
+      background-color: #2e7d32;
+      color: white;
+      padding: 20px 0;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 28px;
+    }
+
+    .container {
+      padding: 30px 20px;
+    }
+
     h2 {
-      text-align: center;
-      color: #2c3e50;
+      font-size: 22px;
+      margin-bottom: 20px;
+      color: #333;
     }
-    .subject-container {
-      display: flex;
-      flex-wrap: wrap;
-      justify-content: center;
-      margin-top: 30px;
-    }
+
     .subject-box {
-      background: #fff;
-      border: 1px solid #ddd;
+      background-color: #ffeb3b;
+      color: #000;
+      padding: 15px;
+      margin: 10px auto;
+      width: 250px;
       border-radius: 8px;
-      padding: 20px 40px;
-      margin: 10px;
       cursor: pointer;
-      transition: background 0.3s ease;
-      box-shadow: 2px 2px 5px rgba(0,0,0,0.1);
+      transition: 0.3s;
+      box-shadow: 0 4px 6px rgba(0,0,0,0.1);
     }
+
     .subject-box:hover {
-      background: #e0ffe0;
+      background-color: #fdd835;
     }
-    .notice {
-      text-align: center;
-      color: red;
-      margin-top: 20px;
+
+    footer {
+      margin-top: 40px;
+      font-size: 14px;
+      color: #888;
     }
   </style>
 </head>
 <body>
 
-<h2>Select a Subject</h2>
-<div id="subjectList" class="subject-container"></div>
-<div id="message" class="notice"></div>
+  <header>
+    <h1>Blooming Kids House Assessment</h1>
+  </header>
 
-<script>
-  const grade = localStorage.getItem("studentGrade");
-  if (!grade) {
-    document.getElementById("message").innerText = "Invalid or missing grade. Please go back and select your grade.";
-  } else {
-    const allSubjects = {
-      "3": ["Maths", "English"],
-      "4": ["Maths", "English"],
-      "5": ["Maths", "English"],
-      "6": ["Maths", "English", "Biology"],
-      "7": ["Maths", "English", "Biology"],
-      "8": ["Maths", "English", "Biology"],
-      "9": ["Maths", "English", "Biology"],
-      "10": ["Maths", "English", "Biology"],
-      "11": ["Maths", "English", "Biology"],
-      "12": ["Maths", "English", "Biology"]
+  <div class="container" id="subjectContainer">
+    <h2>Select a Subject</h2>
+    <!-- Subject buttons will be injected here -->
+  </div>
+
+  <footer>
+    &copy; 2025 Blooming Kids House. All rights reserved.
+  </footer>
+
+  <script>
+    const grade = localStorage.getItem('selectedGrade');
+    const studentName = localStorage.getItem('studentName');
+
+    if (!grade) {
+      alert('Invalid or missing grade. Please go back and select your grade.');
+      window.location.href = 'index.html';
+    }
+
+    const subjectContainer = document.getElementById("subjectContainer");
+
+    const subjectMap = {
+      "Grade 3": ["Math", "English"],
+      "Grade 4": ["Math", "English"],
+      "Grade 5": ["Math", "English", "Science"],
+      "Grade 6": ["Math", "English", "Science", "Biology"],
+      "Grade 7": ["Math", "English", "Science", "Biology"],
+      "Grade 8": ["Math", "English", "Science", "Biology"],
+      "Grade 9": ["Math", "English", "Science", "Biology"],
+      "Grade 10": ["Math", "English", "Biology", "Chemistry"],
+      "Grade 11": ["Math", "English", "Biology", "Chemistry", "Physics"],
+      "Grade 12": ["Math", "English", "Biology", "Chemistry", "Physics"]
     };
 
-    const subjects = allSubjects[grade] || [];
-    const container = document.getElementById("subjectList");
+    const subjects = subjectMap[grade] || [];
 
-    if (subjects.length === 0) {
-      document.getElementById("message").innerText = "No subjects available for this grade yet.";
-    } else {
-      subjects.forEach(subject => {
-        const button = document.createElement("div");
-        button.className = "subject-box";
-        button.textContent = subject;
+    subjects.forEach(subject => {
+      const button = document.createElement("div");
+      button.className = "subject-box";
+      button.textContent = subject;
 
-        button.onclick = () => {
-          const filename = `grade${grade.toLowerCase()}-${subject.toLowerCase()}.html`;
+      const cleanGrade = grade.toLowerCase().replace(/\s/g, "");
+      const cleanSubject = subject.toLowerCase();
+      const filename = `${cleanGrade}-${cleanSubject}.html`;
 
-          fetch(filename)
-            .then(res => {
-              if (res.ok) {
-                window.location.href = filename;
-              } else {
-                document.getElementById("message").innerText = `Questions for ${subject} are not yet available.`;
-              }
-            })
-            .catch(() => {
-              document.getElementById("message").innerText = `Questions for ${subject} are not yet available.`;
-            });
-        };
+      button.onclick = () => {
+        window.location.href = filename;
+      };
 
-        container.appendChild(button);
-      });
-    }
-  }
-</script>
-
+      subjectContainer.appendChild(button);
+    });
+  </script>
 </body>
 </html>
