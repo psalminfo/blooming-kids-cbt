@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Grade 3 – Mathematics Test</title>
-    <script src="js/report-handler.js"></script>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -363,16 +362,6 @@
         alert(`Test ${isAuto ? 'auto-' : ''}submitted! Your score: ${score}/${Object.keys(answers).length}`);
         window.location.href = 'select-subject.html';
     }
-<script>
-  // Example values – use the actual ones from your test logic
-  const studentName = sessionStorage.getItem("studentName") || "Unknown";
-  const studentGrade = sessionStorage.getItem("studentGrade") || "Grade 3";
-  const subjectName = "Grade 3 – Math"; // or Grade 3 – English etc.
-  const score = finalScore; // however your score is calculated
-
-  // Save report when test is submitted
-  saveReportToLocalStorage(studentName, studentGrade, subjectName, score);
-</script>
 
     timerInterval = setInterval(updateTimer, 1000);
     updateTimer(); // Show initial timer immediately
