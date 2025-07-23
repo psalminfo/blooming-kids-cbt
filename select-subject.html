@@ -3,104 +3,132 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Select Subject</title>
+  <title>Select Subject - Blooming Kids House</title>
   <style>
     body {
       font-family: Arial, sans-serif;
-      background: #f9f9f9;
-      margin: 0;
+      background-color: #f1f1f1;
       padding: 20px;
       text-align: center;
     }
-    h1 {
+    h2 {
       color: #2e7d32;
     }
-    .subject-container {
+    .subject-buttons {
       display: flex;
-      justify-content: center;
       flex-wrap: wrap;
+      justify-content: center;
       margin-top: 30px;
     }
-    .subject {
-      background-color: white;
-      border: 2px solid #cddc39;
+    .grade-block {
+      margin: 20px;
       padding: 20px;
-      margin: 10px;
-      width: 200px;
-      cursor: pointer;
-      border-radius: 8px;
-      box-shadow: 2px 2px 10px rgba(0,0,0,0.1);
+      background-color: white;
+      border: 2px solid #2e7d32;
+      border-radius: 10px;
+      width: 300px;
     }
-    .subject:hover {
-      background-color: #f1f8e9;
-    }
-    #backBtn {
-      margin-top: 30px;
+    button {
       padding: 10px 20px;
-      background-color: #2e7d32;
-      color: white;
+      margin: 5px;
+      background-color: #ffcc00;
       border: none;
-      cursor: pointer;
       border-radius: 5px;
+      cursor: pointer;
+      font-weight: bold;
+    }
+    button:disabled {
+      background-color: #ccc;
+      cursor: not-allowed;
     }
   </style>
 </head>
 <body>
-  <h1 id="headerTitle">Welcome</h1>
-  <p>Select a subject below to begin:</p>
-  <div class="subject-container" id="subjectContainer">
-    <!-- Subjects will load here dynamically -->
+  <h2>Select a Subject to Begin Your Test</h2>
+
+  <div class="subject-buttons">
+    <!-- Repeat this block for each grade -->
+    
+    <!-- Grade 3 -->
+    <div class="grade-block">
+      <h3>Grade 3</h3>
+      <a href="grade3-maths.html"><button>Maths</button></a>
+      <a href="grade3-english.html"><button>English</button></a>
+      <button disabled>Biology (Not available)</button>
+    </div>
+
+    <!-- Grade 4 -->
+    <div class="grade-block">
+      <h3>Grade 4</h3>
+      <a href="grade4-maths.html"><button>Maths</button></a>
+      <a href="grade4-english.html"><button>English</button></a>
+      <button disabled>Biology (Not available)</button>
+    </div>
+
+    <!-- Grade 5 -->
+    <div class="grade-block">
+      <h3>Grade 5</h3>
+      <a href="grade5-maths.html"><button>Maths</button></a>
+      <a href="grade5-english.html"><button>English</button></a>
+      <button disabled>Biology (Not available)</button>
+    </div>
+
+    <!-- Grade 6 -->
+    <div class="grade-block">
+      <h3>Grade 6</h3>
+      <a href="grade6-maths.html"><button>Maths</button></a>
+      <a href="grade6-english.html"><button>English</button></a>
+      <a href="grade6-biology.html"><button>Biology</button></a>
+    </div>
+
+    <!-- Grade 7 -->
+    <div class="grade-block">
+      <h3>Grade 7</h3>
+      <a href="grade7-maths.html"><button>Maths</button></a>
+      <a href="grade7-english.html"><button>English</button></a>
+      <a href="grade7-biology.html"><button>Biology</button></a>
+    </div>
+
+    <!-- Grade 8 -->
+    <div class="grade-block">
+      <h3>Grade 8</h3>
+      <a href="grade8-maths.html"><button>Maths</button></a>
+      <a href="grade8-english.html"><button>English</button></a>
+      <a href="grade8-biology.html"><button>Biology</button></a>
+    </div>
+
+    <!-- Grade 9 -->
+    <div class="grade-block">
+      <h3>Grade 9</h3>
+      <a href="grade9-maths.html"><button>Maths</button></a>
+      <a href="grade9-english.html"><button>English</button></a>
+      <a href="grade9-biology.html"><button>Biology</button></a>
+    </div>
+
+    <!-- Grade 10 -->
+    <div class="grade-block">
+      <h3>Grade 10</h3>
+      <a href="grade10-maths.html"><button>Maths</button></a>
+      <a href="grade10-english.html"><button>English</button></a>
+      <a href="grade10-biology.html"><button>Biology</button></a>
+    </div>
+
+    <!-- Grade 11 -->
+    <div class="grade-block">
+      <h3>Grade 11</h3>
+      <a href="grade11-maths.html"><button>Maths</button></a>
+      <a href="grade11-english.html"><button>English</button></a>
+      <a href="grade11-biology.html"><button>Biology</button></a>
+    </div>
+
+    <!-- Grade 12 -->
+    <div class="grade-block">
+      <h3>Grade 12</h3>
+      <a href="grade12-maths.html"><button>Maths</button></a>
+      <a href="grade12-english.html"><button>English</button></a>
+      <a href="grade12-biology.html"><button>Biology</button></a>
+    </div>
+
   </div>
-
-  <button id="backBtn" onclick="goBack()">← Go Back</button>
-
-  <script>
-    const studentName = localStorage.getItem("studentName");
-    const selectedGrade = localStorage.getItem("selectedGrade");
-
-    document.getElementById("headerTitle").textContent = `${studentName} - ${selectedGrade}`;
-
-    const subjects = ["Maths", "English", "Biology"];
-    const container = document.getElementById("subjectContainer");
-
-    subjects.forEach(subject => {
-      const folderName = selectedGrade.replace(" ", "").toLowerCase(); // e.g. grade3
-      const fileName = `${folderName}-${subject.toLowerCase()}.html`;
-
-      const link = document.createElement("a");
-      link.href = `questions/${fileName}`;
-      link.className = "subject";
-
-      // Biology is only from Grade 6 and above
-      if (subject === "Biology" && parseInt(selectedGrade.split(" ")[1]) < 6) {
-        link.textContent = `${subject} (Unavailable)`;
-        link.style.pointerEvents = "none";
-        link.style.opacity = "0.5";
-      } else {
-        // Check if file exists via fetch
-        fetch(`questions/${fileName}`)
-          .then(res => {
-            if (res.ok) {
-              link.textContent = subject;
-            } else {
-              link.textContent = `${subject} (Unavailable)`;
-              link.style.pointerEvents = "none";
-              link.style.opacity = "0.5";
-            }
-          })
-          .catch(() => {
-            link.textContent = `${subject} (Unavailable)`;
-            link.style.pointerEvents = "none";
-            link.style.opacity = "0.5";
-          });
-      }
-
-      container.appendChild(link);
-    });
-
-    function goBack() {
-      window.location.href = "index.html";
-    }
-  </script>
 </body>
 </html>
