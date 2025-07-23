@@ -1,40 +1,49 @@
-// js/report-handler.js
+document.addEventListener("DOMContentLoaded", function () {
+  const submitBtn = document.querySelector("#submitTest"); // Adjust this if your button has a different ID
+  if (!submitBtn) return;
 
-// Save a test report to localStorage
-function saveReportToLocalStorage(name, grade, subject, score) {
-  const existingReports = JSON.parse(localStorage.getItem("studentReports") || "[]");
+  submitBtn.addEventListener("click", function () {
+    let totalQuestions = document.querySelectorAll(".question-block").length;
+    let correctAnswers = 0;
 
-  const newReport = {
-    name: name.trim(),
-    grade: grade,
-    subject: subject,
-    score: score,
-    date: new Date().toLocaleString()
-  };
+    document.querySelectorAll(".question-block").forEach(block => {
+      const selected = block.querySelector("input[type='radio']:checked");
+      const correct = block.dataset.correct; // Must be present in HTML like data-correct="A"
 
-  // Add new report to the array
-  existingReports.push(newReport);
+      if (selected && selected.value === correct) {
+        correctAnswers++;
+      }
+    });
 
-  // Save back to localStorage
-  localStorage.setItem("studentReports", JSON.stringify(existingReports));
-}
+    // Get subject name from the file name (e.g., grade3-math.html → Math)
+    let path = window.location.pathname;
+    let filename = path.substring(path.lastIndexOf('/') + 1);
+    let subjectPart = filename.split("-")[1] || "Unknown";
+    let subject = subjectPart.split(".")[0];
+    subject = subject.charAt(0).toUpperCase() + subject.slice(1);
 
-// Fetch all reports from localStorage
-function getAllReportsFromLocalStorage() {
-  return JSON.parse(localStorage.getItem("studentReports") || "[]");
-}
+    // Retrieve student details from session storage
+    let studentName = sessionStorage.getItem("studentName") || "Unknown";
+    let studentEmail = sessionStorage.getItem("studentEmail") || "Unknown";
+    let studentGrade = sessionStorage.getItem("studentGrade") || "Unknown";
 
-// Filter reports by student name and email (used in parent panel)
-function getStudentReports(name, email) {
-  const allReports = getAllReportsFromLocalStorage();
+    // Build report
+    const report = {
+      name: studentName,
+      email: studentEmail,
+      grade: studentGrade,
+      subject: subject,
+      score: correctAnswers,
+      total: totalQuestions,
+      date: new Date().toLocaleString()
+    };
 
-  return allReports.filter(
-    (report) => report.name.toLowerCase() === name.toLowerCase() &&
-                (report.email ? report.email.toLowerCase() === email.toLowerCase() : true)
-  );
-}
+    // Save report in localStorage
+    let reports = JSON.parse(localStorage.getItem("studentReports") || "[]");
+    reports.push(report);
+    localStorage.setItem("studentReports", JSON.stringify(reports));
 
-// Optional: Clear all reports (for admin use)
-function clearAllReports() {
-  localStorage.removeItem("studentReports");
-}
+    // Redirect to select-subject.html
+    window.location.href = "select-subject.html";
+  });
+});
