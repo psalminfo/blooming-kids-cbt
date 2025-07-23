@@ -85,16 +85,16 @@
         <input type="text" id="accessCode" placeholder="Access Code" required />
         <select id="gradeSelect" required>
           <option value="">Select Grade</option>
-          <option>Grade 3</option>
-          <option>Grade 4</option>
-          <option>Grade 5</option>
-          <option>Grade 6</option>
-          <option>Grade 7</option>
-          <option>Grade 8</option>
-          <option>Grade 9</option>
-          <option>Grade 10</option>
-          <option>Grade 11</option>
-          <option>Grade 12</option>
+          <option value="3">Grade 3</option>
+          <option value="4">Grade 4</option>
+          <option value="5">Grade 5</option>
+          <option value="6">Grade 6</option>
+          <option value="7">Grade 7</option>
+          <option value="8">Grade 8</option>
+          <option value="9">Grade 9</option>
+          <option value="10">Grade 10</option>
+          <option value="11">Grade 11</option>
+          <option value="12">Grade 12</option>
         </select>
         <button type="submit">Start Test</button>
       </form>
@@ -129,18 +129,20 @@
       const accessCode = document.getElementById('accessCode').value.trim();
       const studentName = document.getElementById('studentName').value.trim();
       const grade = document.getElementById('gradeSelect').value;
+      const parentEmail = document.getElementById('parentEmail').value.trim();
 
       if (accessCode !== studentAccessCode) {
         alert('Invalid Student Access Code. Please check and try again.');
         return;
       }
 
-      // Store selected grade and student name
-      localStorage.setItem('selectedGrade', grade);
-      localStorage.setItem('studentName', studentName);
+      if (!grade) {
+        alert('Please select a grade.');
+        return;
+      }
 
-      // Redirect to subject selection page
-      window.location.href = 'select-subject.html';
+      const query = `?name=${encodeURIComponent(studentName)}&grade=${encodeURIComponent(grade)}&email=${encodeURIComponent(parentEmail)}`;
+      window.location.href = `select-subject.html${query}`;
     });
 
     document.getElementById('adminLogin').addEventListener('submit', function(e) {
