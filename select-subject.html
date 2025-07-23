@@ -1,79 +1,100 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta charset="UTF-8">
   <title>Select Subject</title>
   <style>
     body {
       font-family: Arial, sans-serif;
-      background: #f7f7f7;
-      padding: 20px;
-      text-align: center;
+      background: #f0f4f8;
+      padding: 40px;
     }
-    h1 {
+    h2 {
+      text-align: center;
       color: #2c3e50;
     }
-    .subject-box {
-      display: inline-block;
-      margin: 10px;
-      padding: 20px;
-      background-color: #27ae60;
-      color: white;
-      font-size: 18px;
-      border-radius: 8px;
-      cursor: pointer;
+    .subject-container {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      margin-top: 30px;
     }
-    .subject-box.disabled {
-      background-color: gray;
-      cursor: not-allowed;
+    .subject-box {
+      background: #fff;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      padding: 20px 40px;
+      margin: 10px;
+      cursor: pointer;
+      transition: background 0.3s ease;
+      box-shadow: 2px 2px 5px rgba(0,0,0,0.1);
+    }
+    .subject-box:hover {
+      background: #e0ffe0;
+    }
+    .notice {
+      text-align: center;
+      color: red;
+      margin-top: 20px;
     }
   </style>
 </head>
 <body>
-  <h1>Select a Subject</h1>
-  <div id="subjectContainer"></div>
 
-  <script>
-    const studentData = JSON.parse(localStorage.getItem("studentData"));
+<h2>Select a Subject</h2>
+<div id="subjectList" class="subject-container"></div>
+<div id="message" class="notice"></div>
 
-    if (!studentData || !studentData.grade) {
-      alert("Invalid or missing grade. Please go back and select your grade.");
-      window.location.href = "index.html";
-    }
-
-    const grade = studentData.grade.toLowerCase(); // e.g., grade3
-    const availableSubjects = {
-      grade3: ["Maths", "English"],
-      grade4: ["Maths", "English"],
-      grade5: ["Maths", "English"],
-      grade6: ["Maths", "English", "Biology"],
-      grade7: ["Maths", "English", "Biology"],
-      grade8: ["Maths", "English", "Biology"],
-      grade9: ["Maths", "English", "Biology"],
-      grade10: ["Maths", "English", "Biology"],
-      grade11: ["Maths", "English", "Biology"],
-      grade12: ["Maths", "English", "Biology"]
+<script>
+  const grade = localStorage.getItem("studentGrade");
+  if (!grade) {
+    document.getElementById("message").innerText = "Invalid or missing grade. Please go back and select your grade.";
+  } else {
+    const allSubjects = {
+      "3": ["Maths", "English"],
+      "4": ["Maths", "English"],
+      "5": ["Maths", "English"],
+      "6": ["Maths", "English", "Biology"],
+      "7": ["Maths", "English", "Biology"],
+      "8": ["Maths", "English", "Biology"],
+      "9": ["Maths", "English", "Biology"],
+      "10": ["Maths", "English", "Biology"],
+      "11": ["Maths", "English", "Biology"],
+      "12": ["Maths", "English", "Biology"]
     };
 
-    const fileMap = {
-      Maths: "maths.html",
-      English: "english.html",
-      Biology: "biology.html"
-    };
+    const subjects = allSubjects[grade] || [];
+    const container = document.getElementById("subjectList");
 
-    const container = document.getElementById("subjectContainer");
-
-    if (!availableSubjects[grade]) {
-      container.innerHTML = "<p>No subjects available for your grade.</p>";
+    if (subjects.length === 0) {
+      document.getElementById("message").innerText = "No subjects available for this grade yet.";
     } else {
-      availableSubjects[grade].forEach(subject => {
+      subjects.forEach(subject => {
         const button = document.createElement("div");
         button.className = "subject-box";
         button.textContent = subject;
 
-        const fileName = `questions/${grade}/${fileMap[subject]}`;
+        button.onclick = () => {
+          const filename = `grade${grade.toLowerCase()}-${subject.toLowerCase()}.html`;
 
-        // Check if the file is present (this check works only if server-side supports it; for static Netlify, we assume all uploaded files are available)
-        fetch(fileName, { method: "HEAD" })
-          .then(response => {
+          fetch(filename)
+            .then(res => {
+              if (res.ok) {
+                window.location.href = filename;
+              } else {
+                document.getElementById("message").innerText = `Questions for ${subject} are not yet available.`;
+              }
+            })
+            .catch(() => {
+              document.getElementById("message").innerText = `Questions for ${subject} are not yet available.`;
+            });
+        };
+
+        container.appendChild(button);
+      });
+    }
+  }
+</script>
+
+</body>
+</html>
