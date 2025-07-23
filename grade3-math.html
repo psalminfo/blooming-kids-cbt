@@ -306,14 +306,14 @@
             } else {
                 clearInterval(timerInterval);
                 timerDisplay.textContent = 'Time is up!';
-                window.location.href = 'index.html'; // Redirect when time expires
+                window.location.href = 'select_subject.html'; // Redirect when time expires
             }
         }
 
         function submitTest() {
             clearInterval(timerInterval); // Stop the timer
             timerDisplay.textContent = 'Test Submitted!';
-            window.location.href = 'index.html'; // Redirect to initial page
+            window.location.href = 'select_subject.html'; // Redirect to subject selection page
         }
 
         timerInterval = setInterval(updateTimer, 1000);
