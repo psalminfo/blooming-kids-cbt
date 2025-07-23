@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Parent Panel – Blooming Kids House</title>
+  <script src="js/report-handler.js" defer></script>
+  <style>
+    body { font-family: Arial; background: #f9fff9; color: #333; padding: 20px; }
+    h1 { color: green; }
+    .report-box { border: 1px solid green; margin: 10px 0; padding: 10px; background: #eaffea; }
+  </style>
+</head>
+<body>
+  <h1>Parent Panel</h1>
+  <div>
+    <label>Student Name: <input type="text" id="studentNameInput"></label><br><br>
+    <label>Email: <input type="email" id="studentEmailInput"></label><br><br>
+    <button onclick="loadParentReport()">View Report</button>
+  </div>
+  <hr>
+  <div id="parentReport"></div>
+</body>
+</html>
