@@ -7,113 +7,136 @@
   <style>
     body {
       font-family: Arial, sans-serif;
-      background: #f2f2f2;
+      background-color: #f7f7f7;
       margin: 0;
-      padding: 20px;
+      padding: 0;
       text-align: center;
     }
 
-    h2 {
-      color: #2e7d32;
+    header {
+      background-color: #2e7d32;
+      color: white;
+      padding: 20px 0;
     }
 
-    .subjects-container {
-      display: flex;
-      flex-wrap: wrap;
-      justify-content: center;
-      gap: 15px;
-      margin-top: 30px;
+    h1 {
+      margin: 0;
+      font-size: 28px;
+    }
+
+    .container {
+      padding: 30px 20px;
+    }
+
+    h2 {
+      font-size: 22px;
+      margin-bottom: 20px;
+      color: #333;
     }
 
     .subject-box {
-      background-color: #fff;
-      border: 2px solid #2e7d32;
-      color: #2e7d32;
-      padding: 15px 25px;
+      background-color: #ffeb3b;
+      color: #000;
+      padding: 15px;
+      margin: 10px auto;
+      width: 250px;
       border-radius: 8px;
       cursor: pointer;
       transition: 0.3s;
+      box-shadow: 0 4px 6px rgba(0,0,0,0.1);
     }
 
     .subject-box:hover {
-      background-color: #2e7d32;
-      color: white;
+      background-color: #fdd835;
     }
 
-    .logout-btn {
-      margin-top: 40px;
-      background-color: #d32f2f;
+    .logout-button {
+      background-color: #c62828;
       color: white;
-      padding: 12px 25px;
-      border: none;
-      border-radius: 6px;
+      padding: 15px;
+      margin: 30px auto 10px;
+      width: 250px;
+      border-radius: 8px;
       cursor: pointer;
-      font-size: 16px;
+      transition: 0.3s;
+      box-shadow: 0 4px 6px rgba(0,0,0,0.1);
     }
 
-    .logout-btn:hover {
+    .logout-button:hover {
       background-color: #b71c1c;
+    }
+
+    footer {
+      margin-top: 40px;
+      font-size: 14px;
+      color: #888;
     }
   </style>
 </head>
 <body>
 
-  <h2>Select a Subject</h2>
-  <div id="subject-list" class="subjects-container"></div>
+  <header>
+    <h1>Blooming Kids House Assessment</h1>
+  </header>
 
-  <!-- Logout button appears separately below subjects -->
-  <button class="logout-btn" onclick="logoutAndGenerateReport()">Logout</button>
+  <div class="container" id="subjectContainer">
+    <h2>Select a Subject</h2>
+    <!-- Subject buttons will be injected here -->
+  </div>
+
+  <!-- Logout button -->
+  <div class="logout-button" onclick="logout()">Log Out</div>
+
+  <footer>
+    &copy; 2025 Blooming Kids House. All rights reserved.
+  </footer>
 
   <script>
-    const grade = sessionStorage.getItem("studentGrade");
-    const studentName = sessionStorage.getItem("studentName");
-    const parentEmail = sessionStorage.getItem("parentEmail");
+    const grade = localStorage.getItem('selectedGrade');
+    const studentName = localStorage.getItem('studentName');
 
     if (!grade) {
-      alert("Invalid or missing grade. Please go back and select your grade.");
-      window.location.href = "index.html";
+      alert('Invalid or missing grade. Please go back and select your grade.');
+      window.location.href = 'index.html';
     }
 
-    const subjectsPerGrade = {
-      grade3: ["Math", "English Language Arts", "Science"],
-      grade4: ["Math", "English Language Arts", "Science"],
-      grade5: ["Math", "English Language Arts", "Science"],
-      grade6: ["Math", "English Language Arts", "Science", "Biology"],
-      grade7: ["Math", "English Language Arts", "Science", "Biology"],
-      grade8: ["Math", "English Language Arts", "Science", "Biology"],
-      grade9: ["Math", "English Language Arts", "Science", "Biology"],
-      grade10: ["Math", "English Language Arts", "Science", "Biology"],
-      grade11: ["Math", "English Language Arts", "Science", "Biology"],
-      grade12: ["Math", "English Language Arts", "Science", "Biology"]
+    const subjectContainer = document.getElementById("subjectContainer");
+
+    const subjectMap = {
+      "Grade 3": ["Math", "English"],
+      "Grade 4": ["Math", "English"],
+      "Grade 5": ["Math", "English", "Science"],
+      "Grade 6": ["Math", "English", "Science", "Biology"],
+      "Grade 7": ["Math", "English", "Science", "Biology"],
+      "Grade 8": ["Math", "English", "Science", "Biology"],
+      "Grade 9": ["Math", "English", "Science", "Biology"],
+      "Grade 10": ["Math", "English", "Biology", "Chemistry"],
+      "Grade 11": ["Math", "English", "Biology", "Chemistry", "Physics"],
+      "Grade 12": ["Math", "English", "Biology", "Chemistry", "Physics"]
     };
 
-    const subjects = subjectsPerGrade[grade.toLowerCase()];
-    const container = document.getElementById("subject-list");
+    const subjects = subjectMap[grade] || [];
 
-    if (subjects && subjects.length > 0) {
-      subjects.forEach(subject => {
-        const button = document.createElement("div");
-        button.className = "subject-box";
-        button.textContent = subject;
-        button.onclick = () => {
-          const fileName = `tests/${grade.toLowerCase()}-${subject.toLowerCase().replace(/ /g, "-")}.html`;
-          window.location.href = fileName;
-        };
-        container.appendChild(button);
-      });
-    } else {
-      container.innerHTML = "<p>No subjects available for this grade.</p>";
-    }
+    subjects.forEach(subject => {
+      const button = document.createElement("div");
+      button.className = "subject-box";
+      button.textContent = subject;
 
-    function logoutAndGenerateReport() {
-      generateReport();
-      sessionStorage.clear();
-      window.location.href = "index.html";
-    }
+      const cleanGrade = grade.toLowerCase().replace(/\s/g, "");
+      const cleanSubject = subject.toLowerCase();
+      const filename = `${cleanGrade}-${cleanSubject}.html`;
 
-    function generateReport() {
-      // Placeholder — plug your report sending logic here
-      console.log(`Generating joint report for ${studentName}...`);
+      button.onclick = () => {
+        window.location.href = filename;
+      };
+
+      subjectContainer.appendChild(button);
+    });
+
+    function logout() {
+      localStorage.removeItem('selectedGrade');
+      localStorage.removeItem('studentName');
+      window.location.href = 'index.html';
     }
   </script>
 </body>
