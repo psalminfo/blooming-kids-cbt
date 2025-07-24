@@ -1,77 +1,96 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Admin Panel – Blooming Kids House</title>
-  <link rel="stylesheet" href="css/styles.css" />
-</head>
-<body>
-  <h1>Admin Panel</h1>
+<script>
+// Protect Admin Panel - Only accessible after valid login
+if (!sessionStorage.getItem("adminAccess")) {
+  alert("Unauthorized access. Redirecting to home.");
+  window.location.href = "index.html";
+}
 
-  <div id="accessContainer">
-    <p>Enter admin access code:</p>
-    <input type="password" id="accessCodeInput" placeholder="Enter code" />
-    <button onclick="checkAccess()">Submit</button>
-    <p id="accessError" style="color: red;"></p>
-  </div>
+// Load and display all student reports from localStorage
+window.onload = function () {
+  const reportContainer = document.getElementById("admin-report-container");
 
-  <div id="reportContainer" style="display:none;">
-    <h2>All Student Reports</h2>
-    <table border="1" cellpadding="10">
+  if (!reportContainer) return;
+
+  let reports = [];
+  for (let key in localStorage) {
+    if (localStorage.hasOwnProperty(key) && key.startsWith("studentReport_")) {
+      try {
+        const report = JSON.parse(localStorage.getItem(key));
+        reports.push(report);
+      } catch (e) {
+        console.error("Error parsing report for key:", key);
+      }
+    }
+  }
+
+  if (reports.length === 0) {
+    reportContainer.innerHTML = "<p>No reports found yet.</p>";
+    return;
+  }
+
+  let tableHTML = `
+    <table border="1" cellpadding="10" cellspacing="0" style="width: 100%; border-collapse: collapse;">
       <thead>
         <tr>
-          <th>Name</th>
+          <th>Student Name</th>
           <th>Email</th>
           <th>Grade</th>
-          <th>Subject</th>
-          <th>Score</th>
-          <th>Total</th>
-          <th>Date</th>
+          <th>Subjects</th>
+          <th>Performance Summary</th>
+          <th>Download</th>
         </tr>
       </thead>
-      <tbody id="reportTableBody"></tbody>
-    </table>
-  </div>
+      <tbody>
+  `;
 
-  <script>
-    const ACCESS_CODE = "BKHA2025"; // Set your access code here
+  reports.forEach(report => {
+    const subjects = Object.keys(report.scores).join(", ");
+    const performance = Object.entries(report.scores).map(([subject, score]) => {
+      return `${subject}: ${score}%`;
+    }).join("<br>");
 
-    function checkAccess() {
-      const enteredCode = document.getElementById("accessCodeInput").value;
-      const errorText = document.getElementById("accessError");
+    tableHTML += `
+      <tr>
+        <td>${report.studentName}</td>
+        <td>${report.email}</td>
+        <td>${report.grade}</td>
+        <td>${subjects}</td>
+        <td>${performance}</td>
+        <td><button onclick='downloadReport("${report.studentName}")'>Download</button></td>
+      </tr>
+    `;
+  });
 
-      if (enteredCode === ACCESS_CODE) {
-        document.getElementById("accessContainer").style.display = "none";
-        document.getElementById("reportContainer").style.display = "block";
-        loadReports();
-      } else {
-        errorText.textContent = "Invalid access code. Please try again.";
-      }
-    }
+  tableHTML += "</tbody></table>";
+  reportContainer.innerHTML = tableHTML;
+};
 
-    function loadReports() {
-      const reports = JSON.parse(localStorage.getItem("studentReports") || "[]");
-      const tableBody = document.getElementById("reportTableBody");
+// Download individual report
+function downloadReport(studentName) {
+  const key = "studentReport_" + studentName;
+  const report = JSON.parse(localStorage.getItem(key));
+  if (!report) {
+    alert("Report not found.");
+    return;
+  }
 
-      if (reports.length === 0) {
-        tableBody.innerHTML = `<tr><td colspan="7">No reports found</td></tr>`;
-        return;
-      }
+  const content = `
+    Student Name: ${report.studentName}
+    Email: ${report.email}
+    Grade: ${report.grade}
+    Subjects and Scores:\n${Object.entries(report.scores).map(([sub, sc]) => `${sub}: ${sc}%`).join("\n")}
+  `;
 
-      reports.forEach(r => {
-        const row = `<tr>
-          <td>${r.name}</td>
-          <td>${r.email}</td>
-          <td>${r.grade}</td>
-          <td>${r.subject}</td>
-          <td>${r.score}</td>
-          <td>${r.total}</td>
-          <td>${r.date}</td>
-        </tr>`;
-        tableBody.innerHTML += row;
-      });
-    }
-  </script>
-</body>
-</html>
+  const blob = new Blob([content], { type: "text/plain" });
+  const link = document.createElement("a");
+  link.href = window.URL.createObjectURL(blob);
+  link.download = `${report.studentName}_Report.txt`;
+  link.click();
+}
+
+// Logout function
+function logoutAdmin() {
+  sessionStorage.removeItem("adminAccess");
+  window.location.href = "index.html";
+}
+</script>
