@@ -3,58 +3,116 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Grade 3 – Mathematics Test</title>
+  <title>Grade 3 ELA Test - Blooming Kids House</title>
   <link rel="stylesheet" href="css/style.css" />
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 20px;
+      background-color: #f0fff0;
+      color: #333;
+    }
+    h1 {
+      text-align: center;
+      color: green;
+    }
+    #timer {
+      position: fixed;
+      top: 10px;
+      right: 10px;
+      background-color: yellow;
+      padding: 10px;
+      border: 2px solid green;
+      border-radius: 5px;
+      font-weight: bold;
+    }
+    .question {
+      background-color: #fff;
+      padding: 15px;
+      margin: 15px 0;
+      border: 1px solid green;
+      border-radius: 5px;
+    }
+    .question label {
+      display: block;
+      margin: 10px 0;
+    }
+    button {
+      display: block;
+      margin: 30px auto;
+      padding: 12px 25px;
+      background-color: green;
+      color: white;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+      font-size: 16px;
+    }
+    button:hover {
+      background-color: darkgreen;
+    }
+    @media (max-width: 600px) {
+      body {
+        padding: 10px;
+      }
+      #timer {
+        font-size: 14px;
+        padding: 8px;
+      }
+    }
+  </style>
 </head>
 <body>
-  <h1>Blooming Kids House: Grade 3 – Mathematics Test</h1>
+  <h1>Blooming Kids House: Grade 3 – English Language Arts Test</h1>
   <div id="timer">Time Remaining: 30:00</div>
 
   <div id="questions">
     <div class="question">
-      <p><strong>1. What is 15 + 9?</strong></p>
-      <label><input type="radio" name="q1" value="a"> 23</label>
-      <label><input type="radio" name="q1" value="b"> 24</label>
-      <label><input type="radio" name="q1" value="c" data-correct="true"> 24</label>
-      <label><input type="radio" name="q1" value="d"> 25</label>
+      <p><strong>1. What is the opposite of "happy"?</strong></p>
+      <label><input type="radio" name="q1" value="a"> Laugh</label>
+      <label><input type="radio" name="q1" value="b" data-correct="true"> Sad</label>
+      <label><input type="radio" name="q1" value="c"> Smile</label>
+      <label><input type="radio" name="q1" value="d"> Cheerful</label>
     </div>
 
     <div class="question">
-      <p><strong>2. Which number is even?</strong></p>
-      <label><input type="radio" name="q2" value="a"> 15</label>
-      <label><input type="radio" name="q2" value="b" data-correct="true"> 16</label>
-      <label><input type="radio" name="q2" value="c"> 17</label>
-      <label><input type="radio" name="q2" value="d"> 19</label>
+      <p><strong>2. Choose the correct punctuation for this sentence: "What time is it"</strong></p>
+      <label><input type="radio" name="q2" value="a"> .</label>
+      <label><input type="radio" name="q2" value="b"> ,</label>
+      <label><input type="radio" name="q2" value="c" data-correct="true"> ?</label>
+      <label><input type="radio" name="q2" value="d"> !</label>
     </div>
 
     <div class="question">
-      <p><strong>3. What is 6 × 5?</strong></p>
-      <label><input type="radio" name="q3" value="a"> 35</label>
-      <label><input type="radio" name="q3" value="b"> 20</label>
-      <label><input type="radio" name="q3" value="c" data-correct="true"> 30</label>
-      <label><input type="radio" name="q3" value="d"> 25</label>
+      <p><strong>3. Which word is a noun?</strong></p>
+      <label><input type="radio" name="q3" value="a" data-correct="true"> Dog</label>
+      <label><input type="radio" name="q3" value="b"> Run</label>
+      <label><input type="radio" name="q3" value="c"> Quickly</label>
+      <label><input type="radio" name="q3" value="d"> Happy</label>
     </div>
 
     <div class="question">
-      <p><strong>4. Round 67 to the nearest ten.</strong></p>
-      <label><input type="radio" name="q4" value="a"> 60</label>
-      <label><input type="radio" name="q4" value="b"> 65</label>
-      <label><input type="radio" name="q4" value="c" data-correct="true"> 70</label>
-      <label><input type="radio" name="q4" value="d"> 75</label>
+      <p><strong>4. What is the plural of "child"?</strong></p>
+      <label><input type="radio" name="q4" value="a"> Childs</label>
+      <label><input type="radio" name="q4" value="b"> Childes</label>
+      <label><input type="radio" name="q4" value="c"> Childer</label>
+      <label><input type="radio" name="q4" value="d" data-correct="true"> Children</label>
     </div>
 
     <div class="question">
-      <p><strong>5. What is the value of the digit 4 in the number 342?</strong></p>
-      <label><input type="radio" name="q5" value="a"> 4</label>
-      <label><input type="radio" name="q5" value="b" data-correct="true"> 40</label>
-      <label><input type="radio" name="q5" value="c"> 400</label>
-      <label><input type="radio" name="q5" value="d"> 14</label>
+      <p><strong>5. Which sentence is correct?</strong></p>
+      <label><input type="radio" name="q5" value="a"> She run very fast.</label>
+      <label><input type="radio" name="q5" value="b"> He going to the store.</label>
+      <label><input type="radio" name="q5" value="c" data-correct="true"> They are playing outside.</label>
+      <label><input type="radio" name="q5" value="d"> I eats breakfast.</label>
     </div>
   </div>
 
-  <button id="submitBtn">Submit Test</button>
+  <button id="submitTestBtn">Submit Test</button>
 
-  <script src="js/universal-test.js"></script>
-  <script src="js/report-handler.js"></script>
+  <script type="module" src="js/universal-test.js"></script>
+  <script type="module" src="js/report-handler.js"></script>
 </body>
 </html>
