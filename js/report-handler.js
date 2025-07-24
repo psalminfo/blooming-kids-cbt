@@ -1,34 +1,44 @@
-// Generate a report after test submission
-function generateTestReport(name, email, subject, grade, score, total) {
+// ✅ Save test report to localStorage
+function saveTestReport(report) {
+  const reports = JSON.parse(localStorage.getItem("bkh_reports") || "[]");
+  reports.push(report);
+  localStorage.setItem("bkh_reports", JSON.stringify(reports));
+}
+
+// ✅ Generate report structure
+function generateTestReport(name, email, subject, grade, score, totalQuestions) {
+  const percentage = (score / totalQuestions) * 100;
+  let performance = "";
+
+  if (percentage >= 90) performance = "Excellent";
+  else if (percentage >= 75) performance = "Good";
+  else if (percentage >= 60) performance = "Fair";
+  else performance = "Needs Improvement";
+
   return {
     studentName: name,
     studentEmail: email,
-    subject: subject,
     grade: grade,
+    subject: subject,
     score: score,
-    total: total,
-    date: new Date().toLocaleString(),
+    totalQuestions: totalQuestions,
+    percentage: percentage.toFixed(2),
+    performance: performance,
+    timestamp: new Date().toISOString()
   };
 }
 
-// Save report using standard function
-function saveTestReport(report) {
-  saveReportToLocalStorage(report);
-}
-
-// Save test report to localStorage
+// ✅ Admin and parent report features (already present, keep them as-is)
 function saveReportToLocalStorage(report) {
   const reports = JSON.parse(localStorage.getItem('bkh_reports')) || [];
   reports.push(report);
   localStorage.setItem('bkh_reports', JSON.stringify(reports));
 }
 
-// Get all stored reports (for admin)
 function getAllReports() {
   return JSON.parse(localStorage.getItem('bkh_reports')) || [];
 }
 
-// Get report for specific parent
 function getParentReport(name, email) {
   const reports = getAllReports();
   return reports.filter(report =>
@@ -37,15 +47,12 @@ function getParentReport(name, email) {
   );
 }
 
-// Admin logout
 function logoutAdmin() {
   localStorage.removeItem('isAdminLoggedIn');
   window.location.href = 'index.html';
 }
 
-// Admin check
 function checkAdminAuth() {
   const loggedIn = localStorage.getItem('isAdminLoggedIn');
   if (!loggedIn) window.location.href = 'admin-panel.html';
 }
-
