@@ -289,111 +289,70 @@
         <label><input type="radio" name="q30" value="c"> Income</label>
         <label><input type="radio" name="q30" value="d"> Spending</label>
     </div>
+<button onclick="submitTest()">Submit Test</button>
+
 <script>
-// ⏱️ Example trigger: This function should run AFTER the test is submitted and scored
-function saveTestReport(studentName, parentEmail, score, totalQuestions) {
-  // Convert score to percentage
-  const percentage = Math.round((score / totalQuestions) * 100);
+  let timeLeft = 30 * 60;
+  const timerDisplay = document.getElementById('timer');
 
-  // Detect subject and grade from the current page filename
-  const path = window.location.pathname;
-  const file = path.substring(path.lastIndexOf('/') + 1);
-  const subject = file.replace('.html', '').replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase()); // e.g. 'grade3-math' → 'Grade3 Math'
-  const finalSubject = subject.replace(/(\d)([a-zA-Z])/g, '$1 $2'); // makes 'Grade3 Math' → 'Grade 3 Math'
+  function updateTimer() {
+    const minutes = Math.floor(timeLeft / 60);
+    const seconds = timeLeft % 60;
+    timerDisplay.textContent = `Time Remaining: ${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
+    if (timeLeft > 0) {
+      timeLeft--;
+    } else {
+      clearInterval(timerInterval);
+      timerDisplay.textContent = 'Time is up!';
+      submitTest();
+    }
+  }
 
-  const report = {
-    studentName,
-    parentEmail,
-    subject: finalSubject,
-    score,
-    total: totalQuestions,
-    percentage,
-    date: new Date().toLocaleString()
-  };
+  const timerInterval = setInterval(updateTimer, 1000);
+  updateTimer();
 
-  const reportKey = `${studentName}_${parentEmail}`;
-  localStorage.setItem(reportKey, JSON.stringify(report));
+  function submitTest() {
+    clearInterval(timerInterval);
 
-  // Store in a central admin array
-  const reports = JSON.parse(localStorage.getItem('bkh_reports') || '[]');
-  reports.push(report);
-  localStorage.setItem('bkh_reports', JSON.stringify(reports));
-}
-</script>
+    const totalQuestions = 30;
+    const correctAnswers = {
+      q1: 'b', q2: 'b', q3: 'b', q4: 'c', q5: 'b',
+      q6: 'c', q7: 'c', q8: 'b', q9: 'a', q10: 'c',
+      q11: 'b', q12: 'c', q13: 'c', q14: 'a', q15: 'c',
+      q16: 'b', q17: 'c', q18: 'b', q19: 'c', q20: 'b',
+      q21: 'b', q22: 'b', q23: 'b', q24: 'b', q25: 'c',
+      q26: 'b', q27: 'c', q28: 'b', q29: 'c', q30: 'b'
+    };
 
-    <button onclick="submitTest()">Submit Test</button>
+    let score = 0;
 
-   <script>
-    let timeLeft = 30 * 60; // 30 minutes in seconds
-    let timerInterval = null;
-    const timerDisplay = document.getElementById('timer');
-
-    function updateTimer() {
-        const minutes = Math.floor(timeLeft / 60);
-        const seconds = timeLeft % 60;
-        timerDisplay.textContent = `Time Remaining: ${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
-        if (timeLeft > 0) {
-            timeLeft--;
-        } else {
-            clearInterval(timerInterval);
-            finishTest(true); // auto-submit
-        }
+    for (let i = 1; i <= totalQuestions; i++) {
+      const question = document.querySelector(`input[name="q${i}"]:checked`);
+      if (question && question.value === correctAnswers[`q${i}`]) {
+        score++;
+      }
     }
 
-    function submitTest() {
-        clearInterval(timerInterval);
-        finishTest(false); // manual submit
-    }
+    const percentage = (score / totalQuestions) * 100;
+    const studentName = localStorage.getItem('studentName') || 'Student';
+    const subject = 'Mathematics';
+    const grade = 'Grade 3';
 
-    function finishTest(isAuto) {
-        let score = 0;
-        const answers = {
-            q1: 'b',
-            q2: 'b',
-            q3: 'c',
-            q4: 'c',
-            q5: 'b',
-            q6: 'c',
-            q7: 'b',
-            q8: 'b',
-            q9: 'c',
-            q10: 'c',
-            q11: 'd',
-            q12: 'c',
-            q13: 'c',
-            q14: 'a',
-            q15: 'c',
-            q16: 'b',
-            q17: 'c',
-            q18: 'c',
-            q19: 'c',
-            q20: 'b',
-            q21: 'b',
-            q22: 'b',
-            q23: 'b',
-            q24: 'b',
-            q25: 'c',
-            q26: 'b',
-            q27: 'c',
-            q28: 'b',
-            q29: 'c',
-            q30: 'b'
-        };
+    const report = {
+      name: studentName,
+      grade: grade,
+      subject: subject,
+      score: score,
+      total: totalQuestions,
+      percentage: percentage.toFixed(2)
+    };
 
-        for (let q in answers) {
-            const selected = document.querySelector(`input[name="${q}"]:checked`);
-            if (selected && selected.value === answers[q]) {
-                score++;
-            }
-        }
+    let allReports = JSON.parse(localStorage.getItem('bk_reports') || '[]');
+    allReports = allReports.filter(r => !(r.subject === subject && r.grade === grade));
+    allReports.push(report);
+    localStorage.setItem('bk_reports', JSON.stringify(allReports));
 
-        localStorage.setItem("math_grade3_score", score);
-        localStorage.setItem("math_grade3_total", Object.keys(answers).length);
-
-        alert(`Test ${isAuto ? 'auto-' : ''}submitted! Your score: ${score}/${Object.keys(answers).length}`);
-        window.location.href = 'select-subject.html';
-    }
-
-    timerInterval = setInterval(updateTimer, 1000);
-    updateTimer(); // Show initial timer immediately
+    alert(`Test submitted! You scored ${score} out of ${totalQuestions} (${percentage.toFixed(2)}%).`);
+    window.location.href = "select-subject.html";
+  }
 </script>
