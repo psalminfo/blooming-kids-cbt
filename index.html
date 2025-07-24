@@ -124,6 +124,7 @@
     const studentAccessCode = "BKH-STUDENT-2025";
     const adminAccessCode = "BKH-ADMIN-2025";
 
+    // ✅ Student Login
     document.getElementById('studentForm').addEventListener('submit', function(e) {
       e.preventDefault();
 
@@ -140,13 +141,14 @@
         return;
       }
 
-      sessionStorage.setItem("studentName", studentName);
-      sessionStorage.setItem("studentEmail", parentEmail);
-      sessionStorage.setItem("studentGrade", grade);
+      localStorage.setItem("studentName", studentName);
+      localStorage.setItem("studentEmail", parentEmail);
+      localStorage.setItem("grade", grade);
 
       window.location.href = "select-subject.html";
     });
 
+    // ✅ Admin Login
     document.getElementById('adminLogin').addEventListener('submit', function(e) {
       e.preventDefault();
       const enteredAdminCode = document.getElementById('adminCode').value.trim();
@@ -156,13 +158,14 @@
         return;
       }
 
-      sessionStorage.setItem("isAdmin", "true");
+      localStorage.setItem("isAdminLoggedIn", "true");
       window.location.href = "admin-dashboard.html";
     });
 
+    // ✅ Parent Login → Redirect to full parent panel
     document.getElementById('parentLogin').addEventListener('submit', function(e) {
       e.preventDefault();
-      alert('Parent login submitted.');
+      window.location.href = "parent-panel.html";
     });
   </script>
 </body>
