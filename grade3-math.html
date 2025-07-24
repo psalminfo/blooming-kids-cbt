@@ -289,6 +289,37 @@
         <label><input type="radio" name="q30" value="c"> Income</label>
         <label><input type="radio" name="q30" value="d"> Spending</label>
     </div>
+<script>
+// ⏱️ Example trigger: This function should run AFTER the test is submitted and scored
+function saveTestReport(studentName, parentEmail, score, totalQuestions) {
+  // Convert score to percentage
+  const percentage = Math.round((score / totalQuestions) * 100);
+
+  // Detect subject and grade from the current page filename
+  const path = window.location.pathname;
+  const file = path.substring(path.lastIndexOf('/') + 1);
+  const subject = file.replace('.html', '').replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase()); // e.g. 'grade3-math' → 'Grade3 Math'
+  const finalSubject = subject.replace(/(\d)([a-zA-Z])/g, '$1 $2'); // makes 'Grade3 Math' → 'Grade 3 Math'
+
+  const report = {
+    studentName,
+    parentEmail,
+    subject: finalSubject,
+    score,
+    total: totalQuestions,
+    percentage,
+    date: new Date().toLocaleString()
+  };
+
+  const reportKey = `${studentName}_${parentEmail}`;
+  localStorage.setItem(reportKey, JSON.stringify(report));
+
+  // Store in a central admin array
+  const reports = JSON.parse(localStorage.getItem('bkh_reports') || '[]');
+  reports.push(report);
+  localStorage.setItem('bkh_reports', JSON.stringify(reports));
+}
+</script>
 
     <button onclick="submitTest()">Submit Test</button>
 
