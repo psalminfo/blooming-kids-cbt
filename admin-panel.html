@@ -43,7 +43,7 @@
     }
   </style>
 </head>
-<body>
+<body onload="checkAdminAuth(); displayAdminReports()">
   <h2>Admin Dashboard</h2>
   <button class="logout-btn" onclick="logoutAdmin()">Logout</button>
 
@@ -52,5 +52,32 @@
   </div>
 
   <script src="js/report-handler.js"></script>
+  <script>
+    function displayAdminReports() {
+      const reports = getAllReports();
+      const container = document.getElementById('adminContent');
+      container.innerHTML = '';
+
+      if (reports.length === 0) {
+        container.innerHTML = '<p>No reports available.</p>';
+        return;
+      }
+
+      reports.forEach(report => {
+        const card = document.createElement('div');
+        card.className = 'report-card';
+        card.innerHTML = `
+          <strong>Name:</strong> ${report.studentName}<br/>
+          <strong>Email:</strong> ${report.studentEmail}<br/>
+          <strong>Subject:</strong> ${report.subject}<br/>
+          <strong>Grade:</strong> ${report.grade}<br/>
+          <strong>Score:</strong> ${report.score}/${report.total || 30}<br/>
+          <strong>Percentage:</strong> ${report.percentage}%<br/>
+          <strong>Date:</strong> ${report.date}
+        `;
+        container.appendChild(card);
+      });
+    }
+  </script>
 </body>
 </html>
