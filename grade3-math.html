@@ -311,6 +311,13 @@
   const timerInterval = setInterval(updateTimer, 1000);
   updateTimer();
 
+  function saveTestReport(report) {
+    let reports = JSON.parse(localStorage.getItem("bk_reports") || "[]");
+    reports = reports.filter(r => !(r.subject === report.subject && r.grade === report.grade));
+    reports.push(report);
+    localStorage.setItem("bk_reports", JSON.stringify(reports));
+  }
+
   function submitTest() {
     clearInterval(timerInterval);
 
@@ -327,32 +334,24 @@
     let score = 0;
 
     for (let i = 1; i <= totalQuestions; i++) {
-      const question = document.querySelector(`input[name="q${i}"]:checked`);
-      if (question && question.value === correctAnswers[`q${i}`]) {
+      const selected = document.querySelector(`input[name="q${i}"]:checked`);
+      if (selected && selected.value === correctAnswers[`q${i}`]) {
         score++;
       }
     }
 
-    const percentage = (score / totalQuestions) * 100;
-    const studentName = localStorage.getItem('studentName') || 'Student';
-    const subject = 'Mathematics';
-    const grade = 'Grade 3';
-
     const report = {
-      name: studentName,
-      grade: grade,
-      subject: subject,
+      studentName: localStorage.getItem("studentName") || "Unknown",
+      grade: localStorage.getItem("grade") || "Grade 3",
+      subject: localStorage.getItem("subject") || "Mathematics",
       score: score,
       total: totalQuestions,
-      percentage: percentage.toFixed(2)
+      percentage: Math.round((score / totalQuestions) * 100),
+      date: new Date().toLocaleString()
     };
 
-    let allReports = JSON.parse(localStorage.getItem('bk_reports') || '[]');
-    allReports = allReports.filter(r => !(r.subject === subject && r.grade === grade));
-    allReports.push(report);
-    localStorage.setItem('bk_reports', JSON.stringify(allReports));
-
-    alert(`Test submitted! You scored ${score} out of ${totalQuestions} (${percentage.toFixed(2)}%).`);
+    saveTestReport(report);
+    alert(`Test submitted! You scored ${score} out of ${totalQuestions} (${report.percentage}%).`);
     window.location.href = "select-subject.html";
   }
 </script>
