@@ -10,20 +10,20 @@
       max-width: 800px;
       margin: 0 auto;
       padding: 20px;
-      background-color: #f0f8f0;
+      background-color: #f0fff0;
       color: #333;
     }
     h1 {
       text-align: center;
-      color: #2e7d32;
+      color: green;
     }
     #timer {
       position: fixed;
       top: 10px;
       right: 10px;
-      background-color: #ffeb3b;
+      background-color: yellow;
       padding: 10px;
-      border: 2px solid #2e7d32;
+      border: 2px solid green;
       border-radius: 5px;
       font-weight: bold;
     }
@@ -31,7 +31,7 @@
       background-color: #fff;
       padding: 15px;
       margin: 15px 0;
-      border: 1px solid #2e7d32;
+      border: 1px solid green;
       border-radius: 5px;
     }
     .question label {
@@ -40,16 +40,17 @@
     }
     button {
       display: block;
-      margin: 20px auto;
-      padding: 10px 20px;
-      background-color: #2e7d32;
+      margin: 30px auto;
+      padding: 12px 25px;
+      background-color: green;
       color: white;
       border: none;
       border-radius: 5px;
       cursor: pointer;
+      font-size: 16px;
     }
     button:hover {
-      background-color: #1b5e20;
+      background-color: darkgreen;
     }
     @media (max-width: 600px) {
       body {
@@ -66,234 +67,224 @@
   <h1>Blooming Kids House: Grade 3 – Mathematics Test</h1>
   <div id="timer">Time Remaining: 30:00</div>
 
- <!-- Problem Set 1: Number and Operations -->
-    <div class="problem-set">
-        <h2>At the Bakery</h2>
-        <p>Mrs. Lee’s bakery makes cookies. On Monday, she bakes 245 cookies. On Tuesday, she bakes 318 more cookies. She puts 12 cookies in each box to sell. Use addition and division to answer the questions below.</p>
+  <div id="questions">
+    <div class="question">
+      <p><strong>1. What is 24 + 18?</strong></p>
+      <label><input type="radio" name="q1" value="a"> 40</label>
+      <label><input type="radio" name="q1" value="b" data-correct="true"> 42</label>
+      <label><input type="radio" name="q1" value="c"> 44</label>
+      <label><input type="radio" name="q1" value="d"> 38</label>
     </div>
     <div class="question">
-        <p><strong>1. How many cookies does Mrs. Lee bake in total on Monday and Tuesday?</strong></p>
-        <label><input type="radio" name="q1" value="a"> 553 cookies</label>
-        <label><input type="radio" name="q1" value="b"> 563 cookies</label>
-        <label><input type="radio" name="q1" value="c"> 573 cookies</label>
-        <label><input type="radio" name="q1" value="d"> 583 cookies</label>
+      <p><strong>2. Subtract: 45 - 27 = ?</strong></p>
+      <label><input type="radio" name="q2" value="a"> 18</label>
+      <label><input type="radio" name="q2" value="b" data-correct="true"> 18</label>
+      <label><input type="radio" name="q2" value="c"> 20</label>
+      <label><input type="radio" name="q2" value="d"> 16</label>
     </div>
     <div class="question">
-        <p><strong>2. How many boxes can Mrs. Lee fill with 563 cookies if each box holds 12 cookies?</strong></p>
-        <label><input type="radio" name="q2" value="a"> 46 boxes</label>
-        <label><input type="radio" name="q2" value="b"> 47 boxes</label>
-        <label><input type="radio" name="q2" value="c"> 48 boxes</label>
-        <label><input type="radio" name="q2" value="d"> 49 boxes</label>
+      <p><strong>3. What is 6 × 4?</strong></p>
+      <label><input type="radio" name="q3" value="a"> 20</label>
+      <label><input type="radio" name="q3" value="b"> 22</label>
+      <label><input type="radio" name="q3" value="c" data-correct="true"> 24</label>
+      <label><input type="radio" name="q3" value="d"> 26</label>
     </div>
     <div class="question">
-        <p><strong>3. How many cookies are left over after filling the boxes?</strong></p>
-        <label><input type="radio" name="q3" value="a"> 9 cookies</label>
-        <label><input type="radio" name="q3" value="b"> 10 cookies</label>
-        <label><input type="radio" name="q3" value="c"> 11 cookies</label>
-        <label><input type="radio" name="q3" value="d"> 12 cookies</label>
+      <p><strong>4. Divide: 15 ÷ 3 = ?</strong></p>
+      <label><input type="radio" name="q4" value="a"> 4</label>
+      <label><input type="radio" name="q4" value="b" data-correct="true"> 5</label>
+      <label><input type="radio" name="q4" value="c"> 6</label>
+      <label><input type="radio" name="q4" value="d"> 7</label>
     </div>
     <div class="question">
-        <p><strong>4. What is the place value of the digit 5 in 563?</strong></p>
-        <label><input type="radio" name="q4" value="a"> Ones</label>
-        <label><input type="radio" name="q4" value="b"> Tens</label>
-        <label><input type="radio" name="q4" value="c"> Hundreds</label>
-        <label><input type="radio" name="q4" value="d"> Thousands</label>
+      <p><strong>5. Which fraction represents one out of four equal parts?</strong></p>
+      <label><input type="radio" name="q5" value="a"> 1/2</label>
+      <label><input type="radio" name="q5" value="b"> 1/3</label>
+      <label><input type="radio" name="q5" value="c" data-correct="true"> 1/4</label>
+      <label><input type="radio" name="q5" value="d"> 1/5</label>
     </div>
     <div class="question">
-        <p><strong>5. Which number is greater: 563 or 536?</strong></p>
-        <label><input type="radio" name="q5" value="a"> 536</label>
-        <label><input type="radio" name="q5" value="b"> 563</label>
-        <label><input type="radio" name="q5" value="c"> They are equal</label>
-        <label><input type="radio" name="q5" value="d"> Cannot compare</label>
+      <p><strong>6. What is the value of the digit 7 in the number 374?</strong></p>
+      <label><input type="radio" name="q6" value="a"> 7</label>
+      <label><input type="radio" name="q6" value="b"> 70</label>
+      <label><input type="radio" name="q6" value="c" data-correct="true"> 70</label>
+      <label><input type="radio" name="q6" value="d"> 700</label>
     </div>
     <div class="question">
-        <p><strong>6. Mrs. Lee sells 6 boxes of cookies. How many cookies does she sell?</strong></p>
-        <label><input type="radio" name="q6" value="a"> 60 cookies</label>
-        <label><input type="radio" name="q6" value="b"> 66 cookies</label>
-        <label><input type="radio" name="q6" value="c"> 72 cookies</label>
-        <label><input type="radio" name="q6" value="d"> 78 cookies</label>
-    </div>
-
-    <!-- Problem Set 2: Data Analysis -->
-    <div class="problem-set">
-        <h2>Favorite Fruits</h2>
-        <p>The students in a class voted for their favorite fruit. The results are: Apples (6 votes), Bananas (8 votes), Oranges (5 votes), Grapes (7 votes). Use this information to answer the questions below.</p>
+      <p><strong>7. Round 156 to the nearest ten.</strong></p>
+      <label><input type="radio" name="q7" value="a"> 150</label>
+      <label><input type="radio" name="q7" value="b" data-correct="true"> 160</label>
+      <label><input type="radio" name="q7" value="c"> 170</label>
+      <label><input type="radio" name="q7" value="d"> 140</label>
     </div>
     <div class="question">
-        <p><strong>7. How many students voted for apples?</strong></p>
-        <label><input type="radio" name="q7" value="a"> 5 students</label>
-        <label><input type="radio" name="q7" value="b"> 6 students</label>
-        <label><input type="radio" name="q7" value="c"> 7 students</label>
-        <label><input type="radio" name="q7" value="d"> 8 students</label>
+      <p><strong>8. Which number is even?</strong></p>
+      <label><input type="radio" name="q8" value="a"> 13</label>
+      <label><input type="radio" name="q8" value="b"> 17</label>
+      <label><input type="radio" name="q8" value="c"> 19</label>
+      <label><input type="radio" name="q8" value="d" data-correct="true"> 20</label>
     </div>
     <div class="question">
-        <p><strong>8. Which fruit was the most popular?</strong></p>
-        <label><input type="radio" name="q8" value="a"> Apple</label>
-        <label><input type="radio" name="q8" value="b"> Banana</label>
-        <label><input type="radio" name="q8" value="c"> Orange</label>
-        <label><input type="radio" name="q8" value="d"> Grape</label>
+      <p><strong>9. A rectangle has 4 sides. How many sides do 3 rectangles have?</strong></p>
+      <label><input type="radio" name="q9" value="a"> 8</label>
+      <label><input type="radio" name="q9" value="b"> 10</label>
+      <label><input type="radio" name="q9" value="c" data-correct="true"> 12</label>
+      <label><input type="radio" name="q9" value="d"> 14</label>
     </div>
     <div class="question">
-        <p><strong>9. How many more students voted for bananas than oranges?</strong></p>
-        <label><input type="radio" name="q9" value="a"> 2 students</label>
-        <label><input type="radio" name="q9" value="b"> 3 students</label>
-        <label><input type="radio" name="q9" value="c"> 4 students</label>
-        <label><input type="radio" name="q9" value="d"> 5 students</label>
+      <p><strong>10. What is the perimeter of a square with a side length of 5 cm?</strong></p>
+      <label><input type="radio" name="q10" value="a"> 15 cm</label>
+      <label><input type="radio" name="q10" value="b"> 20 cm</label>
+      <label><input type="radio" name="q10" value="c" data-correct="true"> 20 cm</label>
+      <label><input type="radio" name="q10" value="d"> 25 cm</label>
     </div>
     <div class="question">
-        <p><strong>10. How many students voted in total?</strong></p>
-        <label><input type="radio" name="q10" value="a"> 20 students</label>
-        <label><input type="radio" name="q10" value="b"> 22 students</label>
-        <label><input type="radio" name="q10" value="c"> 24 students</label>
-        <label><input type="radio" name="q10" value="d"> 26 students</label>
+      <p><strong>11. Maria has 3 apples, and she buys 4 more. How many apples does she have now?</strong></p>
+      <label><input type="radio" name="q11" value="a"> 6</label>
+      <label><input type="radio" name="q11" value="b" data-correct="true"> 7</label>
+      <label><input type="radio" name="q11" value="c"> 8</label>
+      <label><input type="radio" name="q11" value="d"> 9</label>
     </div>
     <div class="question">
-        <p><strong>11. If 2 more students vote for grapes, how many votes will grapes have?</strong></p>
-        <label><input type="radio" name="q11" value="a"> 6 votes</label>
-        <label><input type="radio" name="q11" value="b"> 7 votes</label>
-        <label><input type="radio" name="q11" value="c"> 8 votes</label>
-        <label><input type="radio" name="q11" value="d"> 9 votes</label>
+      <p><strong>12. What is 8 × 5?</strong></p>
+      <label><input type="radio" name="q12" value="a"> 35</label>
+      <label><input type="radio" name="q12" value="b"> 45</label>
+      <label><input type="radio" name="q12" value="c" data-correct="true"> 40</label>
+      <label><input type="radio" name="q12" value="d"> 50</label>
     </div>
     <div class="question">
-        <p><strong>12. Which fruit has the fewest votes?</strong></p>
-        <label><input type="radio" name="q12" value="a"> Apple</label>
-        <label><input type="radio" name="q12" value="b"> Banana</label>
-        <label><input type="radio" name="q12" value="c"> Orange</label>
-        <label><input type="radio" name="q12" value="d"> Grape</label>
-    </div>
-
-    <!-- Standalone Questions -->
-    <div class="question">
-        <p><strong>13. Which fraction represents the shaded part of a circle divided into 4 equal parts, with 1 part shaded?</strong></p>
-        <label><input type="radio" name="q13" value="a"> 1/2</label>
-        <label><input type="radio" name="q13" value="b"> 1/3</label>
-        <label><input type="radio" name="q13" value="c"> 1/4</label>
-        <label><input type="radio" name="q13" value="d"> 1/5</label>
+      <p><strong>13. Divide: 24 ÷ 4 = ?</strong></p>
+      <label><input type="radio" name="q13" value="a"> 5</label>
+      <label><input type="radio" name="q13" value="b" data-correct="true"> 6</label>
+      <label><input type="radio" name="q13" value="c"> 7</label>
+      <label><input type="radio" name="q13" value="d"> 8</label>
     </div>
     <div class="question">
-        <p><strong>14. Which fraction is equivalent to 2/4?</strong></p>
-        <label><input type="radio" name="q14" value="a"> 1/2</label>
-        <label><input type="radio" name="q14" value="b"> 2/3</label>
-        <label><input type="radio" name="q14" value="c"> 3/4</label>
-        <label><input type="radio" name="q14" value="d"> 4/5</label>
+      <p><strong>14. Which number is greater: 245 or 254?</strong></p>
+      <label><input type="radio" name="q14" value="a"> 245</label>
+      <label><input type="radio" name="q14" value="b" data-correct="true"> 254</label>
+      <label><input type="radio" name="q14" value="c"> They are equal</label>
+      <label><input type="radio" name="q14" value="d"> Cannot compare</label>
     </div>
     <div class="question">
-        <p><strong>15. What is the value of 7 × 8?</strong></p>
-        <label><input type="radio" name="q15" value="a"> 48</label>
-        <label><input type="radio" name="q15" value="b"> 54</label>
-        <label><input type="radio" name="q15" value="c"> 56</label>
-        <label><input type="radio" name="q15" value="d"> 64</label>
+      <p><strong>15. What is 1/3 of 9?</strong></p>
+      <label><input type="radio" name="q15" value="a"> 2</label>
+      <label><input type="radio" name="q15" value="b"> 3</label>
+      <label><input type="radio" name="q15" value="c" data-correct="true"> 3</label>
+      <label><input type="radio" name="q15" value="d"> 4</label>
     </div>
     <div class="question">
-        <p><strong>16. A rectangle has a length of 5 units and a width of 3 units. What is its area?</strong></p>
-        <label><input type="radio" name="q16" value="a"> 8 square units</label>
-        <label><input type="radio" name="q16" value="b"> 15 square units</label>
-        <label><input type="radio" name="q16" value="c"> 16 square units</label>
-        <label><input type="radio" name="q16" value="d"> 18 square units</label>
+      <p><strong>16. How many minutes are in 2 hours?</strong></p>
+      <label><input type="radio" name="q16" value="a"> 60</label>
+      <label><input type="radio" name="q16" value="b"> 100</label>
+      <label><input type="radio" name="q16" value="c" data-correct="true"> 120</label>
+      <label><input type="radio" name="q16" value="d"> 180</label>
     </div>
     <div class="question">
-        <p><strong>17. What is the perimeter of a square with a side length of 6 units?</strong></p>
-        <label><input type="radio" name="q17" value="a"> 12 units</label>
-        <label><input type="radio" name="q17" value="b"> 18 units</label>
-        <label><input type="radio" name="q17" value="c"> 24 units</label>
-        <label><input type="radio" name="q17" value="d"> 36 units</label>
+      <p><strong>17. A triangle has 3 vertices. How many vertices do 4 triangles have?</strong></p>
+      <label><input type="radio" name="q17" value="a"> 9</label>
+      <label><input type="radio" name="q17" value="b"> 10</label>
+      <label><input type="radio" name="q17" value="c" data-correct="true"> 12</label>
+      <label><input type="radio" name="q17" value="d"> 15</label>
     </div>
     <div class="question">
-        <p><strong>18. A clock shows 2:45. What time will it be in 30 minutes?</strong></p>
-        <label><input type="radio" name="q18" value="a"> 3:00</label>
-        <label><input type="radio" name="q18" value="b"> 3:15</label>
-        <label><input type="radio" name="q18" value="c"> 3:30</label>
-        <label><input type="radio" name="q18" value="d"> 3:45</label>
+      <p><strong>18. What is the area of a rectangle with length 6 cm and width 3 cm?</strong></p>
+      <label><input type="radio" name="q18" value="a"> 15 cm²</label>
+      <label><input type="radio" name="q18" value="b"> 18 cm²</label>
+      <label><input type="radio" name="q18" value="c" data-correct="true"> 18 cm²</label>
+      <label><input type="radio" name="q18" value="d"> 20 cm²</label>
     </div>
     <div class="question">
-        <p><strong>19. Which shape has exactly 4 sides and 4 right angles?</strong></p>
-        <label><input type="radio" name="q19" value="a"> Triangle</label>
-        <label><input type="radio" name="q19" value="b"> Pentagon</label>
-        <label><input type="radio" name="q19" value="c"> Rectangle</label>
-        <label><input type="radio" name="q19" value="d"> Hexagon</label>
+      <p><strong>19. Which number comes next in the pattern: 5, 10, 15, 20, ?</strong></p>
+      <label><input type="radio" name="q19" value="a"> 22</label>
+      <label><input type="radio" name="q19" value="b"> 24</label>
+      <label><input type="radio" name="q19" value="c" data-correct="true"> 25</label>
+      <label><input type="radio" name="q19" value="d"> 30</label>
     </div>
     <div class="question">
-        <p><strong>20. A thermometer reads 25°C. If the temperature rises by 10°C, what is the new temperature?</strong></p>
-        <label><input type="radio" name="q20" value="a"> 30°C</label>
-        <label><input type="radio" name="q20" value="b"> 35°C</label>
-        <label><input type="radio" name="q20" value="c"> 40°C</label>
-        <label><input type="radio" name="q20" value="d"> 45°C</label>
+      <p><strong>20. A book costs $8. How much do 3 books cost?</strong></p>
+      <label><input type="radio" name="q20" value="a"> $21</label>
+      <label><input type="radio" name="q20" value="b" data-correct="true"> $24</label>
+      <label><input type="radio" name="q20" value="c"> $27</label>
+      <label><input type="radio" name="q20" value="d"> $30</label>
     </div>
     <div class="question">
-        <p><strong>21. In the pattern 2, 4, 6, 8, what is the next number?</strong></p>
-        <label><input type="radio" name="q21" value="a"> 9</label>
-        <label><input type="radio" name="q21" value="b"> 10</label>
-        <label><input type="radio" name="q21" value="c"> 11</label>
-        <label><input type="radio" name="q21" value="d"> 12</label>
+      <p><strong>21. What is 56 - 29?</strong></p>
+      <label><input type="radio" name="q21" value="a"> 25</label>
+      <label><input type="radio" name="q21" value="b"> 26</label>
+      <label><input type="radio" name="q21" value="c" data-correct="true"> 27</label>
+      <label><input type="radio" name="q21" value="d"> 28</label>
     </div>
     <div class="question">
-        <p><strong>22. A store has 36 pencils to divide equally among 4 students. How many pencils does each student get?</strong></p>
-        <label><input type="radio" name="q22" value="a"> 8 pencils</label>
-        <label><input type="radio" name="q22" value="b"> 9 pencils</label>
-        <label><input type="radio" name="q22" value="c"> 10 pencils</label>
-        <label><input type="radio" name="q22" value="d"> 12 pencils</label>
+      <p><strong>22. Which shape has exactly 6 sides?</strong></p>
+      <label><input type="radio" name="q22" value="a"> Pentagon</label>
+      <label><input type="radio" name="q22" value="b"> Hexagon</label>
+      <label><input type="radio" name="q22" value="c" data-correct="true"> Hexagon</label>
+      <label><input type="radio" name="q22" value="d"> Octagon</label>
     </div>
     <div class="question">
-        <p><strong>23. Mia earns $5 for chores. She wants a toy that costs $20. How much more money does she need?</strong></p>
-        <label><input type="radio" name="q23" value="a"> $10</label>
-        <label><input type="radio" name="q23" value="b"> $15</label>
-        <label><input type="radio" name="q23" value="c"> $20</label>
-        <label><input type="radio" name="q23" value="d"> $25</label>
+      <p><strong>23. What is 7 × 7?</strong></p>
+      <label><input type="radio" name="q23" value="a"> 42</label>
+      <label><input type="radio" name="q23" value="b"> 48</label>
+      <label><input type="radio" name="q23" value="c" data-correct="true"> 49</label>
+      <label><input type="radio" name="q23" value="d"> 56</label>
     </div>
     <div class="question">
-        <p><strong>24. Which number is represented by (5 × 1,000) + (3 × 100) + (2 × 10) + (4 × 1)?</strong></p>
-        <label><input type="radio" name="q24" value="a"> 5,234</label>
-        <label><input type="radio" name="q24" value="b"> 5,324</label>
-        <label><input type="radio" name="q24" value="c"> 5,432</label>
-        <label><input type="radio" name="q24" value="d"> 5,534</label>
+      <p><strong>24. Divide: 30 ÷ 5 = ?</strong></p>
+      <label><input type="radio" name="q24" value="a"> 4</label>
+      <label><input type="radio" name="q24" value="b"> 5</label>
+      <label><input type="radio" name="q24" value="c" data-correct="true"> 6</label>
+      <label><input type="radio" name="q24" value="d"> 7</label>
     </div>
     <div class="question">
-        <p><strong>25. Which fraction is greater: 3/6 or 2/4?</strong></p>
-        <label><input type="radio" name="q25" value="a"> 3/6</label>
-        <label><input type="radio" name="q25" value="b"> 2/4</label>
-        <label><input type="radio" name="q25" value="c"> They are equal</label>
-        <label><input type="radio" name="q25" value="d"> Cannot compare</label>
+      <p><strong>25. Which fraction is equivalent to 2/4?</strong></p>
+      <label><input type="radio" name="q25" value="a"> 1/3</label>
+      <label><input type="radio" name="q25" value="b" data-correct="true"> 1/2</label>
+      <label><input type="radio" name="q25" value="c"> 3/4</label>
+      <label><input type="radio" name="q25" value="d"> 2/3</label>
     </div>
     <div class="question">
-        <p><strong>26. A pictograph shows 4 stars, each representing 2 books read. How many books were read?</strong></p>
-        <label><input type="radio" name="q26" value="a"> 6 books</label>
-        <label><input type="radio" name="q26" value="b"> 8 books</label>
-        <label><input type="radio" name="q26" value="c"> 10 books</label>
-        <label><input type="radio" name="q26" value="d"> 12 books</label>
+      <p><strong>26. A store has 12 candies. If each child gets 3 candies, how many children can get candies?</strong></p>
+      <label><input type="radio" name="q26" value="a"> 3</label>
+      <label><input type="radio" name="q26" value="b"> 4</label>
+      <label><input type="radio" name="q26" value="c" data-correct="true"> 4</label>
+      <label><input type="radio" name="q26" value="d"> 5</label>
     </div>
     <div class="question">
-        <p><strong>27. Which shape is a quadrilateral with only one pair of parallel sides?</strong></p>
-        <label><input type="radio" name="q27" value="a"> Square</label>
-        <label><input type="radio" name="q27" value="b"> Rectangle</label>
-        <label><input type="radio" name="q27" value="c"> Trapezoid</label>
-        <label><input type="radio" name="q27" value="d"> Pentagon</label>
+      <p><strong>27. What is the value of 3 in the number 132?</strong></p>
+      <label><input type="radio" name="q27" value="a"> 3</label>
+      <label><input type="radio" name="q27" value="b"> 30</label>
+      <label><input type="radio" name="q27" value="c" data-correct="true"> 30</label>
+      <label><input type="radio" name="q27" value="d"> 300</label>
     </div>
     <div class="question">
-        <p><strong>28. If you buy a $10 book and pay with a $20 bill, how much change do you get?</strong></p>
-        <label><input type="radio" name="q28" value="a"> $8</label>
-        <label><input type="radio" name="q28" value="b"> $10</label>
-        <label><input type="radio" name="q28" value="c"> $12</label>
-        <label><input type="radio" name="q28" value="d"> $14</label>
+      <p><strong>28. How many days are in 2 weeks?</strong></p>
+      <label><input type="radio" name="q28" value="a"> 10</label>
+      <label><input type="radio" name="q28" value="b"> 12</label>
+      <label><input type="radio" name="q28" value="c" data-correct="true"> 14</label>
+      <label><input type="radio" name="q28" value="d"> 16</label>
     </div>
     <div class="question">
-        <p><strong>29. In an input-output table, if the rule is “multiply by 3,” what is the output for an input of 4?</strong></p>
-        <label><input type="radio" name="q29" value="a"> 9</label>
-        <label><input type="radio" name="q29" value="b"> 10</label>
-        <label><input type="radio" name="q29" value="c"> 12</label>
-        <label><input type="radio" name="q29" value="d"> 15</label>
+      <p><strong>29. Which number is odd?</strong></p>
+      <label><input type="radio" name="q29" value="a"> 12</label>
+      <label><input type="radio" name="q29" value="b"> 14</label>
+      <label><input type="radio" name="q29" value="c" data-correct="true"> 15</label>
+      <label><input type="radio" name="q29" value="d"> 16</label>
     </div>
     <div class="question">
-        <p><strong>30. A store has only 10 balloons but 12 children want one. What does this show?</strong></p>
-        <label><input type="radio" name="q30" value="a"> Saving</label>
-        <label><input type="radio" name="q30" value="b"> Scarcity</label>
-        <label><input type="radio" name="q30" value="c"> Income</label>
-        <label><input type="radio" name="q30" value="d"> Spending</label>
+      <p><strong>30. A shelf holds 5 books. How many books do 4 shelves hold?</strong></p>
+      <label><input type="radio" name="q30" value="a"> 15</label>
+      <label><input type="radio" name="q30" value="b"> 18</label>
+      <label><input type="radio" name="q30" value="c" data-correct="true"> 20</label>
+      <label><input type="radio" name="q30" value="d"> 22</label>
     </div>
+  </div>
 
   <button onclick="submitTest()">Submit Test</button>
 
   <script src="js/report-handler.js"></script>
   <script>
+    // TIMER LOGIC
     let timeLeft = 30 * 60;
     const timerDisplay = document.getElementById('timer');
 
@@ -313,8 +304,10 @@
     const timerInterval = setInterval(updateTimer, 1000);
     updateTimer();
 
+    // TEST SUBMISSION LOGIC
     function submitTest() {
       clearInterval(timerInterval);
+
       let score = 0;
       const questions = document.querySelectorAll(".question");
       const totalQuestions = questions.length;
@@ -330,7 +323,7 @@
       const studentName = localStorage.getItem("studentName") || "Unknown";
       const studentEmail = localStorage.getItem("studentEmail") || "unknown@email.com";
       const subject = "Mathematics";
-      const grade = "Grade 3";
+      const grade = localStorage.getItem("grade") || "Grade 3";
 
       const report = generateTestReport(
         studentName,
