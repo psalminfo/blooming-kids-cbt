@@ -1,44 +1,34 @@
-// ✅ Save test report to localStorage
-function saveTestReport(report) {
-  const reports = JSON.parse(localStorage.getItem("bkh_reports") || "[]");
-  reports.push(report);
-  localStorage.setItem("bkh_reports", JSON.stringify(reports));
-}
-
-// ✅ Generate report structure
-function generateTestReport(name, email, subject, grade, score, totalQuestions) {
-  const percentage = (score / totalQuestions) * 100;
-  let performance = "";
-
-  if (percentage >= 90) performance = "Excellent";
-  else if (percentage >= 75) performance = "Good";
-  else if (percentage >= 60) performance = "Fair";
-  else performance = "Needs Improvement";
-
-  return {
-    studentName: name,
-    studentEmail: email,
-    grade: grade,
-    subject: subject,
-    score: score,
-    totalQuestions: totalQuestions,
-    percentage: percentage.toFixed(2),
-    performance: performance,
-    timestamp: new Date().toISOString()
-  };
-}
-
-// ✅ Admin and parent report features (already present, keep them as-is)
+// Save a single report to localStorage
 function saveReportToLocalStorage(report) {
   const reports = JSON.parse(localStorage.getItem('bkh_reports')) || [];
   reports.push(report);
   localStorage.setItem('bkh_reports', JSON.stringify(reports));
 }
 
+// Wrapper used by test pages (expected name)
+function saveTestReport(report) {
+  saveReportToLocalStorage(report);
+}
+
+// Used by test pages to format the report
+function generateTestReport(name, email, subject, grade, score, totalQuestions) {
+  return {
+    studentName: name,
+    studentEmail: email,
+    subject: subject,
+    grade: grade,
+    score: score,
+    totalQuestions: totalQuestions,
+    timestamp: new Date().toISOString()
+  };
+}
+
+// Retrieve all reports (used by admin)
 function getAllReports() {
   return JSON.parse(localStorage.getItem('bkh_reports')) || [];
 }
 
+// Filter reports for a specific parent login
 function getParentReport(name, email) {
   const reports = getAllReports();
   return reports.filter(report =>
@@ -47,6 +37,7 @@ function getParentReport(name, email) {
   );
 }
 
+// Admin authentication helpers
 function logoutAdmin() {
   localStorage.removeItem('isAdminLoggedIn');
   window.location.href = 'index.html';
@@ -54,5 +45,7 @@ function logoutAdmin() {
 
 function checkAdminAuth() {
   const loggedIn = localStorage.getItem('isAdminLoggedIn');
-  if (!loggedIn) window.location.href = 'admin-panel.html';
+  if (!loggedIn) {
+    window.location.href = 'admin-panel.html';
+  }
 }
