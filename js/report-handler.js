@@ -1,18 +1,32 @@
-// Store report in localStorage after test submission
-function saveReportToLocalStorage(report) {
+// Save report from test submission
+function saveTestReport(report) {
   const reports = JSON.parse(localStorage.getItem('bkh_reports')) || [];
-  reports.push(report);
-  localStorage.setItem('bkh_reports', JSON.stringify(reports));
+
+  // Prevent duplicates (by subject + grade + student name + email)
+  const filtered = reports.filter(r =>
+    !(r.studentName === report.studentName &&
+      r.studentEmail === report.studentEmail &&
+      r.subject === report.subject &&
+      r.grade === report.grade)
+  );
+
+  filtered.push(report);
+  localStorage.setItem('bkh_reports', JSON.stringify(filtered));
 }
 
-// Generate a test report object
-function generateReport(studentName, studentEmail, subject, grade, score, performanceSummary, skillBreakdown, recommendations) {
+// Use this in your submitTest() like:
+// const report = generateTestReport(...); saveTestReport(report);
+
+// Structure the report (for test submission)
+function generateTestReport(studentName, studentEmail, subject, grade, score, total, performanceSummary = "", skillBreakdown = [], recommendations = []) {
   return {
     studentName,
     studentEmail,
     subject,
     grade,
     score,
+    total,
+    percentage: Math.round((score / total) * 100),
     performanceSummary,
     skillBreakdown,
     recommendations,
@@ -20,27 +34,27 @@ function generateReport(studentName, studentEmail, subject, grade, score, perfor
   };
 }
 
-// Retrieve all reports (admin view)
+// Get all reports (for admin)
 function getAllReports() {
   return JSON.parse(localStorage.getItem('bkh_reports')) || [];
 }
 
-// Filter report for parent based on name and email
-function getParentReport(name, email) {
+// Filter reports for a parent (by student name and email)
+function getParentReport(studentName, studentEmail) {
   const reports = getAllReports();
   return reports.filter(report =>
-    report.studentName.toLowerCase() === name.toLowerCase() &&
-    report.studentEmail.toLowerCase() === email.toLowerCase()
+    report.studentName.toLowerCase() === studentName.toLowerCase() &&
+    report.studentEmail.toLowerCase() === studentEmail.toLowerCase()
   );
 }
 
-// Logout from admin and redirect to homepage
+// Admin logout
 function logoutAdmin() {
   localStorage.removeItem('isAdminLoggedIn');
   window.location.href = 'index.html';
 }
 
-// Check if admin is logged in
+// Check admin auth and redirect if not logged in
 function checkAdminAuth() {
   const loggedIn = localStorage.getItem('isAdminLoggedIn');
   if (!loggedIn) {
