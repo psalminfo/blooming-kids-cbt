@@ -342,29 +342,70 @@
         <label><input type="radio" name="q30" value="d"> I have a new shirt.</label>
     </div>
 
-    <button onclick="submitTest()">Submit Test</button>
+   <button onclick="submitTest()">Submit Test</button>
 
-    <script>
-  function submitTest() {
-    // Collect the necessary details (e.g., score or completion flag)
-    // You can replace this with your actual logic
-    const studentName = new URLSearchParams(window.location.search).get("name");
-    const grade = new URLSearchParams(window.location.search).get("grade");
-    const email = new URLSearchParams(window.location.search).get("email");
+<script>
+  let timeLeft = 30 * 60;
+  const timerDisplay = document.getElementById('timer');
 
-    // Optional: Save score logic here
-
-    // Redirect to subject selection page
-    const redirectUrl = `select-subject.html?name=${encodeURIComponent(studentName)}&grade=${encodeURIComponent(grade)}&email=${encodeURIComponent(email)}`;
-    window.location.href = redirectUrl;
+  function updateTimer() {
+    const minutes = Math.floor(timeLeft / 60);
+    const seconds = timeLeft % 60;
+    timerDisplay.textContent = `Time Remaining: ${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
+    if (timeLeft > 0) {
+      timeLeft--;
+    } else {
+      clearInterval(timerInterval);
+      timerDisplay.textContent = 'Time is up!';
+      submitTest();
+    }
   }
 
-  // Trigger test submission manually from a "Submit" button
-  document.getElementById("submitButton").addEventListener("click", function(e) {
-    e.preventDefault();
-    submitTest();
-  });
-</script>
+  const timerInterval = setInterval(updateTimer, 1000);
+  updateTimer();
 
-</body>
-</html>
+  function submitTest() {
+    clearInterval(timerInterval);
+
+    const totalQuestions = 30;
+    const correctAnswers = {
+      q1: 'b', q2: 'b', q3: 'a', q4: 'b', q5: 'b',
+      q6: 'b', q7: 'b', q8: 'c', q9: 'a', q10: 'b',
+      q11: 'a', q12: 'b', q13: 'a', q14: 'b', q15: 'a',
+      q16: 'b', q17: 'a', q18: 'b', q19: 'a', q20: 'b',
+      q21: 'a', q22: 'b', q23: 'b', q24: 'b', q25: 'b',
+      q26: 'b', q27: 'a', q28: 'a', q29: 'b', q30: 'b'
+    };
+
+    let score = 0;
+
+    for (let i = 1; i <= totalQuestions; i++) {
+      const selected = document.querySelector(`input[name="q${i}"]:checked`);
+      if (selected && selected.value === correctAnswers[`q${i}`]) {
+        score++;
+      }
+    }
+
+    const percentage = (score / totalQuestions) * 100;
+    const studentName = localStorage.getItem('studentName') || 'Student';
+    const subject = 'English Language Arts';
+    const grade = 'Grade 3';
+
+    const report = {
+      name: studentName,
+      grade: grade,
+      subject: subject,
+      score: score,
+      total: totalQuestions,
+      percentage: percentage.toFixed(2)
+    };
+
+    let allReports = JSON.parse(localStorage.getItem('bk_reports') || '[]');
+    allReports = allReports.filter(r => !(r.subject === subject && r.grade === grade));
+    allReports.push(report);
+    localStorage.setItem('bk_reports', JSON.stringify(allReports));
+
+    alert(`Test submitted! You scored ${score} out of ${totalQuestions} (${percentage.toFixed(2)}%).`);
+    window.location.href = "select-subject.html";
+  }
+</script>
