@@ -3,64 +3,111 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Parent Panel – Blooming Kids House</title>
-  <link rel="stylesheet" href="css/styles.css" />
+  <title>Parent Panel - Blooming Kids House Assessment</title>
+  <link rel="stylesheet" href="css/style.css" />
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      padding: 20px;
+      background-color: #f2f2f2;
+    }
+
+    h2 {
+      color: #2e7d32;
+    }
+
+    form {
+      margin-bottom: 20px;
+    }
+
+    label {
+      display: block;
+      margin-top: 10px;
+    }
+
+    input[type="text"], input[type="email"] {
+      width: 100%;
+      padding: 10px;
+      margin-top: 5px;
+      border-radius: 4px;
+      border: 1px solid #ccc;
+    }
+
+    button {
+      margin-top: 15px;
+      padding: 10px 20px;
+      background-color: #2e7d32;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+
+    button:hover {
+      background-color: #1b5e20;
+    }
+
+    .report-display {
+      background: #fff;
+      padding: 15px;
+      border: 1px solid #ccc;
+      border-radius: 5px;
+    }
+
+    .back-home {
+      margin-top: 20px;
+      background-color: #444;
+    }
+  </style>
 </head>
 <body>
-  <h1>Parent Panel</h1>
+  <h2>Parent Panel</h2>
 
   <form id="parentLoginForm">
-    <label>Student Name:
-      <input type="text" id="parentStudentName" required />
-    </label><br/>
-    <label>Student Email:
-      <input type="email" id="parentStudentEmail" required />
-    </label><br/>
+    <label for="studentName">Student's Full Name:</label>
+    <input type="text" id="studentName" name="studentName" required />
+
+    <label for="parentEmail">Parent's Email:</label>
+    <input type="email" id="parentEmail" name="parentEmail" required />
+
     <button type="submit">View Report</button>
   </form>
 
-  <div id="reportContainer" style="display:none; margin-top: 20px;">
-    <h2>Assessment Report</h2>
-    <table border="1" cellpadding="10">
-      <thead>
-        <tr>
-          <th>Subject</th>
-          <th>Score</th>
-          <th>Total</th>
-          <th>Date</th>
-        </tr>
-      </thead>
-      <tbody id="reportTableBody"></tbody>
-    </table>
-  </div>
+  <div id="reportOutput"></div>
+
+  <button class="back-home" onclick="window.location.href='index.html'">Back to Homepage</button>
 
   <script>
-    document.getElementById("parentLoginForm").addEventListener("submit", function (e) {
+    document.getElementById('parentLoginForm').addEventListener('submit', function(e) {
       e.preventDefault();
-      const name = document.getElementById("parentStudentName").value.trim();
-      const email = document.getElementById("parentStudentEmail").value.trim();
+      
+      const name = document.getElementById('studentName').value.trim();
+      const email = document.getElementById('parentEmail').value.trim().toLowerCase();
+      const key = `${name}_${email}`;
+      
+      const report = localStorage.getItem(key);
 
-      const reports = JSON.parse(localStorage.getItem("studentReports") || "[]");
-      const filtered = reports.filter(r => r.name === name && r.email === email);
+      const output = document.getElementById('reportOutput');
+      output.innerHTML = '';
 
-      const tableBody = document.getElementById("reportTableBody");
-      tableBody.innerHTML = "";
+      if (report) {
+        const parsedReport = JSON.parse(report);
+        const reportDiv = document.createElement('div');
+        reportDiv.className = 'report-display';
 
-      if (filtered.length > 0) {
-        document.getElementById("reportContainer").style.display = "block";
+        reportDiv.innerHTML = `
+          <h3>Assessment Report</h3>
+          <p><strong>Student Name:</strong> ${parsedReport.studentName}</p>
+          <p><strong>Subject:</strong> ${parsedReport.subject}</p>
+          <p><strong>Score:</strong> ${parsedReport.score} / ${parsedReport.total}</p>
+          <p><strong>Grade:</strong> ${parsedReport.grade}</p>
+          <p><strong>Performance Summary:</strong> ${parsedReport.performanceSummary}</p>
+          <p><strong>Recommendations:</strong> ${parsedReport.recommendations}</p>
+        `;
 
-        filtered.forEach(r => {
-          const row = `<tr>
-            <td>${r.subject}</td>
-            <td>${r.score}</td>
-            <td>${r.total}</td>
-            <td>${r.date}</td>
-          </tr>`;
-          tableBody.innerHTML += row;
-        });
+        output.appendChild(reportDiv);
       } else {
-        alert("No report found for this student.");
-        document.getElementById("reportContainer").style.display = "none";
+        output.innerHTML = '<p style="color: red;">No report found for this student and email combination.</p>';
       }
     });
   </script>
