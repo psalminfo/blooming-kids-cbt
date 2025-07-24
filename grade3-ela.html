@@ -341,9 +341,9 @@
         <label><input type="radio" name="q30" value="c"> The toy was red.</label>
         <label><input type="radio" name="q30" value="d"> I have a new shirt.</label>
     </div>
+<button onclick="submitTest()">Submit Test</button>
 
-  <button onclick="submitTest()">Submit Test</button>
-
+<script src="js/report-handler.js"></script>
 <script>
   let timeLeft = 30 * 60;
   const timerDisplay = document.getElementById('timer');
@@ -364,31 +364,16 @@
   const timerInterval = setInterval(updateTimer, 1000);
   updateTimer();
 
-  function saveTestReport(report) {
-    let reports = JSON.parse(localStorage.getItem("bk_reports") || "[]");
-    reports = reports.filter(r => !(r.subject === report.subject && r.grade === report.grade));
-    reports.push(report);
-    localStorage.setItem("bk_reports", JSON.stringify(reports));
-  }
-
   function submitTest() {
     clearInterval(timerInterval);
 
-    const totalQuestions = 30;
-    const correctAnswers = {
-      q1: 'b', q2: 'b', q3: 'a', q4: 'b', q5: 'b',
-      q6: 'b', q7: 'b', q8: 'c', q9: 'a', q10: 'b',
-      q11: 'a', q12: 'b', q13: 'a', q14: 'b', q15: 'a',
-      q16: 'b', q17: 'a', q18: 'b', q19: 'a', q20: 'b',
-      q21: 'a', q22: 'b', q23: 'b', q24: 'b', q25: 'b',
-      q26: 'b', q27: 'a', q28: 'a', q29: 'b', q30: 'b'
-    };
-
     let score = 0;
+    const totalQuestions = document.querySelectorAll(".question").length;
 
     for (let i = 1; i <= totalQuestions; i++) {
       const selected = document.querySelector(`input[name="q${i}"]:checked`);
-      if (selected && selected.value === correctAnswers[`q${i}`]) {
+      const correct = document.querySelector(`input[name="q${i}"][data-correct="true"]`);
+      if (selected && correct && selected.value === correct.value) {
         score++;
       }
     }
@@ -397,14 +382,14 @@
       studentName: localStorage.getItem("studentName") || "Unknown",
       grade: localStorage.getItem("grade") || "Grade 3",
       subject: localStorage.getItem("subject") || "English Language Arts",
-      score: score,
+      score,
       total: totalQuestions,
       percentage: Math.round((score / totalQuestions) * 100),
       date: new Date().toLocaleString()
     };
 
     saveTestReport(report);
-    alert(`Test submitted! You scored ${score} out of ${totalQuestions} (${report.percentage}%).`);
+    alert("Test submitted successfully.");
     window.location.href = "select-subject.html";
   }
 </script>
