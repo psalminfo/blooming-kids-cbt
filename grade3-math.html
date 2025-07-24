@@ -4,154 +4,57 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Grade 3 – Mathematics Test</title>
-  <style>
-    body {
-      font-family: Arial, sans-serif;
-      background-color: #f0fff0;
-      color: #333;
-      max-width: 800px;
-      margin: 0 auto;
-      padding: 20px;
-    }
-    h1 {
-      text-align: center;
-      color: green;
-    }
-    #timer {
-      position: fixed;
-      top: 10px;
-      right: 10px;
-      background: yellow;
-      color: black;
-      padding: 10px;
-      border: 2px solid green;
-      border-radius: 5px;
-      font-weight: bold;
-    }
-    .question {
-      background-color: #fff;
-      padding: 15px;
-      margin: 15px 0;
-      border: 1px solid green;
-      border-radius: 5px;
-    }
-    .question label {
-      display: block;
-      margin: 10px 0;
-    }
-    button {
-      display: block;
-      margin: 30px auto;
-      padding: 12px 25px;
-      background-color: green;
-      color: white;
-      border: none;
-      border-radius: 5px;
-      cursor: pointer;
-      font-size: 16px;
-    }
-    button:hover {
-      background-color: darkgreen;
-    }
-  </style>
+  <link rel="stylesheet" href="css/style.css" />
 </head>
 <body>
   <h1>Blooming Kids House: Grade 3 – Mathematics Test</h1>
-  <div id="timer">Time Remaining: 05:00</div>
+  <div id="timer">Time Remaining: 30:00</div>
 
   <div id="questions">
     <div class="question">
-      <p><strong>1. What is 7 + 5?</strong></p>
-      <label><input type="radio" name="q1" value="a"> 11</label>
-      <label><input type="radio" name="q1" value="b" data-correct="true"> 12</label>
-      <label><input type="radio" name="q1" value="c"> 13</label>
-      <label><input type="radio" name="q1" value="d"> 14</label>
+      <p><strong>1. What is 15 + 9?</strong></p>
+      <label><input type="radio" name="q1" value="a"> 23</label>
+      <label><input type="radio" name="q1" value="b"> 24</label>
+      <label><input type="radio" name="q1" value="c" data-correct="true"> 24</label>
+      <label><input type="radio" name="q1" value="d"> 25</label>
     </div>
+
     <div class="question">
-      <p><strong>2. What is 18 - 9?</strong></p>
-      <label><input type="radio" name="q2" value="a"> 7</label>
-      <label><input type="radio" name="q2" value="b"> 8</label>
-      <label><input type="radio" name="q2" value="c" data-correct="true"> 9</label>
-      <label><input type="radio" name="q2" value="d"> 10</label>
+      <p><strong>2. Which number is even?</strong></p>
+      <label><input type="radio" name="q2" value="a"> 15</label>
+      <label><input type="radio" name="q2" value="b" data-correct="true"> 16</label>
+      <label><input type="radio" name="q2" value="c"> 17</label>
+      <label><input type="radio" name="q2" value="d"> 19</label>
     </div>
+
     <div class="question">
-      <p><strong>3. What is 3 × 4?</strong></p>
-      <label><input type="radio" name="q3" value="a"> 10</label>
-      <label><input type="radio" name="q3" value="b"> 11</label>
-      <label><input type="radio" name="q3" value="c" data-correct="true"> 12</label>
-      <label><input type="radio" name="q3" value="d"> 13</label>
+      <p><strong>3. What is 6 × 5?</strong></p>
+      <label><input type="radio" name="q3" value="a"> 35</label>
+      <label><input type="radio" name="q3" value="b"> 20</label>
+      <label><input type="radio" name="q3" value="c" data-correct="true"> 30</label>
+      <label><input type="radio" name="q3" value="d"> 25</label>
     </div>
+
     <div class="question">
-      <p><strong>4. Which number is even?</strong></p>
-      <label><input type="radio" name="q4" value="a"> 13</label>
-      <label><input type="radio" name="q4" value="b"> 15</label>
-      <label><input type="radio" name="q4" value="c" data-correct="true"> 16</label>
-      <label><input type="radio" name="q4" value="d"> 19</label>
+      <p><strong>4. Round 67 to the nearest ten.</strong></p>
+      <label><input type="radio" name="q4" value="a"> 60</label>
+      <label><input type="radio" name="q4" value="b"> 65</label>
+      <label><input type="radio" name="q4" value="c" data-correct="true"> 70</label>
+      <label><input type="radio" name="q4" value="d"> 75</label>
     </div>
+
     <div class="question">
-      <p><strong>5. What is the value of the digit 5 in 352?</strong></p>
-      <label><input type="radio" name="q5" value="a"> 5</label>
-      <label><input type="radio" name="q5" value="b"> 50</label>
-      <label><input type="radio" name="q5" value="c" data-correct="true"> 50</label>
-      <label><input type="radio" name="q5" value="d"> 500</label>
+      <p><strong>5. What is the value of the digit 4 in the number 342?</strong></p>
+      <label><input type="radio" name="q5" value="a"> 4</label>
+      <label><input type="radio" name="q5" value="b" data-correct="true"> 40</label>
+      <label><input type="radio" name="q5" value="c"> 400</label>
+      <label><input type="radio" name="q5" value="d"> 14</label>
     </div>
   </div>
 
-  <button onclick="submitTest()">Submit Test</button>
+  <button id="submitBtn">Submit Test</button>
 
+  <script src="js/universal-test.js"></script>
   <script src="js/report-handler.js"></script>
-  <script>
-    // TIMER
-    let timeLeft = 5 * 60;
-    const timerDisplay = document.getElementById('timer');
-
-    function updateTimer() {
-      const minutes = Math.floor(timeLeft / 60);
-      const seconds = timeLeft % 60;
-      timerDisplay.textContent = \`Time Remaining: \${minutes}:\${seconds < 10 ? '0' : ''}\${seconds}\`;
-      if (timeLeft > 0) {
-        timeLeft--;
-      } else {
-        clearInterval(timerInterval);
-        submitTest();
-      }
-    }
-
-    const timerInterval = setInterval(updateTimer, 1000);
-    updateTimer();
-
-    // SUBMIT FUNCTION
-    function submitTest() {
-      clearInterval(timerInterval);
-
-      let score = 0;
-      const questions = document.querySelectorAll('.question');
-      const totalQuestions = questions.length;
-
-      for (let i = 1; i <= totalQuestions; i++) {
-        const selected = document.querySelector(\`input[name="q\${i}"]:checked\`);
-        const correct = document.querySelector(\`input[name="q\${i}"][data-correct="true"]\`);
-        if (selected && correct && selected.value === correct.value) {
-          score++;
-        }
-      }
-
-      const studentName = localStorage.getItem("studentName") || "Unknown";
-      const studentEmail = localStorage.getItem("studentEmail") || "unknown@email.com";
-      const subject = "Mathematics";
-      const grade = localStorage.getItem("selectedGrade") || "Grade 3";
-
-      if (typeof generateTestReport !== "function" || typeof saveTestReport !== "function") {
-        alert("Report functions missing. Please check js/report-handler.js");
-        return;
-      }
-
-      const report = generateTestReport(studentName, studentEmail, subject, grade, score, totalQuestions);
-      saveTestReport(report);
-
-      alert("Test submitted successfully!");
-      window.location.href = "select-subject.html";
-    }
-  </script>
 </body>
 </html>
