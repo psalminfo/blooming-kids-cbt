@@ -66,9 +66,8 @@
 
   <script>
     document.addEventListener("DOMContentLoaded", function() {
-      // ✅ Use localStorage to match test page and login behavior
       const studentName = localStorage.getItem("studentName");
-      const studentGrade = localStorage.getItem("selectedGrade");
+      const studentGrade = localStorage.getItem("studentGrade"); // fixed key name
       const studentEmail = localStorage.getItem("studentEmail");
 
       if (!studentName || !studentGrade || !studentEmail) {
