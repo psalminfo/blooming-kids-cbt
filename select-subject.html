@@ -66,9 +66,10 @@
 
   <script>
     document.addEventListener("DOMContentLoaded", function() {
-      const studentName = sessionStorage.getItem("studentName");
-      const studentGrade = sessionStorage.getItem("studentGrade");
-      const studentEmail = sessionStorage.getItem("studentEmail");
+      // ✅ Use localStorage to match test page and login behavior
+      const studentName = localStorage.getItem("studentName");
+      const studentGrade = localStorage.getItem("selectedGrade");
+      const studentEmail = localStorage.getItem("studentEmail");
 
       if (!studentName || !studentGrade || !studentEmail) {
         alert("Missing student info. Returning to home page.");
@@ -84,11 +85,11 @@
     });
 
     function startSubject(subjectPage) {
-      window.location.href = subjectPage; // You can change to window.open if you prefer a new tab
+      window.location.href = subjectPage;
     }
 
     function logout() {
-      sessionStorage.clear();
+      localStorage.clear();
       window.location.href = "index.html";
     }
   </script>
