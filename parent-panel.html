@@ -10,9 +10,11 @@
       padding: 30px;
       background-color: #f2f2f2;
     }
+
     h1, h2 {
       color: green;
     }
+
     .login-section, .report-section {
       background: white;
       padding: 20px;
@@ -21,12 +23,14 @@
       margin: auto;
       box-shadow: 0 2px 8px rgba(0,0,0,0.1);
     }
+
     input {
       width: 100%;
       padding: 10px;
       margin-top: 10px;
       margin-bottom: 20px;
     }
+
     button {
       background-color: green;
       color: white;
@@ -36,9 +40,11 @@
       width: 100%;
       margin-top: 10px;
     }
+
     button:hover {
       background-color: darkgreen;
     }
+
     .report-card {
       background-color: #fcfcfc;
       padding: 20px;
@@ -47,24 +53,26 @@
       border-left: 6px solid green;
       position: relative;
     }
+
     .section {
       margin-top: 20px;
     }
+
     .section-title {
       font-weight: bold;
       margin-bottom: 8px;
       border-bottom: 1px solid #ddd;
     }
+
     .print-button {
-      margin-top: 15px;
-      background-color: #4caf50;
+      margin-top: 10px;
     }
   </style>
 </head>
 <body>
   <div class="login-section" id="loginSection">
     <h1>Parent Panel</h1>
-    <p>Enter your child’s name and your email to view reports:</p>
+    <p>Enter your child’s name and email to view reports:</p>
     <input type="text" id="studentName" placeholder="Student Full Name"/>
     <input type="email" id="parentEmail" placeholder="Your Email Address"/>
     <button onclick="viewParentReport()">View Report</button>
@@ -105,31 +113,27 @@
         card.id = `report-${index}`;
 
         card.innerHTML = `
-          <div><strong>Student Name:</strong> ${report.studentName}</div>
+          <div><strong>Student:</strong> ${report.studentName}</div>
           <div><strong>Email:</strong> ${report.studentEmail}</div>
           <div><strong>Grade:</strong> ${report.grade}</div>
           <div><strong>Subject:</strong> ${report.subject}</div>
-          <div><strong>Score:</strong> ${report.score}/${report.total || 30}</div>
+          <div><strong>Score:</strong> ${report.score}/${report.total}</div>
           <div><strong>Percentage:</strong> ${report.percentage}%</div>
           <div><strong>Date:</strong> ${report.date}</div>
 
           <div class="section">
-            <div class="section-title">Performance Summary:</div>
+            <div class="section-title">Performance Summary</div>
             <p>${report.performanceSummary || "No summary provided."}</p>
           </div>
 
           <div class="section">
-            <div class="section-title">Knowledge & Skills Categories:</div>
-            <ul>
-              ${(report.skillBreakdown || []).map(skill => `<li>${skill}</li>`).join('') || "<li>No skill breakdown provided.</li>"}
-            </ul>
+            <div class="section-title">Knowledge & Skills</div>
+            <ul>${(report.skillBreakdown || []).map(skill => `<li>${skill}</li>`).join('')}</ul>
           </div>
 
           <div class="section">
-            <div class="section-title">Personalized Recommendations:</div>
-            <ul>
-              ${(report.recommendations || []).map(rec => `<li>${rec}</li>`).join('') || "<li>No recommendations provided.</li>"}
-            </ul>
+            <div class="section-title">Recommendations</div>
+            <ul>${(report.recommendations || []).map(r => `<li>${r}</li>`).join('')}</ul>
           </div>
 
           <button class="print-button" onclick="printReport(${index})">Download PDF</button>
