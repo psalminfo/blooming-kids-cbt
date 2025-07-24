@@ -63,9 +63,9 @@
           <strong>${report.studentName} (${report.studentEmail})</strong><br>
           <strong>Grade:</strong> ${report.grade} |
           <strong>Subject:</strong> ${report.subject}<br>
-          <strong>Score:</strong> ${report.score}/${report.total} (${report.percentage}%)<br>
-          <strong>Date:</strong> ${report.date}<br><br>
-          <strong>Summary:</strong> ${report.performanceSummary || 'No summary provided'}<br>
+          <strong>Score:</strong> ${report.score}/${report.totalQuestions} (${report.percentage}%)<br>
+          <strong>Date:</strong> ${new Date(report.timestamp).toLocaleString()}<br><br>
+          <strong>Summary:</strong> ${report.performanceSummary || 'No summary'}<br>
           <strong>Skills:</strong> <ul>${(report.skillBreakdown || []).map(skill => `<li>${skill}</li>`).join('')}</ul>
           <strong>Recommendations:</strong> <ul>${(report.recommendations || []).map(r => `<li>${r}</li>`).join('')}</ul>
         `;
