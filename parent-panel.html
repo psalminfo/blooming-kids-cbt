@@ -4,112 +4,90 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Parent Panel - Blooming Kids House Assessment</title>
-  <link rel="stylesheet" href="css/style.css" />
   <style>
     body {
       font-family: Arial, sans-serif;
-      padding: 20px;
+      padding: 30px;
       background-color: #f2f2f2;
     }
-
-    h2 {
-      color: #2e7d32;
+    h1 {
+      color: green;
     }
-
-    form {
-      margin-bottom: 20px;
+    .login-section, .report-section {
+      background: white;
+      padding: 20px;
+      border-radius: 10px;
+      max-width: 500px;
+      margin: auto;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
     }
-
-    label {
-      display: block;
-      margin-top: 10px;
-    }
-
-    input[type="text"], input[type="email"] {
+    input {
       width: 100%;
       padding: 10px;
-      margin-top: 5px;
-      border-radius: 4px;
-      border: 1px solid #ccc;
+      margin-top: 10px;
+      margin-bottom: 20px;
     }
-
     button {
-      margin-top: 15px;
-      padding: 10px 20px;
-      background-color: #2e7d32;
+      background-color: green;
       color: white;
       border: none;
-      border-radius: 4px;
+      padding: 12px;
       cursor: pointer;
+      width: 100%;
     }
-
     button:hover {
-      background-color: #1b5e20;
+      background-color: darkgreen;
     }
-
-    .report-display {
-      background: #fff;
-      padding: 15px;
-      border: 1px solid #ccc;
-      border-radius: 5px;
-    }
-
-    .back-home {
-      margin-top: 20px;
-      background-color: #444;
+    #reportDisplay {
+      margin-top: 30px;
     }
   </style>
 </head>
 <body>
-  <h2>Parent Panel</h2>
+  <div class="login-section" id="loginSection">
+    <h1>Parent Panel</h1>
+    <p>Enter your child’s name and email to view reports:</p>
+    <input type="text" id="studentName" placeholder="Student Full Name"/>
+    <input type="email" id="parentEmail" placeholder="Your Email Address"/>
+    <button onclick="viewParentReport()">View Report</button>
+  </div>
 
-  <form id="parentLoginForm">
-    <label for="studentName">Student's Full Name:</label>
-    <input type="text" id="studentName" name="studentName" required />
+  <div class="report-section" id="reportSection" style="display: none;">
+    <h2>Assessment Report</h2>
+    <div id="reportDisplay"></div>
+    <button onclick="downloadPDF()">Download PDF</button>
+    <button onclick="logout()">Logout</button>
+  </div>
 
-    <label for="parentEmail">Parent's Email:</label>
-    <input type="email" id="parentEmail" name="parentEmail" required />
-
-    <button type="submit">View Report</button>
-  </form>
-
-  <div id="reportOutput"></div>
-
-  <button class="back-home" onclick="window.location.href='index.html'">Back to Homepage</button>
-
+  <script src="js/report-handler.js"></script>
   <script>
-    document.getElementById('parentLoginForm').addEventListener('submit', function(e) {
-      e.preventDefault();
-      
+    function viewParentReport() {
       const name = document.getElementById('studentName').value.trim();
-      const email = document.getElementById('parentEmail').value.trim().toLowerCase();
+      const email = document.getElementById('parentEmail').value.trim();
+
+      if (!name || !email) {
+        alert("Please enter both student name and your email.");
+        return;
+      }
+
       const key = `${name}_${email}`;
-      
       const report = localStorage.getItem(key);
 
-      const output = document.getElementById('reportOutput');
-      output.innerHTML = '';
-
-      if (report) {
-        const parsedReport = JSON.parse(report);
-        const reportDiv = document.createElement('div');
-        reportDiv.className = 'report-display';
-
-        reportDiv.innerHTML = `
-          <h3>Assessment Report</h3>
-          <p><strong>Student Name:</strong> ${parsedReport.studentName}</p>
-          <p><strong>Subject:</strong> ${parsedReport.subject}</p>
-          <p><strong>Score:</strong> ${parsedReport.score} / ${parsedReport.total}</p>
-          <p><strong>Grade:</strong> ${parsedReport.grade}</p>
-          <p><strong>Performance Summary:</strong> ${parsedReport.performanceSummary}</p>
-          <p><strong>Recommendations:</strong> ${parsedReport.recommendations}</p>
-        `;
-
-        output.appendChild(reportDiv);
-      } else {
-        output.innerHTML = '<p style="color: red;">No report found for this student and email combination.</p>';
+      if (!report) {
+        alert("No report found for this student.");
+        return;
       }
-    });
+
+      // Hide login and show report
+      document.getElementById('loginSection').style.display = 'none';
+      document.getElementById('reportSection').style.display = 'block';
+
+      displayReport(JSON.parse(report));
+    }
+
+    function logout() {
+      window.location.href = 'index.html';
+    }
   </script>
 </body>
 </html>
