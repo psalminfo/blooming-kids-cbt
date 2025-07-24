@@ -2,44 +2,41 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Admin Panel - Blooming Kids House</title>
+  <title>Admin Dashboard</title>
   <style>
     body {
       font-family: Arial, sans-serif;
-      padding: 40px;
+      padding: 30px;
       background-color: #f5f5f5;
-      color: #333;
     }
     h1 {
       color: #2e7d32;
     }
     button {
-      background-color: #c62828;
+      padding: 10px 20px;
+      background-color: #2e7d32;
       color: white;
-      padding: 10px 15px;
       border: none;
       cursor: pointer;
-      margin-top: 20px;
     }
     button:hover {
-      background-color: #b71c1c;
+      background-color: #1b5e20;
     }
   </style>
 </head>
 <body>
-  <h1>Welcome to the Admin Panel</h1>
-  <p>Here you can manage reports and monitor student data.</p>
+  <h1>Welcome to the Admin Dashboard</h1>
+  <p>You can view reports, export data, and manage student assessments here.</p>
   <button onclick="logout()">Logout</button>
 
   <script>
-    // Prevent direct access without login
-    if (localStorage.getItem("adminLoggedIn") !== "true") {
-      alert("Access denied. Please login through the homepage.");
+    if (sessionStorage.getItem("isAdmin") !== "true") {
+      alert("Unauthorized access. Please log in.");
       window.location.href = "index.html";
     }
 
     function logout() {
-      localStorage.removeItem("adminLoggedIn");
+      sessionStorage.removeItem("isAdmin");
       window.location.href = "index.html";
     }
   </script>
