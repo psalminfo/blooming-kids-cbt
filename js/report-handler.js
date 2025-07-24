@@ -1,60 +1,31 @@
-// Save report to localStorage
-function saveTestReport(report) {
+// Save test report to localStorage
+function saveReportToLocalStorage(report) {
   const reports = JSON.parse(localStorage.getItem('bkh_reports')) || [];
-
-  // Prevent duplicate (optional but clean)
-  const filtered = reports.filter(r =>
-    !(r.studentName === report.studentName &&
-      r.studentEmail === report.studentEmail &&
-      r.subject === report.subject &&
-      r.grade === report.grade)
-  );
-
-  filtered.push(report);
-  localStorage.setItem('bkh_reports', JSON.stringify(filtered));
+  reports.push(report);
+  localStorage.setItem('bkh_reports', JSON.stringify(reports));
 }
 
-// Create a new report object
-function generateTestReport(studentName, studentEmail, subject, grade, score, total, performanceSummary = "", skillBreakdown = [], recommendations = []) {
-  return {
-    studentName,
-    studentEmail,
-    subject,
-    grade,
-    score,
-    total,
-    percentage: Math.round((score / total) * 100),
-    performanceSummary,
-    skillBreakdown,
-    recommendations,
-    date: new Date().toLocaleString()
-  };
-}
-
-// Get all reports for admin view
+// Get all stored reports (for admin)
 function getAllReports() {
   return JSON.parse(localStorage.getItem('bkh_reports')) || [];
 }
 
-// Get filtered reports for parent view
-function getParentReport(studentName, studentEmail) {
+// Get report for specific parent
+function getParentReport(name, email) {
   const reports = getAllReports();
   return reports.filter(report =>
-    report.studentName.toLowerCase() === studentName.toLowerCase() &&
-    report.studentEmail.toLowerCase() === studentEmail.toLowerCase()
+    report.studentName.toLowerCase() === name.toLowerCase() &&
+    report.studentEmail.toLowerCase() === email.toLowerCase()
   );
 }
 
-// Admin logout
+// Admin auth
 function logoutAdmin() {
   localStorage.removeItem('isAdminLoggedIn');
   window.location.href = 'index.html';
 }
 
-// Admin auth redirect
 function checkAdminAuth() {
   const loggedIn = localStorage.getItem('isAdminLoggedIn');
-  if (!loggedIn) {
-    window.location.href = 'admin-panel.html';
-  }
+  if (!loggedIn) window.location.href = 'admin-panel.html';
 }
