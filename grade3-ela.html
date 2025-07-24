@@ -1,66 +1,76 @@
-<!-- ✅ This is your updated universal test page template with corrections to support all grades/subjects -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Grade 3 – English Language Arts Test</title>
-  <style>
-    body {
-      font-family: Arial, sans-serif;
-      max-width: 800px;
-      margin: 0 auto;
-      padding: 20px;
-      background-color: #f0f8f0;
-      color: #333;
-    }
-    h1 {
-      text-align: center;
-      color: #2e7d32;
-    }
-    #timer {
-      position: fixed;
-      top: 10px;
-      right: 10px;
-      background-color: #ffeb3b;
-      padding: 10px;
-      border: 2px solid #2e7d32;
-      border-radius: 5px;
-      font-weight: bold;
-    }
-    .question {
-      background-color: #fff;
-      padding: 15px;
-      margin: 15px 0;
-      border: 1px solid #2e7d32;
-      border-radius: 5px;
-    }
-    .question label {
-      display: block;
-      margin: 10px 0;
-    }
-    button {
-      display: block;
-      margin: 20px auto;
-      padding: 10px 20px;
-      background-color: #2e7d32;
-      color: white;
-      border: none;
-      border-radius: 5px;
-      cursor: pointer;
-    }
-    button:hover {
-      background-color: #1b5e20;
-    }
-    @media (max-width: 600px) {
-      body { padding: 10px; }
-      #timer { font-size: 14px; padding: 8px; }
-    }
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Grade 3 – English Language Arts Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f0f8f0;
+            color: #333;
+        }
+        h1 {
+            text-align: center;
+            color: #2e7d32;
+        }
+        #timer {
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            background-color: #ffeb3b;
+            padding: 10px;
+            border: 2px solid #2e7d32;
+            border-radius: 5px;
+            font-weight: bold;
+        }
+        .passage, .question {
+            background-color: #fff;
+            padding: 15px;
+            margin: 15px 0;
+            border: 1px solid #2e7d32;
+            border-radius: 5px;
+        }
+        .question label {
+            display: block;
+            margin: 10px 0;
+        }
+        img {
+            max-width: 100%;
+            height: auto;
+            display: block;
+            margin: 10px auto;
+        }
+        button {
+            display: block;
+            margin: 20px auto;
+            padding: 10px 20px;
+            background-color: #2e7d32;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #1b5e20;
+        }
+        @media (max-width: 600px) {
+            body {
+                padding: 10px;
+            }
+            #timer {
+                font-size: 14px;
+                padding: 8px;
+            }
+        }
+    </style>
 </head>
 <body>
-  <h1>Blooming Kids House: Grade 3 – English Language Arts Test</h1>
-  <div id="timer">Time Remaining: 30:00</div>
+    <h1>Blooming Kids House: Grade 3 – English Language Arts Test</h1>
+    <div id="timer">Time Remaining: 30:00</div>
 
     <!-- Passage 1: Fiction -->
     <div class="passage">
@@ -298,72 +308,26 @@
         <label><input type="radio" name="q30" value="d"> She is angry.</label>
     </div>
 
+    <button>Submit Test</button>
 
-  <button onclick="submitTest()">Submit Test</button>
+    <script>
+        let timeLeft = 30 * 60; // 30 minutes in seconds
+        const timerDisplay = document.getElementById('timer');
 
-  <!-- ✅ Universal report-handler connection -->
-  <script src="js/report-handler.js"></script>
-  <script>
-    // ✅ Timer setup
-    let timeLeft = 30 * 60;
-    const timerDisplay = document.getElementById('timer');
-    const timerInterval = setInterval(updateTimer, 1000);
-
-    function updateTimer() {
-      const minutes = Math.floor(timeLeft / 60);
-      const seconds = timeLeft % 60;
-      timerDisplay.textContent = `Time Remaining: ${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
-      if (timeLeft > 0) {
-        timeLeft--;
-      } else {
-        clearInterval(timerInterval);
-        timerDisplay.textContent = 'Time is up!';
-        submitTest();
-      }
-    }
-
-    updateTimer(); // initialize on load
-
-    // ✅ Main test submission logic
-    function submitTest() {
-      clearInterval(timerInterval);
-      const questions = document.querySelectorAll(".question");
-      const totalQuestions = questions.length;
-      let score = 0;
-
-      for (let i = 1; i <= totalQuestions; i++) {
-        const selected = document.querySelector(`input[name="q${i}"]:checked`);
-        const correct = document.querySelector(`input[name="q${i}"][data-correct="true"]`);
-        if (selected && correct && selected.value === correct.value) {
-          score++;
+        function updateTimer() {
+            const minutes = Math.floor(timeLeft / 60);
+            const seconds = timeLeft % 60;
+            timerDisplay.textContent = `Time Remaining: ${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
+            if (timeLeft > 0) {
+                timeLeft--;
+            } else {
+                clearInterval(timerInterval);
+                timerDisplay.textContent = 'Time is up!';
+            }
         }
-      }
 
-      // ✅ Get student data from localStorage
-      const studentName = localStorage.getItem("studentName") || "Unknown";
-      const studentEmail = localStorage.getItem("studentEmail") || "unknown@email.com";
-      const subject = document.title.replace("Blooming Kids House: ", "").split(" – ")[1] || "Subject";
-      const grade = localStorage.getItem("studentGrade") || "Unknown Grade";
-
-      if (!studentName || !studentEmail) {
-        alert("Missing student info. Returning to home page.");
-        window.location.href = "index.html";
-        return;
-      }
-
-      const report = generateTestReport(
-        studentName,
-        studentEmail,
-        subject,
-        grade,
-        score,
-        totalQuestions
-      );
-
-      saveTestReport(report);
-      alert("Test submitted successfully.");
-      window.location.href = "select-subject.html";
-    }
-  </script>
+        const timerInterval = setInterval(updateTimer, 1000);
+        updateTimer(); // Initial call to display timer immediately
+    </script>
 </body>
 </html>
