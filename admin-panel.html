@@ -16,10 +16,6 @@
       color: #2e7d32;
     }
 
-    #adminContent {
-      margin-top: 20px;
-    }
-
     .report-card {
       background: #fff;
       border: 1px solid #ddd;
@@ -43,7 +39,7 @@
     }
   </style>
 </head>
-<body onload="checkAdminAuth(); displayAdminReports()">
+<body>
   <h2>Admin Dashboard</h2>
   <button class="logout-btn" onclick="logoutAdmin()">Logout</button>
 
@@ -53,29 +49,27 @@
 
   <script src="js/report-handler.js"></script>
   <script>
-    function displayAdminReports() {
-      const reports = getAllReports();
-      const container = document.getElementById('adminContent');
-      container.innerHTML = '';
+    const reports = getAllReports();
+    const container = document.getElementById("adminContent");
+    container.innerHTML = "";
 
-      if (reports.length === 0) {
-        container.innerHTML = '<p>No reports available.</p>';
-        return;
-      }
-
-      reports.forEach(report => {
-        const card = document.createElement('div');
-        card.className = 'report-card';
-        card.innerHTML = `
-          <strong>Name:</strong> ${report.studentName}<br/>
-          <strong>Email:</strong> ${report.studentEmail}<br/>
-          <strong>Subject:</strong> ${report.subject}<br/>
-          <strong>Grade:</strong> ${report.grade}<br/>
-          <strong>Score:</strong> ${report.score}/${report.total || 30}<br/>
-          <strong>Percentage:</strong> ${report.percentage}%<br/>
-          <strong>Date:</strong> ${report.date}
+    if (reports.length === 0) {
+      container.innerHTML = "<p>No reports found.</p>";
+    } else {
+      reports.forEach((report) => {
+        const div = document.createElement("div");
+        div.className = "report-card";
+        div.innerHTML = `
+          <strong>${report.studentName} (${report.studentEmail})</strong><br>
+          <strong>Grade:</strong> ${report.grade} |
+          <strong>Subject:</strong> ${report.subject}<br>
+          <strong>Score:</strong> ${report.score}/${report.total} (${report.percentage}%)<br>
+          <strong>Date:</strong> ${report.date}<br><br>
+          <strong>Summary:</strong> ${report.performanceSummary || 'No summary provided'}<br>
+          <strong>Skills:</strong> <ul>${(report.skillBreakdown || []).map(skill => `<li>${skill}</li>`).join('')}</ul>
+          <strong>Recommendations:</strong> <ul>${(report.recommendations || []).map(r => `<li>${r}</li>`).join('')}</ul>
         `;
-        container.appendChild(card);
+        container.appendChild(div);
       });
     }
   </script>
