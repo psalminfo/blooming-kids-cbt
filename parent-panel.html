@@ -45,6 +45,7 @@
       border: 1px solid #ccc;
       margin-top: 30px;
       border-left: 6px solid green;
+      position: relative;
     }
     .section {
       margin-top: 20px;
@@ -53,6 +54,10 @@
       font-weight: bold;
       margin-bottom: 8px;
       border-bottom: 1px solid #ddd;
+    }
+    .print-button {
+      margin-top: 15px;
+      background-color: #4caf50;
     }
   </style>
 </head>
@@ -97,6 +102,8 @@
       reports.forEach((report, index) => {
         const card = document.createElement('div');
         card.className = 'report-card';
+        card.id = `report-${index}`;
+
         card.innerHTML = `
           <div><strong>Student Name:</strong> ${report.studentName}</div>
           <div><strong>Email:</strong> ${report.studentEmail}</div>
@@ -124,9 +131,36 @@
               ${(report.recommendations || []).map(rec => `<li>${rec}</li>`).join('') || "<li>No recommendations provided.</li>"}
             </ul>
           </div>
+
+          <button class="print-button" onclick="printReport(${index})">Download PDF</button>
         `;
         container.appendChild(card);
       });
+    }
+
+    function printReport(index) {
+      const content = document.getElementById(`report-${index}`).innerHTML;
+      const win = window.open('', '', 'width=900,height=700');
+      win.document.write(`
+        <html>
+        <head>
+          <title>Student Report</title>
+          <style>
+            body { font-family: Arial, sans-serif; padding: 30px; }
+            h2 { color: green; }
+            .section { margin-top: 20px; }
+            .section-title { font-weight: bold; margin-bottom: 8px; border-bottom: 1px solid #ddd; }
+            ul { padding-left: 20px; }
+          </style>
+        </head>
+        <body>
+          <h2>Blooming Kids House Assessment Report</h2>
+          ${content}
+        </body>
+        </html>
+      `);
+      win.document.close();
+      win.print();
     }
 
     function logout() {
