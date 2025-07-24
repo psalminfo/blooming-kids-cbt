@@ -47,31 +47,40 @@
     <p>Loading reports...</p>
   </div>
 
-  <script src="js/report-handler.js"></script>
-  <script>
-    const reports = getAllReports();
-    const container = document.getElementById("adminContent");
-    container.innerHTML = "";
+  <!-- Load Firebase Config + SDK and Report Handler -->
+  <script type="module">
+    import { logoutAdmin } from './js/report-handler.js';
+    import { getAllReports } from './js/report-handler.js';
 
-    if (reports.length === 0) {
-      container.innerHTML = "<p>No reports found.</p>";
-    } else {
-      reports.forEach((report) => {
+    const container = document.getElementById("adminContent");
+    container.innerHTML = "<p>Loading reports...</p>";
+
+    getAllReports().then(reports => {
+      container.innerHTML = "";
+
+      if (!reports.length) {
+        container.innerHTML = "<p>No reports found.</p>";
+        return;
+      }
+
+      reports.forEach(report => {
         const div = document.createElement("div");
         div.className = "report-card";
         div.innerHTML = `
           <strong>${report.studentName} (${report.studentEmail})</strong><br>
           <strong>Grade:</strong> ${report.grade} |
           <strong>Subject:</strong> ${report.subject}<br>
-          <strong>Score:</strong> ${report.score}/${report.totalQuestions} (${report.percentage}%)<br>
+          <strong>Score:</strong> ${report.score}/${report.totalQuestions} (${Math.round((report.score / report.totalQuestions) * 100)}%)<br>
           <strong>Date:</strong> ${new Date(report.timestamp).toLocaleString()}<br><br>
-          <strong>Summary:</strong> ${report.performanceSummary || 'No summary'}<br>
+          <strong>Summary:</strong> ${report.performanceSummary || 'No summary provided'}<br>
           <strong>Skills:</strong> <ul>${(report.skillBreakdown || []).map(skill => `<li>${skill}</li>`).join('')}</ul>
           <strong>Recommendations:</strong> <ul>${(report.recommendations || []).map(r => `<li>${r}</li>`).join('')}</ul>
         `;
         container.appendChild(div);
       });
-    }
+    }).catch(err => {
+      container.innerHTML = `<p>Error loading reports: ${err.message}</p>`;
+    });
   </script>
 </body>
 </html>
