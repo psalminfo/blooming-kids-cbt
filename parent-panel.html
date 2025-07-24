@@ -10,7 +10,7 @@
       padding: 30px;
       background-color: #f2f2f2;
     }
-    h1 {
+    h1, h2 {
       color: green;
     }
     .login-section, .report-section {
@@ -38,24 +38,26 @@
     button:hover {
       background-color: darkgreen;
     }
-    #reportDisplay {
-      margin-top: 30px;
+    .report-item {
+      background-color: #f9f9f9;
+      margin: 10px 0;
+      padding: 10px;
+      border-left: 5px solid green;
     }
   </style>
 </head>
 <body>
   <div class="login-section" id="loginSection">
     <h1>Parent Panel</h1>
-    <p>Enter your child’s name and email to view reports:</p>
+    <p>Enter your child’s name and your email to view reports:</p>
     <input type="text" id="studentName" placeholder="Student Full Name"/>
     <input type="email" id="parentEmail" placeholder="Your Email Address"/>
     <button onclick="viewParentReport()">View Report</button>
   </div>
 
   <div class="report-section" id="reportSection" style="display: none;">
-    <h2>Assessment Report</h2>
+    <h2>Assessment Reports</h2>
     <div id="reportDisplay"></div>
-    <button onclick="downloadPDF()">Download PDF</button>
     <button onclick="logout()">Logout</button>
   </div>
 
@@ -70,19 +72,31 @@
         return;
       }
 
-      const key = `${name}_${email}`;
-      const report = localStorage.getItem(key);
+      const reports = getParentReport(name, email);
 
-      if (!report) {
-        alert("No report found for this student.");
+      if (reports.length === 0) {
+        alert("No reports found for this student.");
         return;
       }
 
-      // Hide login and show report
       document.getElementById('loginSection').style.display = 'none';
       document.getElementById('reportSection').style.display = 'block';
 
-      displayReport(JSON.parse(report));
+      const display = document.getElementById('reportDisplay');
+      display.innerHTML = '';
+
+      reports.forEach(report => {
+        const div = document.createElement('div');
+        div.className = 'report-item';
+        div.innerHTML = `
+          <strong>Subject:</strong> ${report.subject}<br/>
+          <strong>Grade:</strong> ${report.grade}<br/>
+          <strong>Score:</strong> ${report.score}/${report.total || 30}<br/>
+          <strong>Percentage:</strong> ${report.percentage}%<br/>
+          <strong>Date:</strong> ${report.date}
+        `;
+        display.appendChild(div);
+      });
     }
 
     function logout() {
