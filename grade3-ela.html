@@ -326,8 +326,9 @@
 
       const studentName = localStorage.getItem("studentName") || "Unknown";
       const studentEmail = localStorage.getItem("studentEmail") || "unknown@email.com";
-      const subject = "Mathematics";
-      const grade = localStorage.getItem("grade") || "Grade 3";
+      const subject = "English Language Arts";
+const grade = localStorage.getItem("selectedGrade") || "Grade 3";
+
 
       const report = generateTestReport(
         studentName,
