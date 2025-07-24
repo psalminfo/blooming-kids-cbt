@@ -7,11 +7,11 @@
   <style>
     body {
       font-family: Arial, sans-serif;
+      background-color: #f0fff0;
+      color: #333;
       max-width: 800px;
       margin: 0 auto;
       padding: 20px;
-      background-color: #f0fff0;
-      color: #333;
     }
     h1 {
       text-align: center;
@@ -21,7 +21,8 @@
       position: fixed;
       top: 10px;
       right: 10px;
-      background-color: yellow;
+      background: yellow;
+      color: black;
       padding: 10px;
       border: 2px solid green;
       border-radius: 5px;
@@ -52,231 +53,47 @@
     button:hover {
       background-color: darkgreen;
     }
-    @media (max-width: 600px) {
-      body {
-        padding: 10px;
-      }
-      #timer {
-        font-size: 14px;
-        padding: 8px;
-      }
-    }
   </style>
 </head>
 <body>
   <h1>Blooming Kids House: Grade 3 – Mathematics Test</h1>
-  <div id="timer">Time Remaining: 30:00</div>
+  <div id="timer">Time Remaining: 05:00</div>
 
   <div id="questions">
     <div class="question">
-      <p><strong>1. What is 24 + 18?</strong></p>
-      <label><input type="radio" name="q1" value="a"> 40</label>
-      <label><input type="radio" name="q1" value="b" data-correct="true"> 42</label>
-      <label><input type="radio" name="q1" value="c"> 44</label>
-      <label><input type="radio" name="q1" value="d"> 38</label>
+      <p><strong>1. What is 7 + 5?</strong></p>
+      <label><input type="radio" name="q1" value="a"> 11</label>
+      <label><input type="radio" name="q1" value="b" data-correct="true"> 12</label>
+      <label><input type="radio" name="q1" value="c"> 13</label>
+      <label><input type="radio" name="q1" value="d"> 14</label>
     </div>
     <div class="question">
-      <p><strong>2. Subtract: 45 - 27 = ?</strong></p>
-      <label><input type="radio" name="q2" value="a"> 18</label>
-      <label><input type="radio" name="q2" value="b" data-correct="true"> 18</label>
-      <label><input type="radio" name="q2" value="c"> 20</label>
-      <label><input type="radio" name="q2" value="d"> 16</label>
+      <p><strong>2. What is 18 - 9?</strong></p>
+      <label><input type="radio" name="q2" value="a"> 7</label>
+      <label><input type="radio" name="q2" value="b"> 8</label>
+      <label><input type="radio" name="q2" value="c" data-correct="true"> 9</label>
+      <label><input type="radio" name="q2" value="d"> 10</label>
     </div>
     <div class="question">
-      <p><strong>3. What is 6 × 4?</strong></p>
-      <label><input type="radio" name="q3" value="a"> 20</label>
-      <label><input type="radio" name="q3" value="b"> 22</label>
-      <label><input type="radio" name="q3" value="c" data-correct="true"> 24</label>
-      <label><input type="radio" name="q3" value="d"> 26</label>
+      <p><strong>3. What is 3 × 4?</strong></p>
+      <label><input type="radio" name="q3" value="a"> 10</label>
+      <label><input type="radio" name="q3" value="b"> 11</label>
+      <label><input type="radio" name="q3" value="c" data-correct="true"> 12</label>
+      <label><input type="radio" name="q3" value="d"> 13</label>
     </div>
     <div class="question">
-      <p><strong>4. Divide: 15 ÷ 3 = ?</strong></p>
-      <label><input type="radio" name="q4" value="a"> 4</label>
-      <label><input type="radio" name="q4" value="b" data-correct="true"> 5</label>
-      <label><input type="radio" name="q4" value="c"> 6</label>
-      <label><input type="radio" name="q4" value="d"> 7</label>
+      <p><strong>4. Which number is even?</strong></p>
+      <label><input type="radio" name="q4" value="a"> 13</label>
+      <label><input type="radio" name="q4" value="b"> 15</label>
+      <label><input type="radio" name="q4" value="c" data-correct="true"> 16</label>
+      <label><input type="radio" name="q4" value="d"> 19</label>
     </div>
     <div class="question">
-      <p><strong>5. Which fraction represents one out of four equal parts?</strong></p>
-      <label><input type="radio" name="q5" value="a"> 1/2</label>
-      <label><input type="radio" name="q5" value="b"> 1/3</label>
-      <label><input type="radio" name="q5" value="c" data-correct="true"> 1/4</label>
-      <label><input type="radio" name="q5" value="d"> 1/5</label>
-    </div>
-    <div class="question">
-      <p><strong>6. What is the value of the digit 7 in the number 374?</strong></p>
-      <label><input type="radio" name="q6" value="a"> 7</label>
-      <label><input type="radio" name="q6" value="b"> 70</label>
-      <label><input type="radio" name="q6" value="c" data-correct="true"> 70</label>
-      <label><input type="radio" name="q6" value="d"> 700</label>
-    </div>
-    <div class="question">
-      <p><strong>7. Round 156 to the nearest ten.</strong></p>
-      <label><input type="radio" name="q7" value="a"> 150</label>
-      <label><input type="radio" name="q7" value="b" data-correct="true"> 160</label>
-      <label><input type="radio" name="q7" value="c"> 170</label>
-      <label><input type="radio" name="q7" value="d"> 140</label>
-    </div>
-    <div class="question">
-      <p><strong>8. Which number is even?</strong></p>
-      <label><input type="radio" name="q8" value="a"> 13</label>
-      <label><input type="radio" name="q8" value="b"> 17</label>
-      <label><input type="radio" name="q8" value="c"> 19</label>
-      <label><input type="radio" name="q8" value="d" data-correct="true"> 20</label>
-    </div>
-    <div class="question">
-      <p><strong>9. A rectangle has 4 sides. How many sides do 3 rectangles have?</strong></p>
-      <label><input type="radio" name="q9" value="a"> 8</label>
-      <label><input type="radio" name="q9" value="b"> 10</label>
-      <label><input type="radio" name="q9" value="c" data-correct="true"> 12</label>
-      <label><input type="radio" name="q9" value="d"> 14</label>
-    </div>
-    <div class="question">
-      <p><strong>10. What is the perimeter of a square with a side length of 5 cm?</strong></p>
-      <label><input type="radio" name="q10" value="a"> 15 cm</label>
-      <label><input type="radio" name="q10" value="b"> 20 cm</label>
-      <label><input type="radio" name="q10" value="c" data-correct="true"> 20 cm</label>
-      <label><input type="radio" name="q10" value="d"> 25 cm</label>
-    </div>
-    <div class="question">
-      <p><strong>11. Maria has 3 apples, and she buys 4 more. How many apples does she have now?</strong></p>
-      <label><input type="radio" name="q11" value="a"> 6</label>
-      <label><input type="radio" name="q11" value="b" data-correct="true"> 7</label>
-      <label><input type="radio" name="q11" value="c"> 8</label>
-      <label><input type="radio" name="q11" value="d"> 9</label>
-    </div>
-    <div class="question">
-      <p><strong>12. What is 8 × 5?</strong></p>
-      <label><input type="radio" name="q12" value="a"> 35</label>
-      <label><input type="radio" name="q12" value="b"> 45</label>
-      <label><input type="radio" name="q12" value="c" data-correct="true"> 40</label>
-      <label><input type="radio" name="q12" value="d"> 50</label>
-    </div>
-    <div class="question">
-      <p><strong>13. Divide: 24 ÷ 4 = ?</strong></p>
-      <label><input type="radio" name="q13" value="a"> 5</label>
-      <label><input type="radio" name="q13" value="b" data-correct="true"> 6</label>
-      <label><input type="radio" name="q13" value="c"> 7</label>
-      <label><input type="radio" name="q13" value="d"> 8</label>
-    </div>
-    <div class="question">
-      <p><strong>14. Which number is greater: 245 or 254?</strong></p>
-      <label><input type="radio" name="q14" value="a"> 245</label>
-      <label><input type="radio" name="q14" value="b" data-correct="true"> 254</label>
-      <label><input type="radio" name="q14" value="c"> They are equal</label>
-      <label><input type="radio" name="q14" value="d"> Cannot compare</label>
-    </div>
-    <div class="question">
-      <p><strong>15. What is 1/3 of 9?</strong></p>
-      <label><input type="radio" name="q15" value="a"> 2</label>
-      <label><input type="radio" name="q15" value="b"> 3</label>
-      <label><input type="radio" name="q15" value="c" data-correct="true"> 3</label>
-      <label><input type="radio" name="q15" value="d"> 4</label>
-    </div>
-    <div class="question">
-      <p><strong>16. How many minutes are in 2 hours?</strong></p>
-      <label><input type="radio" name="q16" value="a"> 60</label>
-      <label><input type="radio" name="q16" value="b"> 100</label>
-      <label><input type="radio" name="q16" value="c" data-correct="true"> 120</label>
-      <label><input type="radio" name="q16" value="d"> 180</label>
-    </div>
-    <div class="question">
-      <p><strong>17. A triangle has 3 vertices. How many vertices do 4 triangles have?</strong></p>
-      <label><input type="radio" name="q17" value="a"> 9</label>
-      <label><input type="radio" name="q17" value="b"> 10</label>
-      <label><input type="radio" name="q17" value="c" data-correct="true"> 12</label>
-      <label><input type="radio" name="q17" value="d"> 15</label>
-    </div>
-    <div class="question">
-      <p><strong>18. What is the area of a rectangle with length 6 cm and width 3 cm?</strong></p>
-      <label><input type="radio" name="q18" value="a"> 15 cm²</label>
-      <label><input type="radio" name="q18" value="b"> 18 cm²</label>
-      <label><input type="radio" name="q18" value="c" data-correct="true"> 18 cm²</label>
-      <label><input type="radio" name="q18" value="d"> 20 cm²</label>
-    </div>
-    <div class="question">
-      <p><strong>19. Which number comes next in the pattern: 5, 10, 15, 20, ?</strong></p>
-      <label><input type="radio" name="q19" value="a"> 22</label>
-      <label><input type="radio" name="q19" value="b"> 24</label>
-      <label><input type="radio" name="q19" value="c" data-correct="true"> 25</label>
-      <label><input type="radio" name="q19" value="d"> 30</label>
-    </div>
-    <div class="question">
-      <p><strong>20. A book costs $8. How much do 3 books cost?</strong></p>
-      <label><input type="radio" name="q20" value="a"> $21</label>
-      <label><input type="radio" name="q20" value="b" data-correct="true"> $24</label>
-      <label><input type="radio" name="q20" value="c"> $27</label>
-      <label><input type="radio" name="q20" value="d"> $30</label>
-    </div>
-    <div class="question">
-      <p><strong>21. What is 56 - 29?</strong></p>
-      <label><input type="radio" name="q21" value="a"> 25</label>
-      <label><input type="radio" name="q21" value="b"> 26</label>
-      <label><input type="radio" name="q21" value="c" data-correct="true"> 27</label>
-      <label><input type="radio" name="q21" value="d"> 28</label>
-    </div>
-    <div class="question">
-      <p><strong>22. Which shape has exactly 6 sides?</strong></p>
-      <label><input type="radio" name="q22" value="a"> Pentagon</label>
-      <label><input type="radio" name="q22" value="b"> Hexagon</label>
-      <label><input type="radio" name="q22" value="c" data-correct="true"> Hexagon</label>
-      <label><input type="radio" name="q22" value="d"> Octagon</label>
-    </div>
-    <div class="question">
-      <p><strong>23. What is 7 × 7?</strong></p>
-      <label><input type="radio" name="q23" value="a"> 42</label>
-      <label><input type="radio" name="q23" value="b"> 48</label>
-      <label><input type="radio" name="q23" value="c" data-correct="true"> 49</label>
-      <label><input type="radio" name="q23" value="d"> 56</label>
-    </div>
-    <div class="question">
-      <p><strong>24. Divide: 30 ÷ 5 = ?</strong></p>
-      <label><input type="radio" name="q24" value="a"> 4</label>
-      <label><input type="radio" name="q24" value="b"> 5</label>
-      <label><input type="radio" name="q24" value="c" data-correct="true"> 6</label>
-      <label><input type="radio" name="q24" value="d"> 7</label>
-    </div>
-    <div class="question">
-      <p><strong>25. Which fraction is equivalent to 2/4?</strong></p>
-      <label><input type="radio" name="q25" value="a"> 1/3</label>
-      <label><input type="radio" name="q25" value="b" data-correct="true"> 1/2</label>
-      <label><input type="radio" name="q25" value="c"> 3/4</label>
-      <label><input type="radio" name="q25" value="d"> 2/3</label>
-    </div>
-    <div class="question">
-      <p><strong>26. A store has 12 candies. If each child gets 3 candies, how many children can get candies?</strong></p>
-      <label><input type="radio" name="q26" value="a"> 3</label>
-      <label><input type="radio" name="q26" value="b"> 4</label>
-      <label><input type="radio" name="q26" value="c" data-correct="true"> 4</label>
-      <label><input type="radio" name="q26" value="d"> 5</label>
-    </div>
-    <div class="question">
-      <p><strong>27. What is the value of 3 in the number 132?</strong></p>
-      <label><input type="radio" name="q27" value="a"> 3</label>
-      <label><input type="radio" name="q27" value="b"> 30</label>
-      <label><input type="radio" name="q27" value="c" data-correct="true"> 30</label>
-      <label><input type="radio" name="q27" value="d"> 300</label>
-    </div>
-    <div class="question">
-      <p><strong>28. How many days are in 2 weeks?</strong></p>
-      <label><input type="radio" name="q28" value="a"> 10</label>
-      <label><input type="radio" name="q28" value="b"> 12</label>
-      <label><input type="radio" name="q28" value="c" data-correct="true"> 14</label>
-      <label><input type="radio" name="q28" value="d"> 16</label>
-    </div>
-    <div class="question">
-      <p><strong>29. Which number is odd?</strong></p>
-      <label><input type="radio" name="q29" value="a"> 12</label>
-      <label><input type="radio" name="q29" value="b"> 14</label>
-      <label><input type="radio" name="q29" value="c" data-correct="true"> 15</label>
-      <label><input type="radio" name="q29" value="d"> 16</label>
-    </div>
-    <div class="question">
-      <p><strong>30. A shelf holds 5 books. How many books do 4 shelves hold?</strong></p>
-      <label><input type="radio" name="q30" value="a"> 15</label>
-      <label><input type="radio" name="q30" value="b"> 18</label>
-      <label><input type="radio" name="q30" value="c" data-correct="true"> 20</label>
-      <label><input type="radio" name="q30" value="d"> 22</label>
+      <p><strong>5. What is the value of the digit 5 in 352?</strong></p>
+      <label><input type="radio" name="q5" value="a"> 5</label>
+      <label><input type="radio" name="q5" value="b"> 50</label>
+      <label><input type="radio" name="q5" value="c" data-correct="true"> 50</label>
+      <label><input type="radio" name="q5" value="d"> 500</label>
     </div>
   </div>
 
@@ -284,19 +101,18 @@
 
   <script src="js/report-handler.js"></script>
   <script>
-    // TIMER LOGIC
-    let timeLeft = 30 * 60;
+    // TIMER
+    let timeLeft = 5 * 60;
     const timerDisplay = document.getElementById('timer');
 
     function updateTimer() {
       const minutes = Math.floor(timeLeft / 60);
       const seconds = timeLeft % 60;
-      timerDisplay.textContent = `Time Remaining: ${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
+      timerDisplay.textContent = \`Time Remaining: \${minutes}:\${seconds < 10 ? '0' : ''}\${seconds}\`;
       if (timeLeft > 0) {
         timeLeft--;
       } else {
         clearInterval(timerInterval);
-        timerDisplay.textContent = 'Time is up!';
         submitTest();
       }
     }
@@ -304,47 +120,38 @@
     const timerInterval = setInterval(updateTimer, 1000);
     updateTimer();
 
-    // TEST SUBMISSION LOGIC
+    // SUBMIT FUNCTION
     function submitTest() {
-  clearInterval(timerInterval);
+      clearInterval(timerInterval);
 
-  let score = 0;
-  const questions = document.querySelectorAll(".question");
-  const totalQuestions = questions.length;
+      let score = 0;
+      const questions = document.querySelectorAll('.question');
+      const totalQuestions = questions.length;
 
-  for (let i = 1; i <= totalQuestions; i++) {
-    const selected = document.querySelector(`input[name="q${i}"]:checked`);
-    const correct = document.querySelector(`input[name="q${i}"][data-correct="true"]`);
-    if (selected && correct && selected.value === correct.value) {
-      score++;
+      for (let i = 1; i <= totalQuestions; i++) {
+        const selected = document.querySelector(\`input[name="q\${i}"]:checked\`);
+        const correct = document.querySelector(\`input[name="q\${i}"][data-correct="true"]\`);
+        if (selected && correct && selected.value === correct.value) {
+          score++;
+        }
+      }
+
+      const studentName = localStorage.getItem("studentName") || "Unknown";
+      const studentEmail = localStorage.getItem("studentEmail") || "unknown@email.com";
+      const subject = "Mathematics";
+      const grade = localStorage.getItem("selectedGrade") || "Grade 3";
+
+      if (typeof generateTestReport !== "function" || typeof saveTestReport !== "function") {
+        alert("Report functions missing. Please check js/report-handler.js");
+        return;
+      }
+
+      const report = generateTestReport(studentName, studentEmail, subject, grade, score, totalQuestions);
+      saveTestReport(report);
+
+      alert("Test submitted successfully!");
+      window.location.href = "select-subject.html";
     }
-  }
-
-  const studentName = localStorage.getItem("studentName") || "Unknown";
-  const studentEmail = localStorage.getItem("studentEmail") || "unknown@email.com";
-  const subject = "Mathematics";
-  const grade = localStorage.getItem("selectedGrade") || "Grade 3";
-
-  if (typeof generateTestReport !== "function") {
-    alert("generateTestReport is missing. Please check your js/report-handler.js file.");
-    return;
-  }
-
-  if (typeof saveTestReport !== "function") {
-    alert("saveTestReport is missing. Please check your js/report-handler.js file.");
-    return;
-  }
-
-  const report = generateTestReport(
-    studentName,
-    studentEmail,
-    subject,
-    grade,
-    score,
-    totalQuestions
-  );
-
-  saveTestReport(report);
-  alert("Test submitted successfully.");
-  window.location.href = "select-subject.html";
-}
+  </script>
+</body>
+</html>
