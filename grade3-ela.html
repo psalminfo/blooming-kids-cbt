@@ -3,155 +3,58 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Grade 3 – English Test</title>
-  <style>
-    body {
-      font-family: Arial, sans-serif;
-      background-color: #f0fff0;
-      color: #333;
-      max-width: 800px;
-      margin: 0 auto;
-      padding: 20px;
-    }
-    h1 {
-      text-align: center;
-      color: green;
-    }
-    #timer {
-      position: fixed;
-      top: 10px;
-      right: 10px;
-      background: yellow;
-      color: black;
-      padding: 10px;
-      border: 2px solid green;
-      border-radius: 5px;
-      font-weight: bold;
-    }
-    .question {
-      background-color: #fff;
-      padding: 15px;
-      margin: 15px 0;
-      border: 1px solid green;
-      border-radius: 5px;
-    }
-    .question label {
-      display: block;
-      margin: 10px 0;
-    }
-    button {
-      display: block;
-      margin: 30px auto;
-      padding: 12px 25px;
-      background-color: green;
-      color: white;
-      border: none;
-      border-radius: 5px;
-      cursor: pointer;
-      font-size: 16px;
-    }
-    button:hover {
-      background-color: darkgreen;
-    }
-  </style>
+  <title>Grade 3 – English Language Arts Test</title>
+  <link rel="stylesheet" href="css/style.css" />
 </head>
 <body>
-  <h1>Blooming Kids House: Grade 3 – English Test</h1>
-  <div id="timer">Time Remaining: 05:00</div>
+  <h1>Blooming Kids House: Grade 3 – English Language Arts Test</h1>
+  <div id="timer">Time Remaining: 30:00</div>
 
   <div id="questions">
     <div class="question">
-      <p><strong>1. Which word is a noun?</strong></p>
-      <label><input type="radio" name="q1" value="a" data-correct="true"> Dog</label>
-      <label><input type="radio" name="q1" value="b"> Run</label>
-      <label><input type="radio" name="q1" value="c"> Quickly</label>
-      <label><input type="radio" name="q1" value="d"> Blue</label>
+      <p><strong>1. Which sentence is written correctly?</strong></p>
+      <label><input type="radio" name="q1" value="a"> the cat runned away</label>
+      <label><input type="radio" name="q1" value="b" data-correct="true"> The cat ran away.</label>
+      <label><input type="radio" name="q1" value="c"> The cat run away.</label>
+      <label><input type="radio" name="q1" value="d"> the cat ran away</label>
     </div>
+
     <div class="question">
-      <p><strong>2. What is the past tense of "go"?</strong></p>
-      <label><input type="radio" name="q2" value="a"> Goes</label>
-      <label><input type="radio" name="q2" value="b" data-correct="true"> Went</label>
-      <label><input type="radio" name="q2" value="c"> Gone</label>
-      <label><input type="radio" name="q2" value="d"> Going</label>
+      <p><strong>2. What is the main idea of a story?</strong></p>
+      <label><input type="radio" name="q2" value="a"> The title of the story</label>
+      <label><input type="radio" name="q2" value="b"> The setting of the story</label>
+      <label><input type="radio" name="q2" value="c" data-correct="true"> What the story is mostly about</label>
+      <label><input type="radio" name="q2" value="d"> The characters in the story</label>
     </div>
+
     <div class="question">
-      <p><strong>3. Which sentence is correct?</strong></p>
-      <label><input type="radio" name="q3" value="a"> He can runs fast.</label>
-      <label><input type="radio" name="q3" value="b"> She can run fast.</label>
-      <label><input type="radio" name="q3" value="c" data-correct="true"> She runs fast.</label>
-      <label><input type="radio" name="q3" value="d"> Him run fast.</label>
+      <p><strong>3. Choose the correct plural form of “child”.</strong></p>
+      <label><input type="radio" name="q3" value="a"> childs</label>
+      <label><input type="radio" name="q3" value="b"> childrens</label>
+      <label><input type="radio" name="q3" value="c" data-correct="true"> children</label>
+      <label><input type="radio" name="q3" value="d"> childeren</label>
     </div>
+
     <div class="question">
-      <p><strong>4. What do we call a story that is not real?</strong></p>
-      <label><input type="radio" name="q4" value="a"> Biography</label>
-      <label><input type="radio" name="q4" value="b"> Non-fiction</label>
-      <label><input type="radio" name="q4" value="c" data-correct="true"> Fiction</label>
-      <label><input type="radio" name="q4" value="d"> Newspaper</label>
+      <p><strong>4. What is a synonym for "happy"?</strong></p>
+      <label><input type="radio" name="q4" value="a"> angry</label>
+      <label><input type="radio" name="q4" value="b"> sad</label>
+      <label><input type="radio" name="q4" value="c" data-correct="true"> joyful</label>
+      <label><input type="radio" name="q4" value="d"> quiet</label>
     </div>
+
     <div class="question">
-      <p><strong>5. Which word is a verb?</strong></p>
-      <label><input type="radio" name="q5" value="a"> Happy</label>
-      <label><input type="radio" name="q5" value="b"> Cat</label>
-      <label><input type="radio" name="q5" value="c"> Chair</label>
-      <label><input type="radio" name="q5" value="d" data-correct="true"> Jump</label>
+      <p><strong>5. What punctuation ends a question?</strong></p>
+      <label><input type="radio" name="q5" value="a"> . (period)</label>
+      <label><input type="radio" name="q5" value="b" data-correct="true"> ? (question mark)</label>
+      <label><input type="radio" name="q5" value="c"> ! (exclamation mark)</label>
+      <label><input type="radio" name="q5" value="d"> , (comma)</label>
     </div>
   </div>
 
-  <button onclick="submitTest()">Submit Test</button>
+  <button id="submitBtn">Submit Test</button>
 
+  <script src="js/universal-test.js"></script>
   <script src="js/report-handler.js"></script>
-  <script>
-    // TIMER
-    let timeLeft = 5 * 60;
-    const timerDisplay = document.getElementById('timer');
-
-    function updateTimer() {
-      const minutes = Math.floor(timeLeft / 60);
-      const seconds = timeLeft % 60;
-      timerDisplay.textContent = \`Time Remaining: \${minutes}:\${seconds < 10 ? '0' : ''}\${seconds}\`;
-      if (timeLeft > 0) {
-        timeLeft--;
-      } else {
-        clearInterval(timerInterval);
-        submitTest();
-      }
-    }
-
-    const timerInterval = setInterval(updateTimer, 1000);
-    updateTimer();
-
-    // SUBMIT FUNCTION
-    function submitTest() {
-      clearInterval(timerInterval);
-
-      let score = 0;
-      const questions = document.querySelectorAll('.question');
-      const totalQuestions = questions.length;
-
-      for (let i = 1; i <= totalQuestions; i++) {
-        const selected = document.querySelector(\`input[name="q\${i}"]:checked\`);
-        const correct = document.querySelector(\`input[name="q\${i}"][data-correct="true"]\`);
-        if (selected && correct && selected.value === correct.value) {
-          score++;
-        }
-      }
-
-      const studentName = localStorage.getItem("studentName") || "Unknown";
-      const studentEmail = localStorage.getItem("studentEmail") || "unknown@email.com";
-      const subject = "English Language Arts";
-      const grade = localStorage.getItem("selectedGrade") || "Grade 3";
-
-      if (typeof generateTestReport !== "function" || typeof saveTestReport !== "function") {
-        alert("Report functions missing. Please check js/report-handler.js");
-        return;
-      }
-
-      const report = generateTestReport(studentName, studentEmail, subject, grade, score, totalQuestions);
-      saveTestReport(report);
-
-      alert("Test submitted successfully!");
-      window.location.href = "select-subject.html";
-    }
-  </script>
 </body>
 </html>
