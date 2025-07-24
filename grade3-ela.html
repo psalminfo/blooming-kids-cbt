@@ -281,23 +281,25 @@
 
   <script src="js/report-handler.js"></script>
   <script>
-    // TIMER
-    let timeLeft = 30 * 60;
-    const timerDisplay = document.getElementById('timer');
-    function updateTimer() {
-      const minutes = Math.floor(timeLeft / 60);
-      const seconds = timeLeft % 60;
-      timerDisplay.textContent = \`Time Remaining: \${minutes}:\${seconds < 10 ? '0' : ''}\${seconds}\`;
-      if (timeLeft > 0) {
-        timeLeft--;
-      } else {
-        clearInterval(timerInterval);
-        timerDisplay.textContent = "Time's up!";
-        submitTest();
-      }
-    }
-    const timerInterval = setInterval(updateTimer, 1000);
-    updateTimer();
+   // TIMER LOGIC
+let timeLeft = 30 * 60;
+const timerDisplay = document.getElementById('timer');
+
+function updateTimer() {
+  const minutes = Math.floor(timeLeft / 60);
+  const seconds = timeLeft % 60;
+  timerDisplay.textContent = `Time Remaining: ${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
+  if (timeLeft > 0) {
+    timeLeft--;
+  } else {
+    clearInterval(timerInterval);
+    timerDisplay.textContent = 'Time is up!';
+    submitTest();
+  }
+}
+
+const timerInterval = setInterval(updateTimer, 1000);
+updateTimer();
 
     // SUBMIT TEST
     function submitTest() {
