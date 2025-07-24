@@ -3,43 +3,54 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Admin Login</title>
+  <title>Admin Panel - Blooming Kids House Assessment</title>
+  <link rel="stylesheet" href="css/style.css" />
   <style>
     body {
       font-family: Arial, sans-serif;
-      background: #e8f5e9;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      height: 100vh;
+      padding: 20px;
+      background-color: #f2f2f2;
     }
-    form {
-      background: white;
-      padding: 2em;
-      border-radius: 10px;
-      box-shadow: 0 0 10px rgba(0,0,0,0.1);
+
+    h2 {
+      color: #2e7d32;
     }
-    input[type="password"] {
-      padding: 0.5em;
-      width: 100%;
-      margin-bottom: 1em;
+
+    #adminContent {
+      margin-top: 20px;
     }
-    button {
-      padding: 0.5em 1em;
-      background: #2e7d32;
+
+    .report-card {
+      background: #fff;
+      border: 1px solid #ddd;
+      padding: 15px;
+      margin-bottom: 15px;
+      border-radius: 5px;
+    }
+
+    .logout-btn {
+      background-color: #c62828;
       color: white;
       border: none;
+      padding: 10px 20px;
       cursor: pointer;
+      border-radius: 4px;
+      float: right;
+    }
+
+    .logout-btn:hover {
+      background-color: #a91b1b;
     }
   </style>
 </head>
 <body>
-  <form id="adminLogin">
-    <h2>Admin Login</h2>
-    <input type="password" id="adminCode" placeholder="Enter Access Code" required />
-    <button type="submit">Login</button>
-  </form>
+  <h2>Admin Dashboard</h2>
+  <button class="logout-btn" onclick="logoutAdmin()">Logout</button>
+
+  <div id="adminContent">
+    <p>Loading reports...</p>
+  </div>
+
   <script src="js/report-handler.js"></script>
 </body>
 </html>
