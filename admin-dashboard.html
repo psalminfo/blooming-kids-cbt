@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Admin Dashboard</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #f0f0f0;
+      padding: 20px;
+    }
+    h1 {
+      color: #2e7d32;
+    }
+    button {
+      margin-top: 20px;
+      padding: 0.5em 1em;
+      background-color: #c62828;
+      color: white;
+      border: none;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+  <h1>Welcome to the Admin Dashboard</h1>
+  <p>Here, you will be able to view test summaries, student data, and manage reports.</p>
+  <button onclick="logout()">Logout</button>
+  <script>
+    function logout() {
+      window.location.href = 'admin-panel.html';
+    }
+  </script>
+</body>
+</html>
