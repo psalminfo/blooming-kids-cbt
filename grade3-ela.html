@@ -3,15 +3,14 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Grade 3 – ELA Test</title>
+  <title>Grade 3 – English Language Arts Test</title>
   <style>
     body {
       font-family: Arial, sans-serif;
-      max-width: 800px;
-      margin: 0 auto;
-      padding: 20px;
       background-color: #f0fff0;
-      color: #333;
+      padding: 20px;
+      max-width: 800px;
+      margin: auto;
     }
     h1 {
       text-align: center;
@@ -36,7 +35,7 @@
     }
     .question label {
       display: block;
-      margin: 10px 0;
+      margin: 8px 0;
     }
     button {
       display: block;
@@ -46,29 +45,20 @@
       color: white;
       border: none;
       border-radius: 5px;
-      cursor: pointer;
       font-size: 16px;
+      cursor: pointer;
     }
     button:hover {
       background-color: darkgreen;
     }
-    @media (max-width: 600px) {
-      body {
-        padding: 10px;
-      }
-      #timer {
-        font-size: 14px;
-        padding: 8px;
-      }
-    }
   </style>
 </head>
 <body>
-  <h1>Blooming Kids House: Grade 3 – ELA Test</h1>
+  <h1>Blooming Kids House: Grade 3 – English Language Arts Test</h1>
   <div id="timer">Time Remaining: 30:00</div>
 
-  <div id="questions">
-    <div class="question">
+  <form id="testForm">
+    <div id="questions">
       <p><strong>Passage 1: The Little Red Hen</strong></p>
       <p>Once upon a time, a Little Red Hen lived on a farm with a dog, a cat, and a pig. One day, she found some wheat seeds. She decided to plant them to make bread. "Who will help me plant these seeds?" she asked. The dog said, "Not I." The cat said, "Not I." The pig said, "Not I." So, the Little Red Hen planted the seeds herself. When the wheat grew, she asked, "Who will help me cut the wheat?" Again, the dog, cat, and pig said, "Not I." So, she cut it herself. Later, she asked, "Who will help me grind the wheat into flour?" and "Who will help me bake the bread?" Each time, her friends refused, and she did the work alone. Finally, the bread was ready, and it smelled delicious. "Who will help me eat the bread?" she asked. The dog, cat, and pig shouted, "I will!" But the Little Red Hen said, "I worked hard alone, so I will eat it myself." And she did.</p>
       <p><strong>1. What did the Little Red Hen want to make with the wheat seeds?</strong></p>
@@ -284,71 +274,66 @@
     </div>
   </div>
 
-  <button onclick="submitTest()">Submit Test</button>
+   </div>
+    <button type="button" onclick="submitTest()">Submit Test</button>
+  </form>
 
   <script src="js/report-handler.js"></script>
   <script>
-    // TIMER LOGIC
+    // TIMER
     let timeLeft = 30 * 60;
     const timerDisplay = document.getElementById('timer');
-
     function updateTimer() {
       const minutes = Math.floor(timeLeft / 60);
       const seconds = timeLeft % 60;
-      timerDisplay.textContent = `Time Remaining: ${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
+      timerDisplay.textContent = \`Time Remaining: \${minutes}:\${seconds < 10 ? '0' : ''}\${seconds}\`;
       if (timeLeft > 0) {
         timeLeft--;
       } else {
         clearInterval(timerInterval);
-        timerDisplay.textContent = 'Time is up!';
+        timerDisplay.textContent = "Time's up!";
         submitTest();
       }
     }
-
     const timerInterval = setInterval(updateTimer, 1000);
     updateTimer();
 
-    // TEST SUBMISSION LOGIC
+    // SUBMIT TEST
     function submitTest() {
-  clearInterval(timerInterval);
+      clearInterval(timerInterval);
 
-  let score = 0;
-  const questions = document.querySelectorAll(".question");
-  const totalQuestions = questions.length;
+      let score = 0;
+      const totalQuestions = document.querySelectorAll(".question").length;
 
-  for (let i = 1; i <= totalQuestions; i++) {
-    const selected = document.querySelector(`input[name="q${i}"]:checked`);
-    const correct = document.querySelector(`input[name="q${i}"][data-correct="true"]`);
-    if (selected && correct && selected.value === correct.value) {
-      score++;
+      for (let i = 1; i <= totalQuestions; i++) {
+        const selected = document.querySelector(\`input[name="q\${i}"]:checked\`);
+        const correct = document.querySelector(\`input[name="q\${i}"][data-correct="true"]\`);
+        if (selected && correct && selected.value === correct.value) {
+          score++;
+        }
+      }
+
+      const studentName = localStorage.getItem("studentName") || "Unknown";
+      const studentEmail = localStorage.getItem("studentEmail") || "unknown@email.com";
+      const grade = localStorage.getItem("selectedGrade") || "Grade 3";
+      const subject = "English Language Arts";
+
+      if (typeof generateTestReport !== "function") {
+        alert("generateTestReport is missing. Please check your js/report-handler.js file.");
+        return;
+      }
+
+      if (typeof saveTestReport !== "function") {
+        alert("saveTestReport is missing. Please check your js/report-handler.js file.");
+        return;
+      }
+
+      const report = generateTestReport(studentName, studentEmail, subject, grade, score, totalQuestions);
+      saveTestReport(report);
+
+      alert("Test submitted successfully.");
+      window.location.href = "select-subject.html";
     }
-  }
-
-  const studentName = localStorage.getItem("studentName") || "Unknown";
-  const studentEmail = localStorage.getItem("studentEmail") || "unknown@email.com";
-  const subject = "English Language Arts";
-  const grade = localStorage.getItem("selectedGrade") || "Grade 3";
-
-  if (typeof generateTestReport !== "function") {
-    alert("generateTestReport is missing. Please check your js/report-handler.js file.");
-    return;
-  }
-
-  if (typeof saveTestReport !== "function") {
-    alert("saveTestReport is missing. Please check your js/report-handler.js file.");
-    return;
-  }
-
-  const report = generateTestReport(
-    studentName,
-    studentEmail,
-    subject,
-    grade,
-    score,
-    totalQuestions
-  );
-
-  saveTestReport(report);
-  alert("Test submitted successfully.");
-  window.location.href = "select-subject.html";
-}
+  </script>
+</body>
+</html>
