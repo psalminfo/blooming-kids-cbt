@@ -1,83 +1,83 @@
-// Save a single report to localStorage
-function saveReportToLocalStorage(report) {
-  const reports = JSON.parse(localStorage.getItem('bkh_reports')) || [];
-  reports.push(report);
-  localStorage.setItem('bkh_reports', JSON.stringify(reports));
+// Import Firebase config and Firestore
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import { getFirestore, collection, addDoc, getDocs, query, where } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import { firebaseConfig } from './firebase-config.js';
+
+// Initialize Firebase
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+
+// Save a single report to Firebase
+async function saveReportToFirebase(report) {
+  try {
+    await addDoc(collection(db, 'reports'), report);
+    console.log("✅ Report saved to Firestore");
+  } catch (e) {
+    console.error("❌ Error saving report: ", e);
+  }
 }
 
-// Wrapper used by test pages
+// Wrapper for saving test report
 function saveTestReport(report) {
-  saveReportToLocalStorage(report);
+  saveReportToFirebase(report);
 }
 
-// Generates a full test report
+// Used by test pages to format the report
 function generateTestReport(name, email, subject, grade, score, totalQuestions) {
-  const percentage = Math.round((score / totalQuestions) * 100);
+  const percentage = ((score / totalQuestions) * 100).toFixed(2);
 
-  // Auto-generated performance summary
   let performanceSummary = '';
-  if (percentage === 100) {
-    performanceSummary = "Excellent work! You got everything correct.";
-  } else if (percentage >= 80) {
-    performanceSummary = "Great job! You're performing well in this subject.";
+  if (percentage >= 90) {
+    performanceSummary = 'Excellent performance.';
+  } else if (percentage >= 75) {
+    performanceSummary = 'Good job with room for improvement.';
   } else if (percentage >= 50) {
-    performanceSummary = "You're getting there. A little more practice will help.";
+    performanceSummary = 'Fair performance. More practice is needed.';
   } else {
-    performanceSummary = "You need more revision and practice in this subject.";
+    performanceSummary = 'Below average. Significant support required.';
   }
 
-  // Auto-generated skill breakdown (generic since individual skills per question aren’t tagged yet)
-  const skillBreakdown = [
-    "Reading comprehension",
-    "Vocabulary development",
-    "Grammar and punctuation",
-    "Writing structure",
-    "Critical thinking"
-  ];
-
-  // Auto-generated recommendations
-  let recommendations = [];
-  if (percentage < 100) recommendations.push("Review missed questions carefully.");
-  if (percentage < 80) recommendations.push("Spend more time on reading assignments.");
-  if (percentage < 60) recommendations.push("Request a tutor follow-up session.");
-  if (percentage < 50) recommendations.push("Consider re-taking the test after review.");
+  const skillBreakdown = [`Sample Skill 1: ${Math.floor(Math.random() * 100)}%`, `Sample Skill 2: ${Math.floor(Math.random() * 100)}%`];
+  const recommendations = ['Review weak areas weekly.', 'Practice using STAAR-style questions.', 'Ask for help when unsure.'];
 
   return {
     studentName: name,
     studentEmail: email,
-    subject: subject,
-    grade: grade,
-    score: score,
-    totalQuestions: totalQuestions,
-    percentage: percentage,
-    performanceSummary: performanceSummary,
-    skillBreakdown: skillBreakdown,
-    recommendations: recommendations,
+    subject,
+    grade,
+    score,
+    totalQuestions,
+    percentage,
+    performanceSummary,
+    skillBreakdown,
+    recommendations,
     timestamp: new Date().toISOString()
   };
 }
 
-// Retrieve all reports (for admin)
-function getAllReports() {
-  return JSON.parse(localStorage.getItem('bkh_reports')) || [];
+// Admin panel: Get all reports
+async function getAllReports() {
+  const snapshot = await getDocs(collection(db, 'reports'));
+  return snapshot.docs.map(doc => doc.data());
 }
 
-// Retrieve reports for parent login
-function getParentReport(name, email) {
-  const reports = getAllReports();
-  return reports.filter(report =>
-    report.studentName.toLowerCase() === name.toLowerCase() &&
-    report.studentEmail.toLowerCase() === email.toLowerCase()
+// Parent panel: Get specific reports
+async function getParentReport(name, email) {
+  const q = query(
+    collection(db, 'reports'),
+    where('studentName', '==', name),
+    where('studentEmail', '==', email)
   );
+  const snapshot = await getDocs(q);
+  return snapshot.docs.map(doc => doc.data());
 }
 
-// Admin logout
+// Admin authentication helpers
 function logoutAdmin() {
   localStorage.removeItem('isAdminLoggedIn');
   window.location.href = 'index.html';
 }
 
-// Admin auth check
 function checkAdminAuth() {
   const loggedIn = localStorage.getItem('isAdminLoggedIn');
   if (!loggedIn) {
