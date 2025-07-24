@@ -4,171 +4,116 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Parent Panel - Blooming Kids House Assessment</title>
+  <link rel="stylesheet" href="css/style.css" />
   <style>
     body {
       font-family: Arial, sans-serif;
-      padding: 30px;
-      background-color: #f2f2f2;
-    }
-
-    h1, h2 {
-      color: green;
-    }
-
-    .login-section, .report-section {
-      background: white;
       padding: 20px;
-      border-radius: 10px;
-      max-width: 800px;
-      margin: auto;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+      background-color: #f9f9f9;
+    }
+
+    h2 {
+      color: #2e7d32;
+    }
+
+    .input-group {
+      margin-bottom: 15px;
+    }
+
+    label {
+      display: block;
+      font-weight: bold;
+      margin-bottom: 5px;
     }
 
     input {
       width: 100%;
       padding: 10px;
-      margin-top: 10px;
-      margin-bottom: 20px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
     }
 
     button {
-      background-color: green;
+      background-color: #2e7d32;
       color: white;
+      padding: 10px 20px;
       border: none;
-      padding: 12px;
       cursor: pointer;
-      width: 100%;
-      margin-top: 10px;
+      border-radius: 4px;
     }
 
     button:hover {
-      background-color: darkgreen;
+      background-color: #1b5e20;
     }
 
     .report-card {
-      background-color: #fcfcfc;
-      padding: 20px;
-      border: 1px solid #ccc;
-      margin-top: 30px;
-      border-left: 6px solid green;
-      position: relative;
-    }
-
-    .section {
+      background: #fff;
+      border: 1px solid #ddd;
+      padding: 15px;
       margin-top: 20px;
-    }
-
-    .section-title {
-      font-weight: bold;
-      margin-bottom: 8px;
-      border-bottom: 1px solid #ddd;
-    }
-
-    .print-button {
-      margin-top: 10px;
+      border-radius: 5px;
     }
   </style>
 </head>
 <body>
-  <div class="login-section" id="loginSection">
-    <h1>Parent Panel</h1>
-    <p>Enter your child’s name and email to view reports:</p>
-    <input type="text" id="studentName" placeholder="Student Full Name"/>
-    <input type="email" id="parentEmail" placeholder="Your Email Address"/>
-    <button onclick="viewParentReport()">View Report</button>
+  <h2>Parent Report Access</h2>
+
+  <div id="loginForm">
+    <div class="input-group">
+      <label for="studentName">Student Name</label>
+      <input type="text" id="studentName" required />
+    </div>
+    <div class="input-group">
+      <label for="studentEmail">Student Email</label>
+      <input type="email" id="studentEmail" required />
+    </div>
+    <button onclick="fetchParentReport()">View Report</button>
   </div>
 
-  <div class="report-section" id="reportSection" style="display: none;">
-    <h2>Assessment Reports</h2>
-    <div id="reportDisplay"></div>
-    <button onclick="logout()">Logout</button>
-  </div>
+  <div id="reportSection"></div>
 
-  <script src="js/report-handler.js"></script>
-  <script>
-    function viewParentReport() {
+  <!-- Load Firebase and report-handler -->
+  <script type="module">
+    import { getParentReport } from './js/report-handler.js';
+
+    async function fetchParentReport() {
       const name = document.getElementById('studentName').value.trim();
-      const email = document.getElementById('parentEmail').value.trim();
+      const email = document.getElementById('studentEmail').value.trim();
+      const reportSection = document.getElementById('reportSection');
 
       if (!name || !email) {
-        alert("Please enter both student name and your email.");
+        alert("Please enter both student name and email.");
         return;
       }
 
-      const reports = getParentReport(name, email);
-      if (reports.length === 0) {
-        alert("No reports found for this student.");
-        return;
+      reportSection.innerHTML = "<p>Loading report...</p>";
+
+      try {
+        const reports = await getParentReport(name, email);
+        if (!reports.length) {
+          reportSection.innerHTML = "<p>No report found for this student.</p>";
+          return;
+        }
+
+        reportSection.innerHTML = "";
+        reports.forEach(report => {
+          const div = document.createElement("div");
+          div.className = "report-card";
+          div.innerHTML = `
+            <strong>${report.studentName} (${report.studentEmail})</strong><br>
+            <strong>Grade:</strong> ${report.grade} |
+            <strong>Subject:</strong> ${report.subject}<br>
+            <strong>Score:</strong> ${report.score}/${report.totalQuestions} (${Math.round((report.score / report.totalQuestions) * 100)}%)<br>
+            <strong>Date:</strong> ${new Date(report.timestamp).toLocaleString()}<br><br>
+            <strong>Summary:</strong> ${report.performanceSummary || 'No summary provided'}<br>
+            <strong>Skills:</strong> <ul>${(report.skillBreakdown || []).map(skill => `<li>${skill}</li>`).join('')}</ul>
+            <strong>Recommendations:</strong> <ul>${(report.recommendations || []).map(r => `<li>${r}</li>`).join('')}</ul>
+          `;
+          reportSection.appendChild(div);
+        });
+      } catch (err) {
+        reportSection.innerHTML = `<p>Error fetching report: ${err.message}</p>`;
       }
-
-      document.getElementById('loginSection').style.display = 'none';
-      document.getElementById('reportSection').style.display = 'block';
-
-      const container = document.getElementById('reportDisplay');
-      container.innerHTML = "";
-
-      reports.forEach((report, index) => {
-        const card = document.createElement('div');
-        card.className = 'report-card';
-        card.id = `report-${index}`;
-
-        card.innerHTML = `
-          <div><strong>Student:</strong> ${report.studentName}</div>
-          <div><strong>Email:</strong> ${report.studentEmail}</div>
-          <div><strong>Grade:</strong> ${report.grade}</div>
-          <div><strong>Subject:</strong> ${report.subject}</div>
-          <div><strong>Score:</strong> ${report.score}/${report.total}</div>
-          <div><strong>Percentage:</strong> ${report.percentage}%</div>
-          <div><strong>Date:</strong> ${report.date}</div>
-
-          <div class="section">
-            <div class="section-title">Performance Summary</div>
-            <p>${report.performanceSummary || "No summary provided."}</p>
-          </div>
-
-          <div class="section">
-            <div class="section-title">Knowledge & Skills</div>
-            <ul>${(report.skillBreakdown || []).map(skill => `<li>${skill}</li>`).join('')}</ul>
-          </div>
-
-          <div class="section">
-            <div class="section-title">Recommendations</div>
-            <ul>${(report.recommendations || []).map(r => `<li>${r}</li>`).join('')}</ul>
-          </div>
-
-          <button class="print-button" onclick="printReport(${index})">Download PDF</button>
-        `;
-        container.appendChild(card);
-      });
-    }
-
-    function printReport(index) {
-      const content = document.getElementById(`report-${index}`).innerHTML;
-      const win = window.open('', '', 'width=900,height=700');
-      win.document.write(`
-        <html>
-        <head>
-          <title>Student Report</title>
-          <style>
-            body { font-family: Arial, sans-serif; padding: 30px; }
-            h2 { color: green; }
-            .section { margin-top: 20px; }
-            .section-title { font-weight: bold; margin-bottom: 8px; border-bottom: 1px solid #ddd; }
-            ul { padding-left: 20px; }
-          </style>
-        </head>
-        <body>
-          <h2>Blooming Kids House Assessment Report</h2>
-          ${content}
-        </body>
-        </html>
-      `);
-      win.document.close();
-      win.print();
-    }
-
-    function logout() {
-      window.location.href = 'index.html';
     }
   </script>
 </body>
