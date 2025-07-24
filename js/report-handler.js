@@ -5,46 +5,42 @@ function saveReportToLocalStorage(report) {
   localStorage.setItem('bkh_reports', JSON.stringify(reports));
 }
 
-// Wrapper used by test pages (expected name)
+// Wrapper used by test pages
 function saveTestReport(report) {
   saveReportToLocalStorage(report);
 }
 
-// Used by test pages to format the report
+// Generates a full test report
 function generateTestReport(name, email, subject, grade, score, totalQuestions) {
   const percentage = Math.round((score / totalQuestions) * 100);
 
-  // Basic performance summary
+  // Auto-generated performance summary
   let performanceSummary = '';
-  if (percentage >= 90) {
-    performanceSummary = 'Excellent performance. Keep up the good work!';
-  } else if (percentage >= 75) {
-    performanceSummary = 'Good job. There is room for improvement.';
+  if (percentage === 100) {
+    performanceSummary = "Excellent work! You got everything correct.";
+  } else if (percentage >= 80) {
+    performanceSummary = "Great job! You're performing well in this subject.";
   } else if (percentage >= 50) {
-    performanceSummary = 'Fair attempt. Focus more on understanding key concepts.';
+    performanceSummary = "You're getting there. A little more practice will help.";
   } else {
-    performanceSummary = 'Needs significant improvement. Consider reviewing foundational topics.';
+    performanceSummary = "You need more revision and practice in this subject.";
   }
 
-  // Basic skill breakdown and recommendations (editable as needed)
-  const skillBreakdown = [];
-  const recommendations = [];
+  // Auto-generated skill breakdown (generic since individual skills per question aren’t tagged yet)
+  const skillBreakdown = [
+    "Reading comprehension",
+    "Vocabulary development",
+    "Grammar and punctuation",
+    "Writing structure",
+    "Critical thinking"
+  ];
 
-  if (subject.toLowerCase().includes('math')) {
-    skillBreakdown.push("Number sense", "Operations", "Fractions", "Geometry", "Data interpretation");
-    recommendations.push(
-      "Review basic addition, subtraction, multiplication, and division.",
-      "Practice word problems daily.",
-      "Use flashcards or games to reinforce math facts."
-    );
-  } else if (subject.toLowerCase().includes('english') || subject.toLowerCase().includes('ela')) {
-    skillBreakdown.push("Reading comprehension", "Grammar", "Spelling", "Punctuation", "Vocabulary");
-    recommendations.push(
-      "Read a short passage daily and summarize it.",
-      "Practice identifying parts of speech in sentences.",
-      "Work on common spelling and punctuation rules."
-    );
-  }
+  // Auto-generated recommendations
+  let recommendations = [];
+  if (percentage < 100) recommendations.push("Review missed questions carefully.");
+  if (percentage < 80) recommendations.push("Spend more time on reading assignments.");
+  if (percentage < 60) recommendations.push("Request a tutor follow-up session.");
+  if (percentage < 50) recommendations.push("Consider re-taking the test after review.");
 
   return {
     studentName: name,
@@ -61,12 +57,12 @@ function generateTestReport(name, email, subject, grade, score, totalQuestions) 
   };
 }
 
-// Retrieve all reports (used by admin)
+// Retrieve all reports (for admin)
 function getAllReports() {
   return JSON.parse(localStorage.getItem('bkh_reports')) || [];
 }
 
-// Filter reports for a specific parent login
+// Retrieve reports for parent login
 function getParentReport(name, email) {
   const reports = getAllReports();
   return reports.filter(report =>
@@ -75,12 +71,13 @@ function getParentReport(name, email) {
   );
 }
 
-// Admin authentication helpers
+// Admin logout
 function logoutAdmin() {
   localStorage.removeItem('isAdminLoggedIn');
   window.location.href = 'index.html';
 }
 
+// Admin auth check
 function checkAdminAuth() {
   const loggedIn = localStorage.getItem('isAdminLoggedIn');
   if (!loggedIn) {
