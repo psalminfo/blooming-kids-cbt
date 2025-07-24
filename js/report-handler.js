@@ -1,8 +1,8 @@
-// Save report from test submission
+// Save report to localStorage
 function saveTestReport(report) {
   const reports = JSON.parse(localStorage.getItem('bkh_reports')) || [];
 
-  // Prevent duplicates (by subject + grade + student name + email)
+  // Prevent duplicate (optional but clean)
   const filtered = reports.filter(r =>
     !(r.studentName === report.studentName &&
       r.studentEmail === report.studentEmail &&
@@ -14,10 +14,7 @@ function saveTestReport(report) {
   localStorage.setItem('bkh_reports', JSON.stringify(filtered));
 }
 
-// Use this in your submitTest() like:
-// const report = generateTestReport(...); saveTestReport(report);
-
-// Structure the report (for test submission)
+// Create a new report object
 function generateTestReport(studentName, studentEmail, subject, grade, score, total, performanceSummary = "", skillBreakdown = [], recommendations = []) {
   return {
     studentName,
@@ -34,12 +31,12 @@ function generateTestReport(studentName, studentEmail, subject, grade, score, to
   };
 }
 
-// Get all reports (for admin)
+// Get all reports for admin view
 function getAllReports() {
   return JSON.parse(localStorage.getItem('bkh_reports')) || [];
 }
 
-// Filter reports for a parent (by student name and email)
+// Get filtered reports for parent view
 function getParentReport(studentName, studentEmail) {
   const reports = getAllReports();
   return reports.filter(report =>
@@ -54,7 +51,7 @@ function logoutAdmin() {
   window.location.href = 'index.html';
 }
 
-// Check admin auth and redirect if not logged in
+// Admin auth redirect
 function checkAdminAuth() {
   const loggedIn = localStorage.getItem('isAdminLoggedIn');
   if (!loggedIn) {
