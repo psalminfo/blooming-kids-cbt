@@ -56,7 +56,7 @@
   </style>
 </head>
 <body>
-  <h2>Parent Report Access</h2>
+  <h2>Parent Access – View Student Report</h2>
 
   <div id="loginForm">
     <div class="input-group">
@@ -64,7 +64,7 @@
       <input type="text" id="studentName" required />
     </div>
     <div class="input-group">
-      <label for="parentEmail">Parent's Email</label>
+      <label for="parentEmail">Parent Email</label>
       <input type="email" id="parentEmail" required />
     </div>
     <button onclick="fetchParentReport()">View Report</button>
@@ -72,17 +72,17 @@
 
   <div id="reportSection"></div>
 
-  <!-- ✅ Load Firebase report handler -->
+  <!-- ✅ External JS scripts -->
   <script type="module">
     import { getParentReport } from './js/report-handler.js';
 
     async function fetchParentReport() {
-      const studentName = document.getElementById('studentName').value.trim();
-      const parentEmail = document.getElementById('parentEmail').value.trim();
-      const reportSection = document.getElementById('reportSection');
+      const studentName = document.getElementById("studentName").value.trim();
+      const parentEmail = document.getElementById("parentEmail").value.trim();
+      const reportSection = document.getElementById("reportSection");
 
       if (!studentName || !parentEmail) {
-        alert("Please enter both student name and parent email.");
+        alert("Please enter both Student Name and Parent Email.");
         return;
       }
 
@@ -90,27 +90,52 @@
 
       try {
         const reports = await getParentReport(studentName, parentEmail);
+
         if (!reports.length) {
-          reportSection.innerHTML = "<p>No report found for this student and email combination.</p>";
+          reportSection.innerHTML = "<p>No report found for this student.</p>";
           return;
         }
 
         reportSection.innerHTML = "";
-        reports.forEach(report => {
+        reports.forEach((report, index) => {
           const div = document.createElement("div");
           div.className = "report-card";
           div.innerHTML = `
-            <strong>${report.studentName} (${report.parentEmail})</strong><br>
+            <strong>${report.studentName}</strong><br>
             <strong>Grade:</strong> ${report.grade} |
             <strong>Subject:</strong> ${report.subject}<br>
-            <strong>Score:</strong> ${report.score}/${report.totalQuestions} (${Math.round((report.score / report.totalQuestions) * 100)}%)<br>
+            <strong>Score:</strong> ${report.score}/${report.totalQuestions} (${report.percentage}%)<br>
             <strong>Date:</strong> ${new Date(report.timestamp).toLocaleString()}<br><br>
-            <strong>Summary:</strong> ${report.performanceSummary || 'No summary provided'}<br>
-            <strong>Skills:</strong> <ul>${(report.skillBreakdown || []).map(skill => `<li>${skill}</li>`).join('')}</ul>
-            <strong>Recommendations:</strong> <ul>${(report.recommendations || []).map(r => `<li>${r}</li>`).join('')}</ul>
+            <strong>Performance Summary:</strong> ${report.performanceSummary}<br><br>
+            <strong>Skills:</strong>
+            <ul>${(report.skillBreakdown || []).map(skill => `<li>${skill}</li>`).join("")}</ul>
+            <strong>Recommendations:</strong>
+            <ul>${(report.recommendations || []).map(rec => `<li>${rec}</li>`).join("")}</ul>
+            <button onclick="downloadReport(${index})">Download PDF</button>
           `;
           reportSection.appendChild(div);
         });
+
+        window.downloadReport = function(index) {
+          const report = reports[index];
+          const reportContent = `
+            Student: ${report.studentName}\n
+            Grade: ${report.grade}
+            Subject: ${report.subject}
+            Score: ${report.score}/${report.totalQuestions} (${report.percentage}%)
+            Date: ${new Date(report.timestamp).toLocaleString()}
+            \nPerformance Summary:\n${report.performanceSummary}
+            \nSkills:\n${report.skillBreakdown.join(", ")}
+            \nRecommendations:\n${report.recommendations.join(", ")}
+          `;
+
+          const blob = new Blob([reportContent], { type: "text/plain" });
+          const url = URL.createObjectURL(blob);
+          const link = document.createElement("a");
+          link.href = url;
+          link.download = `${report.studentName.replace(/\s+/g, "_")}_Report.txt`;
+          link.click();
+        };
       } catch (err) {
         reportSection.innerHTML = `<p>Error fetching report: ${err.message}</p>`;
       }
