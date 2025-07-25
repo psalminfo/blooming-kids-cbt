@@ -3,76 +3,133 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Select Subject - Blooming Kids House Assessment</title>
+  <title>Select Subject - Blooming Kids House</title>
   <link rel="stylesheet" href="css/style.css" />
   <style>
-    .subject-buttons {
-      text-align: center;
-      margin-top: 40px;
+    body {
+      font-family: Arial, sans-serif;
+      background-color: #f0f8f0;
+      padding: 20px;
+      color: #333;
     }
 
-    .subject-buttons a {
-      display: inline-block;
-      margin: 10px;
-      padding: 15px 30px;
+    h1 {
+      color: #2e7d32;
+      text-align: center;
+    }
+
+    .subject-buttons {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 20px;
+      margin-top: 30px;
+    }
+
+    .subject-buttons button,
+    #logoutBtn {
+      padding: 12px 20px;
+      font-size: 16px;
+      border: none;
+      border-radius: 6px;
       background-color: #2e7d32;
       color: white;
-      text-decoration: none;
-      font-size: 18px;
-      border-radius: 8px;
+      cursor: pointer;
     }
 
-    .subject-buttons a:hover {
+    .subject-buttons button:hover,
+    #logoutBtn:hover {
       background-color: #1b5e20;
     }
 
     #logoutBtn {
       display: block;
-      margin: 40px auto 0;
-      padding: 12px 24px;
+      margin: 30px auto 0;
       background-color: #c62828;
-      color: white;
-      font-size: 16px;
-      border: none;
-      border-radius: 6px;
-      cursor: pointer;
-    }
-
-    #logoutBtn:hover {
-      background-color: #b71c1c;
     }
   </style>
 </head>
 <body>
-  <header>
-    <h1>Select a Subject to Begin</h1>
-    <p id="studentInfo" style="text-align:center;"></p>
-  </header>
-
+  <h1>Select a Subject to Begin Test</h1>
   <div class="subject-buttons">
-    <a id="mathLink" href="#">Start Mathematics</a>
-    <a id="englishLink" href="#">Start English</a>
+    <button onclick="startSubject('Math')">Math</button>
+    <button onclick="startSubject('English Language Arts')">English Language Arts</button>
   </div>
 
   <button id="logoutBtn">Logout & Generate Final Report</button>
 
   <script type="module">
-    import { generateAndSaveFinalPDF } from './js/report-handler.js';
+    import { getAllReports, saveTestReport } from './js/report-handler.js';
 
     const studentName = localStorage.getItem("studentName");
-    const grade = localStorage.getItem("studentGrade");
+    const parentEmail = localStorage.getItem("parentEmail");
+    const studentGrade = localStorage.getItem("studentGrade");
 
-    document.getElementById("studentInfo").innerText = `${studentName || 'Student'} - ${grade || ''}`;
+    function startSubject(subject) {
+      const gradeSlug = studentGrade.toLowerCase().replace(" ", "");
+      const subjectSlug = subject.toLowerCase().replace(/ /g, "");
+      const url = `tests/${gradeSlug}-${subjectSlug}.html`;
+      window.location.href = url;
+    }
 
-    // Dynamically link test pages based on grade
-    const formattedGrade = grade?.toLowerCase().replace(/\s+/g, '');
-    document.getElementById("mathLink").href = `tests/${formattedGrade}-math.html`;
-    document.getElementById("englishLink").href = `tests/${formattedGrade}-ela.html`;
+    document.getElementById("logoutBtn").addEventListener("click", async function () {
+      if (!studentName || !parentEmail || !studentGrade) {
+        alert("Missing student info. Returning to home.");
+        window.location.href = "index.html";
+        return;
+      }
 
-    document.getElementById("logoutBtn").addEventListener("click", async () => {
-      await generateAndSaveFinalPDF();
-      localStorage.clear();
-      window.location.href = "index.html";
+      try {
+        const allReports = JSON.parse(localStorage.getItem("completedReports") || "[]");
+        if (!allReports.length) {
+          alert("No test completed yet.");
+          return;
+        }
+
+        // Save each report to Firestore (if not already saved)
+        for (const report of allReports) {
+          await saveTestReport(report);
+        }
+
+        // Generate combined PDF
+        const { jsPDF } = await import("https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js");
+        const doc = new jsPDF();
+        doc.setFontSize(14);
+        doc.text("Blooming Kids House Assessment Report", 20, 20);
+        doc.setFontSize(12);
+        doc.text(`Student Name: ${studentName}`, 20, 30);
+        doc.text(`Parent Email: ${parentEmail}`, 20, 37);
+        doc.text(`Grade: ${studentGrade}`, 20, 44);
+
+        let y = 55;
+        for (const report of allReports) {
+          doc.setFontSize(12);
+          doc.text(`Subject: ${report.subject}`, 20, y);
+          doc.text(`Score: ${report.score}/${report.totalQuestions} (${report.percentage}%)`, 20, y + 7);
+          doc.text(`Summary: ${report.performanceSummary}`, 20, y + 14);
+          doc.text("Skills:", 20, y + 21);
+          report.skillBreakdown.forEach((skill, i) => {
+            doc.text(`- ${skill}`, 25, y + 28 + i * 7);
+          });
+          let nextY = y + 28 + report.skillBreakdown.length * 7;
+          doc.text("Tutor Recommendations:", 20, nextY);
+          report.recommendations.forEach((rec, i) => {
+            doc.text(`- ${rec}`, 25, nextY + 7 + i * 7);
+          });
+          y = nextY + 7 + report.recommendations.length * 7 + 10;
+
+          if (y > 260) {
+            doc.addPage();
+            y = 20;
+          }
+        }
+
+        doc.save(`${studentName}_Final_Report.pdf`);
+        localStorage.clear();
+        window.location.href = "index.html";
+      } catch (err) {
+        alert("Error generating report: " + err.message);
+      }
     });
   </script>
 </body>
