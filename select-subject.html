@@ -2,135 +2,82 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Select Subject - Blooming Kids House</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Select Subject - Blooming Kids House Assessment</title>
   <link rel="stylesheet" href="css/style.css" />
   <style>
     body {
       font-family: Arial, sans-serif;
-      background-color: #f0f8f0;
       padding: 20px;
-      color: #333;
+      background-color: #f9f9f9;
     }
 
-    h1 {
+    h2 {
       color: #2e7d32;
       text-align: center;
     }
 
-    .subject-buttons {
+    .subject-grid {
       display: flex;
       flex-wrap: wrap;
       justify-content: center;
-      gap: 20px;
+      gap: 15px;
       margin-top: 30px;
     }
 
-    .subject-buttons button,
-    #logoutBtn {
-      padding: 12px 20px;
-      font-size: 16px;
-      border: none;
-      border-radius: 6px;
+    .subject-btn {
       background-color: #2e7d32;
       color: white;
+      padding: 15px 30px;
+      border: none;
+      border-radius: 8px;
       cursor: pointer;
+      font-size: 16px;
+      transition: background-color 0.3s ease;
     }
 
-    .subject-buttons button:hover,
-    #logoutBtn:hover {
+    .subject-btn:hover {
       background-color: #1b5e20;
     }
 
-    #logoutBtn {
+    .logout-btn {
+      margin-top: 40px;
       display: block;
-      margin: 30px auto 0;
+      text-align: center;
+    }
+
+    .logout-btn button {
       background-color: #c62828;
+      color: white;
+      padding: 12px 24px;
+      border: none;
+      border-radius: 8px;
+      font-size: 16px;
+      cursor: pointer;
+    }
+
+    .logout-btn button:hover {
+      background-color: #b71c1c;
     }
   </style>
 </head>
 <body>
-  <h1>Select a Subject to Begin Test</h1>
-  <div class="subject-buttons">
-    <button onclick="startSubject('Math')">Math</button>
-    <button onclick="startSubject('English Language Arts')">English Language Arts</button>
+  <h2>Welcome to Blooming Kids House Assessment</h2>
+  <p style="text-align:center;">Select a subject to begin your test:</p>
+
+  <div class="subject-grid">
+    <button class="subject-btn" data-grade="grade3" data-subject="math">Grade 3 - Mathematics</button>
+    <button class="subject-btn" data-grade="grade3" data-subject="ela">Grade 3 - English Language Arts</button>
+    <!-- Add more buttons for other grades/subjects as needed -->
   </div>
 
-  <button id="logoutBtn">Logout & Generate Final Report</button>
+  <div class="logout-btn">
+    <button id="logoutBtn">Logout & Generate Final Report</button>
+  </div>
 
-  <script type="module">
-    import { getAllReports, saveTestReport } from './js/report-handler.js';
-
-    const studentName = localStorage.getItem("studentName");
-    const parentEmail = localStorage.getItem("parentEmail");
-    const studentGrade = localStorage.getItem("studentGrade");
-
-    function startSubject(subject) {
-      const gradeSlug = studentGrade.toLowerCase().replace(" ", "");
-      const subjectSlug = subject.toLowerCase().replace(/ /g, "");
-      const url = `tests/${gradeSlug}-${subjectSlug}.html`;
-      window.location.href = url;
-    }
-
-    document.getElementById("logoutBtn").addEventListener("click", async function () {
-      if (!studentName || !parentEmail || !studentGrade) {
-        alert("Missing student info. Returning to home.");
-        window.location.href = "index.html";
-        return;
-      }
-
-      try {
-        const allReports = JSON.parse(localStorage.getItem("completedReports") || "[]");
-        if (!allReports.length) {
-          alert("No test completed yet.");
-          return;
-        }
-
-        // Save each report to Firestore (if not already saved)
-        for (const report of allReports) {
-          await saveTestReport(report);
-        }
-
-        // Generate combined PDF
-        const { jsPDF } = await import("https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js");
-        const doc = new jsPDF();
-        doc.setFontSize(14);
-        doc.text("Blooming Kids House Assessment Report", 20, 20);
-        doc.setFontSize(12);
-        doc.text(`Student Name: ${studentName}`, 20, 30);
-        doc.text(`Parent Email: ${parentEmail}`, 20, 37);
-        doc.text(`Grade: ${studentGrade}`, 20, 44);
-
-        let y = 55;
-        for (const report of allReports) {
-          doc.setFontSize(12);
-          doc.text(`Subject: ${report.subject}`, 20, y);
-          doc.text(`Score: ${report.score}/${report.totalQuestions} (${report.percentage}%)`, 20, y + 7);
-          doc.text(`Summary: ${report.performanceSummary}`, 20, y + 14);
-          doc.text("Skills:", 20, y + 21);
-          report.skillBreakdown.forEach((skill, i) => {
-            doc.text(`- ${skill}`, 25, y + 28 + i * 7);
-          });
-          let nextY = y + 28 + report.skillBreakdown.length * 7;
-          doc.text("Tutor Recommendations:", 20, nextY);
-          report.recommendations.forEach((rec, i) => {
-            doc.text(`- ${rec}`, 25, nextY + 7 + i * 7);
-          });
-          y = nextY + 7 + report.recommendations.length * 7 + 10;
-
-          if (y > 260) {
-            doc.addPage();
-            y = 20;
-          }
-        }
-
-        doc.save(`${studentName}_Final_Report.pdf`);
-        localStorage.clear();
-        window.location.href = "index.html";
-      } catch (err) {
-        alert("Error generating report: " + err.message);
-      }
-    });
-  </script>
+  <!-- ✅ External JS files -->
+  <script type="module" src="js/firebase-config.js"></script>
+  <script type="module" src="js/report-handler.js"></script>
+  <script type="module" src="js/select-subject.js"></script>
 </body>
 </html>
