@@ -9,7 +9,8 @@
     body {
       font-family: Arial, sans-serif;
       padding: 20px;
-      background-color: #f9f9f9;
+      background-color: #f4f4f4;
+      color: #333;
     }
 
     h2 {
@@ -21,14 +22,13 @@
     }
 
     label {
-      display: block;
       font-weight: bold;
-      margin-bottom: 5px;
     }
 
     input {
-      width: 100%;
       padding: 10px;
+      width: 100%;
+      margin-top: 5px;
       border: 1px solid #ccc;
       border-radius: 4px;
     }
@@ -38,9 +38,9 @@
       color: white;
       padding: 10px 20px;
       border: none;
-      cursor: pointer;
+      margin-top: 15px;
       border-radius: 4px;
-      margin-top: 10px;
+      cursor: pointer;
     }
 
     button:hover {
@@ -48,126 +48,110 @@
     }
 
     .report-card {
-      background: #fff;
-      border: 1px solid #ddd;
-      padding: 15px;
-      margin-top: 20px;
+      background-color: white;
+      border: 2px solid #cddc39;
       border-radius: 5px;
+      padding: 20px;
+      margin-top: 20px;
     }
 
     .logout-btn {
-      background-color: #c62828;
+      background-color: #d32f2f;
+      float: right;
     }
 
     .logout-btn:hover {
-      background-color: #8e0000;
+      background-color: #b71c1c;
     }
   </style>
 </head>
 <body>
-  <h2>Parent Report Access</h2>
+  <h2>Parent Access</h2>
 
   <div id="loginForm">
     <div class="input-group">
       <label for="studentName">Student Name</label>
-      <input type="text" id="studentName" required />
+      <input type="text" id="studentName" placeholder="Enter your child's full name" required />
     </div>
     <div class="input-group">
       <label for="parentEmail">Parent Email</label>
-      <input type="email" id="parentEmail" required />
+      <input type="email" id="parentEmail" placeholder="Enter your email" required />
     </div>
-    <button onclick="fetchParentReport()">View Report</button>
+    <button onclick="fetchParentReports()">View Report</button>
   </div>
 
   <div id="reportSection"></div>
-  <button onclick="logout()" class="logout-btn">Logout</button>
 
+  <!-- Scripts -->
   <script type="module">
     import { getParentReport } from './js/report-handler.js';
+    import { generateFinalReportText } from './js/final-report.js';
 
-    async function fetchParentReport() {
-      const name = document.getElementById('studentName').value.trim();
-      const email = document.getElementById('parentEmail').value.trim();
-      const reportSection = document.getElementById('reportSection');
+    async function fetchParentReports() {
+      const studentName = document.getElementById("studentName").value.trim();
+      const parentEmail = document.getElementById("parentEmail").value.trim();
+      const reportSection = document.getElementById("reportSection");
 
-      if (!name || !email) {
+      if (!studentName || !parentEmail) {
         alert("Please enter both student name and parent email.");
         return;
       }
 
-      reportSection.innerHTML = "<p>Loading reports...</p>";
+      reportSection.innerHTML = "<p>Loading report...</p>";
 
       try {
-        const reports = await getParentReport(name, email);
-
+        const reports = await getParentReport(studentName, parentEmail);
         if (!reports.length) {
-          reportSection.innerHTML = "<p>No report found for this student.</p>";
+          reportSection.innerHTML = "<p>No reports found for this student.</p>";
           return;
         }
 
-        reportSection.innerHTML = "";
+        reportSection.innerHTML = `
+          <button class="logout-btn" onclick="logout()">Log Out</button>
+          <br><br>
+          <h3>Report for ${studentName}</h3>
+        `;
+
+        reports.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+
         reports.forEach((report, index) => {
           const div = document.createElement("div");
           div.className = "report-card";
-
-          const percentage = Math.round((report.score / report.totalQuestions) * 100);
-
           div.innerHTML = `
-            <h3>Subject: ${report.subject}</h3>
-            <p><strong>Student:</strong> ${report.studentName}</p>
-            <p><strong>Parent Email:</strong> ${report.parentEmail}</p>
-            <p><strong>Grade:</strong> ${report.grade}</p>
-            <p><strong>Score:</strong> ${report.score}/${report.totalQuestions} (${percentage}%)</p>
-            <p><strong>Performance Summary:</strong> ${report.performanceSummary}</p>
-            <p><strong>Skills Covered:</strong>
-              <ul>${(report.skillBreakdown || []).map(skill => `<li>${skill}</li>`).join('')}</ul>
-            </p>
-            <p><strong>Tutor's Recommendations:</strong>
-              <ul>${(report.recommendations || []).map(r => `<li>${r}</li>`).join('')}</ul>
-            </p>
-            <p><strong>Date:</strong> ${new Date(report.timestamp).toLocaleString()}</p>
-            <button onclick="downloadReport(${index})">Download PDF</button>
+            <strong>Grade:</strong> ${report.grade}<br>
+            <strong>Subject:</strong> ${report.subject}<br>
+            <strong>Score:</strong> ${report.score}/${report.totalQuestions} 
+            (${Math.round((report.score / report.totalQuestions) * 100)}%)<br>
+            <strong>Date:</strong> ${new Date(report.timestamp).toLocaleString()}<br>
+            <strong>Summary:</strong> ${report.performanceSummary || 'None'}<br>
+            <strong>Skills:</strong><ul>${(report.skillBreakdown || []).map(s => `<li>${s}</li>`).join('')}</ul>
+            <strong>Recommendations:</strong><ul>${(report.recommendations || []).map(r => `<li>${r}</li>`).join('')}</ul>
+            <button onclick="downloadReport(${JSON.stringify(report).replace(/"/g, '&quot;')})">Download Report</button>
           `;
-
           reportSection.appendChild(div);
         });
 
-        window.allReports = reports;
-      } catch (err) {
-        reportSection.innerHTML = `<p>Error fetching report: ${err.message}</p>`;
+      } catch (error) {
+        console.error(error);
+        reportSection.innerHTML = "<p>Error fetching report.</p>";
       }
     }
 
-    function logout() {
+    window.logout = function () {
       window.location.href = "index.html";
     }
 
-    function downloadReport(index) {
-      const report = window.allReports[index];
-      const content = `
-        BLOOMING KIDS HOUSE REPORT CARD
-
-        Student: ${report.studentName}
-        Parent Email: ${report.parentEmail}
-        Grade: ${report.grade}
-        Subject: ${report.subject}
-        Score: ${report.score}/${report.totalQuestions}
-        Percentage: ${Math.round((report.score / report.totalQuestions) * 100)}%
-        Performance Summary: ${report.performanceSummary}
-
-        Skills Covered:
-        ${(report.skillBreakdown || []).join(', ')}
-
-        Tutor's Recommendations:
-        ${(report.recommendations || []).join(', ')}
-
-        Date: ${new Date(report.timestamp).toLocaleString()}
-      `;
-
-      const blob = new Blob([content], { type: "text/plain" });
+    window.downloadReport = function (report) {
+      const text = generateFinalReportText(
+        report.studentName,
+        report.studentEmail,
+        report.grade,
+        [report]
+      );
+      const blob = new Blob([text], { type: "text/plain" });
       const link = document.createElement("a");
       link.href = URL.createObjectURL(blob);
-      link.download = `${report.studentName.replace(/\s+/g, "_")}_Report.txt`;
+      link.download = `${report.studentName}_Report.txt`;
       link.click();
     }
   </script>
