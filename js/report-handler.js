@@ -1,44 +1,42 @@
-// Import Firebase config and Firestore
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-import { getFirestore, collection, addDoc, getDocs, query, where } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-import { firebaseConfig } from './firebase-config.js';
+// js/report-handler.js
+import { db } from "./firebase-config.js";
+import {
+  collection,
+  addDoc,
+  getDocs,
+  query,
+  where
+} from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
-// Initialize Firebase
-const app = initializeApp(firebaseConfig);
-const db = getFirestore(app);
-
-// Save a single report to Firebase
-async function saveReportToFirebase(report) {
+// Save report to Firestore
+export async function saveTestReport(report) {
   try {
-    await addDoc(collection(db, 'reports'), report);
-    console.log("✅ Report saved to Firestore");
+    await addDoc(collection(db, "reports"), report);
+    console.log("Report saved successfully");
   } catch (e) {
-    console.error("❌ Error saving report: ", e);
+    console.error("Error saving report:", e);
   }
 }
 
-// Wrapper for saving test report
-function saveTestReport(report) {
-  saveReportToFirebase(report);
-}
+// Format the report
+export function generateTestReport(name, email, subject, grade, score, totalQuestions) {
+  const percentage = Math.round((score / totalQuestions) * 100);
+  const performanceSummary = percentage >= 80 ? "Excellent performance" :
+                             percentage >= 60 ? "Satisfactory performance" :
+                             "Needs Improvement";
 
-// Used by test pages to format the report
-function generateTestReport(name, email, subject, grade, score, totalQuestions) {
-  const percentage = ((score / totalQuestions) * 100).toFixed(2);
+  const skillBreakdown = [
+    "Comprehension and Vocabulary",
+    "Writing and Grammar",
+    "Listening and Speaking",
+    "Reading Fluency"
+  ];
 
-  let performanceSummary = '';
-  if (percentage >= 90) {
-    performanceSummary = 'Excellent performance.';
-  } else if (percentage >= 75) {
-    performanceSummary = 'Good job with room for improvement.';
-  } else if (percentage >= 50) {
-    performanceSummary = 'Fair performance. More practice is needed.';
-  } else {
-    performanceSummary = 'Below average. Significant support required.';
-  }
-
-  const skillBreakdown = [`Sample Skill 1: ${Math.floor(Math.random() * 100)}%`, `Sample Skill 2: ${Math.floor(Math.random() * 100)}%`];
-  const recommendations = ['Review weak areas weekly.', 'Practice using STAAR-style questions.', 'Ask for help when unsure.'];
+  const recommendations = percentage >= 80
+    ? ["Continue practicing with advanced materials", "Explore creative writing"]
+    : percentage >= 60
+    ? ["Revise basic grammar concepts", "Read daily to build fluency"]
+    : ["Seek help with reading strategies", "Focus on decoding and phonics"];
 
   return {
     studentName: name,
@@ -55,32 +53,19 @@ function generateTestReport(name, email, subject, grade, score, totalQuestions) 
   };
 }
 
-// Admin panel: Get all reports
-async function getAllReports() {
-  const snapshot = await getDocs(collection(db, 'reports'));
+// Admin: fetch all reports
+export async function getAllReports() {
+  const snapshot = await getDocs(collection(db, "reports"));
   return snapshot.docs.map(doc => doc.data());
 }
 
-// Parent panel: Get specific reports
-async function getParentReport(name, email) {
+// Parent: fetch specific student reports
+export async function getParentReport(name, email) {
   const q = query(
-    collection(db, 'reports'),
-    where('studentName', '==', name),
-    where('studentEmail', '==', email)
+    collection(db, "reports"),
+    where("studentName", "==", name),
+    where("studentEmail", "==", email)
   );
   const snapshot = await getDocs(q);
   return snapshot.docs.map(doc => doc.data());
-}
-
-// Admin authentication helpers
-function logoutAdmin() {
-  localStorage.removeItem('isAdminLoggedIn');
-  window.location.href = 'index.html';
-}
-
-function checkAdminAuth() {
-  const loggedIn = localStorage.getItem('isAdminLoggedIn');
-  if (!loggedIn) {
-    window.location.href = 'admin-panel.html';
-  }
 }
