@@ -1,32 +1,33 @@
-// js/universal-test.js
 import { saveTestReport, generateTestReport } from "./report-handler.js";
 
-document.addEventListener("DOMContentLoaded", function () {
+document.addEventListener("DOMContentLoaded", () => {
   const timerDisplay = document.getElementById("timer");
   const submitBtn = document.getElementById("submitBtn");
 
   if (!timerDisplay || !submitBtn) {
-    console.error("Timer or Submit button not found in the DOM.");
+    console.error("Timer or Submit button not found.");
     return;
   }
 
-  let timeLeft = 30 * 60; // 30 minutes
+  let timeLeft = 30 * 60; // 30 minutes in seconds
 
   function updateTimer() {
     const minutes = Math.floor(timeLeft / 60);
     const seconds = timeLeft % 60;
     timerDisplay.textContent = `Time Remaining: ${minutes}:${seconds < 10 ? "0" : ""}${seconds}`;
+
     if (timeLeft <= 0) {
       clearInterval(timerInterval);
       submitTest();
     }
+
     timeLeft--;
   }
 
   const timerInterval = setInterval(updateTimer, 1000);
-  updateTimer(); // initialize immediately
+  updateTimer();
 
-  submitBtn.addEventListener("click", function () {
+  submitBtn.addEventListener("click", () => {
     clearInterval(timerInterval);
     submitTest();
   });
@@ -49,9 +50,10 @@ function submitTest() {
   const parentEmail = localStorage.getItem("parentEmail");
   const grade = localStorage.getItem("studentGrade");
 
-  const title = document.title; // example: "Blooming Kids House: Grade 3 – Mathematics Test"
-  const subjectMatch = title.match(/–\s(.*?)\sTest/i);
-  const subject = subjectMatch ? subjectMatch[1] : "Subject";
+  // Infer subject from title
+  const rawTitle = document.title || "Test";
+  const subjectMatch = rawTitle.split(" – ");
+  const subject = subjectMatch.length > 1 ? subjectMatch[1].trim() : "Subject";
 
   if (!studentName || !parentEmail || !grade) {
     alert("Missing student info. Returning to home page.");
@@ -70,11 +72,11 @@ function submitTest() {
 
   saveTestReport(report)
     .then(() => {
-      alert("Test submitted successfully.");
+      alert("Test submitted successfully!");
       window.location.href = "select-subject.html";
     })
     .catch((err) => {
       console.error("Error saving report:", err);
-      alert("An error occurred while saving your test. Please try again.");
+      alert("There was an error submitting the test.");
     });
 }
