@@ -43,8 +43,8 @@ function submitTest() {
   }
 
   const studentName = localStorage.getItem("studentName");
-  const studentEmail = localStorage.getItem("studentEmail");
-  const grade = localStorage.getItem("selectedGrade");
+  const parentEmail = localStorage.getItem("parentEmail");
+  const grade = localStorage.getItem("studentGrade");
   const subject = document.title.replace("Blooming Kids House: ", "").split(" – ")[1] || "Subject";
 
   if (!studentName || !studentEmail || !grade) {
@@ -54,12 +54,12 @@ function submitTest() {
   }
 
   const report = generateTestReport(
-    studentName,
-    studentEmail,
-    subject,
-    grade,
-    score,
-    totalQuestions
+  studentName,
+  parentEmail,
+  subject,
+  studentGrade,
+  score,
+  totalQuestions
   );
 
   try {
