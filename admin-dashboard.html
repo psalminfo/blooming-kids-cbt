@@ -3,118 +3,127 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Admin Dashboard - Blooming Kids House</title>
+  <title>Admin Panel - Blooming Kids House</title>
   <link rel="stylesheet" href="css/style.css" />
   <style>
     body {
       font-family: Arial, sans-serif;
       padding: 20px;
-      background-color: #f4f4f4;
-      color: #333;
+      background-color: #f0f8f0;
     }
 
-    h2 {
+    h1 {
       color: #2e7d32;
+      text-align: center;
     }
 
-    .report-card {
+    .report {
       background: #fff;
-      border: 2px solid #cddc39;
-      padding: 20px;
-      margin-bottom: 20px;
-      border-radius: 6px;
+      border: 1px solid #ccc;
+      padding: 15px;
+      margin: 15px 0;
+      border-radius: 8px;
     }
 
-    .download-btn, .logout-btn {
+    .report strong {
+      display: block;
+      margin-bottom: 5px;
+    }
+
+    button {
       background-color: #2e7d32;
-      color: white;
-      padding: 10px 18px;
+      color: #fff;
+      padding: 8px 16px;
       border: none;
-      border-radius: 4px;
-      margin-top: 10px;
       cursor: pointer;
+      margin-top: 10px;
     }
 
-    .logout-btn {
-      background-color: #d32f2f;
-      float: right;
-    }
-
-    .download-btn:hover {
+    button:hover {
       background-color: #1b5e20;
     }
 
-    .logout-btn:hover {
-      background-color: #b71c1c;
+    #logoutBtn {
+      float: right;
+      margin-top: -60px;
     }
   </style>
 </head>
 <body>
-  <h2>Admin Dashboard - All Reports</h2>
-  <button class="logout-btn" onclick="logout()">Log Out</button>
-  <br><br>
-  <div id="reportContainer">Loading reports...</div>
+  <h1>Admin Dashboard</h1>
+  <button id="logoutBtn" onclick="logout()">Log Out</button>
+  <div id="adminReports">Loading reports...</div>
 
+  <!-- Firebase and Report Script -->
   <script type="module">
     import { getAllReports } from './js/report-handler.js';
-    import { generateFinalReportText } from './js/final-report.js';
 
-    const reportContainer = document.getElementById("reportContainer");
-
-    function logout() {
-      localStorage.clear();
-      window.location.href = "index.html";
-    }
-
-    function downloadReport(studentName, email, grade, report) {
-      const text = generateFinalReportText(studentName, email, grade, [report]);
-      const blob = new Blob([text], { type: "text/plain" });
-      const link = document.createElement("a");
-      link.href = URL.createObjectURL(blob);
-      link.download = `${studentName}_Report.txt`;
-      link.click();
-    }
+    const adminReports = document.getElementById('adminReports');
 
     async function loadReports() {
       try {
         const reports = await getAllReports();
         if (!reports.length) {
-          reportContainer.innerHTML = "<p>No reports found.</p>";
+          adminReports.innerHTML = "<p>No reports found.</p>";
           return;
         }
 
-        reports.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
-
-        reportContainer.innerHTML = "";
-        for (const report of reports) {
+        adminReports.innerHTML = "";
+        reports.forEach(report => {
           const div = document.createElement("div");
-          div.className = "report-card";
+          div.className = "report";
           div.innerHTML = `
-            <strong>Student:</strong> ${report.studentName}<br>
-            <strong>Parent Email:</strong> ${report.studentEmail}<br>
+            <strong>Name:</strong> ${report.studentName}<br>
+            <strong>Email:</strong> ${report.studentEmail}<br>
             <strong>Grade:</strong> ${report.grade}<br>
             <strong>Subject:</strong> ${report.subject}<br>
-            <strong>Score:</strong> ${report.score}/${report.totalQuestions} 
-            (${Math.round((report.score / report.totalQuestions) * 100)}%)<br>
-            <strong>Date:</strong> ${new Date(report.timestamp).toLocaleString()}<br>
-            <strong>Summary:</strong> ${report.performanceSummary || "N/A"}<br>
-            <strong>Skills:</strong> <ul>${(report.skillBreakdown || []).map(s => `<li>${s}</li>`).join('')}</ul>
+            <strong>Score:</strong> ${report.score}/${report.totalQuestions} (${report.percentage}%)<br>
+            <strong>Summary:</strong> ${report.performanceSummary}<br>
+            <strong>Skills:</strong> <ul>${(report.skillBreakdown || []).map(skill => `<li>${skill}</li>`).join('')}</ul>
             <strong>Recommendations:</strong> <ul>${(report.recommendations || []).map(r => `<li>${r}</li>`).join('')}</ul>
-            <button class="download-btn" onclick="downloadReport('${report.studentName}', '${report.studentEmail}', '${report.grade}', ${JSON.stringify(report).replace(/'/g, "\\'")})">
-              Download PDF
-            </button>
+            <button onclick="downloadPDF('${report.studentName}', ${JSON.stringify(report).replace(/"/g, '&quot;')})">Download PDF</button>
           `;
-          reportContainer.appendChild(div);
-        }
-      } catch (err) {
-        console.error(err);
-        reportContainer.innerHTML = "<p>Error loading reports.</p>";
+          adminReports.appendChild(div);
+        });
+      } catch (error) {
+        adminReports.innerHTML = `<p>Error loading reports: ${error.message}</p>`;
       }
     }
 
+    function logout() {
+      localStorage.removeItem("isAdminLoggedIn");
+      window.location.href = "index.html";
+    }
+
+    window.downloadPDF = async (name, report) => {
+      const { jsPDF } = await import("https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js");
+      const doc = new jsPDF();
+
+      doc.setFontSize(14);
+      doc.text("Blooming Kids House Assessment Report", 20, 20);
+      doc.setFontSize(12);
+      doc.text(`Name: ${report.studentName}`, 20, 30);
+      doc.text(`Parent Email: ${report.studentEmail}`, 20, 37);
+      doc.text(`Grade: ${report.grade}`, 20, 44);
+      doc.text(`Subject: ${report.subject}`, 20, 51);
+      doc.text(`Score: ${report.score}/${report.totalQuestions} (${report.percentage}%)`, 20, 58);
+      doc.text(`Summary: ${report.performanceSummary}`, 20, 65);
+
+      doc.text("Skills Covered:", 20, 75);
+      report.skillBreakdown.forEach((skill, i) => {
+        doc.text(`- ${skill}`, 25, 82 + i * 7);
+      });
+
+      const yStart = 82 + report.skillBreakdown.length * 7 + 5;
+      doc.text("Tutor Recommendations:", 20, yStart);
+      report.recommendations.forEach((rec, i) => {
+        doc.text(`- ${rec}`, 25, yStart + 7 + i * 7);
+      });
+
+      doc.save(`${report.studentName}_Report.pdf`);
+    };
+
     loadReports();
-    window.downloadReport = downloadReport;
-    window.logout = logout;
   </script>
 </body>
 </html>
