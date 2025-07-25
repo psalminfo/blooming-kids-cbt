@@ -8,116 +8,110 @@
   <style>
     body {
       font-family: Arial, sans-serif;
-      padding: 20px;
       background-color: #f0f8f0;
+      padding: 30px;
+      text-align: center;
+      color: #333;
     }
 
     h2 {
       color: #2e7d32;
-      text-align: center;
     }
 
-    .subject-list {
-      max-width: 600px;
-      margin: 30px auto;
+    .button-grid {
       display: flex;
-      flex-direction: column;
-      gap: 15px;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 20px;
+      margin-top: 30px;
     }
 
-    .subject-list a {
-      background-color: #2e7d32;
-      color: white;
-      text-decoration: none;
-      padding: 12px;
-      text-align: center;
-      border-radius: 5px;
-    }
-
-    .subject-list a:hover {
-      background-color: #1b5e20;
-    }
-
-    .logout {
-      display: block;
-      margin: 30px auto 0;
-      background-color: #c62828;
-      color: white;
-      padding: 12px 24px;
+    .subject-btn, .logout-btn {
+      padding: 15px 25px;
+      background-color: #cddc39;
       border: none;
-      border-radius: 5px;
+      color: #000;
+      border-radius: 6px;
       font-size: 16px;
       cursor: pointer;
     }
 
-    .logout:hover {
-      background-color: #8e0000;
+    .logout-btn {
+      background-color: #2e7d32;
+      color: white;
+    }
+
+    .logout-btn:hover {
+      background-color: #1b5e20;
     }
   </style>
 </head>
 <body>
-  <h2>Select a Subject to Begin</h2>
+  <h2>Welcome, <span id="studentNameDisplay"></span></h2>
+  <p>Please choose a subject to begin:</p>
 
-  <div class="subject-list">
-    <a href="grade3-math.html">Grade 3 - Mathematics</a>
-    <a href="grade3-ela.html">Grade 3 - English Language Arts</a>
-    <!-- Add more subjects here if needed -->
+  <div class="button-grid">
+    <button class="subject-btn" onclick="startSubject('Math')">Start Math</button>
+    <button class="subject-btn" onclick="startSubject('English Language Arts')">Start English</button>
+    <!-- Add more subjects here -->
   </div>
 
-  <button class="logout" onclick="logoutAndGenerateFinalReport()">Logout & Generate Final Report</button>
+  <br /><br />
+  <button class="logout-btn" onclick="logoutAndGenerateReport()">Logout & Generate Final Report</button>
 
   <script type="module">
-    import { saveTestReport } from './js/report-handler.js';
     import { generateFinalReportText } from './js/final-report.js';
+    import { saveTestReport } from './js/report-handler.js';
 
-    function getReportsFromStorage() {
-      const reports = JSON.parse(localStorage.getItem("completedTests")) || [];
-      return reports;
-    }
+    const studentName = localStorage.getItem("studentName");
+    const parentEmail = localStorage.getItem("parentEmail");
+    const grade = localStorage.getItem("studentGrade");
+    const allReports = JSON.parse(localStorage.getItem("allReports") || "[]");
 
-    function clearSession() {
-      localStorage.removeItem("studentName");
-      localStorage.removeItem("studentGrade");
-      localStorage.removeItem("parentEmail");
-      localStorage.removeItem("completedTests");
-    }
+    document.getElementById("studentNameDisplay").textContent = studentName || "Student";
 
-    async function logoutAndGenerateFinalReport() {
-      const studentName = localStorage.getItem("studentName");
-      const parentEmail = localStorage.getItem("parentEmail");
-      const grade = localStorage.getItem("studentGrade");
+    window.startSubject = function(subject) {
+      const formattedSubject = subject.toLowerCase().replace(/\s+/g, "-");
+      window.location.href = `grade3-${formattedSubject}.html`;
+    };
 
-      if (!studentName || !parentEmail || !grade) {
-        alert("Student info missing. Redirecting to home.");
+    window.logoutAndGenerateReport = async function () {
+      if (!studentName || !parentEmail || !grade || !allReports.length) {
+        alert("Incomplete report data. Please complete at least one test.");
+        return;
+      }
+
+      const finalText = generateFinalReportText(studentName, parentEmail, grade, allReports);
+
+      const finalReportData = {
+        studentName,
+        studentEmail: parentEmail,
+        grade,
+        subject: "Combined Subjects",
+        score: allReports.reduce((sum, r) => sum + r.score, 0),
+        totalQuestions: allReports.reduce((sum, r) => sum + r.totalQuestions, 0),
+        performanceSummary: "See combined details below",
+        skillBreakdown: allReports.flatMap(r => r.skillBreakdown),
+        recommendations: allReports.flatMap(r => r.recommendations),
+        timestamp: new Date().toISOString()
+      };
+
+      try {
+        await saveTestReport(finalReportData);
+
+        const blob = new Blob([finalText], { type: "text/plain" });
+        const link = document.createElement("a");
+        link.href = URL.createObjectURL(blob);
+        link.download = `${studentName}_Final_Report.txt`;
+        link.click();
+
+        localStorage.clear();
         window.location.href = "index.html";
-        return;
+      } catch (err) {
+        alert("Error saving final report.");
+        console.error(err);
       }
-
-      const reports = getReportsFromStorage();
-      if (!reports.length) {
-        alert("No completed test found.");
-        return;
-      }
-
-      // Save each report to Firestore
-      for (let report of reports) {
-        await saveTestReport(report);
-      }
-
-      // Create final report content
-      const fullReportText = generateFinalReportText(studentName, parentEmail, grade, reports);
-
-      // Download as PDF (basic text file)
-      const blob = new Blob([fullReportText], { type: "text/plain" });
-      const link = document.createElement("a");
-      link.href = URL.createObjectURL(blob);
-      link.download = `${studentName.replace(/\s+/g, "_")}_Final_Report.txt`;
-      link.click();
-
-      // Clear session and go to homepage
-      clearSession();
-      window.location.href = "index.html";
-    }
+    };
   </script>
 </body>
 </html>
