@@ -2,7 +2,7 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getFirestore } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
-// Your web app's Firebase configuration
+// BLOOMING KIDS HOUSE ASSESSMENTS Firebase Configuration
 const firebaseConfig = {
   apiKey: "AIzaSyCt7kk_oCBuftEgHeFhoZU2cPrPROhC6JE",
   authDomain: "bkh-assessments.firebaseapp.com",
@@ -12,6 +12,6 @@ const firebaseConfig = {
   appId: "1:86179403579:web:5295877bb92d0a18f3091e"
 };
 
-// Initialize Firebase
+// Initialize Firebase and Firestore
 const app = initializeApp(firebaseConfig);
 export const db = getFirestore(app);
