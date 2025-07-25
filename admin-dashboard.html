@@ -9,79 +9,112 @@
     body {
       font-family: Arial, sans-serif;
       padding: 20px;
-      background-color: #f5f5f5;
+      background-color: #f4f4f4;
+      color: #333;
     }
 
     h2 {
-      text-align: center;
       color: #2e7d32;
     }
 
     .report-card {
       background: #fff;
       border: 2px solid #cddc39;
-      border-radius: 8px;
-      padding: 15px;
-      margin: 15px auto;
-      max-width: 900px;
-      box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+      padding: 20px;
+      margin-bottom: 20px;
+      border-radius: 6px;
     }
 
-    .report-card ul {
-      padding-left: 20px;
+    .download-btn, .logout-btn {
+      background-color: #2e7d32;
+      color: white;
+      padding: 10px 18px;
+      border: none;
+      border-radius: 4px;
+      margin-top: 10px;
+      cursor: pointer;
+    }
+
+    .logout-btn {
+      background-color: #d32f2f;
+      float: right;
+    }
+
+    .download-btn:hover {
+      background-color: #1b5e20;
+    }
+
+    .logout-btn:hover {
+      background-color: #b71c1c;
     }
   </style>
 </head>
 <body>
-  <h2>All Student Reports (Admin View)</h2>
+  <h2>Admin Dashboard - All Reports</h2>
+  <button class="logout-btn" onclick="logout()">Log Out</button>
+  <br><br>
   <div id="reportContainer">Loading reports...</div>
 
   <script type="module">
     import { getAllReports } from './js/report-handler.js';
+    import { generateFinalReportText } from './js/final-report.js';
 
-    const reportContainer = document.getElementById('reportContainer');
+    const reportContainer = document.getElementById("reportContainer");
+
+    function logout() {
+      localStorage.clear();
+      window.location.href = "index.html";
+    }
+
+    function downloadReport(studentName, email, grade, report) {
+      const text = generateFinalReportText(studentName, email, grade, [report]);
+      const blob = new Blob([text], { type: "text/plain" });
+      const link = document.createElement("a");
+      link.href = URL.createObjectURL(blob);
+      link.download = `${studentName}_Report.txt`;
+      link.click();
+    }
 
     async function loadReports() {
       try {
         const reports = await getAllReports();
-
         if (!reports.length) {
-          reportContainer.innerHTML = "<p>No reports available yet.</p>";
+          reportContainer.innerHTML = "<p>No reports found.</p>";
           return;
         }
 
-        reportContainer.innerHTML = ""; // Clear loading text
+        reports.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
 
-        reports.forEach(report => {
+        reportContainer.innerHTML = "";
+        for (const report of reports) {
           const div = document.createElement("div");
           div.className = "report-card";
           div.innerHTML = `
-            <strong>Student Name:</strong> ${report.studentName}<br>
-            <strong>Parent Email:</strong> ${report.parentEmail}<br>
-            <strong>Grade:</strong> ${report.grade} |
+            <strong>Student:</strong> ${report.studentName}<br>
+            <strong>Parent Email:</strong> ${report.studentEmail}<br>
+            <strong>Grade:</strong> ${report.grade}<br>
             <strong>Subject:</strong> ${report.subject}<br>
-            <strong>Score:</strong> ${report.score}/${report.totalQuestions} (${report.percentage}%)<br>
-            <strong>Date:</strong> ${new Date(report.timestamp).toLocaleString()}<br><br>
-
-            <strong>Performance Summary:</strong> ${report.performanceSummary || "N/A"}<br>
-            <strong>Skills:</strong>
-            <ul>
-              ${(report.skillBreakdown || []).map(skill => `<li>${skill}</li>`).join('')}
-            </ul>
-            <strong>Recommendations:</strong>
-            <ul>
-              ${(report.recommendations || []).map(item => `<li>${item}</li>`).join('')}
-            </ul>
+            <strong>Score:</strong> ${report.score}/${report.totalQuestions} 
+            (${Math.round((report.score / report.totalQuestions) * 100)}%)<br>
+            <strong>Date:</strong> ${new Date(report.timestamp).toLocaleString()}<br>
+            <strong>Summary:</strong> ${report.performanceSummary || "N/A"}<br>
+            <strong>Skills:</strong> <ul>${(report.skillBreakdown || []).map(s => `<li>${s}</li>`).join('')}</ul>
+            <strong>Recommendations:</strong> <ul>${(report.recommendations || []).map(r => `<li>${r}</li>`).join('')}</ul>
+            <button class="download-btn" onclick="downloadReport('${report.studentName}', '${report.studentEmail}', '${report.grade}', ${JSON.stringify(report).replace(/'/g, "\\'")})">
+              Download PDF
+            </button>
           `;
           reportContainer.appendChild(div);
-        });
-
+        }
       } catch (err) {
-        reportContainer.innerHTML = `<p>Error loading reports: ${err.message}</p>`;
+        console.error(err);
+        reportContainer.innerHTML = "<p>Error loading reports.</p>";
       }
     }
 
     loadReports();
+    window.downloadReport = downloadReport;
+    window.logout = logout;
   </script>
 </body>
 </html>
