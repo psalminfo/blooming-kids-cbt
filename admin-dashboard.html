@@ -3,57 +3,85 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Admin Dashboard</title>
+  <title>Admin Dashboard - Blooming Kids House</title>
+  <link rel="stylesheet" href="css/style.css" />
   <style>
     body {
       font-family: Arial, sans-serif;
-      background: #f0f0f0;
-      padding: 40px;
-      text-align: center;
+      padding: 20px;
+      background-color: #f5f5f5;
     }
 
-    h1 {
+    h2 {
+      text-align: center;
       color: #2e7d32;
     }
 
-    p {
-      font-size: 1.1em;
-      margin-top: 10px;
-      color: #555;
+    .report-card {
+      background: #fff;
+      border: 2px solid #cddc39;
+      border-radius: 8px;
+      padding: 15px;
+      margin: 15px auto;
+      max-width: 900px;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.1);
     }
 
-    button {
-      margin-top: 30px;
-      padding: 12px 24px;
-      background-color: #c62828;
-      color: white;
-      border: none;
-      border-radius: 4px;
-      font-size: 16px;
-      cursor: pointer;
-    }
-
-    button:hover {
-      background-color: #a91b1b;
+    .report-card ul {
+      padding-left: 20px;
     }
   </style>
 </head>
 <body>
-  <h1>Welcome, Admin</h1>
-  <p>You are logged in. Use the admin panel to view reports, manage assessments, and monitor student progress.</p>
-  <button onclick="logoutAdmin()">Logout</button>
+  <h2>All Student Reports (Admin View)</h2>
+  <div id="reportContainer">Loading reports...</div>
 
-  <script>
-    // Check if admin is logged in
-    const isAdmin = localStorage.getItem('isAdminLoggedIn');
-    if (!isAdmin) {
-      window.location.href = 'admin-panel.html'; // redirect if not logged in
+  <script type="module">
+    import { getAllReports } from './js/report-handler.js';
+
+    const reportContainer = document.getElementById('reportContainer');
+
+    async function loadReports() {
+      try {
+        const reports = await getAllReports();
+
+        if (!reports.length) {
+          reportContainer.innerHTML = "<p>No reports available yet.</p>";
+          return;
+        }
+
+        reportContainer.innerHTML = ""; // Clear loading text
+
+        reports.forEach(report => {
+          const div = document.createElement("div");
+          div.className = "report-card";
+          div.innerHTML = `
+            <strong>Student Name:</strong> ${report.studentName}<br>
+            <strong>Parent Email:</strong> ${report.parentEmail}<br>
+            <strong>Grade:</strong> ${report.grade} |
+            <strong>Subject:</strong> ${report.subject}<br>
+            <strong>Score:</strong> ${report.score}/${report.totalQuestions} (${report.percentage}%)<br>
+            <strong>Date:</strong> ${new Date(report.timestamp).toLocaleString()}<br><br>
+
+            <strong>Performance Summary:</strong> ${report.performanceSummary || "N/A"}<br>
+            <strong>Skills:</strong>
+            <ul>
+              ${(report.skillBreakdown || []).map(skill => `<li>${skill}</li>`).join('')}
+            </ul>
+            <strong>Recommendations:</strong>
+            <ul>
+              ${(report.recommendations || []).map(item => `<li>${item}</li>`).join('')}
+            </ul>
+          `;
+          reportContainer.appendChild(div);
+        });
+
+      } catch (err) {
+        reportContainer.innerHTML = `<p>Error loading reports: ${err.message}</p>`;
+      }
     }
 
-    function logoutAdmin() {
-      localStorage.removeItem('isAdminLoggedIn');
-      window.location.href = 'index.html';
-    }
+    loadReports();
   </script>
 </body>
 </html>
