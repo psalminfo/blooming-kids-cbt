@@ -1,13 +1,14 @@
+/* css/style.css */
 body {
   font-family: Arial, sans-serif;
   background-color: #f0f8f0;
+  padding: 20px;
   color: #333;
   max-width: 800px;
   margin: 0 auto;
-  padding: 20px;
 }
 
-h1, h2 {
+h1 {
   text-align: center;
   color: #2e7d32;
 }
@@ -21,6 +22,7 @@ h1, h2 {
   border: 2px solid #2e7d32;
   border-radius: 5px;
   font-weight: bold;
+  z-index: 1000;
 }
 
 .question {
@@ -33,39 +35,21 @@ h1, h2 {
 
 .question label {
   display: block;
-  margin: 8px 0;
+  margin: 10px 0;
 }
 
-button {
+#submitBtn {
   display: block;
-  margin: 20px auto;
-  padding: 10px 20px;
+  margin: 30px auto;
+  padding: 12px 24px;
   background-color: #2e7d32;
   color: white;
   border: none;
   border-radius: 5px;
+  font-size: 16px;
   cursor: pointer;
 }
 
-button:hover {
+#submitBtn:hover {
   background-color: #1b5e20;
-}
-
-.logout-btn {
-  background-color: #c62828;
-  color: white;
-  padding: 10px 20px;
-  border-radius: 4px;
-  float: right;
-  border: none;
-  cursor: pointer;
-}
-
-.logout-btn:hover {
-  background-color: #a91b1b;
-}
-
-@media (max-width: 600px) {
-  body { padding: 10px; }
-  #timer { font-size: 14px; padding: 8px; }
 }
