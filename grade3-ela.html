@@ -4,22 +4,8 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Blooming Kids House: Grade 3 – English Language Arts</title>
-  <link rel="stylesheet" href="../css/style.css" />
+  <link rel="stylesheet" href="css/style.css" />
   <style>
-    body {
-      font-family: Arial, sans-serif;
-      background-color: #f0f8f0;
-      padding: 20px;
-      color: #333;
-      max-width: 800px;
-      margin: 0 auto;
-    }
-
-    h1 {
-      text-align: center;
-      color: #2e7d32;
-    }
-
     #timer {
       position: fixed;
       top: 10px;
@@ -31,39 +17,10 @@
       font-weight: bold;
       z-index: 1000;
     }
-
-    .question {
-      background-color: #fff;
-      padding: 15px;
-      margin: 15px 0;
-      border: 1px solid #2e7d32;
-      border-radius: 5px;
-    }
-
-    .question label {
-      display: block;
-      margin: 10px 0;
-    }
-
-    #submitBtn {
-      display: block;
-      margin: 30px auto;
-      padding: 12px 24px;
-      background-color: #2e7d32;
-      color: white;
-      border: none;
-      border-radius: 5px;
-      font-size: 16px;
-      cursor: pointer;
-    }
-
-    #submitBtn:hover {
-      background-color: #1b5e20;
-    }
   </style>
 </head>
 <body>
-  <h1>Grade 3 – English Language Arts Test</h1>
+  <h1>Blooming Kids House: Grade 3 – English Language Arts</h1>
   <div id="timer">Time Remaining: 30:00</div>
 
   <!-- ✅ Question 1 -->
@@ -104,7 +61,7 @@
 
   <!-- ✅ Question 5 -->
   <div class="question">
-    <p>5. Which of the following is a verb?<br><em>"The cat jumped over the fence."</em></p>
+    <p>5. Which word in the sentence is a verb?<br><em>“The cat jumped over the fence.”</em></p>
     <label><input type="radio" name="q5" value="a" /> cat</label>
     <label><input type="radio" name="q5" value="b" data-correct="true" /> jumped</label>
     <label><input type="radio" name="q5" value="c" /> fence</label>
@@ -113,9 +70,9 @@
 
   <button id="submitBtn">Submit Test</button>
 
-  <!-- ✅ External scripts -->
-  <script type="module" src="../js/firebase-config.js"></script>
-  <script type="module" src="../js/report-handler.js"></script>
-  <script type="module" src="../js/universal-test.js"></script>
+  <!-- ✅ Scripts -->
+  <script type="module" src="js/firebase-config.js"></script>
+  <script type="module" src="js/report-handler.js"></script>
+  <script type="module" src="js/universal-test.js"></script>
 </body>
 </html>
