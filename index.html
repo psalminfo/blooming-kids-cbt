@@ -1,16 +1,12 @@
+<!-- index.html -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>BLOOMING KIDS HOUSE ASSESSMENT TEST</title>
+  <link rel="stylesheet" href="css/style.css" />
   <style>
-    * { box-sizing: border-box; }
-    body {
-      margin: 0;
-      font-family: Arial, sans-serif;
-      background: #f5f5f5;
-    }
     header {
       background-color: #2e7d32;
       color: white;
@@ -140,7 +136,11 @@
         return;
       }
 
+      // Store all relevant student info
       localStorage.setItem("studentName", studentName);
+      localStorage.setItem("parentName", parentName);
+      localStorage.setItem("tutorName", tutorName);
+      localStorage.setItem("location", location);
       localStorage.setItem("parentEmail", parentEmail);
       localStorage.setItem("studentGrade", grade);
 
@@ -167,7 +167,7 @@
       const parentEmail = document.getElementById("parentEmailLogin").value.trim();
 
       if (!studentName || !parentEmail) {
-        alert("Please enter both fields.");
+        alert("Please enter both student name and email.");
         return;
       }
 
