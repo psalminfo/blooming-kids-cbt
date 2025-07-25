@@ -8,7 +8,7 @@ import {
   where
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
-// Save report to Firestore
+// 🔹 Save report to Firestore
 export async function saveTestReport(report) {
   try {
     await addDoc(collection(db, "reports"), report);
@@ -18,29 +18,44 @@ export async function saveTestReport(report) {
   }
 }
 
-// Generate report object
+// 🔹 Generate full test report object
 export function generateTestReport(name, parentEmail, subject, grade, score, totalQuestions) {
   const percentage = Math.round((score / totalQuestions) * 100);
-  const performanceSummary = percentage >= 80 ? "Excellent performance" :
-                             percentage >= 60 ? "Satisfactory performance" :
-                             "Needs Improvement";
+  const performanceSummary =
+    percentage >= 90 ? "Outstanding performance" :
+    percentage >= 75 ? "Strong performance" :
+    percentage >= 60 ? "Satisfactory performance" :
+    "Needs improvement. Support required.";
 
-  const skillBreakdown = [
-    "Comprehension and Vocabulary",
-    "Writing and Grammar",
-    "Listening and Speaking",
-    "Reading Fluency"
-  ];
+  // Sample skill breakdown by subject (can later be customized)
+  const skillBreakdown = subject.toLowerCase().includes("math")
+    ? ["Numerical fluency", "Word problems", "Geometry and shapes", "Data interpretation"]
+    : ["Reading comprehension", "Grammar", "Vocabulary", "Writing clarity"];
 
-  const recommendations = percentage >= 80
-    ? ["Continue practicing with advanced materials", "Explore creative writing"]
+  // Personalized recommendations
+  const recommendations = percentage >= 90
+    ? [
+        "Keep challenging the student with enrichment tasks.",
+        "Introduce project-based assessments to apply concepts."
+      ]
+    : percentage >= 75
+    ? [
+        "Encourage regular independent practice.",
+        "Provide structured writing prompts weekly."
+      ]
     : percentage >= 60
-    ? ["Revise basic grammar concepts", "Read daily to build fluency"]
-    : ["Seek help with reading strategies", "Focus on decoding and phonics"];
+    ? [
+        "Review foundational topics weekly.",
+        "Offer short daily tasks for fluency."
+      ]
+    : [
+        "One-on-one tutoring is highly recommended.",
+        "Focus on foundational concepts through guided practice."
+      ];
 
   return {
     studentName: name,
-    studentEmail: parentEmail,
+    parentEmail: parentEmail,
     subject,
     grade,
     score,
@@ -53,18 +68,18 @@ export function generateTestReport(name, parentEmail, subject, grade, score, tot
   };
 }
 
-// Admin: get all reports
+// 🔹 Admin: Fetch all reports
 export async function getAllReports() {
   const snapshot = await getDocs(collection(db, "reports"));
   return snapshot.docs.map(doc => doc.data());
 }
 
-// Parent: get reports for a student and email
-export async function getParentReport(name, email) {
+// 🔹 Parent: Fetch student reports
+export async function getParentReport(name, parentEmail) {
   const q = query(
     collection(db, "reports"),
     where("studentName", "==", name),
-    where("studentEmail", "==", email)
+    where("parentEmail", "==", parentEmail)
   );
   const snapshot = await getDocs(q);
   return snapshot.docs.map(doc => doc.data());
