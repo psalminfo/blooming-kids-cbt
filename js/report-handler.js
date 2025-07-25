@@ -19,7 +19,7 @@ export async function saveTestReport(report) {
 }
 
 // Format the report
-export function generateTestReport(name, email, subject, grade, score, totalQuestions) {
+export function generateTestReport(name, parentEmail, subject, grade, score, totalQuestions) {
   const percentage = Math.round((score / totalQuestions) * 100);
   const performanceSummary = percentage >= 80 ? "Excellent performance" :
                              percentage >= 60 ? "Satisfactory performance" :
@@ -40,7 +40,7 @@ export function generateTestReport(name, email, subject, grade, score, totalQues
 
   return {
     studentName: name,
-    studentEmail: email,
+    parentEmail,
     subject,
     grade,
     score,
@@ -59,12 +59,12 @@ export async function getAllReports() {
   return snapshot.docs.map(doc => doc.data());
 }
 
-// Parent: fetch specific student reports
-export async function getParentReport(name, email) {
+// Parent: fetch reports using student name and parent email
+export async function getParentReport(name, parentEmail) {
   const q = query(
     collection(db, "reports"),
     where("studentName", "==", name),
-    where("studentEmail", "==", email)
+    where("parentEmail", "==", parentEmail)
   );
   const snapshot = await getDocs(q);
   return snapshot.docs.map(doc => doc.data());
