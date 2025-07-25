@@ -1,3 +1,37 @@
+// js/universal-test.js
+import { saveTestReport, generateTestReport } from "./report-handler.js";
+
+document.addEventListener("DOMContentLoaded", function () {
+  const timerDisplay = document.getElementById("timer");
+  const submitBtn = document.getElementById("submitBtn");
+
+  if (!timerDisplay || !submitBtn) {
+    console.error("Timer or Submit button not found in the DOM.");
+    return;
+  }
+
+  let timeLeft = 30 * 60; // 30 minutes
+
+  function updateTimer() {
+    const minutes = Math.floor(timeLeft / 60);
+    const seconds = timeLeft % 60;
+    timerDisplay.textContent = `Time Remaining: ${minutes}:${seconds < 10 ? "0" : ""}${seconds}`;
+    if (timeLeft <= 0) {
+      clearInterval(timerInterval);
+      submitTest();
+    }
+    timeLeft--;
+  }
+
+  const timerInterval = setInterval(updateTimer, 1000);
+  updateTimer(); // initialize immediately
+
+  submitBtn.addEventListener("click", function () {
+    clearInterval(timerInterval);
+    submitTest();
+  });
+});
+
 function submitTest() {
   const questions = document.querySelectorAll(".question");
   const totalQuestions = questions.length;
@@ -12,18 +46,19 @@ function submitTest() {
   }
 
   const studentName = localStorage.getItem("studentName");
-  const parentEmail = localStorage.getItem("studentEmail"); // this is correct — from the index page
+  const parentEmail = localStorage.getItem("parentEmail");
   const grade = localStorage.getItem("studentGrade");
-  const subject = document.title.replace("Blooming Kids House: ", "").split(" – ")[1] || "Subject";
 
-  // ✅ Fix: Validate the correct keys that were stored in localStorage
+  const title = document.title; // example: "Blooming Kids House: Grade 3 – Mathematics Test"
+  const subjectMatch = title.match(/–\s(.*?)\sTest/i);
+  const subject = subjectMatch ? subjectMatch[1] : "Subject";
+
   if (!studentName || !parentEmail || !grade) {
     alert("Missing student info. Returning to home page.");
     window.location.href = "index.html";
     return;
   }
 
-  // ✅ Fix: pass correct arguments using the names above
   const report = generateTestReport(
     studentName,
     parentEmail,
@@ -33,18 +68,13 @@ function submitTest() {
     totalQuestions
   );
 
-  try {
-    saveTestReport(report)
-      .then(() => {
-        alert("Test submitted successfully.");
-        window.location.href = "select-subject.html";
-      })
-      .catch((err) => {
-        console.error("Error saving report:", err);
-        alert("An error occurred while saving the report.");
-      });
-  } catch (err) {
-    console.error("Report handler functions missing:", err);
-    alert("Report handler functions missing. Please check js/report-handler.js is included.");
-  }
+  saveTestReport(report)
+    .then(() => {
+      alert("Test submitted successfully.");
+      window.location.href = "select-subject.html";
+    })
+    .catch((err) => {
+      console.error("Error saving report:", err);
+      alert("An error occurred while saving your test. Please try again.");
+    });
 }
