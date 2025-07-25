@@ -9,74 +9,140 @@
   <style>
     body {
       font-family: Arial, sans-serif;
-      padding: 40px;
+      padding: 20px;
       background-color: #f9f9f9;
-      color: #333;
-      text-align: center;
+      max-width: 800px;
+      margin: 0 auto;
     }
 
     h2 {
+      text-align: center;
       color: #2e7d32;
     }
 
-    .subject-btn {
+    .subject-buttons {
+      display: flex;
+      flex-direction: column;
+      gap: 15px;
+      margin-top: 30px;
+    }
+
+    .subject-buttons button {
+      padding: 12px;
+      font-size: 16px;
       background-color: #2e7d32;
       color: white;
       border: none;
-      padding: 15px 30px;
-      margin: 10px;
-      font-size: 16px;
-      border-radius: 6px;
+      border-radius: 5px;
       cursor: pointer;
     }
 
-    .subject-btn:hover {
+    .subject-buttons button:hover {
       background-color: #1b5e20;
     }
 
-    #logoutBtn {
-      margin-top: 30px;
-      background-color: #c62828;
-    }
-
-    #logoutBtn:hover {
-      background-color: #a30000;
+    .logout-btn {
+      margin-top: 40px;
+      background-color: #d32f2f;
     }
   </style>
 </head>
 <body>
-  <h2>Welcome to Blooming Kids House Test Platform</h2>
+  <h2>Welcome, <span id="studentName"></span></h2>
   <p>Select a subject to begin your test:</p>
 
-  <div>
-    <button class="subject-btn" onclick="startTest('Math')">Mathematics</button>
-    <button class="subject-btn" onclick="startTest('English Language Arts')">English Language Arts</button>
-    <button class="subject-btn" onclick="startTest('Science')">Science</button>
-    <!-- Add more subjects if needed -->
+  <div class="subject-buttons">
+    <button onclick="location.href='grade3-math.html'">Mathematics</button>
+    <button onclick="location.href='grade3-ela.html'">English Language Arts</button>
+    <!-- Add more subjects as needed -->
+    <button class="logout-btn" onclick="logoutAndGenerate()">Logout & Generate Final Report</button>
   </div>
 
-  <button id="logoutBtn" class="subject-btn" onclick="finishAndLogout()">Finish and Logout</button>
+  <script type="module">
+    import { db } from './js/firebase-config.js';
+    import { collection, addDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
-  <script>
-    const studentName = localStorage.getItem("studentName");
-    const grade = localStorage.getItem("studentGrade");
+    // Load student name from localStorage
+    document.getElementById("studentName").textContent = localStorage.getItem("studentName") || "Student";
 
-    if (!studentName || !grade) {
-      alert("Missing student information. Redirecting to homepage.");
-      window.location.href = "index.html";
+    async function logoutAndGenerate() {
+      const studentName = localStorage.getItem("studentName");
+      const parentEmail = localStorage.getItem("parentEmail");
+      const grade = localStorage.getItem("studentGrade");
+
+      if (!studentName || !parentEmail || !grade) {
+        alert("Student session missing. Logging out.");
+        window.location.href = "index.html";
+        return;
+      }
+
+      const reports = JSON.parse(localStorage.getItem("bkh_reports") || "[]");
+
+      if (reports.length === 0) {
+        alert("No tests completed. Logging out.");
+        localStorage.clear();
+        window.location.href = "index.html";
+        return;
+      }
+
+      const finalReport = {
+        studentName,
+        studentEmail: parentEmail,
+        grade,
+        totalSubjects: reports.length,
+        timestamp: new Date().toISOString(),
+        tests: reports
+      };
+
+      try {
+        // Save to Firebase
+        await addDoc(collection(db, "finalReports"), finalReport);
+        console.log("Final report saved to Firebase");
+
+        // Generate PDF
+        generateFinalPDF(finalReport);
+
+        // Clear session and redirect
+        setTimeout(() => {
+          localStorage.clear();
+          window.location.href = "index.html";
+        }, 3000);
+
+      } catch (err) {
+        alert("Error saving final report.");
+        console.error(err);
+      }
     }
 
-    function startTest(subject) {
-      const gradeClean = grade.replace(" ", "").toLowerCase(); // e.g., "Grade 3" → "grade3"
-      const subjectClean = subject.toLowerCase().replace(/\s+/g, "-"); // e.g., "English Language Arts" → "english-language-arts"
-      const page = `tests/${gradeClean}-${subjectClean}.html`; // points to tests/grade3-english-language-arts.html
-      window.location.href = page;
+    function generateFinalPDF(report) {
+      const doc = new window.jspdf.jsPDF();
+
+      doc.setFontSize(14);
+      doc.text(`Blooming Kids House - Final Report`, 20, 20);
+      doc.text(`Student Name: ${report.studentName}`, 20, 30);
+      doc.text(`Parent Email: ${report.studentEmail}`, 20, 38);
+      doc.text(`Grade: ${report.grade}`, 20, 46);
+      doc.text(`Subjects Taken: ${report.totalSubjects}`, 20, 54);
+      doc.text(`Date: ${new Date(report.timestamp).toLocaleString()}`, 20, 62);
+
+      let y = 75;
+      report.tests.forEach((test, i) => {
+        doc.setFontSize(12);
+        doc.text(`${i + 1}. ${test.subject}`, 20, y);
+        y += 8;
+        doc.text(`Score: ${test.score}/${test.totalQuestions} (${test.percentage}%)`, 25, y);
+        y += 8;
+        doc.text(`Performance: ${test.performanceSummary}`, 25, y);
+        y += 10;
+      });
+
+      doc.save(`${report.studentName}_Final_Report.pdf`);
     }
 
-    function finishAndLogout() {
-      alert("You've completed your tests. You can now view your report.");
-      window.location.href = "parent-panel.html";
-    }
+    // Load jsPDF library dynamically
+    const script = document.createElement('script');
+    script.src = "https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js";
+    document.body.appendChild(script);
   </script>
 </body>
 </html>
