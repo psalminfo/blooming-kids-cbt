@@ -1,4 +1,3 @@
-<!-- select-subject.html -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -10,139 +9,114 @@
     body {
       font-family: Arial, sans-serif;
       padding: 20px;
-      background-color: #f9f9f9;
-      max-width: 800px;
-      margin: 0 auto;
-    }
-
-    h2 {
+      background-color: #f0f8f0;
       text-align: center;
+    }
+    h2 {
       color: #2e7d32;
     }
-
-    .subject-buttons {
-      display: flex;
-      flex-direction: column;
-      gap: 15px;
-      margin-top: 30px;
+    .subject-btn {
+      display: inline-block;
+      padding: 12px 20px;
+      margin: 10px;
+      background-color: #cddc39;
+      color: black;
+      text-decoration: none;
+      border-radius: 8px;
+      font-weight: bold;
     }
-
-    .subject-buttons button {
-      padding: 12px;
-      font-size: 16px;
+    .subject-btn:hover {
+      background-color: #aab400;
+    }
+    #logoutBtn {
+      margin-top: 40px;
+      padding: 12px 24px;
       background-color: #2e7d32;
       color: white;
       border: none;
       border-radius: 5px;
+      font-size: 16px;
       cursor: pointer;
     }
-
-    .subject-buttons button:hover {
+    #logoutBtn:hover {
       background-color: #1b5e20;
-    }
-
-    .logout-btn {
-      margin-top: 40px;
-      background-color: #d32f2f;
     }
   </style>
 </head>
 <body>
-  <h2>Welcome, <span id="studentName"></span></h2>
+  <h2>Welcome, <span id="studentNameDisplay"></span></h2>
   <p>Select a subject to begin your test:</p>
 
-  <div class="subject-buttons">
-    <button onclick="location.href='grade3-math.html'">Mathematics</button>
-    <button onclick="location.href='grade3-ela.html'">English Language Arts</button>
-    <!-- Add more subjects as needed -->
-    <button class="logout-btn" onclick="logoutAndGenerate()">Logout & Generate Final Report</button>
-  </div>
+  <div id="subjectButtons"></div>
+
+  <button id="logoutBtn" style="display:none;">Logout & Generate Final Report</button>
 
   <script type="module">
-    import { db } from './js/firebase-config.js';
-    import { collection, addDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+    import { saveTestReport } from './js/report-handler.js';
 
-    // Load student name from localStorage
-    document.getElementById("studentName").textContent = localStorage.getItem("studentName") || "Student";
+    const name = localStorage.getItem("studentName");
+    const parentEmail = localStorage.getItem("parentEmail");
+    const grade = localStorage.getItem("studentGrade");
+    const completedTests = JSON.parse(localStorage.getItem("completedTests") || "[]");
 
-    async function logoutAndGenerate() {
-      const studentName = localStorage.getItem("studentName");
-      const parentEmail = localStorage.getItem("parentEmail");
-      const grade = localStorage.getItem("studentGrade");
+    if (!name || !parentEmail || !grade) {
+      alert("Missing student info. Returning to homepage.");
+      window.location.href = "index.html";
+    }
 
-      if (!studentName || !parentEmail || !grade) {
-        alert("Student session missing. Logging out.");
-        window.location.href = "index.html";
+    document.getElementById("studentNameDisplay").textContent = name;
+    const subjectContainer = document.getElementById("subjectButtons");
+    const logoutBtn = document.getElementById("logoutBtn");
+
+    const availableSubjects = {
+      "Grade 3": ["Mathematics", "English Language Arts"],
+      "Grade 4": ["Mathematics", "English Language Arts"],
+      "Grade 5": ["Mathematics", "English Language Arts"]
+      // Add more grades and subjects as needed
+    };
+
+    const subjects = availableSubjects[grade] || [];
+    subjects.forEach(subject => {
+      const subjectFile = `grade${grade.split(" ")[1].toLowerCase()}-${subject.toLowerCase().replace(/\s+/g, "")}.html`;
+      const btn = document.createElement("a");
+      btn.href = subjectFile;
+      btn.textContent = subject;
+      btn.className = "subject-btn";
+      subjectContainer.appendChild(btn);
+    });
+
+    if (completedTests.length > 0) {
+      logoutBtn.style.display = "inline-block";
+    }
+
+    logoutBtn.addEventListener("click", async () => {
+      const allReports = JSON.parse(localStorage.getItem("allTestReports") || "[]");
+      if (!allReports.length) {
+        alert("No reports to submit.");
         return;
       }
-
-      const reports = JSON.parse(localStorage.getItem("bkh_reports") || "[]");
-
-      if (reports.length === 0) {
-        alert("No tests completed. Logging out.");
-        localStorage.clear();
-        window.location.href = "index.html";
-        return;
-      }
-
-      const finalReport = {
-        studentName,
-        studentEmail: parentEmail,
-        grade,
-        totalSubjects: reports.length,
-        timestamp: new Date().toISOString(),
-        tests: reports
-      };
 
       try {
-        // Save to Firebase
-        await addDoc(collection(db, "finalReports"), finalReport);
-        console.log("Final report saved to Firebase");
-
-        // Generate PDF
-        generateFinalPDF(finalReport);
-
-        // Clear session and redirect
-        setTimeout(() => {
-          localStorage.clear();
-          window.location.href = "index.html";
-        }, 3000);
-
+        for (const report of allReports) {
+          await saveTestReport(report);
+        }
+        alert("Final report submitted.");
       } catch (err) {
-        alert("Error saving final report.");
-        console.error(err);
+        console.error("Error submitting final report:", err);
       }
-    }
 
-    function generateFinalPDF(report) {
-      const doc = new window.jspdf.jsPDF();
+      // Clear and redirect
+      localStorage.removeItem("studentName");
+      localStorage.removeItem("parentName");
+      localStorage.removeItem("tutorName");
+      localStorage.removeItem("location");
+      localStorage.removeItem("parentEmail");
+      localStorage.removeItem("studentGrade");
+      localStorage.removeItem("completedTests");
+      localStorage.removeItem("allTestReports");
 
-      doc.setFontSize(14);
-      doc.text(`Blooming Kids House - Final Report`, 20, 20);
-      doc.text(`Student Name: ${report.studentName}`, 20, 30);
-      doc.text(`Parent Email: ${report.studentEmail}`, 20, 38);
-      doc.text(`Grade: ${report.grade}`, 20, 46);
-      doc.text(`Subjects Taken: ${report.totalSubjects}`, 20, 54);
-      doc.text(`Date: ${new Date(report.timestamp).toLocaleString()}`, 20, 62);
-
-      let y = 75;
-      report.tests.forEach((test, i) => {
-        doc.setFontSize(12);
-        doc.text(`${i + 1}. ${test.subject}`, 20, y);
-        y += 8;
-        doc.text(`Score: ${test.score}/${test.totalQuestions} (${test.percentage}%)`, 25, y);
-        y += 8;
-        doc.text(`Performance: ${test.performanceSummary}`, 25, y);
-        y += 10;
-      });
-
-      doc.save(`${report.studentName}_Final_Report.pdf`);
-    }
-
-    // Load jsPDF library dynamically
-    const script = document.createElement('script');
-    script.src = "https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js";
-    document.body.appendChild(script);
+      window.location.href = "index.html";
+    });
   </script>
 </body>
 </html>
