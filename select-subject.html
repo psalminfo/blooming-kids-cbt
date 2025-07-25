@@ -1,95 +1,81 @@
+<!-- select-subject.html -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Select Subject – Blooming Kids House</title>
+  <title>Select Subject - Blooming Kids House</title>
+  <link rel="stylesheet" href="css/style.css" />
   <style>
     body {
       font-family: Arial, sans-serif;
-      background-color: #f0fff0;
-      padding: 20px;
+      padding: 40px;
+      background-color: #f9f9f9;
       color: #333;
-    }
-
-    h1 {
-      text-align: center;
-      color: green;
-    }
-
-    .container {
-      max-width: 600px;
-      margin: 0 auto;
       text-align: center;
     }
 
-    .student-info {
-      background-color: #eaffea;
-      padding: 15px;
-      margin-bottom: 20px;
-      border: 1px solid green;
-      border-radius: 5px;
+    h2 {
+      color: #2e7d32;
     }
 
-    .button {
-      background-color: green;
+    .subject-btn {
+      background-color: #2e7d32;
       color: white;
-      padding: 15px 25px;
-      margin: 10px;
       border: none;
-      border-radius: 5px;
+      padding: 15px 30px;
+      margin: 10px;
       font-size: 16px;
+      border-radius: 6px;
       cursor: pointer;
     }
 
-    .button:hover {
-      background-color: darkgreen;
+    .subject-btn:hover {
+      background-color: #1b5e20;
     }
 
-    .logout-button {
-      background-color: yellow;
-      color: black;
+    #logoutBtn {
+      margin-top: 30px;
+      background-color: #c62828;
+    }
+
+    #logoutBtn:hover {
+      background-color: #a30000;
     }
   </style>
 </head>
 <body>
-  <div class="container">
-    <h1>Select Subject</h1>
-    <div id="studentInfo" class="student-info"></div>
+  <h2>Welcome to Blooming Kids House Test Platform</h2>
+  <p>Select a subject to begin your test:</p>
 
-    <button class="button" onclick="startSubject('grade3-ela.html')">English</button>
-    <button class="button" onclick="startSubject('grade3-math.html')">Math</button>
-
-    <br><br>
-    <button class="button logout-button" onclick="logout()">Logout</button>
+  <div>
+    <button class="subject-btn" onclick="startTest('Math')">Mathematics</button>
+    <button class="subject-btn" onclick="startTest('English Language Arts')">English Language Arts</button>
+    <button class="subject-btn" onclick="startTest('Science')">Science</button>
+    <!-- Add more subjects if needed -->
   </div>
 
+  <button id="logoutBtn" class="subject-btn" onclick="finishAndLogout()">Finish and Logout</button>
+
   <script>
-    document.addEventListener("DOMContentLoaded", function() {
-      const studentName = localStorage.getItem("studentName");
-      const studentGrade = localStorage.getItem("studentGrade"); // fixed key name
-      const studentEmail = localStorage.getItem("studentEmail");
+    const studentName = localStorage.getItem("studentName");
+    const grade = localStorage.getItem("studentGrade");
 
-      if (!studentName || !studentGrade || !studentEmail) {
-        alert("Missing student info. Returning to home page.");
-        window.location.href = "index.html";
-        return;
-      }
-
-      document.getElementById("studentInfo").innerHTML = `
-        <p><strong>Name:</strong> ${studentName}</p>
-        <p><strong>Grade:</strong> ${studentGrade}</p>
-        <p><strong>Email:</strong> ${studentEmail}</p>
-      `;
-    });
-
-    function startSubject(subjectPage) {
-      window.location.href = subjectPage;
+    if (!studentName || !grade) {
+      alert("Missing student information. Redirecting to homepage.");
+      window.location.href = "index.html";
     }
 
-    function logout() {
-      localStorage.clear();
-      window.location.href = "index.html";
+    function startTest(subject) {
+      const gradeClean = grade.replace(" ", "").toLowerCase(); // e.g., "Grade 3" → "grade3"
+      const subjectClean = subject.toLowerCase().replace(/\s+/g, "-"); // e.g., "English Language Arts" → "english-language-arts"
+      const page = `tests/${gradeClean}-${subjectClean}.html`; // points to tests/grade3-english-language-arts.html
+      window.location.href = page;
+    }
+
+    function finishAndLogout() {
+      alert("You've completed your tests. You can now view your report.");
+      window.location.href = "parent-panel.html";
     }
   </script>
 </body>
