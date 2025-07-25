@@ -8,79 +8,115 @@
   <style>
     body {
       font-family: Arial, sans-serif;
+      background-color: #f5f5f5;
       padding: 20px;
-      background-color: #f2f2f2;
     }
 
     h2 {
       color: #2e7d32;
+      margin-bottom: 20px;
+    }
+
+    .report-list {
+      display: flex;
+      flex-direction: column;
+      gap: 15px;
     }
 
     .report-card {
       background: #fff;
-      border: 1px solid #ddd;
+      border: 1px solid #ccc;
       padding: 15px;
-      margin-bottom: 15px;
       border-radius: 5px;
     }
 
-    .logout-btn {
-      background-color: #c62828;
+    button {
+      margin-top: 10px;
+      background-color: #2e7d32;
       color: white;
+      padding: 8px 16px;
       border: none;
-      padding: 10px 20px;
-      cursor: pointer;
       border-radius: 4px;
-      float: right;
+      cursor: pointer;
     }
 
-    .logout-btn:hover {
-      background-color: #a91b1b;
+    button:hover {
+      background-color: #1b5e20;
     }
   </style>
 </head>
 <body>
-  <h2>Admin Dashboard</h2>
-  <button class="logout-btn" onclick="logoutAdmin()">Logout</button>
+  <h2>Admin Dashboard – All Student Reports</h2>
 
-  <div id="adminContent">
+  <div id="reportContainer" class="report-list">
     <p>Loading reports...</p>
   </div>
 
-  <!-- Load Firebase Config + SDK and Report Handler -->
+  <!-- ✅ Firebase report fetch -->
   <script type="module">
-    import { logoutAdmin } from './js/report-handler.js';
     import { getAllReports } from './js/report-handler.js';
 
-    const container = document.getElementById("adminContent");
-    container.innerHTML = "<p>Loading reports...</p>";
+    async function loadReports() {
+      const container = document.getElementById('reportContainer');
+      try {
+        const reports = await getAllReports();
+        if (!reports.length) {
+          container.innerHTML = "<p>No reports found in database.</p>";
+          return;
+        }
 
-    getAllReports().then(reports => {
-      container.innerHTML = "";
+        container.innerHTML = "";
+        reports.forEach((report, index) => {
+          const div = document.createElement("div");
+          div.className = "report-card";
+          div.innerHTML = `
+            <strong>${report.studentName}</strong><br>
+            <strong>Grade:</strong> ${report.grade} |
+            <strong>Subject:</strong> ${report.subject}<br>
+            <strong>Score:</strong> ${report.score}/${report.totalQuestions} (${report.percentage}%)<br>
+            <strong>Parent Email:</strong> ${report.studentEmail}<br>
+            <strong>Date:</strong> ${new Date(report.timestamp).toLocaleString()}<br><br>
+            <strong>Summary:</strong> ${report.performanceSummary}<br>
+            <strong>Skills:</strong>
+            <ul>${(report.skillBreakdown || []).map(s => `<li>${s}</li>`).join('')}</ul>
+            <strong>Recommendations:</strong>
+            <ul>${(report.recommendations || []).map(r => `<li>${r}</li>`).join('')}</ul>
+            <button onclick="downloadReport(${index})">Download Report</button>
+          `;
+          container.appendChild(div);
+        });
 
-      if (!reports.length) {
-        container.innerHTML = "<p>No reports found.</p>";
-        return;
+        window.downloadReport = function(index) {
+          const report = reports[index];
+          const content = `
+Student: ${report.studentName}
+Grade: ${report.grade}
+Subject: ${report.subject}
+Score: ${report.score}/${report.totalQuestions} (${report.percentage}%)
+Parent Email: ${report.studentEmail}
+Date: ${new Date(report.timestamp).toLocaleString()}
+
+Performance Summary: ${report.performanceSummary}
+
+Skills:
+${(report.skillBreakdown || []).join(", ")}
+
+Recommendations:
+${(report.recommendations || []).join(", ")}
+          `;
+          const blob = new Blob([content], { type: "text/plain" });
+          const url = URL.createObjectURL(blob);
+          const link = document.createElement("a");
+          link.href = url;
+          link.download = `${report.studentName.replace(/\s+/g, "_")}_Report.txt`;
+          link.click();
+        };
+      } catch (err) {
+        container.innerHTML = `<p>Error fetching reports: ${err.message}</p>`;
       }
+    }
 
-      reports.forEach(report => {
-        const div = document.createElement("div");
-        div.className = "report-card";
-        div.innerHTML = `
-          <strong>${report.studentName} (${report.studentEmail})</strong><br>
-          <strong>Grade:</strong> ${report.grade} |
-          <strong>Subject:</strong> ${report.subject}<br>
-          <strong>Score:</strong> ${report.score}/${report.totalQuestions} (${Math.round((report.score / report.totalQuestions) * 100)}%)<br>
-          <strong>Date:</strong> ${new Date(report.timestamp).toLocaleString()}<br><br>
-          <strong>Summary:</strong> ${report.performanceSummary || 'No summary provided'}<br>
-          <strong>Skills:</strong> <ul>${(report.skillBreakdown || []).map(skill => `<li>${skill}</li>`).join('')}</ul>
-          <strong>Recommendations:</strong> <ul>${(report.recommendations || []).map(r => `<li>${r}</li>`).join('')}</ul>
-        `;
-        container.appendChild(div);
-      });
-    }).catch(err => {
-      container.innerHTML = `<p>Error loading reports: ${err.message}</p>`;
-    });
+    loadReports();
   </script>
 </body>
 </html>
