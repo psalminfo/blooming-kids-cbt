@@ -4,22 +4,8 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Blooming Kids House: Grade 3 – Mathematics</title>
-  <link rel="stylesheet" href="../css/style.css" />
+  <link rel="stylesheet" href="css/style.css" />
   <style>
-    body {
-      font-family: Arial, sans-serif;
-      background-color: #f0f8f0;
-      padding: 20px;
-      color: #333;
-      max-width: 800px;
-      margin: 0 auto;
-    }
-
-    h1 {
-      text-align: center;
-      color: #2e7d32;
-    }
-
     #timer {
       position: fixed;
       top: 10px;
@@ -31,42 +17,13 @@
       font-weight: bold;
       z-index: 1000;
     }
-
-    .question {
-      background-color: #fff;
-      padding: 15px;
-      margin: 15px 0;
-      border: 1px solid #2e7d32;
-      border-radius: 5px;
-    }
-
-    .question label {
-      display: block;
-      margin: 10px 0;
-    }
-
-    #submitBtn {
-      display: block;
-      margin: 30px auto;
-      padding: 12px 24px;
-      background-color: #2e7d32;
-      color: white;
-      border: none;
-      border-radius: 5px;
-      font-size: 16px;
-      cursor: pointer;
-    }
-
-    #submitBtn:hover {
-      background-color: #1b5e20;
-    }
   </style>
 </head>
 <body>
-  <h1>Grade 3 – Mathematics Test</h1>
+  <h1>Blooming Kids House: Grade 3 – Mathematics</h1>
   <div id="timer">Time Remaining: 30:00</div>
 
-  <!-- ✅ Question 1 -->
+  <!-- ✅ Questions start here -->
   <div class="question">
     <p>1. What is the value of 7 × 6?</p>
     <label><input type="radio" name="q1" value="a" /> 36</label>
@@ -75,31 +32,29 @@
     <label><input type="radio" name="q1" value="d" /> 56</label>
   </div>
 
-  <!-- ✅ Question 2 -->
   <div class="question">
-    <p>2. Which number is a multiple of 5?</p>
-    <label><input type="radio" name="q2" value="a" /> 21</label>
-    <label><input type="radio" name="q2" value="b" /> 42</label>
-    <label><input type="radio" name="q2" value="c" data-correct="true" /> 45</label>
-    <label><input type="radio" name="q2" value="d" /> 33</label>
+    <p>2. What is 126 + 74?</p>
+    <label><input type="radio" name="q2" value="a" /> 180</label>
+    <label><input type="radio" name="q2" value="b" data-correct="true" /> 200</label>
+    <label><input type="radio" name="q2" value="c" /> 210</label>
+    <label><input type="radio" name="q2" value="d" /> 220</label>
   </div>
 
-  <!-- ✅ Question 3 -->
   <div class="question">
-    <p>3. What is 120 + 45?</p>
-    <label><input type="radio" name="q3" value="a" /> 155</label>
-    <label><input type="radio" name="q3" value="b" /> 165</label>
-    <label><input type="radio" name="q3" value="c" data-correct="true" /> 165</label>
-    <label><input type="radio" name="q3" value="d" /> 175</label>
+    <p>3. What is half of 100?</p>
+    <label><input type="radio" name="q3" value="a" /> 40</label>
+    <label><input type="radio" name="q3" value="b" /> 45</label>
+    <label><input type="radio" name="q3" value="c" data-correct="true" /> 50</label>
+    <label><input type="radio" name="q3" value="d" /> 60</label>
   </div>
 
   <!-- ✅ Add more questions here -->
 
   <button id="submitBtn">Submit Test</button>
 
-  <!-- ✅ External scripts -->
-  <script type="module" src="../js/firebase-config.js"></script>
-  <script type="module" src="../js/report-handler.js"></script>
-  <script type="module" src="../js/universal-test.js"></script>
+  <!-- ✅ Scripts -->
+  <script type="module" src="js/firebase-config.js"></script>
+  <script type="module" src="js/report-handler.js"></script>
+  <script type="module" src="js/universal-test.js"></script>
 </body>
 </html>
