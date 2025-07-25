@@ -10,113 +10,114 @@
       font-family: Arial, sans-serif;
       padding: 20px;
       background-color: #f0f8f0;
-      text-align: center;
     }
+
     h2 {
       color: #2e7d32;
+      text-align: center;
     }
-    .subject-btn {
-      display: inline-block;
-      padding: 12px 20px;
-      margin: 10px;
-      background-color: #cddc39;
-      color: black;
-      text-decoration: none;
-      border-radius: 8px;
-      font-weight: bold;
+
+    .subject-list {
+      max-width: 600px;
+      margin: 30px auto;
+      display: flex;
+      flex-direction: column;
+      gap: 15px;
     }
-    .subject-btn:hover {
-      background-color: #aab400;
-    }
-    #logoutBtn {
-      margin-top: 40px;
-      padding: 12px 24px;
+
+    .subject-list a {
       background-color: #2e7d32;
       color: white;
+      text-decoration: none;
+      padding: 12px;
+      text-align: center;
+      border-radius: 5px;
+    }
+
+    .subject-list a:hover {
+      background-color: #1b5e20;
+    }
+
+    .logout {
+      display: block;
+      margin: 30px auto 0;
+      background-color: #c62828;
+      color: white;
+      padding: 12px 24px;
       border: none;
       border-radius: 5px;
       font-size: 16px;
       cursor: pointer;
     }
-    #logoutBtn:hover {
-      background-color: #1b5e20;
+
+    .logout:hover {
+      background-color: #8e0000;
     }
   </style>
 </head>
 <body>
-  <h2>Welcome, <span id="studentNameDisplay"></span></h2>
-  <p>Select a subject to begin your test:</p>
+  <h2>Select a Subject to Begin</h2>
 
-  <div id="subjectButtons"></div>
+  <div class="subject-list">
+    <a href="grade3-math.html">Grade 3 - Mathematics</a>
+    <a href="grade3-ela.html">Grade 3 - English Language Arts</a>
+    <!-- Add more subjects here if needed -->
+  </div>
 
-  <button id="logoutBtn" style="display:none;">Logout & Generate Final Report</button>
+  <button class="logout" onclick="logoutAndGenerateFinalReport()">Logout & Generate Final Report</button>
 
   <script type="module">
     import { saveTestReport } from './js/report-handler.js';
+    import { generateFinalReportText } from './js/final-report.js';
 
-    const name = localStorage.getItem("studentName");
-    const parentEmail = localStorage.getItem("parentEmail");
-    const grade = localStorage.getItem("studentGrade");
-    const completedTests = JSON.parse(localStorage.getItem("completedTests") || "[]");
-
-    if (!name || !parentEmail || !grade) {
-      alert("Missing student info. Returning to homepage.");
-      window.location.href = "index.html";
+    function getReportsFromStorage() {
+      const reports = JSON.parse(localStorage.getItem("completedTests")) || [];
+      return reports;
     }
 
-    document.getElementById("studentNameDisplay").textContent = name;
-    const subjectContainer = document.getElementById("subjectButtons");
-    const logoutBtn = document.getElementById("logoutBtn");
-
-    const availableSubjects = {
-      "Grade 3": ["Mathematics", "English Language Arts"],
-      "Grade 4": ["Mathematics", "English Language Arts"],
-      "Grade 5": ["Mathematics", "English Language Arts"]
-      // Add more grades and subjects as needed
-    };
-
-    const subjects = availableSubjects[grade] || [];
-    subjects.forEach(subject => {
-      const subjectFile = `grade${grade.split(" ")[1].toLowerCase()}-${subject.toLowerCase().replace(/\s+/g, "")}.html`;
-      const btn = document.createElement("a");
-      btn.href = subjectFile;
-      btn.textContent = subject;
-      btn.className = "subject-btn";
-      subjectContainer.appendChild(btn);
-    });
-
-    if (completedTests.length > 0) {
-      logoutBtn.style.display = "inline-block";
+    function clearSession() {
+      localStorage.removeItem("studentName");
+      localStorage.removeItem("studentGrade");
+      localStorage.removeItem("parentEmail");
+      localStorage.removeItem("completedTests");
     }
 
-    logoutBtn.addEventListener("click", async () => {
-      const allReports = JSON.parse(localStorage.getItem("allTestReports") || "[]");
-      if (!allReports.length) {
-        alert("No reports to submit.");
+    async function logoutAndGenerateFinalReport() {
+      const studentName = localStorage.getItem("studentName");
+      const parentEmail = localStorage.getItem("parentEmail");
+      const grade = localStorage.getItem("studentGrade");
+
+      if (!studentName || !parentEmail || !grade) {
+        alert("Student info missing. Redirecting to home.");
+        window.location.href = "index.html";
         return;
       }
 
-      try {
-        for (const report of allReports) {
-          await saveTestReport(report);
-        }
-        alert("Final report submitted.");
-      } catch (err) {
-        console.error("Error submitting final report:", err);
+      const reports = getReportsFromStorage();
+      if (!reports.length) {
+        alert("No completed test found.");
+        return;
       }
 
-      // Clear and redirect
-      localStorage.removeItem("studentName");
-      localStorage.removeItem("parentName");
-      localStorage.removeItem("tutorName");
-      localStorage.removeItem("location");
-      localStorage.removeItem("parentEmail");
-      localStorage.removeItem("studentGrade");
-      localStorage.removeItem("completedTests");
-      localStorage.removeItem("allTestReports");
+      // Save each report to Firestore
+      for (let report of reports) {
+        await saveTestReport(report);
+      }
 
+      // Create final report content
+      const fullReportText = generateFinalReportText(studentName, parentEmail, grade, reports);
+
+      // Download as PDF (basic text file)
+      const blob = new Blob([fullReportText], { type: "text/plain" });
+      const link = document.createElement("a");
+      link.href = URL.createObjectURL(blob);
+      link.download = `${studentName.replace(/\s+/g, "_")}_Final_Report.txt`;
+      link.click();
+
+      // Clear session and go to homepage
+      clearSession();
       window.location.href = "index.html";
-    });
+    }
   </script>
 </body>
 </html>
