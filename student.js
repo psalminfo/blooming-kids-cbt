@@ -1,14 +1,7 @@
-import { auth, db } from './firebaseConfig.js';
-import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
-import { getDoc, doc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
-import { autoGenerateQuestions } from './autoQuestionGen.js';
+import { db } from './firebaseConfig.js';
+import { collection, getDocs } from 'firebase/firestore';
 
-const tabsContainer = document.getElementById('tabsContainer');
-const questionForm = document.getElementById('questionForm');
-const submitBtn = document.getElementById('submitBtn');
-const logoutBtn = document.getElementById('logoutBtn');
-
-const gradeSubjects = {
+const subjectsByGrade = {
   3: ['Math', 'ELA'],
   4: ['Math', 'ELA'],
   5: ['Math', 'ELA'],
@@ -21,53 +14,118 @@ const gradeSubjects = {
   12: ['Math', 'ELA', 'Biology', 'Chemistry', 'Physics']
 };
 
-let currentStudent = {};
-let selectedSubject = null;
-let loadedQuestions = [];
+const studentInfo = JSON.parse(localStorage.getItem('studentInfo')) || {};
+const grade = studentInfo.grade;
+const subjectButtonsContainer = document.getElementById('subjectButtonsContainer');
+const questionPanel = document.getElementById('questionPanel');
+const questionList = document.getElementById('questionList');
+const subjectTitle = document.getElementById('subjectTitle');
+const timerDisplay = document.getElementById('timer');
+const logoutBtn = document.getElementById('logoutBtn');
 
-onAuthStateChanged(auth, async user => {
-  if (!user) location.href = 'login.html';
-
-  const studentDoc = await getDoc(doc(db, "students", user.uid));
-  currentStudent = studentDoc.data();
-  document.getElementById('studentName').textContent = currentStudent.name;
-  loadSubjectTabs();
+logoutBtn.addEventListener('click', () => {
+  localStorage.removeItem('studentInfo');
+  window.location.href = 'index.html';
 });
 
-logoutBtn.onclick = () => {
-  signOut(auth).then(() => location.href = "login.html");
-};
-
-function loadSubjectTabs() {
-  const subjects = gradeSubjects[currentStudent.grade];
-  tabsContainer.innerHTML = subjects.map(subj =>
-    `<button class="tab-btn" onclick="selectSubject('${subj}')">${subj}</button>`
-  ).join('');
+if (!grade || !subjectsByGrade[grade]) {
+  alert('Invalid grade. Please log in again.');
+  window.location.href = 'index.html';
 }
 
-window.selectSubject = async (subject) => {
-  selectedSubject = subject;
-  loadedQuestions = await autoGenerateQuestions(currentStudent.grade, subject);
-  renderQuestions();
-};
+subjectsByGrade[grade].forEach(subject => {
+  const btn = document.createElement('button');
+  btn.textContent = subject;
+  btn.className = 'bg-green-600 text-white px-6 py-2 rounded hover:bg-green-700';
+  btn.addEventListener('click', () => loadSubject(subject));
+  subjectButtonsContainer.appendChild(btn);
+});
 
-function renderQuestions() {
-  questionForm.innerHTML = loadedQuestions.map((q, i) =>
-    `<div class="question-block">
-      <p><strong>${i + 1}. ${q.question}</strong></p>
-      ${q.options.map((opt, j) => `
-        <label>
-          <input type="radio" name="q${i}" value="${opt}">
-          ${opt}
-        </label>
-      `).join('')}
-    </div>`
-  ).join('');
+let currentSubject = '';
+let answers = {};
+let timer = null;
+let remainingTime = 1800;
+
+function loadSubject(subject) {
+  currentSubject = subject;
+  subjectTitle.textContent = `${subject} (Grade ${grade})`;
+  subjectButtonsContainer.classList.add('hidden');
+  questionPanel.classList.remove('hidden');
+  questionList.innerHTML = '';
+  answers = {};
+  remainingTime = 1800;
+  updateTimer();
+
+  getQuestionSet(subject).then(questions => {
+    questions.slice(0, 30).forEach((q, i) => {
+      const div = document.createElement('div');
+      div.className = 'p-4 border rounded bg-white';
+      div.innerHTML = `
+        <p class="font-medium">${i + 1}. ${q.question}</p>
+        ${q.options.map((opt, idx) =>
+          `<label class="block mt-1">
+            <input type="radio" name="q${i}" value="${opt}" class="mr-2" />
+            ${opt}
+          </label>`).join('')}
+      `;
+      questionList.appendChild(div);
+    });
+  });
+
+  if (timer) clearInterval(timer);
+  timer = setInterval(() => {
+    remainingTime--;
+    updateTimer();
+    if (remainingTime <= 0) handleSubmit();
+  }, 1000);
 }
 
-submitBtn.onclick = (e) => {
-  e.preventDefault();
-  // Optionally: store answers or trigger backend logic here
-  alert("Test submitted!");
-  location.href = "subject-select.html";
-};
+function updateTimer() {
+  const mins = Math.floor(remainingTime / 60);
+  const secs = remainingTime % 60;
+  timerDisplay.textContent = `Time Left: ${mins}:${secs < 10 ? '0' : ''}${secs}`;
+}
+
+document.getElementById('submitBtn').addEventListener('click', handleSubmit);
+
+function handleSubmit() {
+  const radioButtons = document.querySelectorAll('input[type="radio"]:checked');
+  radioButtons.forEach(rb => {
+    const qIndex = rb.name.replace('q', '');
+    answers[qIndex] = rb.value;
+  });
+
+  saveResult(currentSubject, answers);
+  alert('Test submitted!');
+  questionPanel.classList.add('hidden');
+  subjectButtonsContainer.classList.remove('hidden');
+  clearInterval(timer);
+}
+
+function saveResult(subject, answers) {
+  const resultData = {
+    student: studentInfo.name,
+    parent: studentInfo.email,
+    tutor: studentInfo.tutor,
+    location: studentInfo.location,
+    grade: grade,
+    subject,
+    answers,
+    timestamp: new Date().toISOString()
+  };
+  console.log('Saving result...', resultData);
+  // You’ll replace this with real Firestore write + report generation
+}
+
+async function getQuestionSet(subject) {
+  // Simulated fallback (replace with real GitHub / Firestore fetch)
+  const fallback = [
+    { question: `Sample ${subject} question 1`, options: ['A', 'B', 'C', 'D'] },
+    { question: `Sample ${subject} question 2`, options: ['A', 'B', 'C', 'D'] },
+    // ...
+  ];
+  return [...Array(30)].map((_, i) => ({
+    question: `Sample ${subject} question ${i + 1}`,
+    options: ['A', 'B', 'C', 'D']
+  }));
+}
