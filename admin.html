@@ -1,69 +1,42 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
+  <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Admin Panel - Blooming Kids House</title>
-  <link rel="stylesheet" href="style.css" />
-  <link rel="icon" type="image/png" href="favicon.ico" />
+  <title>Admin Dashboard - Blooming Kids House</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css"/>
+  <link rel="stylesheet" href="style.css"/>
+  <link rel="icon" href="favicon.ico"/>
 </head>
-<body>
-  <header>
-    <h1>Admin Dashboard</h1>
-    <button id="logoutBtn">Logout</button>
-  </header>
+<body class="bg-white text-green-900 min-h-screen">
+  <div class="bg-green-700 text-white p-4 flex justify-between">
+    <h1 class="text-lg font-bold">Admin Panel</h1>
+    <button id="logoutBtn" class="bg-yellow-400 text-green-800 px-4 py-1 rounded hover:bg-yellow-300">Logout</button>
+  </div>
 
-  <main>
-    <section class="admin-section">
-      <h2>Upload Question JSON</h2>
-      <input type="file" id="jsonUpload" accept=".json"/>
-      <button id="uploadBtn">Upload</button>
-    </section>
+  <div class="flex justify-center mt-4 space-x-2">
+    <button class="tab-btn bg-green-600 text-white px-4 py-2 rounded" data-tab="upload">Upload Questions</button>
+    <button class="tab-btn bg-green-600 text-white px-4 py-2 rounded" data-tab="reports">Reports</button>
+  </div>
 
-    <section class="admin-section">
-      <h2>Download Reports</h2>
-      <input type="text" id="reportSearch" placeholder="Enter Student Name or ID"/>
-      <button id="downloadReportBtn">Download Report</button>
-    </section>
-  </main>
+  <div class="p-6">
+    <div id="upload" class="tab-section hidden">
+      <h2 class="text-xl font-bold mb-4">Upload JSON Question File</h2>
+      <input type="file" id="jsonFile" class="mb-4 block"/>
+      <button class="bg-green-600 text-white px-4 py-2 rounded" id="uploadBtn">Upload to Firestore</button>
+      <p id="uploadStatus" class="mt-4 text-sm text-gray-700"></p>
+    </div>
 
-  <footer>
-    <p>POWERED BY <span style="color:#FFEB3B">POG</span></p>
+    <div id="reports" class="tab-section hidden">
+      <h2 class="text-xl font-bold mb-4">Student Reports</h2>
+      <div class="space-y-4" id="reportTable"></div>
+    </div>
+  </div>
+
+  <footer class="text-center py-4 text-sm text-gray-600">
+    POWERED BY <span style="color:#FFEB3B">POG</span>
   </footer>
 
-  <script type="module">
-    import { auth, db, storage } from './firebaseConfig.js';
-    import { signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
-    import { ref, uploadBytes } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js";
-    import { getDoc, doc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
-
-    const logoutBtn = document.getElementById("logoutBtn");
-    const uploadBtn = document.getElementById("uploadBtn");
-    const jsonUpload = document.getElementById("jsonUpload");
-    const downloadBtn = document.getElementById("downloadReportBtn");
-    const reportSearch = document.getElementById("reportSearch");
-
-    onAuthStateChanged(auth, user => {
-      if (!user) location.href = 'login.html';
-    });
-
-    logoutBtn.onclick = () => {
-      signOut(auth).then(() => location.href = "login.html");
-    };
-
-    uploadBtn.onclick = async () => {
-      const file = jsonUpload.files[0];
-      if (!file) return alert("Select a JSON file first.");
-      const storageRef = ref(storage, `questions/${file.name}`);
-      await uploadBytes(storageRef, file);
-      alert("File uploaded successfully.");
-    };
-
-    downloadBtn.onclick = () => {
-      const key = reportSearch.value.trim();
-      if (!key) return alert("Enter a valid student identifier.");
-      window.open(`reports/${key}.pdf`, '_blank');
-    };
-  </script>
+  <script type="module" src="admin.js"></script>
 </body>
 </html>
