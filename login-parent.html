@@ -2,19 +2,22 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Parent Login - Blooming Kids House</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css"/>
   <link rel="stylesheet" href="style.css" />
-  <link rel="icon" type="image/png" href="favicon.png" />
+  <link rel="icon" href="favicon.ico" />
 </head>
-<body class="login-page parent-bg">
-  <div class="login-container">
-    <h2>Parent Login</h2>
-    <input type="email" id="parent-email" placeholder="Enter your email" />
-    <input type="text" id="student-name" placeholder="Enter your child’s name" />
-    <button onclick="loginParent()">Login</button>
-    <p class="footer">POWERED BY <span style="color:#FFEB3B">POG</span></p>
+<body class="bg-yellow-50 min-h-screen flex items-center justify-center">
+  <div class="bg-white p-8 rounded-xl shadow-xl w-full max-w-md">
+    <h2 class="text-2xl font-bold text-green-700 text-center mb-6">Parent Portal</h2>
+    <form id="parentLoginForm" class="space-y-4">
+      <input type="text" id="childName" placeholder="Student Full Name" required class="w-full px-4 py-2 border rounded" />
+      <input type="email" id="parentEmail" placeholder="Parent Email" required class="w-full px-4 py-2 border rounded" />
+      <button type="submit" class="bg-yellow-400 text-green-800 w-full py-2 rounded hover:bg-yellow-300">View Report</button>
+    </form>
+    <p class="text-xs text-center mt-4 text-gray-600">POWERED BY <span style="color:#FFEB3B">POG</span></p>
   </div>
-
-  <script type="module" src="parent-login.js"></script>
+  <script type="module" src="parent.js"></script>
 </body>
 </html>
