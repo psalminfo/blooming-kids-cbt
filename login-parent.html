@@ -2,22 +2,38 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Parent Login - Blooming Kids House</title>
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css"/>
-  <link rel="stylesheet" href="style.css"/>
-  <link rel="icon" href="favicon.ico"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Parent Login | Blooming Kids House</title>
+  <link rel="stylesheet" href="style.css" />
+  <link rel="icon" href="favicon.ico" />
+
+  <!-- Firebase (CDN version) -->
+  <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-auth.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-firestore.js"></script>
 </head>
-<body class="bg-yellow-50 flex items-center justify-center min-h-screen">
-  <div class="bg-white p-6 rounded-lg shadow-xl w-full max-w-md">
-    <h1 class="text-2xl font-bold text-green-700 text-center mb-4">Parent Portal</h1>
+<body class="bg-green-50 min-h-screen flex items-center justify-center">
+  <div class="bg-white p-8 rounded-lg shadow-md w-full max-w-md border-t-4 border-yellow-400">
+    <h1 class="text-2xl font-bold text-green-700 text-center mb-6">Parent Portal Login</h1>
+    
     <form id="parentLoginForm" class="space-y-4">
-      <input type="text" id="studentName" placeholder="Child's Full Name" required class="w-full px-4 py-2 border rounded"/>
-      <input type="email" id="parentEmail" placeholder="Parent Email (used by student)" required class="w-full px-4 py-2 border rounded"/>
-      <button type="submit" class="bg-green-700 text-white py-2 px-4 w-full rounded hover:bg-green-800">Login</button>
+      <div>
+        <label class="block text-sm font-medium text-gray-700">Student Name</label>
+        <input type="text" id="studentName" required class="w-full mt-1 p-2 border border-gray-300 rounded-md" />
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-700">Parent Email</label>
+        <input type="email" id="parentEmail" required class="w-full mt-1 p-2 border border-gray-300 rounded-md" />
+      </div>
+      <button type="submit" id="parentLoginBtn" class="bg-green-600 hover:bg-green-700 text-white py-2 px-4 rounded w-full">
+        Login
+      </button>
     </form>
-    <p class="text-xs text-center mt-4 text-gray-600">POWERED BY <span style="color:#FFEB3B">POG</span></p>
+
+    <p class="text-xs text-center mt-4">POWERED BY <span style="color:#FFEB3B">POG</span></p>
   </div>
-  <script type="module" src="parent.js"></script>
+
+  <script src="firebaseConfig.js"></script>
+  <script src="parent-login.js"></script>
 </body>
 </html>
