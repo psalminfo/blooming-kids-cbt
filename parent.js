@@ -1,48 +1,52 @@
-import { db } from './firebaseConfig.js';
-import { collection, query, where, getDocs } from 'firebase/firestore';
+document.addEventListener("DOMContentLoaded", () => {
+  const db = firebase.firestore();
 
-let parentInfo = {};
+  const childNameInput = document.getElementById("childName");
+  const parentEmailInput = document.getElementById("parentEmail");
+  const searchBtn = document.getElementById("searchBtn");
+  const resultContainer = document.getElementById("resultContainer");
 
-document.getElementById('parentLoginForm')?.addEventListener('submit', async (e) => {
-  e.preventDefault();
-  parentInfo = {
-    studentName: document.getElementById('studentName').value.trim(),
-    parentEmail: document.getElementById('parentEmail').value.trim()
-  };
-  localStorage.setItem('parentInfo', JSON.stringify(parentInfo));
-  window.location.href = 'parent.html';
-});
+  const logoutBtn = document.getElementById("logoutBtn");
 
-if (window.location.pathname.includes('parent.html')) {
-  const info = JSON.parse(localStorage.getItem('parentInfo'));
-  if (!info) window.location.href = 'login-parent.html';
-
-  document.getElementById('logoutBtn')?.addEventListener('click', () => {
-    localStorage.removeItem('parentInfo');
-    window.location.href = 'login-parent.html';
+  logoutBtn.addEventListener("click", () => {
+    sessionStorage.clear();
+    window.location.href = "login-parent.html";
   });
 
-  const q = query(
-    collection(db, 'reports'),
-    where('studentName', '==', info.studentName),
-    where('parentName', '==', info.parentEmail)
-  );
+  searchBtn.addEventListener("click", () => {
+    const child = childNameInput.value.trim();
+    const email = parentEmailInput.value.trim();
 
-  const snapshot = await getDocs(q);
-  const reportList = document.getElementById('reportList');
-  if (snapshot.empty) {
-    reportList.innerHTML = `<p class="text-red-600">No reports found for this student.</p>`;
-  } else {
-    snapshot.forEach(doc => {
-      const { reportUrl, grade, date } = doc.data();
-      const div = document.createElement('div');
-      div.className = 'p-4 border rounded bg-green-50';
-      div.innerHTML = `
-        <p><strong>Grade:</strong> ${grade}</p>
-        <p><strong>Date:</strong> ${new Date(date.seconds * 1000).toLocaleString()}</p>
-        <a href="${reportUrl}" target="_blank" class="text-blue-600 underline">Download Report</a>
-      `;
-      reportList.appendChild(div);
-    });
-  }
-}
+    if (!child || !email) return alert("Please fill both fields.");
+
+    resultContainer.innerHTML = "Loading...";
+
+    db.collection("testResults")
+      .where("student", "==", child)
+      .where("parent", "==", email)
+      .get()
+      .then((snapshot) => {
+        if (snapshot.empty) {
+          resultContainer.innerHTML = "<p>No reports found.</p>";
+        } else {
+          resultContainer.innerHTML = "";
+          snapshot.forEach((doc) => {
+            const data = doc.data();
+            const div = document.createElement("div");
+            div.className = "bg-white shadow rounded p-3 mb-3";
+            div.innerHTML = `
+              <h3>${data.subject}</h3>
+              <p>Score: ${data.correct}/${data.total}</p>
+              <p>Percentage: ${data.percentage}%</p>
+              <p>Date: ${new Date(data.timestamp).toLocaleString()}</p>
+            `;
+            resultContainer.appendChild(div);
+          });
+        }
+      })
+      .catch((err) => {
+        console.error(err);
+        resultContainer.innerHTML = "<p>Error loading reports.</p>";
+      });
+  });
+});
