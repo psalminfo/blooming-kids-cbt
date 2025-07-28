@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Parent Portal - Blooming Kids House</title>
+  <link rel="stylesheet" href="style.css" />
+  <link rel="icon" type="image/png" href="favicon.ico" />
+</head>
+<body>
+  <header>
+    <h1>Parent Portal</h1>
+    <button id="logoutBtn">Logout</button>
+  </header>
+
+  <main class="parent-main">
+    <section class="parent-section">
+      <h2>Download Your Child's Assessment Report</h2>
+      <input type="text" id="childName" placeholder="Child's Full Name" />
+      <input type="email" id="parentEmail" placeholder="Parent Email Used in Test" />
+      <button id="downloadBtn">Download Report</button>
+    </section>
+  </main>
+
+  <footer>
+    <p>POWERED BY <span style="color:#FFEB3B">POG</span></p>
+  </footer>
+
+  <script type="module">
+    import { auth } from './firebaseConfig.js';
+    import { signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+
+    onAuthStateChanged(auth, user => {
+      if (!user) location.href = 'login.html';
+    });
+
+    document.getElementById('logoutBtn').onclick = () => {
+      signOut(auth).then(() => location.href = 'login.html');
+    };
+
+    document.getElementById('downloadBtn').onclick = () => {
+      const name = document.getElementById('childName').value.trim();
+      const email = document.getElementById('parentEmail').value.trim();
+      if (!name || !email) {
+        alert("Both fields are required.");
+        return;
+      }
+      const reportKey = `${name.replace(/\s+/g, '_')}_${email.replace(/[@.]/g, '_')}`;
+      window.open(`reports/${reportKey}.pdf`, '_blank');
+    };
+  </script>
+</body>
+</html>

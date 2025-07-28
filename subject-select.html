@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Select Subject - Blooming Kids House</title>
+  <link rel="stylesheet" href="style.css" />
+  <link rel="icon" type="image/png" href="favicon.ico" />
+</head>
+<body>
+  <header>
+    <h1>Select Subject</h1>
+    <button id="logoutBtn">Logout</button>
+  </header>
+
+  <main>
+    <section class="subject-list" id="subjectList"></section>
+  </main>
+
+  <footer>
+    <p>POWERED BY <span style="color:#FFEB3B">POG</span></p>
+  </footer>
+
+  <script type="module">
+    import { auth, db } from './firebaseConfig.js';
+    import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+    import { getDoc, doc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+    const subjectList = document.getElementById("subjectList");
+    const logoutBtn = document.getElementById("logoutBtn");
+
+    const gradeSubjects = {
+      3: ['Math', 'ELA'],
+      4: ['Math', 'ELA'],
+      5: ['Math', 'ELA'],
+      6: ['Math', 'ELA'],
+      7: ['Math', 'ELA', 'Biology', 'Chemistry', 'Physics'],
+      8: ['Math', 'ELA', 'Biology', 'Chemistry', 'Physics'],
+      9: ['Math', 'ELA', 'Biology', 'Chemistry', 'Physics'],
+      10: ['Math', 'ELA', 'Biology', 'Chemistry', 'Physics'],
+      11: ['Math', 'ELA', 'Biology', 'Chemistry', 'Physics'],
+      12: ['Math', 'ELA', 'Biology', 'Chemistry', 'Physics']
+    };
+
+    let studentData = {};
+
+    onAuthStateChanged(auth, async user => {
+      if (!user) location.href = 'login.html';
+      const docSnap = await getDoc(doc(db, "students", user.uid));
+      studentData = docSnap.data();
+      renderSubjects(gradeSubjects[studentData.grade]);
+    });
+
+    function renderSubjects(subjects) {
+      subjectList.innerHTML = subjects.map(subj =>
+        `<button class="subject-btn" onclick="startTest('${subj}')">${subj}</button>`
+      ).join('');
+    }
+
+    window.startTest = (subject) => {
+      sessionStorage.setItem("selectedSubject", subject);
+      location.href = "student.html";
+    };
+
+    logoutBtn.onclick = () => {
+      signOut(auth).then(() => location.href = "login.html");
+    };
+  </script>
+</body>
+</html>
