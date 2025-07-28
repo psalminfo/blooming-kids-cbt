@@ -5,17 +5,18 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Parent Dashboard - Blooming Kids House</title>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css"/>
-  <link rel="stylesheet" href="style.css" />
-  <link rel="icon" href="favicon.ico" />
+  <link rel="stylesheet" href="style.css"/>
+  <link rel="icon" href="favicon.ico"/>
 </head>
-<body class="bg-yellow-50 min-h-screen">
-  <div class="flex items-center justify-between bg-yellow-400 text-green-900 p-4">
-    <h1 class="text-lg font-semibold">Available Reports</h1>
-    <button id="logoutBtn" class="bg-white text-green-800 px-4 py-1 rounded hover:bg-green-100">Logout</button>
+<body class="bg-white text-green-900">
+  <div class="bg-green-700 text-white p-4 flex justify-between items-center">
+    <h1 class="text-lg font-bold">Welcome, Parent</h1>
+    <button id="logoutBtn" class="bg-yellow-400 text-green-900 px-4 py-1 rounded hover:bg-yellow-300">Logout</button>
   </div>
 
-  <div class="p-6" id="reportList">
-    <p class="text-center text-gray-600">Searching for reports...</p>
+  <div class="p-6">
+    <h2 class="text-xl font-semibold mb-4">Available Reports for Your Child</h2>
+    <div id="reportList" class="space-y-3"></div>
   </div>
 
   <footer class="text-center py-4 text-sm text-gray-600">
