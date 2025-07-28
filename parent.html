@@ -3,51 +3,25 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Parent Portal - Blooming Kids House</title>
+  <title>Parent Dashboard - Blooming Kids House</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css"/>
   <link rel="stylesheet" href="style.css" />
-  <link rel="icon" type="image/png" href="favicon.ico" />
+  <link rel="icon" href="favicon.ico" />
 </head>
-<body>
-  <header>
-    <h1>Parent Portal</h1>
-    <button id="logoutBtn">Logout</button>
-  </header>
+<body class="bg-yellow-50 min-h-screen">
+  <div class="flex items-center justify-between bg-yellow-400 text-green-900 p-4">
+    <h1 class="text-lg font-semibold">Available Reports</h1>
+    <button id="logoutBtn" class="bg-white text-green-800 px-4 py-1 rounded hover:bg-green-100">Logout</button>
+  </div>
 
-  <main class="parent-main">
-    <section class="parent-section">
-      <h2>Download Your Child's Assessment Report</h2>
-      <input type="text" id="childName" placeholder="Child's Full Name" />
-      <input type="email" id="parentEmail" placeholder="Parent Email Used in Test" />
-      <button id="downloadBtn">Download Report</button>
-    </section>
-  </main>
+  <div class="p-6" id="reportList">
+    <p class="text-center text-gray-600">Searching for reports...</p>
+  </div>
 
-  <footer>
-    <p>POWERED BY <span style="color:#FFEB3B">POG</span></p>
+  <footer class="text-center py-4 text-sm text-gray-600">
+    POWERED BY <span style="color:#FFEB3B">POG</span>
   </footer>
 
-  <script type="module">
-    import { auth } from './firebaseConfig.js';
-    import { signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
-
-    onAuthStateChanged(auth, user => {
-      if (!user) location.href = 'login.html';
-    });
-
-    document.getElementById('logoutBtn').onclick = () => {
-      signOut(auth).then(() => location.href = 'login.html');
-    };
-
-    document.getElementById('downloadBtn').onclick = () => {
-      const name = document.getElementById('childName').value.trim();
-      const email = document.getElementById('parentEmail').value.trim();
-      if (!name || !email) {
-        alert("Both fields are required.");
-        return;
-      }
-      const reportKey = `${name.replace(/\s+/g, '_')}_${email.replace(/[@.]/g, '_')}`;
-      window.open(`reports/${reportKey}.pdf`, '_blank');
-    };
-  </script>
+  <script type="module" src="parent.js"></script>
 </body>
 </html>
