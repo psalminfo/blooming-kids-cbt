@@ -1,31 +1,40 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
+  <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Student Test - Blooming Kids House</title>
+  <title>Student Assessment</title>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css"/>
-  <link rel="stylesheet" href="style.css" />
-  <link rel="icon" href="favicon.ico" />
+  <link rel="stylesheet" href="style.css"/>
+  <link rel="icon" href="favicon.ico"/>
 </head>
-<body class="bg-green-50 min-h-screen">
-  <div class="flex items-center justify-between bg-green-700 text-white p-4">
-    <h1 class="text-xl font-semibold">Select a Subject</h1>
-    <button id="logoutBtn" class="bg-yellow-400 text-green-900 px-4 py-1 rounded hover:bg-yellow-300">Logout</button>
+<body class="bg-white text-green-900">
+  <div class="bg-green-700 text-white p-4 flex justify-between">
+    <h1 class="text-lg font-bold">Welcome Student</h1>
+    <button id="logoutBtn" class="bg-yellow-400 text-green-800 px-4 py-1 rounded hover:bg-yellow-300">Logout</button>
   </div>
 
-  <div class="flex flex-wrap justify-center mt-8 gap-4" id="subjectButtonsContainer"></div>
-
-  <div id="questionPanel" class="p-6 hidden">
-    <h2 id="subjectTitle" class="text-xl font-bold text-green-800 mb-4"></h2>
-    <div id="questionList" class="space-y-4"></div>
-    <div class="flex justify-between mt-6">
-      <div id="timer" class="text-red-600 font-semibold"></div>
-      <button id="submitBtn" class="bg-green-600 text-white px-6 py-2 rounded hover:bg-green-700">Submit</button>
+  <div id="subjectSelection" class="p-6">
+    <h2 class="text-xl font-semibold mb-4">Select a Subject to Start</h2>
+    <div class="grid grid-cols-2 sm:grid-cols-3 gap-4">
+      <button class="subject-btn" data-subject="Math">Math</button>
+      <button class="subject-btn" data-subject="ELA">ELA</button>
+      <button class="subject-btn" data-subject="Biology">Biology</button>
+      <button class="subject-btn" data-subject="Chemistry">Chemistry</button>
+      <button class="subject-btn" data-subject="Physics">Physics</button>
     </div>
   </div>
 
-  <footer class="text-center py-4 mt-12 text-sm text-gray-600">
+  <div id="testArea" class="hidden p-6">
+    <div class="flex justify-between mb-2">
+      <h2 class="text-xl font-bold" id="testTitle">Subject Test</h2>
+      <span class="text-red-600 font-bold" id="timer">30:00</span>
+    </div>
+    <form id="testForm" class="space-y-6 max-h-[70vh] overflow-y-auto"></form>
+    <button class="bg-green-700 text-white mt-6 px-4 py-2 rounded" id="submitTestBtn">Submit Test</button>
+  </div>
+
+  <footer class="text-center py-4 text-sm text-gray-600">
     POWERED BY <span style="color:#FFEB3B">POG</span>
   </footer>
 
