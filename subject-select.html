@@ -4,66 +4,87 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Select Subject - Blooming Kids House</title>
+  <link rel="icon" href="favicon.ico" />
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css"/>
   <link rel="stylesheet" href="style.css" />
-  <link rel="icon" href="favicon.ico" />
 </head>
-<body class="bg-green-50 min-h-screen flex flex-col items-center justify-start py-10">
-
-  <div class="bg-white rounded-xl shadow-lg p-6 w-full max-w-3xl">
-    <div class="flex justify-between items-center mb-6">
-      <h2 class="text-2xl font-bold text-green-800">Select Subject</h2>
-      <button onclick="logout()" class="text-sm text-red-600 underline">Logout</button>
-    </div>
-    <div id="subjectButtons" class="grid grid-cols-2 sm:grid-cols-3 gap-4"></div>
+<body class="bg-green-50 min-h-screen flex flex-col items-center justify-center">
+  <div class="bg-white p-6 rounded-xl shadow-xl w-full max-w-xl mt-10 text-center">
+    <h2 class="text-2xl font-bold text-green-800 mb-4">Select a Subject</h2>
+    <p id="studentInfo" class="text-sm mb-4 text-gray-600"></p>
+    <div id="subjectButtons" class="grid grid-cols-2 gap-4 mt-4 mb-4"></div>
+    <button id="logoutBtn" class="bg-yellow-500 text-white px-4 py-2 rounded hover:bg-yellow-600 mt-4">Logout</button>
     <p class="text-xs text-center mt-6 text-gray-600">POWERED BY <span style="color:#FFEB3B">POG</span></p>
   </div>
 
-  <script type="module">
-    import { auth } from "./firebaseConfig.js";
-    import { signOut } from "firebase/auth";
+  <!-- Firebase App (modular SDK via CDN) -->
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 
-    const studentName = localStorage.getItem("studentName");
-    const grade = parseInt(localStorage.getItem("grade"));
-    const parentEmail = localStorage.getItem("parentEmail");
+  <script>
+    const firebaseConfig = {
+      apiKey: "AIzaSyD1lJhsWMMs_qerLBSzk7wKhjLyI_11RJg",
+      authDomain: "bloomingkidsassessment.firebaseapp.com",
+      projectId: "bloomingkidsassessment",
+      storageBucket: "bloomingkidsassessment.appspot.com",
+      messagingSenderId: "238975054977",
+      appId: "1:238975054977:web:87c70b4db044998a204980"
+    };
 
-    if (!studentName || !grade || !parentEmail) {
-      window.location.href = "index.html";
+    firebase.initializeApp(firebaseConfig);
+    const auth = firebase.auth();
+
+    // Show student info
+    const studentInfo = JSON.parse(localStorage.getItem("studentInfo"));
+    const subjectButtons = document.getElementById("subjectButtons");
+
+    const subjectsByGrade = {
+      default: ["Math", "ELA"],
+      science: ["Math", "ELA", "Biology", "Chemistry", "Physics"]
+    };
+
+    function createButton(subject) {
+      const btn = document.createElement("button");
+      btn.textContent = subject;
+      btn.className = "bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700";
+      btn.onclick = () => {
+        window.location.href = `student.html?subject=${subject}`;
+      };
+      return btn;
     }
 
-    const subjectsPerGrade = {
-      base: ["Math", "ELA"],
-      science: ["Biology", "Chemistry", "Physics"]
-    };
+    function renderSubjects() {
+      subjectButtons.innerHTML = "";
+      if (!studentInfo || !studentInfo.grade) return;
+      const grade = parseInt(studentInfo.grade);
+      const subjects = grade >= 7 ? subjectsByGrade.science : subjectsByGrade.default;
+      subjects.forEach(subject => subjectButtons.appendChild(createButton(subject)));
+    }
 
-    const showSubjects = () => {
-      const container = document.getElementById("subjectButtons");
-      container.innerHTML = "";
+    function displayStudentDetails() {
+      if (studentInfo) {
+        document.getElementById("studentInfo").textContent =
+          `Welcome, ${studentInfo.name} (Grade ${studentInfo.grade})`;
+        renderSubjects();
+      } else {
+        window.location.href = "index.html";
+      }
+    }
 
-      const baseSubjects = subjectsPerGrade.base;
-      const scienceSubjects = grade >= 7 ? subjectsPerGrade.science : [];
+    auth.onAuthStateChanged((user) => {
+      if (!user) {
+        window.location.href = "index.html"; // fallback login page
+      } else {
+        displayStudentDetails();
+      }
+    });
 
-      const allSubjects = [...baseSubjects, ...scienceSubjects];
-      allSubjects.forEach(subject => {
-        const btn = document.createElement("button");
-        btn.textContent = subject;
-        btn.className = "bg-yellow-400 text-green-900 font-semibold py-2 px-4 rounded shadow hover:bg-yellow-500";
-        btn.onclick = () => {
-          window.location.href = `student.html?subject=${subject}&grade=${grade}`;
-        };
-        container.appendChild(btn);
-      });
-    };
-
-    showSubjects();
-
-    window.logout = () => {
-      signOut(auth).then(() => {
-        localStorage.clear();
+    document.getElementById("logoutBtn").addEventListener("click", () => {
+      auth.signOut().then(() => {
+        localStorage.removeItem("studentInfo");
         window.location.href = "index.html";
       });
-    };
+    });
   </script>
-
 </body>
 </html>
