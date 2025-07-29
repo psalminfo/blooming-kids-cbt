@@ -1,77 +1,70 @@
-<!-- subject-select.html -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Subject Selection - Blooming Kids House</title>
+  <title>Subject Selection | Blooming Kids House</title>
   <link rel="stylesheet" href="style.css" />
-  <link rel="icon" type="image/png" href="favicon.ico" />
-  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+  <link rel="icon" href="favicon.ico" type="image/x-icon" />
+  <style>
+    .hidden { display: none; }
+    .subject-btn { background-color: #4CAF50; color: white; padding: 1rem; border-radius: 8px; margin: 0.5rem; cursor: pointer; border: none; }
+    .logout-btn { position: absolute; top: 1rem; right: 1rem; background-color: #f44336; color: white; padding: 0.5rem 1rem; border: none; border-radius: 6px; cursor: pointer; }
+    .container { padding: 2rem; text-align: center; }
+    .footer { position: fixed; bottom: 0; width: 100%; text-align: center; padding: 1rem 0; background: #f0f0f0; }
+  </style>
 </head>
-<body class="bg-green-50 min-h-screen flex flex-col items-center justify-center text-gray-800">
-  <div class="max-w-md w-full p-6 bg-white rounded-2xl shadow-xl">
-    <h2 class="text-2xl font-bold text-center text-green-700 mb-4">Select a Subject</h2>
-    <div id="subject-tabs" class="grid grid-cols-2 gap-4">
-      <!-- Subjects will be inserted here dynamically -->
-    </div>
-    <button id="logoutBtn" class="mt-6 w-full bg-yellow-400 hover:bg-yellow-500 text-white font-bold py-2 px-4 rounded-xl">
-      Logout
-    </button>
+<body>
+  <div class="container">
+    <button class="logout-btn" onclick="logout()">Logout</button>
+    <h2>Select a Subject</h2>
+    <div id="subjects"></div>
   </div>
-  <footer class="mt-10 text-center text-sm">
-    POWERED BY <span style="color:#FFEB3B">POG</span>
-  </footer>
 
+  <div class="footer">POWERED BY <span style="color:#FFEB3B">POG</span></div>
+
+  <!-- Firebase CDN -->
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
   <script>
     const firebaseConfig = {
-      apiKey: 'AIzaSyD1lJhsWMMs_qerLBSzk7wKhjLyI_11RJg',
-      authDomain: 'bloomingkidsassessment.firebaseapp.com',
-      projectId: 'bloomingkidsassessment',
-      storageBucket: 'bloomingkidsassessment.appspot.com',
-      messagingSenderId: '238975054977',
-      appId: '1:238975054977:web:87c70b4db044998a204980'
+      apiKey: "AIzaSyD1lJhsWMMs_qerLBSzk7wKhjLyI_11RJg",
+      authDomain: "bloomingkidsassessment.firebaseapp.com",
+      projectId: "bloomingkidsassessment",
+      storageBucket: "bloomingkidsassessment.appspot.com",
+      messagingSenderId: "238975054977",
+      appId: "1:238975054977:web:87c70b4db044998a204980"
     };
     firebase.initializeApp(firebaseConfig);
-    const auth = firebase.auth();
-
-    const subjectsByGrade = {
-      default: ['Math', 'ELA'],
-      juniorScience: ['Biology', 'Chemistry', 'Physics']
-    };
-
-    auth.onAuthStateChanged((user) => {
+  </script>
+  <script>
+    firebase.auth().onAuthStateChanged((user) => {
       if (!user) {
         window.location.href = 'login-student.html';
       } else {
-        // Fetch grade from localStorage
-        const grade = localStorage.getItem('studentGrade');
-        const subjectContainer = document.getElementById('subject-tabs');
-        subjectContainer.innerHTML = '';
+        const userEmail = user.email;
+        // Dummy subjects - replace with dynamic logic if needed
+        const subjects = ['Math', 'ELA', 'Biology', 'Chemistry', 'Physics'];
+        const subjectsDiv = document.getElementById('subjects');
 
-        const gradeNum = parseInt(grade);
-        const coreSubjects = subjectsByGrade.default;
-        const scienceSubjects = (gradeNum >= 7 && gradeNum <= 12) ? subjectsByGrade.juniorScience : [];
-        const allSubjects = [...coreSubjects, ...scienceSubjects];
-
-        allSubjects.forEach((subj) => {
+        subjects.forEach(sub => {
           const btn = document.createElement('button');
-          btn.textContent = subj;
-          btn.className = 'bg-green-600 text-white font-semibold py-2 px-4 rounded-lg hover:bg-green-700';
+          btn.className = 'subject-btn';
+          btn.textContent = sub;
           btn.onclick = () => {
-            window.location.href = `student.html?subject=${encodeURIComponent(subj)}`;
+            window.location.href = `student.html?subject=${sub}`;
           };
-          subjectContainer.appendChild(btn);
+          subjectsDiv.appendChild(btn);
         });
       }
     });
 
-    document.getElementById('logoutBtn').addEventListener('click', () => {
-      auth.signOut().then(() => {
+    function logout() {
+      firebase.auth().signOut().then(() => {
         window.location.href = 'login-student.html';
       });
-    });
+    }
   </script>
 </body>
 </html>
