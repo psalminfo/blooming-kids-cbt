@@ -1,39 +1,19 @@
-async function fetchQuestions({ subject, grade, curriculum = "UK" }) {
-  const allQuestions = [];
+import { db } from './firebaseConfig.js';
+import { collection, addDoc } from 'firebase/firestore';
 
-  // 1. 🔹 Try manual uploads from Firestore (admin-uploaded)
-  const manualSnapshot = await firebase.firestore()
-    .collection("manualQuestions")
-    .where("subject", "==", subject)
-    .where("grade", "==", grade)
-    .get();
+async function uploadJSONFile() {
+  const fileInput = document.getElementById('uploadJSON');
+  const status = document.getElementById('uploadStatus');
+  if (!fileInput.files.length) return alert("Select a file.");
 
-  manualSnapshot.forEach(doc => allQuestions.push(...doc.data().questions));
+  const file = fileInput.files[0];
+  const text = await file.text();
+  const questions = JSON.parse(text);
 
-  // 2. 🔹 Try GitHub curriculum JSON
-  try {
-    const githubUrl = `https://raw.githubusercontent.com/psalminfo/blooming-kids-cbt/main/curriculum/${curriculum.toLowerCase()}.json`;
-    const res = await fetch(githubUrl);
-    if (res.ok) {
-      const githubData = await res.json();
-      const questions = githubData[grade]?.[subject];
-      if (questions && questions.length) {
-        allQuestions.push(...questions);
-      }
-    }
-  } catch (err) {
-    console.warn("GitHub questions fetch failed:", err);
-  }
+  const batch = questions.map(q => addDoc(collection(db, 'manualQuestions'), q));
+  await Promise.all(batch);
 
-  // 3. 🔹 Try auto-generated fallback (stored in Firestore)
-  const autoSnapshot = await firebase.firestore()
-    .collection("autoQuestions")
-    .where("subject", "==", subject)
-    .where("grade", "==", grade)
-    .get();
-
-  autoSnapshot.forEach(doc => allQuestions.push(...doc.data().questions));
-
-  // Final shuffle & trim to 30
-  return limitQuestions(allQuestions, 30);
+  status.textContent = `Uploaded ${questions.length} questions successfully.`;
 }
+
+window.uploadJSONFile = uploadJSONFile;
