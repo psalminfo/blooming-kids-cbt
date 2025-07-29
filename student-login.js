@@ -1,27 +1,68 @@
-// student-login.js
+// FILE: student-login.js
+import { auth, db } from './firebaseConfig.js';
+import {
+  createUserWithEmailAndPassword,
+  signInWithEmailAndPassword
+} from 'firebase/auth';
+import { doc, setDoc } from 'firebase/firestore';
 
-document.getElementById('studentLoginForm').addEventListener('submit', (e) => {
+const form = document.getElementById('studentLoginForm');
+
+form.addEventListener('submit', async (e) => {
   e.preventDefault();
 
-  const name = document.getElementById('studentName').value.trim();
+  const studentName = document.getElementById('studentName').value.trim();
   const parentEmail = document.getElementById('parentEmail').value.trim();
   const grade = document.getElementById('grade').value;
-  const tutor = document.getElementById('tutorName').value.trim();
+  const tutorName = document.getElementById('tutorName').value.trim();
   const location = document.getElementById('location').value.trim();
   const accessCode = document.getElementById('accessCode').value.trim();
 
   if (accessCode !== 'bkh2025') {
-    alert('Invalid access code. Please enter the correct code.');
+    alert('Invalid Access Code');
     return;
   }
 
-  // Save session details
-  sessionStorage.setItem('studentName', name);
-  sessionStorage.setItem('parentEmail', parentEmail);
-  sessionStorage.setItem('grade', grade);
-  sessionStorage.setItem('tutorName', tutor);
-  sessionStorage.setItem('location', location);
+  try {
+    const email = `${studentName.replace(/\s+/g, '_')}@bkh.com`;
+    const password = 'bkh_default_password';
 
-  // Redirect to subject-select
-  window.location.href = 'subject-select.html';
+    let userCredential;
+    try {
+      userCredential = await createUserWithEmailAndPassword(auth, email, password);
+    } catch (err) {
+      if (err.code === 'auth/email-already-in-use') {
+        userCredential = await signInWithEmailAndPassword(auth, email, password);
+      } else {
+        throw err;
+      }
+    }
+
+    const uid = userCredential.user.uid;
+
+    // Save to Firestore
+    await setDoc(doc(db, 'users', uid), {
+      studentName,
+      parentEmail,
+      grade,
+      tutorName,
+      location,
+      role: 'student',
+      timestamp: new Date()
+    });
+
+    // Save locally
+    localStorage.setItem('studentName', studentName);
+    localStorage.setItem('parentEmail', parentEmail);
+    localStorage.setItem('grade', grade);
+    localStorage.setItem('tutorName', tutorName);
+    localStorage.setItem('location', location);
+    localStorage.setItem('uid', uid);
+
+    // ✅ Redirect to subject-select (NOT login-student.html)
+    window.location.href = 'subject-select.html';
+  } catch (error) {
+    console.error(error);
+    alert('Login failed. Please try again.');
+  }
 });
