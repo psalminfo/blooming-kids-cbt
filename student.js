@@ -1,109 +1,67 @@
-import { db } from "./firebaseConfig.js";
-import { collection, addDoc, Timestamp } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore.js";
-import { generateReportAndUpload } from "./reportGenerator.js";
-import { fetchQuestions } from "./questionBank.js";
+// student.js
+import { auth, db } from './firebaseConfig.js';
+import {
+  onAuthStateChanged,
+  signOut
+} from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
+import {
+  doc,
+  setDoc,
+  collection,
+  serverTimestamp
+} from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
+import { logout } from './utils.js';
 
-const form = document.getElementById("testForm");
-const timerDisplay = document.getElementById("timer");
-const studentName = localStorage.getItem("bk_studentName");
-const subject = localStorage.getItem("bk_subject");
-const grade = localStorage.getItem("bk_grade");
-const studentData = {
-  studentName,
-  subject,
-  grade,
-  parentEmail: localStorage.getItem("bk_parentEmail"),
-  tutor: localStorage.getItem("bk_tutor"),
-  location: localStorage.getItem("bk_location"),
-};
+document.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('logoutBtn').addEventListener('click', logout);
+  document.getElementById('submitBtn').addEventListener('click', submitAnswers);
 
-document.getElementById("studentNameDisplay").innerText = studentName;
-document.getElementById("subjectLabel").innerText = subject;
-
-let timeLeft = 30 * 60;
-let timerInterval;
-let questions = [];
-
-function startTimer() {
-  timerInterval = setInterval(() => {
-    if (timeLeft <= 0) {
-      clearInterval(timerInterval);
-      submitAnswers();
+  onAuthStateChanged(auth, (user) => {
+    if (user) {
+      loadQuestions(user);
+    } else {
+      window.location.href = 'login-student.html';
     }
-    const mins = Math.floor(timeLeft / 60);
-    const secs = timeLeft % 60;
-    timerDisplay.textContent = `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
-    timeLeft--;
-  }, 1000);
-}
+  });
+});
 
-async function loadQuestions() {
-  try {
-    questions = await fetchQuestions(grade, subject);
-    form.innerHTML = "";
+function loadQuestions(user) {
+  const subject = new URLSearchParams(window.location.search).get('subject') || 'Math';
+  document.getElementById('subjectTitle').textContent = subject;
 
-    questions.slice(0, 30).forEach((q, i) => {
-      const block = document.createElement("div");
-      block.className = "bg-white p-4 rounded shadow";
-      block.innerHTML = `
-        <p class="mb-2 font-semibold">${i + 1}. ${q.question}</p>
-        ${q.options
-          .map(
-            (opt, idx) =>
-              `<label class="block mb-1">
-                <input type="radio" name="q${i}" value="${opt}" required />
-                ${opt}
-              </label>`
-          )
-          .join("")}
-      `;
-      form.appendChild(block);
-    });
-  } catch (err) {
-    alert("Error loading questions.");
-    console.error(err);
+  const form = document.getElementById('testForm');
+  for (let i = 1; i <= 30; i++) {
+    const wrapper = document.createElement('div');
+    wrapper.className = 'bg-white p-4 rounded shadow';
+    wrapper.innerHTML = `
+      <label class="block font-semibold mb-2">Q${i}. What is ${i}+${i}?</label>
+      <input type="text" name="q${i}" class="w-full p-2 border border-gray-300 rounded" />
+    `;
+    form.appendChild(wrapper);
   }
 }
 
-async function submitAnswers() {
-  clearInterval(timerInterval);
-  const responses = [];
-  let correct = 0;
+function submitAnswers() {
+  const user = auth.currentUser;
+  if (!user) return;
 
-  questions.slice(0, 30).forEach((q, i) => {
-    const selected = document.querySelector(`input[name="q${i}"]:checked`);
-    const answer = selected ? selected.value : "";
-    responses.push({
-      question: q.question,
-      selected: answer,
-      correctAnswer: q.answer,
-    });
-    if (answer === q.answer) correct++;
+  const formData = new FormData(document.getElementById('testForm'));
+  const answers = {};
+  formData.forEach((value, key) => {
+    answers[key] = value;
   });
 
-  const resultData = {
-    ...studentData,
-    responses,
+  const subject = new URLSearchParams(window.location.search).get('subject') || 'Math';
+
+  const resultRef = doc(collection(db, 'testResults'));
+  setDoc(resultRef, {
+    student: user.email,
     subject,
-    grade,
-    score: correct,
-    total: 30,
-    percent: ((correct / 30) * 100).toFixed(2),
-    timestamp: Timestamp.now(),
-  };
-
-  await addDoc(collection(db, "testResults"), resultData);
-  await generateReportAndUpload(resultData);
-
-  localStorage.removeItem("bk_subject");
-  alert("Submitted!");
-  window.location.href = "subject-select.html";
+    answers,
+    score: 0,
+    submittedAt: serverTimestamp()
+  }).then(() => {
+    alert('Submitted!');
+    window.location.href = 'subject-select.html';
+  });
 }
-
-window.logout = function () {
-  localStorage.clear();
-  window.location.href = "login-student.html";
-};
-
-loadQuestions();
-startTimer();
