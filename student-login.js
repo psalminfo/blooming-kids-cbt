@@ -1,31 +1,26 @@
-document.getElementById("studentLoginForm").addEventListener("submit", async (e) => {
+document.getElementById("studentLoginForm").addEventListener("submit", (e) => {
   e.preventDefault();
 
-  const studentName = document.getElementById("studentName").value;
-  const parentEmail = document.getElementById("parentEmail").value;
+  const name = document.getElementById("studentName").value.trim();
+  const parentEmail = document.getElementById("parentEmail").value.trim();
   const grade = document.getElementById("grade").value;
-  const tutorName = document.getElementById("tutorName").value;
-  const location = document.getElementById("location").value;
-  const accessCode = document.getElementById("accessCode").value;
+  const tutor = document.getElementById("tutorName").value.trim();
+  const location = document.getElementById("location").value.trim();
+  const accessCode = document.getElementById("accessCode").value.trim();
 
   if (accessCode !== "bkh2025") {
-    alert("Invalid access code");
+    alert("Invalid access code.");
     return;
   }
 
-  firebase.auth().signInAnonymously()
-    .then(() => {
-      localStorage.setItem("studentName", studentName);
-      localStorage.setItem("parentEmail", parentEmail);
-      localStorage.setItem("grade", grade);
-      localStorage.setItem("tutorName", tutorName);
-      localStorage.setItem("location", location);
-      localStorage.setItem("timestamp", new Date().toISOString());
+  // Save data to localStorage
+  localStorage.setItem("studentName", name);
+  localStorage.setItem("parentEmail", parentEmail);
+  localStorage.setItem("grade", grade);
+  localStorage.setItem("tutor", tutor);
+  localStorage.setItem("location", location);
+  localStorage.setItem("loginTime", new Date().toISOString());
 
-      window.location.href = "subject-select.html";
-    })
-    .catch((error) => {
-      console.error("Login error", error);
-      alert("Login failed. Try again.");
-    });
+  // Redirect to subject selection
+  window.location.href = "subject-select.html";
 });
