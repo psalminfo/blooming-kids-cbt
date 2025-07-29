@@ -3,32 +3,32 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Student Assessment - Blooming Kids House</title>
+  <title>Student Test | Blooming Kids House</title>
   <link rel="stylesheet" href="style.css" />
-  <link rel="icon" href="favicon.ico" />
-  <script type="module" src="./student.js"></script>
+  <link rel="icon" type="image/x-icon" href="favicon.ico" />
 </head>
-<body class="bg-green-50 text-gray-800 font-sans">
-  <header class="bg-green-600 text-white p-4 flex justify-between items-center">
-    <h1 class="text-xl font-bold">Welcome to Blooming Kids House</h1>
-    <button id="logoutBtn" class="bg-yellow-400 text-black px-4 py-2 rounded">Logout</button>
-  </header>
-
-  <main class="p-4">
-    <h2 class="text-lg font-semibold mb-4">Subject: <span id="subjectTitle"></span></h2>
-    <form id="testForm" class="space-y-4">
-      <!-- Questions dynamically loaded here -->
-    </form>
-
-    <div class="mt-6">
-      <button id="submitBtn" class="bg-green-700 text-white px-6 py-2 rounded hover:bg-green-800">
-        Submit Answers
-      </button>
+<body class="bg-green-50 font-sans text-gray-800">
+  <div class="max-w-4xl mx-auto py-8 px-4">
+    <div class="flex justify-between items-center mb-6">
+      <h1 id="subjectHeader" class="text-2xl font-bold text-green-800">Loading...</h1>
+      <button id="logoutBtn" class="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600">Logout</button>
     </div>
-  </main>
 
-  <footer class="text-center text-sm mt-10 text-gray-600">
+    <form id="testForm">
+      <div id="questionContainer" class="space-y-4">
+        <!-- Questions will be inserted here -->
+      </div>
+
+      <div class="text-center mt-8">
+        <button type="button" id="submitBtn" class="bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700">Submit Test</button>
+      </div>
+    </form>
+  </div>
+
+  <footer class="text-center text-sm text-gray-500 mt-10">
     POWERED BY <span style="color:#FFEB3B">POG</span>
   </footer>
+
+  <script type="module" src="student.js"></script>
 </body>
 </html>
