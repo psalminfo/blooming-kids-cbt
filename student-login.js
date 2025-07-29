@@ -1,6 +1,3 @@
-// student-login.js
-import { auth } from './firebaseConfig.js';
-
 document.getElementById("studentLoginForm").addEventListener("submit", async (e) => {
   e.preventDefault();
 
@@ -16,24 +13,19 @@ document.getElementById("studentLoginForm").addEventListener("submit", async (e)
     return;
   }
 
-  // Dummy anonymous sign-in
-  import("firebase/auth").then(({ getAuth, signInAnonymously }) => {
-    const auth = getAuth();
-    signInAnonymously(auth)
-      .then(() => {
-        // Save student info locally
-        localStorage.setItem("studentName", studentName);
-        localStorage.setItem("parentEmail", parentEmail);
-        localStorage.setItem("grade", grade);
-        localStorage.setItem("tutorName", tutorName);
-        localStorage.setItem("location", location);
-        localStorage.setItem("timestamp", new Date().toISOString());
+  firebase.auth().signInAnonymously()
+    .then(() => {
+      localStorage.setItem("studentName", studentName);
+      localStorage.setItem("parentEmail", parentEmail);
+      localStorage.setItem("grade", grade);
+      localStorage.setItem("tutorName", tutorName);
+      localStorage.setItem("location", location);
+      localStorage.setItem("timestamp", new Date().toISOString());
 
-        window.location.href = "subject-select.html";
-      })
-      .catch((error) => {
-        console.error("Login error", error);
-        alert("Failed to login. Try again.");
-      });
-  });
+      window.location.href = "subject-select.html";
+    })
+    .catch((error) => {
+      console.error("Login error", error);
+      alert("Login failed. Try again.");
+    });
 });
