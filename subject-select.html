@@ -1,21 +1,76 @@
-<!-- ✅ FILE: subject-select.html -->
 <!DOCTYPE html>
 <html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Select Subject - Blooming Kids House</title>
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css">
-  <link rel="stylesheet" href="style.css">
-</head>
-<body class="bg-yellow-50 min-h-screen py-10 px-6">
-  <div class="max-w-3xl mx-auto">
-    <div class="flex justify-between items-center mb-6">
-      <h1 class="text-xl font-bold text-green-800">Select Subject</h1>
-      <button onclick="logout()" class="text-red-600 font-medium hover:underline">Logout</button>
+  <head>
+    <meta charset="UTF-8" />
+    <title>Select Subject - Blooming Kids House</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" />
+    <link rel="stylesheet" href="style.css" />
+    <link rel="icon" href="favicon.ico" />
+  </head>
+  <body class="bg-green-50 min-h-screen flex flex-col items-center justify-center p-4">
+    <div class="bg-white rounded-xl shadow-xl p-6 w-full max-w-xl">
+      <div class="flex justify-between items-center mb-4">
+        <h2 class="text-xl font-bold text-green-800">Select Subject</h2>
+        <button onclick="logout()" class="text-red-600 underline">Logout</button>
+      </div>
+      <div id="subjectButtons" class="grid grid-cols-2 gap-4"></div>
     </div>
-    <div id="subjectList" class="grid grid-cols-2 md:grid-cols-3 gap-4"></div>
-  </div>
-  <script src="subject-select.js"></script>
-</body>
+    <p class="text-xs text-center mt-4 text-gray-600">POWERED BY <span style="color:#FFEB3B">POG</span></p>
+
+    <script type="module">
+      import { auth } from './firebaseConfig.js';
+      import { onAuthStateChanged, signOut } from './firebase/auth';
+
+      const gradeMap = {
+        "3": ["Math", "ELA"],
+        "4": ["Math", "ELA"],
+        "5": ["Math", "ELA"],
+        "6": ["Math", "ELA"],
+        "7": ["Math", "ELA", "Biology", "Chemistry", "Physics"],
+        "8": ["Math", "ELA", "Biology", "Chemistry", "Physics"],
+        "9": ["Math", "ELA", "Biology", "Chemistry", "Physics"],
+        "10": ["Math", "ELA", "Biology", "Chemistry", "Physics"],
+        "11": ["Math", "ELA", "Biology", "Chemistry", "Physics"],
+        "12": ["Math", "ELA", "Biology", "Chemistry", "Physics"]
+      };
+
+      const subjectButtons = document.getElementById("subjectButtons");
+
+      function loadSubjects(grade) {
+        subjectButtons.innerHTML = "";
+        const subjects = gradeMap[grade] || [];
+        subjects.forEach(subject => {
+          const btn = document.createElement("button");
+          btn.textContent = subject;
+          btn.className = "bg-green-600 text-white py-2 px-4 rounded hover:bg-green-700";
+          btn.onclick = () => {
+            window.location.href = `student.html?subject=${subject}`;
+          };
+          subjectButtons.appendChild(btn);
+        });
+      }
+
+      function logout() {
+        signOut(auth).then(() => {
+          localStorage.clear();
+          window.location.href = 'index.html';
+        });
+      }
+
+      onAuthStateChanged(auth, (user) => {
+        if (user) {
+          const grade = localStorage.getItem("grade");
+          if (!grade) {
+            alert("Grade info missing.");
+            logout();
+          } else {
+            loadSubjects(grade);
+          }
+        } else {
+          window.location.href = "index.html";
+        }
+      });
+    </script>
+  </body>
 </html>
