@@ -3,48 +3,71 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Select Test – Blooming Kids House</title>
+  <title>Select Subject</title>
   <link rel="stylesheet" href="style.css" />
-  <link rel="icon" href="favicon.ico" />
+  <link rel="icon" href="favicon.ico" type="image/x-icon" />
 </head>
-<body class="bg-green-50 p-6 min-h-screen">
-  <div class="flex justify-between items-center mb-6">
-    <h1 class="text-xl font-bold text-green-700">Select Subject</h1>
-    <button onclick="logout()" class="bg-yellow-500 text-white px-4 py-2 rounded hover:bg-yellow-600">Logout</button>
+<body class="bg-green-100 min-h-screen flex flex-col items-center justify-center font-sans text-gray-800">
+  <div class="w-full max-w-3xl bg-white rounded-2xl shadow-md p-8">
+    <h1 class="text-3xl font-bold text-center text-green-800 mb-4">Choose Your Subject</h1>
+    <p class="text-center text-sm text-gray-600 mb-6">Grade: <span id="student-grade" class="font-semibold">Loading...</span></p>
+    
+    <div id="subject-buttons" class="grid grid-cols-2 md:grid-cols-3 gap-4 text-center">
+      <!-- Dynamic buttons will be inserted here -->
+    </div>
+
+    <div class="text-center mt-6">
+      <button onclick="logout()" class="bg-yellow-400 text-green-900 font-bold py-2 px-6 rounded-xl shadow hover:bg-yellow-500 transition">Logout</button>
+    </div>
   </div>
 
-  <div id="subjectButtons" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4"></div>
-
-  <footer class="text-center mt-10 text-sm text-gray-500">
+  <footer class="mt-10 text-sm text-center text-gray-500">
     POWERED BY <span style="color:#FFEB3B;">POG</span>
   </footer>
 
   <script type="module">
-    const grade = parseInt(localStorage.getItem("bk_grade"));
-    const container = document.getElementById("subjectButtons");
-    const baseSubjects = ["Math", "ELA"];
-    const scienceSubjects = ["Biology", "Chemistry", "Physics"];
+    import { auth } from './firebaseConfig.js';
+    import { onAuthStateChanged, signOut } from 'firebase/auth';
 
-    let subjects = [...baseSubjects];
-    if (grade >= 7) {
-      subjects = subjects.concat(scienceSubjects);
+    const subjectMap = {
+      default: ['Math', 'ELA'],
+      science: ['Math', 'ELA', 'Biology', 'Chemistry', 'Physics']
+    };
+
+    function generateSubjectButtons(subjects, grade) {
+      const container = document.getElementById('subject-buttons');
+      container.innerHTML = '';
+      subjects.forEach(subject => {
+        const btn = document.createElement('button');
+        btn.textContent = subject;
+        btn.className = "bg-green-600 hover:bg-green-700 text-white py-2 px-4 rounded-xl shadow-md transition duration-200";
+        btn.onclick = () => {
+          window.location.href = `student.html?subject=${subject}&grade=${grade}`;
+        };
+        container.appendChild(btn);
+      });
     }
 
-    subjects.forEach((subject) => {
-      const btn = document.createElement("button");
-      btn.textContent = subject;
-      btn.className = "bg-green-600 hover:bg-green-700 text-white p-3 rounded";
-      btn.onclick = () => {
-        localStorage.setItem("bk_subject", subject);
-        window.location.href = "student.html";
-      };
-      container.appendChild(btn);
+    onAuthStateChanged(auth, (user) => {
+      if (user) {
+        const userData = JSON.parse(localStorage.getItem('studentData'));
+        const grade = userData?.grade || "3";
+        document.getElementById('student-grade').textContent = grade;
+
+        const gradeNum = parseInt(grade);
+        const subjects = gradeNum >= 7 ? subjectMap.science : subjectMap.default;
+        generateSubjectButtons(subjects, grade);
+      } else {
+        window.location.href = 'login-student.html';
+      }
     });
 
-    window.logout = function () {
-      localStorage.clear();
-      window.location.href = "login-student.html";
-    };
+    function logout() {
+      signOut(auth).then(() => {
+        localStorage.removeItem('studentData');
+        window.location.href = 'login-student.html';
+      });
+    }
   </script>
 </body>
 </html>
