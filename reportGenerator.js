@@ -1,111 +1,104 @@
-import { db } from './firebaseConfig.js';
+import { jsPDF } from "https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js";
+import { db } from "./firebaseConfig.js";
+import { ref, uploadString, getDownloadURL } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-storage.js";
+import { addDoc, collection } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore.js";
+import { calculateLetterGrade, formatDate } from "./utils.js";
+import { storage } from "./firebaseConfig.js";
 
-async function generatePDFReport(resultData) {
-  const { student, parent, tutor, location, grade, timestamp, subject, score, total, percent } = resultData;
+export async function generateReportAndUpload(data) {
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF();
+  const lineHeight = 6;
+  let y = 10;
 
-  const doc = new jspdf.jsPDF();
-  doc.setFontSize(12);
-  doc.setTextColor(40);
-
-  // Title
-  doc.setFontSize(16);
-  doc.text("BLOOMING KIDS HOUSE ASSESSMENT REPORT", 105, 15, null, null, "center");
-
-  doc.setFontSize(10);
-  doc.text("From the Director, Mrs. Yinka Isikalu", 200, 22, null, null, "right");
-
-  // Info Block
-  const info = [
-    `Student: ${student}`, `Parent: ${parent}`, `Tutor: ${tutor}`,
-    `Location: ${location}`, `Grade: ${grade}`, `Date: ${new Date(timestamp).toLocaleString()}`
-  ];
-  doc.setFontSize(9);
-  info.forEach((line, i) => {
-    doc.text(line, 14 + (i % 3) * 70, 32 + Math.floor(i / 3) * 6);
-  });
-
-  // Performance Summary Table
-  doc.autoTable({
-    startY: 45,
-    head: [['Subject', 'Score', 'Percentage', 'Letter Grade']],
-    body: [[subject, `${score}/${total}`, `${percent}%`, getLetterGrade(percent)]],
-    theme: 'grid'
-  });
-
-  // Recommendation Section
-  const recY = doc.lastAutoTable.finalY + 10;
-  doc.setFontSize(10);
-  doc.text(`Personalized Recommendations for ${student}`, 14, recY);
-
-  const message = `Dear ${parent},\nAt Blooming Kids House, our tutors are committed to ensuring your child excels academically and develops well-rounded skills. Based on the assessment results, our tutors will focus on key areas to support your child’s growth.`;
-
-  doc.setFontSize(9);
-  doc.text(doc.splitTextToSize(message, 180), 14, recY + 6);
-
-  doc.text("Math", 14, recY + 26);
-  doc.setFont("helvetica", "normal");
-  doc.text(doc.splitTextToSize(`
-- Practice rounding numbers with real-life items
-- Use games to identify place values
-- Compare fractions using visuals
-- Improve multiplication facts
-- Use real-life scenarios for arithmetic
-- Solve division problems with remainders
-- Measure and calculate areas/perimeters
-- Identify shapes and properties
-- Create data charts
-- Analyze bar graphs
-- Practice budgeting and expenses
-  `, 180), 14, recY + 30);
-
-  doc.text("ELA", 110, recY + 26);
-  doc.text(doc.splitTextToSize(`
-- Read texts and discuss ideas
-- Use context clues for vocabulary
-- Summarize stories and articles
-- Write short paragraphs
-- Identify parts of speech
-- Practice grammar corrections
-  `, 90), 110, recY + 30);
-
-  // Director's Closing
   doc.setFont("helvetica", "bold");
-  doc.text("Sincerely,", 14, 260);
-  doc.text("Mrs. Yinka Isikalu, Director", 14, 265);
+  doc.setFontSize(14);
+  doc.text("BLOOMING KIDS HOUSE ASSESSMENT REPORT", 105, y, { align: "center" });
+  y += lineHeight;
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(10);
+  doc.text("From the Director, Mrs. Yinka Isikalu", 105, y, { align: "center" });
+  y += lineHeight * 1.5;
 
-  // Upload to Cloudinary
+  // Info block
+  const info = [
+    `Student: ${data.studentName}`,
+    `Parent: ${data.parentEmail}`,
+    `Tutor: ${data.tutor}`,
+    `Location: ${data.location}`,
+    `Grade: ${data.grade}`,
+    `Date: ${formatDate(data.timestamp)}`
+  ];
+
+  info.forEach((line, i) => {
+    doc.text(line, 10 + (i % 2 === 0 ? 0 : 100), y + Math.floor(i / 2) * lineHeight);
+  });
+
+  y += lineHeight * 3;
+
+  // Performance table
+  doc.setFont("helvetica", "bold");
+  doc.text("Performance Summary", 10, y);
+  y += lineHeight;
+
+  doc.setFont("helvetica", "normal");
+  doc.text("Subject", 10, y);
+  doc.text("Score", 60, y);
+  doc.text("Percent", 110, y);
+  doc.text("Grade", 160, y);
+  y += lineHeight;
+
+  doc.text(data.subject, 10, y);
+  doc.text(`${data.score}/${data.total}`, 60, y);
+  doc.text(`${data.percent}%`, 110, y);
+  doc.text(calculateLetterGrade(data.percent), 160, y);
+  y += lineHeight * 2;
+
+  // Placeholder for Knowledge + Skills
+  doc.setFont("helvetica", "bold");
+  doc.text("Knowledge and Skills Breakdown", 10, y);
+  y += lineHeight;
+
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(9);
+  doc.text("(Auto-generation coming soon)", 10, y);
+  y += lineHeight * 2;
+
+  // Recommendations
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(11);
+  doc.text(`Personalized Recommendations for ${data.studentName}`, 10, y);
+  y += lineHeight;
+
+  const message = `
+Dear ${data.parentEmail},
+At Blooming Kids House, our tutors are committed to ensuring your child excels academically. 
+Based on the assessment results, our tutors will support your child’s growth in key areas.
+
+Sincerely,
+Mrs. Yinka Isikalu, Director`;
+
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(9);
+  doc.text(doc.splitTextToSize(message, 190), 10, y);
+
   const pdfBlob = doc.output("blob");
-  const formData = new FormData();
-  formData.append("file", pdfBlob);
-  formData.append("upload_preset", "bkh_assessments");
-  formData.append("folder", `bkh_assessments/reports/${student}`);
+  const reader = new FileReader();
 
-  const response = await fetch("https://api.cloudinary.com/v1_1/dy2hxcyaf/upload", {
-    method: "POST",
-    body: formData
-  });
+  reader.onloadend = async function () {
+    const base64data = reader.result.split(",")[1];
+    const filename = `Reports/${data.parentEmail}/report_${Date.now()}.pdf`;
+    const storageRef = ref(storage, filename);
+    await uploadString(storageRef, base64data, "base64");
+    const url = await getDownloadURL(storageRef);
+    await addDoc(collection(db, "reports"), {
+      url,
+      student: data.studentName,
+      parent: data.parentEmail,
+      subject: data.subject,
+      timestamp: data.timestamp,
+    });
+  };
 
-  const data = await response.json();
-  const pdfUrl = data.secure_url;
-
-  await db.collection("reports").add({
-    student,
-    parent,
-    subject,
-    url: pdfUrl,
-    createdAt: new Date().toISOString()
-  });
-
-  return pdfUrl;
+  reader.readAsDataURL(pdfBlob);
 }
-
-function getLetterGrade(percent) {
-  const p = parseFloat(percent);
-  if (p >= 90) return "A";
-  if (p >= 80) return "B";
-  if (p >= 70) return "C";
-  if (p >= 60) return "D";
-  return "F";
-}
-
-export { generatePDFReport };
