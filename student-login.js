@@ -1,27 +1,39 @@
-<!-- ✅ FILE: student-login.js -->
-document.getElementById("studentLoginForm").addEventListener("submit", function (e) {
+// student-login.js
+import { auth } from './firebaseConfig.js';
+
+document.getElementById("studentLoginForm").addEventListener("submit", async (e) => {
   e.preventDefault();
-  const studentName = document.getElementById("studentName").value.trim();
-  const parentEmail = document.getElementById("parentEmail").value.trim();
+
+  const studentName = document.getElementById("studentName").value;
+  const parentEmail = document.getElementById("parentEmail").value;
   const grade = document.getElementById("grade").value;
-  const tutorName = document.getElementById("tutorName").value.trim();
-  const location = document.getElementById("location").value.trim();
-  const accessCode = document.getElementById("accessCode").value.trim();
+  const tutorName = document.getElementById("tutorName").value;
+  const location = document.getElementById("location").value;
+  const accessCode = document.getElementById("accessCode").value;
 
   if (accessCode !== "bkh2025") {
-    alert("Invalid Access Code");
+    alert("Invalid access code");
     return;
   }
 
-  // Save student info to sessionStorage
-  sessionStorage.setItem("studentInfo", JSON.stringify({
-    studentName,
-    parentEmail,
-    grade,
-    tutorName,
-    location
-  }));
+  // Dummy anonymous sign-in
+  import("firebase/auth").then(({ getAuth, signInAnonymously }) => {
+    const auth = getAuth();
+    signInAnonymously(auth)
+      .then(() => {
+        // Save student info locally
+        localStorage.setItem("studentName", studentName);
+        localStorage.setItem("parentEmail", parentEmail);
+        localStorage.setItem("grade", grade);
+        localStorage.setItem("tutorName", tutorName);
+        localStorage.setItem("location", location);
+        localStorage.setItem("timestamp", new Date().toISOString());
 
-  // Redirect to subject-select page
-  window.location.href = "subject-select.html";
+        window.location.href = "subject-select.html";
+      })
+      .catch((error) => {
+        console.error("Login error", error);
+        alert("Failed to login. Try again.");
+      });
+  });
 });
