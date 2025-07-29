@@ -1,34 +1,34 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Student Test | Blooming Kids House</title>
-  <link rel="stylesheet" href="style.css" />
-  <link rel="icon" type="image/x-icon" href="favicon.ico" />
-</head>
-<body class="bg-green-50 font-sans text-gray-800">
-  <div class="max-w-4xl mx-auto py-8 px-4">
-    <div class="flex justify-between items-center mb-6">
-      <h1 id="subjectHeader" class="text-2xl font-bold text-green-800">Loading...</h1>
-      <button id="logoutBtn" class="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600">Logout</button>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>Blooming Kids - Test</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css"/>
+    <link rel="stylesheet" href="style.css"/>
+    <link rel="icon" href="favicon.ico"/>
+  </head>
+  <body class="bg-green-50 text-gray-800">
+    <div class="max-w-4xl mx-auto p-6">
+      <div class="flex justify-between items-center mb-6">
+        <h1 class="text-xl font-bold text-green-700" id="subjectTitle">Loading...</h1>
+        <div>
+          <button id="logoutBtn" class="text-sm bg-yellow-400 hover:bg-yellow-500 px-4 py-1 rounded text-white">Logout</button>
+        </div>
+      </div>
+
+      <div class="bg-white p-6 rounded-xl shadow-md space-y-4" id="questionContainer">
+        <p class="text-center text-gray-500">Loading questions...</p>
+      </div>
+
+      <div class="mt-6 flex justify-between items-center">
+        <div id="timerDisplay" class="text-sm text-green-700 font-semibold">Time: 30:00</div>
+        <button id="submitTestBtn" class="bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded-xl">Submit Test</button>
+      </div>
+
+      <p class="text-xs text-center mt-8">POWERED BY <span style="color:#FFEB3B">POG</span></p>
     </div>
 
-    <form id="testForm">
-      <div id="questionContainer" class="space-y-4">
-        <!-- Questions will be inserted here -->
-      </div>
-
-      <div class="text-center mt-8">
-        <button type="button" id="submitBtn" class="bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700">Submit Test</button>
-      </div>
-    </form>
-  </div>
-
-  <footer class="text-center text-sm text-gray-500 mt-10">
-    POWERED BY <span style="color:#FFEB3B">POG</span>
-  </footer>
-
-  <script type="module" src="student.js"></script>
-</body>
+    <script type="module" src="student.js"></script>
+  </body>
 </html>
