@@ -12,7 +12,7 @@ async function fetchQuestions({ subject, grade, curriculum = "UK" }) {
 
   // 2. 🔹 Try GitHub curriculum JSON
   try {
-    const githubUrl = `https://raw.githubusercontent.com/YOUR_GITHUB_USERNAME/YOUR_REPO/main/curriculum/${curriculum.toLowerCase()}.json`;
+    const githubUrl = `https://raw.githubusercontent.com/psalminfo/blooming-kids-cbt/main/curriculum/${curriculum.toLowerCase()}.json`;
     const res = await fetch(githubUrl);
     if (res.ok) {
       const githubData = await res.json();
