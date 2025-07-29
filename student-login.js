@@ -1,23 +1,26 @@
-document.getElementById("studentLoginForm").addEventListener("submit", function (e) {
+// student-login.js
+document.getElementById('studentLoginForm').addEventListener('submit', (e) => {
   e.preventDefault();
 
-  const name = document.getElementById("studentName").value.trim();
-  const parentEmail = document.getElementById("parentEmail").value.trim();
-  const grade = document.getElementById("grade").value;
-  const tutor = document.getElementById("tutorName").value.trim();
-  const location = document.getElementById("location").value.trim();
-  const accessCode = document.getElementById("accessCode").value.trim();
+  const name = document.getElementById('studentName').value.trim();
+  const parentEmail = document.getElementById('parentEmail').value.trim();
+  const grade = document.getElementById('grade').value;
+  const tutor = document.getElementById('tutorName').value.trim();
+  const location = document.getElementById('location').value.trim();
+  const accessCode = document.getElementById('accessCode').value.trim();
 
-  if (accessCode !== "bkh2025") {
-    alert("Invalid access code.");
+  if (accessCode !== 'bkh2025') {
+    alert('Invalid access code. Please enter the correct code.');
     return;
   }
 
-  localStorage.setItem("bk_studentName", name);
-  localStorage.setItem("bk_parentEmail", parentEmail);
-  localStorage.setItem("bk_grade", grade);
-  localStorage.setItem("bk_tutor", tutor);
-  localStorage.setItem("bk_location", location);
+  // Save session details
+  sessionStorage.setItem('studentName', name);
+  sessionStorage.setItem('parentEmail', parentEmail);
+  sessionStorage.setItem('grade', grade);
+  sessionStorage.setItem('tutorName', tutor);
+  sessionStorage.setItem('location', location);
 
-  window.location.href = "subject-select.html";
+  // Redirect to subject-select
+  window.location.href = 'subject-select.html';
 });
