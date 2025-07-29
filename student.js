@@ -1,155 +1,116 @@
-import { db, auth } from './firebaseConfig.js';
+import { auth, db } from './firebaseConfig.js';
+import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { generatePDFReport } from './reportGenerator.js';
 
-let studentInfo = {};
-let selectedSubject = sessionStorage.getItem("selectedSubject") || "Math";
-let questions = [];
-let answers = {};
-let timerInterval;
+const urlParams = new URLSearchParams(window.location.search);
+const subject = urlParams.get('subject');
+const grade = urlParams.get('grade');
+const studentName = sessionStorage.getItem('studentName');
+const parentEmail = sessionStorage.getItem('parentEmail');
+const tutor = sessionStorage.getItem('tutor');
+const location = sessionStorage.getItem('location');
 
-document.addEventListener("DOMContentLoaded", async () => {
-  document.getElementById("subjectTitle").textContent = selectedSubject;
+document.getElementById('subjectTitle').textContent = subject;
 
-  // Auth Check
-  auth.onAuthStateChanged(async (user) => {
-    if (!user) return window.location.href = "login-student.html";
-    const uid = user.uid;
-
-    // Fetch student info from Firestore
-    const doc = await db.collection("users").doc(uid).get();
-    if (!doc.exists) return alert("Student profile not found.");
-
-    studentInfo = doc.data();
-    loadQuestions(studentInfo.grade, selectedSubject);
-    startTimer(30 * 60); // 30 minutes
-  });
-});
-
-function loadQuestions(grade, subject) {
-  const sourceOrder = ["manual", "github", "auto"]; // priority order
-
-  (async function trySources() {
-    for (let source of sourceOrder) {
-      let fetched = await fetchFromSource(source, grade, subject);
-      if (fetched.length >= 30) {
-        questions = shuffleArray(fetched).slice(0, 30);
-        renderQuestions();
-        return;
-      }
-    }
-    alert("No questions available for this subject.");
-  })();
-}
-
-async function fetchFromSource(source, grade, subject) {
-  try {
-    if (source === "manual") {
-      const snap = await db.collection("manualQuestions")
-        .where("grade", "==", grade)
-        .where("subject", "==", subject)
-        .get();
-      return snap.docs.map(doc => doc.data());
-    }
-
-    if (source === "github") {
-      const url = `https://raw.githubusercontent.com/YOUR_USERNAME/YOUR_REPO/main/${grade}/${subject}.json`;
-      const res = await fetch(url);
-      if (!res.ok) return [];
-      return await res.json();
-    }
-
-    if (source === "auto") {
-      const snap = await db.collection("autoQuestions")
-        .where("grade", "==", grade)
-        .where("subject", "==", subject)
-        .get();
-      return snap.docs.map(doc => doc.data());
-    }
-  } catch (e) {
-    console.warn(`Error from ${source}:`, e);
-    return [];
+// Timer logic (30 minutes)
+let secondsRemaining = 1800;
+const timerElement = document.getElementById('timer');
+const timerInterval = setInterval(() => {
+  const mins = Math.floor(secondsRemaining / 60).toString().padStart(2, '0');
+  const secs = (secondsRemaining % 60).toString().padStart(2, '0');
+  timerElement.textContent = `${mins}:${secs}`;
+  if (secondsRemaining <= 0) {
+    clearInterval(timerInterval);
+    submitTest();
   }
-}
+  secondsRemaining--;
+}, 1000);
 
-function renderQuestions() {
-  const container = document.getElementById("questionContainer");
-  container.innerHTML = "";
-
-  questions.forEach((q, i) => {
-    const block = document.createElement("div");
-    block.className = "bg-white p-4 shadow rounded";
-
-    block.innerHTML = `
-      <p class="font-semibold text-green-700 mb-2">Q${i + 1}. ${q.question}</p>
-      ${q.options.map((opt, idx) => `
+// Load questions (from manual, GitHub, or auto)
+async function loadQuestions() {
+  const container = document.getElementById('questionContainer');
+  const questions = await fetchQuestions(grade, subject);
+  questions.forEach((q, index) => {
+    const qDiv = document.createElement('div');
+    qDiv.className = 'bg-white shadow p-4 rounded-md';
+    qDiv.innerHTML = `
+      <p class="font-medium mb-2">Q${index + 1}: ${q.question}</p>
+      ${q.options.map((opt, i) => `
         <label class="block">
-          <input type="radio" name="q${i}" value="${opt}" required />
+          <input type="radio" name="q${index}" value="${opt}" required class="mr-2" />
           ${opt}
         </label>
-      `).join("")}
+      `).join('')}
     `;
-    container.appendChild(block);
+    container.appendChild(qDiv);
   });
+  sessionStorage.setItem('totalQuestions', questions.length);
+  sessionStorage.setItem('questionSet', JSON.stringify(questions));
 }
+loadQuestions();
 
-function submitTest() {
-  clearInterval(timerInterval);
-
-  const total = questions.length;
+window.submitTest = async function () {
+  const form = document.getElementById('testForm');
+  const formData = new FormData(form);
+  const answers = {};
+  const total = parseInt(sessionStorage.getItem('totalQuestions'));
+  const questionSet = JSON.parse(sessionStorage.getItem('questionSet'));
   let correct = 0;
 
-  questions.forEach((q, i) => {
-    const selected = document.querySelector(`input[name="q${i}"]:checked`);
-    const answer = selected ? selected.value : null;
-    answers[`q${i + 1}`] = answer;
-    if (answer === q.answer) correct++;
+  questionSet.forEach((q, index) => {
+    const answer = formData.get(`q${index}`);
+    answers[`q${index + 1}`] = answer || '';
+    if (answer && answer === q.answer) correct++;
   });
 
-  const score = correct;
-  const percent = ((score / total) * 100).toFixed(2);
-  const resultData = {
-    ...studentInfo,
-    subject: selectedSubject,
-    score,
-    total,
-    percent,
+  const percentage = ((correct / total) * 100).toFixed(2);
+  const result = {
+    studentName,
+    parentEmail,
+    tutor,
+    location,
+    grade,
+    subject,
     answers,
-    timestamp: new Date().toISOString()
+    score: `${correct}/${total}`,
+    percentage,
+    timestamp: new Date().toLocaleString()
   };
 
-  db.collection("testResults").add(resultData).then(() => {
-    // Trigger PDF Report generation
-    fetch("reportGenerator.js").then(() => {
-      console.log("Report generation logic called");
-    });
-
-    alert("Test submitted!");
-    window.location.href = "subject-select.html";
-  }).catch(err => {
-    console.error("Submission failed:", err);
-    alert("Failed to submit test.");
+  // Save to Firestore
+  await addDoc(collection(db, 'results'), {
+    ...result,
+    createdAt: serverTimestamp()
   });
-}
 
-function startTimer(seconds) {
-  const timer = document.getElementById("timer");
-  timerInterval = setInterval(() => {
-    let min = Math.floor(seconds / 60);
-    let sec = seconds % 60;
-    timer.textContent = `${min}:${sec.toString().padStart(2, "0")}`;
-    if (seconds-- <= 0) {
-      submitTest();
-    }
-  }, 1000);
-}
+  // Generate report and upload
+  await generatePDFReport(result);
 
-function logout() {
-  auth.signOut().then(() => {
-    window.location.href = "login-student.html";
-  });
-}
+  // Clear session
+  sessionStorage.removeItem('questionSet');
+  sessionStorage.removeItem('totalQuestions');
 
-function shuffleArray(arr) {
-  return arr.map(a => [Math.random(), a])
-            .sort((a, b) => a[0] - b[0])
-            .map(a => a[1]);
+  // Redirect
+  window.location.href = 'subject-select.html';
+};
+
+window.logout = function () {
+  sessionStorage.clear();
+  auth.signOut().then(() => window.location.href = 'login-student.html');
+};
+
+// Fetch fallback
+async function fetchQuestions(grade, subject) {
+  try {
+    const res = await fetch(`./assets/data/curriculum_questions/${grade}_${subject}.json`);
+    if (res.ok) return await res.json();
+  } catch (e) {
+    console.warn('Could not fetch from curriculum fallback:', e);
+  }
+  // fallback random
+  return Array.from({ length: 30 }, (_, i) => ({
+    question: `Sample question ${i + 1} for ${subject}`,
+    options: ['Option A', 'Option B', 'Option C', 'Option D'],
+    answer: 'Option A'
+  }));
 }
