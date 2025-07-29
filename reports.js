@@ -1,30 +1,23 @@
 import { db } from './firebaseConfig.js';
 import { collection, getDocs } from 'firebase/firestore';
 
-async function loadAdminReports() {
-  const container = document.getElementById('adminReports');
-  if (!container) return;
+async function loadReports() {
+  const reportList = document.getElementById('reportList');
+  reportList.innerHTML = "Loading...";
 
   const snapshot = await getDocs(collection(db, 'reports'));
-  if (snapshot.empty) {
-    container.innerHTML = `<p class="text-red-600">No reports found.</p>`;
-    return;
-  }
+  reportList.innerHTML = "";
 
-  container.innerHTML = '';
   snapshot.forEach(doc => {
-    const { studentName, parentName, grade, reportUrl, date } = doc.data();
+    const r = doc.data();
     const div = document.createElement('div');
-    div.className = 'bg-yellow-100 border px-4 py-2 rounded mb-2';
     div.innerHTML = `
-      <p><strong>Student:</strong> ${studentName}</p>
-      <p><strong>Parent:</strong> ${parentName}</p>
-      <p><strong>Grade:</strong> ${grade}</p>
-      <p><strong>Date:</strong> ${new Date(date.seconds * 1000).toLocaleString()}</p>
-      <a href="${reportUrl}" target="_blank" class="text-blue-600 underline">Download PDF</a>
+      <strong>${r.student}</strong> (${r.subject})<br/>
+      <a href="${r.url}" target="_blank" class="text-blue-600 underline">Download Report</a>
+      <hr class="my-2"/>
     `;
-    container.appendChild(div);
+    reportList.appendChild(div);
   });
 }
 
-loadAdminReports();
+window.addEventListener('DOMContentLoaded', loadReports);
