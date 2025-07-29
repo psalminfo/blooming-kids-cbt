@@ -40,7 +40,6 @@ form.addEventListener('submit', async (e) => {
 
     const uid = userCredential.user.uid;
 
-    // Save to Firestore
     await setDoc(doc(db, 'users', uid), {
       studentName,
       parentEmail,
@@ -51,7 +50,6 @@ form.addEventListener('submit', async (e) => {
       timestamp: new Date()
     });
 
-    // Save locally
     localStorage.setItem('studentName', studentName);
     localStorage.setItem('parentEmail', parentEmail);
     localStorage.setItem('grade', grade);
@@ -59,7 +57,7 @@ form.addEventListener('submit', async (e) => {
     localStorage.setItem('location', location);
     localStorage.setItem('uid', uid);
 
-    // ✅ Redirect to subject-select (NOT login-student.html)
+    // ✅ Correct redirection
     window.location.href = 'subject-select.html';
   } catch (error) {
     console.error(error);
