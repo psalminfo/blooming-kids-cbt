@@ -1,91 +1,118 @@
-import jsPDF from 'jspdf';
-import { db, storage } from './firebaseConfig.js';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { collection, addDoc } from 'firebase/firestore';
-
-export async function generatePDFReport(data) {
-  const {
-    studentName, parentName, tutorName, location,
-    grade, results, timestamp
-  } = data;
+function generatePDFReport(studentData, reportData) {
+  const { student, parent, tutor, location, grade, timestamp } = studentData;
+  const { subjects, totalScore, totalPossible } = reportData;
 
   const doc = new jsPDF();
-  const dateStr = new Date(timestamp).toLocaleString();
+  doc.setFontSize(14);
+  doc.setFont("helvetica", "bold");
+  doc.text("BLOOMING KIDS HOUSE ASSESSMENT REPORT", 105, 15, { align: "center" });
 
-  // Header
-  doc.setFontSize(16);
-  doc.text('BLOOMING KIDS HOUSE ASSESSMENT REPORT', 105, 15, { align: 'center' });
   doc.setFontSize(10);
-  doc.text('From the Director, Mrs. Yinka Isikalu', 200, 23, { align: 'right' });
+  doc.setFont("helvetica", "normal");
+  doc.text(`From the Director, Mrs. Yinka Isikalu`, 180, 22, { align: "right" });
 
-  // Info Block
-  doc.setFontSize(9);
-  const info = [
-    `Student: ${studentName}`,
-    `Parent: ${parentName}`,
-    `Tutor: ${tutorName}`,
-    `Location: ${location}`,
-    `Grade: ${grade}`,
-    `Date: ${dateStr}`
-  ];
-  info.forEach((txt, i) => doc.text(txt, 15, 35 + i * 5));
+  // Info table
+  doc.setFont("helvetica", "bold");
+  doc.text("Student:", 10, 30);
+  doc.text("Parent:", 10, 36);
+  doc.text("Tutor:", 10, 42);
+  doc.text("Location:", 10, 48);
+  doc.text("Grade:", 10, 54);
+  doc.text("Date:", 10, 60);
 
-  // Performance Summary
-  doc.setFontSize(11);
-  doc.text('Performance Summary', 15, 70);
-  doc.setFontSize(9);
+  doc.setFont("helvetica", "normal");
+  doc.text(student, 40, 30);
+  doc.text(parent, 40, 36);
+  doc.text(tutor, 40, 42);
+  doc.text(location, 40, 48);
+  doc.text(grade, 40, 54);
+  doc.text(new Date(timestamp).toLocaleString(), 40, 60);
+
+  // Subject Scores Table
+  let startY = 70;
+  doc.setFont("helvetica", "bold");
+  doc.text("Performance Summary", 10, startY);
+  startY += 6;
+
   doc.autoTable({
-    startY: 73,
-    head: [['Subject', 'Score', 'Percentage', 'Letter Grade']],
-    body: Object.entries(results).map(([subject, { score, total, percent, grade }]) => [
-      subject, `${score}/${total}`, `${percent}%`, grade
+    startY,
+    head: [["Subject", "Score", "Percentage", "Letter Grade"]],
+    body: subjects.map((subj) => [
+      subj.name,
+      `${subj.correct}/${subj.total}`,
+      `${subj.percent.toFixed(2)}%`,
+      subj.grade
     ]),
-    theme: 'grid'
+    theme: "grid",
+    styles: { fontSize: 9 }
   });
 
-  // Knowledge and Skills
-  let y = doc.lastAutoTable.finalY + 8;
-  Object.entries(results).forEach(([subject, { breakdown }]) => {
-    doc.setFontSize(11);
-    doc.text(`${subject} Knowledge & Skills`, 15, y);
+  startY = doc.autoTable.previous.finalY + 8;
+
+  // Knowledge + Skills Section
+  subjects.forEach((subj) => {
+    doc.setFont("helvetica", "bold");
+    doc.text(`${subj.name} - Knowledge and Skills`, 10, startY);
+    startY += 5;
+
     doc.autoTable({
-      startY: y + 3,
-      head: [['Category', 'Correct', 'Total', '%']],
-      body: breakdown.map(b => [b.category, b.correct, b.total, b.percent]),
-      theme: 'striped'
+      startY,
+      head: [["Category", "Correct", "Total", "%"]],
+      body: subj.skills.map((s) => [s.category, s.correct, s.total, `${s.percent.toFixed(1)}%`]),
+      theme: "grid",
+      styles: { fontSize: 8 }
     });
-    y = doc.lastAutoTable.finalY + 5;
+
+    startY = doc.autoTable.previous.finalY + 8;
   });
 
   // Recommendations
-  doc.setFontSize(11);
-  doc.text(`Personalized Recommendations for ${studentName}`, 15, y + 5);
-  const msg = `Dear ${parentName},
-
-At Blooming Kids House, our tutors are committed to ensuring your child excels academically and develops well-rounded skills. Based on the assessment results, our tutors will focus on the following areas to support your child’s growth:
-
-[Math and ELA strategies follow as standard block]
-
-Our dedicated tutors at Blooming Kids House will work closely with your child to ensure they thrive academically, build confidence, and develop the essential skills needed for lifelong success.
-
-Sincerely,
-Mrs. Yinka Isikalu, Director`;
-
+  doc.setFont("helvetica", "bold");
+  doc.text(`Personalized Recommendations for ${student}`, 10, startY);
+  startY += 6;
+  doc.setFont("helvetica", "normal");
   doc.setFontSize(9);
-  doc.text(msg, 15, y + 10, { maxWidth: 180, lineHeightFactor: 1.4 });
+  doc.text(`Dear ${parent},`, 10, startY);
+  startY += 5;
 
-  // Upload PDF to Cloudinary
-  const blob = doc.output('blob');
-  const filename = `Reports/${studentName}-${Date.now()}.pdf`;
-  const storageRef = ref(storage, filename);
-  const snap = await uploadBytes(storageRef, blob);
-  const url = await getDownloadURL(snap.ref);
+  const recMsg =
+    "At Blooming Kids House, our tutors are committed to ensuring your child excels academically and develops well-rounded skills. Based on the assessment results, our tutors will focus on the following areas to support your child’s growth:";
+  doc.text(doc.splitTextToSize(recMsg, 180), 10, startY);
+  startY += 20;
 
-  await addDoc(collection(db, 'reports'), {
-    studentName, parentName, tutorName, location,
-    grade, date: new Date(timestamp),
-    reportUrl: url
-  });
+  doc.text(
+    "Math: Practice rounding numbers, place value, comparing fractions, multiplication, perimeter and area.\nELA: Improve comprehension, vocabulary through context, summarizing, writing basics, and grammar practice.",
+    10,
+    startY
+  );
 
-  return url;
+  startY += 20;
+  doc.setFont("helvetica", "italic");
+  doc.text(
+    "Our dedicated tutors at Blooming Kids House will work closely with your child to ensure they thrive academically, build confidence, and develop the essential skills needed for lifelong success.",
+    10,
+    startY
+  );
+
+  startY += 10;
+  doc.setFont("helvetica", "bold");
+  doc.text("Sincerely,", 10, startY);
+  doc.text("Mrs. Yinka Isikalu, Director", 10, startY + 6);
+
+  return doc.output("blob");
+}
+
+function uploadPDFToCloudinary(fileBlob, fileName, callback) {
+  const formData = new FormData();
+  formData.append("file", fileBlob);
+  formData.append("upload_preset", "bkh_assessments");
+  formData.append("folder", `Reports`);
+
+  fetch("https://api.cloudinary.com/v1_1/dy2hxcyaf/upload", {
+    method: "POST",
+    body: formData
+  })
+    .then((res) => res.json())
+    .then((data) => callback(data.secure_url))
+    .catch((err) => console.error("Cloudinary upload error:", err));
 }
