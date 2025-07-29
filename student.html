@@ -3,43 +3,31 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Take Test | Blooming Kids House</title>
+  <title>Assessment – Blooming Kids House</title>
   <link rel="stylesheet" href="style.css" />
-  <link rel="icon" href="favicon.ico" type="image/x-icon" />
+  <link rel="icon" href="favicon.ico" />
 </head>
-<body class="bg-green-50 min-h-screen p-4">
-  <header class="flex justify-between items-center mb-6">
-    <h2 class="text-lg font-semibold text-green-800">
-      BKH Assessment – <span id="subjectTitle">Subject</span>
-    </h2>
-    <button onclick="logout()" class="bg-yellow-500 hover:bg-yellow-600 text-white px-4 py-2 rounded">
-      Logout
-    </button>
-  </header>
-
+<body class="bg-green-50 min-h-screen p-6">
   <div class="flex justify-between items-center mb-4">
-    <div class="text-green-700 text-sm font-medium">
-      Time Remaining: <span id="timer">30:00</span>
-    </div>
-    <button onclick="submitTest()" class="bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded shadow">
-      Submit Test
-    </button>
+    <h2 class="text-xl font-bold text-green-800">Assessment: <span id="subjectLabel"></span></h2>
+    <button onclick="logout()" class="bg-yellow-500 text-white px-4 py-2 rounded hover:bg-yellow-600">Logout</button>
   </div>
 
-  <form id="testForm" class="space-y-6">
-    <div id="questionContainer" class="space-y-6"></div>
-  </form>
+  <div class="flex justify-between items-center mb-4">
+    <p class="text-sm text-gray-600">Student: <span id="studentNameDisplay"></span></p>
+    <p class="text-sm font-semibold text-red-600">Time left: <span id="timer">30:00</span></p>
+  </div>
+
+  <form id="testForm" class="space-y-6"></form>
+
+  <div class="mt-6 flex justify-center">
+    <button type="button" onclick="submitAnswers()" class="bg-green-700 text-white px-6 py-2 rounded hover:bg-green-800">Submit</button>
+  </div>
 
   <footer class="text-center mt-10 text-sm text-gray-500">
     POWERED BY <span style="color:#FFEB3B;">POG</span>
   </footer>
 
-  <!-- jsPDF & AutoTable -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.25/jspdf.plugin.autotable.min.js"></script>
-
-  <!-- Firebase & App Logic -->
-  <script type="module" src="./firebaseConfig.js"></script>
-  <script type="module" src="./student.js"></script>
+  <script type="module" src="student.js"></script>
 </body>
 </html>
