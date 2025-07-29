@@ -1,62 +1,54 @@
-import { auth, db } from './firebaseConfig.js';
-import { onAuthStateChanged, signOut } from 'firebase/auth';
-import { doc, getDoc } from 'firebase/firestore';
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Select Subject - Blooming Kids House</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" />
+    <link rel="stylesheet" href="style.css" />
+    <link rel="icon" href="favicon.ico" />
+  </head>
+  <body class="bg-yellow-50 min-h-screen flex items-center justify-center">
+    <div class="bg-white p-8 rounded-xl shadow-xl w-full max-w-xl">
+      <div class="flex justify-between items-center mb-4">
+        <h2 class="text-2xl font-bold text-green-800">Select Subject</h2>
+        <button onclick="logout()" class="text-sm text-red-600 hover:underline">Logout</button>
+      </div>
+      <div id="subjectList" class="space-y-3"></div>
+      <p class="text-xs text-center mt-6 text-gray-600">POWERED BY <span style="color:#FFEB3B">POG</span></p>
+    </div>
 
-// Subject mapping by grade
-const subjectsByGrade = (grade) => {
-  const baseSubjects = ['Math', 'ELA'];
-  const scienceSubjects = ['Biology', 'Chemistry', 'Physics'];
-  return grade >= 7 ? [...baseSubjects, ...scienceSubjects] : baseSubjects;
-};
+    <script type="module">
+      import { auth } from './firebaseConfig.js';
+      import { onAuthStateChanged, signOut } from './firebase/auth.js';
 
-// Extract query from localStorage or fallback
-let studentData = JSON.parse(localStorage.getItem('studentData') || '{}');
-let studentGrade = parseInt(studentData.grade);
+      onAuthStateChanged(auth, (user) => {
+        if (!user) {
+          window.location.href = 'login-student.html';
+        } else {
+          renderSubjects();
+        }
+      });
 
-// DOM refs
-const subjectTabs = document.getElementById('subjectTabs');
-const logoutBtn = document.getElementById('logoutBtn');
+      function renderSubjects() {
+        const grade = sessionStorage.getItem('grade');
+        const subjects = ['Math', 'ELA'];
 
-// Render subject buttons
-function renderSubjects(subjects) {
-  subjectTabs.innerHTML = '';
-  subjects.forEach(subject => {
-    const btn = document.createElement('button');
-    btn.className = 'bg-green-100 border border-green-600 text-green-800 font-semibold py-3 px-4 rounded shadow hover:bg-green-200 transition';
-    btn.textContent = subject;
-    btn.onclick = () => {
-      window.location.href = `student.html?grade=${studentGrade}&subject=${subject}`;
-    };
-    subjectTabs.appendChild(btn);
-  });
-}
+        if (+grade >= 7) {
+          subjects.push('Biology', 'Chemistry', 'Physics');
+        }
 
-// Firebase auth check
-onAuthStateChanged(auth, async (user) => {
-  if (!user) {
-    window.location.href = 'login-student.html';
-    return;
-  }
+        const subjectList = document.getElementById('subjectList');
+        subjectList.innerHTML = subjects.map(subj => `
+          <button onclick="window.location.href='student.html?subject=${subj}'" class="block w-full bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700">${subj}</button>
+        `).join('');
+      }
 
-  try {
-    const userDoc = await getDoc(doc(db, 'users', user.uid));
-    if (userDoc.exists()) {
-      const data = userDoc.data();
-      studentGrade = parseInt(data.grade);
-      localStorage.setItem('studentData', JSON.stringify(data));
-      renderSubjects(subjectsByGrade(studentGrade));
-    } else {
-      alert('User data not found.');
-      window.location.href = 'login-student.html';
-    }
-  } catch (err) {
-    console.error('Error fetching user grade:', err);
-    window.location.href = 'login-student.html';
-  }
-});
-
-// Logout
-logoutBtn.addEventListener('click', async () => {
-  await signOut(auth);
-  window.location.href = 'login-student.html';
-});
+      window.logout = function () {
+        signOut(auth).then(() => {
+          window.location.href = 'login-student.html';
+        });
+      }
+    </script>
+  </body>
+</html>
