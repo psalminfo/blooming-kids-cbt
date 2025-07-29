@@ -1,41 +1,40 @@
-import { db, storage } from './firebaseConfig.js';
-import { ref, listAll, getDownloadURL } from "firebase/storage";
-import { collection, getDocs } from "firebase/firestore";
+// autoQuestionGen.js
+import { db } from './firebaseConfig.js';
+import { collection, getDocs } from 'https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore.js';
 
-let questionCache = {};
-
-export async function loadQuestions(grade, subject) {
-  const key = `${grade}_${subject}`;
-  if (questionCache[key]) return questionCache[key];
-
-  const allQuestions = [];
-
-  // 1. From Admin-uploaded JSON
+export async function fetchQuestions(grade, subject) {
   try {
-    const querySnap = await getDocs(collection(db, `questions/${grade}/${subject}`));
-    querySnap.forEach(doc => allQuestions.push(...doc.data().questions));
-  } catch (e) {}
-
-  // 2. From GitHub curriculum (simulate as fallback)
-  try {
-    const ghURL = `/curriculum/${grade}/${subject}.json`; // Must be pre-stored locally or via API proxy
-    const res = await fetch(ghURL);
-    const ghQuestions = await res.json();
-    allQuestions.push(...ghQuestions);
-  } catch (e) {}
-
-  // 3. From default randomized backup
-  if (allQuestions.length < 30) {
-    for (let i = allQuestions.length; i < 30; i++) {
-      allQuestions.push({
-        question: `Auto-generated fallback question ${i + 1} for ${subject}`,
-        options: ["A", "B", "C", "D"],
-        answer: "A"
-      });
+    const githubUrl = `https://raw.githubusercontent.com/yourgithubusername/curriculum/main/${grade}-${subject}.json`;
+    const res = await fetch(githubUrl);
+    if (res.ok) {
+      const data = await res.json();
+      return shuffleArray(data).slice(0, 30);
     }
+  } catch (e) {
+    console.warn('GitHub fallback triggered');
   }
 
-  const selected = allQuestions.sort(() => 0.5 - Math.random()).slice(0, 30);
-  questionCache[key] = selected;
-  return selected;
+  try {
+    const localRes = await fetch(`questions/${grade}-${subject}.json`);
+    if (localRes.ok) {
+      const data = await localRes.json();
+      return shuffleArray(data).slice(0, 30);
+    }
+  } catch (e) {
+    console.warn('Local fallback failed');
+  }
+
+  const fallbackCol = collection(db, 'questions');
+  const snapshot = await getDocs(fallbackCol);
+  const fallbackQuestions = [];
+  snapshot.forEach(doc => {
+    const q = doc.data();
+    if (q.grade === grade && q.subject === subject) fallbackQuestions.push(q);
+  });
+
+  return shuffleArray(fallbackQuestions).slice(0, 30);
+}
+
+function shuffleArray(arr) {
+  return arr.sort(() => 0.5 - Math.random());
 }
