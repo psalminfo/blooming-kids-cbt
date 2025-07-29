@@ -1,151 +1,155 @@
-document.addEventListener("DOMContentLoaded", () => {
-  const auth = firebase.auth();
-  const db = firebase.firestore();
+import { db, auth } from './firebaseConfig.js';
 
-  const startBtn = document.getElementById("startBtn");
-  const logoutBtn = document.getElementById("logoutBtn");
+let studentInfo = {};
+let selectedSubject = sessionStorage.getItem("selectedSubject") || "Math";
+let questions = [];
+let answers = {};
+let timerInterval;
 
-  const userName = sessionStorage.getItem("bkh_studentName");
-  const parentEmail = sessionStorage.getItem("bkh_parentEmail");
-  const grade = sessionStorage.getItem("bkh_grade");
-  const tutor = sessionStorage.getItem("bkh_tutor");
-  const location = sessionStorage.getItem("bkh_location");
+document.addEventListener("DOMContentLoaded", async () => {
+  document.getElementById("subjectTitle").textContent = selectedSubject;
 
-  if (!userName || !parentEmail || !grade || !tutor || !location) {
-    alert("Missing login information. Please log in again.");
-    window.location.href = "login-student.html";
-    return;
+  // Auth Check
+  auth.onAuthStateChanged(async (user) => {
+    if (!user) return window.location.href = "login-student.html";
+    const uid = user.uid;
+
+    // Fetch student info from Firestore
+    const doc = await db.collection("users").doc(uid).get();
+    if (!doc.exists) return alert("Student profile not found.");
+
+    studentInfo = doc.data();
+    loadQuestions(studentInfo.grade, selectedSubject);
+    startTimer(30 * 60); // 30 minutes
+  });
+});
+
+function loadQuestions(grade, subject) {
+  const sourceOrder = ["manual", "github", "auto"]; // priority order
+
+  (async function trySources() {
+    for (let source of sourceOrder) {
+      let fetched = await fetchFromSource(source, grade, subject);
+      if (fetched.length >= 30) {
+        questions = shuffleArray(fetched).slice(0, 30);
+        renderQuestions();
+        return;
+      }
+    }
+    alert("No questions available for this subject.");
+  })();
+}
+
+async function fetchFromSource(source, grade, subject) {
+  try {
+    if (source === "manual") {
+      const snap = await db.collection("manualQuestions")
+        .where("grade", "==", grade)
+        .where("subject", "==", subject)
+        .get();
+      return snap.docs.map(doc => doc.data());
+    }
+
+    if (source === "github") {
+      const url = `https://raw.githubusercontent.com/YOUR_USERNAME/YOUR_REPO/main/${grade}/${subject}.json`;
+      const res = await fetch(url);
+      if (!res.ok) return [];
+      return await res.json();
+    }
+
+    if (source === "auto") {
+      const snap = await db.collection("autoQuestions")
+        .where("grade", "==", grade)
+        .where("subject", "==", subject)
+        .get();
+      return snap.docs.map(doc => doc.data());
+    }
+  } catch (e) {
+    console.warn(`Error from ${source}:`, e);
+    return [];
   }
+}
 
-  // Load subjects based on grade
-  const subjects = grade >= 7
-    ? ["Math", "ELA", "Biology", "Chemistry", "Physics"]
-    : ["Math", "ELA"];
+function renderQuestions() {
+  const container = document.getElementById("questionContainer");
+  container.innerHTML = "";
 
-  const subjectTabs = document.getElementById("subjectTabs");
-  const questionContainer = document.getElementById("questionContainer");
+  questions.forEach((q, i) => {
+    const block = document.createElement("div");
+    block.className = "bg-white p-4 shadow rounded";
 
-  subjects.forEach((subject) => {
-    const tab = document.createElement("button");
-    tab.className = "tab-btn";
-    tab.innerText = subject;
-    tab.onclick = () => loadQuestions(subject);
-    subjectTabs.appendChild(tab);
+    block.innerHTML = `
+      <p class="font-semibold text-green-700 mb-2">Q${i + 1}. ${q.question}</p>
+      ${q.options.map((opt, idx) => `
+        <label class="block">
+          <input type="radio" name="q${i}" value="${opt}" required />
+          ${opt}
+        </label>
+      `).join("")}
+    `;
+    container.appendChild(block);
+  });
+}
+
+function submitTest() {
+  clearInterval(timerInterval);
+
+  const total = questions.length;
+  let correct = 0;
+
+  questions.forEach((q, i) => {
+    const selected = document.querySelector(`input[name="q${i}"]:checked`);
+    const answer = selected ? selected.value : null;
+    answers[`q${i + 1}`] = answer;
+    if (answer === q.answer) correct++;
   });
 
-  let activeSubject = null;
-  let questions = [];
+  const score = correct;
+  const percent = ((score / total) * 100).toFixed(2);
+  const resultData = {
+    ...studentInfo,
+    subject: selectedSubject,
+    score,
+    total,
+    percent,
+    answers,
+    timestamp: new Date().toISOString()
+  };
 
-  function loadQuestions(subject) {
-    activeSubject = subject;
-    questionContainer.innerHTML = "<p>Loading questions...</p>";
-
-    const manualRef = db.collection("manualQuestions")
-      .where("grade", "==", grade)
-      .where("subject", "==", subject);
-    
-    manualRef.get().then((snapshot) => {
-      const manualQs = [];
-      snapshot.forEach(doc => manualQs.push(...doc.data().questions));
-      if (manualQs.length >= 30) {
-        questions = shuffleArray(manualQs).slice(0, 30);
-        renderQuestions();
-      } else {
-        fallbackAutoLoad(subject);
-      }
-    }).catch((err) => {
-      console.error("Error loading manual questions:", err);
-      fallbackAutoLoad(subject);
-    });
-  }
-
-  function fallbackAutoLoad(subject) {
-    const autoRef = db.collection("auto_questions")
-      .where("grade", "==", grade)
-      .where("subject", "==", subject);
-    
-    autoRef.get().then((snapshot) => {
-      const autoQs = [];
-      snapshot.forEach(doc => autoQs.push(...doc.data().questions));
-      if (autoQs.length >= 30) {
-        questions = shuffleArray(autoQs).slice(0, 30);
-        renderQuestions();
-      } else {
-        questionContainer.innerHTML = "<p>No questions available.</p>";
-      }
-    }).catch(err => {
-      console.error("Auto fallback error:", err);
-      questionContainer.innerHTML = "<p>Error loading questions.</p>";
-    });
-  }
-
-  function renderQuestions() {
-    questionContainer.innerHTML = "";
-    questions.forEach((q, i) => {
-      const block = document.createElement("div");
-      block.className = "question-box mb-4 p-3 bg-white rounded shadow";
-      block.innerHTML = `
-        <p><strong>Q${i + 1}:</strong> ${q.question}</p>
-        ${q.options.map((opt, j) => `
-          <label class="block">
-            <input type="radio" name="q${i}" value="${opt}" />
-            ${opt}
-          </label>
-        `).join("")}
-      `;
-      questionContainer.appendChild(block);
+  db.collection("testResults").add(resultData).then(() => {
+    // Trigger PDF Report generation
+    fetch("reportGenerator.js").then(() => {
+      console.log("Report generation logic called");
     });
 
-    const submitBtn = document.createElement("button");
-    submitBtn.innerText = "Submit";
-    submitBtn.className = "bg-yellow-500 hover:bg-yellow-600 text-white px-4 py-2 rounded mt-4";
-    submitBtn.onclick = handleSubmit;
-    questionContainer.appendChild(submitBtn);
-  }
+    alert("Test submitted!");
+    window.location.href = "subject-select.html";
+  }).catch(err => {
+    console.error("Submission failed:", err);
+    alert("Failed to submit test.");
+  });
+}
 
-  function handleSubmit() {
-    let correct = 0;
-    questions.forEach((q, i) => {
-      const selected = document.querySelector(`input[name="q${i}"]:checked`);
-      if (selected && selected.value === q.answer) correct++;
-    });
+function startTimer(seconds) {
+  const timer = document.getElementById("timer");
+  timerInterval = setInterval(() => {
+    let min = Math.floor(seconds / 60);
+    let sec = seconds % 60;
+    timer.textContent = `${min}:${sec.toString().padStart(2, "0")}`;
+    if (seconds-- <= 0) {
+      submitTest();
+    }
+  }, 1000);
+}
 
-    const score = correct;
-    const percentage = ((correct / questions.length) * 100).toFixed(2);
+function logout() {
+  auth.signOut().then(() => {
+    window.location.href = "login-student.html";
+  });
+}
 
-    const result = {
-      student: userName,
-      parent: parentEmail,
-      tutor,
-      location,
-      grade,
-      subject: activeSubject,
-      total: questions.length,
-      correct: score,
-      percentage,
-      timestamp: new Date().toISOString(),
-    };
-
-    db.collection("testResults").add(result)
-      .then(() => {
-        questionContainer.innerHTML = "<p class='text-green-700 font-bold text-center'>Submitted successfully!</p>";
-        setTimeout(() => {
-          window.location.href = "subject-select.html";
-        }, 1500);
-      }).catch(err => {
-        console.error("Error submitting:", err);
-        alert("Failed to submit. Try again.");
-      });
-  }
-
-  function shuffleArray(arr) {
-    return arr.sort(() => 0.5 - Math.random());
-  }
-
-  if (logoutBtn) {
-    logoutBtn.addEventListener("click", () => {
-      sessionStorage.clear();
-      window.location.href = "login-student.html";
-    });
-  }
-});
+function shuffleArray(arr) {
+  return arr.map(a => [Math.random(), a])
+            .sort((a, b) => a[0] - b[0])
+            .map(a => a[1]);
+}
