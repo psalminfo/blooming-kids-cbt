@@ -2,29 +2,50 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Student Login - Blooming Kids House</title>
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css"/>
-  <link rel="stylesheet" href="style.css"/>
-  <link rel="icon" href="favicon.ico"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Student Login | Blooming Kids House</title>
+  <link rel="stylesheet" href="style.css" />
+  <link rel="icon" href="favicon.ico" type="image/x-icon" />
 </head>
-<body class="bg-green-50 flex items-center justify-center min-h-screen">
-  <div class="bg-white p-6 rounded-lg shadow-xl w-full max-w-lg">
-    <h1 class="text-2xl font-bold text-green-800 text-center mb-4">Student Login</h1>
+<body class="bg-green-50 min-h-screen flex items-center justify-center">
+  <div class="bg-white shadow-lg rounded-xl w-full max-w-md p-8">
+    <h2 class="text-2xl font-bold text-green-700 text-center mb-6">Student Login</h2>
+
     <form id="studentLoginForm" class="space-y-4">
-      <input type="text" id="studentName" placeholder="Student Name" required class="w-full px-4 py-2 border rounded"/>
-      <input type="email" id="parentEmail" placeholder="Parent Email" required class="w-full px-4 py-2 border rounded"/>
-      <select id="grade" required class="w-full px-4 py-2 border rounded">
+      <input type="text" id="studentName" placeholder="Student Name" class="input-block" required />
+      <input type="email" id="parentEmail" placeholder="Parent Email" class="input-block" required />
+      
+      <select id="grade" class="input-block" required>
         <option value="">Select Grade</option>
-        ${[...Array(10)].map((_, i) => `<option value="Grade ${i + 3}">Grade ${i + 3}</option>`).join('')}
+        <option>Grade 3</option>
+        <option>Grade 4</option>
+        <option>Grade 5</option>
+        <option>Grade 6</option>
+        <option>Grade 7</option>
+        <option>Grade 8</option>
+        <option>Grade 9</option>
+        <option>Grade 10</option>
+        <option>Grade 11</option>
+        <option>Grade 12</option>
       </select>
-      <input type="text" id="tutorName" placeholder="Tutor Name" required class="w-full px-4 py-2 border rounded"/>
-      <input type="text" id="location" placeholder="Location" required class="w-full px-4 py-2 border rounded"/>
-      <input type="text" id="accessCode" placeholder="Access Code" required class="w-full px-4 py-2 border rounded"/>
-      <button type="submit" class="bg-green-600 text-white py-2 px-4 w-full rounded hover:bg-green-700">Start</button>
+
+      <input type="text" id="tutorName" placeholder="Tutor Name" class="input-block" required />
+      <input type="text" id="location" placeholder="Location" class="input-block" required />
+      <input type="password" id="accessCode" placeholder="Access Code (bkh2025)" class="input-block" required />
+
+      <button type="submit" class="w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-2 rounded-lg transition">
+        Start Assessment
+      </button>
     </form>
-    <p class="text-xs text-center mt-4 text-gray-600">POWERED BY <span style="color:#FFEB3B">POG</span></p>
   </div>
-  <script type="module" src="student.js"></script>
+
+  <footer class="text-center mt-4 text-sm text-gray-500">
+    POWERED BY <span style="color:#FFEB3B;">POG</span>
+  </footer>
+
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
+  <script src="firebaseConfig.js"></script>
+  <script src="student-login.js"></script>
 </body>
 </html>
