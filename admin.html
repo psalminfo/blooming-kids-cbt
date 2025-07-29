@@ -3,49 +3,52 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Admin Panel - Blooming Kids House</title>
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css"/>
-  <link rel="stylesheet" href="style.css"/>
-  <link rel="icon" href="favicon.ico"/>
+  <title>Admin Dashboard – Blooming Kids House</title>
+  <link rel="stylesheet" href="style.css" />
+  <link rel="icon" href="favicon.ico" />
 </head>
-<body class="bg-gray-50 text-gray-900">
-  <div class="bg-green-800 text-white p-4 flex justify-between">
-    <h1 class="text-xl font-bold">Admin Dashboard</h1>
-    <button id="logoutBtn" class="bg-yellow-400 text-green-900 px-4 py-1 rounded hover:bg-yellow-300">Logout</button>
+<body class="bg-green-50 min-h-screen p-4">
+  <header class="flex justify-between items-center mb-6">
+    <h1 class="text-xl font-bold text-green-700">Admin Dashboard</h1>
+    <button onclick="logout()" class="bg-yellow-500 text-white px-4 py-2 rounded hover:bg-yellow-600">Logout</button>
+  </header>
+
+  <div class="tabs flex space-x-4 mb-6">
+    <button class="tab-btn" onclick="switchTab('question')">Question Bank</button>
+    <button class="tab-btn" onclick="switchTab('auto')">Curriculum Generator</button>
+    <button class="tab-btn" onclick="switchTab('report')">Reports</button>
   </div>
 
-  <div class="p-4">
-    <div class="flex space-x-4 mb-6">
-      <button class="tab-btn" data-tab="upload">Upload/Edit Questions</button>
-      <button class="tab-btn" data-tab="reports">Reports</button>
-      <button class="tab-btn" data-tab="users">Users</button>
-      <button class="tab-btn" data-tab="curriculum">Curriculum</button>
-    </div>
+  <section id="question" class="tab-section hidden">
+    <h2 class="text-lg font-semibold mb-4 text-green-800">Upload/Edit Questions</h2>
+    <input type="file" id="uploadJSON" class="mb-4" accept=".json"/>
+    <button onclick="uploadJSONFile()" class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700">Upload</button>
+    <pre id="uploadStatus" class="mt-4 text-sm text-gray-600"></pre>
+  </section>
 
-    <div id="tab-upload" class="tab-section hidden">
-      <h2 class="text-lg font-semibold mb-2">Upload/Edit Question JSON</h2>
-      <input type="file" id="jsonUpload" accept=".json" class="mb-2"/>
-      <button id="uploadJsonBtn" class="bg-green-600 text-white px-4 py-2 rounded">Upload</button>
-      <div id="uploadStatus" class="mt-2 text-sm text-gray-700"></div>
-    </div>
+  <section id="auto" class="tab-section hidden">
+    <h2 class="text-lg font-semibold mb-4 text-green-800">Auto Generate Questions</h2>
+    <form id="autoForm" class="space-y-4">
+      <select id="curriculum" class="border rounded p-2 w-full">
+        <option value="uk">UK</option>
+        <option value="texas">Texas</option>
+        <option value="canada">Canada</option>
+      </select>
+      <input type="text" id="subject" placeholder="Subject" class="border rounded p-2 w-full" required/>
+      <input type="text" id="grade" placeholder="Grade" class="border rounded p-2 w-full" required/>
+      <button type="submit" class="bg-green-700 text-white px-4 py-2 rounded hover:bg-green-800">Generate</button>
+    </form>
+    <div id="autoStatus" class="mt-4 text-sm text-gray-600"></div>
+  </section>
 
-    <div id="tab-reports" class="tab-section hidden">
-      <h2 class="text-lg font-semibold mb-2">Student Reports</h2>
-      <div id="adminReports"></div>
-    </div>
+  <section id="report" class="tab-section hidden">
+    <h2 class="text-lg font-semibold mb-4 text-green-800">View Student Reports</h2>
+    <div id="reportList" class="space-y-4 text-sm text-gray-700"></div>
+  </section>
 
-    <div id="tab-users" class="tab-section hidden">
-      <h2 class="text-lg font-semibold mb-2">Users</h2>
-      <div id="userList"></div>
-    </div>
-
-    <div id="tab-curriculum" class="tab-section hidden">
-      <h2 class="text-lg font-semibold mb-2">Curriculum Sources</h2>
-      <p>You may configure GitHub JSON or curriculum-aligned fallback from admin console.</p>
-    </div>
-  </div>
-
-  <footer class="text-center py-4 text-sm text-gray-600">POWERED BY <span style="color:#FFEB3B">POG</span></footer>
+  <footer class="text-center mt-10 text-sm text-gray-500">
+    POWERED BY <span style="color:#FFEB3B;">POG</span>
+  </footer>
 
   <script type="module" src="admin.js"></script>
   <script type="module" src="questionBank.js"></script>
