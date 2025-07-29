@@ -1,116 +1,109 @@
-import { auth, db } from './firebaseConfig.js';
-import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
-import { generatePDFReport } from './reportGenerator.js';
+import { db } from "./firebaseConfig.js";
+import { collection, addDoc, Timestamp } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore.js";
+import { generateReportAndUpload } from "./reportGenerator.js";
+import { fetchQuestions } from "./questionBank.js";
 
-const urlParams = new URLSearchParams(window.location.search);
-const subject = urlParams.get('subject');
-const grade = urlParams.get('grade');
-const studentName = sessionStorage.getItem('studentName');
-const parentEmail = sessionStorage.getItem('parentEmail');
-const tutor = sessionStorage.getItem('tutor');
-const location = sessionStorage.getItem('location');
+const form = document.getElementById("testForm");
+const timerDisplay = document.getElementById("timer");
+const studentName = localStorage.getItem("bk_studentName");
+const subject = localStorage.getItem("bk_subject");
+const grade = localStorage.getItem("bk_grade");
+const studentData = {
+  studentName,
+  subject,
+  grade,
+  parentEmail: localStorage.getItem("bk_parentEmail"),
+  tutor: localStorage.getItem("bk_tutor"),
+  location: localStorage.getItem("bk_location"),
+};
 
-document.getElementById('subjectTitle').textContent = subject;
+document.getElementById("studentNameDisplay").innerText = studentName;
+document.getElementById("subjectLabel").innerText = subject;
 
-// Timer logic (30 minutes)
-let secondsRemaining = 1800;
-const timerElement = document.getElementById('timer');
-const timerInterval = setInterval(() => {
-  const mins = Math.floor(secondsRemaining / 60).toString().padStart(2, '0');
-  const secs = (secondsRemaining % 60).toString().padStart(2, '0');
-  timerElement.textContent = `${mins}:${secs}`;
-  if (secondsRemaining <= 0) {
-    clearInterval(timerInterval);
-    submitTest();
-  }
-  secondsRemaining--;
-}, 1000);
+let timeLeft = 30 * 60;
+let timerInterval;
+let questions = [];
 
-// Load questions (from manual, GitHub, or auto)
-async function loadQuestions() {
-  const container = document.getElementById('questionContainer');
-  const questions = await fetchQuestions(grade, subject);
-  questions.forEach((q, index) => {
-    const qDiv = document.createElement('div');
-    qDiv.className = 'bg-white shadow p-4 rounded-md';
-    qDiv.innerHTML = `
-      <p class="font-medium mb-2">Q${index + 1}: ${q.question}</p>
-      ${q.options.map((opt, i) => `
-        <label class="block">
-          <input type="radio" name="q${index}" value="${opt}" required class="mr-2" />
-          ${opt}
-        </label>
-      `).join('')}
-    `;
-    container.appendChild(qDiv);
-  });
-  sessionStorage.setItem('totalQuestions', questions.length);
-  sessionStorage.setItem('questionSet', JSON.stringify(questions));
+function startTimer() {
+  timerInterval = setInterval(() => {
+    if (timeLeft <= 0) {
+      clearInterval(timerInterval);
+      submitAnswers();
+    }
+    const mins = Math.floor(timeLeft / 60);
+    const secs = timeLeft % 60;
+    timerDisplay.textContent = `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
+    timeLeft--;
+  }, 1000);
 }
-loadQuestions();
 
-window.submitTest = async function () {
-  const form = document.getElementById('testForm');
-  const formData = new FormData(form);
-  const answers = {};
-  const total = parseInt(sessionStorage.getItem('totalQuestions'));
-  const questionSet = JSON.parse(sessionStorage.getItem('questionSet'));
+async function loadQuestions() {
+  try {
+    questions = await fetchQuestions(grade, subject);
+    form.innerHTML = "";
+
+    questions.slice(0, 30).forEach((q, i) => {
+      const block = document.createElement("div");
+      block.className = "bg-white p-4 rounded shadow";
+      block.innerHTML = `
+        <p class="mb-2 font-semibold">${i + 1}. ${q.question}</p>
+        ${q.options
+          .map(
+            (opt, idx) =>
+              `<label class="block mb-1">
+                <input type="radio" name="q${i}" value="${opt}" required />
+                ${opt}
+              </label>`
+          )
+          .join("")}
+      `;
+      form.appendChild(block);
+    });
+  } catch (err) {
+    alert("Error loading questions.");
+    console.error(err);
+  }
+}
+
+async function submitAnswers() {
+  clearInterval(timerInterval);
+  const responses = [];
   let correct = 0;
 
-  questionSet.forEach((q, index) => {
-    const answer = formData.get(`q${index}`);
-    answers[`q${index + 1}`] = answer || '';
-    if (answer && answer === q.answer) correct++;
+  questions.slice(0, 30).forEach((q, i) => {
+    const selected = document.querySelector(`input[name="q${i}"]:checked`);
+    const answer = selected ? selected.value : "";
+    responses.push({
+      question: q.question,
+      selected: answer,
+      correctAnswer: q.answer,
+    });
+    if (answer === q.answer) correct++;
   });
 
-  const percentage = ((correct / total) * 100).toFixed(2);
-  const result = {
-    studentName,
-    parentEmail,
-    tutor,
-    location,
-    grade,
+  const resultData = {
+    ...studentData,
+    responses,
     subject,
-    answers,
-    score: `${correct}/${total}`,
-    percentage,
-    timestamp: new Date().toLocaleString()
+    grade,
+    score: correct,
+    total: 30,
+    percent: ((correct / 30) * 100).toFixed(2),
+    timestamp: Timestamp.now(),
   };
 
-  // Save to Firestore
-  await addDoc(collection(db, 'results'), {
-    ...result,
-    createdAt: serverTimestamp()
-  });
+  await addDoc(collection(db, "testResults"), resultData);
+  await generateReportAndUpload(resultData);
 
-  // Generate report and upload
-  await generatePDFReport(result);
-
-  // Clear session
-  sessionStorage.removeItem('questionSet');
-  sessionStorage.removeItem('totalQuestions');
-
-  // Redirect
-  window.location.href = 'subject-select.html';
-};
+  localStorage.removeItem("bk_subject");
+  alert("Submitted!");
+  window.location.href = "subject-select.html";
+}
 
 window.logout = function () {
-  sessionStorage.clear();
-  auth.signOut().then(() => window.location.href = 'login-student.html');
+  localStorage.clear();
+  window.location.href = "login-student.html";
 };
 
-// Fetch fallback
-async function fetchQuestions(grade, subject) {
-  try {
-    const res = await fetch(`./assets/data/curriculum_questions/${grade}_${subject}.json`);
-    if (res.ok) return await res.json();
-  } catch (e) {
-    console.warn('Could not fetch from curriculum fallback:', e);
-  }
-  // fallback random
-  return Array.from({ length: 30 }, (_, i) => ({
-    question: `Sample question ${i + 1} for ${subject}`,
-    options: ['Option A', 'Option B', 'Option C', 'Option D'],
-    answer: 'Option A'
-  }));
-}
+loadQuestions();
+startTimer();
