@@ -3,68 +3,45 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Select Subject - Blooming Kids House</title>
+  <title>Select Subject | Blooming Kids House</title>
   <link rel="stylesheet" href="style.css" />
-  <link rel="icon" type="image/png" href="favicon.ico" />
+  <link rel="icon" href="favicon.ico" type="image/x-icon" />
 </head>
-<body>
-  <header>
-    <h1>Select Subject</h1>
-    <button id="logoutBtn">Logout</button>
+<body class="bg-green-50 min-h-screen flex flex-col items-center p-6">
+  <header class="w-full max-w-4xl flex justify-between items-center mb-6">
+    <h1 class="text-xl font-bold text-green-700">Select a Subject</h1>
+    <button onclick="logout()" class="text-sm text-white bg-yellow-500 hover:bg-yellow-600 px-4 py-2 rounded">Logout</button>
   </header>
 
-  <main>
-    <section class="subject-list" id="subjectList"></section>
+  <main class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 w-full max-w-4xl">
+    <button class="subject-btn" data-subject="Math">Math</button>
+    <button class="subject-btn" data-subject="ELA">ELA</button>
+    <button class="subject-btn" data-subject="Biology">Biology</button>
+    <button class="subject-btn" data-subject="Chemistry">Chemistry</button>
+    <button class="subject-btn" data-subject="Physics">Physics</button>
   </main>
 
-  <footer>
-    <p>POWERED BY <span style="color:#FFEB3B">POG</span></p>
+  <footer class="text-center mt-8 text-sm text-gray-500">
+    POWERED BY <span style="color:#FFEB3B;">POG</span>
   </footer>
 
-  <script type="module">
-    import { auth, db } from './firebaseConfig.js';
-    import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
-    import { getDoc, doc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
-
-    const subjectList = document.getElementById("subjectList");
-    const logoutBtn = document.getElementById("logoutBtn");
-
-    const gradeSubjects = {
-      3: ['Math', 'ELA'],
-      4: ['Math', 'ELA'],
-      5: ['Math', 'ELA'],
-      6: ['Math', 'ELA'],
-      7: ['Math', 'ELA', 'Biology', 'Chemistry', 'Physics'],
-      8: ['Math', 'ELA', 'Biology', 'Chemistry', 'Physics'],
-      9: ['Math', 'ELA', 'Biology', 'Chemistry', 'Physics'],
-      10: ['Math', 'ELA', 'Biology', 'Chemistry', 'Physics'],
-      11: ['Math', 'ELA', 'Biology', 'Chemistry', 'Physics'],
-      12: ['Math', 'ELA', 'Biology', 'Chemistry', 'Physics']
-    };
-
-    let studentData = {};
-
-    onAuthStateChanged(auth, async user => {
-      if (!user) location.href = 'login.html';
-      const docSnap = await getDoc(doc(db, "students", user.uid));
-      studentData = docSnap.data();
-      renderSubjects(gradeSubjects[studentData.grade]);
-    });
-
-    function renderSubjects(subjects) {
-      subjectList.innerHTML = subjects.map(subj =>
-        `<button class="subject-btn" onclick="startTest('${subj}')">${subj}</button>`
-      ).join('');
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
+  <script src="firebaseConfig.js"></script>
+  <script>
+    function logout() {
+      firebase.auth().signOut().then(() => {
+        window.location.href = "login-student.html";
+      });
     }
 
-    window.startTest = (subject) => {
-      sessionStorage.setItem("selectedSubject", subject);
-      location.href = "student.html";
-    };
-
-    logoutBtn.onclick = () => {
-      signOut(auth).then(() => location.href = "login.html");
-    };
+    document.querySelectorAll(".subject-btn").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const subject = btn.getAttribute("data-subject");
+        sessionStorage.setItem("selectedSubject", subject);
+        window.location.href = "student.html";
+      });
+    });
   </script>
 </body>
 </html>
