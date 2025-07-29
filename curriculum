@@ -1,1 +1,334 @@
-
+{
+  "Grade 3": {
+    "Math": [
+      {
+        "question": "What is 15 + 27?",
+        "answer": "42"
+      },
+      {
+        "question": "If a box has 6 apples and you add 4 more, how many apples are in the box?",
+        "answer": "10"
+      },
+      {
+        "question": "What is 8 x 3?",
+        "answer": "24"
+      },
+      {
+        "question": "How many sides does a hexagon have?",
+        "answer": "6"
+      },
+      {
+        "question": "What is 45 - 19?",
+        "answer": "26"
+      },
+      {
+        "question": "If you have 3 groups of 5 cookies, how many cookies do you have?",
+        "answer": "15"
+      },
+      {
+        "question": "What is the value of 7 tens and 4 ones?",
+        "answer": "74"
+      },
+      {
+        "question": "How many minutes are in 1 hour?",
+        "answer": "60"
+      },
+      {
+        "question": "What is 100 - 25?",
+        "answer": "75"
+      },
+      {
+        "question": "If a rectangle has a length of 8 cm and a width of 3 cm, what is its perimeter?",
+        "answer": "22 cm"
+      },
+      {
+        "question": "What is 4 x 9?",
+        "answer": "36"
+      },
+      {
+        "question": "How many days are in a week?",
+        "answer": "7"
+      },
+      {
+        "question": "What is 56 ÷ 8?",
+        "answer": "7"
+      },
+      {
+        "question": "If you have 12 pencils and give away 5, how many pencils are left?",
+        "answer": "7"
+      },
+      {
+        "question": "What is the next number in the pattern: 5, 10, 15, 20?",
+        "answer": "25"
+      },
+      {
+        "question": "How many corners does a cube have?",
+        "answer": "8"
+      },
+      {
+        "question": "What is 3 + 5 + 7?",
+        "answer": "15"
+      },
+      {
+        "question": "If a book costs $6 and you pay with a $10 bill, how much change will you get?",
+        "answer": "$4"
+      },
+      {
+        "question": "What is 9 x 2?",
+        "answer": "18"
+      },
+      {
+        "question": "How many months are in a year?",
+        "answer": "12"
+      }
+    ],
+    "ELA": [
+      {
+        "question": "What is the plural form of 'cat'?",
+        "answer": "Cats"
+      },
+      {
+        "question": "Which word is a verb: run, house, tree?",
+        "answer": "Run"
+      },
+      {
+        "question": "What is the opposite of 'big'?",
+        "answer": "Small"
+      },
+      {
+        "question": "What is the correct punctuation for this sentence: I have two cats",
+        "answer": "I have two cats."
+      },
+      {
+        "question": "Which word is a noun: jump, table, fast?",
+        "answer": "Table"
+      },
+      {
+        "question": "What is the past tense of 'walk'?",
+        "answer": "Walked"
+      },
+      {
+        "question": "Which word rhymes with 'hat'?",
+        "answer": "Cat"
+      },
+      {
+        "question": "What is the main idea of a story about a dog who saves his owner from danger?",
+        "answer": "The dog is brave and loyal."
+      },
+      {
+        "question": "Which word is an adjective: blue, run, book?",
+        "answer": "Blue"
+      },
+      {
+        "question": "What is the plural form of 'child'?",
+        "answer": "Children"
+      },
+      {
+        "question": "What is the correct spelling: recieve or receive?",
+        "answer": "Receive"
+      },
+      {
+        "question": "What is a synonym for 'happy'?",
+        "answer": "Joyful"
+      },
+      {
+        "question": "Which sentence is correct: She run fast or She runs fast?",
+        "answer": "She runs fast."
+      },
+      {
+        "question": "What is the setting of a story that takes place in a forest?",
+        "answer": "The forest"
+      },
+      {
+        "question": "What is the past tense of 'sing'?",
+        "answer": "Sang"
+      },
+      {
+        "question": "Which word is a pronoun: dog, he, table?",
+        "answer": "He"
+      },
+      {
+        "question": "What is a synonym for 'big'?",
+        "answer": "Large"
+      },
+      {
+        "question": "Which sentence uses correct capitalization: i like to read or I like to read?",
+        "answer": "I like to read."
+      },
+      {
+        "question": "What is the plural form of 'mouse'?",
+        "answer": "Mice"
+      },
+      {
+        "question": "What is the main character called in a story?",
+        "answer": "Protagonist"
+      }
+    ]
+  },
+  "Grade 4": {
+    "Math": [
+      {
+        "question": "What is 234 + 567?",
+        "answer": "801"
+      },
+      {
+        "question": "What is 12 x 6?",
+        "answer": "72"
+      },
+      {
+        "question": "What is 456 - 189?",
+        "answer": "267"
+      },
+      {
+        "question": "How many sides does an octagon have?",
+        "answer": "8"
+      },
+      {
+        "question": "What is 72 ÷ 9?",
+        "answer": "8"
+      },
+      {
+        "question": "If a rectangle has a length of 10 cm and a width of 5 cm, what is its area?",
+        "answer": "50 cm²"
+      },
+      {
+        "question": "What is the value of 5 hundreds, 3 tens, and 7 ones?",
+        "answer": "537"
+      },
+      {
+        "question": "How many seconds are in 2 minutes?",
+        "answer": "120"
+      },
+      {
+        "question": "What is 1,000 - 345?",
+        "answer": "655"
+      },
+      {
+        "question": "What is the perimeter of a square with a side length of 6 cm?",
+        "answer": "24 cm"
+      },
+      {
+        "question": "What is 15 x 4?",
+        "answer": "60"
+      },
+      {
+        "question": "What is the next number in the pattern: 10, 20, 30, 40?",
+        "answer": "50"
+      },
+      {
+        "question": "What is 81 ÷ 9?",
+        "answer": "9"
+      },
+      {
+        "question": "If you have $20 and spend $7, how much money is left?",
+        "answer": "$13"
+      },
+      {
+        "question": "What fraction is equivalent to 1/2?",
+        "answer": "2/4"
+      },
+      {
+        "question": "How many faces does a cube have?",
+        "answer": "6"
+      },
+      {
+        "question": "What is 25 + 36 + 14?",
+        "answer": "75"
+      },
+      {
+        "question": "What is 7 x 8?",
+        "answer": "56"
+      },
+      {
+        "question": "What is the value of the digit 4 in 4,321?",
+        "answer": "4,000"
+      },
+      {
+        "question": "If a book costs $12 and you pay with a $20 bill, how much change will you get?",
+        "answer": "$8"
+      }
+    ],
+    "ELA": [
+      {
+        "question": "What is the plural form of 'deer'?",
+        "answer": "Deer"
+      },
+      {
+        "question": "Which word is an adverb: quickly, house, tree?",
+        "answer": "Quickly"
+      },
+      {
+        "question": "What is a synonym for 'small'?",
+        "answer": "Tiny"
+      },
+      {
+        "question": "Which sentence is correct: He don’t like to read or He doesn’t like to read?",
+        "answer": "He doesn’t like to read."
+      },
+      {
+        "question": "What is the past tense of 'write'?",
+        "answer": "Wrote"
+      },
+      {
+        "question": "What is the main idea of a story about a girl who learns to ride a bike?",
+        "answer": "The girl overcomes challenges to learn a new skill."
+      },
+      {
+        "question": "Which word is a preposition: under, run, book?",
+        "answer": "Under"
+      },
+      {
+        "question": "What is the correct spelling: beleive or believe?",
+        "answer": "Believe"
+      },
+      {
+        "question": "What is an antonym for 'fast'?",
+        "answer": "Slow"
+      },
+      {
+        "question": "What is the setting of a story that takes place in a school?",
+        "answer": "The school"
+      },
+      {
+        "question": "Which word is a conjunction: and, dog, jump?",
+        "answer": "And"
+      },
+      {
+        "question": "What is the past tense of 'swim'?",
+        "answer": "Swam"
+      },
+      {
+        "question": "What is a synonym for 'sad'?",
+        "answer": "Unhappy"
+      },
+      {
+        "question": "Which sentence uses correct punctuation: I have a dog or I have a dog.",
+        "answer": "I have a dog."
+      },
+      {
+        "question": "What is the plural form of 'foot'?",
+        "answer": "Feet"
+      },
+      {
+        "question": "What is the theme of a story about honesty?",
+        "answer": "The importance of telling the truth"
+      },
+      {
+        "question": "Which word is a pronoun: she, table, fast?",
+        "answer": "She"
+      },
+      {
+        "question": "What is the correct capitalization: the grand canyon or The Grand Canyon?",
+        "answer": "The Grand Canyon"
+      },
+      {
+        "question": "What is an antonym for 'happy'?",
+        "answer": "Sad"
+      },
+      {
+        "question": "What is the main character’s problem in a story about a boy who loses his dog?",
+        "answer": "The boy needs to find his lost dog."
+      }
+    ]
+  }
+}
