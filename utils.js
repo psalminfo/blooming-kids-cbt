@@ -1,28 +1,27 @@
-export function gradePercentage(score, total) {
-  const percent = Math.round((score / total) * 100);
-  let letter = 'F';
-  if (percent >= 90) letter = 'A';
-  else if (percent >= 80) letter = 'B';
-  else if (percent >= 70) letter = 'C';
-  else if (percent >= 60) letter = 'D';
-  return { percent, letter };
+function calculatePercentage(score, total) {
+  return total === 0 ? 0 : (score / total) * 100;
 }
 
-export function shuffleArray(arr) {
-  return arr.sort(() => Math.random() - 0.5);
+function getLetterGrade(percentage) {
+  if (percentage >= 90) return "A";
+  if (percentage >= 80) return "B";
+  if (percentage >= 70) return "C";
+  if (percentage >= 60) return "D";
+  return "F";
 }
 
-export function extractBreakdown(questions, answers) {
-  const map = {};
-  questions.forEach((q, i) => {
-    const cat = q.category || 'Other';
-    map[cat] = map[cat] || { correct: 0, total: 0 };
-    map[cat].total += 1;
-    if (q.correct === answers[i]) map[cat].correct += 1;
-  });
+function formatTimestamp() {
+  return new Date().toISOString();
+}
 
-  return Object.entries(map).map(([category, { correct, total }]) => {
-    const percent = Math.round((correct / total) * 100);
-    return { category, correct, total, percent: `${percent}%` };
-  });
+function shuffleArray(arr) {
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr;
+}
+
+function limitQuestions(questions, count = 30) {
+  return shuffleArray(questions).slice(0, count);
 }
