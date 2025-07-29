@@ -3,60 +3,28 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Select Subject</title>
+  <title>Select Subject - Blooming Kids House</title>
   <link rel="stylesheet" href="style.css" />
   <link rel="icon" href="favicon.ico" />
+  <script type="module" src="subject-select.js"></script>
 </head>
-<body class="bg-green-50 font-sans">
-  <div class="min-h-screen flex flex-col items-center justify-center p-4">
-    <div class="w-full max-w-3xl bg-white p-6 rounded-2xl shadow-lg">
-      <h1 class="text-2xl font-bold text-green-700 mb-6 text-center">Choose a Subject to Begin</h1>
-      <div id="subjectTabs" class="grid grid-cols-2 md:grid-cols-3 gap-4 mb-6">
-        <!-- These buttons will be populated dynamically based on grade -->
-      </div>
-      <button id="logoutBtn" class="bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700 w-full mt-4">Logout</button>
+<body class="bg-green-50 text-gray-900 font-sans">
+  <header class="bg-green-700 text-white p-4 flex justify-between items-center">
+    <h1 class="text-xl font-bold">Select a Subject</h1>
+    <button id="logoutBtn" class="bg-yellow-400 text-green-900 px-4 py-1 rounded hover:bg-yellow-300">Logout</button>
+  </header>
+
+  <main class="p-6">
+    <div class="mb-4">
+      <p class="text-lg font-semibold">Choose a subject to begin your test:</p>
     </div>
-  </div>
 
-  <script type="module">
-    import { auth } from './firebaseConfig.js';
-    import { signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+    <div id="subjectTabs" class="grid gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
+      <!-- Subjects will be dynamically rendered here -->
+    </div>
+  </main>
 
-    const logoutBtn = document.getElementById('logoutBtn');
-    logoutBtn.addEventListener('click', async () => {
-      await signOut(auth);
-      window.location.href = "login-student.html";
-    });
-
-    const subjectTabs = document.getElementById('subjectTabs');
-    const queryParams = new URLSearchParams(window.location.search);
-    const grade = parseInt(queryParams.get('grade'));
-
-    const subjectMap = {
-      default: ["Math", "ELA"],
-      science: ["Math", "ELA", "Biology", "Chemistry", "Physics"]
-    };
-
-    const subjects = grade >= 7 ? subjectMap.science : subjectMap.default;
-
-    subjects.forEach(subject => {
-      const btn = document.createElement('button');
-      btn.textContent = subject;
-      btn.className = "bg-yellow-400 text-green-900 font-semibold py-2 px-4 rounded-xl hover:bg-yellow-300";
-      btn.onclick = () => {
-        window.location.href = `student.html?grade=${grade}&subject=${subject}`;
-      };
-      subjectTabs.appendChild(btn);
-    });
-
-    onAuthStateChanged(auth, user => {
-      if (!user) {
-        window.location.href = "login-student.html";
-      }
-    });
-  </script>
-
-  <footer class="text-center text-sm mt-10 text-gray-600">
+  <footer class="text-center text-sm py-4 text-gray-700">
     POWERED BY <span style="color:#FFEB3B">POG</span>
   </footer>
 </body>
