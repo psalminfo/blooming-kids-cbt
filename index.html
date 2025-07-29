@@ -1,40 +1,145 @@
+<!-- ✅ FILE: index.html (Student Login) -->
 <!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Student Login - Blooming Kids House</title>
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" />
-    <link rel="stylesheet" href="style.css" />
-    <link rel="icon" href="favicon.ico" />
-  </head>
-  <body class="bg-green-50 min-h-screen flex items-center justify-center">
-    <div class="bg-white p-8 rounded-xl shadow-xl w-full max-w-md">
-      <h2 class="text-2xl font-bold text-green-800 text-center mb-6">Student Login</h2>
-      <form id="studentLoginForm" class="space-y-4">
-        <input type="text" id="studentName" placeholder="Full Name" required class="w-full px-4 py-2 border rounded" />
-        <input type="email" id="parentEmail" placeholder="Parent Email" required class="w-full px-4 py-2 border rounded" />
-        <select id="grade" required class="w-full px-4 py-2 border rounded">
-          <option value="">Select Grade</option>
-          <option value="3">Grade 3</option>
-          <option value="4">Grade 4</option>
-          <option value="5">Grade 5</option>
-          <option value="6">Grade 6</option>
-          <option value="7">Grade 7</option>
-          <option value="8">Grade 8</option>
-          <option value="9">Grade 9</option>
-          <option value="10">Grade 10</option>
-          <option value="11">Grade 11</option>
-          <option value="12">Grade 12</option>
-        </select>
-        <input type="text" id="tutorName" placeholder="Tutor Name" required class="w-full px-4 py-2 border rounded" />
-        <input type="text" id="location" placeholder="Location" required class="w-full px-4 py-2 border rounded" />
-        <input type="text" id="accessCode" placeholder="Access Code (bkh2025)" required class="w-full px-4 py-2 border rounded" />
-        <button type="submit" class="bg-green-600 text-white w-full py-2 rounded hover:bg-green-700">Login</button>
-      </form>
-      <p class="text-xs text-center mt-4 text-gray-600">POWERED BY <span style="color:#FFEB3B">POG</span></p>
-    </div>
-
-    <script type="module" src="student-login.js"></script>
-  </body>
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Student Login - Blooming Kids House</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css">
+  <link rel="stylesheet" href="style.css">
+  <link rel="icon" href="favicon.ico">
+</head>
+<body class="bg-green-50 min-h-screen flex items-center justify-center">
+  <div class="bg-white p-8 rounded-xl shadow-xl w-full max-w-md">
+    <h2 class="text-2xl font-bold text-green-800 text-center mb-6">Student Login</h2>
+    <form id="studentLoginForm" class="space-y-4">
+      <input type="text" id="studentName" placeholder="Full Name" required class="w-full px-4 py-2 border rounded">
+      <input type="email" id="parentEmail" placeholder="Parent Email" required class="w-full px-4 py-2 border rounded">
+      <select id="grade" required class="w-full px-4 py-2 border rounded">
+        <option value="">Select Grade</option>
+        <option value="3">Grade 3</option>
+        <option value="4">Grade 4</option>
+        <option value="5">Grade 5</option>
+        <option value="6">Grade 6</option>
+        <option value="7">Grade 7</option>
+        <option value="8">Grade 8</option>
+        <option value="9">Grade 9</option>
+        <option value="10">Grade 10</option>
+        <option value="11">Grade 11</option>
+        <option value="12">Grade 12</option>
+      </select>
+      <input type="text" id="tutorName" placeholder="Tutor Name" required class="w-full px-4 py-2 border rounded">
+      <input type="text" id="location" placeholder="Location" required class="w-full px-4 py-2 border rounded">
+      <input type="text" id="accessCode" placeholder="Access Code (bkh2025)" required class="w-full px-4 py-2 border rounded">
+      <button type="submit" class="bg-green-600 text-white w-full py-2 rounded hover:bg-green-700">Login</button>
+    </form>
+    <p class="text-xs text-center mt-4 text-gray-600">POWERED BY <span style="color:#FFEB3B">POG</span></p>
+  </div>
+  <script src="student-login.js"></script>
+</body>
 </html>
+
+
+<!-- ✅ FILE: student-login.js -->
+document.getElementById("studentLoginForm").addEventListener("submit", function (e) {
+  e.preventDefault();
+  const studentName = document.getElementById("studentName").value.trim();
+  const parentEmail = document.getElementById("parentEmail").value.trim();
+  const grade = document.getElementById("grade").value;
+  const tutorName = document.getElementById("tutorName").value.trim();
+  const location = document.getElementById("location").value.trim();
+  const accessCode = document.getElementById("accessCode").value.trim();
+
+  if (accessCode !== "bkh2025") {
+    alert("Invalid Access Code");
+    return;
+  }
+
+  // Save student info to sessionStorage
+  sessionStorage.setItem("studentInfo", JSON.stringify({
+    studentName,
+    parentEmail,
+    grade,
+    tutorName,
+    location
+  }));
+
+  // Redirect to subject-select page
+  window.location.href = "subject-select.html";
+});
+
+
+<!-- ✅ FILE: subject-select.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Select Subject - Blooming Kids House</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body class="bg-yellow-50 min-h-screen py-10 px-6">
+  <div class="max-w-3xl mx-auto">
+    <div class="flex justify-between items-center mb-6">
+      <h1 class="text-xl font-bold text-green-800">Select Subject</h1>
+      <button onclick="logout()" class="text-red-600 font-medium hover:underline">Logout</button>
+    </div>
+    <div id="subjectList" class="grid grid-cols-2 md:grid-cols-3 gap-4"></div>
+  </div>
+  <script src="subject-select.js"></script>
+</body>
+</html>
+
+
+<!-- ✅ FILE: subject-select.js -->
+const studentData = JSON.parse(sessionStorage.getItem("studentInfo"));
+if (!studentData) {
+  window.location.href = "index.html";
+}
+
+const subjectsByGrade = {
+  default: ["Math", "ELA"],
+  scienceGrades: ["Biology", "Chemistry", "Physics"]
+};
+
+const allSubjects = [...subjectsByGrade.default];
+if (parseInt(studentData.grade) >= 7) {
+  allSubjects.push(...subjectsByGrade.scienceGrades);
+}
+
+const subjectList = document.getElementById("subjectList");
+allSubjects.forEach(subject => {
+  const btn = document.createElement("button");
+  btn.innerText = subject;
+  btn.className = "bg-green-600 text-white py-2 rounded hover:bg-green-700";
+  btn.onclick = () => {
+    const params = new URLSearchParams({
+      subject,
+      grade: studentData.grade,
+      studentName: studentData.studentName,
+      parentEmail: studentData.parentEmail,
+      tutorName: studentData.tutorName,
+      location: studentData.location
+    });
+    window.location.href = `student.html?${params.toString()}`;
+  };
+  subjectList.appendChild(btn);
+});
+
+function logout() {
+  sessionStorage.clear();
+  window.location.href = "index.html";
+}
+
+
+<!-- ✅ FILE: style.css -->
+body {
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+button {
+  width: 100%;
+  padding: 12px;
+  margin-bottom: 10px;
+  transition: all 0.2s ease-in-out;
+}
