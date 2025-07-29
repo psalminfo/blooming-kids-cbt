@@ -1,52 +1,42 @@
-document.addEventListener("DOMContentLoaded", () => {
-  const db = firebase.firestore();
+import { db } from './firebaseConfig.js';
+import { collection, getDocs } from 'firebase/firestore';
 
-  const childNameInput = document.getElementById("childName");
-  const parentEmailInput = document.getElementById("parentEmail");
-  const searchBtn = document.getElementById("searchBtn");
-  const resultContainer = document.getElementById("resultContainer");
+async function fetchReports() {
+  const student = localStorage.getItem('bk_studentName');
+  const email = localStorage.getItem('bk_parentEmail');
+  const container = document.getElementById('reportContainer');
 
-  const logoutBtn = document.getElementById("logoutBtn");
+  if (!student || !email) {
+    container.innerHTML = "Missing login info.";
+    return;
+  }
 
-  logoutBtn.addEventListener("click", () => {
-    sessionStorage.clear();
-    window.location.href = "login-parent.html";
+  const snapshot = await getDocs(collection(db, 'reports'));
+  container.innerHTML = "";
+
+  snapshot.forEach(doc => {
+    const data = doc.data();
+    if (data.student === student && data.parentEmail === email) {
+      const div = document.createElement('div');
+      div.innerHTML = `
+        <strong>${data.subject} (Grade ${data.grade})</strong><br/>
+        <a href="${data.url}" target="_blank" class="text-blue-600 underline">Download Report</a>
+        <hr class="my-2"/>
+      `;
+      container.appendChild(div);
+    }
   });
 
-  searchBtn.addEventListener("click", () => {
-    const child = childNameInput.value.trim();
-    const email = parentEmailInput.value.trim();
+  if (!container.innerHTML) {
+    container.innerHTML = "No matching reports found.";
+  }
+}
 
-    if (!child || !email) return alert("Please fill both fields.");
+function logout() {
+  localStorage.removeItem('bk_studentName');
+  localStorage.removeItem('bk_parentEmail');
+  window.location.href = 'login-parent.html';
+}
 
-    resultContainer.innerHTML = "Loading...";
-
-    db.collection("testResults")
-      .where("student", "==", child)
-      .where("parent", "==", email)
-      .get()
-      .then((snapshot) => {
-        if (snapshot.empty) {
-          resultContainer.innerHTML = "<p>No reports found.</p>";
-        } else {
-          resultContainer.innerHTML = "";
-          snapshot.forEach((doc) => {
-            const data = doc.data();
-            const div = document.createElement("div");
-            div.className = "bg-white shadow rounded p-3 mb-3";
-            div.innerHTML = `
-              <h3>${data.subject}</h3>
-              <p>Score: ${data.correct}/${data.total}</p>
-              <p>Percentage: ${data.percentage}%</p>
-              <p>Date: ${new Date(data.timestamp).toLocaleString()}</p>
-            `;
-            resultContainer.appendChild(div);
-          });
-        }
-      })
-      .catch((err) => {
-        console.error(err);
-        resultContainer.innerHTML = "<p>Error loading reports.</p>";
-      });
-  });
-});
+window.addEventListener('DOMContentLoaded', fetchReports);
+window.logout = logout;
