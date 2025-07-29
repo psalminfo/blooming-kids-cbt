@@ -1,3 +1,4 @@
+import { auth } from './firebaseConfig.js';
 import { getQuestions } from './autoQuestionGen.js';
 
 const urlParams = new URLSearchParams(window.location.search);
