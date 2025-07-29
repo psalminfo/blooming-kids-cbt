@@ -40,56 +40,9 @@
 </html>
 
 
-<!-- ✅ FILE: student-login.js -->
-document.getElementById("studentLoginForm").addEventListener("submit", function (e) {
-  e.preventDefault();
-  const studentName = document.getElementById("studentName").value.trim();
-  const parentEmail = document.getElementById("parentEmail").value.trim();
-  const grade = document.getElementById("grade").value;
-  const tutorName = document.getElementById("tutorName").value.trim();
-  const location = document.getElementById("location").value.trim();
-  const accessCode = document.getElementById("accessCode").value.trim();
-
-  if (accessCode !== "bkh2025") {
-    alert("Invalid Access Code");
-    return;
-  }
-
-  // Save student info to sessionStorage
-  sessionStorage.setItem("studentInfo", JSON.stringify({
-    studentName,
-    parentEmail,
-    grade,
-    tutorName,
-    location
-  }));
-
-  // Redirect to subject-select page
-  window.location.href = "subject-select.html";
-});
 
 
-<!-- ✅ FILE: subject-select.html -->
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Select Subject - Blooming Kids House</title>
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css">
-  <link rel="stylesheet" href="style.css">
-</head>
-<body class="bg-yellow-50 min-h-screen py-10 px-6">
-  <div class="max-w-3xl mx-auto">
-    <div class="flex justify-between items-center mb-6">
-      <h1 class="text-xl font-bold text-green-800">Select Subject</h1>
-      <button onclick="logout()" class="text-red-600 font-medium hover:underline">Logout</button>
-    </div>
-    <div id="subjectList" class="grid grid-cols-2 md:grid-cols-3 gap-4"></div>
-  </div>
-  <script src="subject-select.js"></script>
-</body>
-</html>
+
 
 
 <!-- ✅ FILE: subject-select.js -->
