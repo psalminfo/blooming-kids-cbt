@@ -1,20 +1,26 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Take Test | Blooming Kids House</title>
-  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="style.css" />
   <link rel="icon" href="favicon.ico" type="image/x-icon" />
 </head>
 <body class="bg-green-50 min-h-screen p-4">
   <header class="flex justify-between items-center mb-6">
-    <h2 class="text-lg font-semibold text-green-800">BKH Assessment - <span id="subjectTitle">Subject</span></h2>
-    <button onclick="logout()" class="bg-yellow-500 hover:bg-yellow-600 text-white px-4 py-2 rounded">Logout</button>
+    <h2 class="text-lg font-semibold text-green-800">
+      BKH Assessment – <span id="subjectTitle">Subject</span>
+    </h2>
+    <button onclick="logout()" class="bg-yellow-500 hover:bg-yellow-600 text-white px-4 py-2 rounded">
+      Logout
+    </button>
   </header>
 
   <div class="flex justify-between items-center mb-4">
-    <div class="text-green-700 text-sm font-medium">Time Remaining: <span id="timer">30:00</span></div>
+    <div class="text-green-700 text-sm font-medium">
+      Time Remaining: <span id="timer">30:00</span>
+    </div>
     <button onclick="submitTest()" class="bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded shadow">
       Submit Test
     </button>
@@ -28,10 +34,12 @@
     POWERED BY <span style="color:#FFEB3B;">POG</span>
   </footer>
 
-  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
-  <script src="firebaseConfig.js"></script>
-  <script src="student.js"></script>
+  <!-- jsPDF & AutoTable -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.25/jspdf.plugin.autotable.min.js"></script>
+
+  <!-- Firebase & App Logic -->
+  <script type="module" src="./firebaseConfig.js"></script>
+  <script type="module" src="./student.js"></script>
 </body>
 </html>
