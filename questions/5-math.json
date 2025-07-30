@@ -1,0 +1,246 @@
+{
+  "math_questions": {
+    "grade_5": [
+      {
+        "question": "What is the value of 4.56 × 3?",
+        "options": ["₦13.68", "₦14.68", "₦12.68", "₦13.58"],
+        "answer": "₦13.68",
+        "category": "Number and Operations"
+      },
+      {
+        "question": "What is 15% of ₦200?",
+        "options": ["₦25", "₦30", "₦35", "₦40"],
+        "answer": "₦30",
+        "category": "Number - Fractions"
+      },
+      {
+        "question": "Explain how to find the volume of a rectangular prism with dimensions 5 cm, 4 cm, and 3 cm.",
+        "options": [],
+        "answer": "Multiply length × width × height: 5 × 4 × 3 = 60 cubic cm.",
+        "category": "Spatial Sense"
+      },
+      {
+        "question": "Which expression is equivalent to 6 × (3 + 4)?",
+        "options": ["(6 × 3) + (6 × 4)", "(6 × 3) + 4", "(6 + 3) × 4", "6 + (3 × 4)"],
+        "answer": "(6 × 3) + (6 × 4)",
+        "category": "Algebraic Thinking"
+      },
+      {
+        "question": "How many milliliters are in 4.5 liters?",
+        "options": ["₦4,500", "₦450", "₦45,000", "₦450,000"],
+        "answer": "₦4,500",
+        "category": "Measurement"
+      },
+      {
+        "question": "What is 3/4 ÷ 1/2?",
+        "options": ["1/2", "3/2", "2/3", "4/3"],
+        "answer": "3/2",
+        "category": "Number and Operations"
+      },
+      {
+        "question": "A bar graph shows 15 votes for blue, 10 for red, and 5 for green. How many votes were cast in total?",
+        "options": ["₦25", "₦30", "₦35", "₦40"],
+        "answer": "₦30",
+        "category": "Data Analysis"
+      },
+      {
+        "question": "Write 0.8 as a fraction in its simplest form.",
+        "options": [],
+        "answer": "4/5",
+        "category": "Number - Fractions"
+      },
+      {
+        "question": "What is the area of a triangle with a base of 8 cm and a height of 6 cm?",
+        "options": ["₦24 cm²", "₦48 cm²", "₦20 cm²", "₦28 cm²"],
+        "answer": "₦24 cm²",
+        "category": "Spatial Sense"
+      },
+      {
+        "question": "A savings account earns ₦1.25 interest per month. How much interest is earned in 4 months?",
+        "options": ["₦4.50", "₦5.00", "₦5.50", "₦6.00"],
+        "answer": "₦5.00",
+        "category": "Personal Financial Literacy"
+      },
+      {
+        "question": "What is the value of (3 × 1,000) + (5 × 100) + (2 × 10) + (7 × 1)?",
+        "options": ["3,527", "3,257", "5,327", "3,572"],
+        "answer": "3,527",
+        "category": "Number and Place Value"
+      },
+      {
+        "question": "What is 3/5 + 2/5?",
+        "options": ["1/5", "2/5", "1", "5/5"],
+        "answer": "1",
+        "category": "Number - Fractions"
+      },
+      {
+        "question": "What is 456 ÷ 3?",
+        "options": ["151", "152", "153", "154"],
+        "answer": "152",
+        "category": "Number and Operations"
+      },
+      {
+        "question": "Which number is 10,000 more than 23,456?",
+        "options": ["33,456", "23,566", "33,566", "43,456"],
+        "answer": "33,456",
+        "category": "Number and Place Value"
+      },
+      {
+        "question": "What is 25% of ₦400?",
+        "options": ["₦75", "₦100", "₦125", "₦150"],
+        "answer": "₦100",
+        "category": "Number - Fractions"
+      },
+      {
+        "question": "What is the perimeter of a rectangle with a length of 10 cm and a width of 6 cm?",
+        "options": ["₦16 cm", "₦32 cm", "₦36 cm", "₦60 cm"],
+        "answer": "₦32 cm",
+        "category": "Spatial Sense"
+      },
+      {
+        "question": "A store sells pencils for ₦2.50 each. How much will 6 pencils cost?",
+        "options": ["₦12.50", "₦15.00", "₦17.50", "₦20.00"],
+        "answer": "₦15.00",
+        "category": "Personal Financial Literacy"
+      },
+      {
+        "question": "What is 7.8 – 2.3?",
+        "options": ["₦5.5", "₦5.4", "₦5.3", "₦5.2"],
+        "answer": "₦5.5",
+        "category": "Number and Operations"
+      },
+      {
+        "question": "What is the next number in the pattern: 5, 10, 15, 20?",
+        "options": ["25", "30", "35", "40"],
+        "answer": "25",
+        "category": "Patterns"
+      },
+      {
+        "question": "Which number is rounded to 6,000 when rounded to the nearest thousand?",
+        "options": ["5,499", "5,501", "6,501", "6,599"],
+        "answer": "5,501",
+        "category": "Number and Place Value"
+      },
+      {
+        "question": "What is 9 × 7?",
+        "options": ["63", "64", "72", "81"],
+        "answer": "63",
+        "category": "Number - Multiplication and Division"
+      },
+      {
+        "question": "What is the value of the digit 4 in 34,567?",
+        "options": ["4", "40", "400", "4,000"],
+        "answer": "4,000",
+        "category": "Number and Place Value"
+      },
+      {
+        "question": "Which fraction is equivalent to 0.25?",
+        "options": ["1/2", "1/3", "1/4", "1/5"],
+        "answer": "1/4",
+        "category": "Number - Fractions"
+      },
+      {
+        "question": "How many centimeters are in 3.2 meters?",
+        "options": ["₦32", "₦320", "₦3,200", "₦32,000"],
+        "answer": "₦320",
+        "category": "Measurement"
+      },
+      {
+        "question": "What is 5/6 – 1/3?",
+        "options": ["1/3", "1/2", "2/3", "3/4"],
+        "answer": "1/2",
+        "category": "Number and Operations"
+      },
+      {
+        "question": "A dot plot shows the number of books read: 3, 4, 4, 5, 6. What is the most common number of books?",
+        "options": ["3", "4", "5", "6"],
+        "answer": "4",
+        "category": "Data Analysis"
+      },
+      {
+        "question": "What is 10% of ₦500?",
+        "options": ["₦40", "₦50", "₦60", "₦70"],
+        "answer": "₦50",
+        "category": "Number - Fractions"
+      },
+      {
+        "question": "Which shape has exactly two pairs of parallel sides?",
+        "options": ["Trapezoid", "Parallelogram", "Triangle", "Pentagon"],
+        "answer": "Parallelogram",
+        "category": "Geometry"
+      },
+      {
+        "question": "A toy costs ₦12.75. How much change will you get from ₦20.00?",
+        "options": ["₦7.25", "₦7.75", "₦8.25", "₦8.75"],
+        "answer": "₦7.25",
+        "category": "Personal Financial Literacy"
+      },
+      {
+        "question": "What is 3.24 rounded to the nearest whole number?",
+        "options": ["3", "3.2", "3.3", "4"],
+        "answer": "3",
+        "category": "Number and Place Value"
+      },
+      {
+        "question": "What is 72 ÷ 8?",
+        "options": ["8", "9", "10", "11"],
+        "answer": "9",
+        "category": "Number - Multiplication and Division"
+      },
+      {
+        "question": "Explain how to multiply 34 × 5 using the standard algorithm.",
+        "options": [],
+        "answer": "Write 34 × 5 vertically. Multiply 5 × 4 ones = 20 ones, write 0, carry 2 tens. Multiply 5 × 3 tens = 15 tens, add 2 tens = 17 tens. The answer is 170.",
+        "category": "Number and Operations"
+      },
+      {
+        "question": "Which number is 100 less than 5,678?",
+        "options": ["5,578", "5,678", "5,778", "5,878"],
+        "answer": "5,578",
+        "category": "Number and Place Value"
+      },
+      {
+        "question": "What time is it 1 hour and 45 minutes after 2:30 p.m.?",
+        "options": ["3:15 p.m.", "4:00 p.m.", "4:15 p.m.", "4:30 p.m."],
+        "answer": "4:15 p.m.",
+        "category": "Measurement"
+      },
+      {
+        "question": "What is the area of a rectangle with a length of 7 cm and a width of 5 cm?",
+        "options": ["₦12 cm²", "₦30 cm²", "₦35 cm²", "₦42 cm²"],
+        "answer": "₦35 cm²",
+        "category": "Spatial Sense"
+      },
+      {
+        "question": "Which expression represents the total cost of 4 items at ₦3.50 each?",
+        "options": ["4 + ₦3.50", "4 × ₦3.50", "₦3.50 ÷ 4", "₦3.50 – 4"],
+        "answer": "4 × ₦3.50",
+        "category": "Personal Financial Literacy"
+      },
+      {
+        "question": "What is 2.5 + 3.7?",
+        "options": ["₦5.2", "₦5.7", "₦6.2", "₦6.7"],
+        "answer": "₦6.2",
+        "category": "Number and Operations"
+      },
+      {
+        "question": "What is the next number in the sequence 8, 12, 16, 20?",
+        "options": ["24", "25", "26", "28"],
+        "answer": "24",
+        "category": "Patterns"
+      },
+      {
+        "question": "Explain how to compare the fractions 3/4 and 2/3 using a common denominator.",
+        "options": [],
+        "answer": "Find a common denominator, such as 12. Convert 3/4 to 9/12 and 2/3 to 8/12. Since 9/12 > 8/12, 3/4 is greater than 2/3.",
+        "category": "Number - Fractions"
+      },
+      {
+        "question": "What is 567 – 289?",
+        "options": ["278", "288", "298", "308"],
+        "answer": "278",
+        "category": "Number and Operations"
+      }
+    ]
+  }
+}
