@@ -1,55 +1,48 @@
 // autoQuestionGen.js
 
-export async function loadQuestions(subject, grade) {
-  const githubURL = `https://raw.githubusercontent.com/psalminfo/bkh-curriculum/main/questions/${grade}-${subject}.json`;
+// GitHub raw path to your /questions/ folder
+const GITHUB_BASE = "https://raw.githubusercontent.com/psalminfo/bkh-curriculum/main/questions/";
 
-  let questions = [];
+// Firebase fallback (if needed)
+import { db } from './firebaseConfig.js';
+import { collection, getDocs } from 'https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore.js';
 
-  // Try GitHub first
+async function fetchGitHubQuestions(grade, subject) {
+  const url = `${GITHUB_BASE}${grade}-${subject}.json`;
   try {
-    const res = await fetch(githubURL);
-    if (res.ok) {
-      const data = await res.json();
-      questions = questions.concat(data);
-    }
+    const res = await fetch(url);
+    if (!res.ok) throw new Error("GitHub fetch failed");
+    const data = await res.json();
+    return data.questions || data;
   } catch (err) {
-    console.warn("GitHub load failed:", err);
+    console.warn("GitHub fallback failed:", err);
+    return [];
   }
+}
 
-  // Then try Firebase
+async function fetchFirebaseQuestions(grade, subject) {
   try {
-    const firebaseQuestions = await loadFromFirebase(subject, grade);
-    questions = questions.concat(firebaseQuestions);
+    const querySnapshot = await getDocs(collection(db, `questions-${grade}-${subject}`));
+    const questions = [];
+    querySnapshot.forEach(doc => questions.push(doc.data()));
+    return questions;
   } catch (err) {
-    console.warn("Firebase load failed:", err);
+    console.warn("Firebase fetch failed:", err);
+    return [];
+  }
+}
+
+export async function generateQuestions(grade, subject) {
+  const github = await fetchGitHubQuestions(grade, subject);
+  const firebase = await fetchFirebaseQuestions(grade, subject);
+  const combined = [...github, ...firebase];
+
+  if (combined.length === 0) {
+    alert("No questions found for this subject.");
+    return [];
   }
 
   // Shuffle and return 30
-  if (questions.length === 0) {
-    throw new Error("No questions available from any source.");
-  }
-
-  return shuffleArray(questions).slice(0, 30);
-}
-
-// Utility: Shuffle array
-function shuffleArray(array) {
-  return array.sort(() => Math.random() - 0.5);
-}
-
-// Load from Firebase Firestore
-async function loadFromFirebase(subject, grade) {
-  const { db } = await import('./firebaseConfig.js');
-  const { collection, query, where, getDocs } = await import('https://www.gstatic.com/firebasejs/9.6.10/firebase-firestore.js');
-
-  const q = query(
-    collection(db, "questions"),
-    where("subject", "==", subject),
-    where("grade", "==", parseInt(grade))
-  );
-
-  const snapshot = await getDocs(q);
-  const result = [];
-  snapshot.forEach(doc => result.push(...doc.data().questions));
-  return result;
+  const shuffled = combined.sort(() => 0.5 - Math.random());
+  return shuffled.slice(0, 30);
 }
