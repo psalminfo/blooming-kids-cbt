@@ -1,67 +1,83 @@
-<!-- FILE: subject-select.html -->
 <!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Select Subject - Blooming Kids House</title>
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" />
-    <link rel="stylesheet" href="style.css" />
-    <link rel="icon" href="favicon.ico" />
-  </head>
-  <body class="bg-green-50 min-h-screen flex items-center justify-center">
-    <div class="bg-white p-6 rounded-xl shadow-xl w-full max-w-lg text-center">
-      <h2 class="text-xl font-bold text-green-800 mb-4">Select a Subject</h2>
-      <div id="subjectButtons" class="grid grid-cols-2 gap-4 mb-6"></div>
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Select Subject - Blooming Kids House</title>
+  <link rel="stylesheet" href="style.css"/>
+  <link rel="icon" href="favicon.ico"/>
+</head>
+<body class="bg-green-50 min-h-screen flex flex-col items-center justify-center">
+  <div class="bg-white p-8 rounded-xl shadow-xl w-full max-w-2xl">
+    <h2 class="text-2xl font-bold text-green-800 text-center mb-6">Select a Subject</h2>
+    <div id="subjectButtons" class="grid grid-cols-2 sm:grid-cols-3 gap-4 mb-4"></div>
+    <div class="flex justify-between mt-6">
       <button onclick="logout()" class="bg-yellow-500 text-white px-4 py-2 rounded hover:bg-yellow-600">Logout</button>
-      <p class="text-xs text-center mt-4 text-gray-600">POWERED BY <span style="color:#FFEB3B">POG</span></p>
     </div>
+    <p class="text-xs text-center mt-4 text-gray-600">POWERED BY <span style="color:#FFEB3B">POG</span></p>
+  </div>
 
-    <script type="module">
-      import { auth, db } from './firebaseConfig.js';
-      import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-auth.js";
-      import { doc, getDoc } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore.js";
+  <script type="module">
+    import { getAuth, onAuthStateChanged, signOut } from "./firebase-auth.js";
+    import { db } from "./firebaseConfig.js";
+    import { doc, getDoc } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-firestore.js";
 
-      const subjectButtonsDiv = document.getElementById("subjectButtons");
-      let studentGrade = null;
+    const auth = getAuth();
 
-      onAuthStateChanged(auth, async (user) => {
-        if (!user) {
-          window.location.href = 'index.html';
-        } else {
-          const docRef = doc(db, "students", user.uid);
-          const docSnap = await getDoc(docRef);
-          if (docSnap.exists()) {
-            studentGrade = docSnap.data().grade;
-            showSubjectsForGrade(studentGrade);
-          } else {
-            window.location.href = 'index.html';
+    const subjectMap = {
+      "3": ["Math", "ELA"],
+      "4": ["Math", "ELA"],
+      "5": ["Math", "ELA"],
+      "6": ["Math", "ELA"],
+      "7": ["Math", "ELA", "Biology", "Chemistry", "Physics"],
+      "8": ["Math", "ELA", "Biology", "Chemistry", "Physics"],
+      "9": ["Math", "ELA", "Biology", "Chemistry", "Physics"],
+      "10": ["Math", "ELA", "Biology", "Chemistry", "Physics"],
+      "11": ["Math", "ELA", "Biology", "Chemistry", "Physics"],
+      "12": ["Math", "ELA", "Biology", "Chemistry", "Physics"]
+    };
+
+    onAuthStateChanged(auth, async (user) => {
+      if (user) {
+        const userDocRef = doc(db, "students", user.uid);
+        const userDocSnap = await getDoc(userDocRef);
+
+        if (userDocSnap.exists()) {
+          const userData = userDocSnap.data();
+          const grade = userData.grade;
+
+          if (!grade) {
+            alert("Missing grade. Redirecting...");
+            window.location.href = "index.html";
+            return;
           }
+
+          const subjects = subjectMap[grade] || [];
+          const subjectButtonsContainer = document.getElementById("subjectButtons");
+
+          subjects.forEach(subject => {
+            const btn = document.createElement("button");
+            btn.textContent = subject;
+            btn.className = "bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700";
+            btn.onclick = () => {
+              window.location.href = `student.html?grade=${grade}&subject=${subject}`;
+            };
+            subjectButtonsContainer.appendChild(btn);
+          });
+        } else {
+          alert("Student record not found. Redirecting...");
+          window.location.href = "index.html";
         }
+      } else {
+        window.location.href = "index.html";
+      }
+    });
+
+    function logout() {
+      signOut(auth).then(() => {
+        window.location.href = "index.html";
       });
-
-      function showSubjectsForGrade(grade) {
-        let subjects = ["Math", "ELA"];
-        if (parseInt(grade) >= 7) {
-          subjects.push("Biology", "Chemistry", "Physics");
-        }
-
-        subjects.forEach(subject => {
-          const btn = document.createElement("button");
-          btn.textContent = subject;
-          btn.className = "bg-green-600 text-white py-2 px-4 rounded hover:bg-green-700";
-          btn.onclick = () => {
-            window.location.href = `student.html?grade=${grade}&subject=${subject}`;
-          };
-          subjectButtonsDiv.appendChild(btn);
-        });
-      }
-
-      window.logout = function () {
-        signOut(auth).then(() => {
-          window.location.href = 'index.html';
-        });
-      }
-    </script>
-  </body>
+    }
+  </script>
+</body>
 </html>
