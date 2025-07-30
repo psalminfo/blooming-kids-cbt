@@ -1,26 +1,48 @@
-document.getElementById("studentLoginForm").addEventListener("submit", (e) => {
+// student-login.js
+
+import { db } from './firebaseConfig.js';
+import {
+  collection,
+  addDoc,
+  serverTimestamp
+} from 'https://www.gstatic.com/firebasejs/10.11.0/firebase-firestore.js';
+
+document.getElementById('studentLoginForm').addEventListener('submit', async (e) => {
   e.preventDefault();
 
-  const name = document.getElementById("studentName").value.trim();
-  const parentEmail = document.getElementById("parentEmail").value.trim();
-  const grade = document.getElementById("grade").value;
-  const tutor = document.getElementById("tutorName").value.trim();
-  const location = document.getElementById("location").value.trim();
-  const accessCode = document.getElementById("accessCode").value.trim();
+  const studentName = document.getElementById('studentName').value.trim();
+  const parentEmail = document.getElementById('parentEmail').value.trim();
+  const grade = document.getElementById('grade').value.trim();
+  const tutorName = document.getElementById('tutorName').value.trim();
+  const location = document.getElementById('location').value.trim();
+  const accessCode = document.getElementById('accessCode').value.trim();
 
-  if (accessCode !== "bkh2025") {
-    alert("Invalid access code.");
+  if (accessCode !== 'bkh2025') {
+    alert('Invalid access code.');
     return;
   }
 
-  // Save data to localStorage
-  localStorage.setItem("studentName", name);
-  localStorage.setItem("parentEmail", parentEmail);
-  localStorage.setItem("grade", grade);
-  localStorage.setItem("tutor", tutor);
-  localStorage.setItem("location", location);
-  localStorage.setItem("loginTime", new Date().toISOString());
+  try {
+    // Save student info in Firestore
+    const docRef = await addDoc(collection(db, 'students'), {
+      studentName,
+      parentEmail,
+      grade,
+      tutorName,
+      location,
+      timestamp: serverTimestamp()
+    });
 
-  // Redirect to subject selection
-  window.location.href = "subject-select.html";
+    // Store locally for use in subject-select.html
+    localStorage.setItem('studentName', studentName);
+    localStorage.setItem('grade', grade);
+    localStorage.setItem('parentEmail', parentEmail);
+    localStorage.setItem('studentId', docRef.id);
+
+    // Redirect to subject selection
+    window.location.href = 'subject-select.html';
+  } catch (error) {
+    console.error('Error logging in student:', error);
+    alert('Login failed. Please try again.');
+  }
 });
