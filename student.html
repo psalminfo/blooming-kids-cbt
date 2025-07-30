@@ -1,34 +1,149 @@
 <!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-    <title>Blooming Kids - Test</title>
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css"/>
-    <link rel="stylesheet" href="style.css"/>
-    <link rel="icon" href="favicon.ico"/>
-  </head>
-  <body class="bg-green-50 text-gray-800">
-    <div class="max-w-4xl mx-auto p-6">
-      <div class="flex justify-between items-center mb-6">
-        <h1 class="text-xl font-bold text-green-700" id="subjectTitle">Loading...</h1>
-        <div>
-          <button id="logoutBtn" class="text-sm bg-yellow-400 hover:bg-yellow-500 px-4 py-1 rounded text-white">Logout</button>
-        </div>
-      </div>
-
-      <div class="bg-white p-6 rounded-xl shadow-md space-y-4" id="questionContainer">
-        <p class="text-center text-gray-500">Loading questions...</p>
-      </div>
-
-      <div class="mt-6 flex justify-between items-center">
-        <div id="timerDisplay" class="text-sm text-green-700 font-semibold">Time: 30:00</div>
-        <button id="submitTestBtn" class="bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded-xl">Submit Test</button>
-      </div>
-
-      <p class="text-xs text-center mt-8">POWERED BY <span style="color:#FFEB3B">POG</span></p>
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Student Test - Blooming Kids House</title>
+  <link rel="stylesheet" href="style.css" />
+  <link rel="icon" href="favicon.ico" />
+</head>
+<body class="bg-green-50 min-h-screen flex flex-col items-center justify-center px-4">
+  <div class="bg-white p-6 rounded-xl shadow-xl w-full max-w-4xl">
+    <div class="flex justify-between items-center mb-4">
+      <h2 class="text-xl font-bold text-green-800" id="testTitle">Loading Test...</h2>
+      <button onclick="logout()" class="bg-yellow-500 text-white px-4 py-2 rounded hover:bg-yellow-600">Logout</button>
     </div>
 
-    <script type="module" src="student.js"></script>
-  </body>
+    <div id="questionContainer" class="space-y-6 mb-6"></div>
+
+    <button onclick="submitAnswers()" class="bg-green-600 text-white px-6 py-2 rounded hover:bg-green-700">
+      Submit Test
+    </button>
+    <p class="text-xs text-center mt-6 text-gray-600">POWERED BY <span style="color:#FFEB3B">POG</span></p>
+  </div>
+
+  <script type="module">
+    import { getAuth, onAuthStateChanged, signOut } from "./firebase-auth.js";
+    import { db } from "./firebaseConfig.js";
+    import { doc, setDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-firestore.js";
+
+    const auth = getAuth();
+    const urlParams = new URLSearchParams(window.location.search);
+    const grade = urlParams.get("grade");
+    const subject = urlParams.get("subject");
+
+    const titleEl = document.getElementById("testTitle");
+    const questionContainer = document.getElementById("questionContainer");
+
+    if (!grade || !subject) {
+      alert("Missing subject or grade. Redirecting...");
+      window.location.href = "subject-select.html";
+    }
+
+    titleEl.textContent = `${subject} Test - Grade ${grade}`;
+
+    let currentUserData = null;
+
+    onAuthStateChanged(auth, async (user) => {
+      if (!user) {
+        window.location.href = "index.html";
+        return;
+      }
+
+      const userDocSnap = await fetch(`https://firestore.googleapis.com/v1/projects/bloomingkidsassessment/databases/(default)/documents/students/${user.uid}`);
+      const userDoc = await userDocSnap.json();
+      currentUserData = userDoc.fields || null;
+    });
+
+    async function loadQuestions() {
+      const sources = [
+        `/questions/${grade}-${subject.toLowerCase()}.json`,
+        `https://raw.githubusercontent.com/psalminfo/bkh-curriculum/main/questions/${grade}-${subject.toLowerCase()}.json`
+      ];
+
+      for (const url of sources) {
+        try {
+          const res = await fetch(url);
+          if (res.ok) {
+            const questions = await res.json();
+            renderQuestions(questions);
+            return;
+          }
+        } catch (err) {
+          continue;
+        }
+      }
+
+      questionContainer.innerHTML = `<p class="text-red-500">No questions available.</p>`;
+    }
+
+    function renderQuestions(questions) {
+      questionContainer.innerHTML = "";
+      questions.slice(0, 30).forEach((q, index) => {
+        const wrapper = document.createElement("div");
+        wrapper.className = "bg-gray-100 p-4 rounded-lg";
+
+        const qText = document.createElement("p");
+        qText.className = "font-medium";
+        qText.innerHTML = `${index + 1}. ${q.question}`;
+        wrapper.appendChild(qText);
+
+        q.options.forEach((opt, i) => {
+          const id = `q${index}_opt${i}`;
+          const label = document.createElement("label");
+          label.htmlFor = id;
+          label.className = "block ml-4";
+
+          const input = document.createElement("input");
+          input.type = "radio";
+          input.name = `q${index}`;
+          input.id = id;
+          input.value = opt;
+          input.className = "mr-2";
+
+          label.appendChild(input);
+          label.append(opt);
+          wrapper.appendChild(label);
+        });
+
+        questionContainer.appendChild(wrapper);
+      });
+    }
+
+    async function submitAnswers() {
+      const answers = [];
+      const inputs = document.querySelectorAll("input[type='radio']:checked");
+
+      inputs.forEach(input => {
+        const name = input.name;
+        const questionIndex = parseInt(name.replace("q", ""));
+        answers[questionIndex] = input.value;
+      });
+
+      const user = auth.currentUser;
+      if (!user || !currentUserData) return;
+
+      const reportData = {
+        studentName: currentUserData.name?.stringValue || "Unknown",
+        grade,
+        subject,
+        answers,
+        timestamp: serverTimestamp()
+      };
+
+      await setDoc(doc(db, "results", `${user.uid}_${subject}`), reportData);
+
+      alert("Test submitted!");
+      window.location.href = "subject-select.html";
+    }
+
+    function logout() {
+      signOut(auth).then(() => {
+        window.location.href = "index.html";
+      });
+    }
+
+    loadQuestions();
+  </script>
+</body>
 </html>
