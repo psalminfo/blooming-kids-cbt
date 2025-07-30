@@ -1,57 +1,47 @@
 // autoQuestionGen.js
 
-const GITHUB_REPO = "psalminfo/blooming-kids-cbt";
-const QUESTIONS_FOLDER = "questions"; // main folder in the GitHub repo
+import { collection, getDocs } from "./firebaseConfig.js";
 
-// Fetch questions from GitHub
-async function fetchFromGitHub(subject, grade) {
+const fetchFromGitHub = async (grade, subject) => {
   const fileName = `${grade}-${subject}.json`;
-  const url = `https://raw.githubusercontent.com/${GITHUB_REPO}/main/${QUESTIONS_FOLDER}/${fileName}`;
+  const githubUrl = `https://raw.githubusercontent.com/psalminfo/blooming-kids-cbt/main/questions/${fileName}`;
 
   try {
-    const response = await fetch(url);
+    const response = await fetch(githubUrl);
     if (!response.ok) throw new Error("GitHub fetch failed");
     const data = await response.json();
     return data;
   } catch (err) {
-    console.warn("GitHub fetch failed:", err);
-    return [];
+    console.error("GitHub fetch failed:", err);
+    throw err;
   }
-}
+};
 
-// Fetch from Firebase (admin uploads)
-async function fetchFromFirebase(subject, grade) {
+const fetchFromFirebase = async (grade, subject) => {
   try {
-    const snapshot = await getDocs(collection(db, "questions"));
-    const questions = [];
-    snapshot.forEach(doc => {
-      const q = doc.data();
-      if (q.subject === subject && q.grade === grade) {
-        questions.push(...q.questions);
-      }
-    });
-    return questions;
+    const colRef = collection(firebase.firestore(), `questions/${grade}/${subject}`);
+    const snapshot = await getDocs(colRef);
+    const data = snapshot.docs.map((doc) => doc.data());
+    return data;
   } catch (err) {
-    console.warn("Firebase fetch failed:", err);
+    console.error("Firebase fetch failed:", err);
     return [];
   }
-}
+};
 
-// Combined fetch
-export async function loadQuestions(subject, grade) {
-  if (!subject || !grade) throw new Error("Missing subject or grade");
+export const loadQuestions = async (grade, subject) => {
+  let allQuestions = [];
 
-  const fromGitHub = await fetchFromGitHub(subject, grade);
-  const fromFirebase = await fetchFromFirebase(subject, grade);
-
-  const combined = [...fromGitHub, ...fromFirebase];
-  if (combined.length === 0) throw new Error("No questions available");
-
-  // Shuffle and pick 30
-  for (let i = combined.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [combined[i], combined[j]] = [combined[j], combined[i]];
+  try {
+    allQuestions = await fetchFromGitHub(grade, subject);
+  } catch (err) {
+    allQuestions = await fetchFromFirebase(grade, subject);
   }
 
-  return combined.slice(0, 30);
-}
+  if (!allQuestions || allQuestions.length === 0) {
+    throw new Error("No questions available");
+  }
+
+  const selected = allQuestions.sort(() => 0.5 - Math.random()).slice(0, 30);
+  return selected;
+};
