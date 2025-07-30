@@ -1,48 +1,44 @@
-// autoQuestionGen.js
+export async function loadQuestions(subject, grade) {
+  let questions = [];
 
-// GitHub raw path to your /questions/ folder
-const GITHUB_BASE = "https://raw.githubusercontent.com/psalminfo/main/questions/";
+  const githubUrl = `https://raw.githubusercontent.com/psalminfo/bkh-curriculum/main/questions/${grade}-${subject}.json`;
 
-// Firebase fallback (if needed)
-import { db } from './firebaseConfig.js';
-import { collection, getDocs } from 'https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore.js';
-
-async function fetchGitHubQuestions(grade, subject) {
-  const url = `${GITHUB_BASE}${grade}-${subject}.json`;
   try {
-    const res = await fetch(url);
-    if (!res.ok) throw new Error("GitHub fetch failed");
-    const data = await res.json();
-    return data.questions || data;
+    const response = await fetch(githubUrl);
+    if (response.ok) {
+      const data = await response.json();
+      questions = questions.concat(data);
+    }
   } catch (err) {
-    console.warn("GitHub fallback failed:", err);
-    return [];
+    console.warn("GitHub fetch failed:", err.message);
   }
-}
 
-async function fetchFirebaseQuestions(grade, subject) {
+  // Fallback to Firebase if GitHub fails or returns nothing
   try {
-    const querySnapshot = await getDocs(collection(db, `questions-${grade}-${subject}`));
-    const questions = [];
-    querySnapshot.forEach(doc => questions.push(doc.data()));
-    return questions;
-  } catch (err) {
-    console.warn("Firebase fetch failed:", err);
-    return [];
-  }
-}
+    const snapshot = await firebase.firestore().collection('questions')
+      .where('grade', '==', grade)
+      .where('subject', '==', subject)
+      .get();
 
-export async function generateQuestions(grade, subject) {
-  const github = await fetchGitHubQuestions(grade, subject);
-  const firebase = await fetchFirebaseQuestions(grade, subject);
-  const combined = [...github, ...firebase];
-
-  if (combined.length === 0) {
-    alert("No questions found for this subject.");
-    return [];
+    snapshot.forEach(doc => {
+      const data = doc.data();
+      if (data && Array.isArray(data.questions)) {
+        questions = questions.concat(data.questions);
+      }
+    });
+  } catch (e) {
+    console.warn("Firebase fetch failed:", e.message);
   }
 
-  // Shuffle and return 30
-  const shuffled = combined.sort(() => 0.5 - Math.random());
-  return shuffled.slice(0, 30);
+  if (questions.length === 0) {
+    throw new Error("No questions available");
+  }
+
+  // Shuffle and select 30
+  for (let i = questions.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [questions[i], questions[j]] = [questions[j], questions[i]];
+  }
+
+  return questions.slice(0, 30);
 }
