@@ -1,21 +1,32 @@
-export async function getQuestions(subject, grade) {
-  const githubUrl = `https://raw.githubusercontent.com/psalminfo/bkh-curriculum/main/curriculum/curriculum/${grade}-${subject.toLowerCase()}.json`;
+// Tries local questions first, then GitHub, then Firebase
+export async function fetchQuestions(grade, subject) {
+  const fileName = `${grade}-${subject.toLowerCase()}.json`;
 
+  // 1. Try local /questions/ folder
   try {
-    const response = await fetch(githubUrl);
-    if (!response.ok) throw new Error("GitHub fallback failed");
-    const data = await response.json();
-    return shuffleArray(data).slice(0, 30);
-  } catch (e) {
-    console.warn("GitHub fetch failed, using local fallback.");
-    return [];
+    const local = await fetch(`./questions/${fileName}`);
+    if (local.ok) return await local.json();
+  } catch (err) {
+    console.warn("Local questions not found.", err);
   }
-}
 
-function shuffleArray(arr) {
-  for (let i = arr.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [arr[i], arr[j]] = [arr[j], arr[i]];
+  // 2. Try GitHub
+  try {
+    const githubURL = `https://raw.githubusercontent.com/psalminfo/bkh-curriculum/main/curriculum/curriculum/${fileName}`;
+    const github = await fetch(githubURL);
+    if (github.ok) return await github.json();
+  } catch (err) {
+    console.warn("GitHub fallback failed.", err);
   }
-  return arr;
+
+  // 3. Try Firebase fallback
+  try {
+    const res = await fetch(`https://bloomingkidsassessment.web.app/fallback/${fileName}`);
+    if (res.ok) return await res.json();
+  } catch (err) {
+    console.error("Firebase fallback failed.", err);
+  }
+
+  // All attempts failed
+  throw new Error("No questions found for selected grade and subject.");
 }
