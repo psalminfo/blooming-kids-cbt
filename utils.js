@@ -1,9 +1,16 @@
 // utils.js
-import { auth } from './firebaseConfig.js';
-import { signOut } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
+import { auth, db } from './firebaseConfig.js';
 
 export function logout() {
-  signOut(auth).then(() => {
-    window.location.href = 'login-student.html';
-  });
+  localStorage.removeItem("studentData");
+  window.location.href = "index.html";
+}
+
+export function getStudentData() {
+  const data = localStorage.getItem("studentData");
+  return data ? JSON.parse(data) : null;
+}
+
+export function saveStudentData(studentData) {
+  localStorage.setItem("studentData", JSON.stringify(studentData));
 }
