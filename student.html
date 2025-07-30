@@ -3,21 +3,30 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Take Test - Blooming Kids House</title>
-  <link rel="stylesheet" href="style.css" />
+  <title>Test Page - Blooming Kids House</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css"/>
+  <link rel="stylesheet" href="style.css"/>
   <link rel="icon" href="favicon.ico" />
 </head>
-<body class="bg-green-50 min-h-screen flex flex-col items-center p-4">
-  <div class="w-full max-w-4xl bg-white p-6 rounded-xl shadow">
-    <div class="flex justify-between items-center mb-4">
-      <h2 id="subjectTitle" class="text-xl font-bold text-green-800">Subject: </h2>
-      <button id="logoutBtn" class="bg-red-600 text-white px-4 py-2 rounded">Logout</button>
+<body class="bg-green-50 text-gray-800">
+  <div class="p-4 text-right">
+    <button id="logoutBtn" class="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600">Logout</button>
+  </div>
+
+  <div class="max-w-3xl mx-auto">
+    <h1 class="text-2xl font-bold mb-4 text-green-700 text-center">Blooming Kids House Test</h1>
+
+    <div id="questionContainer" class="bg-white p-6 rounded-lg shadow-md">
+      <!-- Questions will load here -->
     </div>
-    <form id="testForm" class="space-y-4"></form>
-    <div class="flex justify-end mt-6">
+
+    <div class="text-center mt-6">
       <button id="submitBtn" class="bg-green-600 text-white px-6 py-2 rounded hover:bg-green-700">Submit Test</button>
     </div>
-    <p class="text-xs text-center mt-4 text-gray-600">POWERED BY <span style="color:#FFEB3B">POG</span></p>
+
+    <p class="text-xs text-center mt-6 text-gray-600">
+      POWERED BY <span style="color:#FFEB3B">POG</span>
+    </p>
   </div>
 
   <script type="module" src="student.js"></script>
