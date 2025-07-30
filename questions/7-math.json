@@ -1,0 +1,246 @@
+{
+  "math_questions": {
+    "grade_7": [
+      {
+        "question": "What is the value of the expression 2.5 + 3 × (4 – 1)?",
+        "options": ["$11.5", "$12.5", "$10.5", "$9.5"],
+        "answer": "$11.5",
+        "category": "Number and Operations"
+      },
+      {
+        "question": "What is 20% of £150?",
+        "options": ["£20", "£25", "£30", "£35"],
+        "answer": "£30",
+        "category": "Number - Fractions"
+      },
+      {
+        "question": "Explain how to find the surface area of a rectangular prism with dimensions 6 cm, 4 cm, and 3 cm.",
+        "options": [],
+        "answer": "Calculate the area of each face: 2 × (6 × 4) = 48 cm², 2 × (6 × 3) = 36 cm², 2 × (4 × 3) = 24 cm². Add them: 48 + 36 + 24 = 108 cm².",
+        "category": "Spatial Sense"
+      },
+      {
+        "question": "Solve the equation 3x + 5 = 20.",
+        "options": ["5", "6", "7", "8"],
+        "answer": "5",
+        "category": "Algebra"
+      },
+      {
+        "question": "What is the ratio of 15 minutes to 1 hour in simplest form?",
+        "options": ["1:4", "4:1", "3:4", "4:3"],
+        "answer": "1:4",
+        "category": "Ratio and Proportion"
+      },
+      {
+        "question": "What is 0.6 ÷ 0.2?",
+        "options": ["C$3", "C$0.3", "C$30", "C$0.03"],
+        "answer": "C$3",
+        "category": "Number and Operations"
+      },
+      {
+        "question": "A box plot shows a median of 40, a first quartile of 35, and a third quartile of 50. What is the interquartile range?",
+        "options": ["$10", "$15", "$20", "$25"],
+        "answer": "$15",
+        "category": "Data Analysis"
+      },
+      {
+        "question": "Convert 4.5 km to meters.",
+        "options": [],
+        "answer": "4,500 meters",
+        "category": "Measurement"
+      },
+      {
+        "question": "What is the value of x in the equation 2x/3 = 8?",
+        "options": ["12", "14", "16", "18"],
+        "answer": "12",
+        "category": "Algebra"
+      },
+      {
+        "question": "A jacket costs $60.00 and is on sale for 25% off. What is the sale price?",
+        "options": ["$45.00", "$50.00", "$55.00", "$40.00"],
+        "answer": "$45.00",
+        "category": "Personal Financial Literacy"
+      },
+      {
+        "question": "What is -3 + 5?",
+        "options": ["2", "-2", "8", "-8"],
+        "answer": "2",
+        "category": "Number and Operations"
+      },
+      {
+        "question": "What is 2/3 × 3/4?",
+        "options": ["1/2", "1/3", "1/6", "1/4"],
+        "answer": "1/2",
+        "category": "Number - Fractions"
+      },
+      {
+        "question": "What is the value of the digit 7 in 67,890?",
+        "options": ["7", "70", "700", "7,000"],
+        "answer": "7,000",
+        "category": "Number and Place Value"
+      },
+      {
+        "question": "A store sells books for $12.50 each. How much will 5 books cost?",
+        "options": ["$62.50", "$60.00", "$57.50", "$65.00"],
+        "answer": "$62.50",
+        "category": "Personal Financial Literacy"
+      },
+      {
+        "question": "What is 30% of £200?",
+        "options": ["£50", "£60", "£70", "£80"],
+        "answer": "£60",
+        "category": "Number - Fractions"
+      },
+      {
+        "question": "What is the circumference of a circle with a diameter of 10 cm? (Use 3.14 for π.)",
+        "options": ["C$31.4 cm", "C$62.8 cm", "C$15.7 cm", "C$20 cm"],
+        "answer": "C$31.4 cm",
+        "category": "Spatial Sense"
+      },
+      {
+        "question": "Which expression is equivalent to 4 × (3 + 5)?",
+        "options": ["(4 × 3) + (4 × 5)", "(4 × 3) + 5", "(4 + 3) × 5", "4 + (3 × 5)"],
+        "answer": "(4 × 3) + (4 × 5)",
+        "category": "Algebraic Thinking"
+      },
+      {
+        "question": "How many milliliters are in 3.75 liters?",
+        "options": ["£3,750", "£375", "£37,500", "£375,000"],
+        "answer": "£3,750",
+        "category": "Measurement"
+      },
+      {
+        "question": "What is the next number in the sequence 9, 18, 27, 36?",
+        "options": ["45", "46", "47", "48"],
+        "answer": "45",
+        "category": "Patterns"
+      },
+      {
+        "question": "What is 1,234 ÷ 4?",
+        "options": ["308", "308.5", "309", "309.5"],
+        "answer": "308.5",
+        "category": "Number and Operations"
+      },
+      {
+        "question": "Which number is 10,000 less than 56,789?",
+        "options": ["46,789", "56,689", "66,789", "76,789"],
+        "answer": "46,789",
+        "category": "Number and Place Value"
+      },
+      {
+        "question": "Explain how to solve the inequality 2x + 3 < 9.",
+        "options": [],
+        "answer": "Subtract 3 from both sides: 2x < 6. Divide both sides by 2: x < 3.",
+        "category": "Algebra"
+      },
+      {
+        "question": "A bar graph shows 20 votes for soccer, 15 for basketball, and 10 for tennis. How many votes were cast in total?",
+        "options": ["$45", "$50", "$55", "$60"],
+        "answer": "$45",
+        "category": "Data Analysis"
+      },
+      {
+        "question": "What is 0.4 written as a percentage?",
+        "options": ["40%", "4%", "400%", "0.4%"],
+        "answer": "40%",
+        "category": "Number - Fractions"
+      },
+      {
+        "question": "What is the area of a circle with a radius of 5 cm? (Use 3.14 for π.)",
+        "options": ["C$78.5 cm²", "C$31.4 cm²", "C$15.7 cm²", "C$62.8 cm²"],
+        "answer": "C$78.5 cm²",
+        "category": "Spatial Sense"
+      },
+      {
+        "question": "A phone costs C$120.00 and is on sale for 15% off. What is the sale price?",
+        "options": ["C$102.00", "C$105.00", "C$108.00", "C$110.00"],
+        "answer": "C$102.00",
+        "category": "Personal Financial Literacy"
+      },
+      {
+        "question": "What is -7 – (-3)?",
+        "options": ["-4", "4", "-10", "10"],
+        "answer": "-4",
+        "category": "Number and Operations"
+      },
+      {
+        "question": "What is the ratio of 24 cm to 2 m in simplest form?",
+        "options": ["12:100", "24:200", "3:25", "6:50"],
+        "answer": "12:100",
+        "category": "Ratio and Proportion"
+      },
+      {
+        "question": "What is the value of 3x – 4 when x = 5?",
+        "options": ["11", "12", "13", "14"],
+        "answer": "11",
+        "category": "Algebra"
+      },
+      {
+        "question": "What is 12 × 7?",
+        "options": ["84", "91", "98", "105"],
+        "answer": "84",
+        "category": "Number - Multiplication and Division"
+      },
+      {
+        "question": "Explain how to find the volume of a cylinder with a radius of 2 cm and a height of 5 cm. (Use 3.14 for π.)",
+        "options": [],
+        "answer": "Use the formula V = πr²h. Calculate the base area: 3.14 × 2 × 2 = 12.56 cm². Multiply by height: 12.56 × 5 = 62.8 cm³.",
+        "category": "Spatial Sense"
+      },
+      {
+        "question": "What is 25% of $400?",
+        "options": ["$75", "$100", "$125", "$150"],
+        "answer": "$100",
+        "category": "Number - Fractions"
+      },
+      {
+        "question": "Which shape has three sides and one right angle?",
+        "options": ["Equilateral triangle", "Isosceles triangle", "Right triangle", "Scalene triangle"],
+        "answer": "Right triangle",
+        "category": "Geometry"
+      },
+      {
+        "question": "A savings account earns $1.75 interest per month. How much interest is earned in 8 months?",
+        "options": ["$12.50", "$14.00", "$15.50", "$17.00"],
+        "answer": "$14.00",
+        "category": "Personal Financial Literacy"
+      },
+      {
+        "question": "What is 6.7 × 3?",
+        "options": ["$20.1", "$20.4", "$21.1", "$21.4"],
+        "answer": "$20.1",
+        "category": "Number and Operations"
+      },
+      {
+        "question": "What is 5/6 – 1/3?",
+        "options": ["1/3", "1/2", "2/3", "3/4"],
+        "answer": "1/2",
+        "category": "Number - Fractions"
+      },
+      {
+        "question": "What is the next number in the pattern: 12, 18, 24, 30?",
+        "options": ["36", "37", "38", "39"],
+        "answer": "36",
+        "category": "Patterns"
+      },
+      {
+        "question": "What is 789 – 456?",
+        "options": ["333", "343", "353", "363"],
+        "answer": "333",
+        "category": "Number and Operations"
+      },
+      {
+        "question": "Explain how to solve the proportion 3/x = 6/24.",
+        "options": [],
+        "answer": "Cross-multiply: 3 × 24 = 6 × x, so 72 = 6x. Divide both sides by 6: x = 12.",
+        "category": "Ratio and Proportion"
+      },
+      {
+        "question": "What is 15% of £300?",
+        "options": ["£30", "£45", "£60", "£75"],
+        "answer": "£45",
+        "category": "Number - Fractions"
+      }
+    ]
+  }
+}
