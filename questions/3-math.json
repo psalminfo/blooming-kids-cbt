@@ -1,14 +1,14 @@
-{
-  "math_questions": {
-    "grade_3": [
-      {
-        "curriculum": "Texas",
-        "question": "Emma has 324 stickers. She gives 137 stickers to her friend. How many stickers does Emma have left?",
-        "type": "multiple-choice",
-        "options": ["A. 187", "B. 197", "C. 177", "D. 167"],
-        "correct_answer": "A",
-        "standard": "TEKS 3.4A"
-      },
+[
+  {
+    "curriculum": "Texas",
+    "question": "Emma has 324 stickers. She gives 137 stickers to her friend. How many stickers does Emma have left?",
+    "type": "multiple-choice",
+    "options": ["A. 187", "B. 197", "C. 177", "D. 167"],
+    "correct_answer": "A",
+    "standard": "TEKS 3.4A"
+  }
+]
+
       {
         "curriculum": "UK",
         "question": "A bakery sells cupcakes in boxes of 6. If Sarah buys 3 boxes, how many cupcakes does she get?",
