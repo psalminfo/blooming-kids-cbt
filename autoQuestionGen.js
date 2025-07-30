@@ -1,7 +1,7 @@
 export async function loadQuestions(subject, grade) {
   let questions = [];
 
-  const githubUrl = `https://raw.githubusercontent.com/psalminfo/main/questions/${grade}-${subject}.json`;
+  const githubUrl = `https://github.com/psalminfo/blooming-kids-cbt/tree/main/questions`;
 
   try {
     const response = await fetch(githubUrl);
