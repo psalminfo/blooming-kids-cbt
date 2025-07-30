@@ -1,49 +1,42 @@
+// ======================= student.js =======================
+
 import { fetchQuestions } from './autoQuestionGen.js';
 
-let studentData = {};
+const urlParams = new URLSearchParams(window.location.search);
+const subject = urlParams.get('subject');
+const grade = urlParams.get('grade');
 
-window.onload = async () => {
-  const params = new URLSearchParams(window.location.search);
-  studentData = {
-    name: params.get('name'),
-    parentEmail: params.get('parentEmail'),
-    tutor: params.get('tutor'),
-    location: params.get('location'),
-    grade: params.get('grade'),
-    subject: params.get('subject')
-  };
+const questionContainer = document.getElementById('questionContainer');
+const submitBtn = document.getElementById('submitBtn');
 
-  if (!studentData.grade || !studentData.subject) {
-    alert("Missing subject or grade");
+if (!subject || !grade) {
+  alert('Missing subject or grade. Redirecting...');
+  window.location.href = 'index.html';
+}
+
+fetchQuestions(grade, subject).then(renderQuestions);
+
+function renderQuestions(questions) {
+  if (!questions.length) {
+    questionContainer.innerHTML = '<p class="text-red-600">No questions available for this subject and grade.</p>';
     return;
   }
 
-  try {
-    const questions = await fetchQuestions(studentData.grade, studentData.subject);
-    displayQuestions(questions);
-  } catch (error) {
-    document.getElementById("question-area").innerHTML = `<p class="text-red-600">${error.message}</p>`;
-  }
-};
+  const html = questions.map((q, i) => `
+    <div class="mb-4">
+      <p class="font-semibold">${i + 1}. ${q.question}</p>
+      ${q.options.map((opt, j) => `
+        <label class="block">
+          <input type="radio" name="q${i}" value="${opt}" class="mr-2" />${opt}
+        </label>`).join('')}
+    </div>
+  `).join('');
 
-function displayQuestions(questions) {
-  const area = document.getElementById("question-area");
-  area.innerHTML = '';
-  questions.forEach((q, i) => {
-    const block = document.createElement("div");
-    block.className = "mb-6 p-4 bg-white rounded shadow";
-
-    const questionText = document.createElement("p");
-    questionText.innerHTML = `<strong>Q${i + 1}:</strong> ${q.question}`;
-    block.appendChild(questionText);
-
-    q.options.forEach((opt, j) => {
-      const label = document.createElement("label");
-      label.className = "block ml-4";
-      label.innerHTML = `<input type="radio" name="q${i}" value="${opt}"> ${opt}`;
-      block.appendChild(label);
-    });
-
-    area.appendChild(block);
-  });
+  questionContainer.innerHTML = html;
 }
+
+submitBtn.addEventListener('click', () => {
+  // Handle answer collection and submission logic here
+  alert('Test submitted successfully!');
+  window.location.href = 'subject-select.html';
+});
