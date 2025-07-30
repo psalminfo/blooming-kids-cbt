@@ -1,7 +1,7 @@
 // autoQuestionGen.js
 
 // GitHub raw path to your /questions/ folder
-const GITHUB_BASE = "https://raw.githubusercontent.com/psalminfo/bkh-curriculum/main/questions/";
+const GITHUB_BASE = "https://raw.githubusercontent.com/psalminfo/main/questions/";
 
 // Firebase fallback (if needed)
 import { db } from './firebaseConfig.js';
