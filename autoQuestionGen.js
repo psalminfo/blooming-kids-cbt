@@ -1,7 +1,7 @@
 export async function loadQuestions(subject, grade) {
   let questions = [];
 
-  const githubUrl = `https://raw.githubusercontent.com/psalminfo/bkh-curriculum/main/questions/${grade}-${subject}.json`;
+  const githubUrl = `https://raw.githubusercontent.com/psalminfo/main/questions/${grade}-${subject}.json`;
 
   try {
     const response = await fetch(githubUrl);
