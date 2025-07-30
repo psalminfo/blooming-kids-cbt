@@ -4,27 +4,21 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Select Subject - Blooming Kids House</title>
-  <link rel="stylesheet" href="style.css"/>
-  <link rel="icon" href="favicon.ico"/>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" />
+  <link rel="stylesheet" href="style.css" />
+  <link rel="icon" href="favicon.ico" />
 </head>
-<body class="bg-green-50 min-h-screen flex flex-col items-center justify-center">
-  <div class="bg-white p-8 rounded-xl shadow-xl w-full max-w-2xl">
-    <h2 class="text-2xl font-bold text-green-800 text-center mb-6">Select a Subject</h2>
-    <div id="subjectButtons" class="grid grid-cols-2 sm:grid-cols-3 gap-4 mb-4"></div>
-    <div class="flex justify-between mt-6">
-      <button onclick="logout()" class="bg-yellow-500 text-white px-4 py-2 rounded hover:bg-yellow-600">Logout</button>
-    </div>
+<body class="bg-green-50 min-h-screen flex items-center justify-center">
+  <div class="bg-white p-8 rounded-xl shadow-xl w-full max-w-md">
+    <h2 class="text-2xl font-bold text-green-800 text-center mb-6">Choose a Subject</h2>
+    <div id="subjectButtons" class="space-y-4 mb-4"></div>
+    <button onclick="logout()" class="bg-yellow-500 text-white w-full py-2 rounded hover:bg-yellow-600">Logout</button>
     <p class="text-xs text-center mt-4 text-gray-600">POWERED BY <span style="color:#FFEB3B">POG</span></p>
   </div>
 
-  <script type="module">
-    import { getAuth, onAuthStateChanged, signOut } from "./firebase-auth.js";
-    import { db } from "./firebaseConfig.js";
-    import { doc, getDoc } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-firestore.js";
-
-    const auth = getAuth();
-
-    const subjectMap = {
+  <script>
+    const grade = localStorage.getItem('grade');
+    const subjectsByGrade = {
       "3": ["Math", "ELA"],
       "4": ["Math", "ELA"],
       "5": ["Math", "ELA"],
@@ -37,46 +31,26 @@
       "12": ["Math", "ELA", "Biology", "Chemistry", "Physics"]
     };
 
-    onAuthStateChanged(auth, async (user) => {
-      if (user) {
-        const userDocRef = doc(db, "students", user.uid);
-        const userDocSnap = await getDoc(userDocRef);
+    if (!grade) {
+      window.location.href = "index.html"; // redirect to login if grade missing
+    }
 
-        if (userDocSnap.exists()) {
-          const userData = userDocSnap.data();
-          const grade = userData.grade;
+    const container = document.getElementById('subjectButtons');
+    const subjects = subjectsByGrade[grade] || [];
 
-          if (!grade) {
-            alert("Missing grade. Redirecting...");
-            window.location.href = "index.html";
-            return;
-          }
-
-          const subjects = subjectMap[grade] || [];
-          const subjectButtonsContainer = document.getElementById("subjectButtons");
-
-          subjects.forEach(subject => {
-            const btn = document.createElement("button");
-            btn.textContent = subject;
-            btn.className = "bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700";
-            btn.onclick = () => {
-              window.location.href = `student.html?grade=${grade}&subject=${subject}`;
-            };
-            subjectButtonsContainer.appendChild(btn);
-          });
-        } else {
-          alert("Student record not found. Redirecting...");
-          window.location.href = "index.html";
-        }
-      } else {
-        window.location.href = "index.html";
-      }
+    subjects.forEach(subject => {
+      const btn = document.createElement('button');
+      btn.textContent = subject;
+      btn.className = "w-full bg-green-600 text-white py-2 rounded hover:bg-green-700";
+      btn.onclick = () => {
+        window.location.href = `student.html?subject=${subject}&grade=${grade}`;
+      };
+      container.appendChild(btn);
     });
 
     function logout() {
-      signOut(auth).then(() => {
-        window.location.href = "index.html";
-      });
+      localStorage.clear();
+      window.location.href = "index.html";
     }
   </script>
 </body>
