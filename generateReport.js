@@ -1,145 +1,152 @@
 // generateReport.js
-import jsPDF from "https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js";
-import {
-  db,
-  collection,
-  getDocs,
-  doc,
-  updateDoc
-} from './firebaseConfig.js';
+import { db } from './firebaseConfig.js';
+import { collection, getDocs, addDoc } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-lite.js';
 
-const CLOUDINARY_UPLOAD_URL = "https://api.cloudinary.com/v1_1/dxewqfuul/upload";
-const CLOUDINARY_UPLOAD_PRESET = "bloomingkids_preset"; // Update if needed
+async function generateReport(studentName, parentEmail, grade, tutorName) {
+  const resultsCol = collection(db, "results");
+  const snapshot = await getDocs(resultsCol);
+  const reportData = [];
 
-export async function generateReport(studentName, parentEmail, grade, tutorName) {
-  const reportDoc = new jsPDF();
-
-  // 1. Fetch all results for this student
-  const querySnapshot = await getDocs(collection(db, "results"));
-  const studentResults = [];
-
-  querySnapshot.forEach((docSnap) => {
-    const data = docSnap.data();
+  snapshot.forEach(doc => {
+    const data = doc.data();
     if (data.name === studentName && data.parentEmail === parentEmail) {
-      studentResults.push(data);
+      reportData.push(data);
     }
   });
 
-  if (studentResults.length === 0) {
-    alert("No results found for this student.");
+  if (reportData.length === 0) {
+    alert("No test data found for this student.");
     return;
   }
 
-  // 2. Build tables for each subject
+  // Sort subjects alphabetically for consistency
+  reportData.sort((a, b) => a.subject.localeCompare(b.subject));
+
+  const reportDoc = new jsPDF();
   let y = 20;
 
+  // Title
+  reportDoc.setFontSize(16);
   reportDoc.setFont("helvetica", "bold");
-  reportDoc.setFontSize(14);
-  reportDoc.text("BLOOMING KIDS HOUSE ASSESSMENT REPORT", 105, y, { align: "center" });
+  reportDoc.text("BLOOMING KIDS HOUSE ASSESSMENT REPORT", 105, y, { align: 'center' });
   y += 10;
 
-  reportDoc.setFontSize(11);
+  // Student info
+  reportDoc.setFontSize(12);
   reportDoc.setFont("helvetica", "normal");
-  reportDoc.text(`Name: ${studentName}`, 15, y);
-  reportDoc.text(`Grade: ${grade}`, 105, y);
+  reportDoc.text(`Name: ${studentName}`, 20, y);
+  reportDoc.text(`Grade: ${grade}`, 110, y);
   y += 8;
-  reportDoc.text(`Parent Email: ${parentEmail}`, 15, y);
-  reportDoc.text(`Tutor: ${tutorName}`, 105, y);
+  reportDoc.text(`Tutor: ${tutorName}`, 20, y);
+  reportDoc.text(`Parent Email: ${parentEmail}`, 110, y);
   y += 10;
 
-  for (let subjectResult of studentResults) {
-    const { subject, score, knowledge, skills } = subjectResult;
+  // Subject Results
+  for (let result of reportData) {
+    if (y > 260) {
+      reportDoc.addPage();
+      y = 20;
+    }
 
     reportDoc.setFont("helvetica", "bold");
-    reportDoc.text(`Subject: ${subject}`, 15, y);
-    y += 8;
+    reportDoc.text(`${result.subject} Result`, 20, y);
+    y += 6;
 
     reportDoc.setFont("helvetica", "normal");
-    reportDoc.text(`Score: ${score}%`, 15, y);
+    reportDoc.text(`Score: ${result.score}%`, 25, y);
     y += 6;
 
-    reportDoc.text("Knowledge Outcomes:", 15, y);
-    y += 6;
-    knowledge.forEach(k => {
-      reportDoc.text(`- ${k}`, 20, y);
-      y += 5;
-    });
+    if (result.knowledge && Array.isArray(result.knowledge)) {
+      reportDoc.text("Knowledge Gained:", 25, y);
+      y += 6;
+      for (let item of result.knowledge) {
+        reportDoc.text(`• ${item}`, 30, y);
+        y += 5;
+        if (y > 270) {
+          reportDoc.addPage();
+          y = 20;
+        }
+      }
+    }
 
-    reportDoc.text("Skills Outcomes:", 15, y);
-    y += 6;
-    skills.forEach(s => {
-      reportDoc.text(`- ${s}`, 20, y);
-      y += 5;
-    });
+    if (result.skills && Array.isArray(result.skills)) {
+      reportDoc.text("Skills Developed:", 25, y);
+      y += 6;
+      for (let skill of result.skills) {
+        reportDoc.text(`• ${skill}`, 30, y);
+        y += 5;
+        if (y > 270) {
+          reportDoc.addPage();
+          y = 20;
+        }
+      }
+    }
 
     y += 8;
   }
 
-  // 3. Add Personalized Recommendation
+  // Recommendation
   reportDoc.setFont("helvetica", "bold");
-  reportDoc.text("RECOMMENDATION", 15, y);
-  y += 8;
-
+  reportDoc.text("Recommendation:", 20, y);
+  y += 6;
   reportDoc.setFont("helvetica", "normal");
-  const recText = `Based on the assessment results, we strongly recommend that your child receive ongoing tutoring support. ${tutorName}, our experienced tutor, will be working closely with your child to address learning gaps and strengthen their understanding. This personalized attention will ensure your child excels confidently.`;
-  const recLines = reportDoc.splitTextToSize(recText, 180);
-  reportDoc.text(recLines, 15, y);
-  y += recLines.length * 6 + 8;
+  const recommendation = `Based on the performance, we strongly recommend continued tutoring support with ${tutorName} to help ${studentName} improve and thrive academically.`;
+  const splitRecommendation = reportDoc.splitTextToSize(recommendation, 170);
+  reportDoc.text(splitRecommendation, 25, y);
+  y += splitRecommendation.length * 6;
 
-  // 4. Add Director Message
-  reportDoc.setFont("helvetica", "bold");
-  reportDoc.text("MESSAGE FROM THE DIRECTOR", 15, y);
-  y += 8;
-
-  const dirMessage = `Thank you for choosing Blooming Kids House. We are committed to your child's academic growth. This report reflects our passion for excellence and care. Please feel free to reach out for further assistance.`;
-  const dirLines = reportDoc.splitTextToSize(dirMessage, 180);
-  reportDoc.setFont("helvetica", "normal");
-  reportDoc.text(dirLines, 15, y);
-  y += dirLines.length * 6 + 10;
+  // Director Message
+  if (y > 250) {
+    reportDoc.addPage();
+    y = 20;
+  }
 
   reportDoc.setFont("helvetica", "bold");
-  reportDoc.text("Mrs. Oladoyin Temitope", 15, y);
+  reportDoc.text("Message from the Director:", 20, y);
+  y += 6;
   reportDoc.setFont("helvetica", "normal");
-  reportDoc.text("Director, Blooming Kids House", 15, y + 6);
+  const directorMessage = `Thank you for trusting Blooming Kids House. Our mission is to guide and support every child toward excellence. We are proud of ${studentName}'s progress and remain committed to their academic journey.\n\nSincerely,\nDirector, Blooming Kids House`;
+  const splitMessage = reportDoc.splitTextToSize(directorMessage, 170);
+  reportDoc.text(splitMessage, 25, y);
+  y += splitMessage.length * 6;
 
-  // 5. Add Footer
+  // Footer
   reportDoc.setFontSize(10);
-  reportDoc.text("POWERED BY ", 15, 290);
-  reportDoc.setTextColor("#FFEB3B");
-  reportDoc.text("POG", 50, 290);
-  reportDoc.setTextColor(0, 0, 0);
+  reportDoc.setTextColor("#4CAF50");
+  reportDoc.textWithLink("POWERED BY POG", 105, 285, { align: "center" });
 
-  // 6. Upload to Cloudinary
-  const blob = reportDoc.output("blob");
+  // Export as Blob for upload
+  const pdfBlob = reportDoc.output("blob");
+
+  // Upload to Cloudinary
+  const cloudinaryUrl = "https://api.cloudinary.com/v1_1/blooming-kids-house/upload";
+  const uploadPreset = "bkhpdf";
 
   const formData = new FormData();
-  formData.append("file", blob);
-  formData.append("upload_preset", CLOUDINARY_UPLOAD_PRESET);
+  formData.append("file", pdfBlob);
+  formData.append("upload_preset", uploadPreset);
 
-  const cloudRes = await fetch(CLOUDINARY_UPLOAD_URL, {
+  const uploadRes = await fetch(cloudinaryUrl, {
     method: "POST",
     body: formData
   });
 
-  const cloudData = await cloudRes.json();
-  const pdfUrl = cloudData.secure_url;
+  const uploadData = await uploadRes.json();
+  const pdfUrl = uploadData.secure_url;
 
-  // 7. Save the report URL to Firestore under "reports"
-  const reportRef = doc(db, "reports", `${studentName}_${grade}`);
-  await updateDoc(reportRef, {
-    url: pdfUrl,
-    timestamp: new Date()
-  }).catch(async () => {
-    await setDoc(reportRef, {
-      name: studentName,
-      grade,
-      parentEmail,
-      tutorName,
-      url: pdfUrl,
-      timestamp: new Date()
-    });
+  // Save to Firestore under "reports"
+  const reportRef = collection(db, "reports");
+  await addDoc(reportRef, {
+    studentName,
+    parentEmail,
+    grade,
+    tutorName,
+    reportUrl: pdfUrl,
+    timestamp: new Date().toISOString()
   });
 
-  // 8. Offer to download or view
+  // Open PDF in new tab
   window.open(pdfUrl, "_blank");
 }
+
+window.generateReport = generateReport;
