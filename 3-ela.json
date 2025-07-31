@@ -1,0 +1,334 @@
+{
+  "questions": [
+    {
+      "question": "Which word is a noun?",
+      "type": "multiple-choice",
+      "options": [
+        "run",
+        "blue",
+        "cat",
+        "happy"
+      ],
+      "correct_answer": "cat"
+    },
+    {
+      "question": "What is the plural of 'child'?",
+      "type": "multiple-choice",
+      "options": [
+        "childs",
+        "children",
+        "childes",
+        "chields"
+      ],
+      "correct_answer": "children"
+    },
+    {
+      "question": "Which word is a verb?",
+      "type": "multiple-choice",
+      "options": [
+        "jump",
+        "book",
+        "red",
+        "tree"
+      ],
+      "correct_answer": "jump"
+    },
+    {
+      "question": "Which sentence is written correctly?",
+      "type": "multiple-choice",
+      "options": [
+        "he went to School.",
+        "He went to school.",
+        "he Went to school.",
+        "He Went To School."
+      ],
+      "correct_answer": "He went to school."
+    },
+    {
+      "question": "What does an adjective describe?",
+      "type": "multiple-choice",
+      "options": [
+        "a place",
+        "a person",
+        "a verb",
+        "a noun"
+      ],
+      "correct_answer": "a noun"
+    },
+    {
+      "question": "Which word is an adjective?",
+      "type": "multiple-choice",
+      "options": [
+        "quick",
+        "fox",
+        "jumps",
+        "over"
+      ],
+      "correct_answer": "quick"
+    },
+    {
+      "question": "What is the opposite of 'happy'?",
+      "type": "multiple-choice",
+      "options": [
+        "glad",
+        "joyful",
+        "sad",
+        "kind"
+      ],
+      "correct_answer": "sad"
+    },
+    {
+      "question": "Which sentence is a question?",
+      "type": "multiple-choice",
+      "options": [
+        "The cat is sleeping",
+        "Can I have some water?",
+        "I like pizza",
+        "We are going home"
+      ],
+      "correct_answer": "Can I have some water?"
+    },
+    {
+      "question": "Which word is a synonym for 'fast'?",
+      "type": "multiple-choice",
+      "options": [
+        "slow",
+        "quick",
+        "lazy",
+        "walk"
+      ],
+      "correct_answer": "quick"
+    },
+    {
+      "question": "What punctuation ends a statement?",
+      "type": "multiple-choice",
+      "options": [
+        "!",
+        ".",
+        ",",
+        "?"
+      ],
+      "correct_answer": "."
+    },
+    {
+      "question": "Which is a compound word?",
+      "type": "multiple-choice",
+      "options": [
+        "butterfly",
+        "water",
+        "fly",
+        "butter"
+      ],
+      "correct_answer": "butterfly"
+    },
+    {
+      "question": "What is a pronoun?",
+      "type": "multiple-choice",
+      "options": [
+        "A word that replaces a noun",
+        "A describing word",
+        "An action word",
+        "A type of punctuation"
+      ],
+      "correct_answer": "A word that replaces a noun"
+    },
+    {
+      "question": "Which word best completes: 'The boy ___ the ball.'",
+      "type": "multiple-choice",
+      "options": [
+        "throw",
+        "threw",
+        "thrown",
+        "throws"
+      ],
+      "correct_answer": "threw"
+    },
+    {
+      "question": "What part of speech is 'quickly'?",
+      "type": "multiple-choice",
+      "options": [
+        "noun",
+        "adverb",
+        "verb",
+        "adjective"
+      ],
+      "correct_answer": "adverb"
+    },
+    {
+      "question": "Which sentence shows correct capitalization?",
+      "type": "multiple-choice",
+      "options": [
+        "i like apples.",
+        "My mom is a teacher.",
+        "the sun is hot.",
+        "we are going to lagos."
+      ],
+      "correct_answer": "My mom is a teacher."
+    },
+    {
+      "question": "What is the past tense of 'go'?",
+      "type": "multiple-choice",
+      "options": [
+        "goed",
+        "going",
+        "went",
+        "goes"
+      ],
+      "correct_answer": "went"
+    },
+    {
+      "question": "Which is a complete sentence?",
+      "type": "multiple-choice",
+      "options": [
+        "Running to the store",
+        "She eats breakfast",
+        "Because it is hot",
+        "After the game"
+      ],
+      "correct_answer": "She eats breakfast"
+    },
+    {
+      "question": "Which is a proper noun?",
+      "type": "multiple-choice",
+      "options": [
+        "city",
+        "girl",
+        "Lagos",
+        "river"
+      ],
+      "correct_answer": "Lagos"
+    },
+    {
+      "question": "Which is an example of a question mark?",
+      "type": "multiple-choice",
+      "options": [
+        "?",
+        ".",
+        ",",
+        "!"
+      ],
+      "correct_answer": "?"
+    },
+    {
+      "question": "What is the root word in 'unhappy'?",
+      "type": "multiple-choice",
+      "options": [
+        "happy",
+        "un",
+        "hap",
+        "unhappy"
+      ],
+      "correct_answer": "happy"
+    },
+    {
+      "question": "Which word is spelled correctly?",
+      "type": "multiple-choice",
+      "options": [
+        "becaus",
+        "beecause",
+        "because",
+        "becuz"
+      ],
+      "correct_answer": "because"
+    },
+    {
+      "question": "Which sentence uses a comma correctly?",
+      "type": "multiple-choice",
+      "options": [
+        "I like apples oranges and bananas.",
+        "I like apples, oranges, and bananas.",
+        "I like, apples, oranges and bananas.",
+        "I like apples oranges, and bananas."
+      ],
+      "correct_answer": "I like apples, oranges, and bananas."
+    },
+    {
+      "question": "Which word best completes: 'She ___ a new dress.'",
+      "type": "multiple-choice",
+      "options": [
+        "wear",
+        "wears",
+        "wore",
+        "wearing"
+      ],
+      "correct_answer": "wore"
+    },
+    {
+      "question": "Which word is an antonym for 'hot'?",
+      "type": "multiple-choice",
+      "options": [
+        "burn",
+        "heat",
+        "cold",
+        "warm"
+      ],
+      "correct_answer": "cold"
+    },
+    {
+      "question": "Which is a sentence fragment?",
+      "type": "multiple-choice",
+      "options": [
+        "The cat is cute.",
+        "Because it was raining.",
+        "We went to the park.",
+        "He plays football."
+      ],
+      "correct_answer": "Because it was raining."
+    },
+    {
+      "question": "What is the main idea of a paragraph?",
+      "type": "multiple-choice",
+      "options": [
+        "The last word",
+        "The most difficult sentence",
+        "The central message",
+        "The first sentence only"
+      ],
+      "correct_answer": "The central message"
+    },
+    {
+      "question": "Which is a plural noun?",
+      "type": "multiple-choice",
+      "options": [
+        "child",
+        "children",
+        "sheep",
+        "book"
+      ],
+      "correct_answer": "children"
+    },
+    {
+      "question": "Which word is a homophone for 'two'?",
+      "type": "multiple-choice",
+      "options": [
+        "too",
+        "to",
+        "toe",
+        "tune"
+      ],
+      "correct_answer": "too"
+    },
+    {
+      "question": "Which is an imperative sentence?",
+      "type": "multiple-choice",
+      "options": [
+        "Close the door.",
+        "Where is my pen?",
+        "That\u2019s my bag.",
+        "He is running."
+      ],
+      "correct_answer": "Close the door."
+    },
+    {
+      "question": "What is the suffix in 'careless'?",
+      "type": "multiple-choice",
+      "options": [
+        "care",
+        "less",
+        "ca",
+        "ess"
+      ],
+      "correct_answer": "less"
+    }
+  ]
+}
