@@ -7,32 +7,26 @@
   <link rel="icon" href="favicon.ico" />
   <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
 </head>
-<body class="bg-gray-100 min-h-screen flex flex-col">
-  <div class="bg-green-700 text-white py-4 px-6">
-    <h1 class="text-2xl font-bold">Blooming Kids House - Assessment</h1>
-  </div>
+<body class="bg-gray-100 min-h-screen">
+  <div class="max-w-4xl mx-auto p-4">
+    <h1 class="text-3xl font-bold text-center text-green-800 mb-4">Blooming Kids House Test</h1>
+    <div id="timer" class="text-xl text-center font-semibold text-red-600 mb-6">Time Left: 30:00</div>
 
-  <div class="flex-1 container mx-auto py-6 px-4">
-    <div class="mb-4 flex justify-between items-center">
-      <h2 class="text-xl font-semibold" id="subjectTitle">Loading...</h2>
-      <span class="text-red-600 font-bold text-lg" id="timer">30:00</span>
+    <!-- Tabs -->
+    <div class="flex space-x-4 mb-4">
+      <button class="tab px-4 py-2 bg-blue-600 text-white rounded" data-subject="math">Math</button>
+      <button class="tab px-4 py-2 bg-blue-600 text-white rounded" data-subject="ela">ELA</button>
     </div>
 
-    <form id="testForm" class="space-y-6">
-      <div id="questionContainer" class="space-y-4"></div>
+    <!-- Question Containers -->
+    <div id="mathContainer" class="subjectTab"></div>
+    <div id="elaContainer" class="subjectTab hidden"></div>
 
-      <button type="submit" class="mt-6 bg-green-700 hover:bg-green-800 text-white font-semibold py-2 px-6 rounded">
-        Submit Test
-      </button>
-    </form>
+    <div class="text-center mt-6">
+      <button id="submitBtn" class="bg-green-600 text-white px-6 py-2 rounded hover:bg-green-700">Submit Test</button>
+    </div>
   </div>
 
-  <footer class="bg-gray-800 text-center text-white py-2 text-sm">
-    POWERED BY <span class="text-yellow-300">POG</span>
-  </footer>
-
-  <script type="module" src="./firebaseConfig.js"></script>
-  <script type="module" src="./autoQuestionGen.js"></script>
-  <script type="module" src="./student.js"></script>
+  <script type="module" src="student.js"></script>
 </body>
 </html>
