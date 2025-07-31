@@ -1,39 +1,47 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Parent Login – Blooming Kids House</title>
-  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
-  <link rel="icon" href="favicon.ico" />
-</head>
-<body class="bg-gradient-to-r from-green-100 to-yellow-100 min-h-screen flex items-center justify-center">
-  <div class="bg-white shadow-2xl rounded-2xl w-full max-w-md p-8 space-y-6">
-    <h2 class="text-3xl font-bold text-green-700 text-center">Parent Portal</h2>
-    <form id="parentLoginForm" class="space-y-5">
-      <div>
-        <label for="studentName" class="block text-sm font-medium text-gray-700">Student Name</label>
-        <input type="text" id="studentName" required class="mt-1 block w-full border border-gray-300 rounded-xl p-3 focus:outline-none focus:ring-2 focus:ring-green-500" />
-      </div>
-      <div>
-        <label for="parentEmail" class="block text-sm font-medium text-gray-700">Parent Email</label>
-        <input type="email" id="parentEmail" required class="mt-1 block w-full border border-gray-300 rounded-xl p-3 focus:outline-none focus:ring-2 focus:ring-green-500" />
-      </div>
-      <button type="submit" class="w-full bg-green-600 text-white py-3 rounded-xl hover:bg-green-700 font-semibold transition">View Report</button>
-    </form>
-    <p class="text-center text-xs text-gray-400 mt-4">POWERED BY <span style="color:#FFEB3B">POG</span></p>
-  </div>
-
-  <script type="module">
-    document.getElementById('parentLoginForm').addEventListener('submit', (e) => {
-      e.preventDefault();
-      const studentName = document.getElementById('studentName').value.trim();
-      const parentEmail = document.getElementById('parentEmail').value.trim();
-      if (studentName && parentEmail) {
-        const params = new URLSearchParams({ student: studentName, email: parentEmail });
-        window.location.href = `parent-report.html?${params}`;
-      }
-    });
-  </script>
-</body>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Parent Login | Blooming Kids House</title>
+    <link rel="icon" href="favicon.ico" />
+    <script type="module" src="./parent-login.js"></script>
+    <link
+      href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css"
+      rel="stylesheet"
+    />
+  </head>
+  <body class="bg-green-50 flex items-center justify-center h-screen">
+    <div class="bg-white p-8 rounded-2xl shadow-xl w-full max-w-md">
+      <h1 class="text-2xl font-bold text-center mb-6 text-green-700">
+        Parent Portal
+      </h1>
+      <form id="parent-login-form" class="space-y-4">
+        <div>
+          <label class="block font-semibold text-gray-700">Student Name</label>
+          <input
+            type="text"
+            id="studentName"
+            required
+            class="w-full px-4 py-2 rounded border border-gray-300 focus:outline-none focus:ring-2 focus:ring-green-400"
+          />
+        </div>
+        <div>
+          <label class="block font-semibold text-gray-700">Parent Email</label>
+          <input
+            type="email"
+            id="parentEmail"
+            required
+            class="w-full px-4 py-2 rounded border border-gray-300 focus:outline-none focus:ring-2 focus:ring-green-400"
+          />
+        </div>
+        <button
+          type="submit"
+          class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-2 rounded transition"
+        >
+          View Report
+        </button>
+      </form>
+    </div>
+  </body>
 </html>
