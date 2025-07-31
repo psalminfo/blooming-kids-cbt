@@ -1,5 +1,5 @@
 import { db } from './firebaseConfig.js';
-import { collection, getDocs } from 'firebase/firestore';
+import { collection, getDocs, query, where } from 'firebase/firestore';
 
 async function fetchReports() {
   const student = localStorage.getItem('bk_studentName');
@@ -11,24 +11,36 @@ async function fetchReports() {
     return;
   }
 
-  const snapshot = await getDocs(collection(db, 'reports'));
-  container.innerHTML = "";
+  try {
+    const q = query(
+      collection(db, 'reports'),
+      where('student', '==', student),
+      where('parentEmail', '==', email)
+    );
 
-  snapshot.forEach(doc => {
-    const data = doc.data();
-    if (data.student === student && data.parentEmail === email) {
+    const snapshot = await getDocs(q);
+    container.innerHTML = "";
+
+    if (snapshot.empty) {
+      container.innerHTML = "No matching report found.";
+      return;
+    }
+
+    snapshot.forEach(doc => {
+      const data = doc.data();
       const div = document.createElement('div');
       div.innerHTML = `
-        <strong>${data.subject} (Grade ${data.grade})</strong><br/>
-        <a href="${data.url}" target="_blank" class="text-blue-600 underline">Download Report</a>
-        <hr class="my-2"/>
+        <strong>BLOOMING KIDS HOUSE ASSESSMENT REPORT</strong><br/>
+        <em>${data.student} (Grade ${data.grade})</em><br/>
+        <a href="${data.url}" target="_blank" class="text-blue-600 underline">Download Report PDF</a>
+        <hr class="my-3"/>
       `;
       container.appendChild(div);
-    }
-  });
+    });
 
-  if (!container.innerHTML) {
-    container.innerHTML = "No matching reports found.";
+  } catch (error) {
+    console.error("Error loading report:", error);
+    container.innerHTML = "An error occurred. Please try again.";
   }
 }
 
