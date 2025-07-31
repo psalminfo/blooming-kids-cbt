@@ -1,56 +1,38 @@
 <!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Student Login - Blooming Kids House</title>
-    <link rel="icon" href="favicon.ico" />
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" />
-    <link rel="stylesheet" href="style.css" />
-
-    <!-- Firebase CDN -->
-    <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-auth-compat.js"></script>
-    <script>
-      const firebaseConfig = {
-        apiKey: "AIzaSyD1lJhsWMMs_qerLBSzk7wKhjLyI_11RJg",
-        authDomain: "bloomingkidsassessment.firebaseapp.com",
-        projectId: "bloomingkidsassessment",
-        storageBucket: "bloomingkidsassessment.appspot.com",
-        messagingSenderId: "238975054977",
-        appId: "1:238975054977:web:87c70b4db044998a204980"
-      };
-      firebase.initializeApp(firebaseConfig);
-    </script>
-  </head>
-  <body class="bg-green-50 min-h-screen flex items-center justify-center">
-    <div class="bg-white p-8 rounded-xl shadow-xl w-full max-w-md">
-      <h2 class="text-2xl font-bold text-green-800 text-center mb-6">Student Login</h2>
-      <form id="studentLoginForm" class="space-y-4">
-        <input type="text" id="studentName" placeholder="Full Name" required class="w-full px-4 py-2 border rounded" />
-        <input type="email" id="parentEmail" placeholder="Parent Email" required class="w-full px-4 py-2 border rounded" />
-        <select id="grade" required class="w-full px-4 py-2 border rounded">
-          <option value="">Select Grade</option>
-          <option value="3">Grade 3</option>
-          <option value="4">Grade 4</option>
-          <option value="5">Grade 5</option>
-          <option value="6">Grade 6</option>
-          <option value="7">Grade 7</option>
-          <option value="8">Grade 8</option>
-          <option value="9">Grade 9</option>
-          <option value="10">Grade 10</option>
-          <option value="11">Grade 11</option>
-          <option value="12">Grade 12</option>
-        </select>
-        <input type="text" id="tutorName" placeholder="Tutor Name" required class="w-full px-4 py-2 border rounded" />
-        <input type="text" id="location" placeholder="Location" required class="w-full px-4 py-2 border rounded" />
-        <input type="text" id="accessCode" placeholder="Access Code (bkh2025)" required class="w-full px-4 py-2 border rounded" />
-        <button type="submit" class="bg-green-600 text-white w-full py-2 rounded hover:bg-green-700">Login</button>
-      </form>
-      <p class="text-xs text-center mt-4 text-gray-600">POWERED BY <span style="color:#FFEB3B">POG</span></p>
-    </div>
-
-    <!-- Logic script (NO type="module") -->
-    <script src="student-login.js"></script>
-  </body>
+<head>
+  <meta charset="UTF-8">
+  <title>Blooming Kids House - Student Login</title>
+  <link rel="icon" href="favicon.ico">
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-green-50 flex items-center justify-center min-h-screen">
+  <div class="bg-white shadow-2xl rounded-2xl p-8 w-full max-w-md border-2 border-green-500">
+    <h2 class="text-2xl font-bold text-center mb-6 text-green-700">Student Login</h2>
+    <form id="studentLoginForm" class="space-y-4">
+      <input type="text" id="studentName" placeholder="Student Name" required class="w-full p-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-400" />
+      <input type="email" id="parentEmail" placeholder="Parent Email" required class="w-full p-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-400" />
+      <select id="grade" required class="w-full p-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-400">
+        <option value="" disabled selected>Select Grade</option>
+        <option value="3">Grade 3</option>
+        <option value="4">Grade 4</option>
+        <option value="5">Grade 5</option>
+        <option value="6">Grade 6</option>
+        <option value="7">Grade 7</option>
+        <option value="8">Grade 8</option>
+        <option value="9">Grade 9</option>
+        <option value="10">Grade 10</option>
+        <option value="11">Grade 11</option>
+        <option value="12">Grade 12</option>
+      </select>
+      <input type="text" id="tutorName" placeholder="Tutor Name" required class="w-full p-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-400" />
+      <input type="text" id="location" placeholder="Location" required class="w-full p-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-400" />
+      <input type="password" id="accessCode" placeholder="Access Code" required class="w-full p-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-yellow-400" />
+      <button type="submit" class="w-full bg-green-600 hover:bg-green-700 text-white p-3 rounded-xl font-semibold transition-all">
+        Proceed to Subjects
+      </button>
+    </form>
+  </div>
+  <script src="studentLogin.js"></script>
+</body>
 </html>
