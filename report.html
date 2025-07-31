@@ -3,119 +3,156 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Student Report - Blooming Kids House</title>
+  <title>Student Report</title>
   <link rel="icon" href="favicon.ico" />
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 </head>
-<body class="bg-gray-100 font-sans">
-
-  <div class="max-w-4xl mx-auto py-10 px-4">
-    <div class="bg-white shadow-md rounded-xl p-6" id="reportContainer">
-
-      <h1 class="text-2xl font-bold text-center text-green-700 mb-4">BLOOMING KIDS HOUSE ASSESSMENT REPORT</h1>
-
-      <div class="grid grid-cols-2 gap-4 mb-6">
-        <p><strong>Student Name:</strong> <span id="studentName"></span></p>
-        <p><strong>Grade:</strong> <span id="grade"></span></p>
-        <p><strong>Parent Email:</strong> <span id="parentEmail"></span></p>
-        <p><strong>Location:</strong> <span id="location"></span></p>
-        <p><strong>Tutor:</strong> <span id="tutor"></span></p>
-      </div>
-
-      <div id="subjectReports" class="space-y-6"></div>
-
-      <div class="mt-6">
-        <h2 class="text-lg font-semibold text-green-700 mb-2">Director’s Message</h2>
-        <p>
-          Dear Parent,<br><br>
-          Thank you for allowing your child to participate in the Blooming Kids House Assessment. This report reflects your child's current academic strengths and areas that need attention. 
-          We believe every child is unique and capable of greatness with the right guidance. Your child's tutor, <span id="tutorNameFooter" class="font-bold"></span>, is committed to working closely with you to help your child improve in the necessary areas and shine brightly. <br><br>
-          Best regards,<br>
-          <strong>Mrs. Oluwakemi Oladunjoye</strong><br>
-          Director, Blooming Kids House
-        </p>
-      </div>
-
-      <footer class="text-center text-sm text-gray-600 mt-10">
-        POWERED BY <span style="color:#FFEB3B">POG</span>
-      </footer>
+<body class="bg-gray-100 p-6 font-sans">
+  <div class="max-w-4xl mx-auto bg-white shadow-xl rounded-lg p-6" id="reportContent">
+    <div class="text-center mb-4">
+      <h1 class="text-2xl font-bold text-green-700">BLOOMING KIDS HOUSE ASSESSMENT REPORT</h1>
     </div>
 
-    <div class="text-center mt-6">
-      <button id="downloadBtn" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-6 rounded">
-        Download PDF
-      </button>
+    <!-- Student Info -->
+    <div class="grid grid-cols-2 gap-4 text-sm mb-6">
+      <div><strong>Student Name:</strong> <span id="studentName">-</span></div>
+      <div><strong>Parent Email:</strong> <span id="parentEmail">-</span></div>
+      <div><strong>Grade:</strong> <span id="studentGrade">-</span></div>
+      <div><strong>Tutor Name:</strong> <span id="tutorName">-</span></div>
+      <div><strong>Location:</strong> <span id="studentLocation">-</span></div>
+    </div>
+
+    <!-- Subjects -->
+    <h2 class="text-lg font-semibold text-green-600 mt-4">Subjects Taken</h2>
+    <ul class="list-disc ml-6 mb-4 text-sm" id="subjectsList">
+      <!-- Injected subjects -->
+    </ul>
+
+    <!-- Knowledge Assessment -->
+    <h2 class="text-lg font-semibold text-green-600 mt-4">Knowledge Assessment</h2>
+    <table class="table-auto w-full text-sm mb-4 border">
+      <thead class="bg-green-200">
+        <tr>
+          <th class="border px-4 py-2 text-left">Subject</th>
+          <th class="border px-4 py-2 text-left">Score (%)</th>
+        </tr>
+      </thead>
+      <tbody id="knowledgeTable">
+        <!-- Injected knowledge scores -->
+      </tbody>
+    </table>
+
+    <!-- Skills Assessment -->
+    <h2 class="text-lg font-semibold text-green-600 mt-4">Skills Assessment</h2>
+    <table class="table-auto w-full text-sm mb-4 border">
+      <thead class="bg-yellow-200">
+        <tr>
+          <th class="border px-4 py-2 text-left">Subject</th>
+          <th class="border px-4 py-2 text-left">Skill</th>
+          <th class="border px-4 py-2 text-left">Performance</th>
+        </tr>
+      </thead>
+      <tbody id="skillsTable">
+        <!-- Injected skills -->
+      </tbody>
+    </table>
+
+    <!-- Director Message -->
+    <div class="mt-6">
+      <h2 class="text-lg font-semibold text-green-600">Message from the Director</h2>
+      <p class="text-sm mt-2">
+        Dear Parent,<br/><br/>
+        Thank you for enrolling <span id="studentFirstName">your child</span> in the Blooming Kids House assessment. Based on the results, there is potential for improvement in key learning areas. Our goal is to provide the right academic support to ensure your child succeeds.
+      </p>
+    </div>
+
+    <!-- Recommendation -->
+    <div class="mt-6">
+      <h2 class="text-lg font-semibold text-green-600">Recommendation</h2>
+      <p class="text-sm mt-2">
+        We strongly recommend personalized tutoring support to strengthen <span id="studentFirstName2">your child</span>'s learning. <span id="tutorReference">The assigned tutor</span> will guide them through structured lessons tailored to their needs.
+      </p>
+    </div>
+
+    <!-- Footer -->
+    <div class="mt-10 text-center text-xs text-gray-500">
+      POWERED BY <span style="color:#FFEB3B">POG</span>
     </div>
   </div>
 
+  <!-- Buttons -->
+  <div class="flex justify-center mt-6 gap-4">
+    <button onclick="downloadPDF()" class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 text-sm">Download PDF</button>
+    <button onclick="logout()" class="bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700 text-sm">Logout</button>
+  </div>
+
   <script>
-    const reportData = JSON.parse(localStorage.getItem("reportData") || "{}");
+    // Simulate report data (replace this with your Firebase logic)
+    const studentData = {
+      name: "Precious Olawale",
+      email: "mother@gmail.com",
+      grade: "4",
+      tutor: "Mr. Samson Adewale",
+      location: "Lagos, Nigeria",
+      subjects: ["Math", "English Language Arts"],
+      scores: { "Math": 70, "English Language Arts": 60 },
+      skills: [
+        { subject: "Math", skill: "Computation", performance: "Average" },
+        { subject: "Math", skill: "Reasoning", performance: "Strong" },
+        { subject: "ELA", skill: "Reading", performance: "Fair" },
+        { subject: "ELA", skill: "Inference", performance: "Weak" }
+      ]
+    };
 
-    document.getElementById("studentName").innerText = reportData.studentName || "";
-    document.getElementById("grade").innerText = reportData.grade || "";
-    document.getElementById("parentEmail").innerText = reportData.parentEmail || "";
-    document.getElementById("location").innerText = reportData.location || "";
-    document.getElementById("tutor").innerText = reportData.tutorName || "";
-    document.getElementById("tutorNameFooter").innerText = reportData.tutorName || "";
+    // Populate report
+    document.getElementById('studentName').textContent = studentData.name;
+    document.getElementById('parentEmail').textContent = studentData.email;
+    document.getElementById('studentGrade').textContent = studentData.grade;
+    document.getElementById('tutorName').textContent = studentData.tutor;
+    document.getElementById('studentLocation').textContent = studentData.location;
 
-    const subjectReportsContainer = document.getElementById("subjectReports");
+    const firstName = studentData.name.split(" ")[0];
+    document.getElementById('studentFirstName').textContent = firstName;
+    document.getElementById('studentFirstName2').textContent = firstName;
+    document.getElementById('tutorReference').textContent = `${studentData.tutor} will guide ${firstName}`;
 
-    if (reportData.subjects) {
-      Object.entries(reportData.subjects).forEach(([subject, data]) => {
-        const subjectDiv = document.createElement("div");
-        subjectDiv.classList.add("bg-gray-50", "p-4", "rounded", "shadow");
+    const subjectsList = document.getElementById('subjectsList');
+    studentData.subjects.forEach(sub => {
+      const li = document.createElement('li');
+      li.textContent = sub;
+      subjectsList.appendChild(li);
+    });
 
-        subjectDiv.innerHTML = `
-          <h3 class="text-green-700 font-semibold text-lg mb-2">${subject}</h3>
-          <table class="table-auto w-full text-sm mb-3">
-            <thead>
-              <tr class="bg-green-100">
-                <th class="px-2 py-1 text-left">Knowledge Area</th>
-                <th class="px-2 py-1 text-left">Score</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${Object.entries(data.knowledge || {}).map(([k, v]) => `
-                <tr>
-                  <td class="border px-2 py-1">${k}</td>
-                  <td class="border px-2 py-1">${v}</td>
-                </tr>`).join("")}
-            </tbody>
-          </table>
-          <table class="table-auto w-full text-sm">
-            <thead>
-              <tr class="bg-yellow-100">
-                <th class="px-2 py-1 text-left">Skill</th>
-                <th class="px-2 py-1 text-left">Score</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${Object.entries(data.skills || {}).map(([k, v]) => `
-                <tr>
-                  <td class="border px-2 py-1">${k}</td>
-                  <td class="border px-2 py-1">${v}</td>
-                </tr>`).join("")}
-            </tbody>
-          </table>
-        `;
-
-        subjectReportsContainer.appendChild(subjectDiv);
-      });
+    const knowledgeTable = document.getElementById('knowledgeTable');
+    for (const subject in studentData.scores) {
+      const row = `<tr>
+        <td class="border px-4 py-2">${subject}</td>
+        <td class="border px-4 py-2">${studentData.scores[subject]}%</td>
+      </tr>`;
+      knowledgeTable.innerHTML += row;
     }
 
-    document.getElementById("downloadBtn").addEventListener("click", () => {
-      const element = document.getElementById("reportContainer");
-      const opt = {
-        margin: 0.3,
-        filename: `${reportData.studentName || 'report'}-Assessment-Report.pdf`,
-        image: { type: 'jpeg', quality: 0.98 },
-        html2canvas: { scale: 2 },
-        jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' }
-      };
-      html2pdf().set(opt).from(element).save();
+    const skillsTable = document.getElementById('skillsTable');
+    studentData.skills.forEach(skill => {
+      const row = `<tr>
+        <td class="border px-4 py-2">${skill.subject}</td>
+        <td class="border px-4 py-2">${skill.skill}</td>
+        <td class="border px-4 py-2">${skill.performance}</td>
+      </tr>`;
+      skillsTable.innerHTML += row;
     });
-  </script>
 
+    // Download PDF
+    function downloadPDF() {
+      const element = document.getElementById('reportContent');
+      html2pdf().from(element).save(`${studentData.name.replace(/\s+/g, '_')}_report.pdf`);
+    }
+
+    // Logout
+    function logout() {
+      window.location.href = "index.html";
+    }
+  </script>
 </body>
 </html>
