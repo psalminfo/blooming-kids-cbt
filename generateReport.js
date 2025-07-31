@@ -5,23 +5,16 @@ import {
   getDocs
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-import {
-  onAuthStateChanged
-} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+import { db } from "./firebaseConfig.js";
 
-import { db, auth } from "./firebaseConfig.js";
-
-onAuthStateChanged(auth, async (user) => {
-  if (!user) {
-    window.location.href = "parent.html"; // Redirect if not logged in
-    return;
-  }
-
+// Immediately run everything without waiting for auth
+(async () => {
   const studentName = localStorage.getItem("studentName");
   const parentEmail = localStorage.getItem("parentEmail");
 
   if (!studentName || !parentEmail) {
     alert("Missing student or parent info.");
+    window.location.href = "parent.html";
     return;
   }
 
@@ -43,10 +36,11 @@ onAuthStateChanged(auth, async (user) => {
       const data = doc.data();
       console.log("Student Report Data:", data);
 
-      // TODO: Add your PDF generation or display logic here
+      // ✨ INSERT your PDF generation or display code here
+      // e.g. generatePDF(data);
     });
 
   } catch (error) {
     console.error("Error fetching report:", error);
   }
-});
+})();
