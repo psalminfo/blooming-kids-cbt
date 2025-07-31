@@ -1,10 +1,19 @@
-document.getElementById('parentLoginForm').addEventListener('submit', function (e) {
-  e.preventDefault();
-  const student = document.getElementById('studentName').value.trim();
-  const email = document.getElementById('parentEmail').value.trim();
+document
+  .getElementById("parent-login-form")
+  .addEventListener("submit", function (e) {
+    e.preventDefault();
+    const studentName = document.getElementById("studentName").value.trim();
+    const parentEmail = document.getElementById("parentEmail").value.trim();
 
-  localStorage.setItem('bk_studentName', student);
-  localStorage.setItem('bk_parentEmail', email);
+    if (!studentName || !parentEmail) {
+      alert("Please fill in both fields.");
+      return;
+    }
 
-  window.location.href = 'parent.html';
-});
+    const params = new URLSearchParams({
+      student: studentName,
+      email: parentEmail,
+    });
+
+    window.location.href = `parent.html?${params.toString()}`;
+  });
