@@ -27,92 +27,68 @@
     <p class="text-xs text-center mt-8 text-gray-600">POWERED BY <span style="color:#FFEB3B">POG</span></p>
   </div>
 
-  <!-- Firebase SDKs -->
-  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
-
-  <!-- Firebase Config -->
-  <script>
-    const firebaseConfig = {
-      apiKey: "AIzaSyBpwxvEoeuT8e6F5vGmDc1VkVfWTUdxavY",
-      authDomain: "blooming-kids-house.firebaseapp.com",
-      projectId: "blooming-kids-house",
-      storageBucket: "blooming-kids-house.appspot.com",
-      messagingSenderId: "739684305208",
-      appId: "1:739684305208:web:ee1cc9e998b37e1f002f84"
-    };
-
-    firebase.initializeApp(firebaseConfig);
-    const db = firebase.firestore();
-    const auth = firebase.auth();
-  </script>
-
-  <!-- Utility and question loader -->
+  <!-- ✅ Load all scripts in non-module order -->
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+  <script src="firebaseConfig.js"></script>
   <script src="utils.js"></script>
   <script src="autoQuestionGen.js"></script>
-
-  <!-- Student script logic -->
   <script>
     const urlParams = new URLSearchParams(window.location.search);
     const subject = urlParams.get('subject');
     const grade = urlParams.get('grade');
+    const container = document.getElementById("question-container");
 
     if (!subject || !grade) {
       alert("Missing subject or grade. Redirecting...");
       window.location.href = "index.html";
     } else {
-      loadQuestions(subject, grade); // from autoQuestionGen.js
+      loadQuestions(subject, grade);
     }
 
-    window.logout = logout; // from utils.js
-
-    window.submitAnswers = async function () {
-      const container = document.getElementById("question-container");
+    function submitAnswers() {
+      const questions = document.querySelectorAll(".question-block");
       const answers = [];
 
-      document.querySelectorAll(".question-block").forEach((block, index) => {
-        const qText = block.querySelector("p").innerText.trim();
+      questions.forEach((block, index) => {
         const selected = block.querySelector("input[type='radio']:checked");
         answers.push({
-          question: qText,
-          answer: selected ? selected.value : "No Answer"
+          question: block.querySelector(".question-text").innerText,
+          selected: selected ? selected.value : null
         });
       });
 
-      const user = firebase.auth().currentUser;
-      const studentName = localStorage.getItem("studentName") || "Unknown";
-      const parentEmail = localStorage.getItem("parentEmail") || "Unknown";
-      const tutorName = localStorage.getItem("tutorName") || "Unknown";
-      const location = localStorage.getItem("location") || "Unknown";
+      const studentData = JSON.parse(localStorage.getItem('studentData') || '{}');
+      const payload = {
+        answers,
+        subject,
+        grade,
+        name: studentData.name || "Unknown",
+        email: studentData.parentEmail || "unknown@email.com",
+        tutor: studentData.tutor || "",
+        location: studentData.location || "",
+        submittedAt: firebase.firestore.FieldValue.serverTimestamp()
+      };
 
-      try {
-        await db.collection("testResults").add({
-          studentName,
-          parentEmail,
-          tutorName,
-          location,
-          subject,
-          grade,
-          answers,
-          timestamp: firebase.firestore.FieldValue.serverTimestamp()
+      firebase.firestore().collection("testResults").add(payload)
+        .then(() => {
+          container.innerHTML = `
+            <div class="text-center p-6 text-green-700 font-semibold text-xl">
+              ✅ Submitted. Redirecting...
+            </div>
+          `;
+          setTimeout(() => {
+            window.location.href = "subject-select.html";
+          }, 1500);
+        })
+        .catch((error) => {
+          alert("❌ Failed to submit test: " + error.message);
         });
+    }
 
-        container.innerHTML = `
-          <div class="text-center p-6 text-green-700 font-semibold text-xl">
-            ✅ Submitted. Redirecting...
-          </div>
-        `;
-
-        setTimeout(() => {
-          window.location.href = "subject-select.html";
-        }, 1500);
-      } catch (error) {
-        alert("Failed to submit test. Please try again.");
-        console.error(error);
-      }
-    };
+    window.submitAnswers = submitAnswers;
+    window.logout = logout;
   </script>
-
 </body>
 </html>
