@@ -1,16 +1,45 @@
-import { getDocs, collection, deleteDoc, doc } from "firebase/firestore";
-import { db } from "./firebaseConfig.js";
+// firebaseConfig.js
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import {
+  getFirestore,
+  collection,
+  getDocs,
+  addDoc,
+  doc,
+  deleteDoc,
+  updateDoc,
+  setDoc
+} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-async function bulkDeleteReports() {
-  const snapshot = await getDocs(collection(db, 'reports'));
-  const promises = [];
+import {
+  getAuth,
+  signInWithEmailAndPassword
+} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
-  snapshot.forEach(report => {
-    promises.push(deleteDoc(doc(db, 'reports', report.id)));
-  });
+const firebaseConfig = {
+  apiKey: "AIzaSyBpwxvEoeuT8e6F5vGmDc1VkVfWTUdxavY",
+  authDomain: "blooming-kids-house.firebaseapp.com",
+  projectId: "blooming-kids-house",
+  storageBucket: "blooming-kids-house.appspot.com",
+  messagingSenderId: "739684305208",
+  appId: "1:739684305208:web:ee1cc9e998b37e1f002f84"
+};
 
-  await Promise.all(promises);
-  alert("All reports deleted successfully.");
-}
+const app = initializeApp(firebaseConfig);
 
-bulkDeleteReports();
+const db = getFirestore(app);
+const auth = getAuth(app);
+
+// ✅ Export all needed functions
+export {
+  auth,
+  db,
+  collection,
+  getDocs,
+  addDoc,
+  doc,
+  deleteDoc,
+  updateDoc,
+  setDoc,
+  signInWithEmailAndPassword
+};
