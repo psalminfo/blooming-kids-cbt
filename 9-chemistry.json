@@ -1,0 +1,334 @@
+{
+  "questions": [
+    {
+      "question": "What is the chemical symbol for water?",
+      "type": "multiple-choice",
+      "options": [
+        "H2O",
+        "O2",
+        "CO2",
+        "NaCl"
+      ],
+      "correct_answer": "H2O"
+    },
+    {
+      "question": "Which of the following is a noble gas?",
+      "type": "multiple-choice",
+      "options": [
+        "Nitrogen",
+        "Oxygen",
+        "Argon",
+        "Hydrogen"
+      ],
+      "correct_answer": "Argon"
+    },
+    {
+      "question": "What is the pH of a neutral substance?",
+      "type": "multiple-choice",
+      "options": [
+        "0",
+        "7",
+        "14",
+        "10"
+      ],
+      "correct_answer": "7"
+    },
+    {
+      "question": "What is the atomic number of Carbon?",
+      "type": "multiple-choice",
+      "options": [
+        "6",
+        "12",
+        "8",
+        "14"
+      ],
+      "correct_answer": "6"
+    },
+    {
+      "question": "Which of these is a chemical change?",
+      "type": "multiple-choice",
+      "options": [
+        "Melting ice",
+        "Boiling water",
+        "Burning wood",
+        "Breaking glass"
+      ],
+      "correct_answer": "Burning wood"
+    },
+    {
+      "question": "What is the formula for table salt?",
+      "type": "multiple-choice",
+      "options": [
+        "NaCl",
+        "KCl",
+        "Na2SO4",
+        "CaCl2"
+      ],
+      "correct_answer": "NaCl"
+    },
+    {
+      "question": "Which of the following is an acid?",
+      "type": "multiple-choice",
+      "options": [
+        "NaOH",
+        "HCl",
+        "KOH",
+        "CaCO3"
+      ],
+      "correct_answer": "HCl"
+    },
+    {
+      "question": "Which subatomic particle has a positive charge?",
+      "type": "multiple-choice",
+      "options": [
+        "Electron",
+        "Proton",
+        "Neutron",
+        "Ion"
+      ],
+      "correct_answer": "Proton"
+    },
+    {
+      "question": "What is the periodic table?",
+      "type": "multiple-choice",
+      "options": [
+        "A chart of animals",
+        "A chart of elements",
+        "A list of planets",
+        "A calendar"
+      ],
+      "correct_answer": "A chart of elements"
+    },
+    {
+      "question": "What is an element?",
+      "type": "multiple-choice",
+      "options": [
+        "A mixture",
+        "A pure substance",
+        "A solution",
+        "A compound"
+      ],
+      "correct_answer": "A pure substance"
+    },
+    {
+      "question": "What is the chemical symbol for water?",
+      "type": "multiple-choice",
+      "options": [
+        "H2O",
+        "O2",
+        "CO2",
+        "NaCl"
+      ],
+      "correct_answer": "H2O"
+    },
+    {
+      "question": "Which of the following is a noble gas?",
+      "type": "multiple-choice",
+      "options": [
+        "Nitrogen",
+        "Oxygen",
+        "Argon",
+        "Hydrogen"
+      ],
+      "correct_answer": "Argon"
+    },
+    {
+      "question": "What is the pH of a neutral substance?",
+      "type": "multiple-choice",
+      "options": [
+        "0",
+        "7",
+        "14",
+        "10"
+      ],
+      "correct_answer": "7"
+    },
+    {
+      "question": "What is the atomic number of Carbon?",
+      "type": "multiple-choice",
+      "options": [
+        "6",
+        "12",
+        "8",
+        "14"
+      ],
+      "correct_answer": "6"
+    },
+    {
+      "question": "Which of these is a chemical change?",
+      "type": "multiple-choice",
+      "options": [
+        "Melting ice",
+        "Boiling water",
+        "Burning wood",
+        "Breaking glass"
+      ],
+      "correct_answer": "Burning wood"
+    },
+    {
+      "question": "What is the formula for table salt?",
+      "type": "multiple-choice",
+      "options": [
+        "NaCl",
+        "KCl",
+        "Na2SO4",
+        "CaCl2"
+      ],
+      "correct_answer": "NaCl"
+    },
+    {
+      "question": "Which of the following is an acid?",
+      "type": "multiple-choice",
+      "options": [
+        "NaOH",
+        "HCl",
+        "KOH",
+        "CaCO3"
+      ],
+      "correct_answer": "HCl"
+    },
+    {
+      "question": "Which subatomic particle has a positive charge?",
+      "type": "multiple-choice",
+      "options": [
+        "Electron",
+        "Proton",
+        "Neutron",
+        "Ion"
+      ],
+      "correct_answer": "Proton"
+    },
+    {
+      "question": "What is the periodic table?",
+      "type": "multiple-choice",
+      "options": [
+        "A chart of animals",
+        "A chart of elements",
+        "A list of planets",
+        "A calendar"
+      ],
+      "correct_answer": "A chart of elements"
+    },
+    {
+      "question": "What is an element?",
+      "type": "multiple-choice",
+      "options": [
+        "A mixture",
+        "A pure substance",
+        "A solution",
+        "A compound"
+      ],
+      "correct_answer": "A pure substance"
+    },
+    {
+      "question": "What is the chemical symbol for water?",
+      "type": "multiple-choice",
+      "options": [
+        "H2O",
+        "O2",
+        "CO2",
+        "NaCl"
+      ],
+      "correct_answer": "H2O"
+    },
+    {
+      "question": "Which of the following is a noble gas?",
+      "type": "multiple-choice",
+      "options": [
+        "Nitrogen",
+        "Oxygen",
+        "Argon",
+        "Hydrogen"
+      ],
+      "correct_answer": "Argon"
+    },
+    {
+      "question": "What is the pH of a neutral substance?",
+      "type": "multiple-choice",
+      "options": [
+        "0",
+        "7",
+        "14",
+        "10"
+      ],
+      "correct_answer": "7"
+    },
+    {
+      "question": "What is the atomic number of Carbon?",
+      "type": "multiple-choice",
+      "options": [
+        "6",
+        "12",
+        "8",
+        "14"
+      ],
+      "correct_answer": "6"
+    },
+    {
+      "question": "Which of these is a chemical change?",
+      "type": "multiple-choice",
+      "options": [
+        "Melting ice",
+        "Boiling water",
+        "Burning wood",
+        "Breaking glass"
+      ],
+      "correct_answer": "Burning wood"
+    },
+    {
+      "question": "What is the formula for table salt?",
+      "type": "multiple-choice",
+      "options": [
+        "NaCl",
+        "KCl",
+        "Na2SO4",
+        "CaCl2"
+      ],
+      "correct_answer": "NaCl"
+    },
+    {
+      "question": "Which of the following is an acid?",
+      "type": "multiple-choice",
+      "options": [
+        "NaOH",
+        "HCl",
+        "KOH",
+        "CaCO3"
+      ],
+      "correct_answer": "HCl"
+    },
+    {
+      "question": "Which subatomic particle has a positive charge?",
+      "type": "multiple-choice",
+      "options": [
+        "Electron",
+        "Proton",
+        "Neutron",
+        "Ion"
+      ],
+      "correct_answer": "Proton"
+    },
+    {
+      "question": "What is the periodic table?",
+      "type": "multiple-choice",
+      "options": [
+        "A chart of animals",
+        "A chart of elements",
+        "A list of planets",
+        "A calendar"
+      ],
+      "correct_answer": "A chart of elements"
+    },
+    {
+      "question": "What is an element?",
+      "type": "multiple-choice",
+      "options": [
+        "A mixture",
+        "A pure substance",
+        "A solution",
+        "A compound"
+      ],
+      "correct_answer": "A pure substance"
+    }
+  ]
+}
