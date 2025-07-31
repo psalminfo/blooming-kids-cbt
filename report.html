@@ -1,117 +1,97 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Assessment Report</title>
-  <link rel="icon" href="/favicon.ico" />
-  <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+  <title>Student Assessment Report</title>
+  <link rel="icon" href="favicon.ico" type="image/x-icon" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js"></script>
-  <script src="/firebaseConfig.js"></script>
   <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
 </head>
-<body class="bg-gray-100 text-gray-900">
-  <div class="max-w-4xl mx-auto py-10 px-6" id="reportContent">
-    <div class="bg-white rounded-2xl shadow-xl p-8">
-      <div class="text-center mb-6">
-        <h1 class="text-2xl font-bold text-green-700">BLOOMING KIDS HOUSE ASSESSMENT REPORT</h1>
-      </div>
-      <div class="grid grid-cols-2 gap-4 text-sm">
-        <p><strong>Student Name:</strong> <span id="studentName"></span></p>
-        <p><strong>Grade:</strong> <span id="grade"></span></p>
-        <p><strong>Parent Email:</strong> <span id="parentEmail"></span></p>
-        <p><strong>Tutor:</strong> <span id="tutorName"></span></p>
-        <p><strong>Location:</strong> <span id="location"></span></p>
-      </div>
 
-      <div class="mt-6">
-        <h2 class="text-xl font-semibold border-b pb-1 mb-4 text-yellow-600">Performance Summary</h2>
-        <div id="subjectScores" class="space-y-3"></div>
-      </div>
+<body class="bg-gray-100 text-gray-800">
+  <div class="max-w-4xl mx-auto p-6 bg-white shadow-lg rounded-xl mt-10" id="reportContent">
+    <header class="border-b border-gray-300 pb-4 mb-6">
+      <h1 class="text-2xl font-bold text-green-700">BLOOMING KIDS HOUSE ASSESSMENT REPORT</h1>
+      <p class="text-sm text-gray-600">Comprehensive Evaluation of Academic Performance</p>
+    </header>
 
-      <div class="mt-6">
-        <h2 class="text-xl font-semibold border-b pb-1 mb-4 text-yellow-600">Personalized Recommendations</h2>
-        <div id="recommendations" class="space-y-2 text-sm leading-relaxed"></div>
-      </div>
+    <section class="mb-6">
+      <h2 class="text-lg font-semibold text-yellow-600">Student Information</h2>
+      <p><strong>Name:</strong> <span id="studentName">-</span></p>
+      <p><strong>Grade:</strong> <span id="studentGrade">-</span></p>
+      <p><strong>Location:</strong> <span id="studentLocation">-</span></p>
+      <p><strong>Tutor Name:</strong> <span id="tutorName">-</span></p>
+    </section>
 
-      <div class="mt-6">
-        <h2 class="text-xl font-semibold border-b pb-1 mb-4 text-yellow-600">Message from the Director</h2>
-        <p class="text-sm leading-relaxed">
-          We sincerely appreciate your commitment to your child's academic growth. This report reflects the performance based on carefully selected curriculum-aligned content. We encourage continued practice and engagement in the recommended areas. Our tutors are always ready to guide your child on their learning journey.<br /><br />
-          <strong>Mrs. Oladoyin Temitope</strong><br />
-          Director, Blooming Kids House
-        </p>
-      </div>
+    <section class="mb-6">
+      <h2 class="text-lg font-semibold text-yellow-600">Subjects Taken</h2>
+      <ul class="list-disc list-inside text-sm" id="subjectsList">
+        <!-- Populated dynamically -->
+      </ul>
+    </section>
 
-      <div class="mt-8 flex justify-between">
-        <button onclick="downloadPDF()" class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700">Download PDF</button>
-        <button onclick="logout()" class="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600">Logout</button>
+    <section class="mb-6">
+      <h2 class="text-lg font-semibold text-yellow-600">Performance Summary</h2>
+      <div id="performanceSummary" class="text-sm">
+        <!-- Populated dynamically -->
       </div>
+    </section>
 
-      <div class="text-center text-xs mt-10 text-gray-500">
-        POWERED BY <span style="color:#FFEB3B">POG</span>
+    <section class="mb-6">
+      <h2 class="text-lg font-semibold text-yellow-600">Recommendations</h2>
+      <div id="recommendations" class="text-sm">
+        <!-- Populated dynamically -->
       </div>
-    </div>
+    </section>
+
+    <section class="mb-6">
+      <h2 class="text-lg font-semibold text-yellow-600">Message from the Director</h2>
+      <p class="text-sm leading-relaxed">
+        Dear Parent/Guardian,
+        <br><br>
+        Thank you for trusting Blooming Kids House to assess your child's academic abilities. This report provides an in-depth insight into your child's performance based on core curriculum standards. Our goal is to support continuous academic excellence.
+        <br><br>
+        Based on these results, we highly recommend our tutoring sessions which are carefully designed to bridge gaps, reinforce key concepts, and accelerate progress. Your child will be personally supported by their assigned tutor, <span class="font-medium" id="tutorMention"></span>, to ensure improvement in specific curriculum areas.
+        <br><br>
+        Best regards,
+        <br>
+        <strong>Mrs. Oladoyin Temitope</strong><br>
+        Director, Blooming Kids House
+      </p>
+    </section>
+
+    <footer class="border-t pt-4 text-xs text-center text-gray-500 mt-6">
+      POWERED BY <span style="color:#FFEB3B">POG</span>
+    </footer>
   </div>
 
+  <div class="flex justify-center mt-6 space-x-4">
+    <button onclick="downloadPDF()" class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700">Download PDF</button>
+    <button onclick="logout()" class="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600">Logout</button>
+  </div>
+
+  <script type="module" src="generateReport.js"></script>
   <script>
-    const query = new URLSearchParams(window.location.search);
-    const studentName = query.get('name') || 'Student';
-    const grade = query.get('grade') || 'Grade';
-    const parentEmail = query.get('email') || 'Parent Email';
-    const tutorName = query.get('tutor') || 'Tutor';
-    const location = query.get('location') || 'Location';
-    const scores = JSON.parse(localStorage.getItem('bk_scores') || '{}');
-
-    document.getElementById('studentName').textContent = studentName;
-    document.getElementById('grade').textContent = grade;
-    document.getElementById('parentEmail').textContent = parentEmail;
-    document.getElementById('tutorName').textContent = tutorName;
-    document.getElementById('location').textContent = location;
-
-    const curriculumTopics = {
-      Math: ['fractions', 'geometry', 'algebra', 'data analysis'],
-      ELA: ['reading comprehension', 'grammar', 'vocabulary', 'writing skills'],
-      Science: ['biology basics', 'chemical reactions', 'energy', 'experiments'],
-    };
-
-    function buildSubjectSummary() {
-      const container = document.getElementById('subjectScores');
-      const recContainer = document.getElementById('recommendations');
-      Object.entries(scores).forEach(([subject, score]) => {
-        const topicExamples = curriculumTopics[subject] || ['key topics'];
-
-        container.innerHTML += `<div><strong>${subject}:</strong> ${score}%</div>`;
-
-        recContainer.innerHTML += `
-          <p>
-            <strong>${subject}:</strong> Based on this performance, we recommend focused revision on topics such as ${topicExamples.join(', ')}. Continued support from Tutor ${tutorName} will help solidify understanding and improve performance.
-          </p>
-        `;
-      });
-    }
-
-    function logout() {
-      window.location.href = 'parent.html';
-    }
-
     function downloadPDF() {
-      const report = document.getElementById('reportContent');
+      const report = document.getElementById("reportContent");
       html2canvas(report).then(canvas => {
-        const imgData = canvas.toDataURL('image/png');
+        const imgData = canvas.toDataURL("image/png");
         const pdf = new jspdf.jsPDF('p', 'mm', 'a4');
         const imgProps = pdf.getImageProperties(imgData);
         const pdfWidth = pdf.internal.pageSize.getWidth();
         const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
         pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
-        pdf.save(`${studentName.replace(/\s+/g, '_')}_Report.pdf`);
+        pdf.save("assessment_report.pdf");
       });
     }
 
-    buildSubjectSummary();
+    function logout() {
+      window.location.href = "parent.html";
+    }
   </script>
 </body>
+
 </html>
