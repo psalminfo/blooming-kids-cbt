@@ -2,7 +2,7 @@ export async function loadQuestions(subject, grade) {
   const container = document.getElementById("question-container");
   container.innerHTML = `<p class="text-gray-500">Loading questions from GitHub...</p>`;
 
-  const GITHUB_URL = `https://raw.githubusercontent.com/psalminfo/blooming-kids-cbt/main/questions/${grade}-${subject}.json`;
+  const GITHUB_URL = `https://raw.githubusercontent.com/psalminfo/blooming-kids-cbt/main/${grade}-${subject}.json`;
 
   try {
     const res = await fetch(GITHUB_URL);
