@@ -1,329 +1,244 @@
 {
-  "math_questions": {
-    "grade_4": [
-      {
-        "curriculum": "Texas",
-        "question": "A number is rounded to the nearest thousand and becomes 7,000. Which number could it be?",
-        "type": "multiple-choice",
-        "options": ["A. 6,499", "B. 6,501", "C. 7,501", "D. 7,599"],
-        "correct_answer": "B",
-        "standard": "TEKS 4.2D"
-      },
-      {
-        "curriculum": "UK",
-        "question": "What is 12 × 6?",
-        "type": "multiple-choice",
-        "options": ["A. 72", "B. 78", "C. 84", "D. 90"],
-        "correct_answer": "A",
-        "standard": "Year 4 Number - Multiplication and Division"
-      },
-      {
-        "curriculum": "Canada",
-        "question": "Explain how to find the perimeter of a rectangle with a length of 9 cm and a width of 4 cm.",
-        "type": "open-ended",
-        "correct_answer": "Add the lengths of all sides: 9 + 4 + 9 + 4 = 26 cm.",
-        "standard": "Ontario 4.E2.4"
-      },
-      {
-        "curriculum": "Texas",
-        "question": "What is the value of 2/3 + 1/3?",
-        "type": "multiple-choice",
-        "options": ["A. 1/3", "B. 2/3", "C. 1", "D. 3/2"],
-        "correct_answer": "C",
-        "standard": "TEKS 4.3E"
-      },
-      {
-        "curriculum": "UK",
-        "question": "How many minutes are in 3 hours and 20 minutes?",
-        "type": "multiple-choice",
-        "options": ["A. 180", "B. 200", "C. 220", "D. 240"],
-        "correct_answer": "B",
-        "standard": "Year 4 Measurement"
-      },
-      {
-        "curriculum": "Canada",
-        "question": "What is 568 ÷ 4?",
-        "type": "multiple-choice",
-        "options": ["A. 141", "B. 142", "C. 143", "D. 144"],
-        "correct_answer": "B",
-        "standard": "Ontario 4.B2.2"
-      },
-      {
-        "curriculum": "Texas",
-        "question": "Which shape has exactly one pair of parallel sides?",
-        "type": "multiple-choice",
-        "options": ["A. Rectangle", "B. Trapezoid", "C. Parallelogram", "D. Square"],
-        "correct_answer": "B",
-        "standard": "TEKS 4.6A"
-      },
-      {
-        "curriculum": "UK",
-        "question": "Write the fraction 4/5 as a decimal.",
-        "type": "open-ended",
-        "correct_answer": "0.8",
-        "standard": "Year 4 Number - Fractions"
-      },
-      {
-        "curriculum": "Canada",
-        "question": "A pattern starts: 3, 7, 11, 15. What is the next number?",
-        "type": "multiple-choice",
-        "options": ["A. 17", "B. 18", "C. 19", "D. 20"],
-        "correct_answer": "C",
-        "standard": "Ontario 4.C1.2"
-      },
-      {
-        "curriculum": "Texas",
-        "question": "A book costs $15.75. How much change will you get from $20.00?",
-        "type": "multiple-choice",
-        "options": ["A. $4.25", "B. $4.75", "C. $5.25", "D. $5.75"],
-        "correct_answer": "A",
-        "standard": "TEKS 4.8C"
-      },
-      {
-        "curriculum": "Texas",
-        "question": "Which number is 1,000 more than 4,328?",
-        "type": "multiple-choice",
-        "options": ["A. 3,328", "B. 4,428", "C. 5,328", "D. 6,328"],
-        "correct_answer": "C",
-        "standard": "TEKS 4.2B"
-      },
-      {
-        "curriculum": "UK",
-        "question": "What is 8 × 9?",
-        "type": "multiple-choice",
-        "options": ["A. 64", "B. 72", "C. 80", "D. 88"],
-        "correct_answer": "B",
-        "standard": "Year 4 Number - Multiplication and Division"
-      },
-      {
-        "curriculum": "Canada",
-        "question": "What is the value of the digit 7 in 7,412?",
-        "type": "multiple-choice",
-        "options": ["A. 7", "B. 70", "C. 700", "D. 7,000"],
-        "correct_answer": "D",
-        "standard": "Ontario 4.B1.1"
-      },
-      {
-        "curriculum": "Texas",
-        "question": "Which fraction is equivalent to 3/6?",
-        "type": "multiple-choice",
-        "options": ["A. 1/2", "B. 2/3", "C. 3/4", "D. 4/5"],
-        "correct_answer": "A",
-        "standard": "TEKS 4.3C"
-      },
-      {
-        "curriculum": "UK",
-        "question": "What is 100 less than 1,234?",
-        "type": "multiple-choice",
-        "options": ["A. 1,134", "B. 1,234", "C. 1,334", "D. 1,434"],
-        "correct_answer": "A",
-        "standard": "Year 4 Number - Number and Place Value"
-      },
-      {
-        "curriculum": "Canada",
-        "question": "What is 345 + 278?",
-        "type": "multiple-choice",
-        "options": ["A. 613", "B. 623", "C. 633", "D. 643"],
-        "correct_answer": "B",
-        "standard": "Ontario 4.B2.1"
-      },
-      {
-        "curriculum": "Texas",
-        "question": "A bar graph shows 10 votes for soccer, 6 for basketball, and 4 for tennis. How many votes were cast in total?",
-        "type": "multiple-choice",
-        "options": ["A. 18", "B. 20", "C. 22", "D. 24"],
-        "correct_answer": "B",
-        "standard": "TEKS 4.8B"
-      },
-      {
-        "curriculum": "UK",
-        "question": "What time is it 45 minutes after 3:30 p.m.?",
-        "type": "multiple-choice",
-        "options": ["A. 3:45 p.m.", "B. 4:00 p.m.", "C. 4:15 p.m.", "D. 4:30 p.m."],
-        "correct_answer": "C",
-        "standard": "Year 4 Measurement"
-      },
-      {
-        "curriculum": "Canada",
-        "question": "Which shape has 5 sides?",
-        "type": "multiple-choice",
-        "options": ["A. Quadrilateral", "B. Pentagon", "C. Hexagon", "D. Octagon"],
-        "correct_answer": "B",
-        "standard": "Ontario 4.E1.1"
-      },
-      {
-        "curriculum": "Texas",
-        "question": "What is 5.2 + 3.8?",
-        "type": "multiple-choice",
-        "options": ["A. 8.0", "B. 8.8", "C. 9.0", "D. 9.8"],
-        "correct_answer": "C",
-        "standard": "TEKS 4.4A"
-      },
-      {
-        "curriculum": "Texas",
-        "question": "A store sells apples for $0.50 each. How much will 7 apples cost?",
-        "type": "multiple-choice",
-        "options": ["A. $3.00", "B. $3.50", "C. $4.00", "D. $4.50"],
-        "correct_answer": "B",
-        "standard": "TEKS 4.8C"
-      },
-      {
-        "curriculum": "UK",
-        "question": "Write the number 2,056 in words.",
-        "type": "open-ended",
-        "correct_answer": "Two thousand fifty-six",
-        "standard": "Year 4 Number - Number and Place Value"
-      },
-      {
-        "curriculum": "Canada",
-        "question": "What is 72 ÷ 9?",
-        "type": "multiple-choice",
-        "options": ["A. 7", "B. 8", "C. 9", "D. 10"],
-        "correct_answer": "B",
-        "standard": "Ontario 4.B2.2"
-      },
-      {
-        "curriculum": "Texas",
-        "question": "Which number is between 5,500 and 6,000?",
-        "type": "multiple-choice",
-        "options": ["A. 5,499", "B. 5,750", "C. 6,001", "D. 6,100"],
-        "correct_answer": "B",
-        "standard": "TEKS 4.2C"
-      },
-      {
-        "curriculum": "UK",
-        "question": "How many milliliters are in 2 liters?",
-        "type": "multiple-choice",
-        "options": ["A. 200", "B. 2,000", "C. 20,000", "D. 200,000"],
-        "correct_answer": "B",
-        "standard": "Year 4 Measurement"
-      },
-      {
-        "curriculum": "Canada",
-        "question": "What is the area of a rectangle with a length of 6 cm and a width of 5 cm?",
-        "type": "multiple-choice",
-        "options": ["A. 11 cm²", "B. 22 cm²", "C. 30 cm²", "D. 36 cm²"],
-        "correct_answer": "C",
-        "standard": "Ontario 4.E2.2"
-      },
-      {
-        "curriculum": "Texas",
-        "question": "Which angle measures 90 degrees?",
-        "type": "multiple-choice",
-        "options": ["A. Acute", "B. Right", "C. Obtuse", "D. Straight"],
-        "correct_answer": "B",
-        "standard": "TEKS 4.7C"
-      },
-      {
-        "curriculum": "UK",
-        "question": "What is 456 – 189?",
-        "type": "multiple-choice",
-        "options": ["A. 267", "B. 277", "C. 287", "D. 297"],
-        "correct_answer": "A",
-        "standard": "Year 4 Number - Addition and Subtraction"
-      },
-      {
-        "curriculum": "Canada",
-        "question": "Explain how to multiply 23 × 4 using the standard algorithm.",
-        "type": "open-ended",
-        "correct_answer": "Write 23 × 4 vertically. Multiply 4 × 3 ones = 12 ones, write 2, carry 1 ten. Multiply 4 × 2 tens = 8 tens, add 1 ten = 9 tens. The answer is 92.",
-        "standard": "Ontario 4.B2.2"
-      },
-      {
-        "curriculum": "Texas",
-        "question": "A dot plot shows the number of hours spent reading: 2, 3, 3, 4, 5. What is the most common number of hours?",
-        "type": "multiple-choice",
-        "options": ["A. 2", "B. 3", "C. 4", "D. 5"],
-        "correct_answer": "B",
-        "standard": "TEKS 4.9A"
-      },
-      {
-        "curriculum": "UK",
-        "question": "Which fraction is greater: 2/3 or 3/4?",
-        "type": "multiple-choice",
-        "options": ["A. 2/3", "B. 3/4", "C. They are equal", "D. Cannot compare"],
-        "correct_answer": "B",
-        "standard": "Year 4 Number - Fractions"
-      },
-      {
-        "curriculum": "Canada",
-        "question": "What is the next number in the sequence 10, 15, 20, 25?",
-        "type": "multiple-choice",
-        "options": ["A. 30", "B. 35", "C. 40", "D. 45"],
-        "correct_answer": "A",
-        "standard": "Ontario 4.C1.2"
-      },
-      {
-        "curriculum": "Texas",
-        "question": "What is 3.45 rounded to the nearest whole number?",
-        "type": "multiple-choice",
-        "options": ["A. 3", "B. 3.5", "C. 4", "D. 4.5"],
-        "correct_answer": "C",
-        "standard": "TEKS 4.2G"
-      },
-      {
-        "curriculum": "UK",
-        "question": "What is 7 × 8?",
-        "type": "multiple-choice",
-        "options": ["A. 48", "B. 56", "C. 64", "D. 72"],
-        "correct_answer": "B",
-        "standard": "Year 4 Number - Multiplication and Division"
-      },
-      {
-        "curriculum": "Canada",
-        "question": "Which number is odd?",
-        "type": "multiple-choice",
-        "options": ["A. 14", "B. 21", "C. 28", "D. 36"],
-        "correct_answer": "B",
-        "standard": "Ontario 4.B1.2"
-      },
-      {
-        "curriculum": "Texas",
-        "question": "A ticket costs $8.50. How much will 3 tickets cost?",
-        "type": "multiple-choice",
-        "options": ["A. $24.50", "B. $25.00", "C. $25.50", "D. $26.00"],
-        "correct_answer": "C",
-        "standard": "TEKS 4.8C"
-      },
-      {
-        "curriculum": "UK",
-        "question": "What is 1,000 more than 2,345?",
-        "type": "multiple-choice",
-        "options": ["A. 2,445", "B. 3,345", "C. 4,345", "D. 5,345"],
-        "correct_answer": "B",
-        "standard": "Year 4 Number - Number and Place Value"
-      },
-      {
-        "curriculum": "Canada",
-        "question": "What is the perimeter of a rectangle with a length of 7 cm and a width of 3 cm?",
-        "type": "multiple-choice",
-        "options": ["A. 10 cm", "B. 20 cm", "C. 21 cm", "D. 24 cm"],
-        "correct_answer": "B",
-        "standard": "Ontario 4.E2.4"
-      },
-      {
-        "curriculum": "Texas",
-        "question": "Which number is represented by (5 × 1,000) + (2 × 100) + (3 × 10) + (4 × 1)?",
-        "type": "multiple-choice",
-        "options": ["A. 5,234", "B. 5,324", "C. 5,423", "D. 5,432"],
-        "correct_answer": "A",
-        "standard": "TEKS 4.2A"
-      },
-      {
-        "curriculum": "UK",
-        "question": "Explain how to convert 150 cm to meters.",
-        "type": "open-ended",
-        "correct_answer": "Divide 150 by 100, since there are 100 cm in 1 meter. So, 150 ÷ 100 = 1.5 meters.",
-        "standard": "Year 4 Measurement"
-      },
-      {
-        "curriculum": "Canada",
-        "question": "What is 456 – 289?",
-        "type": "multiple-choice",
-        "options": ["A. 167", "B. 177", "C. 187", "D. 197"],
-        "correct_answer": "A",
-        "standard": "Ontario 4.B2.1"
-      }
-    ]
-  }
+  "questions": [
+    {
+      "question": "If a cowboy rides 12 miles in 2 hours, how many miles does he ride in 1 hour?",
+      "type": "multiple-choice",
+      "options": ["4 miles", "6 miles", "8 miles", "10 miles"],
+      "correct_answer": "6 miles"
+    },
+    {
+      "question": "What is the perimeter of a rectangle with a length of 5 cm and a width of 3 cm?",
+      "type": "multiple-choice",
+      "options": ["15 cm", "16 cm", "18 cm", "20 cm"],
+      "correct_answer": "16 cm"
+    },
+    {
+      "question": "Which of these numbers is a multiple of 3?",
+      "type": "multiple-choice",
+      "options": ["14", "15", "16", "17"],
+      "correct_answer": "15"
+    },
+    {
+      "question": "What is the value of 7 × 8?",
+      "type": "multiple-choice",
+      "options": ["54", "56", "58", "60"],
+      "correct_answer": "56"
+    },
+    {
+      "question": "A lasso is 24 feet long. If a cowgirl cuts it into 4 equal pieces, how long is each piece?",
+      "type": "multiple-choice",
+      "options": ["4 feet", "5 feet", "6 feet", "8 feet"],
+      "correct_answer": "6 feet"
+    },
+    {
+      "question": "What fraction of a pizza is left if 3 out of 8 slices are eaten?",
+      "type": "multiple-choice",
+      "options": ["3/8", "4/8", "5/8", "6/8"],
+      "correct_answer": "5/8"
+    },
+    {
+      "question": "Which shape has exactly 5 sides?",
+      "type": "multiple-choice",
+      "options": ["Hexagon", "Pentagon", "Octagon", "Quadrilateral"],
+      "correct_answer": "Pentagon"
+    },
+    {
+      "question": "What is 100 - 42?",
+      "type": "multiple-choice",
+      "options": ["56", "57", "58", "59"],
+      "correct_answer": "58"
+    },
+    {
+      "question": "How many minutes are in 3 hours?",
+      "type": "multiple-choice",
+      "options": ["120 minutes", "150 minutes", "180 minutes", "200 minutes"],
+      "correct_answer": "180 minutes"
+    },
+    {
+      "question": "Which number is odd?",
+      "type": "multiple-choice",
+      "options": ["12", "14", "15", "16"],
+      "correct_answer": "15"
+    },
+    {
+      "question": "If a barn has 6 horses and each horse eats 4 apples, how many apples are needed?",
+      "type": "multiple-choice",
+      "options": ["18", "20", "24", "28"],
+      "correct_answer": "24"
+    },
+    {
+      "question": "What is the area of a square with a side length of 4 cm?",
+      "type": "multiple-choice",
+      "options": ["12 cm²", "14 cm²", "16 cm²", "18 cm²"],
+      "correct_answer": "16 cm²"
+    },
+    {
+      "question": "Which of these is a prime number?",
+      "type": "multiple-choice",
+      "options": ["4", "6", "7", "9"],
+      "correct_answer": "7"
+    },
+    {
+      "question": "If a train travels 60 miles in 2 hours, how far does it travel in 3 hours?",
+      "type": "multiple-choice",
+      "options": ["80 miles", "90 miles", "100 miles", "120 miles"],
+      "correct_answer": "90 miles"
+    },
+    {
+      "question": "What is 3/4 of 12?",
+      "type": "multiple-choice",
+      "options": ["6", "7", "8", "9"],
+      "correct_answer": "9"
+    },
+    {
+      "question": "Which shape has no corners?",
+      "type": "multiple-choice",
+      "options": ["Triangle", "Circle", "Square", "Pentagon"],
+      "correct_answer": "Circle"
+    },
+    {
+      "question": "What is 9 × 9?",
+      "type": "multiple-choice",
+      "options": ["72", "81", "90", "99"],
+      "correct_answer": "81"
+    },
+    {
+      "question": "A rancher has 15 cows. If he buys 5 more, how many cows does he have?",
+      "type": "multiple-choice",
+      "options": ["18", "19", "20", "21"],
+      "correct_answer": "20"
+    },
+    {
+      "question": "What is the value of 48 ÷ 6?",
+      "type": "multiple-choice",
+      "options": ["6", "7", "8", "9"],
+      "correct_answer": "8"
+    },
+    {
+      "question": "Which of these numbers is divisible by 5?",
+      "type": "multiple-choice",
+      "options": ["12", "13", "14", "15"],
+      "correct_answer": "15"
+    },
+    {
+      "question": "What is the perimeter of a triangle with sides 3 cm, 4 cm, and 5 cm?",
+      "type": "multiple-choice",
+      "options": ["10 cm", "11 cm", "12 cm", "13 cm"],
+      "correct_answer": "12 cm"
+    },
+    {
+      "question": "If a bucket holds 8 liters and 3 buckets are filled, how many liters are there?",
+      "type": "multiple-choice",
+      "options": ["21 liters", "22 liters", "24 liters", "26 liters"],
+      "correct_answer": "24 liters"
+    },
+    {
+      "question": "What is 2/5 + 1/5?",
+      "type": "multiple-choice",
+      "options": ["1/5", "2/5", "3/5", "4/5"],
+      "correct_answer": "3/5"
+    },
+    {
+      "question": "Which shape has 6 sides?",
+      "type": "multiple-choice",
+      "options": ["Pentagon", "Hexagon", "Heptagon", "Octagon"],
+      "correct_answer": "Hexagon"
+    },
+    {
+      "question": "What is 75 - 19?",
+      "type": "multiple-choice",
+      "options": ["54", "55", "56", "57"],
+      "correct_answer": "56"
+    },
+    {
+      "question": "How many seconds are in 2 minutes?",
+      "type": "multiple-choice",
+      "options": ["100 seconds", "120 seconds", "140 seconds", "160 seconds"],
+      "correct_answer": "120 seconds"
+    },
+    {
+      "question": "If a rope is 36 meters long and cut into 9 equal pieces, how long is each piece?",
+      "type": "multiple-choice",
+      "options": ["3 meters", "4 meters", "5 meters", "6 meters"],
+      "correct_answer": "4 meters"
+    },
+    {
+      "question": "What is the area of a rectangle with length 6 cm and width 4 cm?",
+      "type": "multiple-choice",
+      "options": ["20 cm²", "22 cm²", "24 cm²", "26 cm²"],
+      "correct_answer": "24 cm²"
+    },
+    {
+      "question": "Which number is a factor of 12?",
+      "type": "multiple-choice",
+      "options": ["5", "6", "7", "8"],
+      "correct_answer": "6"
+    },
+    {
+      "question": "If a wagon carries 10 hay bales and 4 wagons are used, how many bales are carried?",
+      "type": "multiple-choice",
+      "options": ["30 bales", "35 bales", "40 bales", "45 bales"],
+      "correct_answer": "40 bales"
+    },
+    {
+      "question": "What is 1/3 of 18?",
+      "type": "multiple-choice",
+      "options": ["4", "5", "6", "7"],
+      "correct_answer": "6"
+    },
+    {
+      "question": "Which of these is a composite number?",
+      "type": "multiple-choice",
+      "options": ["2", "3", "5", "6"],
+      "correct_answer": "6"
+    },
+    {
+      "question": "What is 15 × 4?",
+      "type": "multiple-choice",
+      "options": ["50", "55", "60", "65"],
+      "correct_answer": "60"
+    },
+    {
+      "question": "A farmer plants 24 trees in 4 rows. How many trees are in each row?",
+      "type": "multiple-choice",
+      "options": ["4 trees", "5 trees", "6 trees", "7 trees"],
+      "correct_answer": "6 trees"
+    },
+    {
+      "question": "What is 2/3 - 1/3?",
+      "type": "multiple-choice",
+      "options": ["1/3", "2/3", "1/6", "3/6"],
+      "correct_answer": "1/3"
+    },
+    {
+      "question": "Which shape has 8 sides?",
+      "type": "multiple-choice",
+      "options": ["Heptagon", "Octagon", "Nonagon", "Decagon"],
+      "correct_answer": "Octagon"
+    },
+    {
+      "question": "What is 88 ÷ 11?",
+      "type": "multiple-choice",
+      "options": ["6", "7", "8", "9"],
+      "correct_answer": "8"
+    },
+    {
+      "question": "If a stagecoach travels 30 miles in 5 hours, how far does it travel in 1 hour?",
+      "type": "multiple-choice",
+      "options": ["4 miles", "5 miles", "6 miles", "7 miles"],
+      "correct_answer": "6 miles"
+    },
+    {
+      "question": "What is the perimeter of a square with a side length of 7 cm?",
+      "type": "multiple-choice",
+      "options": ["24 cm", "26 cm", "28 cm", "30 cm"],
+      "correct_answer": "28 cm"
+    },
+    {
+      "question": "Which number is divisible by both 2 and 3?",
+      "type": "multiple-choice",
+      "options": ["10", "12", "14", "16"],
+      "correct_answer": "12"
+    }
+  ]
 }
