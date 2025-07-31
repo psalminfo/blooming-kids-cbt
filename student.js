@@ -1,131 +1,63 @@
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-import {
-  getFirestore, collection, addDoc, serverTimestamp
-} from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
-import {
-  getAuth, onAuthStateChanged, signOut
-} from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+// student.js
+import { loadQuestions } from './autoQuestionGen.js';
+import { db } from './firebaseConfig.js';
+import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 
-// ✅ Firebase config
-const firebaseConfig = {
-  apiKey: "AIzaSyBpwxvEoeuT8e6F5vGmDc1VkVfWTUdxavY",
-  authDomain: "blooming-kids-house.firebaseapp.com",
-  projectId: "blooming-kids-house",
-  storageBucket: "blooming-kids-house.appspot.com",
-  messagingSenderId: "739684305208",
-  appId: "1:739684305208:web:ee1cc9e998b37e1f002f84"
-};
+const params = new URLSearchParams(window.location.search);
+const subject = params.get('subject');
+const grade = params.get('grade');
 
-// ✅ Initialize Firebase
-const app = initializeApp(firebaseConfig);
-const db = getFirestore(app);
-const auth = getAuth(app);
+const student = localStorage.getItem('bk_studentName');
+const parentEmail = localStorage.getItem('bk_parentEmail');
 
-// ✅ Global variables
-let student = "";
-let parentEmail = "";
-let grade = "";
-let subject = "";
+if (!subject || !grade || !student || !parentEmail) {
+  alert("Missing info. Redirecting...");
+  window.location.href = "subject-select.html";
+}
+
 let currentQuestions = [];
 
-// ✅ Load user info from localStorage
-window.addEventListener("DOMContentLoaded", async () => {
-  student = localStorage.getItem("studentName") || "";
-  parentEmail = localStorage.getItem("parentEmail") || "";
-  grade = localStorage.getItem("grade") || "";
-  subject = localStorage.getItem("subject") || "";
-
-  if (!student || !parentEmail || !grade || !subject) {
-    alert("Missing student or subject info. Please log in again.");
-    window.location.href = "index.html";
-    return;
-  }
-
-  document.getElementById("studentName").textContent = student;
-  document.getElementById("subjectName").textContent = subject.toUpperCase();
-
-  await loadQuestions();
-});
-
-// ✅ Load questions from GitHub
-async function loadQuestions() {
-  const fileName = `${grade}-${subject.toLowerCase()}.json`;
-  const url = `https://raw.githubusercontent.com/psalminfo/blooming-kids-cbt/main/${fileName}`;
-
+async function renderQuestions() {
   try {
-    const response = await fetch(url);
-    const data = await response.json();
+    const questions = await loadQuestions(subject, grade);
+    currentQuestions = questions;
 
-    if (!data.questions || !Array.isArray(data.questions)) {
-      throw new Error("Invalid question format.");
-    }
+    const container = document.getElementById('questions-container');
+    container.innerHTML = '';
 
-    currentQuestions = shuffleArray(data.questions).slice(0, 30);
-    renderQuestions();
+    questions.forEach((q, index) => {
+      const qDiv = document.createElement('div');
+      qDiv.className = 'mb-4 p-4 border rounded';
+      qDiv.innerHTML = `<p class="font-bold">${index + 1}. ${q.question}</p>`;
+
+      if (q.type === 'multiple-choice') {
+        q.options.forEach(opt => {
+          const id = `q${index}-${opt}`;
+          qDiv.innerHTML += `
+            <label for="${id}" class="block">
+              <input type="radio" id="${id}" name="q${index}" value="${opt}" class="mr-2">${opt}
+            </label>
+          `;
+        });
+      } else {
+        qDiv.innerHTML += `
+          <textarea name="q${index}" class="w-full border rounded p-2 mt-2" placeholder="Type your answer here..."></textarea>
+        `;
+      }
+
+      container.appendChild(qDiv);
+    });
   } catch (err) {
-    console.error("Failed to load questions:", err);
-    alert("Could not load questions. Please contact support.");
+    document.getElementById('questions-container').innerHTML = `<p class="text-red-500">Failed to load questions: ${err.message}</p>`;
   }
 }
 
-// ✅ Shuffle function
-function shuffleArray(array) {
-  const arr = [...array];
-  for (let i = arr.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [arr[i], arr[j]] = [arr[j], arr[i]];
-  }
-  return arr;
-}
-
-// ✅ Render questions to the DOM
-function renderQuestions() {
-  const container = document.getElementById("questionsContainer");
-  container.innerHTML = "";
-
-  currentQuestions.forEach((q, index) => {
-    const questionBlock = document.createElement("div");
-    questionBlock.className = "mb-6 p-4 bg-white shadow rounded";
-
-    const questionText = document.createElement("p");
-    questionText.className = "mb-2 font-semibold";
-    questionText.textContent = `${index + 1}. ${q.question}`;
-    questionBlock.appendChild(questionText);
-
-    if (q.type === "multiple-choice") {
-      q.options.forEach((option, i) => {
-        const optionId = `q${index}_opt${i}`;
-        const optionLabel = document.createElement("label");
-        optionLabel.className = "block mb-1";
-
-        const optionInput = document.createElement("input");
-        optionInput.type = "radio";
-        optionInput.name = `q${index}`;
-        optionInput.value = option;
-        optionInput.className = "mr-2";
-
-        optionLabel.appendChild(optionInput);
-        optionLabel.appendChild(document.createTextNode(option));
-        questionBlock.appendChild(optionLabel);
-      });
-    } else if (q.type === "short-answer") {
-      const input = document.createElement("input");
-      input.type = "text";
-      input.name = `q${index}`;
-      input.className = "w-full mt-2 p-2 border rounded";
-      questionBlock.appendChild(input);
-    }
-
-    container.appendChild(questionBlock);
-  });
-}
-
-// ✅ Handle test submission
-document.getElementById("submitBtn").addEventListener("click", async () => {
+async function handleSubmit() {
   const answers = [];
 
   currentQuestions.forEach((q, index) => {
-    const input = document.querySelector(`[name="q${index}"]:checked`) || document.querySelector(`[name="q${index}"]`);
+    const name = `q${index}`;
+    const input = document.querySelector(`[name="${name}"]:checked`) || document.querySelector(`[name="${name}"]`);
     const userAnswer = input ? input.value.trim() : '';
     const isCorrect = userAnswer.toLowerCase() === q.correct_answer.toLowerCase();
 
@@ -158,12 +90,7 @@ document.getElementById("submitBtn").addEventListener("click", async () => {
     console.error("Error submitting:", err);
     alert("There was an error submitting your test.");
   }
-});
+}
 
-// ✅ Handle logout
-document.getElementById("logoutBtn").addEventListener("click", () => {
-  signOut(auth).then(() => {
-    localStorage.clear();
-    window.location.href = "index.html";
-  });
-});
+document.getElementById("submit-btn").addEventListener("click", handleSubmit);
+renderQuestions();
