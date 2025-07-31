@@ -1,47 +1,44 @@
 <!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Parent Login | Blooming Kids House</title>
-    <link rel="icon" href="favicon.ico" />
-    <script type="module" src="./parent-login.js"></script>
-    <link
-      href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css"
-      rel="stylesheet"
-    />
-  </head>
-  <body class="bg-green-50 flex items-center justify-center h-screen">
-    <div class="bg-white p-8 rounded-2xl shadow-xl w-full max-w-md">
-      <h1 class="text-2xl font-bold text-center mb-6 text-green-700">
-        Parent Portal
-      </h1>
-      <form id="parent-login-form" class="space-y-4">
-        <div>
-          <label class="block font-semibold text-gray-700">Student Name</label>
-          <input
-            type="text"
-            id="studentName"
-            required
-            class="w-full px-4 py-2 rounded border border-gray-300 focus:outline-none focus:ring-2 focus:ring-green-400"
-          />
-        </div>
-        <div>
-          <label class="block font-semibold text-gray-700">Parent Email</label>
-          <input
-            type="email"
-            id="parentEmail"
-            required
-            class="w-full px-4 py-2 rounded border border-gray-300 focus:outline-none focus:ring-2 focus:ring-green-400"
-          />
-        </div>
-        <button
-          type="submit"
-          class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-2 rounded transition"
-        >
-          View Report
-        </button>
-      </form>
-    </div>
-  </body>
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Parent Assessment Report</title>
+  <link rel="icon" href="favicon.ico" type="image/x-icon" />
+  <script type="module" src="firebaseConfig.js"></script>
+  <script type="module" src="parent.js" defer></script>
+  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+</head>
+<body class="bg-gray-100 font-sans min-h-screen flex flex-col items-center justify-start p-4">
+
+  <!-- Header -->
+  <header class="w-full max-w-4xl bg-white rounded-xl shadow-lg p-6 mb-4 flex justify-between items-center">
+    <h1 class="text-2xl font-bold text-green-700">Your Child's Assessment Report</h1>
+    <button id="logoutBtn" class="bg-yellow-400 hover:bg-yellow-500 text-white font-bold py-2 px-4 rounded">
+      Logout
+    </button>
+  </header>
+
+  <!-- Report Section -->
+  <section id="reportSection" class="w-full max-w-4xl bg-white p-6 rounded-xl shadow-md">
+    <p class="text-gray-600 mb-2">Loading report...</p>
+    <div id="reportContainer" class="space-y-4"></div>
+  </section>
+
+  <!-- Footer -->
+  <footer class="mt-auto text-center text-sm text-gray-500 pt-6">
+    POWERED BY <span style="color:#FFEB3B">POG</span>
+  </footer>
+
+  <script type="module">
+    import { auth } from './firebaseConfig.js';
+    const logoutBtn = document.getElementById("logoutBtn");
+
+    logoutBtn.addEventListener("click", () => {
+      auth.signOut().then(() => {
+        window.location.href = "login-parent.html";
+      });
+    });
+  </script>
+</body>
 </html>
