@@ -28,6 +28,8 @@
 
   <script>
     document.getElementById("logoutBtn").addEventListener("click", () => {
+      localStorage.removeItem("studentName");
+      localStorage.removeItem("parentEmail");
       window.location.href = "parent.html";
     });
   </script>
