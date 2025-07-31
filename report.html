@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Parent Assessment Report</title>
+  <link rel="icon" href="favicon.ico" />
+  <script type="module" src="generateReport.js" defer></script>
+  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+</head>
+<body class="bg-gray-100 font-sans min-h-screen flex flex-col items-center justify-start p-4">
+
+  <header class="w-full max-w-4xl bg-white rounded-xl shadow-lg p-6 mb-4 flex justify-between items-center">
+    <h1 class="text-2xl font-bold text-green-700">Your Child's Assessment Report</h1>
+    <button id="logoutBtn" class="bg-yellow-400 hover:bg-yellow-500 text-white font-bold py-2 px-4 rounded">
+      Logout
+    </button>
+  </header>
+
+  <section id="reportSection" class="w-full max-w-4xl bg-white p-6 rounded-xl shadow-md">
+    <p class="text-gray-600 mb-2">Loading report...</p>
+    <div id="reportContainer" class="space-y-4"></div>
+  </section>
+
+  <footer class="mt-auto text-center text-sm text-gray-500 pt-6">
+    POWERED BY <span style="color:#FFEB3B">POG</span>
+  </footer>
+
+  <script>
+    document.getElementById("logoutBtn").addEventListener("click", () => {
+      window.location.href = "parent.html";
+    });
+  </script>
+</body>
+</html>
