@@ -1,14 +1,13 @@
-import {
-  getFirestore,
-  collection,
-  query,
-  where,
-  getDocs
-} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+document.getElementById("parentLoginForm").addEventListener("submit", (e) => {
+  e.preventDefault();
+  const studentName = document.getElementById("studentName").value.trim();
+  const parentEmail = document.getElementById("parentEmail").value.trim();
 
-import {
-  getAuth,
-  onAuthStateChanged
-} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-
-import { db, auth } from "./firebaseConfig.js";
+  if (studentName && parentEmail) {
+    const encodedName = encodeURIComponent(studentName);
+    const encodedEmail = encodeURIComponent(parentEmail);
+    window.location.href = `report.html?name=${encodedName}&email=${encodedEmail}`;
+  } else {
+    alert("Please fill in both fields.");
+  }
+});
