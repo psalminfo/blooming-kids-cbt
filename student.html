@@ -2,121 +2,143 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Blooming Kids Test</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Blooming Kids | Test</title>
   <link rel="icon" href="favicon.ico" />
-  <script type="module" src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js"></script>
-  <script type="module" src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js"></script>
-  <script type="module" src="./firebaseConfig.js"></script>
   <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            primary: "#4CAF50", // green
+            accent: "#FFEB3B" // yellow
+          }
+        }
+      }
+    };
+  </script>
 </head>
-<body class="bg-green-50 text-gray-800">
-  <div class="max-w-4xl mx-auto p-6">
-    <div class="flex justify-between items-center mb-4">
-      <h1 class="text-3xl font-bold text-green-700">Blooming Kids House Assessment</h1>
-      <button onclick="logout()" class="bg-yellow-400 text-green-900 font-semibold px-4 py-2 rounded shadow">Logout</button>
-    </div>
-    <div class="mb-4">
-      <p class="text-lg"><strong>Student:</strong> <span id="studentNameDisplay"></span></p>
-      <p class="text-lg"><strong>Subject:</strong> <span id="subjectDisplay"></span></p>
+<body class="bg-gray-100 min-h-screen">
+  <div class="max-w-4xl mx-auto p-4">
+    <div class="text-center mb-6">
+      <h1 class="text-3xl font-bold text-primary">Blooming Kids House</h1>
+      <h2 class="text-xl text-gray-700" id="subjectTitle">Test</h2>
     </div>
 
-    <form id="questionForm" class="space-y-6"></form>
+    <form id="testForm" class="space-y-6"></form>
 
-    <div class="mt-8 text-center">
-      <button id="submitBtn" class="bg-green-700 hover:bg-green-800 text-white px-6 py-2 rounded-lg text-lg font-semibold shadow-lg">
+    <div class="text-center mt-8">
+      <button
+        type="submit"
+        form="testForm"
+        class="bg-primary hover:bg-green-600 text-white font-bold py-2 px-6 rounded"
+      >
         Submit Test
       </button>
     </div>
   </div>
 
   <script type="module">
-    import { db, collection, addDoc, serverTimestamp } from './firebaseConfig.js';
+    import {
+      db,
+      collection,
+      addDoc,
+      serverTimestamp
+    } from "./firebaseConfig.js";
 
+    const form = document.getElementById("testForm");
+    const subjectTitle = document.getElementById("subjectTitle");
+
+    // Retrieve query params
     const urlParams = new URLSearchParams(window.location.search);
-    const studentName = urlParams.get("name");
-    const parentEmail = urlParams.get("email");
-    const tutorName = urlParams.get("tutor");
-    const location = urlParams.get("location");
-    const grade = urlParams.get("grade");
     const subject = urlParams.get("subject");
+    const grade = urlParams.get("grade");
+    const studentName = localStorage.getItem("studentName");
+    const parentEmail = localStorage.getItem("parentEmail");
+    const tutorName = localStorage.getItem("tutorName");
+    const location = localStorage.getItem("location");
 
-    document.getElementById("studentNameDisplay").textContent = studentName;
-    document.getElementById("subjectDisplay").textContent = subject.toUpperCase();
+    if (!studentName || !subject || !grade) {
+      alert("Invalid access. Redirecting to login.");
+      window.location.href = "index.html";
+    }
 
-    const form = document.getElementById("questionForm");
-    let questions = [];
+    subjectTitle.textContent = `${subject} - Grade ${grade}`;
 
-    fetch(`https://raw.githubusercontent.com/psalminfo/blooming-kids-cbt/main/${grade}-${subject}.json`)
-      .then(res => res.json())
-      .then(data => {
-        questions = shuffleArray(data.questions).slice(0, 30);
-        renderQuestions(questions);
+    const questionFile = `https://raw.githubusercontent.com/psalminfo/blooming-kids-cbt/main/questions/${grade}-${subject.toLowerCase()}.json`;
+
+    // Fetch and display 30 random questions
+    fetch(questionFile)
+      .then((res) => res.json())
+      .then((data) => {
+        const all = data.questions || [];
+        const selected = all.sort(() => 0.5 - Math.random()).slice(0, 30);
+
+        selected.forEach((q, idx) => {
+          const qDiv = document.createElement("div");
+          qDiv.className = "bg-white p-4 rounded shadow";
+
+          const qLabel = document.createElement("label");
+          qLabel.className = "font-medium block mb-2";
+          qLabel.textContent = `${idx + 1}. ${q.question}`;
+
+          qDiv.appendChild(qLabel);
+
+          q.options.forEach((opt, i) => {
+            const id = `q${idx}_opt${i}`;
+            const radio = document.createElement("input");
+            radio.type = "radio";
+            radio.name = `q${idx}`;
+            radio.value = opt;
+            radio.id = id;
+            radio.className = "mr-2";
+
+            const label = document.createElement("label");
+            label.htmlFor = id;
+            label.textContent = opt;
+            label.className = "mr-4";
+
+            qDiv.appendChild(radio);
+            qDiv.appendChild(label);
+          });
+
+          form.appendChild(qDiv);
+        });
       })
-      .catch(err => {
-        console.error("Failed to load questions", err);
-        form.innerHTML = `<p class="text-red-500 font-semibold">Error loading questions. Please try again.</p>`;
+      .catch((err) => {
+        alert("Error loading questions.");
+        console.error(err);
       });
 
-    function shuffleArray(array) {
-      return [...array].sort(() => Math.random() - 0.5);
-    }
+    // Submit handler
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
 
-    function renderQuestions(questions) {
-      form.innerHTML = '';
-      questions.forEach((q, index) => {
-        const optionsHtml = q.options.map((opt, i) => `
-          <label class="block">
-            <input type="radio" name="q${index}" value="${opt}" class="mr-2" />
-            ${opt}
-          </label>
-        `).join('');
-        form.innerHTML += `
-          <div class="bg-white shadow p-4 rounded-lg border">
-            <p class="font-medium mb-2">Q${index + 1}: ${q.question}</p>
-            <div class="pl-4 space-y-1">${optionsHtml}</div>
-          </div>
-        `;
-      });
-    }
-
-    async function submitAnswers() {
-      const answers = questions.map((q, i) => {
-        const selected = document.querySelector(`input[name="q${i}"]:checked`);
-        return {
-          question: q.question,
-          selectedAnswer: selected ? selected.value : "No Answer",
-          correctAnswer: q.correct_answer
-        };
-      });
+      const answers = {};
+      for (let i = 0; i < 30; i++) {
+        const selected = form.querySelector(`input[name="q${i}"]:checked`);
+        answers[`Q${i + 1}`] = selected ? selected.value : "";
+      }
 
       try {
-        await addDoc(collection(db, "student_reports"), {
+        await addDoc(collection(db, "reports"), {
           studentName,
           parentEmail,
           tutorName,
           location,
-          grade,
           subject,
-          timestamp: serverTimestamp(),
-          answers
+          grade,
+          answers,
+          timestamp: serverTimestamp()
         });
 
-        window.location.href = `subject-select.html?name=${studentName}&email=${parentEmail}&tutor=${tutorName}&location=${location}&grade=${grade}`;
-      } catch (error) {
-        console.error("Error saving test:", error);
-        alert("Something went wrong while saving your test. Please try again.");
+        window.location.href = "subject-select.html";
+      } catch (err) {
+        alert("Error submitting test.");
+        console.error(err);
       }
-    }
-
-    document.getElementById("submitBtn").addEventListener("click", (e) => {
-      e.preventDefault();
-      submitAnswers();
     });
-
-    function logout() {
-      window.location.href = "index.html";
-    }
   </script>
 </body>
 </html>
