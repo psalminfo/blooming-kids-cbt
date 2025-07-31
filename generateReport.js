@@ -1,15 +1,16 @@
 import {
-  db,
-  auth,
-  collection,
   query,
+  collection,
   where,
   getDocs
-} from "./firebaseConfig.js";
+} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+import {
+  onAuthStateChanged
+} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
-// Optional: Check if parent is logged in (if using auth)
+import { db, auth } from "./firebaseConfig.js"; // Only import db and auth
+
 onAuthStateChanged(auth, async (user) => {
   if (!user) {
     window.location.href = "parent.html"; // redirect if not logged in
@@ -39,7 +40,7 @@ onAuthStateChanged(auth, async (user) => {
       querySnapshot.forEach((doc) => {
         const data = doc.data();
         console.log("Student Report Data:", data);
-        // TODO: Generate PDF report or populate HTML with data
+        // TODO: Generate PDF report or populate HTML
       });
 
     } catch (error) {
