@@ -42,8 +42,20 @@
       loadQuestions(subject, grade);
     }
 
+    // ✅ Finalized submit function (no score, clean redirect)
     window.submitAnswers = function () {
-      alert("Submit button clicked! (Integrate answer collection & scoring logic here)");
+      const container = document.getElementById("question-container");
+      if (container) {
+        container.innerHTML = `
+          <div class="text-center p-6 text-green-700 font-semibold text-xl">
+            ✅ Submitted. Redirecting...
+          </div>
+        `;
+      }
+
+      setTimeout(() => {
+        window.location.href = "subject-select.html";
+      }, 1500);
     }
 
     window.logout = logout;
