@@ -2,238 +2,119 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Parent Assessment Report</title>
-  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet" />
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Student Report - Blooming Kids House</title>
+  <link rel="icon" href="favicon.ico" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 </head>
-<body class="bg-gray-100 min-h-screen p-6 flex flex-col items-center">
+<body class="bg-gray-100 font-sans">
 
-  <header class="w-full max-w-4xl flex justify-between items-center bg-white p-6 rounded shadow mb-6">
-    <h1 class="text-2xl font-bold text-green-700">Your Child's Assessment Report</h1>
-    <div>
-      <button id="downloadBtn" class="bg-green-600 text-white px-4 py-2 rounded mr-4 hover:bg-green-700">Download PDF</button>
-      <button id="logoutBtn" class="bg-yellow-400 text-white px-4 py-2 rounded hover:bg-yellow-500">Logout</button>
+  <div class="max-w-4xl mx-auto py-10 px-4">
+    <div class="bg-white shadow-md rounded-xl p-6" id="reportContainer">
+
+      <h1 class="text-2xl font-bold text-center text-green-700 mb-4">BLOOMING KIDS HOUSE ASSESSMENT REPORT</h1>
+
+      <div class="grid grid-cols-2 gap-4 mb-6">
+        <p><strong>Student Name:</strong> <span id="studentName"></span></p>
+        <p><strong>Grade:</strong> <span id="grade"></span></p>
+        <p><strong>Parent Email:</strong> <span id="parentEmail"></span></p>
+        <p><strong>Location:</strong> <span id="location"></span></p>
+        <p><strong>Tutor:</strong> <span id="tutor"></span></p>
+      </div>
+
+      <div id="subjectReports" class="space-y-6"></div>
+
+      <div class="mt-6">
+        <h2 class="text-lg font-semibold text-green-700 mb-2">Director’s Message</h2>
+        <p>
+          Dear Parent,<br><br>
+          Thank you for allowing your child to participate in the Blooming Kids House Assessment. This report reflects your child's current academic strengths and areas that need attention. 
+          We believe every child is unique and capable of greatness with the right guidance. Your child's tutor, <span id="tutorNameFooter" class="font-bold"></span>, is committed to working closely with you to help your child improve in the necessary areas and shine brightly. <br><br>
+          Best regards,<br>
+          <strong>Mrs. Oluwakemi Oladunjoye</strong><br>
+          Director, Blooming Kids House
+        </p>
+      </div>
+
+      <footer class="text-center text-sm text-gray-600 mt-10">
+        POWERED BY <span style="color:#FFEB3B">POG</span>
+      </footer>
     </div>
-  </header>
 
-  <main id="reportContainer" class="w-full max-w-4xl bg-white p-6 rounded shadow space-y-6">
-    <p class="text-gray-700">Loading report...</p>
-  </main>
+    <div class="text-center mt-6">
+      <button id="downloadBtn" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-6 rounded">
+        Download PDF
+      </button>
+    </div>
+  </div>
 
-  <footer class="mt-auto text-center text-sm text-gray-600 pt-8">
-    POWERED BY <span style="color:#FFEB3B">POG</span>
-  </footer>
+  <script>
+    const reportData = JSON.parse(localStorage.getItem("reportData") || "{}");
 
-  <script type="module">
-    import { db } from './firebaseConfig.js';
-    import { collection, query, where, getDocs } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
-    
-    const reportContainer = document.getElementById('reportContainer');
-    const downloadBtn = document.getElementById('downloadBtn');
-    const logoutBtn = document.getElementById('logoutBtn');
+    document.getElementById("studentName").innerText = reportData.studentName || "";
+    document.getElementById("grade").innerText = reportData.grade || "";
+    document.getElementById("parentEmail").innerText = reportData.parentEmail || "";
+    document.getElementById("location").innerText = reportData.location || "";
+    document.getElementById("tutor").innerText = reportData.tutorName || "";
+    document.getElementById("tutorNameFooter").innerText = reportData.tutorName || "";
 
-    // Get info from localStorage
-    const studentName = localStorage.getItem('studentName');
-    const parentEmail = localStorage.getItem('parentEmail');
-    const grade = localStorage.getItem('grade') || 'N/A';
-    const tutorName = localStorage.getItem('tutorName') || 'Your Assigned Tutor';
+    const subjectReportsContainer = document.getElementById("subjectReports");
 
-    if (!studentName || !parentEmail) {
-      alert('Missing student or parent information.');
-      window.location.href = 'parent.html';
-    }
+    if (reportData.subjects) {
+      Object.entries(reportData.subjects).forEach(([subject, data]) => {
+        const subjectDiv = document.createElement("div");
+        subjectDiv.classList.add("bg-gray-50", "p-4", "rounded", "shadow");
 
-    async function fetchResults() {
-      try {
-        const q = query(
-          collection(db, "results"),
-          where("studentName", "==", studentName),
-          where("parentEmail", "==", parentEmail)
-        );
-        const snapshot = await getDocs(q);
-
-        if (snapshot.empty) {
-          reportContainer.innerHTML = '<p class="text-red-600 font-semibold">No reports found for this student.</p>';
-          downloadBtn.disabled = true;
-          return [];
-        }
-
-        const results = [];
-        snapshot.forEach(doc => results.push(doc.data()));
-        return results;
-      } catch (err) {
-        reportContainer.innerHTML = `<p class="text-red-600 font-semibold">Error loading report: ${err.message}</p>`;
-        downloadBtn.disabled = true;
-        return [];
-      }
-    }
-
-    function renderReport(results) {
-      if (!results.length) return;
-
-      reportContainer.innerHTML = `
-        <section class="mb-6">
-          <p><strong>Name:</strong> ${studentName}</p>
-          <p><strong>Grade:</strong> ${grade}</p>
-          <p><strong>Tutor:</strong> ${tutorName}</p>
-          <p><strong>Parent Email:</strong> ${parentEmail}</p>
-        </section>
-      `;
-
-      results.forEach(res => {
-        reportContainer.innerHTML += `
-          <section class="mb-6 border p-4 rounded">
-            <h2 class="text-lg font-semibold mb-2">${res.subject} Result</h2>
-            <p><strong>Score:</strong> ${res.score ?? 'N/A'}%</p>
-
-            <p class="mt-2 font-semibold">Knowledge Gained:</p>
-            <ul class="list-disc list-inside">
-              ${(res.knowledge?.length) ? res.knowledge.map(k => `<li>${k}</li>`).join('') : '<li>N/A</li>'}
-            </ul>
-
-            <p class="mt-2 font-semibold">Skills Developed:</p>
-            <ul class="list-disc list-inside">
-              ${(res.skills?.length) ? res.skills.map(s => `<li>${s}</li>`).join('') : '<li>N/A</li>'}
-            </ul>
-          </section>
+        subjectDiv.innerHTML = `
+          <h3 class="text-green-700 font-semibold text-lg mb-2">${subject}</h3>
+          <table class="table-auto w-full text-sm mb-3">
+            <thead>
+              <tr class="bg-green-100">
+                <th class="px-2 py-1 text-left">Knowledge Area</th>
+                <th class="px-2 py-1 text-left">Score</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${Object.entries(data.knowledge || {}).map(([k, v]) => `
+                <tr>
+                  <td class="border px-2 py-1">${k}</td>
+                  <td class="border px-2 py-1">${v}</td>
+                </tr>`).join("")}
+            </tbody>
+          </table>
+          <table class="table-auto w-full text-sm">
+            <thead>
+              <tr class="bg-yellow-100">
+                <th class="px-2 py-1 text-left">Skill</th>
+                <th class="px-2 py-1 text-left">Score</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${Object.entries(data.skills || {}).map(([k, v]) => `
+                <tr>
+                  <td class="border px-2 py-1">${k}</td>
+                  <td class="border px-2 py-1">${v}</td>
+                </tr>`).join("")}
+            </tbody>
+          </table>
         `;
+
+        subjectReportsContainer.appendChild(subjectDiv);
       });
-
-      reportContainer.innerHTML += `
-        <section class="mb-6">
-          <h3 class="font-bold">Recommendation:</h3>
-          <p>Based on the performance, we strongly recommend continued tutoring support with ${tutorName} to help ${studentName} improve and thrive academically.</p>
-        </section>
-
-        <section>
-          <h3 class="font-bold">Message from the Director:</h3>
-          <p>Thank you for trusting Blooming Kids House. Our mission is to guide and support every child toward excellence. We are proud of ${studentName}'s progress and remain committed to their academic journey.</p>
-          <p>Sincerely,<br>Director, Blooming Kids House</p>
-        </section>
-      `;
     }
 
-    async function generatePDF(results) {
-      if (!results.length) return;
-
-      const { jsPDF } = window.jspdf;
-      const doc = new jsPDF();
-      let y = 20;
-      const leftMargin = 20;
-
-      doc.setFontSize(16);
-      doc.setFont("helvetica", "bold");
-      doc.text("BLOOMING KIDS HOUSE ASSESSMENT REPORT", 105, y, { align: "center" });
-      y += 10;
-
-      doc.setFontSize(12);
-      doc.setFont("helvetica", "normal");
-      doc.text(`Name: ${studentName}`, leftMargin, y);
-      doc.text(`Grade: ${grade}`, 120, y);
-      y += 8;
-      doc.text(`Tutor: ${tutorName}`, leftMargin, y);
-      doc.text(`Parent Email: ${parentEmail}`, 120, y);
-      y += 10;
-
-      results.forEach(res => {
-        if (y > 270) {
-          doc.addPage();
-          y = 20;
-        }
-        doc.setFont("helvetica", "bold");
-        doc.text(`${res.subject} Result`, leftMargin, y);
-        y += 6;
-
-        doc.setFont("helvetica", "normal");
-        doc.text(`Score: ${res.score ?? 'N/A'}%`, leftMargin + 5, y);
-        y += 6;
-
-        if (res.knowledge && Array.isArray(res.knowledge)) {
-          doc.text("Knowledge Gained:", leftMargin + 5, y);
-          y += 6;
-          res.knowledge.forEach(item => {
-            const lines = doc.splitTextToSize(`• ${item}`, 160);
-            doc.text(lines, leftMargin + 10, y);
-            y += lines.length * 5;
-            if (y > 270) {
-              doc.addPage();
-              y = 20;
-            }
-          });
-        }
-
-        if (res.skills && Array.isArray(res.skills)) {
-          doc.text("Skills Developed:", leftMargin + 5, y);
-          y += 6;
-          res.skills.forEach(skill => {
-            const lines = doc.splitTextToSize(`• ${skill}`, 160);
-            doc.text(lines, leftMargin + 10, y);
-            y += lines.length * 5;
-            if (y > 270) {
-              doc.addPage();
-              y = 20;
-            }
-          });
-        }
-
-        y += 8;
-      });
-
-      // Recommendation
-      const recommendation = `Based on the performance, we strongly recommend continued tutoring support with ${tutorName} to help ${studentName} improve and thrive academically.`;
-      const recLines = doc.splitTextToSize(recommendation, 170);
-      doc.setFont("helvetica", "bold");
-      doc.text("Recommendation:", leftMargin, y);
-      y += 6;
-      doc.setFont("helvetica", "normal");
-      doc.text(recLines, leftMargin + 5, y);
-      y += recLines.length * 6;
-
-      // Director message
-      if (y > 250) {
-        doc.addPage();
-        y = 20;
-      }
-
-      const directorMessage = `Thank you for trusting Blooming Kids House. Our mission is to guide and support every child toward excellence. We are proud of ${studentName}'s progress and remain committed to their academic journey.\n\nSincerely,\nDirector, Blooming Kids House`;
-      const directorLines = doc.splitTextToSize(directorMessage, 170);
-      doc.setFont("helvetica", "bold");
-      doc.text("Message from the Director:", leftMargin, y);
-      y += 6;
-      doc.setFont("helvetica", "normal");
-      doc.text(directorLines, leftMargin + 5, y);
-      y += directorLines.length * 6;
-
-      // Footer
-      doc.setFontSize(10);
-      doc.setTextColor("#4CAF50");
-      doc.textWithLink("POWERED BY POG", 105, 285, { align: "center" });
-
-      doc.save(`${studentName}-Assessment-Report.pdf`);
-    }
-
-    logoutBtn.addEventListener('click', () => {
-      localStorage.clear();
-      window.location.href = 'parent.html';
+    document.getElementById("downloadBtn").addEventListener("click", () => {
+      const element = document.getElementById("reportContainer");
+      const opt = {
+        margin: 0.3,
+        filename: `${reportData.studentName || 'report'}-Assessment-Report.pdf`,
+        image: { type: 'jpeg', quality: 0.98 },
+        html2canvas: { scale: 2 },
+        jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' }
+      };
+      html2pdf().set(opt).from(element).save();
     });
-
-    downloadBtn.addEventListener('click', async () => {
-      downloadBtn.disabled = true;
-      downloadBtn.textContent = 'Generating PDF...';
-      const results = await fetchResults();
-      if (results.length > 0) {
-        generatePDF(results);
-      }
-      downloadBtn.disabled = false;
-      downloadBtn.textContent = 'Download PDF';
-    });
-
-    // On load: fetch and render report
-    (async () => {
-      const results = await fetchResults();
-      renderReport(results);
-    })();
   </script>
 
 </body>
