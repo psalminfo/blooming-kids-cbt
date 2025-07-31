@@ -1,8 +1,12 @@
 export async function loadQuestions(subject, grade) {
   const container = document.getElementById("question-container");
-  container.innerHTML = `<p class="text-gray-500">Loading questions from GitHub...</p>`;
 
-  const GITHUB_URL = `https://raw.githubusercontent.com/psalminfo/blooming-kids-cbt/main/${grade}-${subject}.json`;
+  // ✅ Normalize filename
+  const fileName = `${grade}-${subject}`.toLowerCase();
+  const GITHUB_URL = `https://raw.githubusercontent.com/psalminfo/blooming-kids-cbt/main/${fileName}.json`;
+
+  // ✅ Optional cleaner message
+  container.innerHTML = `<p class="text-gray-500">Please wait, loading questions...</p>`;
 
   try {
     const res = await fetch(GITHUB_URL);
@@ -11,7 +15,7 @@ export async function loadQuestions(subject, grade) {
     displayQuestions(data.questions);
   } catch (err) {
     console.error("GitHub load failed:", err);
-    container.innerHTML = `<p class="text-red-600">❌ No questions found for ${subject.toUpperCase()} Grade ${grade}.<br>Please contact your tutor.</p>`;
+    container.innerHTML = `<p class="text-red-600">❌ No questions found for ${subject.toUpperCase()} Grade ${grade}.</p>`;
   }
 }
 
