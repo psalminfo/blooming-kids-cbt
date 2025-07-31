@@ -1,55 +1,36 @@
-// autoQuestionGen.js
-import { db, collection, getDocs } from "./firebaseConfig.js";
-
-const GITHUB_BASE = "https://raw.githubusercontent.com/psalminfo/blooming-kids-cbt/main/questions";
-
 export async function loadQuestions(subject, grade) {
-  const questionContainer = document.getElementById("question-container");
-  questionContainer.innerHTML = `<p class="text-gray-600">Loading questions...</p>`;
+  const container = document.getElementById("question-container");
+  container.innerHTML = `<p class="text-gray-500">Loading questions from GitHub...</p>`;
 
-  const filename = `${grade}-${subject}`.toLowerCase();
-  const githubURL = `${GITHUB_BASE}/${filename}.json`;
+  const GITHUB_URL = `https://raw.githubusercontent.com/psalminfo/blooming-kids-cbt/main/questions/${grade}-${subject}.json`;
 
   try {
-    const res = await fetch(githubURL);
-    if (!res.ok) throw new Error("GitHub fetch failed");
+    const res = await fetch(GITHUB_URL);
+    if (!res.ok) throw new Error("Question file not found");
     const data = await res.json();
     displayQuestions(data.questions);
   } catch (err) {
-    console.warn("GitHub failed, trying Firebase...", err);
-    try {
-      const snapshot = await getDocs(collection(db, "questions"));
-      const questions = [];
-      snapshot.forEach(doc => {
-        const q = doc.data();
-        if (q.subject === subject && q.grade == grade) {
-          questions.push(q);
-        }
-      });
-      displayQuestions(questions);
-    } catch (fbErr) {
-      questionContainer.innerHTML = `<p class="text-red-600">❌ Could not load questions.</p>`;
-      console.error("Firebase error:", fbErr);
-    }
+    console.error("GitHub load failed:", err);
+    container.innerHTML = `<p class="text-red-600">❌ No questions found for ${subject.toUpperCase()} Grade ${grade}.<br>Please contact your tutor.</p>`;
   }
 }
 
 function displayQuestions(questions) {
   const container = document.getElementById("question-container");
+
   if (!questions || questions.length === 0) {
-    container.innerHTML = `<p class="text-red-600">❌ No questions available.</p>`;
+    container.innerHTML = `<p class="text-red-600">❌ This subject has no questions yet.</p>`;
     return;
   }
 
   container.innerHTML = questions.map((q, i) => `
-    <div class="bg-white border border-gray-200 p-4 rounded shadow">
-      <p class="font-medium mb-2">${i + 1}. ${q.question}</p>
+    <div class="bg-white p-4 border rounded-lg shadow-sm">
+      <p class="font-semibold mb-2">${i + 1}. ${q.question}</p>
       ${q.options.map((opt, j) => `
-        <label class="block ml-4 mb-1">
-          <input type="radio" name="q${i}" value="${opt}" class="mr-2">
-          ${opt}
+        <label class="block ml-4">
+          <input type="radio" name="q${i}" value="${opt}" class="mr-2"> ${opt}
         </label>
-      `).join("")}
+      `).join('')}
     </div>
-  `).join("");
+  `).join('');
 }
