@@ -66,7 +66,7 @@
 
     async function loadQuestions(subject, grade) {
       try {
-        const res = await fetch(`https://raw.githubusercontent.com/psalminfo/blooming-kids-cbt/main/questions/${grade}-${subject.toLowerCase()}.json`);
+        const res = await fetch(`https://raw.githubusercontent.com/psalminfo/blooming-kids-cbt/main/${grade}-${subject.toLowerCase()}.json`);
         const data = await res.json();
         const questions = data.questions;
 
