@@ -3,54 +3,22 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Select Subject - Blooming Kids House</title>
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" />
-  <link rel="stylesheet" href="style.css" />
+  <title>Select Subject</title>
   <link rel="icon" href="favicon.ico" />
+  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
 </head>
-<body class="bg-green-50 min-h-screen flex items-center justify-center">
-  <div class="bg-white p-8 rounded-xl shadow-xl w-full max-w-md">
-    <h2 class="text-2xl font-bold text-green-800 text-center mb-6">Choose a Subject</h2>
-    <div id="subjectButtons" class="space-y-4 mb-4"></div>
-    <button onclick="logout()" class="bg-yellow-500 text-white w-full py-2 rounded hover:bg-yellow-600">Logout</button>
-    <p class="text-xs text-center mt-4 text-gray-600">POWERED BY <span style="color:#FFEB3B">POG</span></p>
+<body class="bg-yellow-50 flex items-center justify-center min-h-screen">
+  <div class="bg-white p-6 rounded shadow w-full max-w-md">
+    <h2 class="text-2xl font-bold text-yellow-600 mb-6 text-center">Select a Subject</h2>
+    <div class="space-y-4">
+      <button onclick="startTest('math')" class="w-full bg-yellow-500 text-white py-2 rounded hover:bg-yellow-600">Math</button>
+      <button onclick="startTest('ela')" class="w-full bg-yellow-500 text-white py-2 rounded hover:bg-yellow-600">ELA</button>
+    </div>
   </div>
 
   <script>
-    const grade = localStorage.getItem('grade');
-    const subjectsByGrade = {
-      "3": ["Math", "ELA"],
-      "4": ["Math", "ELA"],
-      "5": ["Math", "ELA"],
-      "6": ["Math", "ELA"],
-      "7": ["Math", "ELA", "Biology", "Chemistry", "Physics"],
-      "8": ["Math", "ELA", "Biology", "Chemistry", "Physics"],
-      "9": ["Math", "ELA", "Biology", "Chemistry", "Physics"],
-      "10": ["Math", "ELA", "Biology", "Chemistry", "Physics"],
-      "11": ["Math", "ELA", "Biology", "Chemistry", "Physics"],
-      "12": ["Math", "ELA", "Biology", "Chemistry", "Physics"]
-    };
-
-    if (!grade) {
-      window.location.href = "index.html"; // redirect to login if grade missing
-    }
-
-    const container = document.getElementById('subjectButtons');
-    const subjects = subjectsByGrade[grade] || [];
-
-    subjects.forEach(subject => {
-      const btn = document.createElement('button');
-      btn.textContent = subject;
-      btn.className = "w-full bg-green-600 text-white py-2 rounded hover:bg-green-700";
-      btn.onclick = () => {
-        window.location.href = `student.html?subject=${subject}&grade=${grade}`;
-      };
-      container.appendChild(btn);
-    });
-
-    function logout() {
-      localStorage.clear();
-      window.location.href = "index.html";
+    function startTest(subject) {
+      window.location.href = `student.html?subject=${subject}`;
     }
   </script>
 </body>
