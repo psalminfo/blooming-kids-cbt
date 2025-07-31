@@ -15,6 +15,7 @@ document.getElementById('studentLoginForm').addEventListener('submit', function 
 
   const studentId = `${studentName}-${Date.now()}`;
 
+  // Save individual fields (optional)
   localStorage.setItem('studentId', studentId);
   localStorage.setItem('studentName', studentName);
   localStorage.setItem('parentEmail', parentEmail);
@@ -22,5 +23,17 @@ document.getElementById('studentLoginForm').addEventListener('submit', function 
   localStorage.setItem('tutorName', tutorName);
   localStorage.setItem('location', location);
 
+  // ✅ Save full student object
+  const student = {
+    id: studentId,
+    name: studentName,
+    email: parentEmail,
+    grade: grade,
+    tutor: tutorName,
+    location: location
+  };
+  localStorage.setItem('student', JSON.stringify(student));
+
+  // Redirect to subject select page
   window.location.href = 'subject-select.html';
 });
