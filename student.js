@@ -1,113 +1,89 @@
 import { db, collection, addDoc } from "./firebaseConfig.js";
 
-document.addEventListener("DOMContentLoaded", () => {
-  const studentName = localStorage.getItem("studentName");
-  const studentEmail = localStorage.getItem("studentEmail");
+document.addEventListener("DOMContentLoaded", async () => {
+  const urlParams = new URLSearchParams(window.location.search);
+  const subject = urlParams.get("subject");
+
+  const name = localStorage.getItem("studentName");
+  const email = localStorage.getItem("studentEmail");
   const grade = localStorage.getItem("grade");
 
-  if (!studentName || !studentEmail || !grade) {
-    alert("Missing student information. Please log in again.");
+  if (!name || !email || !grade || !subject) {
+    alert("Missing student info. Please log in.");
     window.location.href = "index.html";
     return;
   }
 
-  const subjects = ["math", "ela"];
-  const allQuestions = {};
-  let timerInterval;
+  const file = `${grade}-${subject}.json`;
+  let questions = [];
 
-  async function fetchQuestions(subject) {
-    const file = `${grade}-${subject}.json`;
-    try {
-      const response = await fetch(file);
-      if (!response.ok) throw new Error("File not found");
-      const data = await response.json();
-      const shuffled = data.questions.sort(() => 0.5 - Math.random());
-      allQuestions[subject] = shuffled.slice(0, 30);
-      renderQuestions(subject);
-    } catch (error) {
-      console.error("Failed to load questions:", error);
-      alert(`Could not load ${subject} questions.`);
-    }
+  try {
+    const res = await fetch(file);
+    const data = await res.json();
+    questions = data.questions.sort(() => 0.5 - Math.random()).slice(0, 30);
+    renderQuestions(questions);
+    startTimer(30);
+  } catch (err) {
+    console.error("Question fetch error:", err);
+    alert("Could not load questions.");
   }
 
-  function renderQuestions(subject) {
-    const container = document.getElementById(`${subject}Container`);
-    if (!container) return;
-    const questions = allQuestions[subject];
-    container.innerHTML = questions.map((q, i) => `
-      <div class="mb-4 p-4 bg-white rounded shadow">
+  function renderQuestions(qs) {
+    const container = document.getElementById("questionContainer");
+    container.innerHTML = qs.map((q, i) => `
+      <div class="bg-white p-4 rounded shadow">
         <p class="font-semibold mb-2">${i + 1}. ${q.question}</p>
         ${q.options.map(opt => `
           <label class="block">
-            <input type="radio" name="${subject}-q${i}" value="${opt}" class="mr-2" />
-            ${opt}
-          </label>
-        `).join("")}
+            <input type="radio" name="q${i}" value="${opt}" class="mr-2" />${opt}
+          </label>`).join("")}
       </div>
     `).join("");
   }
 
-  function startTimer(durationMinutes) {
-    let remaining = durationMinutes * 60;
-    const display = document.getElementById("timer");
-    timerInterval = setInterval(() => {
-      const minutes = String(Math.floor(remaining / 60)).padStart(2, "0");
-      const seconds = String(remaining % 60).padStart(2, "0");
-      display.textContent = `Time Left: ${minutes}:${seconds}`;
-      if (--remaining < 0) {
-        clearInterval(timerInterval);
-        alert("Time's up! Submitting test.");
-        handleSubmit();
+  function startTimer(mins) {
+    let time = mins * 60;
+    const timer = document.getElementById("timer");
+    const interval = setInterval(() => {
+      const m = String(Math.floor(time / 60)).padStart(2, "0");
+      const s = String(time % 60).padStart(2, "0");
+      timer.textContent = `Time Left: ${m}:${s}`;
+      if (--time < 0) {
+        clearInterval(interval);
+        alert("Time is up! Submitting...");
+        submitTest();
       }
     }, 1000);
   }
 
-  async function handleSubmit() {
-    clearInterval(timerInterval);
-
-    const answers = {};
-    subjects.forEach(subject => {
-      answers[subject] = allQuestions[subject].map((q, i) => {
-        const selected = document.querySelector(`input[name="${subject}-q${i}"]:checked`);
-        return {
-          question: q.question,
-          selected: selected ? selected.value : "",
-          correct: q.correct_answer
-        };
-      });
+  async function submitTest() {
+    const answers = questions.map((q, i) => {
+      const selected = document.querySelector(`input[name="q${i}"]:checked`);
+      return {
+        question: q.question,
+        selected: selected ? selected.value : "",
+        correct: q.correct_answer
+      };
     });
 
     try {
       await addDoc(collection(db, "student_results"), {
-        name: studentName,
-        email: studentEmail,
+        name,
+        email,
         grade,
-        submittedAt: new Date(),
-        answers
+        subject,
+        answers,
+        submittedAt: new Date()
       });
       localStorage.removeItem("studentName");
       localStorage.removeItem("studentEmail");
       localStorage.removeItem("grade");
       window.location.href = "subject-select.html";
     } catch (err) {
-      console.error("Submission failed:", err);
+      console.error("Submit error:", err);
       alert("Failed to submit. Try again.");
     }
   }
 
-  document.getElementById("submitBtn").addEventListener("click", handleSubmit);
-
-  // Load questions
-  subjects.forEach(fetchQuestions);
-  startTimer(30);
-
-  // Tab functionality
-  const tabs = document.querySelectorAll(".tab");
-  tabs.forEach(tab => {
-    tab.addEventListener("click", () => {
-      const target = tab.dataset.subject;
-      document.querySelectorAll(".subjectTab").forEach(el => el.classList.add("hidden"));
-      document.getElementById(`${target}Container`).classList.remove("hidden");
-    });
-  });
+  document.getElementById("submitBtn").addEventListener("click", submitTest);
 });
