@@ -3,74 +3,51 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>CBT Test | Blooming Kids</title>
+  <title>Student Test - Blooming Kids House</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" />
+  <link rel="stylesheet" href="style.css" />
   <link rel="icon" href="favicon.ico" />
-  <script type="module" src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js"></script>
-  <script type="module" src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js"></script>
-  <script type="module" src="./firebaseConfig.js"></script>
-  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet" />
 </head>
-<body class="bg-white text-gray-800 p-4">
-  <div class="max-w-4xl mx-auto">
-    <h1 class="text-2xl font-bold mb-4 text-green-700">Blooming Kids CBT Test</h1>
-    <p class="mb-4 text-gray-600">Answer the questions below. You have 30 minutes.</p>
-    
-    <div id="questions-container" class="space-y-6"></div>
+<body class="bg-green-50 min-h-screen">
+
+  <div class="max-w-4xl mx-auto p-6">
+    <div class="flex justify-between items-center mb-4">
+      <h1 class="text-xl font-bold text-green-800">Blooming Kids House Test</h1>
+      <button onclick="logout()" class="bg-yellow-400 text-white px-4 py-2 rounded hover:bg-yellow-500">Logout</button>
+    </div>
+
+    <div id="question-container" class="space-y-4">
+      <p class="text-gray-600">Loading questions...</p>
+    </div>
+
+    <div class="mt-6 flex justify-between">
+      <button onclick="submitAnswers()" class="bg-green-600 text-white px-6 py-2 rounded hover:bg-green-700">Submit Test</button>
+    </div>
+
+    <p class="text-xs text-center mt-8 text-gray-600">POWERED BY <span style="color:#FFEB3B">POG</span></p>
   </div>
 
   <script type="module">
-    import { db, collection, getDocs } from './firebaseConfig.js';
+    import { logout } from './utils.js';
+    import { loadQuestions } from './autoQuestionGen.js';
 
     const urlParams = new URLSearchParams(window.location.search);
-    const subject = urlParams.get("subject");
-    const grade = urlParams.get("grade");
-    const fileName = `${grade}-${subject}`.toLowerCase();
-    const localURL = `./questions/${fileName}.json`;
-    const fallbackFirestoreCollection = `${fileName}`;
+    const subject = urlParams.get('subject');
+    const grade = urlParams.get('grade');
 
-    async function fetchQuestions() {
-      try {
-        const res = await fetch(localURL);
-        if (!res.ok) throw new Error("Local file not found");
-        const data = await res.json();
-        displayQuestions(data.questions);
-      } catch (e) {
-        try {
-          const snapshot = await getDocs(collection(db, fallbackFirestoreCollection));
-          const questions = [];
-          snapshot.forEach(doc => questions.push(doc.data()));
-          displayQuestions(questions);
-        } catch (err) {
-          document.getElementById("questions-container").innerHTML = "<p class='text-red-600'>❌ No questions found for this subject/grade.</p>";
-        }
-      }
+    if (!subject || !grade) {
+      alert("Missing subject or grade. Redirecting...");
+      window.location.href = "index.html";
+    } else {
+      loadQuestions(subject, grade);
     }
 
-    function displayQuestions(questions) {
-      const container = document.getElementById("questions-container");
-      if (!questions || questions.length === 0) {
-        container.innerHTML = "<p class='text-red-500'>❌ No questions available.</p>";
-        return;
-      }
-
-      container.innerHTML = questions.map((q, i) => `
-        <div class="p-4 border rounded shadow-sm">
-          <p class="font-medium">${i + 1}. ${q.question}</p>
-          ${q.options.map((opt, j) => `
-            <div class="ml-4 mt-1">
-              <input type="radio" name="q${i}" id="q${i}_${j}" value="${opt}">
-              <label for="q${i}_${j}">${opt}</label>
-            </div>
-          `).join("")}
-        </div>
-      `).join("");
+    window.submitAnswers = function () {
+      alert("Submit button clicked! (Integrate answer collection & scoring logic here)");
     }
 
-    fetchQuestions();
+    window.logout = logout;
   </script>
 
-  <footer class="text-center text-sm text-gray-400 mt-8">
-    POWERED BY <span style="color:#FFEB3B">POG</span>
-  </footer>
 </body>
 </html>
