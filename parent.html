@@ -5,23 +5,38 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Parent Login</title>
   <link rel="icon" href="favicon.ico" />
-  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet" />
-  <script type="module" src="parent.js" defer></script>
+  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
 </head>
-<body class="bg-green-50 min-h-screen flex items-center justify-center p-4">
-  <div class="bg-white rounded-2xl shadow-xl p-8 w-full max-w-md">
-    <h2 class="text-2xl font-bold text-green-700 mb-4 text-center">Parent Access</h2>
-    <form id="parentLoginForm" class="space-y-4">
-      <div>
-        <label class="block text-sm font-medium">Student Name</label>
-        <input type="text" id="studentName" required class="w-full border p-2 rounded" />
-      </div>
-      <div>
-        <label class="block text-sm font-medium">Parent Email</label>
-        <input type="email" id="parentEmail" required class="w-full border p-2 rounded" />
-      </div>
-      <button type="submit" class="w-full bg-yellow-400 hover:bg-yellow-500 text-white py-2 rounded font-semibold">View Report</button>
-    </form>
+<body class="bg-gray-100 flex items-center justify-center min-h-screen p-4">
+  <div class="bg-white rounded-xl shadow-xl p-8 max-w-md w-full">
+    <h1 class="text-2xl font-bold text-center text-green-700 mb-6">Parent Report Access</h1>
+    <div class="space-y-4">
+      <input id="studentName" type="text" placeholder="Student Name" class="w-full p-2 border rounded" />
+      <input id="parentEmail" type="email" placeholder="Parent Email" class="w-full p-2 border rounded" />
+      <button id="loginBtn" class="w-full bg-yellow-400 hover:bg-yellow-500 text-white font-bold py-2 px-4 rounded">
+        View Report
+      </button>
+    </div>
+    <footer class="text-center mt-6 text-sm text-gray-500">
+      POWERED BY <span style="color:#FFEB3B">POG</span>
+    </footer>
   </div>
+
+  <script>
+    document.getElementById("loginBtn").addEventListener("click", () => {
+      const studentName = document.getElementById("studentName").value.trim();
+      const parentEmail = document.getElementById("parentEmail").value.trim();
+
+      if (!studentName || !parentEmail) {
+        alert("Please enter both student name and parent email.");
+        return;
+      }
+
+      localStorage.setItem("studentName", studentName);
+      localStorage.setItem("parentEmail", parentEmail);
+
+      window.location.href = "report.html";
+    });
+  </script>
 </body>
 </html>
