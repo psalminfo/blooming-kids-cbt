@@ -18,7 +18,7 @@
   </header>
 
   <main id="reportContainer" class="w-full max-w-4xl bg-white p-6 rounded shadow space-y-6">
-    <p>Loading report...</p>
+    <p class="text-gray-700">Loading report...</p>
   </main>
 
   <footer class="mt-auto text-center text-sm text-gray-600 pt-8">
@@ -28,13 +28,12 @@
   <script type="module">
     import { db } from './firebaseConfig.js';
     import { collection, query, where, getDocs } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
-    import { auth } from './firebaseConfig.js';
-
+    
     const reportContainer = document.getElementById('reportContainer');
     const downloadBtn = document.getElementById('downloadBtn');
     const logoutBtn = document.getElementById('logoutBtn');
 
-    // Fetch student and parent info from localStorage (set after login)
+    // Get info from localStorage
     const studentName = localStorage.getItem('studentName');
     const parentEmail = localStorage.getItem('parentEmail');
     const grade = localStorage.getItem('grade') || 'N/A';
@@ -42,7 +41,7 @@
 
     if (!studentName || !parentEmail) {
       alert('Missing student or parent information.');
-      window.location.href = 'parent.html';  // Parent login page
+      window.location.href = 'parent.html';
     }
 
     async function fetchResults() {
@@ -55,7 +54,7 @@
         const snapshot = await getDocs(q);
 
         if (snapshot.empty) {
-          reportContainer.innerHTML = '<p class="text-red-600">No reports found for this student.</p>';
+          reportContainer.innerHTML = '<p class="text-red-600 font-semibold">No reports found for this student.</p>';
           downloadBtn.disabled = true;
           return [];
         }
@@ -64,14 +63,14 @@
         snapshot.forEach(doc => results.push(doc.data()));
         return results;
       } catch (err) {
-        reportContainer.innerHTML = `<p class="text-red-600">Error loading report: ${err.message}</p>`;
+        reportContainer.innerHTML = `<p class="text-red-600 font-semibold">Error loading report: ${err.message}</p>`;
         downloadBtn.disabled = true;
         return [];
       }
     }
 
     function renderReport(results) {
-      if (results.length === 0) return;
+      if (!results.length) return;
 
       reportContainer.innerHTML = `
         <section class="mb-6">
@@ -90,18 +89,17 @@
 
             <p class="mt-2 font-semibold">Knowledge Gained:</p>
             <ul class="list-disc list-inside">
-              ${res.knowledge?.map(k => `<li>${k}</li>`).join('') ?? '<li>N/A</li>'}
+              ${(res.knowledge?.length) ? res.knowledge.map(k => `<li>${k}</li>`).join('') : '<li>N/A</li>'}
             </ul>
 
             <p class="mt-2 font-semibold">Skills Developed:</p>
             <ul class="list-disc list-inside">
-              ${res.skills?.map(s => `<li>${s}</li>`).join('') ?? '<li>N/A</li>'}
+              ${(res.skills?.length) ? res.skills.map(s => `<li>${s}</li>`).join('') : '<li>N/A</li>'}
             </ul>
           </section>
         `;
       });
 
-      // Recommendation and director message
       reportContainer.innerHTML += `
         <section class="mb-6">
           <h3 class="font-bold">Recommendation:</h3>
@@ -216,17 +214,13 @@
     }
 
     logoutBtn.addEventListener('click', () => {
-      // Clear local storage and redirect to login
-      localStorage.removeItem('studentName');
-      localStorage.removeItem('parentEmail');
-      localStorage.removeItem('grade');
-      localStorage.removeItem('tutorName');
+      localStorage.clear();
       window.location.href = 'parent.html';
     });
 
     downloadBtn.addEventListener('click', async () => {
       downloadBtn.disabled = true;
-      downloadBtn.textContent = 'Generating...';
+      downloadBtn.textContent = 'Generating PDF...';
       const results = await fetchResults();
       if (results.length > 0) {
         generatePDF(results);
@@ -235,12 +229,11 @@
       downloadBtn.textContent = 'Download PDF';
     });
 
-    // On load, fetch and render report
+    // On load: fetch and render report
     (async () => {
       const results = await fetchResults();
       renderReport(results);
     })();
-
   </script>
 
 </body>
