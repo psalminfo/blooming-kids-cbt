@@ -3,91 +3,50 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Assessment Report – Blooming Kids House</title>
-  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+  <title>Parent Assessment Report</title>
   <link rel="icon" href="favicon.ico" />
-  <script src="https://cdn.jsdelivr.net/npm/pdf-lib/dist/pdf-lib.min.js"></script>
+  <script type="module" src="firebaseConfig.js"></script>
+  <script type="module" src="parent-report.js" defer></script>
+  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
 </head>
-<body class="bg-yellow-50 min-h-screen flex flex-col items-center justify-start pt-10 px-4">
-  <div class="bg-white shadow-2xl rounded-2xl max-w-4xl w-full p-8 space-y-6">
-    <h1 class="text-3xl font-bold text-center text-green-700">BLOOMING KIDS HOUSE ASSESSMENT REPORT</h1>
-    <div id="studentInfo" class="text-center text-gray-700 text-lg font-semibold"></div>
+<body class="bg-gray-100 font-sans min-h-screen flex flex-col items-center justify-start p-6">
 
-    <div id="reportContainer" class="space-y-4 mt-6"></div>
+  <!-- Header -->
+  <header class="w-full max-w-4xl bg-white rounded-xl shadow p-4 mb-6 flex justify-between items-center">
+    <h1 class="text-2xl font-bold text-green-700">Assessment Report</h1>
+    <button id="logoutBtn" class="bg-yellow-400 hover:bg-yellow-500 text-white font-semibold py-2 px-4 rounded">
+      Logout
+    </button>
+  </header>
 
-    <div class="text-center mt-8">
-      <button id="downloadReport" class="bg-green-600 text-white px-6 py-3 rounded-xl hover:bg-green-700 transition font-semibold">Download Report</button>
+  <!-- Report Section -->
+  <section class="w-full max-w-4xl bg-white p-6 rounded-xl shadow-md">
+    <div id="reportContainer">
+      <p class="text-gray-600">Fetching report...</p>
     </div>
-    <p class="text-center text-xs text-gray-400 mt-8">POWERED BY <span style="color:#FFEB3B">POG</span></p>
-  </div>
+  </section>
+
+  <!-- Footer -->
+  <footer class="mt-auto text-center text-sm text-gray-500 pt-6">
+    POWERED BY <span style="color:#FFEB3B">POG</span>
+  </footer>
 
   <script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/9.6.10/firebase-app.js";
-    import { getFirestore, collection, query, where, getDocs } from "https://www.gstatic.com/firebasejs/9.6.10/firebase-firestore.js";
+    import { auth } from './firebaseConfig.js';
 
-    const firebaseConfig = {
-      apiKey: "AIzaSyBpwxvEoeuT8e6F5vGmDc1VkVfWTUdxavY",
-      authDomain: "blooming-kids-house.firebaseapp.com",
-      projectId: "blooming-kids-house",
-      storageBucket: "blooming-kids-house.appspot.com",
-      messagingSenderId: "739684305208",
-      appId: "1:739684305208:web:ee1cc9e998b37e1f002f84"
-    };
+    const logoutBtn = document.getElementById("logoutBtn");
 
-    const app = initializeApp(firebaseConfig);
-    const db = getFirestore(app);
-
-    const params = new URLSearchParams(window.location.search);
-    const studentName = params.get("student");
-    const parentEmail = params.get("email");
-
-    document.getElementById("studentInfo").innerText = `Report for ${studentName}`;
-
-    async function loadReport() {
-      const reportsRef = collection(db, "studentReports");
-      const q = query(reportsRef, where("studentName", "==", studentName), where("parentEmail", "==", parentEmail));
-      const querySnapshot = await getDocs(q);
-
-      const reportContainer = document.getElementById("reportContainer");
-
-      if (querySnapshot.empty) {
-        reportContainer.innerHTML = "<p class='text-center text-red-500'>No report found for this student and email.</p>";
-        return;
-      }
-
-      querySnapshot.forEach((doc) => {
-        const data = doc.data();
-
-        Object.keys(data.subjects || {}).forEach((subject) => {
-          const subjData = data.subjects[subject];
-
-          const block = document.createElement("div");
-          block.className = "border rounded-xl p-4 shadow-sm bg-gray-50";
-
-          const knowledge = subjData.knowledge || {};
-          const skills = subjData.skills || {};
-
-          block.innerHTML = `
-            <h2 class="text-xl font-bold text-green-700 mb-2">${subject}</h2>
-            <p><strong>Score:</strong> ${subjData.score || "N/A"}</p>
-            <div class="mt-3">
-              <h3 class="font-semibold text-gray-700">Knowledge</h3>
-              <ul class="list-disc list-inside text-sm">${Object.entries(knowledge).map(([k, v]) => `<li>${k}: ${v}</li>`).join("")}</ul>
-            </div>
-            <div class="mt-3">
-              <h3 class="font-semibold text-gray-700">Skills</h3>
-              <ul class="list-disc list-inside text-sm">${Object.entries(skills).map(([k, v]) => `<li>${k}: ${v}</li>`).join("")}</ul>
-            </div>
-          `;
-          reportContainer.appendChild(block);
-        });
+    logoutBtn.addEventListener("click", () => {
+      auth.signOut().then(() => {
+        window.location.href = "parent.html"; // 👈 go back to parent login page
       });
-    }
+    });
 
-    loadReport();
-
-    document.getElementById("downloadReport").addEventListener("click", () => {
-      window.print(); // You can replace this with real PDF logic if needed
+    // Optional: redirect if not logged in
+    auth.onAuthStateChanged((user) => {
+      if (!user) {
+        window.location.href = "parent.html";
+      }
     });
   </script>
 </body>
