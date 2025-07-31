@@ -5,8 +5,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Parent Assessment Report</title>
   <link rel="icon" href="favicon.ico" />
-  <script type="module" src="generateReport.js" defer></script>
   <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+  <script type="module" src="generateReport.js" defer></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 </head>
 <body class="bg-gray-100 font-sans min-h-screen flex flex-col items-center justify-start p-4">
 
@@ -20,6 +21,12 @@
   <section id="reportSection" class="w-full max-w-4xl bg-white p-6 rounded-xl shadow-md">
     <p class="text-gray-600 mb-2">Loading report...</p>
     <div id="reportContainer" class="space-y-4"></div>
+
+    <div class="mt-4 text-right">
+      <button id="downloadBtn" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-6 rounded">
+        Download PDF
+      </button>
+    </div>
   </section>
 
   <footer class="mt-auto text-center text-sm text-gray-500 pt-6">
@@ -28,8 +35,6 @@
 
   <script>
     document.getElementById("logoutBtn").addEventListener("click", () => {
-      localStorage.removeItem("studentName");
-      localStorage.removeItem("parentEmail");
       window.location.href = "parent.html";
     });
   </script>
