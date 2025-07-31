@@ -1,46 +1,28 @@
 {
-  "math_questions": {
-    "grade_3": [
-      {
-        "curriculum": "Texas",
-        "question": "Emma has 324 stickers. She gives 137 stickers to her friend. How many stickers does Emma have left?",
-        "type": "multiple-choice",
-        "options": ["A. 187", "B. 197", "C. 177", "D. 167"],
-        "correct_answer": "A",
-        "standard": "TEKS 3.4A"
-      },
-      {
-        "curriculum": "UK",
-        "question": "A bakery sells cupcakes in boxes of 6. If Sarah buys 3 boxes, how many cupcakes does she get?",
-        "type": "multiple-choice",
-        "options": ["A. 12", "B. 15", "C. 18", "D. 21"],
-        "correct_answer": "C",
-        "standard": "Year 3 Number - Multiplication and Division"
-      },
-      {
-        "curriculum": "Canada",
-        "question": "Draw a rectangle with an area of 8 square units on a grid. Explain how you found the dimensions.",
-        "type": "open-ended",
-        "correct_answer": "A rectangle with dimensions 2 units by 4 units has an area of 8 square units. I multiplied the length and width to check: 2 × 4 = 8.",
-        "standard": "Ontario 3.E2.6"
-      },
-      {
-        "curriculum": "Texas",
-        "question": "Which number is shown by (4 × 100) + (6 × 10) + (2 × 1)?",
-        "type": "multiple-choice",
-        "options": ["A. 462", "B. 426", "C. 642", "D. 246"],
-        "correct_answer": "A",
-        "standard": "TEKS 3.2A"
-      },
-      {
-        "curriculum": "UK",
-        "question": "What is the total length of 4 ropes, each 25 cm long?",
-        "type": "multiple-choice",
-        "options": ["A. 75 cm", "B. 100 cm", "C. 125 cm", "D. 150 cm"],
-        "correct_answer": "B",
-        "standard": "Year 3 Measurement"
-      }
-      // ... (continue other questions using the same format, inside the array)
-    ]
-  }
+  "questions": [
+    {
+      "curriculum": "Texas",
+      "question": "What is 25 + 47?",
+      "type": "multiple-choice",
+      "options": ["A. 62", "B. 72", "C. 74", "D. 75"],
+      "correct_answer": "C",
+      "standard": "TEKS 3.4A"
+    },
+    {
+      "curriculum": "UK",
+      "question": "How many sides does a hexagon have?",
+      "type": "multiple-choice",
+      "options": ["A. 5", "B. 6", "C. 7", "D. 8"],
+      "correct_answer": "B",
+      "standard": "Year 3 Geometry"
+    },
+    {
+      "curriculum": "Canada",
+      "question": "Which number is the smallest?",
+      "type": "multiple-choice",
+      "options": ["A. 32", "B. 23", "C. 43", "D. 34"],
+      "correct_answer": "B",
+      "standard": "Ontario 3.NS1.2"
+    }
+  ]
 }
