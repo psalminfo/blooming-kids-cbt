@@ -1,46 +1,55 @@
 // autoQuestionGen.js
-import { getDocs, collection } from './firebaseConfig.js';
+import { db, collection, getDocs } from "./firebaseConfig.js";
+
+const GITHUB_BASE = "https://raw.githubusercontent.com/psalminfo/blooming-kids-cbt/main/questions";
 
 export async function loadQuestions(subject, grade) {
-  const questionFileName = `${grade}-${subject}.json`;
-  const githubUrl = `https://raw.githubusercontent.com/psalminfo/blooming-kids-cbt/main/questions/${questionFileName}`;
+  const questionContainer = document.getElementById("question-container");
+  questionContainer.innerHTML = `<p class="text-gray-600">Loading questions...</p>`;
 
-  let githubQuestions = [];
-  let firebaseQuestions = [];
+  const filename = `${grade}-${subject}`.toLowerCase();
+  const githubURL = `${GITHUB_BASE}/${filename}.json`;
 
-  // Load from GitHub
   try {
-    const res = await fetch(githubUrl);
+    const res = await fetch(githubURL);
     if (!res.ok) throw new Error("GitHub fetch failed");
     const data = await res.json();
-    if (data.questions && Array.isArray(data.questions)) {
-      githubQuestions = data.questions;
+    displayQuestions(data.questions);
+  } catch (err) {
+    console.warn("GitHub failed, trying Firebase...", err);
+    try {
+      const snapshot = await getDocs(collection(db, "questions"));
+      const questions = [];
+      snapshot.forEach(doc => {
+        const q = doc.data();
+        if (q.subject === subject && q.grade == grade) {
+          questions.push(q);
+        }
+      });
+      displayQuestions(questions);
+    } catch (fbErr) {
+      questionContainer.innerHTML = `<p class="text-red-600">❌ Could not load questions.</p>`;
+      console.error("Firebase error:", fbErr);
     }
-  } catch (err) {
-    console.error("GitHub fetch failed:", err);
+  }
+}
+
+function displayQuestions(questions) {
+  const container = document.getElementById("question-container");
+  if (!questions || questions.length === 0) {
+    container.innerHTML = `<p class="text-red-600">❌ No questions available.</p>`;
+    return;
   }
 
-  // Load from Firebase
-  try {
-    const snapshot = await getDocs(collection(window.db, 'questions'));
-    snapshot.forEach(doc => {
-      const q = doc.data();
-      if (q.grade === grade && q.subject === subject) {
-        githubQuestions.push(q); // Append admin questions too
-      }
-    });
-  } catch (err) {
-    console.error("Firebase fetch failed:", err);
-  }
-
-  // Filter valid questions only
-  const valid = githubQuestions.filter(q =>
-    q.question && q.type && q.correct_answer && (q.type === 'open-ended' || (Array.isArray(q.options) && q.options.length))
-  );
-
-  if (valid.length === 0) throw new Error("No valid questions found");
-
-  // Randomly select 30
-  const selected = valid.sort(() => 0.5 - Math.random()).slice(0, 30);
-  return selected;
+  container.innerHTML = questions.map((q, i) => `
+    <div class="bg-white border border-gray-200 p-4 rounded shadow">
+      <p class="font-medium mb-2">${i + 1}. ${q.question}</p>
+      ${q.options.map((opt, j) => `
+        <label class="block ml-4 mb-1">
+          <input type="radio" name="q${i}" value="${opt}" class="mr-2">
+          ${opt}
+        </label>
+      `).join("")}
+    </div>
+  `).join("");
 }
