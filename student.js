@@ -1,95 +1,111 @@
 // student.js
-import { db, collection, addDoc } from './firebaseConfig.js';
+import { db, collection, addDoc } from "./firebaseConfig.js";
 
-const form = document.getElementById('testForm');
-const questionsContainer = document.getElementById('questionsContainer');
-const timerEl = document.getElementById('timer');
+document.addEventListener("DOMContentLoaded", () => {
+  const studentName = localStorage.getItem("studentName");
+  const studentEmail = localStorage.getItem("studentEmail");
+  const grade = localStorage.getItem("grade");
 
-let allQuestions = [];
-let selectedSubject = 'Math';
-let remainingTime = 30 * 60; // 30 minutes in seconds
+  if (!studentName || !studentEmail || !grade) {
+    alert("Missing student information. Please log in again.");
+    window.location.href = "index.html";
+    return;
+  }
 
-function startTimer() {
-  const interval = setInterval(() => {
-    const minutes = Math.floor(remainingTime / 60);
-    const seconds = remainingTime % 60;
-    timerEl.textContent = `${minutes}:${seconds.toString().padStart(2, '0')}`;
-    remainingTime--;
-    if (remainingTime < 0) {
-      clearInterval(interval);
-      submitTest();
+  const subjects = ["math", "ela"];
+  const allQuestions = {};
+  let timerInterval;
+
+  async function fetchQuestions(subject) {
+    const file = `${grade}-${subject}.json`; // Same folder
+    try {
+      const response = await fetch(file);
+      if (!response.ok) throw new Error("Network error");
+      const data = await response.json();
+      const shuffled = data.questions.sort(() => 0.5 - Math.random());
+      allQuestions[subject] = shuffled.slice(0, 30);
+      renderQuestions(subject);
+    } catch (error) {
+      console.error("Failed to load questions:", error);
+      alert("Error loading questions for " + subject);
     }
-  }, 1000);
-}
-
-async function fetchQuestions(subject) {
-  try {
-    const url = `https://raw.githubusercontent.com/psalminfo/blooming-kids-cbt/main/3-${subject.toLowerCase()}.json`;
-    const response = await fetch(url);
-    const data = await response.json();
-    allQuestions = data.questions.sort(() => 0.5 - Math.random()).slice(0, 30);
-    renderQuestions();
-  } catch (err) {
-    console.error('Failed to load questions:', err);
   }
-}
 
-function renderQuestions() {
-  questionsContainer.innerHTML = '';
-  allQuestions.forEach((q, index) => {
-    const questionEl = document.createElement('div');
-    questionEl.classList.add('border', 'p-4', 'rounded', 'shadow-sm');
+  function renderQuestions(subject) {
+    const container = document.getElementById(`${subject}Container`);
+    if (!container) {
+      console.error(`Missing container for subject: ${subject}`);
+      return;
+    }
 
-    const optionsHTML = q.options.map(option => `
-      <label class="block">
-        <input type="radio" name="q${index}" value="${option}" class="mr-2">
-        ${option}
-      </label>
-    `).join('');
+    const questions = allQuestions[subject];
+    container.innerHTML = questions.map((q, i) => `
+      <div class="mb-4 p-4 bg-white rounded shadow">
+        <p class="font-semibold mb-2">${i + 1}. ${q.question}</p>
+        ${q.options.map(opt => `
+          <label class="block">
+            <input type="radio" name="${subject}-q${i}" value="${opt}" class="mr-2" />
+            ${opt}
+          </label>
+        `).join("")}
+      </div>
+    `).join("");
+  }
 
-    questionEl.innerHTML = `
-      <p class="font-medium mb-2">${index + 1}. ${q.question}</p>
-      ${optionsHTML}
-    `;
+  function startTimer(durationMinutes) {
+    let remaining = durationMinutes * 60;
+    const display = document.getElementById("timer");
+    timerInterval = setInterval(() => {
+      const minutes = Math.floor(remaining / 60).toString().padStart(2, "0");
+      const seconds = (remaining % 60).toString().padStart(2, "0");
+      display.textContent = `Time Left: ${minutes}:${seconds}`;
+      if (--remaining < 0) {
+        clearInterval(timerInterval);
+        alert("Time's up! Submitting test.");
+        handleSubmit();
+      }
+    }, 1000);
+  }
 
-    questionsContainer.appendChild(questionEl);
-  });
-}
+  async function handleSubmit() {
+    clearInterval(timerInterval);
 
-async function submitTest() {
-  const answers = {};
-  allQuestions.forEach((q, i) => {
-    const selected = document.querySelector(`input[name=q${i}]:checked`);
-    answers[`q${i + 1}`] = selected ? selected.value : "";
-  });
-
-  try {
-    await addDoc(collection(db, "student-submissions"), {
-      subject: selectedSubject,
-      timestamp: new Date(),
-      answers,
+    const answers = {};
+    subjects.forEach(subject => {
+      answers[subject] = allQuestions[subject].map((q, i) => {
+        const selected = document.querySelector(`input[name="${subject}-q${i}"]:checked`);
+        return {
+          question: q.question,
+          selected: selected ? selected.value : "",
+          correct: q.correct_answer
+        };
+      });
     });
-    window.location.href = 'subject-select.html';
-  } catch (e) {
-    console.error("Error submitting test:", e);
-    alert("Submission failed. Please try again.");
+
+    try {
+      await addDoc(collection(db, "student_results"), {
+        name: studentName,
+        email: studentEmail,
+        grade: grade,
+        submittedAt: new Date(),
+        answers: answers
+      });
+      localStorage.removeItem("studentName");
+      localStorage.removeItem("studentEmail");
+      localStorage.removeItem("grade");
+      window.location.href = "subject-select.html";
+    } catch (error) {
+      console.error("Submission error:", error);
+      alert("Failed to submit test. Please try again.");
+    }
   }
-}
 
-form.addEventListener('submit', (e) => {
-  e.preventDefault();
-  submitTest();
+  // Attach to button
+  document.getElementById("submitBtn").addEventListener("click", handleSubmit);
+
+  // Load all subjects
+  subjects.forEach(fetchQuestions);
+
+  // Start 30-minute timer
+  startTimer(30);
 });
-
-document.querySelectorAll('.tab-btn').forEach(btn => {
-  btn.addEventListener('click', () => {
-    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('bg-green-600', 'text-white'));
-    btn.classList.add('bg-green-600', 'text-white');
-    selectedSubject = btn.dataset.subject;
-    fetchQuestions(selectedSubject);
-  });
-});
-
-// Initial load
-fetchQuestions(selectedSubject);
-startTimer();
