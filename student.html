@@ -2,64 +2,121 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Student Test - Blooming Kids House</title>
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" />
-  <link rel="stylesheet" href="style.css" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Blooming Kids Test</title>
   <link rel="icon" href="favicon.ico" />
+  <script type="module" src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js"></script>
+  <script type="module" src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js"></script>
+  <script type="module" src="./firebaseConfig.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
 </head>
-<body class="bg-green-50 min-h-screen">
-
+<body class="bg-green-50 text-gray-800">
   <div class="max-w-4xl mx-auto p-6">
     <div class="flex justify-between items-center mb-4">
-      <h1 class="text-xl font-bold text-green-800">Blooming Kids House Test</h1>
-      <button onclick="logout()" class="bg-yellow-400 text-white px-4 py-2 rounded hover:bg-yellow-500">Logout</button>
+      <h1 class="text-3xl font-bold text-green-700">Blooming Kids House Assessment</h1>
+      <button onclick="logout()" class="bg-yellow-400 text-green-900 font-semibold px-4 py-2 rounded shadow">Logout</button>
+    </div>
+    <div class="mb-4">
+      <p class="text-lg"><strong>Student:</strong> <span id="studentNameDisplay"></span></p>
+      <p class="text-lg"><strong>Subject:</strong> <span id="subjectDisplay"></span></p>
     </div>
 
-    <div id="question-container" class="space-y-4">
-      <p class="text-gray-600">Loading questions...</p>
-    </div>
+    <form id="questionForm" class="space-y-6"></form>
 
-    <div class="mt-6 flex justify-between">
-      <button onclick="submitAnswers()" class="bg-green-600 text-white px-6 py-2 rounded hover:bg-green-700">Submit Test</button>
+    <div class="mt-8 text-center">
+      <button id="submitBtn" class="bg-green-700 hover:bg-green-800 text-white px-6 py-2 rounded-lg text-lg font-semibold shadow-lg">
+        Submit Test
+      </button>
     </div>
-
-    <p class="text-xs text-center mt-8 text-gray-600">POWERED BY <span style="color:#FFEB3B">POG</span></p>
   </div>
 
   <script type="module">
-    import { logout } from './utils.js';
-    import { loadQuestions } from './autoQuestionGen.js';
+    import { db, collection, addDoc, serverTimestamp } from './firebaseConfig.js';
 
     const urlParams = new URLSearchParams(window.location.search);
-    const subject = urlParams.get('subject');
-    const grade = urlParams.get('grade');
+    const studentName = urlParams.get("name");
+    const parentEmail = urlParams.get("email");
+    const tutorName = urlParams.get("tutor");
+    const location = urlParams.get("location");
+    const grade = urlParams.get("grade");
+    const subject = urlParams.get("subject");
 
-    if (!subject || !grade) {
-      alert("Missing subject or grade. Redirecting...");
-      window.location.href = "index.html";
-    } else {
-      loadQuestions(subject, grade);
+    document.getElementById("studentNameDisplay").textContent = studentName;
+    document.getElementById("subjectDisplay").textContent = subject.toUpperCase();
+
+    const form = document.getElementById("questionForm");
+    let questions = [];
+
+    fetch(`https://raw.githubusercontent.com/psalminfo/blooming-kids-cbt/main/${grade}-${subject}.json`)
+      .then(res => res.json())
+      .then(data => {
+        questions = shuffleArray(data.questions).slice(0, 30);
+        renderQuestions(questions);
+      })
+      .catch(err => {
+        console.error("Failed to load questions", err);
+        form.innerHTML = `<p class="text-red-500 font-semibold">Error loading questions. Please try again.</p>`;
+      });
+
+    function shuffleArray(array) {
+      return [...array].sort(() => Math.random() - 0.5);
     }
 
-    // ✅ Finalized submit function (no score, clean redirect)
-    window.submitAnswers = function () {
-      const container = document.getElementById("question-container");
-      if (container) {
-        container.innerHTML = `
-          <div class="text-center p-6 text-green-700 font-semibold text-xl">
-            ✅ Submitted. Redirecting...
+    function renderQuestions(questions) {
+      form.innerHTML = '';
+      questions.forEach((q, index) => {
+        const optionsHtml = q.options.map((opt, i) => `
+          <label class="block">
+            <input type="radio" name="q${index}" value="${opt}" class="mr-2" />
+            ${opt}
+          </label>
+        `).join('');
+        form.innerHTML += `
+          <div class="bg-white shadow p-4 rounded-lg border">
+            <p class="font-medium mb-2">Q${index + 1}: ${q.question}</p>
+            <div class="pl-4 space-y-1">${optionsHtml}</div>
           </div>
         `;
-      }
-
-      setTimeout(() => {
-        window.location.href = "subject-select.html";
-      }, 1500);
+      });
     }
 
-    window.logout = logout;
-  </script>
+    async function submitAnswers() {
+      const answers = questions.map((q, i) => {
+        const selected = document.querySelector(`input[name="q${i}"]:checked`);
+        return {
+          question: q.question,
+          selectedAnswer: selected ? selected.value : "No Answer",
+          correctAnswer: q.correct_answer
+        };
+      });
 
+      try {
+        await addDoc(collection(db, "student_reports"), {
+          studentName,
+          parentEmail,
+          tutorName,
+          location,
+          grade,
+          subject,
+          timestamp: serverTimestamp(),
+          answers
+        });
+
+        window.location.href = `subject-select.html?name=${studentName}&email=${parentEmail}&tutor=${tutorName}&location=${location}&grade=${grade}`;
+      } catch (error) {
+        console.error("Error saving test:", error);
+        alert("Something went wrong while saving your test. Please try again.");
+      }
+    }
+
+    document.getElementById("submitBtn").addEventListener("click", (e) => {
+      e.preventDefault();
+      submitAnswers();
+    });
+
+    function logout() {
+      window.location.href = "index.html";
+    }
+  </script>
 </body>
 </html>
