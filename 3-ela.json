@@ -1,0 +1,244 @@
+{
+  "questions": [
+    {
+      "question": "What is the correct spelling of the word that means 'happy'?",
+      "type": "multiple-choice",
+      "options": ["Hapy", "Happie", "Happy", "Hapey"],
+      "correct_answer": "Happy"
+    },
+    {
+      "question": "Which word is a noun?",
+      "type": "multiple-choice",
+      "options": ["Run", "Big", "Dog", "Fast"],
+      "correct_answer": "Dog"
+    },
+    {
+      "question": "What is the opposite of 'big'?",
+      "type": "multiple-choice",
+      "options": ["Tall", "Small", "Wide", "Long"],
+      "correct_answer": "Small"
+    },
+    {
+      "question": "Which sentence is complete?",
+      "type": "multiple-choice",
+      "options": ["The cat.", "Jumps high.", "The cat jumps high.", "Cat high."],
+      "correct_answer": "The cat jumps high."
+    },
+    {
+      "question": "What punctuation mark goes at the end of a question?",
+      "type": "multiple-choice",
+      "options": ["Period", "Comma", "Question mark", "Exclamation point"],
+      "correct_answer": "Question mark"
+    },
+    {
+      "question": "Which word is a verb?",
+      "type": "multiple-choice",
+      "options": ["Tree", "Sing", "Blue", "Cloud"],
+      "correct_answer": "Sing"
+    },
+    {
+      "question": "What is the plural of 'book'?",
+      "type": "multiple-choice",
+      "options": ["Books", "Bookes", "Bookies", "Book"],
+      "correct_answer": "Books"
+    },
+    {
+      "question": "Which word rhymes with 'hat'?",
+      "type": "multiple-choice",
+      "options": ["Car", "Cat", "Dog", "Sun"],
+      "correct_answer": "Cat"
+    },
+    {
+      "question": "What is the correct form of the verb in 'She ___ to school'?",
+      "type": "multiple-choice",
+      "options": ["Walk", "Walks", "Walking", "Walked"],
+      "correct_answer": "Walks"
+    },
+    {
+      "question": "Which word is an adjective?",
+      "type": "multiple-choice",
+      "options": ["Run", "Happy", "Ball", "Jump"],
+      "correct_answer": "Happy"
+    },
+    {
+      "question": "What does the word 'brave' mean?",
+      "type": "multiple-choice",
+      "options": ["Scared", "Courageous", "Tired", "Sad"],
+      "correct_answer": "Courageous"
+    },
+    {
+      "question": "Which sentence uses a capital letter correctly?",
+      "type": "multiple-choice",
+      "options": ["the dog barks.", "The dog barks.", "the Dog barks.", "The dog Barks."],
+      "correct_answer": "The dog barks."
+    },
+    {
+      "question": "What is the past tense of 'jump'?",
+      "type": "multiple-choice",
+      "options": ["Jumps", "Jumping", "Jumped", "Jumper"],
+      "correct_answer": "Jumped"
+    },
+    {
+      "question": "Which word is a synonym for 'small'?",
+      "type": "multiple-choice",
+      "options": ["Big", "Tiny", "Tall", "Wide"],
+      "correct_answer": "Tiny"
+    },
+    {
+      "question": "What punctuation mark shows excitement?",
+      "type": "multiple-choice",
+      "options": ["Comma", "Period", "Question mark", "Exclamation point"],
+      "correct_answer": "Exclamation point"
+    },
+    {
+      "question": "Which word is a pronoun?",
+      "type": "multiple-choice",
+      "options": ["Tree", "She", "Run", "Big"],
+      "correct_answer": "She"
+    },
+    {
+      "question": "What is the plural of 'child'?",
+      "type": "multiple-choice",
+      "options": ["Childs", "Childes", "Children", "Child"],
+      "correct_answer": "Children"
+    },
+    {
+      "question": "Which word completes the sentence: 'The ___ is red.'?",
+      "type": "multiple-choice",
+      "options": ["Apple", "Run", "Big", "Sing"],
+      "correct_answer": "Apple"
+    },
+    {
+      "question": "What is the opposite of 'hot'?",
+      "type": "multiple-choice",
+      "options": ["Warm", "Cold", "Cool", "Boiling"],
+      "correct_answer": "Cold"
+    },
+    {
+      "question": "Which sentence is a question?",
+      "type": "multiple-choice",
+      "options": ["The dog runs.", "Run fast!", "Is the dog fast?", "The dog is fast."],
+      "correct_answer": "Is the dog fast?"
+    },
+    {
+      "question": "What is the correct spelling of the word for a flying animal?",
+      "type": "multiple-choice",
+      "options": ["Brid", "Bird", "Berd", "Burdy"],
+      "correct_answer": "Bird"
+    },
+    {
+      "question": "Which word is an adverb?",
+      "type": "multiple-choice",
+      "options": ["Quickly", "Dog", "Red", "Tree"],
+      "correct_answer": "Quickly"
+    },
+    {
+      "question": "What does the word 'kind' mean?",
+      "type": "multiple-choice",
+      "options": ["Mean", "Nice", "Tall", "Fast"],
+      "correct_answer": "Nice"
+    },
+    {
+      "question": "Which sentence uses commas correctly?",
+      "type": "multiple-choice",
+      "options": ["I like apples bananas, and oranges.", "I like apples, bananas, and oranges.", "I like apples bananas and oranges.", "I like, apples, bananas, and oranges."],
+      "correct_answer": "I like apples, bananas, and oranges."
+    },
+    {
+      "question": "What is the past tense of 'run'?",
+      "type": "multiple-choice",
+      "options": ["Runs", "Running", "Ran", "Runner"],
+      "correct_answer": "Ran"
+    },
+    {
+      "question": "Which word rhymes with 'moon'?",
+      "type": "multiple-choice",
+      "options": ["Sun", "Star", "Spoon", "Cloud"],
+      "correct_answer": "Spoon"
+    },
+    {
+      "question": "What is the correct form of the verb in 'They ___ happy'?",
+      "type": "multiple-choice",
+      "options": ["Is", "Are", "Was", "Be"],
+      "correct_answer": "Are"
+    },
+    {
+      "question": "Which word is a synonym for 'happy'?",
+      "type": "multiple-choice",
+      "options": ["Sad", "Joyful", "Angry", "Tired"],
+      "correct_answer": "Joyful"
+    },
+    {
+      "question": "What punctuation mark separates items in a list?",
+      "type": "multiple-choice",
+      "options": ["Period", "Comma", "Question mark", "Exclamation point"],
+      "correct_answer": "Comma"
+    },
+    {
+      "question": "Which word is a noun?",
+      "type": "multiple-choice",
+      "options": ["Jump", "Fast", "Star", "Sing"],
+      "correct_answer": "Star"
+    },
+    {
+      "question": "What is the opposite of 'fast'?",
+      "type": "multiple-choice",
+      "options": ["Quick", "Slow", "Speedy", "Rapid"],
+      "correct_answer": "Slow"
+    },
+    {
+      "question": "Which sentence is an exclamation?",
+      "type": "multiple-choice",
+      "options": ["The cat sleeps.", "What a big cat!", "Is the cat big?", "The cat is big."],
+      "correct_answer": "What a big cat!"
+    },
+    {
+      "question": "What is the plural of 'box'?",
+      "type": "multiple-choice",
+      "options": ["Boxs", "Boxes", "Boxies", "Box"],
+      "correct_answer": "Boxes"
+    },
+    {
+      "question": "Which word completes the sentence: 'I ___ a book.'?",
+      "type": "multiple-choice",
+      "options": ["Read", "Big", "Tree", "Blue"],
+      "correct_answer": "Read"
+    },
+    {
+      "question": "What does the word 'tall' describe?",
+      "type": "multiple-choice",
+      "options": ["A smell", "A height", "A taste", "A sound"],
+      "correct_answer": "A height"
+    },
+    {
+      "question": "Which word is a verb?",
+      "type": "multiple-choice",
+      "options": ["Cloud", "Dance", "Red", "Hill"],
+      "correct_answer": "Dance"
+    },
+    {
+      "question": "What is the correct spelling of the word for a young cat?",
+      "type": "multiple-choice",
+      "options": ["Kiten", "Kittin", "Kitten", "Kitin"],
+      "correct_answer": "Kitten"
+    },
+    {
+      "question": "Which word is a pronoun?",
+      "type": "multiple-choice",
+      "options": ["Big", "He", "Run", "Tree"],
+      "correct_answer": "He"
+    },
+    {
+      "question": "What is the past tense of 'sing'?",
+      "type": "multiple-choice",
+      "options": ["Sings", "Singing", "Sang", "Singer"],
+      "correct_answer": "Sang"
+    },
+    {
+      "question": "Which word rhymes with 'cake'?",
+      "type": "multiple-choice",
+      "options": ["Hat", "Lake", "Dog", "Sun"],
+      "correct_answer": "Lake"
+    }
+  ]
+}
