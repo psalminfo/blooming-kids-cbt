@@ -2,7 +2,7 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import { getFirestore, collection, addDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-const firebaseConfig = {
+export const firebaseConfig = {
   apiKey: "AIzaSyBpwxvEoeuT8e6F5vGmDc1VkVfWTUdxavY",
   authDomain: "blooming-kids-house.firebaseapp.com",
   projectId: "blooming-kids-house",
@@ -11,7 +11,6 @@ const firebaseConfig = {
   appId: "1:739684305208:web:ee1cc9e998b37e1f002f84"
 };
 
-const app = initializeApp(firebaseConfig);
-const db = getFirestore(app);
-
-export { db, collection, addDoc };
+export const app = initializeApp(firebaseConfig);
+export const db = getFirestore(app);
+export { collection, addDoc };
