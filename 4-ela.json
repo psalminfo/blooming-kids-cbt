@@ -1,0 +1,444 @@
+{
+  "questions": [
+    {
+      "question": "Read the passage and answer the questions that follow.\n\n**Passage:**\n\nMaria stepped into the library with excitement. Her favorite author had released a new book, and she couldn\u2019t wait to dive into it. She walked quickly to the fiction section, scanning the shelves until her eyes landed on the bright red cover. Clutching the book to her chest, she hurried to the checkout desk.\n\n**Why was Maria excited to go to the library?**",
+      "type": "multiple-choice",
+      "options": [
+        "She wanted to study for a test.",
+        "Her favorite author had released a new book.",
+        "She had never been to the library before.",
+        "She was meeting her friend there."
+      ],
+      "correct_answer": "Her favorite author had released a new book."
+    },
+    {
+      "question": "What does the word 'clutching' most likely mean as used in the passage?",
+      "type": "multiple-choice",
+      "options": [
+        "Throwing something away",
+        "Holding something tightly",
+        "Dropping something suddenly",
+        "Losing grip of something"
+      ],
+      "correct_answer": "Holding something tightly"
+    },
+    {
+      "question": "Which of the following best describes the main idea of the passage?",
+      "type": "multiple-choice",
+      "options": [
+        "Maria enjoys reading and is excited about a new book.",
+        "Maria is late for her class at the library.",
+        "The library is a confusing place to find books.",
+        "Maria doesn\u2019t like reading fiction books."
+      ],
+      "correct_answer": "Maria enjoys reading and is excited about a new book."
+    },
+    {
+      "question": "Which sentence is written correctly?",
+      "type": "multiple-choice",
+      "options": [
+        "my Mom went to the store yesterday.",
+        "My mom went to the Store yesterday.",
+        "My mom went to the store yesterday.",
+        "my mom Went to the store yesterday."
+      ],
+      "correct_answer": "My mom went to the store yesterday."
+    },
+    {
+      "question": "Which word is a synonym for **happy**?",
+      "type": "multiple-choice",
+      "options": [
+        "Sad",
+        "Angry",
+        "Joyful",
+        "Tired"
+      ],
+      "correct_answer": "Joyful"
+    },
+    {
+      "question": "Choose the sentence that uses the correct punctuation.",
+      "type": "multiple-choice",
+      "options": [
+        "Can you help me clean my room?",
+        "Can you help me clean my room.",
+        "Can you help me clean my room!",
+        "Can you help me clean my room,"
+      ],
+      "correct_answer": "Can you help me clean my room?"
+    },
+    {
+      "question": "Which word in the sentence is a **noun**? _The dog barked loudly at the stranger._",
+      "type": "multiple-choice",
+      "options": [
+        "barked",
+        "loudly",
+        "dog",
+        "at"
+      ],
+      "correct_answer": "dog"
+    },
+    {
+      "question": "Which sentence is written in the **past tense**?",
+      "type": "multiple-choice",
+      "options": [
+        "She walks to school every day.",
+        "She will walk to school tomorrow.",
+        "She is walking to school now.",
+        "She walked to school yesterday."
+      ],
+      "correct_answer": "She walked to school yesterday."
+    },
+    {
+      "question": "Which sentence shows **cause and effect**?",
+      "type": "multiple-choice",
+      "options": [
+        "Tom read a book.",
+        "Tom forgot his umbrella, so he got wet.",
+        "Tom ran fast.",
+        "Tom likes pizza."
+      ],
+      "correct_answer": "Tom forgot his umbrella, so he got wet."
+    },
+    {
+      "question": "What is the correct contraction for _they are_?",
+      "type": "multiple-choice",
+      "options": [
+        "There",
+        "Their",
+        "They're",
+        "Theirs"
+      ],
+      "correct_answer": "They're"
+    },
+    {
+      "question": "Read the passage and answer the questions that follow.\n\n**Passage:**\n\nMaria stepped into the library with excitement. Her favorite author had released a new book, and she couldn\u2019t wait to dive into it. She walked quickly to the fiction section, scanning the shelves until her eyes landed on the bright red cover. Clutching the book to her chest, she hurried to the checkout desk.\n\n**Why was Maria excited to go to the library?**",
+      "type": "multiple-choice",
+      "options": [
+        "She wanted to study for a test.",
+        "Her favorite author had released a new book.",
+        "She had never been to the library before.",
+        "She was meeting her friend there."
+      ],
+      "correct_answer": "Her favorite author had released a new book."
+    },
+    {
+      "question": "What does the word 'clutching' most likely mean as used in the passage?",
+      "type": "multiple-choice",
+      "options": [
+        "Throwing something away",
+        "Holding something tightly",
+        "Dropping something suddenly",
+        "Losing grip of something"
+      ],
+      "correct_answer": "Holding something tightly"
+    },
+    {
+      "question": "Which of the following best describes the main idea of the passage?",
+      "type": "multiple-choice",
+      "options": [
+        "Maria enjoys reading and is excited about a new book.",
+        "Maria is late for her class at the library.",
+        "The library is a confusing place to find books.",
+        "Maria doesn\u2019t like reading fiction books."
+      ],
+      "correct_answer": "Maria enjoys reading and is excited about a new book."
+    },
+    {
+      "question": "Which sentence is written correctly?",
+      "type": "multiple-choice",
+      "options": [
+        "my Mom went to the store yesterday.",
+        "My mom went to the Store yesterday.",
+        "My mom went to the store yesterday.",
+        "my mom Went to the store yesterday."
+      ],
+      "correct_answer": "My mom went to the store yesterday."
+    },
+    {
+      "question": "Which word is a synonym for **happy**?",
+      "type": "multiple-choice",
+      "options": [
+        "Sad",
+        "Angry",
+        "Joyful",
+        "Tired"
+      ],
+      "correct_answer": "Joyful"
+    },
+    {
+      "question": "Choose the sentence that uses the correct punctuation.",
+      "type": "multiple-choice",
+      "options": [
+        "Can you help me clean my room?",
+        "Can you help me clean my room.",
+        "Can you help me clean my room!",
+        "Can you help me clean my room,"
+      ],
+      "correct_answer": "Can you help me clean my room?"
+    },
+    {
+      "question": "Which word in the sentence is a **noun**? _The dog barked loudly at the stranger._",
+      "type": "multiple-choice",
+      "options": [
+        "barked",
+        "loudly",
+        "dog",
+        "at"
+      ],
+      "correct_answer": "dog"
+    },
+    {
+      "question": "Which sentence is written in the **past tense**?",
+      "type": "multiple-choice",
+      "options": [
+        "She walks to school every day.",
+        "She will walk to school tomorrow.",
+        "She is walking to school now.",
+        "She walked to school yesterday."
+      ],
+      "correct_answer": "She walked to school yesterday."
+    },
+    {
+      "question": "Which sentence shows **cause and effect**?",
+      "type": "multiple-choice",
+      "options": [
+        "Tom read a book.",
+        "Tom forgot his umbrella, so he got wet.",
+        "Tom ran fast.",
+        "Tom likes pizza."
+      ],
+      "correct_answer": "Tom forgot his umbrella, so he got wet."
+    },
+    {
+      "question": "What is the correct contraction for _they are_?",
+      "type": "multiple-choice",
+      "options": [
+        "There",
+        "Their",
+        "They're",
+        "Theirs"
+      ],
+      "correct_answer": "They're"
+    },
+    {
+      "question": "Read the passage and answer the questions that follow.\n\n**Passage:**\n\nMaria stepped into the library with excitement. Her favorite author had released a new book, and she couldn\u2019t wait to dive into it. She walked quickly to the fiction section, scanning the shelves until her eyes landed on the bright red cover. Clutching the book to her chest, she hurried to the checkout desk.\n\n**Why was Maria excited to go to the library?**",
+      "type": "multiple-choice",
+      "options": [
+        "She wanted to study for a test.",
+        "Her favorite author had released a new book.",
+        "She had never been to the library before.",
+        "She was meeting her friend there."
+      ],
+      "correct_answer": "Her favorite author had released a new book."
+    },
+    {
+      "question": "What does the word 'clutching' most likely mean as used in the passage?",
+      "type": "multiple-choice",
+      "options": [
+        "Throwing something away",
+        "Holding something tightly",
+        "Dropping something suddenly",
+        "Losing grip of something"
+      ],
+      "correct_answer": "Holding something tightly"
+    },
+    {
+      "question": "Which of the following best describes the main idea of the passage?",
+      "type": "multiple-choice",
+      "options": [
+        "Maria enjoys reading and is excited about a new book.",
+        "Maria is late for her class at the library.",
+        "The library is a confusing place to find books.",
+        "Maria doesn\u2019t like reading fiction books."
+      ],
+      "correct_answer": "Maria enjoys reading and is excited about a new book."
+    },
+    {
+      "question": "Which sentence is written correctly?",
+      "type": "multiple-choice",
+      "options": [
+        "my Mom went to the store yesterday.",
+        "My mom went to the Store yesterday.",
+        "My mom went to the store yesterday.",
+        "my mom Went to the store yesterday."
+      ],
+      "correct_answer": "My mom went to the store yesterday."
+    },
+    {
+      "question": "Which word is a synonym for **happy**?",
+      "type": "multiple-choice",
+      "options": [
+        "Sad",
+        "Angry",
+        "Joyful",
+        "Tired"
+      ],
+      "correct_answer": "Joyful"
+    },
+    {
+      "question": "Choose the sentence that uses the correct punctuation.",
+      "type": "multiple-choice",
+      "options": [
+        "Can you help me clean my room?",
+        "Can you help me clean my room.",
+        "Can you help me clean my room!",
+        "Can you help me clean my room,"
+      ],
+      "correct_answer": "Can you help me clean my room?"
+    },
+    {
+      "question": "Which word in the sentence is a **noun**? _The dog barked loudly at the stranger._",
+      "type": "multiple-choice",
+      "options": [
+        "barked",
+        "loudly",
+        "dog",
+        "at"
+      ],
+      "correct_answer": "dog"
+    },
+    {
+      "question": "Which sentence is written in the **past tense**?",
+      "type": "multiple-choice",
+      "options": [
+        "She walks to school every day.",
+        "She will walk to school tomorrow.",
+        "She is walking to school now.",
+        "She walked to school yesterday."
+      ],
+      "correct_answer": "She walked to school yesterday."
+    },
+    {
+      "question": "Which sentence shows **cause and effect**?",
+      "type": "multiple-choice",
+      "options": [
+        "Tom read a book.",
+        "Tom forgot his umbrella, so he got wet.",
+        "Tom ran fast.",
+        "Tom likes pizza."
+      ],
+      "correct_answer": "Tom forgot his umbrella, so he got wet."
+    },
+    {
+      "question": "What is the correct contraction for _they are_?",
+      "type": "multiple-choice",
+      "options": [
+        "There",
+        "Their",
+        "They're",
+        "Theirs"
+      ],
+      "correct_answer": "They're"
+    },
+    {
+      "question": "Read the passage and answer the questions that follow.\n\n**Passage:**\n\nMaria stepped into the library with excitement. Her favorite author had released a new book, and she couldn\u2019t wait to dive into it. She walked quickly to the fiction section, scanning the shelves until her eyes landed on the bright red cover. Clutching the book to her chest, she hurried to the checkout desk.\n\n**Why was Maria excited to go to the library?**",
+      "type": "multiple-choice",
+      "options": [
+        "She wanted to study for a test.",
+        "Her favorite author had released a new book.",
+        "She had never been to the library before.",
+        "She was meeting her friend there."
+      ],
+      "correct_answer": "Her favorite author had released a new book."
+    },
+    {
+      "question": "What does the word 'clutching' most likely mean as used in the passage?",
+      "type": "multiple-choice",
+      "options": [
+        "Throwing something away",
+        "Holding something tightly",
+        "Dropping something suddenly",
+        "Losing grip of something"
+      ],
+      "correct_answer": "Holding something tightly"
+    },
+    {
+      "question": "Which of the following best describes the main idea of the passage?",
+      "type": "multiple-choice",
+      "options": [
+        "Maria enjoys reading and is excited about a new book.",
+        "Maria is late for her class at the library.",
+        "The library is a confusing place to find books.",
+        "Maria doesn\u2019t like reading fiction books."
+      ],
+      "correct_answer": "Maria enjoys reading and is excited about a new book."
+    },
+    {
+      "question": "Which sentence is written correctly?",
+      "type": "multiple-choice",
+      "options": [
+        "my Mom went to the store yesterday.",
+        "My mom went to the Store yesterday.",
+        "My mom went to the store yesterday.",
+        "my mom Went to the store yesterday."
+      ],
+      "correct_answer": "My mom went to the store yesterday."
+    },
+    {
+      "question": "Which word is a synonym for **happy**?",
+      "type": "multiple-choice",
+      "options": [
+        "Sad",
+        "Angry",
+        "Joyful",
+        "Tired"
+      ],
+      "correct_answer": "Joyful"
+    },
+    {
+      "question": "Choose the sentence that uses the correct punctuation.",
+      "type": "multiple-choice",
+      "options": [
+        "Can you help me clean my room?",
+        "Can you help me clean my room.",
+        "Can you help me clean my room!",
+        "Can you help me clean my room,"
+      ],
+      "correct_answer": "Can you help me clean my room?"
+    },
+    {
+      "question": "Which word in the sentence is a **noun**? _The dog barked loudly at the stranger._",
+      "type": "multiple-choice",
+      "options": [
+        "barked",
+        "loudly",
+        "dog",
+        "at"
+      ],
+      "correct_answer": "dog"
+    },
+    {
+      "question": "Which sentence is written in the **past tense**?",
+      "type": "multiple-choice",
+      "options": [
+        "She walks to school every day.",
+        "She will walk to school tomorrow.",
+        "She is walking to school now.",
+        "She walked to school yesterday."
+      ],
+      "correct_answer": "She walked to school yesterday."
+    },
+    {
+      "question": "Which sentence shows **cause and effect**?",
+      "type": "multiple-choice",
+      "options": [
+        "Tom read a book.",
+        "Tom forgot his umbrella, so he got wet.",
+        "Tom ran fast.",
+        "Tom likes pizza."
+      ],
+      "correct_answer": "Tom forgot his umbrella, so he got wet."
+    },
+    {
+      "question": "What is the correct contraction for _they are_?",
+      "type": "multiple-choice",
+      "options": [
+        "There",
+        "Their",
+        "They're",
+        "Theirs"
+      ],
+      "correct_answer": "They're"
+    }
+  ]
+}
