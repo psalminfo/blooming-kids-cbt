@@ -5,37 +5,49 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Login - Blooming Kids House</title>
   <link rel="icon" href="favicon.ico" />
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" />
+  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
 </head>
-<body class="bg-blue-100 min-h-screen flex items-center justify-center">
-  <div class="bg-white p-8 rounded shadow-md w-full max-w-md">
-    <h1 class="text-2xl font-bold mb-6 text-center">Student Login</h1>
-    <input id="studentName" type="text" placeholder="Full Name" class="w-full p-2 border mb-4 rounded" />
-    <input id="studentEmail" type="email" placeholder="Email" class="w-full p-2 border mb-4 rounded" />
-    <select id="grade" class="w-full p-2 border mb-6 rounded">
-      <option value="">Select Grade</option>
-      <option value="3">Grade 3</option>
-      <option value="4">Grade 4</option>
-      <option value="5">Grade 5</option>
-    </select>
-    <button id="loginBtn" class="w-full bg-blue-500 text-white py-2 rounded hover:bg-blue-600">Login</button>
+<body class="bg-yellow-50 flex items-center justify-center min-h-screen">
+  <div class="bg-white p-8 rounded shadow-lg w-full max-w-md">
+    <h1 class="text-2xl font-bold text-center text-yellow-600 mb-4">Blooming Kids House</h1>
+    <p class="text-center mb-6">Student Login</p>
+    <form id="loginForm" class="space-y-4">
+      <input type="text" id="studentName" placeholder="Student Name" class="w-full p-2 border rounded" required />
+      <input type="email" id="studentEmail" placeholder="Email" class="w-full p-2 border rounded" required />
+      <select id="grade" class="w-full p-2 border rounded" required>
+        <option value="">Select Grade</option>
+        <option value="3">Grade 3</option>
+        <option value="4">Grade 4</option>
+        <option value="5">Grade 5</option>
+      </select>
+      <input type="password" id="password" placeholder="Password" class="w-full p-2 border rounded" required />
+      <button type="submit" class="w-full bg-yellow-500 text-white py-2 rounded hover:bg-yellow-600">Login</button>
+    </form>
   </div>
 
-  <script>
-    document.getElementById("loginBtn").addEventListener("click", () => {
-      const name = document.getElementById("studentName").value.trim();
-      const email = document.getElementById("studentEmail").value.trim();
+  <script type="module">
+    import { getAuth, signInWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+    import { app } from "./firebaseConfig.js";
+
+    const auth = getAuth(app);
+    const form = document.getElementById("loginForm");
+
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const name = document.getElementById("studentName").value;
+      const email = document.getElementById("studentEmail").value;
       const grade = document.getElementById("grade").value;
+      const password = document.getElementById("password").value;
 
-      if (!name || !email || !grade) {
-        alert("Please fill in all fields.");
-        return;
+      try {
+        await signInWithEmailAndPassword(auth, email, password);
+        localStorage.setItem("studentName", name);
+        localStorage.setItem("studentEmail", email);
+        localStorage.setItem("grade", grade);
+        window.location.href = "subject-select.html";
+      } catch (err) {
+        alert("Login failed: " + err.message);
       }
-
-      localStorage.setItem("studentName", name);
-      localStorage.setItem("studentEmail", email);
-      localStorage.setItem("grade", grade);
-      window.location.href = "subject-select.html";
     });
   </script>
 </body>
