@@ -1,4 +1,3 @@
-// student.js
 import { db, collection, addDoc } from "./firebaseConfig.js";
 
 document.addEventListener("DOMContentLoaded", () => {
@@ -17,27 +16,23 @@ document.addEventListener("DOMContentLoaded", () => {
   let timerInterval;
 
   async function fetchQuestions(subject) {
-    const file = `${grade}-${subject}.json`; // Same folder
+    const file = `${grade}-${subject}.json`;
     try {
       const response = await fetch(file);
-      if (!response.ok) throw new Error("Network error");
+      if (!response.ok) throw new Error("File not found");
       const data = await response.json();
       const shuffled = data.questions.sort(() => 0.5 - Math.random());
       allQuestions[subject] = shuffled.slice(0, 30);
       renderQuestions(subject);
     } catch (error) {
       console.error("Failed to load questions:", error);
-      alert("Error loading questions for " + subject);
+      alert(`Could not load ${subject} questions.`);
     }
   }
 
   function renderQuestions(subject) {
     const container = document.getElementById(`${subject}Container`);
-    if (!container) {
-      console.error(`Missing container for subject: ${subject}`);
-      return;
-    }
-
+    if (!container) return;
     const questions = allQuestions[subject];
     container.innerHTML = questions.map((q, i) => `
       <div class="mb-4 p-4 bg-white rounded shadow">
@@ -56,8 +51,8 @@ document.addEventListener("DOMContentLoaded", () => {
     let remaining = durationMinutes * 60;
     const display = document.getElementById("timer");
     timerInterval = setInterval(() => {
-      const minutes = Math.floor(remaining / 60).toString().padStart(2, "0");
-      const seconds = (remaining % 60).toString().padStart(2, "0");
+      const minutes = String(Math.floor(remaining / 60)).padStart(2, "0");
+      const seconds = String(remaining % 60).padStart(2, "0");
       display.textContent = `Time Left: ${minutes}:${seconds}`;
       if (--remaining < 0) {
         clearInterval(timerInterval);
@@ -86,26 +81,33 @@ document.addEventListener("DOMContentLoaded", () => {
       await addDoc(collection(db, "student_results"), {
         name: studentName,
         email: studentEmail,
-        grade: grade,
+        grade,
         submittedAt: new Date(),
-        answers: answers
+        answers
       });
       localStorage.removeItem("studentName");
       localStorage.removeItem("studentEmail");
       localStorage.removeItem("grade");
       window.location.href = "subject-select.html";
-    } catch (error) {
-      console.error("Submission error:", error);
-      alert("Failed to submit test. Please try again.");
+    } catch (err) {
+      console.error("Submission failed:", err);
+      alert("Failed to submit. Try again.");
     }
   }
 
-  // Attach to button
   document.getElementById("submitBtn").addEventListener("click", handleSubmit);
 
-  // Load all subjects
+  // Load questions
   subjects.forEach(fetchQuestions);
-
-  // Start 30-minute timer
   startTimer(30);
+
+  // Tab functionality
+  const tabs = document.querySelectorAll(".tab");
+  tabs.forEach(tab => {
+    tab.addEventListener("click", () => {
+      const target = tab.dataset.subject;
+      document.querySelectorAll(".subjectTab").forEach(el => el.classList.add("hidden"));
+      document.getElementById(`${target}Container`).classList.remove("hidden");
+    });
+  });
 });
