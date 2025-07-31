@@ -5,7 +5,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Student Test - Blooming Kids House</title>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" />
-  <link rel="stylesheet" href="style.css" />
   <link rel="icon" href="favicon.ico" />
 </head>
 <body class="bg-green-50 min-h-screen">
@@ -21,19 +20,22 @@
     </div>
 
     <div class="mt-6 flex justify-between">
-      <button onclick="submitAnswers()" class="bg-green-600 text-white px-6 py-2 rounded hover:bg-green-700">Submit Test</button>
+      <button id="submitBtn" class="bg-green-600 text-white px-6 py-2 rounded hover:bg-green-700">Submit Test</button>
     </div>
 
     <p class="text-xs text-center mt-8 text-gray-600">POWERED BY <span style="color:#FFEB3B">POG</span></p>
   </div>
 
-  <!-- Firebase SDKs -->
-  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
+  <!-- Firebase SDKs (modular for modern code) -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-app.js";
+    import {
+      getFirestore,
+      collection,
+      addDoc,
+      serverTimestamp,
+    } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore.js";
 
-  <!-- Firebase Config -->
-  <script>
     const firebaseConfig = {
       apiKey: "AIzaSyBpwxvEoeuT8e6F5vGmDc1VkVfWTUdxavY",
       authDomain: "blooming-kids-house.firebaseapp.com",
@@ -42,17 +44,13 @@
       messagingSenderId: "739684305208",
       appId: "1:739684305208:web:ee1cc9e998b37e1f002f84"
     };
-    firebase.initializeApp(firebaseConfig);
-    const db = firebase.firestore();
-    const auth = firebase.auth();
-  </script>
 
-  <!-- Utility + Question Loader -->
-  <script>
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+
     function logout() {
-      firebase.auth().signOut().then(() => {
-        window.location.href = "index.html";
-      });
+      localStorage.removeItem("student");
+      window.location.href = "index.html";
     }
 
     const urlParams = new URLSearchParams(window.location.search);
@@ -64,24 +62,21 @@
       window.location.href = "index.html";
     }
 
-    async function loadQuestions(subject, grade) {
+    async function loadQuestions() {
       try {
         const res = await fetch(`https://raw.githubusercontent.com/psalminfo/blooming-kids-cbt/main/${grade}-${subject.toLowerCase()}.json`);
         const data = await res.json();
-        const questions = data.questions;
-
-        // Shuffle and pick first 30
-        const selected = questions.sort(() => 0.5 - Math.random()).slice(0, 30);
+        const questions = data.questions.sort(() => 0.5 - Math.random()).slice(0, 30);
 
         const container = document.getElementById("question-container");
         container.innerHTML = "";
 
-        selected.forEach((q, index) => {
+        questions.forEach((q, index) => {
           const div = document.createElement("div");
-          div.className = "p-4 bg-white rounded shadow";
+          div.className = "question-block p-4 bg-white rounded shadow";
           div.innerHTML = `
-            <p class="font-medium mb-2">${index + 1}. ${q.question}</p>
-            ${q.options.map((opt, i) => `
+            <p class="question-text font-medium mb-2">${index + 1}. ${q.question}</p>
+            ${q.options.map(opt => `
               <label class="block">
                 <input type="radio" name="q${index}" value="${opt}" class="mr-2" />
                 ${opt}
@@ -91,16 +86,16 @@
           container.appendChild(div);
         });
 
-        window._loadedQuestions = selected;
+        window._loadedQuestions = questions;
       } catch (err) {
         document.getElementById("question-container").innerHTML = "<p class='text-red-500'>Failed to load questions.</p>";
       }
     }
 
-    window.submitAnswers = async function () {
-      const student = JSON.parse(localStorage.getItem("student")); // stored from login
+    async function submitAnswers() {
+      const student = JSON.parse(localStorage.getItem("student"));
       if (!student || !student.name) {
-        alert("Invalid access. Redirecting...");
+        alert("Student not logged in. Redirecting...");
         window.location.href = "index.html";
         return;
       }
@@ -110,31 +105,39 @@
         const selected = document.querySelector(`input[name="q${index}"]:checked`);
         answers.push({
           question: q.question,
-          selected: selected ? selected.value : "",
+          selected: selected ? selected.value : "No Answer",
           correct: q.correct_answer
         });
       });
 
-      await db.collection("student_reports").add({
-        name: student.name,
-        email: student.email,
-        tutor: student.tutor,
-        location: student.location,
-        grade: grade,
-        subject: subject,
-        answers: answers,
-        timestamp: firebase.firestore.FieldValue.serverTimestamp()
-      });
+      try {
+        await addDoc(collection(db, "student_reports"), {
+          name: student.name,
+          email: student.email,
+          tutor: student.tutor,
+          location: student.location,
+          grade,
+          subject,
+          answers,
+          timestamp: serverTimestamp()
+        });
 
-      const container = document.getElementById("question-container");
-      container.innerHTML = `<div class="text-center p-6 text-green-700 font-semibold text-xl">✅ Submitted. Redirecting...</div>`;
-      setTimeout(() => {
-        window.location.href = "subject-select.html";
-      }, 1500);
+        document.getElementById("question-container").innerHTML = `
+          <div class="text-center p-6 text-green-700 font-semibold text-xl">
+            ✅ Test Submitted Successfully. Redirecting...
+          </div>
+        `;
+        setTimeout(() => {
+          window.location.href = "subject-select.html";
+        }, 1500);
+      } catch (error) {
+        console.error("Submit failed:", error);
+        alert("Failed to submit test. Please try again.");
+      }
     }
 
-    // Load on start
-    loadQuestions(subject, grade);
+    document.getElementById("submitBtn").addEventListener("click", submitAnswers);
+    loadQuestions();
   </script>
 </body>
 </html>
