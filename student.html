@@ -3,30 +3,18 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Student Test - Blooming Kids House</title>
+  <title>Student Test</title>
   <link rel="icon" href="favicon.ico" />
   <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
 </head>
-<body class="bg-gray-100 min-h-screen">
-  <div class="max-w-4xl mx-auto p-4">
-    <h1 class="text-3xl font-bold text-center text-green-800 mb-4">Blooming Kids House Test</h1>
-    <div id="timer" class="text-xl text-center font-semibold text-red-600 mb-6">Time Left: 30:00</div>
-
-    <!-- Tabs -->
-    <div class="flex space-x-4 mb-4">
-      <button class="tab px-4 py-2 bg-blue-600 text-white rounded" data-subject="math">Math</button>
-      <button class="tab px-4 py-2 bg-blue-600 text-white rounded" data-subject="ela">ELA</button>
-    </div>
-
-    <!-- Question Containers -->
-    <div id="mathContainer" class="subjectTab"></div>
-    <div id="elaContainer" class="subjectTab hidden"></div>
-
-    <div class="text-center mt-6">
-      <button id="submitBtn" class="bg-green-600 text-white px-6 py-2 rounded hover:bg-green-700">Submit Test</button>
-    </div>
+<body class="bg-gray-50">
+  <div class="max-w-4xl mx-auto py-6 px-4">
+    <h1 class="text-3xl font-bold text-yellow-600 mb-2">Blooming Kids House - Test</h1>
+    <div id="timer" class="text-lg text-red-600 font-semibold mb-4">Loading timer...</div>
+    <div id="questionContainer" class="space-y-4"></div>
+    <button id="submitBtn" class="mt-6 bg-yellow-500 hover:bg-yellow-600 text-white px-4 py-2 rounded">Submit Test</button>
   </div>
 
-  <script type="module" src="student.js"></script>
+  <script type="module" src="./student.js"></script>
 </body>
 </html>
