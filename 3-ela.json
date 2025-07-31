@@ -1,11 +1,11 @@
 {
   "questions": [
     {
-      "question": "What is the main idea of a story?",
+      "question": "Which word is a noun?",
       "type": "multiple-choice",
-      "options": ["The setting", "The characters", "The central message", "The ending"],
-      "correct_answer": "The central message"
+      "options": ["run", "blue", "cat", "happy"],
+      "correct_answer": "cat"
     }
-    // ...add 29 more
+    // Add 29 more
   ]
 }
