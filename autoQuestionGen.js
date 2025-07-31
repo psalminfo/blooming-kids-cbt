@@ -1,47 +1,22 @@
-// autoQuestionGen.js
-
-import { collection, getDocs } from "./firebaseConfig.js";
-
-const fetchFromGitHub = async (grade, subject) => {
-  const fileName = `${grade}-${subject}.json`;
-  const githubUrl = `https://raw.githubusercontent.com/psalminfo/blooming-kids-cbt/main/questions/${fileName}`;
+export async function loadQuestions(subject, grade) {
+  const baseUrl = 'https://raw.githubusercontent.com/psalminfo/blooming-kids-cbt/main';
+  const fileName = `${grade}-${subject}.json`; // e.g., 3-Math.json
+  const url = `${baseUrl}/${fileName}`;
 
   try {
-    const response = await fetch(githubUrl);
+    const response = await fetch(url);
     if (!response.ok) throw new Error("GitHub fetch failed");
-    const data = await response.json();
-    return data;
+
+    const questions = await response.json();
+
+    if (!Array.isArray(questions) || questions.length === 0) {
+      throw new Error("No valid questions found");
+    }
+
+    // Shuffle and return 30 questions max
+    return questions.sort(() => Math.random() - 0.5).slice(0, 30);
   } catch (err) {
-    console.error("GitHub fetch failed:", err);
-    throw err;
-  }
-};
-
-const fetchFromFirebase = async (grade, subject) => {
-  try {
-    const colRef = collection(firebase.firestore(), `questions/${grade}/${subject}`);
-    const snapshot = await getDocs(colRef);
-    const data = snapshot.docs.map((doc) => doc.data());
-    return data;
-  } catch (err) {
-    console.error("Firebase fetch failed:", err);
-    return [];
-  }
-};
-
-export const loadQuestions = async (grade, subject) => {
-  let allQuestions = [];
-
-  try {
-    allQuestions = await fetchFromGitHub(grade, subject);
-  } catch (err) {
-    allQuestions = await fetchFromFirebase(grade, subject);
-  }
-
-  if (!allQuestions || allQuestions.length === 0) {
+    console.error("Error loading questions:", err);
     throw new Error("No questions available");
   }
-
-  const selected = allQuestions.sort(() => 0.5 - Math.random()).slice(0, 30);
-  return selected;
-};
+}
