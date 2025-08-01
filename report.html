@@ -2,50 +2,47 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Student Report - Blooming Kids House</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Assessment Report</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" />
   <link rel="icon" href="favicon.ico" />
-  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
 </head>
-<body class="bg-green-50 text-gray-800">
-  <div class="max-w-3xl mx-auto mt-8 p-6 bg-white shadow-xl rounded-xl border-2 border-yellow-300" id="reportContainer">
-    <div class="text-center mb-6">
-      <h1 class="text-3xl font-bold text-green-700">Assessment Report</h1>
-      <p class="text-yellow-600 font-semibold mt-1">Blooming Kids House</p>
+<body class="bg-white text-gray-800 p-6">
+  <div class="max-w-3xl mx-auto border-4 border-yellow-400 rounded-xl shadow-lg p-6">
+    <h1 class="text-3xl font-bold text-green-600 text-center mb-2">Assessment Report</h1>
+    <h2 class="text-center text-yellow-500 font-semibold text-xl mb-4">Blooming Kids House</h2>
+
+    <div class="mb-4">
+      <p><strong>Student Name:</strong> <span id="studentName" class="text-green-700 font-medium">Loading...</span></p>
+      <p><strong>Email:</strong> <span id="studentEmail">Loading...</span></p>
+      <p><strong>Grade:</strong> <span id="studentGrade">Loading...</span></p>
+      <p><strong>Score:</strong> <span id="studentScore">Loading...</span></p>
+      <p><strong>Assigned Tutor:</strong> <span id="tutorName">Loading...</span></p>
     </div>
 
-    <div id="studentInfo" class="mb-6 text-lg space-y-1"></div>
-
     <div class="mb-6">
-      <h2 class="text-xl font-semibold text-green-700 mb-2">Director’s Message</h2>
-      <p class="text-gray-700 leading-relaxed">
-        Dear Parent,<br /><br />
-        Thank you for allowing us the opportunity to assess your child's academic progress. This report highlights their current performance and identifies areas where support is needed. We are committed to working with you to ensure your child's growth and success.<br /><br />
-        Warm regards,<br />
-        <span class="font-bold text-green-800">Mrs. Yinka Isikalu</span><br />
-        Director, Blooming Kids House
+      <h3 class="text-xl font-bold text-yellow-500 mb-2">Director’s Message</h3>
+      <p>Dear Parent,</p>
+      <p class="mt-2">
+        Thank you for allowing us the opportunity to assess your child's academic progress. This report highlights their current performance and identifies areas where support is needed. We are committed to working with you to ensure your child's growth and success.
       </p>
+      <p class="mt-4 font-semibold text-green-700">Warm regards,</p>
+      <p class="font-semibold">Mrs. Yinka Isikalu<br/>Director, Blooming Kids House</p>
     </div>
 
     <div class="mb-6">
-      <h2 class="text-xl font-semibold text-green-700 mb-2">Recommendations</h2>
-      <p id="recommendationText" class="text-gray-700 leading-relaxed"></p>
+      <h3 class="text-xl font-bold text-yellow-500 mb-2">Recommendations</h3>
+      <p id="recommendations" class="text-gray-800">Loading...</p>
     </div>
 
-    <div class="flex justify-between mt-8">
-      <button id="downloadBtn" class="bg-yellow-400 hover:bg-yellow-500 text-white font-bold py-2 px-4 rounded-xl shadow">
-        Download Report
-      </button>
-      <button id="logoutBtn" class="bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded-xl shadow">
-        Logout
-      </button>
+    <div class="flex justify-between">
+      <button id="downloadBtn" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded">Download Report</button>
+      <button id="logoutBtn" class="bg-yellow-500 hover:bg-yellow-600 text-white font-bold py-2 px-4 rounded">Logout</button>
     </div>
 
-    <footer class="mt-10 text-center text-sm text-gray-600">
-      POWERED BY <span style="color:#FFEB3B">POG</span>
-    </footer>
+    <p class="text-center mt-6 text-sm text-gray-600">POWERED BY <span style="color:#FFEB3B">POG</span></p>
   </div>
 
-  <script type="module" src="generateReportFromFirestore.js"></script>
+  <script type="module" src="./generateReportFromFirestore.js"></script>
 </body>
 </html>
