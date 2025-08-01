@@ -1,69 +1,64 @@
-// report.js
-import { db } from './firebaseParentConfig.js'; // optional future use
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import {
+  getFirestore,
+  collection,
+  query,
+  where,
+  getDocs
+} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import { generateAndDownloadPDF, renderReportToHTML } from './generateReportParent.js';
 
-window.addEventListener("DOMContentLoaded", () => {
-  const studentName = sessionStorage.getItem("studentName");
-  const parentEmail = sessionStorage.getItem("parentEmail");
-  const rawData = sessionStorage.getItem("studentData");
+const firebaseConfig = {
+  apiKey: "AIzaSyBpwxvEoeuT8e6F5vGmDc1VkVfWTUdxavY",
+  authDomain: "blooming-kids-house.firebaseapp.com",
+  projectId: "blooming-kids-house",
+  storageBucket: "blooming-kids-house.appspot.com",
+  messagingSenderId: "739684305208",
+  appId: "1:739684305208:web:ee1cc9e998b37e1f002f84"
+};
 
-  if (!studentName || !parentEmail || !rawData) {
-    alert("Session expired. Please login again.");
-    window.location.href = "parent.html";
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+
+const loginBtn = document.getElementById("loginBtn");
+const logoutBtn = document.getElementById("logoutBtn");
+const downloadBtn = document.getElementById("downloadBtn");
+
+loginBtn.addEventListener("click", async () => {
+  const studentName = document.getElementById("studentName").value.trim();
+  const parentEmail = document.getElementById("parentEmail").value.trim();
+
+  if (!studentName || !parentEmail) {
+    alert("Please enter both student name and parent email.");
     return;
   }
 
-  const data = JSON.parse(rawData);
-  const { grade, subject, score, total = 30, tutorName = "Assigned Tutor" } = data;
+  const q = query(
+    collection(db, "student_results"),
+    where("studentName", "==", studentName),
+    where("parentEmail", "==", parentEmail)
+  );
 
-  document.getElementById("student-name").textContent = studentName;
-  document.getElementById("grade").textContent = grade || "N/A";
-  document.getElementById("subject").textContent = subject || "N/A";
-  document.getElementById("score").textContent = `${score} / ${total}`;
-  document.getElementById("tutor").textContent = tutorName;
-
-  // Recommendations
-  let rec = "";
-  if (subject?.toLowerCase() === "math") {
-    rec = `We encourage ${studentName} to focus on number sense, problem solving, and geometry. ${tutorName} will guide your child through daily practice sessions to build confidence and accuracy.`;
-  } else if (subject?.toLowerCase() === "ela") {
-    rec = `${studentName} should strengthen reading comprehension, grammar, and writing structure. ${tutorName} will provide support through guided reading and personalized writing tasks.`;
-  } else {
-    rec = `${studentName} will benefit from personalized tutoring with ${tutorName} to strengthen understanding of key curriculum topics.`;
+  const querySnapshot = await getDocs(q);
+  if (querySnapshot.empty) {
+    alert("No matching report found. Please check the details.");
+    return;
   }
 
-  document.getElementById("recommendation").textContent = rec;
+  const allResults = [];
+  querySnapshot.forEach(doc => allResults.push(doc.data()));
 
-  // Logout
-  document.getElementById("logout").addEventListener("click", () => {
-    sessionStorage.clear();
-    window.location.href = "parent.html";
-  });
+  document.getElementById("loginSection").classList.add("hidden");
+  document.getElementById("reportSection").classList.remove("hidden");
 
-  // Download as PDF
-  document.getElementById("download-report").addEventListener("click", () => {
-    const { jsPDF } = window.jspdf;
-    const doc = new jsPDF();
+  const html = renderReportToHTML(studentName, parentEmail, allResults);
+  document.getElementById("reportContainer").innerHTML = html;
 
-    doc.setFontSize(14);
-    doc.text("Blooming Kids House – Student Report", 10, 20);
-    doc.text(`Student Name: ${studentName}`, 10, 30);
-    doc.text(`Grade: ${grade || "N/A"}`, 10, 40);
-    doc.text(`Subject: ${subject}`, 10, 50);
-    doc.text(`Score: ${score} / ${total}`, 10, 60);
-    doc.text(`Tutor: ${tutorName}`, 10, 70);
+  downloadBtn.onclick = () => {
+    generateAndDownloadPDF(studentName, html);
+  };
+});
 
-    doc.text("Director's Message:", 10, 90);
-    doc.setFontSize(12);
-    doc.text(
-      `We appreciate your child’s effort during the assessment. At Blooming Kids House, we recommend personalized tutoring sessions to strengthen your child's skills.\n\n– Mrs. Yinka Isikalu, Director`,
-      10, 100
-    );
-
-    doc.setFontSize(14);
-    doc.text("Recommendations:", 10, 150);
-    doc.setFontSize(12);
-    doc.text(rec, 10, 160, { maxWidth: 180 });
-
-    doc.save(`${studentName}-report.pdf`);
-  });
+logoutBtn.addEventListener("click", () => {
+  window.location.reload();
 });
