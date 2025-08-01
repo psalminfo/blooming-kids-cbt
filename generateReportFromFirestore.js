@@ -1,33 +1,41 @@
-export function renderReport() {
-  const data = JSON.parse(localStorage.getItem("studentReportData"));
+window.addEventListener("DOMContentLoaded", () => {
+  const data = JSON.parse(localStorage.getItem("reportData"));
 
-  if (!data) {
-    document.body.innerHTML = "<div class='text-center mt-10 text-red-500 font-bold'>Missing student info. Please return to the parent portal.</div>";
+  if (!data || !data.studentName || !data.studentEmail) {
+    alert("Missing student info. Please return to the parent portal.");
+    window.location.href = "parent.html";
     return;
   }
 
-  document.getElementById("studentName").textContent = data.studentName || "N/A";
-  document.getElementById("studentEmail").textContent = data.studentEmail || "N/A";
-  document.getElementById("grade").textContent = data.grade || "N/A";
-  document.getElementById("score").textContent = data.score || "N/A";
-  document.getElementById("tutorName").textContent = data.tutorName || "N/A";
-  document.getElementById("recommendation").textContent = data.recommendation || "N/A";
-}
+  // Populate report
+  document.getElementById("studentName").textContent = data.studentName;
+  document.getElementById("studentEmail").textContent = data.studentEmail;
+  document.getElementById("grade").textContent = data.grade;
+  document.getElementById("score").textContent = data.score + "%";
+  document.getElementById("tutorName").textContent = data.tutorName;
+  document.getElementById("recommendation").textContent = data.recommendation;
 
-function downloadPDF() {
-  const element = document.body;
-  const opt = {
-    margin:       0.5,
-    filename:     'student_report.pdf',
-    image:        { type: 'jpeg', quality: 0.98 },
-    html2canvas:  { scale: 2 },
-    jsPDF:        { unit: 'in', format: 'letter', orientation: 'portrait' }
-  };
+  // Director Message
+  document.getElementById("directorMessage").textContent = `
+    At Blooming Kids House, we believe every child has the potential to excel. 
+    ${data.studentName} has taken an important step. Our tutor, ${data.tutorName}, 
+    will provide personalized support to ensure progress in key subjects.
+  `;
 
-  html2pdf().from(element).set(opt).save();
-}
+  // Handle download button
+  const downloadBtn = document.getElementById("downloadBtn");
+  if (downloadBtn) {
+    downloadBtn.addEventListener("click", () => {
+      window.print(); // or generate PDF with html2pdf if you prefer
+    });
+  }
 
-window.addEventListener("DOMContentLoaded", () => {
-  renderReport();
-  document.getElementById("downloadBtn").addEventListener("click", downloadPDF);
+  // Handle logout button
+  const logoutBtn = document.getElementById("logoutBtn");
+  if (logoutBtn) {
+    logoutBtn.addEventListener("click", () => {
+      localStorage.removeItem("reportData");
+      window.location.href = "parent.html";
+    });
+  }
 });
