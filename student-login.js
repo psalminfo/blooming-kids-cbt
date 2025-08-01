@@ -1,32 +1,16 @@
-document.addEventListener('DOMContentLoaded', function () {
-  const form = document.getElementById('studentLoginForm');
+document.getElementById("studentLoginForm").addEventListener("submit", function (e) {
+  e.preventDefault();
+  const studentName = document.getElementById("studentName").value;
+  const parentEmail = document.getElementById("parentEmail").value;
+  const grade = document.getElementById("grade").value;
+  const tutorName = document.getElementById("tutorName").value;
+  const location = document.getElementById("location").value;
+  const accessCode = document.getElementById("accessCode").value;
 
-  form.addEventListener('submit', function (e) {
-    e.preventDefault();
+  if (accessCode !== "bkh2025") {
+    alert("Invalid access code");
+    return;
+  }
 
-    const studentName = document.getElementById('studentName').value.trim();
-    const parentEmail = document.getElementById('parentEmail').value.trim();
-    const grade = document.getElementById('grade').value;
-    const tutorName = document.getElementById('tutorName').value.trim();
-    const location = document.getElementById('location').value.trim();
-    const accessCode = document.getElementById('accessCode').value.trim();
-
-    if (accessCode !== 'bkh2025') {
-      alert('Invalid access code. Please contact your tutor.');
-      return;
-    }
-
-    const studentId = `${studentName}-${Date.now()}`;
-    const student = {
-      id: studentId,
-      name: studentName,
-      email: parentEmail,
-      grade: grade,
-      tutor: tutorName,
-      location: location
-    };
-
-    localStorage.setItem('student', JSON.stringify(student));
-    window.location.href = 'subject-select.html';
-  });
+  window.location.href = `subject-select.html?studentName=${encodeURIComponent(studentName)}&parentEmail=${encodeURIComponent(parentEmail)}&grade=${grade}&tutorName=${encodeURIComponent(tutorName)}&location=${encodeURIComponent(location)}`;
 });
