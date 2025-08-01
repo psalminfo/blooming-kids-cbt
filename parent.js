@@ -1,32 +1,71 @@
-async function fetchStudentResult() {
-  const studentName = document.getElementById("studentName").value.trim();
-  const parentEmail = document.getElementById("parentEmail").value.trim().toLowerCase();
-  const errorEl = document.getElementById("error");
+import { db } from './firebaseConfig.js';
+import { collection, query, where, getDocs } from "https://www.gstatic.com/firebasejs/9.6.10/firebase-firestore.js";
+import { generatePDFReport } from './parentReport.js';
 
-  if (!studentName || !parentEmail) {
-    errorEl.textContent = "Please enter both student name and parent email.";
-    errorEl.classList.remove("hidden");
+window.downloadReport = generatePDFReport;
+
+window.logout = () => {
+  window.location.href = "parent.html";
+};
+
+document.getElementById("fetchReport").addEventListener("click", async () => {
+  const studentName = document.getElementById("studentName").value.trim();
+  const parentEmail = document.getElementById("parentEmail").value.trim();
+  const subjectInput = document.getElementById("subject").value.trim().toLowerCase();
+
+  if (!studentName || !parentEmail || !subjectInput) {
+    alert("Please fill in all fields.");
     return;
   }
 
-  try {
-    const querySnapshot = await firebase.firestore()
-      .collection("student_results")
-      .where("studentName", "==", studentName)
-      .where("parentEmail", "==", parentEmail)
-      .get();
+  const resultsRef = collection(db, "student_results");
+  const q = query(resultsRef, where("studentName", "==", studentName), where("parentEmail", "==", parentEmail));
+  const querySnapshot = await getDocs(q);
 
-    if (querySnapshot.empty) {
-      errorEl.textContent = "No results found for this student and parent combination.";
-      errorEl.classList.remove("hidden");
-      return;
+  let found = false;
+
+  querySnapshot.forEach(doc => {
+    const data = doc.data();
+    if ((data.subject || '').toLowerCase() === subjectInput) {
+      found = true;
+      showReport(data);
     }
+  });
 
-    const doc = querySnapshot.docs[0].data();
-    generateReport(doc); // This will call generateReport from generateReport.js
-  } catch (err) {
-    console.error(err);
-    errorEl.textContent = "An error occurred while fetching the report.";
-    errorEl.classList.remove("hidden");
+  if (!found) {
+    alert("No matching report found.");
   }
+});
+
+function showReport(data) {
+  const reportDiv = document.getElementById("report");
+  const actionsDiv = document.getElementById("actions");
+
+  const score = data.answers.filter(a => a === "correct").length;
+  const total = data.answers.length;
+
+  reportDiv.innerHTML = `
+    <h2 class="text-xl font-semibold mb-2">Student: ${data.studentName}</h2>
+    <p><strong>Subject:</strong> ${data.subject}</p>
+    <p><strong>Grade:</strong> ${data.grade}</p>
+    <p><strong>Tutor:</strong> ${data.tutorName}</p>
+    <p><strong>Location:</strong> ${data.location}</p>
+    <p><strong>Score:</strong> ${score} / ${total}</p>
+
+    <div class="mt-4">
+      <h3 class="font-bold text-green-700">Director's Message</h3>
+      <p class="italic">Dear Parent, thank you for trusting us with your child's learning journey. This report reflects performance and areas where your child can grow. Let's work together to support their success. — Mrs. Yinka Isikalu</p>
+    </div>
+
+    <div class="mt-4">
+      <h3 class="font-bold text-green-700">Recommendations</h3>
+      <p>
+        Based on the performance in <strong>${data.subject}</strong>, your child needs focused support on key areas of the curriculum.
+        Our tutor <strong>${data.tutorName}</strong> will guide them in building confidence, addressing learning gaps, and mastering the topics covered in the test.
+      </p>
+    </div>
+  `;
+
+  reportDiv.classList.remove("hidden");
+  actionsDiv.classList.remove("hidden");
 }
