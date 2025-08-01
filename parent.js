@@ -1,34 +1,37 @@
-// Initialize Firebase
-const app = firebase.initializeApp(firebaseConfig);
-const db = firebase.firestore(app);
+document.addEventListener("DOMContentLoaded", function () {
+  const form = document.getElementById("parentLoginForm");
 
-document.getElementById("parentLoginForm").addEventListener("submit", async (e) => {
-  e.preventDefault();
-  const studentName = document.getElementById("studentName").value.trim();
-  const parentEmail = document.getElementById("parentEmail").value.trim();
+  form.addEventListener("submit", async function (e) {
+    e.preventDefault();
 
-  const errorMsg = document.getElementById("errorMsg");
-  errorMsg.classList.add("hidden");
+    const studentName = document.getElementById("studentName").value.trim();
+    const parentEmail = document.getElementById("parentEmail").value.trim();
 
-  try {
-    const resultsRef = db.collection("student_results");
-    const querySnapshot = await resultsRef
-      .where("studentName", "==", studentName)
-      .where("parentEmail", "==", parentEmail)
-      .get();
+    try {
+      const querySnapshot = await db
+        .collection("student_results")
+        .where("studentName", "==", studentName)
+        .where("parentEmail", "==", parentEmail)
+        .orderBy("timestamp", "desc")
+        .limit(1)
+        .get();
 
-    if (!querySnapshot.empty) {
-      const doc = querySnapshot.docs[0];
-      const data = doc.data();
+      if (querySnapshot.empty) {
+        alert("No report found for this student and parent email.");
+        return;
+      }
 
-      // Save data temporarily in localStorage to use in report.html
-      localStorage.setItem("studentReportData", JSON.stringify(data));
-      window.location.href = "report.html";
-    } else {
-      errorMsg.classList.remove("hidden");
+      const reportData = querySnapshot.docs[0].data();
+      const reportURL = reportData.reportUrl;
+
+      if (reportURL) {
+        window.open(reportURL, "_blank");
+      } else {
+        alert("Report exists but no URL found.");
+      }
+    } catch (error) {
+      console.error("Error fetching report:", error);
+      alert("An error occurred. Please try again later.");
     }
-  } catch (error) {
-    console.error("Error fetching report:", error);
-    alert("Something went wrong while fetching the report.");
-  }
+  });
 });
