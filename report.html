@@ -3,45 +3,41 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Student Report - Blooming Kids House</title>
+  <title>Student Report – Blooming Kids House</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" />
   <link rel="icon" href="favicon.ico" />
-  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet" />
 </head>
-<body class="bg-yellow-50 text-gray-800 min-h-screen p-4">
+<body class="bg-gray-100 text-gray-800 p-4">
+  <div class="max-w-3xl mx-auto bg-white shadow-xl p-8 rounded-2xl" id="report-card">
+    <h1 class="text-2xl font-bold mb-4">Student Report</h1>
+    <p><strong>Student Name:</strong> <span id="student-name">Loading...</span></p>
+    <p><strong>Grade:</strong> <span id="grade">Loading...</span></p>
+    <p><strong>Subject:</strong> <span id="subject">Loading...</span></p>
+    <p><strong>Score:</strong> <span id="score">Loading...</span></p>
+    <p><strong>Tutor:</strong> <span id="tutor">Loading...</span></p>
 
-  <div class="max-w-4xl mx-auto bg-white shadow-xl rounded-2xl p-8">
-    <h1 class="text-3xl font-bold mb-4 text-center">Student Report</h1>
-
-    <div id="student-info" class="mb-6 space-y-2">
-      <p><strong>Name:</strong> <span id="student-name">Loading...</span></p>
-      <p><strong>Grade:</strong> <span id="student-grade">Loading...</span></p>
-      <p><strong>Email:</strong> <span id="student-email">Loading...</span></p>
-      <p><strong>Tutor:</strong> <span id="tutor-name">Loading...</span></p>
+    <div class="mt-6">
+      <h2 class="text-lg font-semibold mb-2">Director's Message</h2>
+      <p>
+        Dear Parent,<br />
+        We appreciate your child’s effort during the assessment. At Blooming Kids House, we are committed to nurturing every child's potential. We recommend personalized tutoring sessions to strengthen your child's skills.
+        <br /><br />
+        <strong>– Mrs. Yinka Isikalu, Director</strong>
+      </p>
     </div>
 
-    <div id="subject-scores" class="mb-6"></div>
-
-    <div id="recommendations" class="mb-6">
-      <h2 class="text-xl font-semibold mb-2">Recommendations</h2>
-      <p id="recommendation-text" class="text-sm text-gray-700"></p>
+    <div class="mt-6">
+      <h2 class="text-lg font-semibold mb-2">Recommendations</h2>
+      <p id="recommendation">Loading...</p>
     </div>
 
-    <div id="director-message" class="mb-6 border-t pt-4">
-      <h2 class="text-xl font-semibold mb-2">Message from the Director</h2>
-      <p class="text-sm">Thank you for trusting us with your child's learning journey. We believe with proper support, your child will thrive academically. Let's work together toward their success.</p>
-      <p class="text-right mt-2 font-semibold">Mrs. Yinka Isikalu<br/>Director, Blooming Kids House</p>
+    <div class="flex gap-4 mt-8">
+      <button id="download-report" class="bg-blue-600 text-white px-4 py-2 rounded-xl hover:bg-blue-700">Download Report</button>
+      <button id="logout" class="bg-red-500 text-white px-4 py-2 rounded-xl hover:bg-red-600">Logout</button>
     </div>
-
-    <div class="flex justify-between mt-6">
-      <button id="download-btn" class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700">Download PDF</button>
-      <button id="logout-btn" class="bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700">Logout</button>
-    </div>
-
-    <footer class="mt-10 text-center text-sm text-gray-500">
-      POWERED BY <span class="text-yellow-400 font-semibold">POG</span>
-    </footer>
   </div>
 
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <script type="module" src="report.js"></script>
 </body>
 </html>
