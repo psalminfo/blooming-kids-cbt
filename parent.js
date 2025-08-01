@@ -1,36 +1,29 @@
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-import { getFirestore, collection, query, where, getDocs } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-import { generateAndDownloadReport } from "./generateReportFromFirestore.js";
-import { firebaseConfig } from "./firebaseConfig.js";
+import { fetchAndDisplayReport } from './generateReportFromFirestore.js';
 
-const app = initializeApp(firebaseConfig);
-const db = getFirestore(app);
-
-document.getElementById("report-form").addEventListener("submit", async (e) => {
+document.getElementById('parentForm').addEventListener('submit', async (e) => {
   e.preventDefault();
 
-  const studentName = document.getElementById("student-name").value.trim();
-  const parentEmail = document.getElementById("parent-email").value.trim();
+  const studentName = document.getElementById('studentName').value.trim();
+  const parentEmail = document.getElementById('parentEmail').value.trim();
+  const status = document.getElementById('reportStatus');
 
-  const reportsRef = collection(db, "testResults");
-  const q = query(reportsRef, where("studentName", "==", studentName), where("parentEmail", "==", parentEmail));
+  if (!studentName || !parentEmail) {
+    status.innerText = 'Please fill in both fields.';
+    return;
+  }
+
+  status.innerText = '🔍 Searching for report...';
+  status.classList.remove('text-green-600', 'text-red-600');
+  status.classList.add('text-yellow-600');
 
   try {
-    const querySnapshot = await getDocs(q);
-
-    if (querySnapshot.empty) {
-      alert("No report found. Please check the student's name and your email.");
-      return;
-    }
-
-    // Assuming one match — pick the first result
-    const docData = querySnapshot.docs[0].data();
-
-    // Dynamically generate and download PDF from Firestore data
-    await generateAndDownloadReport(docData);
-
-  } catch (error) {
-    console.error("Error fetching report:", error);
-    alert("Something went wrong. Please try again.");
+    await fetchAndDisplayReport(parentEmail, studentName);
+    status.classList.remove('text-yellow-600');
+    status.classList.add('text-green-600');
+  } catch (err) {
+    console.error('Error fetching report:', err);
+    status.innerText = '❌ Could not retrieve the report.';
+    status.classList.remove('text-yellow-600');
+    status.classList.add('text-red-600');
   }
 });
