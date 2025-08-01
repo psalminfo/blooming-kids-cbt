@@ -5,7 +5,7 @@ import {
   collection,
   getDocs,
   query,
-  where,
+  where
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
 const firebaseConfig = {
@@ -31,45 +31,34 @@ document.addEventListener("DOMContentLoaded", () => {
   form.addEventListener("submit", async (e) => {
     e.preventDefault();
 
-    const studentName = document.getElementById("studentName").value.trim();
-    const parentEmail = document.getElementById("parentEmail").value.trim();
+    const studentName = document.getElementById("studentName").value.trim().toLowerCase();
+    const parentEmail = document.getElementById("parentEmail").value.trim().toLowerCase();
 
     if (!studentName || !parentEmail) {
-      alert("Please fill in both fields.");
+      alert("Please enter both student name and parent email.");
       return;
     }
 
     try {
       const resultsRef = collection(db, "student_results");
-      const q = query(
-        resultsRef,
-        where("studentName", "==", studentName),
-        where("parentEmail", "==", parentEmail)
-      );
+      const q = query(resultsRef, where("studentNameLower", "==", studentName), where("parentEmailLower", "==", parentEmail));
       const querySnapshot = await getDocs(q);
 
       if (querySnapshot.empty) {
-        alert("No report found for the provided student.");
+        alert("No matching result found. Please check the name and email.");
         return;
       }
 
       const doc = querySnapshot.docs[0];
       const resultData = doc.data();
 
-      const report = {
-        studentName: resultData.studentName,
-        grade: resultData.grade,
-        parentEmail: resultData.parentEmail,
-        scores: resultData.scores,
-        tutor: resultData.tutorName || "Assigned Tutor",
-      };
-
-      localStorage.setItem("studentReportData", JSON.stringify(report));
+      // Store in localStorage to be picked up by report.html
+      localStorage.setItem("studentReportData", JSON.stringify(resultData));
       window.location.href = "report.html";
 
     } catch (err) {
       console.error("Error fetching report:", err);
-      alert("An error occurred while fetching the report.");
+      alert("An error occurred while fetching the report. Try again.");
     }
   });
 });
