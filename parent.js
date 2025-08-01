@@ -1,53 +1,52 @@
-// parent.js
-import { db } from './firebaseConfig.js';
-import { collection, query, where, getDocs } from 'https://www.gstatic.com/firebasejs/9.6.10/firebase-firestore.js';
+import { db, storage } from './firebaseConfig.js';
+import { collection, query, where, getDocs } from "https://www.gstatic.com/firebasejs/9.6.10/firebase-firestore.js";
+import { ref, getDownloadURL } from "https://www.gstatic.com/firebasejs/9.6.10/firebase-storage.js";
 
 document.addEventListener("DOMContentLoaded", () => {
-  const reportForm = document.getElementById("reportForm");
-  const reportResult = document.getElementById("reportResult");
+  const form = document.getElementById("parentLoginForm");
+  const reportSection = document.getElementById("reportSection");
+  const pdfPreview = document.getElementById("pdfPreview");
+  const downloadLink = document.getElementById("downloadLink");
 
-  reportForm.addEventListener("submit", async (e) => {
+  form.addEventListener("submit", async (e) => {
     e.preventDefault();
 
-    const studentName = document.getElementById("studentName").value.trim().toLowerCase();
-    const parentEmail = document.getElementById("parentEmail").value.trim().toLowerCase();
+    const studentName = document.getElementById("studentName").value.trim();
+    const parentEmail = document.getElementById("parentEmail").value.trim();
 
-    reportResult.innerHTML = "⏳ Fetching report...";
+    if (!studentName || !parentEmail) return;
 
     try {
       const resultsRef = collection(db, "student_results");
-      const q = query(
-        resultsRef,
-        where("studentName", "==", studentName),
-        where("parentEmail", "==", parentEmail)
-      );
-
+      const q = query(resultsRef, where("studentName", "==", studentName), where("parentEmail", "==", parentEmail));
       const querySnapshot = await getDocs(q);
 
       if (querySnapshot.empty) {
-        reportResult.innerHTML = "❌ No report found for this student and parent email.";
+        alert("No report found for this student and parent email.");
         return;
       }
 
-      let reportHTML = `<div class="text-left">`;
-      querySnapshot.forEach((doc) => {
-        const data = doc.data();
-        reportHTML += `
-          <div class="border rounded p-4 my-4 bg-gray-50">
-            <p><strong>Student:</strong> ${data.studentName}</p>
-            <p><strong>Subject:</strong> ${data.subject}</p>
-            <p><strong>Score:</strong> ${data.score}</p>
-            <p><strong>Grade:</strong> ${data.grade}</p>
-            <a href="${data.reportUrl}" target="_blank" class="text-blue-600 underline">Download Report</a>
-          </div>
-        `;
-      });
-      reportHTML += `</div>`;
-      reportResult.innerHTML = reportHTML;
+      const reportDoc = querySnapshot.docs[0].data();
+      const reportFileName = reportDoc.reportFileName;
+
+      if (!reportFileName) {
+        alert("Report found but missing file reference.");
+        return;
+      }
+
+      const fileRef = ref(storage, `reports/${reportFileName}`);
+      const downloadURL = await getDownloadURL(fileRef);
+
+      // Show preview
+      pdfPreview.src = downloadURL;
+      downloadLink.href = downloadURL;
+      downloadLink.download = `${studentName}_report.pdf`;
+
+      reportSection.classList.remove("hidden");
 
     } catch (error) {
       console.error("Error fetching report:", error);
-      reportResult.innerHTML = "🚨 An error occurred. Please try again later.";
+      alert("An error occurred. Please try again later.");
     }
   });
 });
