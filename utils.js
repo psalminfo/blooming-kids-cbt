@@ -1,5 +1,5 @@
 // utils.js
-import { auth, db } from './firebaseConfig.js';
+import { db } from './firebaseConfig.js'; // only import what you use
 
 export function logout() {
   localStorage.removeItem("studentData");
