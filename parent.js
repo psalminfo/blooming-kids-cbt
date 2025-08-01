@@ -1,43 +1,75 @@
-document.addEventListener("DOMContentLoaded", () => {
-  const parentForm = document.getElementById("parentForm");
-  const errorMsg = document.getElementById("errorMsg");
+// parent.js
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import {
+  getFirestore,
+  collection,
+  getDocs,
+  query,
+  where,
+} from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
-  if (!parentForm) {
+const firebaseConfig = {
+  apiKey: "AIzaSyBpwxvEoeuT8e6F5vGmDc1VkVfWTUdxavY",
+  authDomain: "blooming-kids-house.firebaseapp.com",
+  projectId: "blooming-kids-house",
+  storageBucket: "blooming-kids-house.appspot.com",
+  messagingSenderId: "739684305208",
+  appId: "1:739684305208:web:ee1cc9e998b37e1f002f84"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+
+document.addEventListener("DOMContentLoaded", () => {
+  const form = document.getElementById("parentLoginForm");
+
+  if (!form) {
     console.error("Form not found in the DOM.");
     return;
   }
 
-  parentForm.addEventListener("submit", async (e) => {
+  form.addEventListener("submit", async (e) => {
     e.preventDefault();
 
-    const studentNameInput = document.getElementById("studentName");
-    const studentEmailInput = document.getElementById("studentEmail");
+    const studentName = document.getElementById("studentName").value.trim();
+    const parentEmail = document.getElementById("parentEmail").value.trim();
 
-    if (!studentNameInput || !studentEmailInput) {
-      console.error("Input fields not found.");
-      return;
-    }
-
-    const studentName = studentNameInput.value.trim();
-    const studentEmail = studentEmailInput.value.trim();
-
-    if (!studentName || !studentEmail) {
-      errorMsg.textContent = "Please fill in both fields.";
-      errorMsg.classList.remove("hidden");
+    if (!studentName || !parentEmail) {
+      alert("Please fill in both fields.");
       return;
     }
 
     try {
-      // Encode the parameters to safely include in URL
-      const encodedName = encodeURIComponent(studentName);
-      const encodedEmail = encodeURIComponent(studentEmail);
+      const resultsRef = collection(db, "student_results");
+      const q = query(
+        resultsRef,
+        where("studentName", "==", studentName),
+        where("parentEmail", "==", parentEmail)
+      );
+      const querySnapshot = await getDocs(q);
 
-      // Redirect to the report page with parameters
-      window.location.href = `report.html?name=${encodedName}&email=${encodedEmail}`;
-    } catch (error) {
-      console.error("Error while submitting parent form:", error);
-      errorMsg.textContent = "An error occurred. Please try again.";
-      errorMsg.classList.remove("hidden");
+      if (querySnapshot.empty) {
+        alert("No report found for the provided student.");
+        return;
+      }
+
+      const doc = querySnapshot.docs[0];
+      const resultData = doc.data();
+
+      const report = {
+        studentName: resultData.studentName,
+        grade: resultData.grade,
+        parentEmail: resultData.parentEmail,
+        scores: resultData.scores,
+        tutor: resultData.tutorName || "Assigned Tutor",
+      };
+
+      localStorage.setItem("studentReportData", JSON.stringify(report));
+      window.location.href = "report.html";
+
+    } catch (err) {
+      console.error("Error fetching report:", err);
+      alert("An error occurred while fetching the report.");
     }
   });
 });
