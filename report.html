@@ -1,132 +1,150 @@
-<!-- report.html -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Student Report</title>
   <link rel="icon" href="favicon.ico" />
-  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet" />
   <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
 </head>
-<body class="bg-green-50 font-sans">
-  <div class="container mx-auto px-4 py-6">
-    <div class="flex justify-between items-center mb-4">
-      <h1 class="text-3xl font-bold text-green-700">BLOOMING KIDS HOUSE ASSESSMENT REPORT</h1>
-      <button id="logoutBtn" class="bg-yellow-400 hover:bg-yellow-500 text-white font-semibold px-4 py-2 rounded">Logout</button>
+<body class="bg-gray-100 min-h-screen p-4 flex flex-col items-center justify-center">
+  <div id="reportContainer" class="bg-white shadow-xl rounded-2xl max-w-3xl w-full p-8 space-y-6">
+    <div class="text-center">
+      <h1 class="text-2xl font-bold text-green-700">Student Performance Report</h1>
     </div>
 
-    <div id="reportContent" class="bg-white shadow-md rounded-lg p-6 text-gray-800">
-      <!-- Dynamic content will be injected here -->
+    <div id="studentDetails" class="space-y-1 text-sm">
+      <p><strong>Name:</strong> <span id="studentName">Loading...</span></p>
+      <p><strong>Grade:</strong> <span id="studentGrade">Loading...</span></p>
+      <p><strong>Location:</strong> <span id="studentLocation">Loading...</span></p>
+      <p><strong>Assigned Tutor:</strong> <span id="tutorName">Loading...</span></p>
     </div>
 
-    <div class="flex justify-end mt-6">
-      <button id="downloadBtn" class="bg-green-600 hover:bg-green-700 text-white font-semibold px-6 py-2 rounded">Download PDF</button>
+    <div class="border-t pt-4 space-y-2">
+      <h2 class="font-semibold text-lg text-yellow-600">Performance Summary</h2>
+      <div id="summaryText" class="text-gray-700 text-sm">Loading report summary...</div>
     </div>
 
-    <footer class="mt-10 text-center text-sm text-gray-500">
+    <div class="border-t pt-4 space-y-2">
+      <h2 class="font-semibold text-lg text-yellow-600">Recommendation</h2>
+      <div id="recommendationText" class="text-gray-700 text-sm">Loading recommendations...</div>
+    </div>
+
+    <div class="border-t pt-4 space-y-2">
+      <h2 class="font-semibold text-lg text-yellow-600">Director's Note</h2>
+      <div class="text-gray-700 text-sm">
+        Dear Esteemed Parent,<br><br>
+        Thank you for giving your child the opportunity to participate in this assessment. At Blooming Kids House, we believe every child is capable of excellence when guided with love and structure. Whether your child has shown strength or needs support, we are here to help them grow.<br><br>
+        We are ready to walk with your child to improve their academic journey. You’re not alone on this path — our tutors are here to help!<br><br>
+        With warm regards,<br>
+        <strong>Mrs. Yinka Isikalu</strong><br>
+        Director, Blooming Kids House
+      </div>
+    </div>
+
+    <div class="flex items-center justify-between pt-6">
+      <button id="downloadBtn" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded">Download Report</button>
+      <button id="logoutBtn" class="text-sm text-red-600 underline">Logout</button>
+    </div>
+
+    <footer class="text-center pt-4 text-sm text-gray-400 border-t">
       POWERED BY <span style="color:#FFEB3B">POG</span>
     </footer>
   </div>
 
   <script>
-    const studentName = localStorage.getItem("studentName");
-    const parentEmail = localStorage.getItem("parentEmail");
+    import('https://www.gstatic.com/firebasejs/10.7.2/firebase-app-compat.js').then(() => {
+      return import('https://www.gstatic.com/firebasejs/10.7.2/firebase-firestore-compat.js');
+    }).then(() => {
+      const firebaseConfig = {
+        apiKey: "AIzaSyBpwxvEoeuT8e6F5vGmDc1VkVfWTUdxavY",
+        authDomain: "blooming-kids-house.firebaseapp.com",
+        projectId: "blooming-kids-house",
+        storageBucket: "blooming-kids-house.appspot.com",
+        messagingSenderId: "739684305208",
+        appId: "1:739684305208:web:ee1cc9e998b37e1f002f84"
+      };
 
-    if (!studentName || !parentEmail) {
-      alert("Invalid access. Redirecting to parent login.");
-      window.location.href = "parent.html";
-    }
-
-    document.getElementById('logoutBtn').addEventListener('click', () => {
-      localStorage.removeItem("studentName");
-      localStorage.removeItem("parentEmail");
-      window.location.href = 'parent.html';
-    });
-
-    const firebaseAppConfig = {
-      apiKey: "AIzaSyBpwxvEoeuT8e6F5vGmDc1VkVfWTUdxavY",
-      authDomain: "blooming-kids-house.firebaseapp.com",
-      projectId: "blooming-kids-house",
-      storageBucket: "blooming-kids-house.appspot.com",
-      messagingSenderId: "739684305208",
-      appId: "1:739684305208:web:ee1cc9e998b37e1f002f84"
-    };
-
-    const script1 = document.createElement('script');
-    script1.src = "https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js";
-    document.head.appendChild(script1);
-
-    const script2 = document.createElement('script');
-    script2.src = "https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore-compat.js";
-    document.head.appendChild(script2);
-
-    script2.onload = () => {
-      firebase.initializeApp(firebaseAppConfig);
+      firebase.initializeApp(firebaseConfig);
       const db = firebase.firestore();
 
-      db.collection("studentReports")
+      const studentName = localStorage.getItem("studentName");
+      const parentEmail = localStorage.getItem("parentEmail");
+
+      if (!studentName || !parentEmail) {
+        alert("No parent data found. Redirecting...");
+        window.location.href = "parent.html";
+      }
+
+      document.getElementById("studentName").innerText = studentName;
+
+      db.collection("studentResults")
         .where("studentName", "==", studentName)
         .where("parentEmail", "==", parentEmail)
+        .orderBy("timestamp", "desc")
+        .limit(1)
         .get()
-        .then(querySnapshot => {
-          if (querySnapshot.empty) {
-            document.getElementById('reportContent').innerHTML = `<p class='text-red-600 font-semibold'>No report found for ${studentName}.</p>`;
+        .then((snapshot) => {
+          if (snapshot.empty) {
+            document.getElementById("summaryText").innerText = "No record found for this student.";
             return;
           }
-          const doc = querySnapshot.docs[0].data();
-          renderReport(doc);
+
+          const data = snapshot.docs[0].data();
+          document.getElementById("studentGrade").innerText = data.grade || "N/A";
+          document.getElementById("studentLocation").innerText = data.location || "N/A";
+          document.getElementById("tutorName").innerText = data.tutor || "N/A";
+
+          const subjects = Object.keys(data.subjects || {});
+          let summaryHTML = '';
+          let recommendationHTML = '';
+
+          subjects.forEach((subject) => {
+            const result = data.subjects[subject];
+            const percentage = Math.round((result.score / result.total) * 100);
+
+            summaryHTML += `
+              <div class="mb-2">
+                <strong>${subject}:</strong> ${percentage}% 
+                ${percentage >= 80 ? '✅' : percentage >= 60 ? '⚠️' : '❌'}
+              </div>
+            `;
+
+            recommendationHTML += `
+              <div class="mb-2">
+                In <strong>${subject}</strong>, your child covered core curriculum areas but still needs guided reinforcement. 
+                We will work with them to master key topics such as <em>${(result.topics || []).join(', ') || 'relevant standards'}</em>, using practice-based learning and tailored strategies.
+              </div>
+            `;
+          });
+
+          document.getElementById("summaryText").innerHTML = summaryHTML;
+          document.getElementById("recommendationText").innerHTML = recommendationHTML;
         })
-        .catch(err => {
-          console.error("Error fetching report:", err);
+        .catch((error) => {
+          console.error("Error loading report:", error);
+          document.getElementById("summaryText").innerText = "An error occurred while fetching the report.";
         });
-    };
 
-    function renderReport(data) {
-      const subjectReports = Object.entries(data.subjects || {}).map(([subject, scoreObj]) => {
-        return `
-          <div class="mb-4">
-            <h3 class="text-lg font-semibold text-green-600">${subject.toUpperCase()}</h3>
-            <p class="mb-2">Score: ${scoreObj.score}%</p>
-            <p class="text-sm italic text-gray-600">Recommendations: ${generateRecommendation(subject, scoreObj.topics)}</p>
-          </div>
-        `;
-      }).join('');
+      document.getElementById("logoutBtn").addEventListener("click", () => {
+        localStorage.clear();
+        window.location.href = "parent.html";
+      });
 
-      const reportHTML = `
-        <div class="mb-6">
-          <p class="text-xl font-semibold">Student Name: ${data.studentName}</p>
-          <p class="text-lg">Grade: ${data.grade}</p>
-          <p class="text-lg">Tutor: ${data.tutorName}</p>
-          <p class="text-lg">Location: ${data.location}</p>
-        </div>
-        <div class="border-t border-b py-4">
-          ${subjectReports}
-        </div>
-        <div class="mt-6">
-          <h2 class="text-xl font-semibold mb-2">Director's Message</h2>
-          <p class="mb-1">Dear Parent,</p>
-          <p class="mb-2">
-            Thank you for entrusting us with ${data.studentName}'s academic journey. This report provides valuable insights into your child's strengths and areas that need targeted intervention. Our tutors, especially ${data.tutorName}, are fully prepared to provide expert support to help your child excel across all subjects.
-          </p>
-          <p>Sincerely,<br /><strong>Mrs. Yinka Isikalu</strong><br />Director, Blooming Kids House</p>
-        </div>
-      `;
-
-      document.getElementById('reportContent').innerHTML = reportHTML;
-    }
-
-    function generateRecommendation(subject, topics = []) {
-      if (!topics.length) return `Encourage continued practice in ${subject}.`;
-      return `Focus on improving the following areas in ${subject.toLowerCase()}: ${topics.join(', ')}. Consider personalized sessions with ${studentName}'s tutor to reinforce these concepts.`;
-    }
-
-    document.getElementById("downloadBtn").addEventListener("click", () => {
-      const doc = new jspdf.jsPDF();
-      const content = document.getElementById("reportContent").innerText;
-      const lines = doc.splitTextToSize(content, 180);
-      doc.text(lines, 10, 10);
-      doc.save(`${studentName}_Assessment_Report.pdf`);
+      document.getElementById("downloadBtn").addEventListener("click", () => {
+        const container = document.getElementById("reportContainer");
+        html2canvas(container).then((canvas) => {
+          const imgData = canvas.toDataURL("image/png");
+          const pdf = new jspdf.jsPDF('p', 'mm', 'a4');
+          const pageWidth = pdf.internal.pageSize.getWidth();
+          const imgProps = pdf.getImageProperties(imgData);
+          const pdfHeight = (imgProps.height * pageWidth) / imgProps.width;
+          pdf.addImage(imgData, 'PNG', 0, 0, pageWidth, pdfHeight);
+          pdf.save(`${studentName}-report.pdf`);
+        });
+      });
     });
   </script>
 </body>
