@@ -1,5 +1,8 @@
+import { saveStudentData } from './utils.js';
+
 document.getElementById("studentLoginForm").addEventListener("submit", function (e) {
   e.preventDefault();
+
   const studentName = document.getElementById("studentName").value;
   const parentEmail = document.getElementById("parentEmail").value;
   const grade = document.getElementById("grade").value;
@@ -12,5 +15,15 @@ document.getElementById("studentLoginForm").addEventListener("submit", function 
     return;
   }
 
-  window.location.href = `subject-select.html?studentName=${encodeURIComponent(studentName)}&parentEmail=${encodeURIComponent(parentEmail)}&grade=${grade}&tutorName=${encodeURIComponent(tutorName)}&location=${encodeURIComponent(location)}`;
+  // ✅ Save full student info
+  saveStudentData({
+    studentName,
+    parentEmail,
+    grade,
+    tutorName,
+    location
+  });
+
+  // ✅ Redirect to subject selection
+  window.location.href = "subject-select.html";
 });
