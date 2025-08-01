@@ -21,42 +21,66 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
-// ✅ Handle form submission
-document.addEventListener("DOMContentLoaded", () => {
-  const form = document.getElementById("parentLoginForm");
+// ✅ On load: fetch student + parent from URL and load report
+document.addEventListener("DOMContentLoaded", async () => {
+  const urlParams = new URLSearchParams(window.location.search);
+  const studentName = urlParams.get("student");
+  const parentEmail = urlParams.get("parent");
 
-  if (!form) return;
+  if (!studentName || !parentEmail) {
+    document.getElementById("reportContent").innerHTML = "<p class='text-red-500'>Missing student or parent info.</p>";
+    return;
+  }
 
-  form.addEventListener("submit", async (e) => {
-    e.preventDefault();
+  try {
+    const resultsRef = collection(db, "student_results");
+    const q = query(
+      resultsRef,
+      where("studentName", "==", studentName),
+      where("parentEmail", "==", parentEmail.toLowerCase())
+    );
 
-    const studentName = document.getElementById("studentName").value.trim();
-    const parentEmail = document.getElementById("parentEmail").value.trim().toLowerCase();
+    const querySnapshot = await getDocs(q);
 
-    if (!studentName || !parentEmail) {
-      alert("Please enter both student name and parent email.");
-      return;
+    if (!querySnapshot.empty) {
+      const resultData = querySnapshot.docs[0].data();
+
+      // ✅ Display report data
+      document.getElementById("studentNameDisplay").textContent = resultData.studentName;
+      document.getElementById("tutorNameDisplay").textContent = resultData.tutorName || "Your Assigned Tutor";
+      document.getElementById("mathScoreDisplay").textContent = resultData.mathScore ?? "N/A";
+      document.getElementById("elaScoreDisplay").textContent = resultData.elaScore ?? "N/A";
+
+      // ✅ Recommendations based on score
+      const recommendations = generateRecommendations(resultData);
+      document.getElementById("recommendations").innerHTML = recommendations;
+
+    } else {
+      document.getElementById("reportContent").innerHTML = "<p class='text-red-500'>No report found for this student.</p>";
     }
-
-    try {
-      const resultsRef = collection(db, "testResults");
-      const q = query(
-        resultsRef,
-        where("studentName", "==", studentName),
-        where("parentEmail", "==", parentEmail)
-      );
-
-      const querySnapshot = await getDocs(q);
-
-      if (!querySnapshot.empty) {
-        // ✅ Found a result, redirect to report page with query params
-        window.location.href = `report.html?student=${encodeURIComponent(studentName)}&parent=${encodeURIComponent(parentEmail)}`;
-      } else {
-        alert("No report found for this student and parent email.");
-      }
-    } catch (error) {
-      console.error("Error fetching report:", error);
-      alert("An error occurred. Please try again later.");
-    }
-  });
+  } catch (error) {
+    console.error("Error loading report:", error);
+    document.getElementById("reportContent").innerHTML = "<p class='text-red-500'>An error occurred while loading the report.</p>";
+  }
 });
+
+// ✅ Generate tailored recommendations
+function generateRecommendations(data) {
+  let sections = [];
+
+  if (data.mathScore !== undefined) {
+    sections.push(`
+      <h3 class="text-lg font-semibold mt-4 mb-1 text-blue-700">Math:</h3>
+      <p>Your child scored ${data.mathScore}%. We recommend focusing on number sense, basic operations, and word problems. Your assigned tutor, <strong>${data.tutorName}</strong>, will guide your child through these areas weekly.</p>
+    `);
+  }
+
+  if (data.elaScore !== undefined) {
+    sections.push(`
+      <h3 class="text-lg font-semibold mt-4 mb-1 text-green-700">ELA:</h3>
+      <p>Your child scored ${data.elaScore}%. We suggest targeted reading comprehension, grammar, and vocabulary exercises. <strong>${data.tutorName}</strong> will use STAAR-aligned materials for improvement.</p>
+    `);
+  }
+
+  return sections.join("");
+}
