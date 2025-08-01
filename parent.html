@@ -2,32 +2,26 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Parent Portal - Blooming Kids House</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css"/>
   <link rel="icon" href="favicon.ico" />
-  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
 </head>
-<body class="bg-yellow-50 text-gray-800">
-  <div class="min-h-screen flex flex-col justify-center items-center">
-    <h1 class="text-2xl font-bold text-yellow-800 mb-4">📄 Download Your Child's Report</h1>
-    
-    <form id="parentForm" class="bg-white p-6 rounded-xl shadow-lg w-full max-w-md">
-      <label class="block mb-2">
-        Student Name:
-        <input type="text" id="studentName" required class="mt-1 block w-full border border-gray-300 rounded p-2" />
-      </label>
-      <label class="block mb-4">
-        Parent Email:
-        <input type="email" id="parentEmail" required class="mt-1 block w-full border border-gray-300 rounded p-2" />
-      </label>
-      <button type="submit" class="bg-yellow-600 hover:bg-yellow-700 text-white py-2 px-4 rounded w-full">Search Report</button>
-      <p id="reportStatus" class="mt-4 text-center text-sm"></p>
+<body class="bg-white text-gray-800 min-h-screen flex items-center justify-center p-4">
+  <div class="bg-yellow-50 shadow-2xl p-8 rounded-2xl w-full max-w-md border border-yellow-300">
+    <h1 class="text-2xl font-bold text-center text-yellow-800 mb-6">Parent Report Portal</h1>
+    <form id="parentForm" class="space-y-4">
+      <div>
+        <label class="block text-sm font-medium text-yellow-900">Student Full Name</label>
+        <input type="text" id="studentName" class="mt-1 block w-full border-yellow-300 rounded-md shadow-sm" required />
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-yellow-900">Email Used During Test</label>
+        <input type="email" id="studentEmail" class="mt-1 block w-full border-yellow-300 rounded-md shadow-sm" required />
+      </div>
+      <button type="submit" class="w-full bg-yellow-500 hover:bg-yellow-600 text-white font-semibold py-2 px-4 rounded">Get Report</button>
     </form>
-
-    <div id="reportContainer" class="mt-6 w-full max-w-3xl hidden">
-      <iframe id="reportFrame" class="w-full h-[500px] border rounded-xl shadow-lg"></iframe>
-      <a id="downloadLink" href="#" class="block mt-4 text-center text-white bg-yellow-700 px-4 py-2 rounded-lg hover:bg-yellow-800">⬇ Download Report PDF</a>
-    </div>
+    <p id="errorMsg" class="text-red-500 mt-4 text-center hidden"></p>
   </div>
 
   <script type="module" src="./parent.js"></script>
