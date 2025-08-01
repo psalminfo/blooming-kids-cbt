@@ -1,71 +1,54 @@
 import { db } from './firebaseConfig.js';
 import { collection, query, where, getDocs } from "https://www.gstatic.com/firebasejs/9.6.10/firebase-firestore.js";
-import { generatePDFReport } from './parentReport.js';
+import html2pdf from 'https://cdn.jsdelivr.net/npm/html2pdf.js@0.10.1/dist/html2pdf.bundle.min.js';
 
-window.downloadReport = generatePDFReport;
+document.getElementById('parentForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const studentName = document.getElementById('studentName').value.trim();
+  const parentEmail = document.getElementById('parentEmail').value.trim();
+  const q = query(collection(db, 'student_results'), where('studentName', '==', studentName), where('parentEmail', '==', parentEmail));
+  const snapshot = await getDocs(q);
 
-window.logout = () => {
-  window.location.href = "parent.html";
-};
+  const reportContainer = document.getElementById('reportContent');
+  reportContainer.innerHTML = '';
 
-document.getElementById("fetchReport").addEventListener("click", async () => {
-  const studentName = document.getElementById("studentName").value.trim();
-  const parentEmail = document.getElementById("parentEmail").value.trim();
-  const subjectInput = document.getElementById("subject").value.trim().toLowerCase();
+  if (snapshot.empty) {
+    reportContainer.innerHTML = '<p class="text-red-500">No reports found for this student and email.</p>';
+  } else {
+    let totalScore = 0;
+    let totalSubjects = 0;
+    let tutorName = '';
+    snapshot.forEach(doc => {
+      const data = doc.data();
+      const score = data.answers.filter(ans => ans === 'correct').length;
+      totalScore += score;
+      totalSubjects += 1;
+      tutorName = data.tutorName || '';
+      reportContainer.innerHTML += `
+        <div class="mb-4">
+          <h2 class="text-xl font-semibold text-green-700">Subject: ${data.subject.toUpperCase()}</h2>
+          <p>Score: ${score}/30</p>
+        </div>`;
+    });
 
-  if (!studentName || !parentEmail || !subjectInput) {
-    alert("Please fill in all fields.");
-    return;
-  }
+    reportContainer.innerHTML = `
+      <h1 class="text-2xl font-bold text-green-800 mb-2">BLOOMING KIDS HOUSE ASSESSMENT REPORT</h1>
+      <p><strong>Student:</strong> ${studentName}</p>
+      <p><strong>Parent:</strong> ${parentEmail}</p>
+      <p><strong>Tutor:</strong> ${tutorName}</p>
+      <p><strong>Total Score:</strong> ${totalScore} / ${totalSubjects * 30}</p>
+      <p><strong>Recommendations:</strong> Consistent improvement can be achieved through weekly tutorials with support from the assigned tutor.</p>
+      <p class="mt-4 italic text-sm">POWERED BY <span style="color:#FFEB3B">POG</span></p>
+    ` + reportContainer.innerHTML;
 
-  const resultsRef = collection(db, "student_results");
-  const q = query(resultsRef, where("studentName", "==", studentName), where("parentEmail", "==", parentEmail));
-  const querySnapshot = await getDocs(q);
-
-  let found = false;
-
-  querySnapshot.forEach(doc => {
-    const data = doc.data();
-    if ((data.subject || '').toLowerCase() === subjectInput) {
-      found = true;
-      showReport(data);
-    }
-  });
-
-  if (!found) {
-    alert("No matching report found.");
+    document.getElementById('reportSection').classList.remove('hidden');
   }
 });
 
-function showReport(data) {
-  const reportDiv = document.getElementById("report");
-  const actionsDiv = document.getElementById("actions");
+document.getElementById('downloadBtn').addEventListener('click', () => {
+  html2pdf().from(document.getElementById('reportContent')).save();
+});
 
-  const score = data.answers.filter(a => a === "correct").length;
-  const total = data.answers.length;
-
-  reportDiv.innerHTML = `
-    <h2 class="text-xl font-semibold mb-2">Student: ${data.studentName}</h2>
-    <p><strong>Subject:</strong> ${data.subject}</p>
-    <p><strong>Grade:</strong> ${data.grade}</p>
-    <p><strong>Tutor:</strong> ${data.tutorName}</p>
-    <p><strong>Location:</strong> ${data.location}</p>
-    <p><strong>Score:</strong> ${score} / ${total}</p>
-
-    <div class="mt-4">
-      <h3 class="font-bold text-green-700">Director's Message</h3>
-      <p class="italic">Dear Parent, thank you for trusting us with your child's learning journey. This report reflects performance and areas where your child can grow. Let's work together to support their success. — Mrs. Yinka Isikalu</p>
-    </div>
-
-    <div class="mt-4">
-      <h3 class="font-bold text-green-700">Recommendations</h3>
-      <p>
-        Based on the performance in <strong>${data.subject}</strong>, your child needs focused support on key areas of the curriculum.
-        Our tutor <strong>${data.tutorName}</strong> will guide them in building confidence, addressing learning gaps, and mastering the topics covered in the test.
-      </p>
-    </div>
-  `;
-
-  reportDiv.classList.remove("hidden");
-  actionsDiv.classList.remove("hidden");
-}
+document.getElementById('logoutBtn').addEventListener('click', () => {
+  window.location.href = 'parent.html';
+});
