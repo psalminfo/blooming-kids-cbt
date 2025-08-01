@@ -1,76 +1,92 @@
-import { db } from './firebaseConfig.js';
-import { collection, query, where, getDocs } from "https://www.gstatic.com/firebasejs/9.6.10/firebase-firestore.js";
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import { getFirestore, collection, query, where, getDocs } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import html2pdf from "https://cdn.jsdelivr.net/npm/html2pdf.js@0.9.3/dist/html2pdf.bundle.min.js";
 
-async function loadReport() {
-  const studentName = document.getElementById("studentName").value.trim().toLowerCase();
-  const parentEmail = document.getElementById("parentEmail").value.trim().toLowerCase();
-  const reportArea = document.getElementById("reportArea");
-  const reportContent = document.getElementById("reportContent");
+const firebaseConfig = {
+  apiKey: "AIzaSyBpwxvEoeuT8e6F5vGmDc1VkVfWTUdxavY",
+  authDomain: "blooming-kids-house.firebaseapp.com",
+  projectId: "blooming-kids-house",
+  storageBucket: "blooming-kids-house.appspot.com",
+  messagingSenderId: "739684305208",
+  appId: "1:739684305208:web:ee1cc9e998b37e1f002f84"
+};
 
-  if (!studentName || !parentEmail) {
-    alert("Please enter both student name and parent email.");
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+
+window.fetchReports = async function () {
+  const studentName = document.getElementById('studentName').value.trim();
+  const parentEmail = document.getElementById('parentEmail').value.trim().toLowerCase();
+
+  if (!studentName || !parentEmail) return alert("Please enter both student name and parent email.");
+
+  const q = query(collection(db, "testResults"), where("studentName", "==", studentName), where("parentEmail", "==", parentEmail));
+  const snapshot = await getDocs(q);
+  const reportContainer = document.getElementById("reportContainer");
+  reportContainer.innerHTML = "";
+
+  if (snapshot.empty) {
+    reportContainer.innerHTML = `<p class='text-red-600'>No test reports found for this student and parent email.</p>`;
     return;
   }
 
-  const q = query(collection(db, "student_results"), where("parentEmail", "==", parentEmail));
-  const querySnapshot = await getDocs(q);
-
-  const studentResults = [];
-  querySnapshot.forEach((doc) => {
+  snapshot.forEach(doc => {
     const data = doc.data();
-    if (data.studentName.toLowerCase() === studentName) {
-      studentResults.push(data);
-    }
-  });
+    const timestamp = new Date(data.timestamp).toLocaleString();
 
-  if (studentResults.length === 0) {
-    alert("No records found.");
-    return;
-  }
+    const scoresTable = Object.entries(data.scores).map(([subject, score]) => {
+      const percent = `${Math.round((score.correct / score.total) * 100)}%`;
+      return `<tr><td class='border p-2'>${subject}</td><td class='border p-2 text-center'>${percent}</td></tr>`;
+    }).join("");
 
-  const subjects = studentResults.map(r => r.subject.toUpperCase());
-  const scores = studentResults.map(r => {
-    const correct = r.answers.filter(a => a === "correct").length;
-    return { subject: r.subject, score: correct, total: r.answers.length };
-  });
+    const topicsList = data.topicsCovered?.length ? data.topicsCovered.map(t => `<li>${t}</li>`).join("") : '<li>No topics listed.</li>';
 
-  // Report layout
-  reportContent.innerHTML = `
-    <h2 class="text-xl font-bold mb-2">Student Name: ${capitalize(studentResults[0].studentName)}</h2>
-    <p><strong>Parent Email:</strong> ${parentEmail}</p>
-    <p><strong>Grade:</strong> ${studentResults[0].grade}</p>
-    <p><strong>Tutor:</strong> ${studentResults[0].tutorName}</p>
-    <p><strong>Location:</strong> ${studentResults[0].location}</p>
-    <hr class="my-3"/>
-    <h3 class="text-lg font-semibold mb-2">Subject Scores:</h3>
-    <ul class="mb-4">
-      ${scores.map(s => `<li><strong>${s.subject.toUpperCase()}</strong>: ${s.score}/${s.total}</li>`).join("")}
-    </ul>
-    <h3 class="text-lg font-semibold mb-1">Director’s Message:</h3>
-    <p class="mb-2 italic">Dear Parent, thank you for trusting Blooming Kids House. Based on the results, we recommend personalized tutoring for your child to build confidence and mastery. Our tutor, ${studentResults[0].tutorName}, will guide them with expert support across all topics tested.</p>
-    <h3 class="text-lg font-semibold mb-1">Recommendations:</h3>
-    <ul class="list-disc pl-5">
-      ${studentResults.map(r => `<li><strong>${r.subject.toUpperCase()}</strong>: Focus on revising major concepts covered in the assessment. Consistent tutoring sessions are highly recommended.</li>`).join("")}
-    </ul>
-    <footer class="text-sm text-center text-gray-500 mt-6">POWERED BY <span class="text-blooming-yellow font-bold">POG</span></footer>
-  `;
+    const recommendations = data.topicsCovered?.length ?
+      `<p>We noticed areas like <strong>${data.topicsCovered.join(", ")}</strong> could use some improvement. We recommend focused tutoring sessions to build confidence and skill.</p>` :
+      `<p>We recommend our tutoring sessions to strengthen your child’s academic foundation.</p>`;
 
-  reportArea.classList.remove("hidden");
-}
+    const reportHTML = `
+      <div class="bg-white p-6 rounded-xl shadow space-y-4">
+        <h2 class="text-xl font-semibold text-yellow-800">Report for ${data.studentName}</h2>
+        <p><strong>Grade:</strong> ${data.grade}</p>
+        <p><strong>Date:</strong> ${timestamp}</p>
 
-function capitalize(str) {
-  return str.replace(/\b\w/g, l => l.toUpperCase());
-}
+        <table class="w-full border mt-4">
+          <thead>
+            <tr class="bg-yellow-200">
+              <th class="border p-2">Subject</th>
+              <th class="border p-2">Score (%)</th>
+            </tr>
+          </thead>
+          <tbody>${scoresTable}</tbody>
+        </table>
 
-window.loadReport = loadReport;
+        <div>
+          <h3 class="font-semibold mt-4 mb-2">Topics Covered</h3>
+          <ul class="list-disc list-inside">${topicsList}</ul>
+        </div>
 
-window.downloadReport = function () {
-  import("https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js").then(module => {
-    const element = document.getElementById("reportContent");
-    html2pdf().from(element).save("Assessment_Report.pdf");
+        <div class="mt-4">
+          <h3 class="font-semibold mb-2">Recommendations</h3>
+          ${recommendations}
+        </div>
+
+        <div class="mt-6 italic text-sm text-gray-700 border-t pt-4">
+          <p>“Thank you for trusting us with your child’s academic journey. We believe every child can excel with the right guidance and support.”</p>
+          <p class="mt-2 font-semibold">Mrs. Yinka Isikalu<br>Director, Blooming Kids House</p>
+        </div>
+
+        <button class="mt-4 bg-yellow-500 hover:bg-yellow-600 text-white px-4 py-2 rounded" onclick="downloadReport(this)">Download PDF</button>
+      </div>
+    `;
+
+    const wrapper = document.createElement('div');
+    wrapper.innerHTML = reportHTML;
+    reportContainer.appendChild(wrapper);
   });
 };
 
-window.logout = function () {
-  window.location.href = "parent.html";
+window.downloadReport = function (btn) {
+  const reportDiv = btn.closest(".bg-white");
+  html2pdf().from(reportDiv).save("student-report.pdf");
 };
