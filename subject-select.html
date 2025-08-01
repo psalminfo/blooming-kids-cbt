@@ -12,11 +12,7 @@
 
   <div class="bg-white p-8 rounded-xl shadow-xl w-full max-w-md text-center">
     <h2 class="text-2xl font-bold text-green-800 mb-4">Select a Subject</h2>
-    <div id="subjectButtons" class="space-y-4">
-      <button onclick="goToSubject('math')" class="bg-green-600 text-white w-full py-2 rounded hover:bg-green-700">Math</button>
-      <button onclick="goToSubject('ela')" class="bg-green-600 text-white w-full py-2 rounded hover:bg-green-700">English Language Arts</button>
-      <button onclick="goToSubject('science')" class="bg-green-600 text-white w-full py-2 rounded hover:bg-green-700">Science</button>
-    </div>
+    <div id="subjectButtons" class="space-y-4"></div>
     <p class="text-xs text-center mt-6 text-gray-600">POWERED BY <span style="color:#FFEB3B">POG</span></p>
   </div>
 
@@ -24,23 +20,41 @@
     import { getStudentData } from './utils.js';
 
     const studentData = getStudentData();
-    if (!studentData || !studentData.grade || !studentData.studentName || !studentData.parentEmail) {
+    const subjectButtons = document.getElementById("subjectButtons");
+
+    if (!studentData || !studentData.grade) {
       alert("Missing student info. Redirecting...");
       window.location.href = "index.html";
     }
 
-    window.goToSubject = function(subject) {
-      const query = new URLSearchParams({
-        subject,
-        grade: studentData.grade,
-        studentName: studentData.studentName,
-        parentEmail: studentData.parentEmail,
-        tutorName: studentData.tutorName,
-        location: studentData.location
-      }).toString();
+    const grade = parseInt(studentData.grade);
 
-      window.location.href = `student.html?${query}`;
+    const coreSubjects = ["math", "ela"];
+    const scienceSubjects = ["chemistry", "biology", "physics"];
+
+    let subjectsToShow = coreSubjects;
+    if (grade >= 7) {
+      subjectsToShow = [...coreSubjects, ...scienceSubjects];
     }
+
+    subjectsToShow.forEach(subject => {
+      const label = subject.toUpperCase().replace("ELA", "English Language Arts");
+      const btn = document.createElement("button");
+      btn.textContent = label.charAt(0) + label.slice(1).toLowerCase();
+      btn.className = "bg-green-600 text-white w-full py-2 rounded hover:bg-green-700";
+      btn.onclick = () => {
+        const query = new URLSearchParams({
+          subject,
+          grade: studentData.grade,
+          studentName: studentData.studentName,
+          parentEmail: studentData.parentEmail,
+          tutorName: studentData.tutorName,
+          location: studentData.location
+        }).toString();
+        window.location.href = `student.html?${query}`;
+      };
+      subjectButtons.appendChild(btn);
+    });
   </script>
 
 </body>
