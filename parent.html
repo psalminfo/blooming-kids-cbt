@@ -3,35 +3,48 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Parent Portal – Blooming Kids House</title>
-  <link rel="icon" href="favicon.ico" />
-  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet" />
+  <title>Parent Report - Blooming Kids House</title>
+  <link rel="icon" href="favicon.ico">
+  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
 </head>
-<body class="bg-green-50 text-gray-800">
+<body class="bg-green-50 text-gray-900">
   <div class="max-w-3xl mx-auto p-6">
-    <h1 class="text-2xl font-bold text-center text-green-700 mb-4">BLOOMING KIDS HOUSE ASSESSMENT REPORT</h1>
+    <h1 class="text-3xl font-bold text-center text-green-700 mb-6">
+      BLOOMING KIDS HOUSE ASSESSMENT REPORT
+    </h1>
 
-    <form id="parentForm" class="bg-white shadow-md rounded p-4 mb-6">
-      <div class="mb-4">
-        <label class="block font-semibold">Student Name</label>
-        <input type="text" id="studentName" required class="w-full p-2 border rounded" />
-      </div>
-      <div class="mb-4">
-        <label class="block font-semibold">Parent Email</label>
-        <input type="email" id="parentEmail" required class="w-full p-2 border rounded" />
-      </div>
-      <button type="submit" class="bg-yellow-400 hover:bg-yellow-500 text-white font-bold py-2 px-4 rounded w-full">Fetch Report</button>
-    </form>
+    <div class="bg-white p-4 rounded shadow">
+      <label class="block mb-2 text-sm font-medium">Student Name</label>
+      <input id="studentName" class="w-full border p-2 mb-4 rounded" placeholder="Enter full student name">
 
-    <div id="reportContainer" class="hidden bg-white p-6 shadow rounded">
-      <div id="reportContent" class="text-sm space-y-3"></div>
-      <div class="flex justify-between mt-4">
-        <button id="downloadBtn" class="bg-green-600 text-white py-2 px-4 rounded hover:bg-green-700">Download PDF</button>
-        <button onclick="window.location.reload()" class="bg-gray-500 text-white py-2 px-4 rounded hover:bg-gray-600">Log Out</button>
-      </div>
+      <label class="block mb-2 text-sm font-medium">Parent Email</label>
+      <input id="parentEmail" class="w-full border p-2 mb-4 rounded" placeholder="Enter parent email used">
+
+      <label class="block mb-2 text-sm font-medium">Subject</label>
+      <input id="subject" class="w-full border p-2 mb-4 rounded" placeholder="e.g., math or ela">
+
+      <button id="fetchReport" class="bg-yellow-400 hover:bg-yellow-500 text-white font-bold py-2 px-4 rounded w-full mb-4">Fetch Report</button>
     </div>
+
+    <div id="report" class="mt-6 hidden bg-white p-6 rounded shadow text-sm">
+      <!-- Filled by JS -->
+    </div>
+
+    <div class="mt-4 space-x-2 hidden" id="actions">
+      <button onclick="downloadReport()" class="bg-green-600 hover:bg-green-700 text-white py-2 px-4 rounded">
+        Download PDF
+      </button>
+      <button onclick="logout()" class="bg-red-500 hover:bg-red-600 text-white py-2 px-4 rounded">
+        Logout
+      </button>
+    </div>
+
+    <footer class="text-center text-xs mt-10 text-gray-500">
+      POWERED BY <span style="color:#FFEB3B">POG</span>
+    </footer>
   </div>
 
-  <script type="module" src="parentReport.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/html2pdf.js@0.10.1/dist/html2pdf.bundle.min.js"></script>
+  <script type="module" src="parent.js"></script>
 </body>
 </html>
