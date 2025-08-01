@@ -1,55 +1,69 @@
-// parent.js
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import {
   getFirestore,
   collection,
   query,
   where,
   getDocs
-} from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
-
-import { firebaseConfig } from "./firebaseConfig.js";
+} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import { firebaseConfig } from './firebaseConfig.js';
 
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
-document.getElementById("parentLoginForm").addEventListener("submit", async (e) => {
-  e.preventDefault();
+const form = document.getElementById("parentLoginForm");
 
-  const studentName = document.getElementById("studentName").value.trim();
-  const studentEmail = document.getElementById("studentEmail").value.trim();
+if (form) {
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
 
-  if (!studentName || !studentEmail) {
-    alert("Please enter both name and email.");
-    return;
-  }
+    const studentName = document.getElementById("studentNameInput").value.trim();
+    const parentEmail = document.getElementById("parentEmailInput").value.trim();
 
-  try {
-    const reportsRef = collection(db, "studentResults");
-    const q = query(reportsRef, where("studentEmail", "==", studentEmail), where("studentName", "==", studentName));
-    const querySnapshot = await getDocs(q);
-
-    if (!querySnapshot.empty) {
-      // Assume the latest report is fine
-      const doc = querySnapshot.docs[0];
-      const data = doc.data();
-
-      // Save all relevant report data to localStorage
-      localStorage.setItem("reportData", JSON.stringify({
-        studentName: data.studentName,
-        studentEmail: data.studentEmail,
-        grade: data.grade,
-        score: data.score,
-        tutorName: data.tutorName || "Your child's assigned tutor",
-        recommendation: data.recommendation || "We recommend personalized tutoring to help improve academic progress."
-      }));
-
-      window.location.href = "report.html";
-    } else {
-      alert("No report found for that student.");
+    if (!studentName || !parentEmail) {
+      alert("Please fill out all fields.");
+      return;
     }
-  } catch (error) {
-    console.error("Error fetching report:", error);
-    alert("An error occurred while trying to fetch the report.");
-  }
-});
+
+    try {
+      const resultsRef = collection(db, "student_results");
+      const q = query(resultsRef, where("studentName", "==", studentName));
+
+      const querySnapshot = await getDocs(q);
+
+      if (querySnapshot.empty) {
+        alert("No report found for the provided student.");
+        return;
+      }
+
+      let reportData = null;
+
+      querySnapshot.forEach((doc) => {
+        const data = doc.data();
+        if (data.parentEmail === parentEmail) {
+          reportData = {
+            studentName: data.studentName,
+            studentEmail: data.studentEmail,
+            grade: data.grade,
+            score: data.score,
+            tutorName: data.tutorName || "Assigned Tutor",
+            recommendation: data.recommendation || "Keep working hard!"
+          };
+        }
+      });
+
+      if (!reportData) {
+        alert("No matching report found for that parent email.");
+        return;
+      }
+
+      localStorage.setItem("studentReportData", JSON.stringify(reportData));
+      window.location.href = "report.html";
+    } catch (err) {
+      console.error("Error fetching student report:", err);
+      alert("An error occurred. Please try again.");
+    }
+  });
+} else {
+  console.warn("Form not found in the DOM.");
+}
