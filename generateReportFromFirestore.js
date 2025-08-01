@@ -1,138 +1,135 @@
-import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import {
   getFirestore,
   collection,
-  getDocs,
   query,
-  where
-} from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
-
-import html2pdf from 'https://cdn.jsdelivr.net/npm/html2pdf.js@0.10.1/dist/html2pdf.bundle.min.js';
+  where,
+  getDocs
+} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 import { firebaseConfig } from './firebaseConfig.js';
 
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
-export async function generateReportFromFirestore(studentName, parentEmail) {
-  const resultsRef = collection(db, 'student_results');
-  const q = query(resultsRef, where('name', '==', studentName), where('parentEmail', '==', parentEmail));
+async function fetchQuestionFile(grade, subject) {
+  const path = `./${grade}-${subject}.json`;
+  try {
+    const response = await fetch(path);
+    if (!response.ok) throw new Error("Failed to load question file");
+    const data = await response.json();
+    return data.questions;
+  } catch (error) {
+    console.error("Question fetch error:", error);
+    return [];
+  }
+}
 
-  const querySnapshot = await getDocs(q);
-  if (querySnapshot.empty) {
-    alert('No report found for the provided name and email.');
+function calculateScore(studentAnswers, questions) {
+  let correctCount = 0;
+  const total = questions.length;
+
+  for (let i = 0; i < studentAnswers.length; i++) {
+    const studentAns = studentAnswers[i];
+    const correctAns = questions[i]?.correct_answer;
+
+    if (studentAns && correctAns && studentAns.trim().toLowerCase() === correctAns.trim().toLowerCase()) {
+      correctCount++;
+    }
+  }
+
+  return {
+    correct: correctCount,
+    total,
+    percentage: ((correctCount / total) * 100).toFixed(1)
+  };
+}
+
+function generateRecommendations(subject, score) {
+  const topics = {
+    chemistry: [
+      "Elements & Compounds",
+      "Acids, Bases & Salts",
+      "States of Matter",
+      "Chemical Reactions",
+      "Periodic Table"
+    ],
+    math: [
+      "Number Sense",
+      "Fractions & Decimals",
+      "Measurement",
+      "Geometry",
+      "Data Interpretation"
+    ],
+    ela: [
+      "Reading Comprehension",
+      "Grammar & Vocabulary",
+      "Spelling",
+      "Writing Structure",
+      "Critical Thinking"
+    ]
+  };
+
+  const keyTopics = topics[subject.toLowerCase()] || ["Curriculum topics"];
+
+  return `
+    Based on this test, your child may need support in key areas such as <strong>${keyTopics.join(", ")}</strong>.
+    We recommend enrolling in our tailored tutoring sessions where Tutor <strong>${window.tutorName || "assigned tutor"}</strong>
+    will guide them using personalized techniques to close gaps and build confidence.
+  `;
+}
+
+export async function generateReportFromFirestore(studentName, parentEmail) {
+  const reportRef = collection(db, "studentReports");
+  const q = query(
+    reportRef,
+    where("studentName", "==", studentName),
+    where("parentEmail", "==", parentEmail)
+  );
+
+  const snapshot = await getDocs(q);
+
+  if (snapshot.empty) {
+    document.getElementById("summary").innerHTML = `<p>No record found for this student.</p>`;
     return;
   }
 
-  const reportContainer = document.getElementById('reportContainer');
-  reportContainer.innerHTML = ''; // Clear any previous report
+  const reportData = snapshot.docs[0].data();
+  const {
+    grade,
+    subject,
+    studentAnswers,
+    tutorName,
+    location,
+    submittedAt
+  } = reportData;
 
-  querySnapshot.forEach((doc) => {
-    const data = doc.data();
-    const { name, grade, email, location, tutor, results } = data;
+  window.tutorName = tutorName; // for use in recommendation section
 
-    const date = new Date().toLocaleDateString();
+  document.getElementById("studentName").textContent = studentName;
+  document.getElementById("grade").textContent = grade;
+  document.getElementById("location").textContent = location;
+  document.getElementById("tutorName").textContent = tutorName;
+  document.getElementById("submittedAt").textContent = new Date(
+    submittedAt.seconds * 1000
+  ).toLocaleString();
 
-    const reportCard = document.createElement('div');
-    reportCard.className = 'p-6 max-w-3xl mx-auto bg-white rounded-xl shadow-md';
+  const questions = await fetchQuestionFile(grade, subject);
 
-    // Header
-    const header = `
-      <div class="text-center mb-6">
-        <h2 class="text-2xl font-bold text-gray-800">Blooming Kids House Assessment Report</h2>
-        <p class="text-sm text-gray-500">${date}</p>
-      </div>
-    `;
+  if (questions.length === 0) {
+    document.getElementById("summary").innerHTML = `<p>No record found for this student.</p>`;
+    return;
+  }
 
-    // Student Info
-    const studentInfo = `
-      <div class="mb-4 text-gray-700">
-        <p><strong>Student Name:</strong> ${name}</p>
-        <p><strong>Grade:</strong> ${grade}</p>
-        <p><strong>Location:</strong> ${location}</p>
-        <p><strong>Email:</strong> ${email}</p>
-        <p><strong>Assigned Tutor:</strong> ${tutor || 'To be assigned'}</p>
-      </div>
-    `;
+  const { correct, total, percentage } = calculateScore(studentAnswers, questions);
 
-    // Results
-    let scoresSection = '';
-    let recommendationsSection = '';
+  // Build performance summary
+  document.getElementById("summary").innerHTML = `
+    <p><strong>Total Questions:</strong> ${total}</p>
+    <p><strong>Correct Answers:</strong> ${correct}</p>
+    <p><strong>Score:</strong> ${percentage}%</p>
+  `;
 
-    Object.entries(results).forEach(([subject, subjectData]) => {
-      const score = subjectData.score;
-      const percentage = `${score}%`;
-
-      // Subject-specific recommendation
-      let rec = '';
-      if (score >= 80) {
-        rec = `We’ll continue strengthening ${subject} problem-solving and test endurance, especially on high-level questions.`;
-      } else if (score >= 60) {
-        rec = `We'll focus on revisiting key topics in ${subject} and improve comprehension and speed through targeted practice.`;
-      } else {
-        rec = `Your child needs foundational support in ${subject}. Our tutor will rebuild core concepts and boost confidence.`;
-      }
-
-      scoresSection += `
-        <div class="mb-4">
-          <h3 class="text-lg font-semibold text-blue-600">${subject}</h3>
-          <p class="text-gray-700">Performance: <strong>${percentage}</strong></p>
-        </div>
-      `;
-
-      recommendationsSection += `
-        <li class="mb-2"><strong>${subject}:</strong> ${rec}</li>
-      `;
-    });
-
-    // Recommendation Summary
-    const recommendationsHTML = `
-      <div class="mt-6">
-        <h3 class="text-lg font-semibold text-gray-800 mb-2">Our Plan for Your Child</h3>
-        <ul class="text-gray-700 list-disc list-inside">
-          ${recommendationsSection}
-        </ul>
-      </div>
-    `;
-
-    // Director’s Note
-    const directorNote = `
-      <div class="mt-6 p-4 bg-yellow-50 border-l-4 border-yellow-400 text-gray-800">
-        <p>
-          “At Blooming Kids House, we believe no child is left behind. Whether your child is ahead or catching up,
-          our tailored support ensures they reach their full potential. We go beyond grades — we build confidence,
-          discipline, and love for learning.
-        </p>
-        <p class="mt-2">
-          Your child’s journey matters deeply to us, and together with our passionate tutors,
-          we’re committed to walking hand-in-hand with your family toward lasting academic success.”
-        </p>
-        <p class="mt-4 text-right font-semibold">— Mrs. Yinka Isikalu, Director</p>
-      </div>
-    `;
-
-    // Footer
-    const footer = `
-      <div class="mt-6 text-center text-sm text-gray-500">
-        POWERED BY <span style="color:#FFEB3B">POG</span>
-      </div>
-    `;
-
-    reportCard.innerHTML = header + studentInfo + scoresSection + recommendationsHTML + directorNote + footer;
-    reportContainer.appendChild(reportCard);
-  });
-
-  // Download button
-  const downloadBtn = document.getElementById('downloadReport');
-  downloadBtn.classList.remove('hidden');
-  downloadBtn.onclick = () => {
-    const opt = {
-      margin:       0.5,
-      filename:     `${studentName}-assessment-report.pdf`,
-      image:        { type: 'jpeg', quality: 0.98 },
-      html2canvas:  { scale: 2 },
-      jsPDF:        { unit: 'in', format: 'letter', orientation: 'portrait' }
-    };
-    html2pdf().from(reportContainer).set(opt).save();
-  };
+  // Build recommendation
+  document.getElementById("recommendations").innerHTML = generateRecommendations(subject, percentage);
 }
