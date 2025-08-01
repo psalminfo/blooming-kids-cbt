@@ -1,3 +1,4 @@
+<!-- report.html -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -29,16 +30,17 @@
   </div>
 
   <script>
-    const urlParams = new URLSearchParams(window.location.search);
-    const studentName = urlParams.get('student');
-    const parentEmail = urlParams.get('email');
+    const studentName = localStorage.getItem("studentName");
+    const parentEmail = localStorage.getItem("parentEmail");
 
     if (!studentName || !parentEmail) {
-      alert('Invalid access. Redirecting to parent login.');
-      window.location.href = 'parent.html';
+      alert("Invalid access. Redirecting to parent login.");
+      window.location.href = "parent.html";
     }
 
     document.getElementById('logoutBtn').addEventListener('click', () => {
+      localStorage.removeItem("studentName");
+      localStorage.removeItem("parentEmail");
       window.location.href = 'parent.html';
     });
 
@@ -51,7 +53,6 @@
       appId: "1:739684305208:web:ee1cc9e998b37e1f002f84"
     };
 
-    // Load Firebase SDK via CDN
     const script1 = document.createElement('script');
     script1.src = "https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js";
     document.head.appendChild(script1);
