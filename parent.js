@@ -20,7 +20,7 @@ parentForm.addEventListener("submit", async (e) => {
   sessionStorage.setItem("parentEmail", parentEmail);
 
   try {
-    const resultsRef = collection(db, "results");
+    const resultsRef = collection(db, "student_results"); // ✅ MATCHES YOUR FIRESTORE
     const q = query(
       resultsRef,
       where("studentName", "==", studentName),
