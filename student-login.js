@@ -1,5 +1,3 @@
-import { saveStudentData } from './utils.js';
-
 document.getElementById("studentLoginForm").addEventListener("submit", function (e) {
   e.preventDefault();
 
@@ -15,15 +13,15 @@ document.getElementById("studentLoginForm").addEventListener("submit", function 
     return;
   }
 
-  // ✅ Save full student info
-  saveStudentData({
+  const studentData = {
     studentName,
     parentEmail,
     grade,
     tutorName,
     location
-  });
+  };
 
-  // ✅ Redirect to subject selection
+  localStorage.setItem("studentData", JSON.stringify(studentData));
+
   window.location.href = "subject-select.html";
 });
