@@ -4,30 +4,32 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Parent Portal - Blooming Kids House</title>
-  <link rel="icon" type="image/png" href="favicon.ico" />
-  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet" />
+  <link rel="icon" href="favicon.ico" />
+  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
 </head>
-<body class="bg-yellow-50 min-h-screen flex items-center justify-center font-sans">
-  <div class="bg-white p-6 rounded-xl shadow-xl max-w-3xl w-full">
-    <h1 class="text-2xl font-bold mb-4 text-center text-blue-900">Blooming Kids House - Report Viewer</h1>
-
-    <form id="parentLoginForm" class="space-y-4">
-      <input type="text" id="studentName" placeholder="Enter Student Name" class="w-full border p-2 rounded" required />
-      <input type="email" id="parentEmail" placeholder="Enter Parent Email" class="w-full border p-2 rounded" required />
-      <button type="submit" class="w-full bg-yellow-400 text-blue-900 font-semibold py-2 rounded hover:bg-yellow-300">
-        View Report
-      </button>
+<body class="bg-yellow-50 text-gray-800">
+  <div class="min-h-screen flex flex-col justify-center items-center">
+    <h1 class="text-2xl font-bold text-yellow-800 mb-4">📄 Download Your Child's Report</h1>
+    
+    <form id="parentForm" class="bg-white p-6 rounded-xl shadow-lg w-full max-w-md">
+      <label class="block mb-2">
+        Student Name:
+        <input type="text" id="studentName" required class="mt-1 block w-full border border-gray-300 rounded p-2" />
+      </label>
+      <label class="block mb-4">
+        Parent Email:
+        <input type="email" id="parentEmail" required class="mt-1 block w-full border border-gray-300 rounded p-2" />
+      </label>
+      <button type="submit" class="bg-yellow-600 hover:bg-yellow-700 text-white py-2 px-4 rounded w-full">Search Report</button>
+      <p id="reportStatus" class="mt-4 text-center text-sm"></p>
     </form>
 
-    <div id="reportSection" class="mt-6 hidden">
-      <h2 class="text-lg font-semibold text-blue-900 mb-2">Student Report Preview</h2>
-      <iframe id="pdfPreview" class="w-full h-96 border rounded" src=""></iframe>
-      <a id="downloadLink" class="block mt-4 text-center bg-blue-900 text-white py-2 rounded hover:bg-blue-800" download>
-        Download Report PDF
-      </a>
+    <div id="reportContainer" class="mt-6 w-full max-w-3xl hidden">
+      <iframe id="reportFrame" class="w-full h-[500px] border rounded-xl shadow-lg"></iframe>
+      <a id="downloadLink" href="#" class="block mt-4 text-center text-white bg-yellow-700 px-4 py-2 rounded-lg hover:bg-yellow-800">⬇ Download Report PDF</a>
     </div>
   </div>
 
-  <script type="module" src="parent.js"></script>
+  <script type="module" src="./parent.js"></script>
 </body>
 </html>
