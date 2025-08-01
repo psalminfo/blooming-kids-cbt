@@ -9,9 +9,10 @@
 </head>
 <body class="bg-white text-gray-800">
   <div class="max-w-3xl mx-auto py-12 px-6">
-    <h1 class="text-3xl font-bold text-yellow-700 mb-4">Student Report</h1>
-    <div id="reportContent" class="space-y-4"></div>
-    <button onclick="logout()" class="mt-6 bg-yellow-500 hover:bg-yellow-600 text-white py-2 px-4 rounded">Logout</button>
+    <h1 class="text-3xl font-bold text-yellow-700 mb-6">Student Report</h1>
+    <div id="reportContent" class="space-y-4 text-lg"></div>
+    <button onclick="logout()" class="mt-8 bg-yellow-500 hover:bg-yellow-600 text-white py-2 px-4 rounded">Logout</button>
+    <p class="mt-8 text-sm text-center text-gray-500">POWERED BY <span style="color:#FFEB3B">POG</span></p>
   </div>
 
   <script>
@@ -19,22 +20,35 @@
     const reportDiv = document.getElementById("reportContent");
 
     if (data) {
+      const { studentName, grade, parentEmail, scores = {}, tutor = "Assigned Tutor", recommendations = {} } = data;
+
+      let scoresHTML = Object.entries(scores).map(([subject, score]) => {
+        const recommendation = recommendations[subject] || "Your child has done well. Continued support is recommended to master more advanced topics.";
+        return `
+          <div class="mt-4 border rounded-lg p-4 bg-gray-50">
+            <h3 class="text-xl font-semibold text-yellow-600">${subject}</h3>
+            <p><strong>Score:</strong> ${score}%</p>
+            <p class="mt-2 text-gray-700"><strong>Recommendation:</strong> ${recommendation}</p>
+          </div>
+        `;
+      }).join("");
+
       reportDiv.innerHTML = `
-        <p><strong>Student Name:</strong> ${data.studentName}</p>
-        <p><strong>Grade:</strong> ${data.grade}</p>
-        <p><strong>Parent Email:</strong> ${data.parentEmail}</p>
-        <p><strong>Subjects Attempted:</strong> ${Object.keys(data.scores).join(", ")}</p>
-        <div class="mt-4">
-          ${Object.entries(data.scores).map(([subject, score]) => `
-            <p><strong>${subject}:</strong> ${score}%</p>
-          `).join("")}
+        <p><strong>Student Name:</strong> ${studentName}</p>
+        <p><strong>Grade:</strong> ${grade}</p>
+        <p><strong>Parent Email:</strong> ${parentEmail}</p>
+        <p><strong>Subjects Attempted:</strong> ${Object.keys(scores).join(", ")}</p>
+        ${scoresHTML}
+        <div class="mt-6">
+          <p><strong>Assigned Tutor:</strong> ${tutor}</p>
+          <p><strong>Director's Message:</strong> We appreciate your trust in Blooming Kids House. Our goal is to ensure that every child achieves academic excellence through tailored support and expert guidance.</p>
+          <p class="mt-2"><strong>Sincerely,</strong> Mrs. Yinka Isikalu</p>
         </div>
-        <p class="mt-6"><strong>Tutor:</strong> ${data.tutor || "Assigned Tutor"}</p>
-        <p><strong>Director:</strong> Mrs. Yinka Isikalu</p>
-        <p class="mt-4 text-sm text-gray-500">POWERED BY <span style="color:#FFEB3B">POG</span></p>
       `;
     } else {
-      reportDiv.innerHTML = "<p class='text-red-600'>No report data found. Please go back to the parent portal.</p>";
+      reportDiv.innerHTML = `
+        <p class='text-red-600 text-lg font-semibold'>No report data found. Please go back to the parent portal.</p>
+      `;
     }
 
     function logout() {
