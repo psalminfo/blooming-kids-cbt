@@ -1,14 +1,25 @@
-<body class="bg-green-50 min-h-screen">
-  <div class="max-w-md mx-auto p-6">
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Select Subject - Blooming Kids House</title>
+  <link rel="icon" href="favicon.ico" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body class="bg-green-50 min-h-screen flex items-center justify-center">
+  <div class="bg-white p-8 rounded-xl shadow-xl w-full max-w-md">
     <div class="flex justify-between items-center mb-4">
-      <h1 class="text-xl font-bold text-green-800">Select a Subject</h1>
-      <button onclick="logout()" class="bg-yellow-400 text-white px-4 py-2 rounded hover:bg-yellow-500">Logout</button>
+      <h2 class="text-2xl font-bold text-green-800">Select a Subject</h2>
+      <button onclick="logout()" class="bg-yellow-400 text-white px-4 py-2 rounded hover:bg-yellow-500 text-sm">Logout</button>
     </div>
 
-    <div class="bg-white p-8 rounded-xl shadow-xl w-full text-center">
-      <div id="subjectButtons" class="space-y-4"></div>
-      <p class="text-xs text-center mt-6 text-gray-600">POWERED BY <span style="color:#FFEB3B">POG</span></p>
-    </div>
+    <div id="subjectButtons" class="space-y-4 mt-4"></div>
+
+    <p class="text-xs text-center mt-6 text-gray-600">
+      POWERED BY <span style="color:#FFEB3B">POG</span>
+    </p>
   </div>
 
   <script type="module">
@@ -33,9 +44,9 @@
     }
 
     subjectsToShow.forEach(subject => {
-      const label = subject.toUpperCase().replace("ELA", "English Language Arts");
+      const label = subject === "ela" ? "English Language Arts" : subject.charAt(0).toUpperCase() + subject.slice(1);
       const btn = document.createElement("button");
-      btn.textContent = label.charAt(0) + label.slice(1).toLowerCase();
+      btn.textContent = label;
       btn.className = "bg-green-600 text-white w-full py-2 rounded hover:bg-green-700";
       btn.onclick = () => {
         const query = new URLSearchParams({
@@ -54,3 +65,4 @@
     window.logout = logout;
   </script>
 </body>
+</html>
