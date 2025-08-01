@@ -2,46 +2,32 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Student Report - Blooming Kids House</title>
+  <title>Student Report</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <link rel="icon" href="favicon.ico" />
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" />
   <script type="module" src="generateReportFromFirestore.js" defer></script>
+  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet" />
 </head>
 <body class="bg-green-50 text-gray-800">
-  <div class="max-w-4xl mx-auto mt-10 p-6 bg-white rounded-2xl shadow-lg">
-    <h1 class="text-3xl font-bold text-green-700 text-center mb-6">Student Assessment Report</h1>
-
-    <div class="grid grid-cols-2 gap-4 text-lg">
-      <div><strong>Name:</strong> <span id="studentName" class="text-gray-700"></span></div>
-      <div><strong>Email:</strong> <span id="studentEmail" class="text-gray-700"></span></div>
-      <div><strong>Grade:</strong> <span id="grade" class="text-gray-700"></span></div>
-      <div><strong>Score:</strong> <span id="score" class="text-gray-700"></span></div>
-      <div><strong>Tutor:</strong> <span id="tutorName" class="text-gray-700"></span></div>
+  <div class="max-w-3xl mx-auto my-12 p-6 bg-white rounded-2xl shadow-lg border border-green-200">
+    <h1 class="text-3xl font-bold text-center text-green-700 mb-6">🌼 Blooming Kids House Assessment Report</h1>
+    
+    <div class="space-y-4 text-lg">
+      <p><strong>Student Name:</strong> <span id="studentName"></span></p>
+      <p><strong>Email:</strong> <span id="studentEmail"></span></p>
+      <p><strong>Grade:</strong> <span id="grade"></span></p>
+      <p><strong>Score:</strong> <span id="score"></span></p>
+      <p><strong>Assigned Tutor:</strong> <span id="tutorName"></span></p>
+      <p><strong>Recommendation:</strong></p>
+      <p class="bg-yellow-100 p-4 rounded text-sm" id="recommendation"></p>
     </div>
 
-    <div class="mt-6">
-      <h2 class="text-xl font-semibold text-yellow-600 mb-2">Director's Message</h2>
-      <p class="text-gray-700">
-        At Blooming Kids House, we believe every child can thrive with the right support. 
-        Your child has shown great potential, and with personalized tutoring, we’re confident they’ll reach even greater heights.
-      </p>
-      <p class="mt-2 font-semibold">– Mrs. Yinka Isikalu, Director</p>
+    <div class="flex justify-between mt-6">
+      <button id="downloadBtn" class="bg-yellow-400 hover:bg-yellow-500 text-white font-bold py-2 px-4 rounded shadow">Download PDF</button>
+      <button onclick="location.href='parent.html'" class="bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded shadow">Logout</button>
     </div>
 
-    <div class="mt-6">
-      <h2 class="text-xl font-semibold text-yellow-600 mb-2">Personalized Recommendation</h2>
-      <p id="recommendation" class="text-gray-700"></p>
-    </div>
-
-    <div class="flex justify-between mt-8">
-      <button id="downloadBtn" class="bg-yellow-400 text-green-900 px-4 py-2 rounded-lg shadow hover:bg-yellow-500 font-semibold">Download PDF</button>
-      <button id="logoutBtn" class="bg-red-500 text-white px-4 py-2 rounded-lg shadow hover:bg-red-600 font-semibold">Log Out</button>
-    </div>
-
-    <footer class="text-center mt-10 text-sm text-gray-500">
-      POWERED BY <span class="text-yellow-400 font-bold">POG</span>
-    </footer>
+    <p class="text-center text-xs text-gray-500 mt-6">POWERED BY <span class="text-yellow-400">POG</span></p>
   </div>
 </body>
 </html>
