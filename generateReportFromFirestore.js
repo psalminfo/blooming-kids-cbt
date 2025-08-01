@@ -1,36 +1,15 @@
-import { getFirestore, collection, query, where, getDocs } from 'firebase/firestore';
-import { getStorage, ref, getDownloadURL } from 'firebase/storage';
-import { initializeApp } from 'firebase/app';
-import { firebaseConfig } from './firebaseConfig.js';
+export function renderReport() {
+  const data = JSON.parse(localStorage.getItem("reportData"));
 
-const app = initializeApp(firebaseConfig);
-const db = getFirestore(app);
-const storage = getStorage(app);
-
-export async function fetchAndDisplayReport(parentEmail, studentName) {
-  const reportsRef = collection(db, 'reports');
-  const q = query(reportsRef, where('studentName', '==', studentName), where('parentEmail', '==', parentEmail));
-  const querySnapshot = await getDocs(q);
-
-  if (querySnapshot.empty) {
-    throw new Error('Report not found.');
+  if (!data) {
+    document.body.innerHTML = "<div class='text-center mt-10 text-red-500 font-bold'>Report not found. Please return to the parent login page.</div>";
+    return;
   }
 
-  const doc = querySnapshot.docs[0];
-  const reportData = doc.data();
-  const filePath = reportData.filePath;
-
-  if (!filePath) {
-    throw new Error('Report found but missing file reference.');
-  }
-
-  const url = await getDownloadURL(ref(storage, filePath));
-
-  const reportContainer = document.getElementById('reportContainer');
-  const reportFrame = document.getElementById('reportFrame');
-  const downloadLink = document.getElementById('downloadLink');
-
-  reportFrame.src = url;
-  downloadLink.href = url;
-  reportContainer.classList.remove('hidden');
+  document.getElementById("studentName").textContent = data.studentName || "N/A";
+  document.getElementById("studentEmail").textContent = data.studentEmail || "N/A";
+  document.getElementById("grade").textContent = data.grade || "N/A";
+  document.getElementById("score").textContent = data.score || "N/A";
+  document.getElementById("tutorName").textContent = data.tutorName || "N/A";
+  document.getElementById("recommendation").textContent = data.recommendation || "N/A";
 }
