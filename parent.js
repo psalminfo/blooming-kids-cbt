@@ -1,86 +1,34 @@
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.2/firebase-app.js";
-import {
-  getFirestore,
-  collection,
-  query,
-  where,
-  getDocs
-} from "https://www.gstatic.com/firebasejs/10.7.2/firebase-firestore.js";
+// Initialize Firebase
+const app = firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore(app);
 
-// ✅ Firebase config
-const firebaseConfig = {
-  apiKey: "AIzaSyBpwxvEoeuT8e6F5vGmDc1VkVfWTUdxavY",
-  authDomain: "blooming-kids-house.firebaseapp.com",
-  projectId: "blooming-kids-house",
-  storageBucket: "blooming-kids-house.appspot.com",
-  messagingSenderId: "739684305208",
-  appId: "1:739684305208:web:ee1cc9e998b37e1f002f84"
-};
+document.getElementById("parentLoginForm").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const studentName = document.getElementById("studentName").value.trim();
+  const parentEmail = document.getElementById("parentEmail").value.trim();
 
-// ✅ Initialize Firebase
-const app = initializeApp(firebaseConfig);
-const db = getFirestore(app);
-
-// ✅ On load: fetch student + parent from URL and load report
-document.addEventListener("DOMContentLoaded", async () => {
-  const urlParams = new URLSearchParams(window.location.search);
-  const studentName = urlParams.get("student");
-  const parentEmail = urlParams.get("parent");
-
-  if (!studentName || !parentEmail) {
-    document.getElementById("reportContent").innerHTML = "<p class='text-red-500'>Missing student or parent info.</p>";
-    return;
-  }
+  const errorMsg = document.getElementById("errorMsg");
+  errorMsg.classList.add("hidden");
 
   try {
-    const resultsRef = collection(db, "student_results");
-    const q = query(
-      resultsRef,
-      where("studentName", "==", studentName),
-      where("parentEmail", "==", parentEmail.toLowerCase())
-    );
-
-    const querySnapshot = await getDocs(q);
+    const resultsRef = db.collection("student_results");
+    const querySnapshot = await resultsRef
+      .where("studentName", "==", studentName)
+      .where("parentEmail", "==", parentEmail)
+      .get();
 
     if (!querySnapshot.empty) {
-      const resultData = querySnapshot.docs[0].data();
+      const doc = querySnapshot.docs[0];
+      const data = doc.data();
 
-      // ✅ Display report data
-      document.getElementById("studentNameDisplay").textContent = resultData.studentName;
-      document.getElementById("tutorNameDisplay").textContent = resultData.tutorName || "Your Assigned Tutor";
-      document.getElementById("mathScoreDisplay").textContent = resultData.mathScore ?? "N/A";
-      document.getElementById("elaScoreDisplay").textContent = resultData.elaScore ?? "N/A";
-
-      // ✅ Recommendations based on score
-      const recommendations = generateRecommendations(resultData);
-      document.getElementById("recommendations").innerHTML = recommendations;
-
+      // Save data temporarily in localStorage to use in report.html
+      localStorage.setItem("studentReportData", JSON.stringify(data));
+      window.location.href = "report.html";
     } else {
-      document.getElementById("reportContent").innerHTML = "<p class='text-red-500'>No report found for this student.</p>";
+      errorMsg.classList.remove("hidden");
     }
   } catch (error) {
-    console.error("Error loading report:", error);
-    document.getElementById("reportContent").innerHTML = "<p class='text-red-500'>An error occurred while loading the report.</p>";
+    console.error("Error fetching report:", error);
+    alert("Something went wrong while fetching the report.");
   }
 });
-
-// ✅ Generate tailored recommendations
-function generateRecommendations(data) {
-  let sections = [];
-
-  if (data.mathScore !== undefined) {
-    sections.push(`
-      <h3 class="text-lg font-semibold mt-4 mb-1 text-blue-700">Math:</h3>
-      <p>Your child scored ${data.mathScore}%. We recommend focusing on number sense, basic operations, and word problems. Your assigned tutor, <strong>${data.tutorName}</strong>, will guide your child through these areas weekly.</p>
-    `);
-  }
-
-  if (data.elaScore !== undefined) {
-    sections.push(`
-      <h3 class="text-lg font-semibold mt-4 mb-1 text-green-700">ELA:</h3>
-      <p>Your child scored ${data.elaScore}%. We suggest targeted reading comprehension, grammar, and vocabulary exercises. <strong>${data.tutorName}</strong> will use STAAR-aligned materials for improvement.</p>
-    `);
-  }
-
-  return sections.join("");
-}
