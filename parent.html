@@ -22,7 +22,8 @@
     </footer>
   </div>
 
-  <script>
+  <script type="module">
+    // No Firebase needed here yet; redirect only
     document.getElementById("loginBtn").addEventListener("click", () => {
       const studentName = document.getElementById("studentName").value.trim();
       const parentEmail = document.getElementById("parentEmail").value.trim();
@@ -32,9 +33,11 @@
         return;
       }
 
+      // Save data to localStorage so report.html can fetch it
       localStorage.setItem("studentName", studentName);
       localStorage.setItem("parentEmail", parentEmail);
 
+      // Redirect to report page
       window.location.href = "report.html";
     });
   </script>
