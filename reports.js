@@ -1,32 +1,78 @@
 // report.js
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import { getFirestore, collection, query, where, getDocs } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-lite.js";
 import html2pdf from "https://cdn.jsdelivr.net/npm/html2pdf.js@0.10.1/dist/html2pdf.bundle.min.js";
 
-// Load student data from sessionStorage
-const studentData = JSON.parse(sessionStorage.getItem("studentData"));
-const studentName = sessionStorage.getItem("studentName");
-const parentEmail = sessionStorage.getItem("parentEmail");
+// Firebase config
+const firebaseConfig = {
+  apiKey: "AIzaSyD1lJhsWMMs_qerLBSzk7wKhjLyI_11RJg",
+  authDomain: "bloomingkidsassessment.firebaseapp.com",
+  projectId: "bloomingkidsassessment",
+  storageBucket: "bloomingkidsassessment.appspot.com",
+  messagingSenderId: "238975054977",
+  appId: "1:238975054977:web:87c70b4db044998a204980"
+};
 
-if (!studentData || !studentName || !parentEmail) {
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+
+// Load from sessionStorage
+const studentName = sessionStorage.getItem("studentName");
+
+if (!studentName) {
   alert("Missing student info. Please return to the parent portal.");
   window.location.href = "parent.html";
 }
 
-document.getElementById("student-name").textContent = studentName;
-document.getElementById("student-grade").textContent = studentData.grade || "N/A";
-document.getElementById("parent-email").textContent = parentEmail;
-document.getElementById("subject").textContent = studentData.subject || "N/A";
-document.getElementById("tutor-name").textContent = studentData.tutorName || "N/A";
-document.getElementById("director-tutor-name").textContent = studentData.tutorName || "our tutor";
-document.getElementById("score").textContent = `${studentData.score || 0}/30`;
+// Query Firestore for student result
+async function loadReport() {
+  const q = query(collection(db, "student_results"), where("studentName", "==", studentName));
+  const snapshot = await getDocs(q);
 
-document.getElementById("summary-text").textContent = `Your child scored ${studentData.score} out of 30 in the ${studentData.subject} assessment. This result shows the student's performance across key areas in the ${studentData.subject} curriculum.`;
+  if (snapshot.empty) {
+    alert("No report found for this student.");
+    return;
+  }
 
-document.getElementById("recommendations").textContent = `We recommend targeted support in areas such as comprehension, vocabulary, and grammar (for ELA), or arithmetic, word problems, and measurement (for Math). Our tutor ${studentData.tutorName || "assigned"} will focus on these during sessions.`;
+  const data = snapshot.docs[0].data();
+
+  // Fill in fields
+  document.getElementById("student-name").textContent = data.studentName || "N/A";
+  document.getElementById("student-grade").textContent = data.grade || "N/A";
+  document.getElementById("student-email").textContent = data.email || "N/A";
+  document.getElementById("tutor-name").textContent = data.tutor || "N/A";
+
+  // Subject Scores
+  const subjectContainer = document.getElementById("subject-scores");
+  subjectContainer.innerHTML = "";
+  Object.entries(data.scores || {}).forEach(([subject, score]) => {
+    const div = document.createElement("div");
+    div.className = "mb-2";
+    div.innerHTML = `<strong>${subject}:</strong> ${score}/30`;
+    subjectContainer.appendChild(div);
+  });
+
+  // Personalized Recommendation
+  const rec = generateRecommendation(data);
+  document.getElementById("recommendation-text").textContent = rec;
+}
+
+// Recommendation logic
+function generateRecommendation(data) {
+  const tutor = data.tutor || "our tutor";
+  const subjects = Object.entries(data.scores || {});
+  const lowSubjects = subjects.filter(([_, score]) => score < 20).map(([s]) => s);
+
+  if (lowSubjects.length === 0) {
+    return `Great job! ${data.studentName} performed well in all subjects. Continued practice with ${tutor} will strengthen understanding.`;
+  }
+
+  return `We recommend targeted support in ${lowSubjects.join(", ")} to build stronger foundations. ${tutor} will guide ${data.studentName} in mastering these areas.`;
+}
 
 // Download PDF
 document.getElementById("download-btn").addEventListener("click", () => {
-  const report = document.getElementById("report-content");
-  html2pdf().from(report).save(`${studentName}_report.pdf`);
+  html2pdf().from(document.body).save(`${studentName}-report.pdf`);
 });
 
 // Logout
@@ -34,3 +80,6 @@ document.getElementById("logout-btn").addEventListener("click", () => {
   sessionStorage.clear();
   window.location.href = "parent.html";
 });
+
+// Load report now
+loadReport();
