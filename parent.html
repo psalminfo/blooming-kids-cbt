@@ -3,23 +3,27 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Parent Portal - Blooming Kids House</title>
-  <link rel="icon" href="favicon.ico" />
+  <title>Parent Login - Blooming Kids House</title>
+  <link rel="icon" href="favicon.ico" type="image/x-icon">
   <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
 </head>
-<body class="bg-gray-100 flex items-center justify-center min-h-screen">
+<body class="bg-yellow-50 flex items-center justify-center min-h-screen">
   <div class="bg-white p-8 rounded-2xl shadow-lg w-full max-w-md">
-    <h2 class="text-2xl font-bold mb-6 text-center text-blue-700">Parent Portal</h2>
-
-    <label class="block mb-2 text-sm font-semibold">Student Name</label>
-    <input id="studentName" type="text" class="w-full p-3 mb-4 border border-gray-300 rounded-lg" placeholder="Enter student's full name"/>
-
-    <label class="block mb-2 text-sm font-semibold">Parent Email</label>
-    <input id="parentEmail" type="email" class="w-full p-3 mb-6 border border-gray-300 rounded-lg" placeholder="Enter your email"/>
-
-    <button id="loginBtn" class="w-full bg-blue-600 text-white p-3 rounded-lg font-bold hover:bg-blue-700 transition">Login</button>
+    <h1 class="text-2xl font-bold mb-6 text-center text-gray-800">Parent Portal</h1>
+    <form id="parentLoginForm" class="space-y-4">
+      <div>
+        <label for="studentName" class="block text-sm font-medium text-gray-700">Student Name</label>
+        <input type="text" id="studentName" class="mt-1 block w-full px-4 py-2 border border-gray-300 rounded-xl focus:outline-none focus:ring-yellow-500 focus:border-yellow-500" required>
+      </div>
+      <div>
+        <label for="parentEmail" class="block text-sm font-medium text-gray-700">Your Email</label>
+        <input type="email" id="parentEmail" class="mt-1 block w-full px-4 py-2 border border-gray-300 rounded-xl focus:outline-none focus:ring-yellow-500 focus:border-yellow-500" required>
+      </div>
+      <button type="submit" class="w-full bg-yellow-500 hover:bg-yellow-600 text-white py-2 px-4 rounded-xl font-semibold">Login</button>
+    </form>
   </div>
 
-  <script type="module" src="parent.js"></script>
+  <!-- ✅ JavaScript placed at the end to ensure DOM elements exist -->
+  <script src="parent.js"></script>
 </body>
 </html>
