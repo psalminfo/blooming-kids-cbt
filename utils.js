@@ -1,9 +1,20 @@
 // utils.js
-import { db } from './firebaseConfig.js'; // only import what you use
+import { auth } from './firebaseConfig.js';
+import { signOut } from "https://www.gstatic.com/firebasejs/9.6.10/firebase-auth.js";
 
 export function logout() {
-  localStorage.removeItem("studentData");
-  window.location.href = "index.html";
+  // Sign out from Firebase
+  signOut(auth)
+    .then(() => {
+      localStorage.removeItem("studentData");
+      window.location.href = "index.html";
+    })
+    .catch((error) => {
+      console.error("Logout error:", error);
+      // Still redirect even if Firebase sign-out fails
+      localStorage.removeItem("studentData");
+      window.location.href = "index.html";
+    });
 }
 
 export function getStudentData() {
