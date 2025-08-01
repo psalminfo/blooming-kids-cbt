@@ -1,14 +1,13 @@
-// Import Firebase
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.2/firebase-app.js";
 import {
   getFirestore,
   collection,
   query,
   where,
   getDocs
-} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+} from "https://www.gstatic.com/firebasejs/10.7.2/firebase-firestore.js";
 
-// Your Firebase config
+// ✅ Firebase config
 const firebaseConfig = {
   apiKey: "AIzaSyBpwxvEoeuT8e6F5vGmDc1VkVfWTUdxavY",
   authDomain: "blooming-kids-house.firebaseapp.com",
@@ -18,41 +17,46 @@ const firebaseConfig = {
   appId: "1:739684305208:web:ee1cc9e998b37e1f002f84"
 };
 
-// Initialize Firebase
+// ✅ Initialize Firebase
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
-// Handle parent login
-document.getElementById("parentLoginForm").addEventListener("submit", async (e) => {
-  e.preventDefault();
+// ✅ Handle form submission
+document.addEventListener("DOMContentLoaded", () => {
+  const form = document.getElementById("parentLoginForm");
 
-  const studentName = document.getElementById("studentName").value.trim();
-  const parentEmail = document.getElementById("parentEmail").value.trim();
+  if (!form) return;
 
-  if (!studentName || !parentEmail) {
-    alert("Please fill in both fields.");
-    return;
-  }
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
 
-  try {
-    const q = query(
-      collection(db, "studentsAnswers"),
-      where("studentName", "==", studentName),
-      where("parentEmail", "==", parentEmail)
-    );
+    const studentName = document.getElementById("studentName").value.trim();
+    const parentEmail = document.getElementById("parentEmail").value.trim().toLowerCase();
 
-    const querySnapshot = await getDocs(q);
-
-    if (!querySnapshot.empty) {
-      // Valid record found — redirect to report
-      const encodedName = encodeURIComponent(studentName);
-      const encodedEmail = encodeURIComponent(parentEmail);
-      window.location.href = `report.html?name=${encodedName}&email=${encodedEmail}`;
-    } else {
-      alert("No matching student record found. Please check the name and email.");
+    if (!studentName || !parentEmail) {
+      alert("Please enter both student name and parent email.");
+      return;
     }
-  } catch (error) {
-    console.error("Error checking student record:", error);
-    alert("An error occurred while verifying. Please try again.");
-  }
+
+    try {
+      const resultsRef = collection(db, "testResults");
+      const q = query(
+        resultsRef,
+        where("studentName", "==", studentName),
+        where("parentEmail", "==", parentEmail)
+      );
+
+      const querySnapshot = await getDocs(q);
+
+      if (!querySnapshot.empty) {
+        // ✅ Found a result, redirect to report page with query params
+        window.location.href = `report.html?student=${encodeURIComponent(studentName)}&parent=${encodeURIComponent(parentEmail)}`;
+      } else {
+        alert("No report found for this student and parent email.");
+      }
+    } catch (error) {
+      console.error("Error fetching report:", error);
+      alert("An error occurred. Please try again later.");
+    }
+  });
 });
