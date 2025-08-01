@@ -2,59 +2,46 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Student Report - Blooming Kids House</title>
   <link rel="icon" href="favicon.ico" />
-  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" />
+  <script type="module" src="generateReportFromFirestore.js" defer></script>
 </head>
-<body class="bg-white text-gray-800">
-  <div class="max-w-3xl mx-auto py-12 px-6">
-    <h1 class="text-3xl font-bold text-yellow-700 mb-6">Student Report</h1>
-    <div id="reportContent" class="space-y-4 text-lg"></div>
-    <button onclick="logout()" class="mt-8 bg-yellow-500 hover:bg-yellow-600 text-white py-2 px-4 rounded">Logout</button>
-    <p class="mt-8 text-sm text-center text-gray-500">POWERED BY <span style="color:#FFEB3B">POG</span></p>
+<body class="bg-green-50 text-gray-800">
+  <div class="max-w-4xl mx-auto mt-10 p-6 bg-white rounded-2xl shadow-lg">
+    <h1 class="text-3xl font-bold text-green-700 text-center mb-6">Student Assessment Report</h1>
+
+    <div class="grid grid-cols-2 gap-4 text-lg">
+      <div><strong>Name:</strong> <span id="studentName" class="text-gray-700"></span></div>
+      <div><strong>Email:</strong> <span id="studentEmail" class="text-gray-700"></span></div>
+      <div><strong>Grade:</strong> <span id="grade" class="text-gray-700"></span></div>
+      <div><strong>Score:</strong> <span id="score" class="text-gray-700"></span></div>
+      <div><strong>Tutor:</strong> <span id="tutorName" class="text-gray-700"></span></div>
+    </div>
+
+    <div class="mt-6">
+      <h2 class="text-xl font-semibold text-yellow-600 mb-2">Director's Message</h2>
+      <p class="text-gray-700">
+        At Blooming Kids House, we believe every child can thrive with the right support. 
+        Your child has shown great potential, and with personalized tutoring, we’re confident they’ll reach even greater heights.
+      </p>
+      <p class="mt-2 font-semibold">– Mrs. Yinka Isikalu, Director</p>
+    </div>
+
+    <div class="mt-6">
+      <h2 class="text-xl font-semibold text-yellow-600 mb-2">Personalized Recommendation</h2>
+      <p id="recommendation" class="text-gray-700"></p>
+    </div>
+
+    <div class="flex justify-between mt-8">
+      <button id="downloadBtn" class="bg-yellow-400 text-green-900 px-4 py-2 rounded-lg shadow hover:bg-yellow-500 font-semibold">Download PDF</button>
+      <button id="logoutBtn" class="bg-red-500 text-white px-4 py-2 rounded-lg shadow hover:bg-red-600 font-semibold">Log Out</button>
+    </div>
+
+    <footer class="text-center mt-10 text-sm text-gray-500">
+      POWERED BY <span class="text-yellow-400 font-bold">POG</span>
+    </footer>
   </div>
-
-  <script>
-    const data = JSON.parse(localStorage.getItem("studentReportData"));
-    const reportDiv = document.getElementById("reportContent");
-
-    if (data) {
-      const { studentName, grade, parentEmail, scores = {}, tutor = "Assigned Tutor", recommendations = {} } = data;
-
-      let scoresHTML = Object.entries(scores).map(([subject, score]) => {
-        const recommendation = recommendations[subject] || "Your child has done well. Continued support is recommended to master more advanced topics.";
-        return `
-          <div class="mt-4 border rounded-lg p-4 bg-gray-50">
-            <h3 class="text-xl font-semibold text-yellow-600">${subject}</h3>
-            <p><strong>Score:</strong> ${score}%</p>
-            <p class="mt-2 text-gray-700"><strong>Recommendation:</strong> ${recommendation}</p>
-          </div>
-        `;
-      }).join("");
-
-      reportDiv.innerHTML = `
-        <p><strong>Student Name:</strong> ${studentName}</p>
-        <p><strong>Grade:</strong> ${grade}</p>
-        <p><strong>Parent Email:</strong> ${parentEmail}</p>
-        <p><strong>Subjects Attempted:</strong> ${Object.keys(scores).join(", ")}</p>
-        ${scoresHTML}
-        <div class="mt-6">
-          <p><strong>Assigned Tutor:</strong> ${tutor}</p>
-          <p><strong>Director's Message:</strong> We appreciate your trust in Blooming Kids House. Our goal is to ensure that every child achieves academic excellence through tailored support and expert guidance.</p>
-          <p class="mt-2"><strong>Sincerely,</strong> Mrs. Yinka Isikalu</p>
-        </div>
-      `;
-    } else {
-      reportDiv.innerHTML = `
-        <p class='text-red-600 text-lg font-semibold'>No report data found. Please go back to the parent portal.</p>
-      `;
-    }
-
-    function logout() {
-      localStorage.removeItem("studentReportData");
-      window.location.href = "parent.html";
-    }
-  </script>
 </body>
 </html>
