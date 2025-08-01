@@ -1,85 +1,66 @@
 // report.js
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-import { getFirestore, collection, query, where, getDocs } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-lite.js";
-import html2pdf from "https://cdn.jsdelivr.net/npm/html2pdf.js@0.10.1/dist/html2pdf.bundle.min.js";
+import { db } from './firebaseParentConfig.js'; // optional if using Firebase in future
 
-// Firebase config
-const firebaseConfig = {
-  apiKey: "AIzaSyD1lJhsWMMs_qerLBSzk7wKhjLyI_11RJg",
-  authDomain: "bloomingkidsassessment.firebaseapp.com",
-  projectId: "bloomingkidsassessment",
-  storageBucket: "bloomingkidsassessment.appspot.com",
-  messagingSenderId: "238975054977",
-  appId: "1:238975054977:web:87c70b4db044998a204980"
-};
-
-const app = initializeApp(firebaseConfig);
-const db = getFirestore(app);
-
-// Load from sessionStorage
 const studentName = sessionStorage.getItem("studentName");
+const parentEmail = sessionStorage.getItem("parentEmail");
+const rawData = sessionStorage.getItem("studentData");
 
-if (!studentName) {
-  alert("Missing student info. Please return to the parent portal.");
+if (!studentName || !parentEmail || !rawData) {
+  alert("Session expired. Please login again.");
   window.location.href = "parent.html";
 }
 
-// Query Firestore for student result
-async function loadReport() {
-  const q = query(collection(db, "student_results"), where("studentName", "==", studentName));
-  const snapshot = await getDocs(q);
+const data = JSON.parse(rawData);
+const { grade, subject, score, total = 30, tutorName = "Assigned Tutor" } = data;
 
-  if (snapshot.empty) {
-    alert("No report found for this student.");
-    return;
-  }
+// Fill report content
+document.getElementById("student-name").textContent = studentName;
+document.getElementById("grade").textContent = grade || "N/A";
+document.getElementById("subject").textContent = subject || "N/A";
+document.getElementById("score").textContent = `${score} / ${total}`;
+document.getElementById("tutor").textContent = tutorName;
 
-  const data = snapshot.docs[0].data();
-
-  // Fill in fields
-  document.getElementById("student-name").textContent = data.studentName || "N/A";
-  document.getElementById("student-grade").textContent = data.grade || "N/A";
-  document.getElementById("student-email").textContent = data.email || "N/A";
-  document.getElementById("tutor-name").textContent = data.tutor || "N/A";
-
-  // Subject Scores
-  const subjectContainer = document.getElementById("subject-scores");
-  subjectContainer.innerHTML = "";
-  Object.entries(data.scores || {}).forEach(([subject, score]) => {
-    const div = document.createElement("div");
-    div.className = "mb-2";
-    div.innerHTML = `<strong>${subject}:</strong> ${score}/30`;
-    subjectContainer.appendChild(div);
-  });
-
-  // Personalized Recommendation
-  const rec = generateRecommendation(data);
-  document.getElementById("recommendation-text").textContent = rec;
+// Subject-specific recommendation
+let rec = "";
+if (subject?.toLowerCase() === "math") {
+  rec = `We encourage ${studentName} to focus on number sense, problem solving, and geometry. ${tutorName} will guide your child through daily practice sessions to build confidence and accuracy.`;
+} else if (subject?.toLowerCase() === "ela") {
+  rec = `${studentName} should strengthen reading comprehension, grammar, and writing structure. ${tutorName} will provide support through guided reading and personalized writing tasks.`;
+} else {
+  rec = `${studentName} will benefit from personalized tutoring with ${tutorName} to strengthen understanding of key curriculum topics.`;
 }
-
-// Recommendation logic
-function generateRecommendation(data) {
-  const tutor = data.tutor || "our tutor";
-  const subjects = Object.entries(data.scores || {});
-  const lowSubjects = subjects.filter(([_, score]) => score < 20).map(([s]) => s);
-
-  if (lowSubjects.length === 0) {
-    return `Great job! ${data.studentName} performed well in all subjects. Continued practice with ${tutor} will strengthen understanding.`;
-  }
-
-  return `We recommend targeted support in ${lowSubjects.join(", ")} to build stronger foundations. ${tutor} will guide ${data.studentName} in mastering these areas.`;
-}
-
-// Download PDF
-document.getElementById("download-btn").addEventListener("click", () => {
-  html2pdf().from(document.body).save(`${studentName}-report.pdf`);
-});
+document.getElementById("recommendation").textContent = rec;
 
 // Logout
-document.getElementById("logout-btn").addEventListener("click", () => {
+document.getElementById("logout").addEventListener("click", () => {
   sessionStorage.clear();
   window.location.href = "parent.html";
 });
 
-// Load report now
-loadReport();
+// Download as PDF
+document.getElementById("download-report").addEventListener("click", () => {
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF();
+
+  doc.setFontSize(14);
+  doc.text("Blooming Kids House – Student Report", 10, 20);
+  doc.text(`Student Name: ${studentName}`, 10, 30);
+  doc.text(`Grade: ${grade || "N/A"}`, 10, 40);
+  doc.text(`Subject: ${subject}`, 10, 50);
+  doc.text(`Score: ${score} / ${total}`, 10, 60);
+  doc.text(`Tutor: ${tutorName}`, 10, 70);
+
+  doc.text("Director's Message:", 10, 90);
+  doc.setFontSize(12);
+  doc.text(
+    `We appreciate your child’s effort during the assessment. At Blooming Kids House, we recommend personalized tutoring sessions to strengthen your child's skills.\n\n– Mrs. Yinka Isikalu, Director`,
+    10, 100
+  );
+
+  doc.setFontSize(14);
+  doc.text("Recommendations:", 10, 150);
+  doc.setFontSize(12);
+  doc.text(rec, 10, 160, { maxWidth: 180 });
+
+  doc.save(`${studentName}-report.pdf`);
+});
