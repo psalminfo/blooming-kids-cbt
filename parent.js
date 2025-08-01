@@ -1,39 +1,36 @@
 // parent.js
 
-import { db } from './firebaseParentConfig.js'; // using separate config for parent portal
-import {
-  collection,
-  query,
-  where,
-  getDocs
-} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-lite.js";
+import { getFirestore, collection, query, where, getDocs } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-lite.js";
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 
-// Form submission handler
-const parentForm = document.getElementById("parent-login-form");
+// Use your own config here (copied from your message)
+const firebaseConfig = {
+  apiKey: "AIzaSyD1lJhsWMMs_qerLBSzk7wKhjLyI_11RJg",
+  authDomain: "bloomingkidsassessment.firebaseapp.com",
+  projectId: "bloomingkidsassessment",
+  storageBucket: "bloomingkidsassessment.appspot.com",
+  messagingSenderId: "238975054977",
+  appId: "1:238975054977:web:87c70b4db044998a204980"
+};
 
-parentForm.addEventListener("submit", async (e) => {
+// Initialize Firebase
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+
+// Handle parent login form
+document.getElementById("parent-login-form").addEventListener("submit", async (e) => {
   e.preventDefault();
 
-  const parentEmail = document.getElementById("parent-email").value.trim();
   const studentName = document.getElementById("student-name").value.trim();
+  const parentEmail = document.getElementById("parent-email").value.trim();
 
   if (!studentName || !parentEmail) {
     alert("Please enter both student name and parent email.");
     return;
   }
 
-  // Save to sessionStorage
-  sessionStorage.setItem("studentName", studentName);
-  sessionStorage.setItem("parentEmail", parentEmail);
-
-  // 🔍 Debug: See what's being searched
-  console.log("🔍 Searching Firestore for:");
-  console.log("studentName:", studentName);
-  console.log("parentEmail:", parentEmail);
-
   try {
-    const resultsRef = collection(db, "student_results");
-
+    const resultsRef = collection(db, "student_results"); // ✅ fixed collection name
     const q = query(
       resultsRef,
       where("studentName", "==", studentName),
@@ -42,22 +39,19 @@ parentForm.addEventListener("submit", async (e) => {
 
     const snapshot = await getDocs(q);
 
-    // 🔍 Debug: Log results if found
     if (snapshot.empty) {
-      console.warn("No matching document found.");
       alert("No report found for this student and parent email.");
       return;
     }
 
     const studentData = snapshot.docs[0].data();
-    console.log("✅ Found student record:", studentData);
-
     sessionStorage.setItem("studentData", JSON.stringify(studentData));
+    sessionStorage.setItem("studentName", studentName);
+    sessionStorage.setItem("parentEmail", parentEmail);
 
-    // Redirect to report page
     window.location.href = "report.html";
   } catch (error) {
-    console.error("🔥 Error fetching report:", error);
+    console.error("Error fetching report:", error);
     alert("An error occurred while retrieving the student report.");
   }
 });
