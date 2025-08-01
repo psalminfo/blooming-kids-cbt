@@ -2,7 +2,7 @@
 
 import { getFirestore, collection, query, where, getDocs } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-lite.js";
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-import { firebaseConfig } from './firebaseConfig.js';
+import firebaseConfig from './firebaseConfig.js';
 
 // Initialize Firebase app
 const app = initializeApp(firebaseConfig);
