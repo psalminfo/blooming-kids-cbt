@@ -4,39 +4,26 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Parent Portal - Blooming Kids House</title>
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" />
   <link rel="icon" href="favicon.ico" />
-  <style>
-    body {
-      background-color: #f9f9f9;
-      font-family: 'Segoe UI', sans-serif;
-    }
-    .bg-blooming-green { background-color: #4CAF50; }
-    .text-blooming-yellow { color: #FFEB3B; }
-    .btn-yellow { background-color: #FFEB3B; color: #000; }
-  </style>
+  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet" />
 </head>
-<body class="min-h-screen flex flex-col items-center p-4">
-  <header class="w-full text-center py-4 bg-blooming-green text-white text-2xl font-bold">
-    BLOOMING KIDS HOUSE ASSESSMENT REPORT
-  </header>
+<body class="bg-gray-50 text-gray-800">
+  <div class="max-w-2xl mx-auto p-4">
+    <h1 class="text-2xl font-bold mb-4 text-center">Parent Portal</h1>
+    <form id="parentForm" class="space-y-4 bg-white p-6 rounded shadow">
+      <input type="text" id="studentName" placeholder="Student's Full Name" class="w-full p-2 border border-gray-300 rounded" required />
+      <input type="email" id="parentEmail" placeholder="Parent Email" class="w-full p-2 border border-gray-300 rounded" required />
+      <button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Fetch Report</button>
+    </form>
 
-  <main class="w-full max-w-2xl mt-6">
-    <div class="bg-white shadow p-4 rounded mb-4">
-      <h2 class="text-xl font-semibold mb-2">Enter Student Details</h2>
-      <input id="studentName" type="text" placeholder="Student Full Name" class="w-full mb-2 p-2 border rounded" />
-      <input id="parentEmail" type="email" placeholder="Parent Email" class="w-full mb-4 p-2 border rounded" />
-      <button onclick="loadReport()" class="w-full py-2 px-4 btn-yellow font-bold rounded">Generate Report</button>
-    </div>
-
-    <div id="reportArea" class="bg-white p-4 shadow rounded hidden">
-      <div id="reportContent"></div>
-      <div class="flex justify-between mt-4">
-        <button onclick="downloadReport()" class="btn-yellow px-4 py-2 rounded">Download PDF</button>
-        <button onclick="logout()" class="bg-red-500 text-white px-4 py-2 rounded">Logout</button>
+    <div id="reportContainer" class="mt-8 hidden">
+      <div id="reportContent" class="bg-white p-6 rounded shadow"></div>
+      <div class="mt-4 flex gap-4">
+        <button id="downloadBtn" class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700">Download PDF</button>
+        <button onclick="window.location.reload()" class="bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700">Logout</button>
       </div>
     </div>
-  </main>
+  </div>
 
   <script type="module" src="parent.js"></script>
 </body>
