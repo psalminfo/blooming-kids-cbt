@@ -1,69 +1,45 @@
+// parent.js
+
+import { getFirestore, collection, query, where, getDocs } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-lite.js";
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-import {
-  getFirestore,
-  collection,
-  query,
-  where,
-  getDocs
-} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import { firebaseConfig } from './firebaseConfig.js';
 
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
-const form = document.getElementById("parentLoginForm");
+const parentForm = document.getElementById("parent-login-form");
 
-if (form) {
-  form.addEventListener("submit", async (e) => {
-    e.preventDefault();
+parentForm.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const parentEmail = document.getElementById("parent-email").value;
+  const studentName = document.getElementById("student-name").value;
 
-    const studentName = document.getElementById("studentNameInput").value.trim();
-    const parentEmail = document.getElementById("parentEmailInput").value.trim();
+  if (!parentEmail || !studentName) {
+    alert("Please enter both student name and parent email.");
+    return;
+  }
 
-    if (!studentName || !parentEmail) {
-      alert("Please fill out all fields.");
+  // Save data to sessionStorage
+  sessionStorage.setItem("studentName", studentName);
+  sessionStorage.setItem("parentEmail", parentEmail);
+
+  try {
+    const resultsRef = collection(db, "student_results");
+    const q = query(resultsRef, where("studentName", "==", studentName));
+    const snapshot = await getDocs(q);
+
+    if (snapshot.empty) {
+      alert("No report found for this student.");
       return;
     }
 
-    try {
-      const resultsRef = collection(db, "student_results");
-      const q = query(resultsRef, where("studentName", "==", studentName));
+    // Save first match for simplicity
+    const studentData = snapshot.docs[0].data();
+    sessionStorage.setItem("studentData", JSON.stringify(studentData));
 
-      const querySnapshot = await getDocs(q);
-
-      if (querySnapshot.empty) {
-        alert("No report found for the provided student.");
-        return;
-      }
-
-      let reportData = null;
-
-      querySnapshot.forEach((doc) => {
-        const data = doc.data();
-        if (data.parentEmail === parentEmail) {
-          reportData = {
-            studentName: data.studentName,
-            studentEmail: data.studentEmail,
-            grade: data.grade,
-            score: data.score,
-            tutorName: data.tutorName || "Assigned Tutor",
-            recommendation: data.recommendation || "Keep working hard!"
-          };
-        }
-      });
-
-      if (!reportData) {
-        alert("No matching report found for that parent email.");
-        return;
-      }
-
-      localStorage.setItem("studentReportData", JSON.stringify(reportData));
-      window.location.href = "report.html";
-    } catch (err) {
-      console.error("Error fetching student report:", err);
-      alert("An error occurred. Please try again.");
-    }
-  });
-} else {
-  console.warn("Form not found in the DOM.");
-}
+    window.location.href = "report.html";
+  } catch (error) {
+    console.error("Error fetching report:", error);
+    alert("An error occurred while fetching the report.");
+  }
+});
