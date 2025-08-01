@@ -1,14 +1,8 @@
 // parent.js
+import { db } from './firebaseParentConfig.js';
+import { collection, query, where, getDocs } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-lite.js";
 
-import { getFirestore, collection, query, where, getDocs } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-lite.js";
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-import firebaseConfig from './firebaseConfig.js';
-
-// Initialize Firebase app
-const app = initializeApp(firebaseConfig);
-const db = getFirestore(app);
-
-// Form submission handler
+// Form handling (unchanged)
 const parentForm = document.getElementById("parent-login-form");
 
 parentForm.addEventListener("submit", async (e) => {
@@ -22,12 +16,11 @@ parentForm.addEventListener("submit", async (e) => {
     return;
   }
 
-  // Save details to sessionStorage for use in report.html
   sessionStorage.setItem("studentName", studentName);
   sessionStorage.setItem("parentEmail", parentEmail);
 
   try {
-    const resultsRef = collection(db, "results");  // ✅ This matches Firestore collection used in student.js
+    const resultsRef = collection(db, "results");
     const q = query(
       resultsRef,
       where("studentName", "==", studentName),
@@ -44,7 +37,6 @@ parentForm.addEventListener("submit", async (e) => {
     const studentData = snapshot.docs[0].data();
     sessionStorage.setItem("studentData", JSON.stringify(studentData));
 
-    // Redirect to report page
     window.location.href = "report.html";
   } catch (error) {
     console.error("Error fetching report:", error);
