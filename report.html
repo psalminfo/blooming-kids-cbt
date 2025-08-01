@@ -2,150 +2,45 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Student Report</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Student Report - Blooming Kids House</title>
   <link rel="icon" href="favicon.ico" />
   <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet" />
-  <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
 </head>
-<body class="bg-gray-100 min-h-screen p-4 flex flex-col items-center justify-center">
-  <div id="reportContainer" class="bg-white shadow-xl rounded-2xl max-w-3xl w-full p-8 space-y-6">
-    <div class="text-center">
-      <h1 class="text-2xl font-bold text-green-700">Student Performance Report</h1>
-    </div>
-
-    <div id="studentDetails" class="space-y-1 text-sm">
-      <p><strong>Name:</strong> <span id="studentName">Loading...</span></p>
-      <p><strong>Grade:</strong> <span id="studentGrade">Loading...</span></p>
-      <p><strong>Location:</strong> <span id="studentLocation">Loading...</span></p>
-      <p><strong>Assigned Tutor:</strong> <span id="tutorName">Loading...</span></p>
-    </div>
-
-    <div class="border-t pt-4 space-y-2">
-      <h2 class="font-semibold text-lg text-yellow-600">Performance Summary</h2>
-      <div id="summaryText" class="text-gray-700 text-sm">Loading report summary...</div>
-    </div>
-
-    <div class="border-t pt-4 space-y-2">
-      <h2 class="font-semibold text-lg text-yellow-600">Recommendation</h2>
-      <div id="recommendationText" class="text-gray-700 text-sm">Loading recommendations...</div>
-    </div>
-
-    <div class="border-t pt-4 space-y-2">
-      <h2 class="font-semibold text-lg text-yellow-600">Director's Note</h2>
-      <div class="text-gray-700 text-sm">
-        Dear Esteemed Parent,<br><br>
-        Thank you for giving your child the opportunity to participate in this assessment. At Blooming Kids House, we believe every child is capable of excellence when guided with love and structure. Whether your child has shown strength or needs support, we are here to help them grow.<br><br>
-        We are ready to walk with your child to improve their academic journey. You’re not alone on this path — our tutors are here to help!<br><br>
-        With warm regards,<br>
-        <strong>Mrs. Yinka Isikalu</strong><br>
-        Director, Blooming Kids House
-      </div>
-    </div>
-
-    <div class="flex items-center justify-between pt-6">
-      <button id="downloadBtn" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded">Download Report</button>
-      <button id="logoutBtn" class="text-sm text-red-600 underline">Logout</button>
-    </div>
-
-    <footer class="text-center pt-4 text-sm text-gray-400 border-t">
-      POWERED BY <span style="color:#FFEB3B">POG</span>
-    </footer>
+<body class="bg-white text-gray-800">
+  <div class="max-w-3xl mx-auto py-12 px-6">
+    <h1 class="text-3xl font-bold text-yellow-700 mb-4">Student Report</h1>
+    <div id="reportContent" class="space-y-4"></div>
+    <button onclick="logout()" class="mt-6 bg-yellow-500 hover:bg-yellow-600 text-white py-2 px-4 rounded">Logout</button>
   </div>
 
   <script>
-    import('https://www.gstatic.com/firebasejs/10.7.2/firebase-app-compat.js').then(() => {
-      return import('https://www.gstatic.com/firebasejs/10.7.2/firebase-firestore-compat.js');
-    }).then(() => {
-      const firebaseConfig = {
-        apiKey: "AIzaSyBpwxvEoeuT8e6F5vGmDc1VkVfWTUdxavY",
-        authDomain: "blooming-kids-house.firebaseapp.com",
-        projectId: "blooming-kids-house",
-        storageBucket: "blooming-kids-house.appspot.com",
-        messagingSenderId: "739684305208",
-        appId: "1:739684305208:web:ee1cc9e998b37e1f002f84"
-      };
+    const data = JSON.parse(localStorage.getItem("studentReportData"));
+    const reportDiv = document.getElementById("reportContent");
 
-      firebase.initializeApp(firebaseConfig);
-      const db = firebase.firestore();
+    if (data) {
+      reportDiv.innerHTML = `
+        <p><strong>Student Name:</strong> ${data.studentName}</p>
+        <p><strong>Grade:</strong> ${data.grade}</p>
+        <p><strong>Parent Email:</strong> ${data.parentEmail}</p>
+        <p><strong>Subjects Attempted:</strong> ${Object.keys(data.scores).join(", ")}</p>
+        <div class="mt-4">
+          ${Object.entries(data.scores).map(([subject, score]) => `
+            <p><strong>${subject}:</strong> ${score}%</p>
+          `).join("")}
+        </div>
+        <p class="mt-6"><strong>Tutor:</strong> ${data.tutor || "Assigned Tutor"}</p>
+        <p><strong>Director:</strong> Mrs. Yinka Isikalu</p>
+        <p class="mt-4 text-sm text-gray-500">POWERED BY <span style="color:#FFEB3B">POG</span></p>
+      `;
+    } else {
+      reportDiv.innerHTML = "<p class='text-red-600'>No report data found. Please go back to the parent portal.</p>";
+    }
 
-      const studentName = localStorage.getItem("studentName");
-      const parentEmail = localStorage.getItem("parentEmail");
-
-      if (!studentName || !parentEmail) {
-        alert("No parent data found. Redirecting...");
-        window.location.href = "parent.html";
-      }
-
-      document.getElementById("studentName").innerText = studentName;
-
-      db.collection("studentResults")
-        .where("studentName", "==", studentName)
-        .where("parentEmail", "==", parentEmail)
-        .orderBy("timestamp", "desc")
-        .limit(1)
-        .get()
-        .then((snapshot) => {
-          if (snapshot.empty) {
-            document.getElementById("summaryText").innerText = "No record found for this student.";
-            return;
-          }
-
-          const data = snapshot.docs[0].data();
-          document.getElementById("studentGrade").innerText = data.grade || "N/A";
-          document.getElementById("studentLocation").innerText = data.location || "N/A";
-          document.getElementById("tutorName").innerText = data.tutor || "N/A";
-
-          const subjects = Object.keys(data.subjects || {});
-          let summaryHTML = '';
-          let recommendationHTML = '';
-
-          subjects.forEach((subject) => {
-            const result = data.subjects[subject];
-            const percentage = Math.round((result.score / result.total) * 100);
-
-            summaryHTML += `
-              <div class="mb-2">
-                <strong>${subject}:</strong> ${percentage}% 
-                ${percentage >= 80 ? '✅' : percentage >= 60 ? '⚠️' : '❌'}
-              </div>
-            `;
-
-            recommendationHTML += `
-              <div class="mb-2">
-                In <strong>${subject}</strong>, your child covered core curriculum areas but still needs guided reinforcement. 
-                We will work with them to master key topics such as <em>${(result.topics || []).join(', ') || 'relevant standards'}</em>, using practice-based learning and tailored strategies.
-              </div>
-            `;
-          });
-
-          document.getElementById("summaryText").innerHTML = summaryHTML;
-          document.getElementById("recommendationText").innerHTML = recommendationHTML;
-        })
-        .catch((error) => {
-          console.error("Error loading report:", error);
-          document.getElementById("summaryText").innerText = "An error occurred while fetching the report.";
-        });
-
-      document.getElementById("logoutBtn").addEventListener("click", () => {
-        localStorage.clear();
-        window.location.href = "parent.html";
-      });
-
-      document.getElementById("downloadBtn").addEventListener("click", () => {
-        const container = document.getElementById("reportContainer");
-        html2canvas(container).then((canvas) => {
-          const imgData = canvas.toDataURL("image/png");
-          const pdf = new jspdf.jsPDF('p', 'mm', 'a4');
-          const pageWidth = pdf.internal.pageSize.getWidth();
-          const imgProps = pdf.getImageProperties(imgData);
-          const pdfHeight = (imgProps.height * pageWidth) / imgProps.width;
-          pdf.addImage(imgData, 'PNG', 0, 0, pageWidth, pdfHeight);
-          pdf.save(`${studentName}-report.pdf`);
-        });
-      });
-    });
+    function logout() {
+      localStorage.removeItem("studentReportData");
+      window.location.href = "parent.html";
+    }
   </script>
 </body>
 </html>
