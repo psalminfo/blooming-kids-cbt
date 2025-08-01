@@ -1,52 +1,36 @@
-import { db, storage } from './firebaseConfig.js';
-import { collection, query, where, getDocs } from "https://www.gstatic.com/firebasejs/9.6.10/firebase-firestore.js";
-import { ref, getDownloadURL } from "https://www.gstatic.com/firebasejs/9.6.10/firebase-storage.js";
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import { getFirestore, collection, query, where, getDocs } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import { generateAndDownloadReport } from "./generateReportFromFirestore.js";
+import { firebaseConfig } from "./firebaseConfig.js";
 
-document.addEventListener("DOMContentLoaded", () => {
-  const form = document.getElementById("parentLoginForm");
-  const reportSection = document.getElementById("reportSection");
-  const pdfPreview = document.getElementById("pdfPreview");
-  const downloadLink = document.getElementById("downloadLink");
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
 
-  form.addEventListener("submit", async (e) => {
-    e.preventDefault();
+document.getElementById("report-form").addEventListener("submit", async (e) => {
+  e.preventDefault();
 
-    const studentName = document.getElementById("studentName").value.trim();
-    const parentEmail = document.getElementById("parentEmail").value.trim();
+  const studentName = document.getElementById("student-name").value.trim();
+  const parentEmail = document.getElementById("parent-email").value.trim();
 
-    if (!studentName || !parentEmail) return;
+  const reportsRef = collection(db, "testResults");
+  const q = query(reportsRef, where("studentName", "==", studentName), where("parentEmail", "==", parentEmail));
 
-    try {
-      const resultsRef = collection(db, "student_results");
-      const q = query(resultsRef, where("studentName", "==", studentName), where("parentEmail", "==", parentEmail));
-      const querySnapshot = await getDocs(q);
+  try {
+    const querySnapshot = await getDocs(q);
 
-      if (querySnapshot.empty) {
-        alert("No report found for this student and parent email.");
-        return;
-      }
-
-      const reportDoc = querySnapshot.docs[0].data();
-      const reportFileName = reportDoc.reportFileName;
-
-      if (!reportFileName) {
-        alert("Report found but missing file reference.");
-        return;
-      }
-
-      const fileRef = ref(storage, `reports/${reportFileName}`);
-      const downloadURL = await getDownloadURL(fileRef);
-
-      // Show preview
-      pdfPreview.src = downloadURL;
-      downloadLink.href = downloadURL;
-      downloadLink.download = `${studentName}_report.pdf`;
-
-      reportSection.classList.remove("hidden");
-
-    } catch (error) {
-      console.error("Error fetching report:", error);
-      alert("An error occurred. Please try again later.");
+    if (querySnapshot.empty) {
+      alert("No report found. Please check the student's name and your email.");
+      return;
     }
-  });
+
+    // Assuming one match — pick the first result
+    const docData = querySnapshot.docs[0].data();
+
+    // Dynamically generate and download PDF from Firestore data
+    await generateAndDownloadReport(docData);
+
+  } catch (error) {
+    console.error("Error fetching report:", error);
+    alert("Something went wrong. Please try again.");
+  }
 });
