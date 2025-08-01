@@ -1,21 +1,43 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Parent Report - Blooming Kids House</title>
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" />
-  <link rel="icon" href="favicon.ico" type="image/x-icon" />
+  <title>Parent Portal – Blooming Kids House</title>
+  <link rel="icon" type="image/png" href="favicon.png" />
+  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
 </head>
-<body class="bg-gray-100 p-4">
-  <div id="report-container" class="max-w-4xl mx-auto bg-white shadow-md rounded-lg p-6">
-    <h1 class="text-3xl font-bold text-center mb-4">Student Progress Report</h1>
-    <div id="student-info" class="mb-6"></div>
-    <div id="report-sections"></div>
-    <div id="directors-message" class="mt-8 text-sm text-gray-700 border-t pt-4"></div>
-    <div class="mt-4 text-center">
-      <button id="downloadBtn" class="bg-blue-500 text-white px-6 py-2 rounded hover:bg-blue-600">Download PDF</button>
+<body class="bg-yellow-50 min-h-screen flex flex-col justify-center items-center p-4">
+  <!-- Branding -->
+  <div class="text-center mb-8">
+    <h1 class="text-3xl md:text-4xl font-bold text-yellow-900">Blooming Kids House</h1>
+    <p class="text-md text-gray-600">Parent Report Access Portal</p>
+  </div>
+
+  <!-- Login Section -->
+  <div id="loginSection" class="bg-white rounded-2xl shadow-lg p-6 w-full max-w-md">
+    <h2 class="text-xl font-semibold mb-4 text-yellow-800">Enter Student Details</h2>
+    <form id="parentLoginForm" class="space-y-4">
+      <div>
+        <label for="parentEmail" class="block text-sm font-medium text-gray-700">Your Email</label>
+        <input type="email" id="parentEmail" class="mt-1 block w-full px-4 py-2 border border-gray-300 rounded-lg shadow-sm focus:ring-yellow-500 focus:border-yellow-500" required />
+      </div>
+      <div>
+        <label for="studentName" class="block text-sm font-medium text-gray-700">Student's Full Name</label>
+        <input type="text" id="studentName" class="mt-1 block w-full px-4 py-2 border border-gray-300 rounded-lg shadow-sm focus:ring-yellow-500 focus:border-yellow-500" required />
+      </div>
+      <button type="submit" class="w-full bg-yellow-500 hover:bg-yellow-600 text-white py-2 px-4 rounded-xl font-bold">Generate Report</button>
+    </form>
+  </div>
+
+  <!-- Report Section (hidden until login) -->
+  <div id="reportSection" class="hidden w-full max-w-4xl mt-10 bg-white rounded-2xl shadow-md p-6">
+    <div id="reportContent" class="prose max-w-none">
+      <!-- Report content will be injected here -->
+    </div>
+    <div class="flex justify-between mt-6">
+      <button id="downloadReport" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-xl">Download PDF</button>
+      <button id="logoutBtn" class="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-xl">Logout</button>
     </div>
   </div>
 
