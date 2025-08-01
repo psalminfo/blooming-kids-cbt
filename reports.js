@@ -1,85 +1,90 @@
 // report.js
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-import { getFirestore, collection, query, where, getDocs } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-lite.js";
-import html2pdf from "https://cdn.jsdelivr.net/npm/html2pdf.js@0.10.1/dist/html2pdf.bundle.min.js";
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import {
+  getFirestore,
+  collection,
+  getDocs,
+  query,
+  where
+} from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
-// Firebase config
-const firebaseConfig = {
-  apiKey: "AIzaSyD1lJhsWMMs_qerLBSzk7wKhjLyI_11RJg",
-  authDomain: "bloomingkidsassessment.firebaseapp.com",
-  projectId: "bloomingkidsassessment",
-  storageBucket: "bloomingkidsassessment.appspot.com",
-  messagingSenderId: "238975054977",
-  appId: "1:238975054977:web:87c70b4db044998a204980"
-};
+import { firebaseConfig } from "./firebaseConfig.js";
 
+// Initialize Firebase
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
-// Load from sessionStorage
 const studentName = sessionStorage.getItem("studentName");
+const parentEmail = sessionStorage.getItem("parentEmail");
 
-if (!studentName) {
-  alert("Missing student info. Please return to the parent portal.");
-  window.location.href = "parent.html";
+if (!studentName || !parentEmail) {
+  document.body.innerHTML = `
+    <div class="min-h-screen flex items-center justify-center bg-yellow-50">
+      <div class="bg-white p-6 rounded shadow text-center">
+        <p class="text-lg font-semibold text-red-500">Missing student info. Please return to the parent portal.</p>
+        <a href="parent.html" class="text-yellow-600 underline mt-4 block">Go to Parent Portal</a>
+      </div>
+    </div>
+  `;
+  throw new Error("Missing session data");
 }
 
-// Query Firestore for student result
-async function loadReport() {
-  const q = query(collection(db, "student_results"), where("studentName", "==", studentName));
-  const snapshot = await getDocs(q);
+const resultsRef = collection(db, "results");
+const q = query(resultsRef, where("studentName", "==", studentName));
 
+getDocs(q).then(snapshot => {
   if (snapshot.empty) {
-    alert("No report found for this student.");
+    document.getElementById("report").innerHTML = `
+      <div class="text-center text-red-500 font-semibold">No report found for ${studentName}.</div>
+    `;
     return;
   }
 
-  const data = snapshot.docs[0].data();
-
-  // Fill in fields
-  document.getElementById("student-name").textContent = data.studentName || "N/A";
-  document.getElementById("student-grade").textContent = data.grade || "N/A";
-  document.getElementById("student-email").textContent = data.email || "N/A";
-  document.getElementById("tutor-name").textContent = data.tutor || "N/A";
-
-  // Subject Scores
-  const subjectContainer = document.getElementById("subject-scores");
-  subjectContainer.innerHTML = "";
-  Object.entries(data.scores || {}).forEach(([subject, score]) => {
-    const div = document.createElement("div");
-    div.className = "mb-2";
-    div.innerHTML = `<strong>${subject}:</strong> ${score}/30`;
-    subjectContainer.appendChild(div);
+  let reportsHtml = "";
+  snapshot.forEach(doc => {
+    const data = doc.data();
+    reportsHtml += generateReportCard(data);
   });
 
-  // Personalized Recommendation
-  const rec = generateRecommendation(data);
-  document.getElementById("recommendation-text").textContent = rec;
-}
-
-// Recommendation logic
-function generateRecommendation(data) {
-  const tutor = data.tutor || "our tutor";
-  const subjects = Object.entries(data.scores || {});
-  const lowSubjects = subjects.filter(([_, score]) => score < 20).map(([s]) => s);
-
-  if (lowSubjects.length === 0) {
-    return `Great job! ${data.studentName} performed well in all subjects. Continued practice with ${tutor} will strengthen understanding.`;
-  }
-
-  return `We recommend targeted support in ${lowSubjects.join(", ")} to build stronger foundations. ${tutor} will guide ${data.studentName} in mastering these areas.`;
-}
-
-// Download PDF
-document.getElementById("download-btn").addEventListener("click", () => {
-  html2pdf().from(document.body).save(`${studentName}-report.pdf`);
+  document.getElementById("report").innerHTML = reportsHtml;
 });
 
-// Logout
-document.getElementById("logout-btn").addEventListener("click", () => {
-  sessionStorage.clear();
-  window.location.href = "parent.html";
-});
+function generateReportCard(data) {
+  const subjects = Object.keys(data.scores || {});
+  const subjectList = subjects.map(subject => `
+    <li><strong>${subject}:</strong> ${data.scores[subject]}%</li>
+  `).join("");
 
-// Load report now
-loadReport();
+  const recommendations = subjects.map(subject => `
+    <li>${subject}: ${generateRecommendation(subject)}</li>
+  `).join("");
+
+  return `
+    <div class="bg-white p-6 rounded shadow-md">
+      <h2 class="text-2xl font-bold mb-4 text-yellow-600">Student Report</h2>
+      <p><strong>Name:</strong> ${data.studentName}</p>
+      <p><strong>Email:</strong> ${data.email}</p>
+      <p><strong>Grade:</strong> ${data.grade}</p>
+      <p><strong>Assigned Tutor:</strong> ${data.tutorName}</p>
+      <ul class="mt-4 space-y-1">${subjectList}</ul>
+      <div class="mt-6">
+        <h3 class="text-lg font-semibold mb-2">Recommendations</h3>
+        <ul class="list-disc pl-5">${recommendations}</ul>
+      </div>
+      <div class="mt-6 italic text-sm text-gray-700">
+        Director's Note: Thank you for trusting us. Your child's learning journey is important to us.
+        — <strong>Mrs. Yinka Isikalu</strong>, Director
+      </div>
+      <div class="mt-6 text-xs text-center text-gray-500">
+        POWERED BY <span style="color:#FFEB3B">POG</span>
+      </div>
+      <div class="mt-4 text-center">
+        <a href="parent.html" class="text-yellow-600 underline">Logout</a>
+      </div>
+    </div>
+  `;
+}
+
+function generateRecommendation(subject) {
+  return `Further support in ${subject} is advised. The tutor will focus on helping your child master key areas using curriculum-based strategies.`;
+}
