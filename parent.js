@@ -1,95 +1,113 @@
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import { db } from './firebaseConfig.js';
 import {
-  getFirestore, collection, query, where, getDocs, orderBy
-} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-import { firebaseConfig } from './firebaseConfig.js';
+  collection,
+  query,
+  where,
+  getDocs
+} from "https://www.gstatic.com/firebasejs/9.6.10/firebase-firestore.js";
 
-const app = initializeApp(firebaseConfig);
-const db = getFirestore(app);
-
-window.fetchReports = async function () {
-  const studentName = document.getElementById("studentName").value.trim();
-  const parentEmail = document.getElementById("parentEmail").value.trim();
-  const reportContainer = document.getElementById("reportContainer");
-
-  reportContainer.innerHTML = "";
+async function loadReport() {
+  const studentName = document.getElementById("studentName").value.trim().toLowerCase();
+  const parentEmail = document.getElementById("parentEmail").value.trim().toLowerCase();
+  const reportArea = document.getElementById("reportArea");
+  const reportContent = document.getElementById("reportContent");
 
   if (!studentName || !parentEmail) {
     alert("Please enter both student name and parent email.");
     return;
   }
 
-  const reportsRef = collection(db, "reports");
-  const q = query(
-    reportsRef,
-    where("studentName", "==", studentName),
-    where("parentEmail", "==", parentEmail),
-    orderBy("timestamp", "desc")
-  );
-
+  const q = query(collection(db, "student_results"), where("parentEmail", "==", parentEmail));
   const querySnapshot = await getDocs(q);
 
-  if (querySnapshot.empty) {
-    reportContainer.innerHTML = "<p class='text-red-600'>No reports found.</p>";
+  const studentResults = [];
+  querySnapshot.forEach((doc) => {
+    const data = doc.data();
+    if (data.studentName.toLowerCase() === studentName) {
+      studentResults.push(data);
+    }
+  });
+
+  if (studentResults.length === 0) {
+    alert("No records found.");
     return;
   }
 
-  const doc = querySnapshot.docs[0].data(); // Latest report only
+  // Group results by timestamp session
+  const grouped = {};
+  studentResults.forEach(result => {
+    const ts = result.submittedAt?.seconds || 0;
+    if (!grouped[ts]) grouped[ts] = [];
+    grouped[ts].push(result);
+  });
 
-  const scoreTable = Object.entries(doc.scores)
-    .map(([subject, score]) => {
-      const percentage = ((score.correct / score.total) * 100).toFixed(1);
-      return `<tr><td class="border px-4 py-2 font-semibold">${subject}</td><td class="border px-4 py-2">${percentage}%</td></tr>`;
-    })
-    .join("");
+  // Render sessions
+  reportContent.innerHTML = "";
+  Object.entries(grouped).sort((a, b) => b[0] - a[0]).forEach(([timestamp, results], index) => {
+    const sessionDate = new Date(timestamp * 1000).toLocaleString();
+    const student = results[0];
 
-  const recommendations = Object.entries(doc.recommendations || {})
-    .map(([subject, tip]) => {
-      return `<div class="mb-3"><strong>${subject}:</strong> ${tip}</div>`;
-    })
-    .join("");
+    const subjectRows = results.map(r => {
+      const correct = r.answers.filter(a => a === "correct").length;
+      const total = r.answers.length;
+      const percentage = ((correct / total) * 100).toFixed(1);
+      return `<tr><td class='border px-4 py-2'>${r.subject.toUpperCase()}</td><td class='border px-4 py-2'>${percentage}%</td></tr>`;
+    }).join("");
 
-  const html = `
-    <div id="report" class="bg-white shadow-md rounded p-4">
-      <h2 class="text-xl font-bold mb-2">Student Report</h2>
-      <p><strong>Name:</strong> ${doc.studentName}</p>
-      <p><strong>Grade:</strong> ${doc.grade}</p>
-      <p><strong>Tutor:</strong> ${doc.tutorName || 'N/A'}</p>
-      <h3 class="mt-4 font-bold">Scores</h3>
-      <table class="w-full border mt-2 mb-4">
-        <thead>
-          <tr><th class="border px-4 py-2 text-left">Subject</th><th class="border px-4 py-2 text-left">Score</th></tr>
-        </thead>
-        <tbody>${scoreTable}</tbody>
-      </table>
-      <h3 class="font-bold">Recommendations</h3>
-      <div class="mb-4">${recommendations || 'No recommendations available.'}</div>
+    const recommendations = results.map(r => {
+      const topics = r.topicsCovered?.join(", ") || "key concepts from the assessment";
+      return `<li><strong>${r.subject.toUpperCase()}:</strong> Focus on ${topics} for improved mastery.</li>`;
+    }).join("");
 
-      <div class="mt-6">
-        <h3 class="font-bold text-lg">Director’s Message</h3>
-        <p class="mt-2">Thank you for trusting us with your child's learning. We are committed to helping them grow academically and personally. Please contact us for next steps.</p>
-        <p class="mt-2 italic">— Mrs. Yinka Isikalu, Director</p>
+    const sessionId = `session-${timestamp}`;
+    reportContent.innerHTML += `
+      <div class="bg-white shadow p-6 mb-8 rounded-xl" id="${sessionId}">
+        <h2 class="text-xl font-bold mb-1">Blooming Kids House Assessment Report</h2>
+        <p><strong>Student:</strong> ${capitalize(student.studentName)}</p>
+        <p><strong>Grade:</strong> ${student.grade}</p>
+        <p><strong>Tutor:</strong> ${student.tutorName}</p>
+        <p><strong>Location:</strong> ${student.location}</p>
+        <p><strong>Date:</strong> ${sessionDate}</p>
+
+        <h3 class="mt-4 font-semibold">Subject Scores</h3>
+        <table class="table-auto w-full border my-2">
+          <thead>
+            <tr class="bg-gray-200">
+              <th class="px-4 py-2 border">Subject</th>
+              <th class="px-4 py-2 border">Score (%)</th>
+            </tr>
+          </thead>
+          <tbody>${subjectRows}</tbody>
+        </table>
+
+        <h3 class="mt-4 font-semibold">Recommendations</h3>
+        <ul class="list-disc pl-5 mb-4">${recommendations}</ul>
+
+        <h3 class="font-semibold">Director's Message</h3>
+        <p class="italic mb-2">Thank you for trusting Blooming Kids House. We recommend personalized tutoring to reinforce learning. Your child will be supported by ${student.tutorName} to boost performance and confidence.</p>
+        <p><strong>– Mrs. Yinka Isikalu, Director</strong></p>
+
+        <button onclick="downloadSessionReport('${sessionId}')" class="mt-4 bg-green-600 hover:bg-green-700 text-white py-2 px-4 rounded-xl">Download PDF</button>
       </div>
+    `;
+  });
 
-      <div class="mt-6 text-sm text-gray-500">
-        POWERED BY <span style="color:#FFEB3B">POG</span>
-      </div>
+  reportArea.classList.remove("hidden");
+}
 
-      <button onclick="downloadPDF()" class="mt-4 bg-green-600 text-white px-4 py-2 rounded">Download PDF</button>
-    </div>
-  `;
+function capitalize(str) {
+  return str.replace(/\b\w/g, l => l.toUpperCase());
+}
 
-  reportContainer.innerHTML = html;
+window.loadReport = loadReport;
+
+window.downloadSessionReport = function (id) {
+  import("https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js").then(() => {
+    const element = document.getElementById(id);
+    html2pdf().from(element).save("Assessment_Report.pdf");
+  });
 };
 
-window.downloadPDF = function () {
-  const element = document.getElementById("report");
-  const opt = {
-    margin: 0.5,
-    filename: 'student-report.pdf',
-    image: { type: 'jpeg', quality: 0.98 },
-    html2canvas: { scale: 2 },
-    jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' }
-  };
-  html2pdf().set(opt).from(element).save();
+window.logout = function () {
+  window.location.href = "parent.html";
 };
