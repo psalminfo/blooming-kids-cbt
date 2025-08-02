@@ -1,5 +1,19 @@
 import { db } from './firebaseConfig.js';
-import { collection, query, where, getDocs } from "https://www.gstatic.com/firebasejs/9.6.10/firebase-firestore.js";
+import {
+  collection,
+  query,
+  where,
+  getDocs
+} from "https://www.gstatic.com/firebasejs/9.6.10/firebase-firestore.js";
+
+function capitalize(str) {
+  return str.replace(/\b\w/g, l => l.toUpperCase());
+}
+
+function formatDate(timestamp) {
+  const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
+  return date.toLocaleString();
+}
 
 async function loadReport() {
   const studentName = document.getElementById("studentName").value.trim().toLowerCase();
@@ -15,114 +29,89 @@ async function loadReport() {
   const q = query(collection(db, "student_results"), where("parentEmail", "==", parentEmail));
   const querySnapshot = await getDocs(q);
 
-  const sessions = {};
-
-  for (const doc of querySnapshot.docs) {
+  const allResults = [];
+  querySnapshot.forEach(doc => {
     const data = doc.data();
-    if (data.studentName.toLowerCase() !== studentName) continue;
+    if (data.studentName.toLowerCase() === studentName) {
+      allResults.push({ ...data, submittedAt: doc.data().submittedAt });
+    }
+  });
 
-    const submittedAt = data.submittedAt?.seconds || 0;
-    const rounded = Math.floor(submittedAt / 3600) * 3600;
-
-    if (!sessions[rounded]) sessions[rounded] = [];
-    sessions[rounded].push(data);
-  }
-
-  if (Object.keys(sessions).length === 0) {
+  if (allResults.length === 0) {
     alert("No records found.");
     return;
   }
 
+  // Group results by session (within 1 hour of each other)
+  const grouped = [];
+  allResults.sort((a, b) => a.submittedAt.seconds - b.submittedAt.seconds);
+
+  allResults.forEach(result => {
+    const lastGroup = grouped[grouped.length - 1];
+    if (
+      !lastGroup ||
+      Math.abs(result.submittedAt.seconds - lastGroup[0].submittedAt.seconds) > 3600
+    ) {
+      grouped.push([result]);
+    } else {
+      lastGroup.push(result);
+    }
+  });
+
+  // Render each session group
   reportContent.innerHTML = "";
+  grouped.forEach((session, index) => {
+    const first = session[0];
+    const topics = new Set();
+    const scoreTableRows = session
+      .map(r => {
+        const correct = r.answers.filter(a => a === "correct").length;
+        const percent = ((correct / r.answers.length) * 100).toFixed(0);
+        topics.add(r.topic || "General"); // fallback to 'General' if topic missing
+        return `<tr><td class="border px-2 py-1">${r.subject.toUpperCase()}</td><td class="border px-2 py-1">${percent}%</td></tr>`;
+      })
+      .join("");
 
-  for (const [timestamp, tests] of Object.entries(sessions)) {
-    const date = new Date(timestamp * 1000).toLocaleString();
-    const base = tests[0];
+    const topicList = [...topics].map(t => `<li>${t}</li>`).join("");
 
-    const subjectScores = tests.map(t => {
-      const correct = t.answers.filter(a => a === "correct").length;
-      const percent = Math.round((correct / t.answers.length) * 100);
-      return { subject: t.subject.toUpperCase(), percent };
-    });
-
-    const topics = await collectTopics(tests);
-
-    const sessionHTML = `
-      <div class="bg-white rounded-2xl shadow-md p-6 mb-8">
-        <h2 class="text-xl font-bold text-green-700 mb-2">BLOOMING KIDS HOUSE ASSESSMENT REPORT</h2>
-        <p><strong>Student Name:</strong> ${capitalize(base.studentName)}</p>
+    reportContent.innerHTML += `
+      <div class="bg-white rounded-xl shadow-md p-6 mb-6">
+        <h2 class="text-xl font-bold mb-2">Student Name: ${capitalize(first.studentName)}</h2>
         <p><strong>Parent Email:</strong> ${parentEmail}</p>
-        <p><strong>Grade:</strong> ${base.grade}</p>
-        <p><strong>Location:</strong> ${base.location}</p>
-        <p><strong>Tutor:</strong> ${base.tutorName}</p>
-        <p><strong>Submitted:</strong> ${date}</p>
+        <p><strong>Grade:</strong> ${first.grade}</p>
+        <p><strong>Tutor:</strong> ${first.tutorName}</p>
+        <p><strong>Location:</strong> ${first.location}</p>
+        <p><strong>Session Time:</strong> ${formatDate(first.submittedAt)}</p>
 
-        <hr class="my-4 border-yellow-400"/>
-
-        <h3 class="text-lg font-semibold text-green-800 mb-1">Performance Summary</h3>
-        <table class="w-full text-left border mb-4">
-          <thead><tr class="bg-yellow-100"><th class="p-2">Subject</th><th class="p-2">Score (%)</th></tr></thead>
-          <tbody>
-            ${subjectScores.map(s => `<tr><td class="p-2">${s.subject}</td><td class="p-2">${s.percent}%</td></tr>`).join("")}
-          </tbody>
+        <h3 class="text-lg font-semibold mt-4 mb-2">Performance Summary</h3>
+        <table class="table-auto border w-full mb-4 text-left text-sm">
+          <thead><tr><th class="border px-2 py-1">Subject</th><th class="border px-2 py-1">Score (%)</th></tr></thead>
+          <tbody>${scoreTableRows}</tbody>
         </table>
 
-        <h3 class="text-lg font-semibold text-green-800 mb-1">Knowledge & Skill Analysis</h3>
-        <p class="mb-4">${topics.length ? topics.join(", ") : "Key curriculum areas were assessed across subjects."}</p>
+        <h3 class="text-lg font-semibold mb-2">Knowledge & Skills Analysis</h3>
+        <ul class="list-disc pl-5 mb-4">${topicList}</ul>
 
-        <h3 class="text-lg font-semibold text-green-800 mb-1">Tutor’s Recommendation</h3>
-        <p class="mb-4">We encourage consistent review of the topics listed above. ${base.tutorName} will provide personalized support to reinforce these skills and boost confidence in upcoming assessments.</p>
+        <h3 class="text-lg font-semibold mb-2">Tutor’s Recommendation</h3>
+        <p class="mb-4">To improve performance, our tutor <strong>${first.tutorName}</strong> recommends revisiting the listed topics with personalized lessons. Regular practice sessions will greatly boost confidence and accuracy.</p>
 
-        <h3 class="text-lg font-semibold text-green-800 mb-1">Director’s Message</h3>
-        <p class="italic mb-2">Dear Parent,</p>
-        <p class="mb-2">Thank you for partnering with Blooming Kids House. We are committed to helping your child excel academically and personally. With the support of our expert tutors, your child will gain confidence and mastery in every subject area.</p>
-        <p class="font-bold mb-2">– Mrs. Yinka Isikalu, Director</p>
+        <h3 class="text-lg font-semibold mb-2">Director’s Message</h3>
+        <p class="italic text-sm mb-2">Dear Parent, thank you for trusting Blooming Kids House. Based on this session, we encourage ongoing support through focused tutoring. We are committed to helping your child grow in mastery and confidence across all subjects.</p>
+        <p class="text-sm font-bold">– Mrs. Yinka Isikalu, Director</p>
 
         <button class="mt-4 bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700" onclick="downloadPDF(this)">Download PDF</button>
       </div>
     `;
-
-    reportContent.innerHTML += sessionHTML;
-  }
+  });
 
   reportArea.classList.remove("hidden");
-}
-
-async function collectTopics(tests) {
-  const topics = new Set();
-
-  for (const test of tests) {
-    const file = `${test.grade}-${test.subject}.json`;
-    try {
-      const res = await fetch(`https://raw.githubusercontent.com/psalminfo/blooming-kids-cbt/main/${file}`);
-      const json = await res.json();
-
-      const questionMap = {};
-      for (const q of json.questions) {
-        questionMap[q.question] = q.topic || "";
-      }
-
-      for (const ans of test.answers) {
-        const matchedTopic = questionMap[ans];
-        if (matchedTopic) topics.add(matchedTopic);
-      }
-    } catch (e) {
-      console.warn("Topic fetch failed for", file);
-    }
-  }
-
-  return Array.from(topics);
-}
-
-function capitalize(str) {
-  return str.replace(/\b\w/g, c => c.toUpperCase());
 }
 
 window.loadReport = loadReport;
 
 window.downloadPDF = function (btn) {
   import("https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js").then(() => {
-    const reportBlock = btn.closest(".bg-white");
+    const block = btn.closest(".bg-white");
     const opt = {
       margin: 0.5,
       filename: 'Assessment_Report.pdf',
@@ -130,10 +119,10 @@ window.downloadPDF = function (btn) {
       html2canvas: { scale: 2, useCORS: true },
       jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' }
     };
-    html2pdf().set(opt).from(reportBlock).save();
+    html2pdf().set(opt).from(block).save();
   });
 };
 
-window.logout = () => {
+window.logout = function () {
   window.location.href = "parent.html";
 };
