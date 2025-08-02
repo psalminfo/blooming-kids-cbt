@@ -1,444 +1,284 @@
 {
   "questions": [
     {
-      "question": "Read the passage and answer the questions that follow.\n\n**Passage:**\n\nMaria stepped into the library with excitement. Her favorite author had released a new book, and she couldn\u2019t wait to dive into it. She walked quickly to the fiction section, scanning the shelves until her eyes landed on the bright red cover. Clutching the book to her chest, she hurried to the checkout desk.\n\n**Why was Maria excited to go to the library?**",
+      "topic": "Reading Comprehension",
+      "question": "In a story about a girl named Mia who finds a magical book in her attic, what is the main reason Mia decides to read the book?",
       "type": "multiple-choice",
-      "options": [
-        "She wanted to study for a test.",
-        "Her favorite author had released a new book.",
-        "She had never been to the library before.",
-        "She was meeting her friend there."
-      ],
-      "correct_answer": "Her favorite author had released a new book."
+      "options": ["She wants to learn about history", "She is curious about its glowing cover", "Her teacher assigns it as homework", "Her friend dares her to read it"],
+      "correct_answer": "She is curious about its glowing cover"
     },
     {
-      "question": "What does the word 'clutching' most likely mean as used in the passage?",
+      "topic": "Vocabulary",
+      "question": "In the sentence 'The cowboy galloped swiftly across the vast prairie,' what does the word 'vast' mean?",
       "type": "multiple-choice",
-      "options": [
-        "Throwing something away",
-        "Holding something tightly",
-        "Dropping something suddenly",
-        "Losing grip of something"
-      ],
-      "correct_answer": "Holding something tightly"
+      "options": ["Small", "Large", "Dry", "Green"],
+      "correct_answer": "Large"
     },
     {
-      "question": "Which of the following best describes the main idea of the passage?",
-      "type": "multiple-choice",
-      "options": [
-        "Maria enjoys reading and is excited about a new book.",
-        "Maria is late for her class at the library.",
-        "The library is a confusing place to find books.",
-        "Maria doesn\u2019t like reading fiction books."
-      ],
-      "correct_answer": "Maria enjoys reading and is excited about a new book."
-    },
-    {
+      "topic": "Grammar",
       "question": "Which sentence is written correctly?",
       "type": "multiple-choice",
-      "options": [
-        "my Mom went to the store yesterday.",
-        "My mom went to the Store yesterday.",
-        "My mom went to the store yesterday.",
-        "my mom Went to the store yesterday."
-      ],
-      "correct_answer": "My mom went to the store yesterday."
+      "options": ["The dog run fast.", "The dog runs fast.", "The dog running fast.", "The dog runned fast."],
+      "correct_answer": "The dog runs fast."
     },
     {
-      "question": "Which word is a synonym for **happy**?",
+      "topic": "Literary Elements",
+      "question": "In a story set in a Texas ranch, the main character, Juan, feels nervous before his first rodeo. What is this an example of?",
       "type": "multiple-choice",
-      "options": [
-        "Sad",
-        "Angry",
-        "Joyful",
-        "Tired"
-      ],
+      "options": ["Setting", "Plot", "Character", "Conflict"],
+      "correct_answer": "Conflict"
+    },
+    {
+      "topic": "Reading Comprehension",
+      "question": "In a folktale about a talking armadillo, why does the armadillo help the lost traveler?",
+      "type": "multiple-choice",
+      "options": ["He wants to be famous", "He feels sorry for the traveler", "He wants a reward", "He is bored"],
+      "correct_answer": "He feels sorry for the traveler"
+    },
+    {
+      "topic": "Vocabulary",
+      "question": "In the sentence 'The festival was a jubilant celebration,' what does 'jubilant' mean?",
+      "type": "multiple-choice",
+      "options": ["Quiet", "Joyful", "Sad", "Tired"],
       "correct_answer": "Joyful"
     },
     {
-      "question": "Choose the sentence that uses the correct punctuation.",
+      "topic": "Writing Conventions",
+      "question": "Which sentence uses correct punctuation?",
       "type": "multiple-choice",
-      "options": [
-        "Can you help me clean my room?",
-        "Can you help me clean my room.",
-        "Can you help me clean my room!",
-        "Can you help me clean my room,"
-      ],
-      "correct_answer": "Can you help me clean my room?"
+      "options": ["I have two cats a dog and a bird.", "I have two cats, a dog, and a bird.", "I have two cats a dog, and a bird.", "I have two cats, a dog and a bird."],
+      "correct_answer": "I have two cats, a dog, and a bird."
     },
     {
-      "question": "Which word in the sentence is a **noun**? _The dog barked loudly at the stranger._",
+      "topic": "Text Features",
+      "question": "In a book about Texas wildlife, what is the purpose of a caption under a picture of a longhorn?",
       "type": "multiple-choice",
-      "options": [
-        "barked",
-        "loudly",
-        "dog",
-        "at"
-      ],
-      "correct_answer": "dog"
+      "options": ["To tell the main idea", "To explain the picture", "To list the chapters", "To give the author’s name"],
+      "correct_answer": "To explain the picture"
     },
     {
-      "question": "Which sentence is written in the **past tense**?",
+      "topic": "Reading Comprehension",
+      "question": "In a story about a boy exploring a cave in the Texas Hill Country, what is the main idea of the passage?",
       "type": "multiple-choice",
-      "options": [
-        "She walks to school every day.",
-        "She will walk to school tomorrow.",
-        "She is walking to school now.",
-        "She walked to school yesterday."
-      ],
-      "correct_answer": "She walked to school yesterday."
+      "options": ["Caves are dark and scary", "Exploring can lead to new discoveries", "Bats live in caves", "The boy likes to hike"],
+      "correct_answer": "Exploring can lead to new discoveries"
     },
     {
-      "question": "Which sentence shows **cause and effect**?",
+      "topic": "Vocabulary",
+      "question": "In the sentence 'The river meandered through the valley,' what does 'meandered' mean?",
       "type": "multiple-choice",
-      "options": [
-        "Tom read a book.",
-        "Tom forgot his umbrella, so he got wet.",
-        "Tom ran fast.",
-        "Tom likes pizza."
-      ],
-      "correct_answer": "Tom forgot his umbrella, so he got wet."
+      "options": ["Rushed", "Stopped", "Wound slowly", "Dried up"],
+      "correct_answer": "Wound slowly"
     },
     {
-      "question": "What is the correct contraction for _they are_?",
+      "topic": "Grammar",
+      "question": "Which word is a plural noun?",
       "type": "multiple-choice",
-      "options": [
-        "There",
-        "Their",
-        "They're",
-        "Theirs"
-      ],
-      "correct_answer": "They're"
+      "options": ["Horse", "Horses", "Ride", "Riding"],
+      "correct_answer": "Horses"
     },
     {
-      "question": "Read the passage and answer the questions that follow.\n\n**Passage:**\n\nMaria stepped into the library with excitement. Her favorite author had released a new book, and she couldn\u2019t wait to dive into it. She walked quickly to the fiction section, scanning the shelves until her eyes landed on the bright red cover. Clutching the book to her chest, she hurried to the checkout desk.\n\n**Why was Maria excited to go to the library?**",
+      "topic": "Literary Elements",
+      "question": "In a story about a girl training her horse in San Antonio, what is the setting?",
       "type": "multiple-choice",
-      "options": [
-        "She wanted to study for a test.",
-        "Her favorite author had released a new book.",
-        "She had never been to the library before.",
-        "She was meeting her friend there."
-      ],
-      "correct_answer": "Her favorite author had released a new book."
+      "options": ["The girl’s emotions", "The horse’s actions", "San Antonio", "The training process"],
+      "correct_answer": "San Antonio"
     },
     {
-      "question": "What does the word 'clutching' most likely mean as used in the passage?",
+      "topic": "Reading Comprehension",
+      "question": "In a poem about the Texas bluebonnet, what does the poet compare the flower to?",
       "type": "multiple-choice",
-      "options": [
-        "Throwing something away",
-        "Holding something tightly",
-        "Dropping something suddenly",
-        "Losing grip of something"
-      ],
-      "correct_answer": "Holding something tightly"
+      "options": ["A sparkling jewel", "A tall tree", "A soft cloud", "A rushing river"],
+      "correct_answer": "A sparkling jewel"
     },
     {
-      "question": "Which of the following best describes the main idea of the passage?",
+      "topic": "Vocabulary",
+      "question": "In the sentence 'The hiker was cautious near the cliff,' what does 'cautious' mean?",
       "type": "multiple-choice",
-      "options": [
-        "Maria enjoys reading and is excited about a new book.",
-        "Maria is late for her class at the library.",
-        "The library is a confusing place to find books.",
-        "Maria doesn\u2019t like reading fiction books."
-      ],
-      "correct_answer": "Maria enjoys reading and is excited about a new book."
+      "options": ["Careful", "Excited", "Angry", "Tired"],
+      "correct_answer": "Careful"
     },
     {
-      "question": "Which sentence is written correctly?",
+      "topic": "Writing Conventions",
+      "question": "Which sentence uses the correct form of the verb?",
       "type": "multiple-choice",
-      "options": [
-        "my Mom went to the store yesterday.",
-        "My mom went to the Store yesterday.",
-        "My mom went to the store yesterday.",
-        "my mom Went to the store yesterday."
-      ],
-      "correct_answer": "My mom went to the store yesterday."
+      "options": ["She sing beautifully.", "She sings beautifully.", "She singing beautifully.", "She sung beautifully."],
+      "correct_answer": "She sings beautifully."
     },
     {
-      "question": "Which word is a synonym for **happy**?",
+      "topic": "Text Structure",
+      "question": "In an article about the Alamo, the author describes events in the order they happened. What is this text structure called?",
       "type": "multiple-choice",
-      "options": [
-        "Sad",
-        "Angry",
-        "Joyful",
-        "Tired"
-      ],
-      "correct_answer": "Joyful"
+      "options": ["Cause and effect", "Problem and solution", "Chronological order", "Compare and contrast"],
+      "correct_answer": "Chronological order"
     },
     {
-      "question": "Choose the sentence that uses the correct punctuation.",
+      "topic": "Reading Comprehension",
+      "question": "In a story about a boy who builds a kite in Houston, what lesson does he learn?",
       "type": "multiple-choice",
-      "options": [
-        "Can you help me clean my room?",
-        "Can you help me clean my room.",
-        "Can you help me clean my room!",
-        "Can you help me clean my room,"
-      ],
-      "correct_answer": "Can you help me clean my room?"
+      "options": ["Kites are hard to fly", "Patience leads to success", "The wind is too strong", "Building kites is expensive"],
+      "correct_answer": "Patience leads to success"
     },
     {
-      "question": "Which word in the sentence is a **noun**? _The dog barked loudly at the stranger._",
+      "topic": "Vocabulary",
+      "question": "In the sentence 'The storm was ferocious,' what does 'ferocious' mean?",
       "type": "multiple-choice",
-      "options": [
-        "barked",
-        "loudly",
-        "dog",
-        "at"
-      ],
-      "correct_answer": "dog"
+      "options": ["Gentle", "Fierce", "Calm", "Weak"],
+      "correct_answer": "Fierce"
     },
     {
-      "question": "Which sentence is written in the **past tense**?",
+      "topic": "Grammar",
+      "question": "Which sentence uses a possessive noun correctly?",
       "type": "multiple-choice",
-      "options": [
-        "She walks to school every day.",
-        "She will walk to school tomorrow.",
-        "She is walking to school now.",
-        "She walked to school yesterday."
-      ],
-      "correct_answer": "She walked to school yesterday."
+      "options": ["The dogs bone is buried.", "The dog’s bone is buried.", "The dogs’ bone is buried.", "The dog bone is buried."],
+      "correct_answer": "The dog’s bone is buried."
     },
     {
-      "question": "Which sentence shows **cause and effect**?",
+      "topic": "Literary Elements",
+      "question": "In a story about a girl who enters a storytelling contest in Austin, what is the main conflict?",
       "type": "multiple-choice",
-      "options": [
-        "Tom read a book.",
-        "Tom forgot his umbrella, so he got wet.",
-        "Tom ran fast.",
-        "Tom likes pizza."
-      ],
-      "correct_answer": "Tom forgot his umbrella, so he got wet."
+      "options": ["She loses her story", "She is nervous about speaking", "She forgets her lines", "She doesn’t like contests"],
+      "correct_answer": "She is nervous about speaking"
     },
     {
-      "question": "What is the correct contraction for _they are_?",
+      "topic": "Reading Comprehension",
+      "question": "In a biography about a Texas artist, what is the author’s purpose?",
       "type": "multiple-choice",
-      "options": [
-        "There",
-        "Their",
-        "They're",
-        "Theirs"
-      ],
-      "correct_answer": "They're"
+      "options": ["To entertain with a funny story", "To inform about the artist’s life", "To persuade people to buy art", "To describe a painting"],
+      "correct_answer": "To inform about the artist’s life"
     },
     {
-      "question": "Read the passage and answer the questions that follow.\n\n**Passage:**\n\nMaria stepped into the library with excitement. Her favorite author had released a new book, and she couldn\u2019t wait to dive into it. She walked quickly to the fiction section, scanning the shelves until her eyes landed on the bright red cover. Clutching the book to her chest, she hurried to the checkout desk.\n\n**Why was Maria excited to go to the library?**",
+      "topic": "Vocabulary",
+      "question": "In the sentence 'The eagle soared majestically,' what does 'majestically' mean?",
       "type": "multiple-choice",
-      "options": [
-        "She wanted to study for a test.",
-        "Her favorite author had released a new book.",
-        "She had never been to the library before.",
-        "She was meeting her friend there."
-      ],
-      "correct_answer": "Her favorite author had released a new book."
+      "options": ["Quickly", "Gracefully", "Loudly", "Slowly"],
+      "correct_answer": "Gracefully"
     },
     {
-      "question": "What does the word 'clutching' most likely mean as used in the passage?",
+      "topic": "Writing Conventions",
+      "question": "Which sentence uses correct capitalization?",
       "type": "multiple-choice",
-      "options": [
-        "Throwing something away",
-        "Holding something tightly",
-        "Dropping something suddenly",
-        "Losing grip of something"
-      ],
-      "correct_answer": "Holding something tightly"
+      "options": ["i went to dallas.", "I went to dallas.", "I went to Dallas.", "i went to Dallas."],
+      "correct_answer": "I went to Dallas."
     },
     {
-      "question": "Which of the following best describes the main idea of the passage?",
+      "topic": "Text Features",
+      "question": "In a book about Texas history, what is the purpose of a timeline?",
       "type": "multiple-choice",
-      "options": [
-        "Maria enjoys reading and is excited about a new book.",
-        "Maria is late for her class at the library.",
-        "The library is a confusing place to find books.",
-        "Maria doesn\u2019t like reading fiction books."
-      ],
-      "correct_answer": "Maria enjoys reading and is excited about a new book."
+      "options": ["To show pictures", "To list important dates", "To explain vocabulary", "To give directions"],
+      "correct_answer": "To list important dates"
     },
     {
-      "question": "Which sentence is written correctly?",
+      "topic": "Reading Comprehension",
+      "question": "In a story about a boy who finds a lost puppy in El Paso, what does he do first?",
       "type": "multiple-choice",
-      "options": [
-        "my Mom went to the store yesterday.",
-        "My mom went to the Store yesterday.",
-        "My mom went to the store yesterday.",
-        "my mom Went to the store yesterday."
-      ],
-      "correct_answer": "My mom went to the store yesterday."
+      "options": ["He takes the puppy home", "He looks for the owner", "He gives the puppy food", "He names the puppy"],
+      "correct_answer": "He looks for the owner"
     },
     {
-      "question": "Which word is a synonym for **happy**?",
+      "topic": "Vocabulary",
+      "question": "In the sentence 'The desert was barren,' what does 'barren' mean?",
       "type": "multiple-choice",
-      "options": [
-        "Sad",
-        "Angry",
-        "Joyful",
-        "Tired"
-      ],
-      "correct_answer": "Joyful"
+      "options": ["Full of life", "Empty and lifeless", "Hot and sunny", "Cold and windy"],
+      "correct_answer": "Empty and lifeless"
     },
     {
-      "question": "Choose the sentence that uses the correct punctuation.",
+      "topic": "Grammar",
+      "question": "Which word is an adjective?",
       "type": "multiple-choice",
-      "options": [
-        "Can you help me clean my room?",
-        "Can you help me clean my room.",
-        "Can you help me clean my room!",
-        "Can you help me clean my room,"
-      ],
-      "correct_answer": "Can you help me clean my room?"
+      "options": ["Run", "Quick", "Dog", "Jump"],
+      "correct_answer": "Quick"
     },
     {
-      "question": "Which word in the sentence is a **noun**? _The dog barked loudly at the stranger._",
+      "topic": "Literary Elements",
+      "question": "In a story about a family camping in Big Bend National Park, what is the theme?",
       "type": "multiple-choice",
-      "options": [
-        "barked",
-        "loudly",
-        "dog",
-        "at"
-      ],
-      "correct_answer": "dog"
+      "options": ["Nature is dangerous", "Family teamwork is important", "Camping is boring", "The park is far away"],
+      "correct_answer": "Family teamwork is important"
     },
     {
-      "question": "Which sentence is written in the **past tense**?",
+      "topic": "Reading Comprehension",
+      "question": "In a poem about a Texas sunset, what does the poet use to describe the sky?",
       "type": "multiple-choice",
-      "options": [
-        "She walks to school every day.",
-        "She will walk to school tomorrow.",
-        "She is walking to school now.",
-        "She walked to school yesterday."
-      ],
-      "correct_answer": "She walked to school yesterday."
+      "options": ["A quiet whisper", "A blazing fire", "A soft blanket", "A rushing stream"],
+      "correct_answer": "A blazing fire"
     },
     {
-      "question": "Which sentence shows **cause and effect**?",
+      "topic": "Vocabulary",
+      "question": "In the sentence 'The festival was vibrant,' what does 'vibrant' mean?",
       "type": "multiple-choice",
-      "options": [
-        "Tom read a book.",
-        "Tom forgot his umbrella, so he got wet.",
-        "Tom ran fast.",
-        "Tom likes pizza."
-      ],
-      "correct_answer": "Tom forgot his umbrella, so he got wet."
+      "options": ["Dull", "Lively", "Quiet", "Dark"],
+      "correct_answer": "Lively"
     },
     {
-      "question": "What is the correct contraction for _they are_?",
+      "topic": "Writing Conventions",
+      "question": "Which sentence uses the correct pronoun?",
       "type": "multiple-choice",
-      "options": [
-        "There",
-        "Their",
-        "They're",
-        "Theirs"
-      ],
-      "correct_answer": "They're"
+      "options": ["Me went to the park.", "I went to the park.", "Him went to the park.", "Us went to the park."],
+      "correct_answer": "I went to the park."
     },
     {
-      "question": "Read the passage and answer the questions that follow.\n\n**Passage:**\n\nMaria stepped into the library with excitement. Her favorite author had released a new book, and she couldn\u2019t wait to dive into it. She walked quickly to the fiction section, scanning the shelves until her eyes landed on the bright red cover. Clutching the book to her chest, she hurried to the checkout desk.\n\n**Why was Maria excited to go to the library?**",
+      "topic": "Text Structure",
+      "question": "In an article about Texas rivers, the author explains why rivers flood. What is this text structure called?",
       "type": "multiple-choice",
-      "options": [
-        "She wanted to study for a test.",
-        "Her favorite author had released a new book.",
-        "She had never been to the library before.",
-        "She was meeting her friend there."
-      ],
-      "correct_answer": "Her favorite author had released a new book."
+      "options": ["Cause and effect", "Sequence", "Description", "Problem and solution"],
+      "correct_answer": "Cause and effect"
     },
     {
-      "question": "What does the word 'clutching' most likely mean as used in the passage?",
+      "topic": "Reading Comprehension",
+      "question": "In a story about a girl who joins a mariachi band in Laredo, what is her main goal?",
       "type": "multiple-choice",
-      "options": [
-        "Throwing something away",
-        "Holding something tightly",
-        "Dropping something suddenly",
-        "Losing grip of something"
-      ],
-      "correct_answer": "Holding something tightly"
+      "options": ["To learn to play the guitar", "To win a competition", "To make new friends", "To travel to Mexico"],
+      "correct_answer": "To learn to play the guitar"
     },
     {
-      "question": "Which of the following best describes the main idea of the passage?",
+      "topic": "Vocabulary",
+      "question": "In the sentence 'The wind howled ominously,' what does 'ominously' mean?",
       "type": "multiple-choice",
-      "options": [
-        "Maria enjoys reading and is excited about a new book.",
-        "Maria is late for her class at the library.",
-        "The library is a confusing place to find books.",
-        "Maria doesn\u2019t like reading fiction books."
-      ],
-      "correct_answer": "Maria enjoys reading and is excited about a new book."
+      "options": ["Softly", "Threateningly", "Cheerfully", "Quickly"],
+      "correct_answer": "Threateningly"
     },
     {
-      "question": "Which sentence is written correctly?",
+      "topic": "Grammar",
+      "question": "Which sentence uses the correct verb tense?",
       "type": "multiple-choice",
-      "options": [
-        "my Mom went to the store yesterday.",
-        "My mom went to the Store yesterday.",
-        "My mom went to the store yesterday.",
-        "my mom Went to the store yesterday."
-      ],
-      "correct_answer": "My mom went to the store yesterday."
+      "options": ["She will dance yesterday.", "She danced yesterday.", "She dances yesterday.", "She dancing yesterday."],
+      "correct_answer": "She danced yesterday."
     },
     {
-      "question": "Which word is a synonym for **happy**?",
+      "topic": "Literary Elements",
+      "question": "In a story about a boy who builds a raft in Galveston, what is the main plot event?",
       "type": "multiple-choice",
-      "options": [
-        "Sad",
-        "Angry",
-        "Joyful",
-        "Tired"
-      ],
-      "correct_answer": "Joyful"
+      "options": ["He sails to an island", "He learns to swim", "He meets a fisherman", "He finds a treasure"],
+      "correct_answer": "He sails to an island"
     },
     {
-      "question": "Choose the sentence that uses the correct punctuation.",
+      "topic": "Reading Comprehension",
+      "question": "In an article about Texas cowboys, what is the author’s main purpose?",
       "type": "multiple-choice",
-      "options": [
-        "Can you help me clean my room?",
-        "Can you help me clean my room.",
-        "Can you help me clean my room!",
-        "Can you help me clean my room,"
-      ],
-      "correct_answer": "Can you help me clean my room?"
+      "options": ["To describe cowboy life", "To persuade people to become cowboys", "To entertain with a funny story", "To compare cowboys to farmers"],
+      "correct_answer": "To describe cowboy life"
     },
     {
-      "question": "Which word in the sentence is a **noun**? _The dog barked loudly at the stranger._",
+      "topic": "Vocabulary",
+      "question": "In the sentence 'The stars twinkled brilliantly,' what does 'brilliantly' mean?",
       "type": "multiple-choice",
-      "options": [
-        "barked",
-        "loudly",
-        "dog",
-        "at"
-      ],
-      "correct_answer": "dog"
+      "options": ["Dimly", "Brightly", "Slowly", "Softly"],
+      "correct_answer": "Brightly"
     },
     {
-      "question": "Which sentence is written in the **past tense**?",
+      "topic": "Writing Conventions",
+      "question": "Which sentence uses correct commas in a list?",
       "type": "multiple-choice",
-      "options": [
-        "She walks to school every day.",
-        "She will walk to school tomorrow.",
-        "She is walking to school now.",
-        "She walked to school yesterday."
-      ],
-      "correct_answer": "She walked to school yesterday."
+      "options": ["I need pens pencils and paper.", "I need pens, pencils and paper.", "I need pens, pencils, and paper.", "I need pens pencils, and paper."],
+      "correct_answer": "I need pens, pencils, and paper."
     },
     {
-      "question": "Which sentence shows **cause and effect**?",
+      "topic": "Text Features",
+      "question": "In a book about Texas animals, what is the purpose of a glossary?",
       "type": "multiple-choice",
-      "options": [
-        "Tom read a book.",
-        "Tom forgot his umbrella, so he got wet.",
-        "Tom ran fast.",
-        "Tom likes pizza."
-      ],
-      "correct_answer": "Tom forgot his umbrella, so he got wet."
-    },
-    {
-      "question": "What is the correct contraction for _they are_?",
-      "type": "multiple-choice",
-      "options": [
-        "There",
-        "Their",
-        "They're",
-        "Theirs"
-      ],
-      "correct_answer": "They're"
+      "options": ["To show pictures", "To define words", "To list chapters", "To give directions"],
+      "correct_answer": "To define words"
     }
   ]
 }
