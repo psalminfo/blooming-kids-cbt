@@ -1,7 +1,11 @@
 import { db } from './firebaseConfig.js';
 import { collection, query, where, getDocs } from "https://www.gstatic.com/firebasejs/9.6.10/firebase-firestore.js";
 
-async function loadReport() {
+function capitalize(str) {
+  return str.replace(/\b\w/g, l => l.toUpperCase());
+}
+
+window.loadReport = async function () {
   const studentName = document.getElementById("studentName").value.trim().toLowerCase();
   const parentEmail = document.getElementById("parentEmail").value.trim().toLowerCase();
   const reportArea = document.getElementById("reportArea");
@@ -15,99 +19,142 @@ async function loadReport() {
   const q = query(collection(db, "student_results"), where("parentEmail", "==", parentEmail));
   const querySnapshot = await getDocs(q);
 
-  const studentResults = [];
+  const rawResults = [];
   querySnapshot.forEach((doc) => {
     const data = doc.data();
     if (data.studentName.toLowerCase() === studentName) {
-      studentResults.push({ id: doc.id, ...data });
+      rawResults.push(data);
     }
   });
 
-  if (studentResults.length === 0) {
+  if (rawResults.length === 0) {
     alert("No records found.");
     return;
   }
 
-  // Group results by rounded hour timestamp (same test session)
-  const grouped = {};
-  studentResults.forEach((res) => {
-    const date = new Date(res.submittedAt?.seconds * 1000);
-    const roundedKey = date.toISOString().slice(0, 13); // e.g., 2025-08-01T10
-    if (!grouped[roundedKey]) grouped[roundedKey] = [];
-    grouped[roundedKey].push(res);
+  // Group sessions within 1 hour
+  rawResults.sort((a, b) => a.submittedAt.seconds - b.submittedAt.seconds);
+  const groupedSessions = [];
+  let currentGroup = [];
+
+  rawResults.forEach((entry, i) => {
+    const ts = entry.submittedAt.seconds;
+    if (currentGroup.length === 0) {
+      currentGroup.push(entry);
+    } else {
+      const last = currentGroup[currentGroup.length - 1];
+      if (ts - last.submittedAt.seconds <= 3600) {
+        currentGroup.push(entry);
+      } else {
+        groupedSessions.push(currentGroup);
+        currentGroup = [entry];
+      }
+    }
+    if (i === rawResults.length - 1 && currentGroup.length > 0) {
+      groupedSessions.push(currentGroup);
+    }
   });
 
-  reportContent.innerHTML = "";
-  Object.entries(grouped).forEach(([session, tests], index) => {
-    const summaryRows = tests.map((r) => {
-      const score = r.answers.filter((a) => a === "correct").length;
-      const percent = Math.round((score / r.answers.length) * 100);
-      return `<tr><td class="border px-4 py-1">${r.subject.toUpperCase()}</td><td class="border px-4 py-1">${percent}%</td></tr>`;
-    }).join("");
-
-    const allTopics = tests.flatMap(r => r.topic || []);
-    const uniqueTopics = [...new Set(allTopics)];
-
-    const topicTable = uniqueTopics.map(topic => `
-      <tr>
-        <td class="border px-4 py-1">${topic}</td>
-        <td class="border px-4 py-1">Needs Practice</td>
-      </tr>
-    `).join("");
-
-    const htmlBlock = `
-      <div class="report-block bg-white p-6 rounded shadow mb-6" id="report-block-${index}">
-        <h2 class="text-xl font-bold mb-2">${capitalize(tests[0].studentName)}</h2>
-        <p><strong>Parent Email:</strong> ${parentEmail}</p>
-        <p><strong>Grade:</strong> ${tests[0].grade}</p>
-        <p><strong>Tutor:</strong> ${tests[0].tutorName}</p>
-        <p><strong>Location:</strong> ${tests[0].location}</p>
-        <p><strong>Test Session:</strong> ${new Date(tests[0].submittedAt.seconds * 1000).toLocaleString()}</p>
-
-        <h3 class="mt-4 font-semibold text-lg">Performance Summary (Percent)</h3>
-        <table class="w-full mb-3 border">
-          <thead><tr><th class="border px-4 py-1">Subject</th><th class="border px-4 py-1">Score</th></tr></thead>
-          <tbody>${summaryRows}</tbody>
-        </table>
-
-        <h3 class="mt-4 font-semibold text-lg">Knowledge & Skills Analysis</h3>
-        <table class="w-full mb-3 border">
-          <thead><tr><th class="border px-4 py-1">Topic</th><th class="border px-4 py-1">Remarks</th></tr></thead>
-          <tbody>${topicTable}</tbody>
-        </table>
-
-        <h3 class="mt-4 font-semibold text-lg">Tutor's Recommendation</h3>
-        <p class="mb-2">It is recommended that ${capitalize(tests[0].studentName)} receive focused tutoring on the topics listed above. Our tutor, ${tests[0].tutorName}, will support your child through personalized sessions.</p>
-
-        <h3 class="mt-4 font-semibold text-lg">Director’s Message</h3>
-        <p class="italic">Thank you for choosing Blooming Kids House. We are committed to nurturing your child’s academic growth through personalized support. We recommend regular practice and guided learning to build confidence and mastery.</p>
-        <p class="mt-2 font-bold">– Mrs. Yinka Isikalu, Director</p>
-
-        <button class="mt-4 bg-yellow-400 px-4 py-2 rounded font-bold" onclick="downloadSessionReport(${index})">Download PDF</button>
-      </div>
-    `;
-    reportContent.innerHTML += htmlBlock;
-  });
-
-  reportArea.classList.remove("hidden");
-}
-
-function capitalize(str) {
-  return str.replace(/\b\w/g, l => l.toUpperCase());
-}
-
-// ✅ Target only that block for PDF generation
-window.downloadSessionReport = function (index) {
-  const el = document.getElementById(`report-block-${index}`);
-  setTimeout(() => {
-    import("https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js").then(() => {
-      html2pdf().from(el).save(`Assessment_Report_${index + 1}.pdf`);
+  // Render reports
+  reportContent.innerHTML = groupedSessions.map((group, index) => {
+    const first = group[0];
+    const scores = group.map(r => {
+      const correct = r.answers.filter(a => a === "correct").length;
+      const total = r.answers.length;
+      const percent = Math.round((correct / total) * 100);
+      return { subject: r.subject, percent, topic: r.topic || "General Concepts" };
     });
-  }, 300); // Wait for layout
+
+    const scoreTable = `
+      <table class="w-full text-sm border mt-2">
+        <thead>
+          <tr class="bg-gray-100">
+            <th class="border p-1">Subject</th>
+            <th class="border p-1">Score (%)</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${scores.map(s => `
+            <tr>
+              <td class="border p-1 text-center">${s.subject.toUpperCase()}</td>
+              <td class="border p-1 text-center">${s.percent}%</td>
+            </tr>`).join("")}
+        </tbody>
+      </table>`;
+
+    const knowledgeTable = `
+      <table class="w-full text-sm border mt-2">
+        <thead>
+          <tr class="bg-gray-100">
+            <th class="border p-1">Subject</th>
+            <th class="border p-1">Topics Covered</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${scores.map(s => `
+            <tr>
+              <td class="border p-1 text-center">${s.subject.toUpperCase()}</td>
+              <td class="border p-1 text-center">${s.topic}</td>
+            </tr>`).join("")}
+        </tbody>
+      </table>`;
+
+    const submittedDate = new Date(first.submittedAt.seconds * 1000).toLocaleString();
+
+    return `
+      <div id="report-block-${index}" class="p-4 border rounded mb-6 bg-white shadow">
+        <h2 class="text-xl font-bold mb-1">Assessment Report – Session ${index + 1}</h2>
+        <p class="text-sm text-gray-500 mb-3">Submitted on: ${submittedDate}</p>
+
+        <p><strong>Student:</strong> ${capitalize(first.studentName)}</p>
+        <p><strong>Grade:</strong> ${first.grade}</p>
+        <p><strong>Parent Email:</strong> ${first.parentEmail}</p>
+        <p><strong>Tutor:</strong> ${first.tutorName}</p>
+        <p><strong>Location:</strong> ${first.location}</p>
+
+        <h3 class="mt-4 font-semibold">Performance Summary</h3>
+        ${scoreTable}
+
+        <h3 class="mt-4 font-semibold">Knowledge & Skill Analysis</h3>
+        ${knowledgeTable}
+
+        <h3 class="mt-4 font-semibold">Tutor's Recommendation</h3>
+        <p class="text-sm mt-1 mb-2">We encourage your child to continue practicing especially in areas highlighted. Our tutor, ${first.tutorName}, will support your child with targeted practice and encouragement.</p>
+
+        <h3 class="mt-4 font-semibold">Director's Message</h3>
+        <p class="text-sm italic">Thank you for trusting Blooming Kids House. We are committed to excellence and growth. Our tailored sessions build confidence and mastery in each child.<br><br>– <strong>Mrs. Yinka Isikalu</strong>, Director</p>
+
+        <div class="mt-4 flex justify-end">
+          <button onclick="downloadSessionReport(${index})" class="bg-yellow-400 text-black px-4 py-1 rounded font-bold">Download PDF</button>
+        </div>
+      </div>`;
+  }).join("");
+
+  document.getElementById("reportArea").classList.remove("hidden");
 };
 
-window.loadReport = loadReport;
+// ✅ PDF export using html2canvas + jsPDF
+window.downloadSessionReport = function (index) {
+  const el = document.getElementById(`report-block-${index}`);
 
+  import("https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js").then(({ jsPDF }) => {
+    import("https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js").then(() => {
+      html2canvas(el).then((canvas) => {
+        const imgData = canvas.toDataURL("image/png");
+        const pdf = new jsPDF("p", "mm", "a4");
+
+        const imgProps = pdf.getImageProperties(imgData);
+        const pdfWidth = pdf.internal.pageSize.getWidth();
+        const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
+
+        pdf.addImage(imgData, "PNG", 0, 0, pdfWidth, pdfHeight);
+        pdf.save(`Assessment_Report_${index + 1}.pdf`);
+      });
+    });
+  });
+};
+
+// 🔁 Logout button
 window.logout = function () {
   window.location.href = "parent.html";
 };
