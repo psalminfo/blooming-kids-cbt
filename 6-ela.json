@@ -1,0 +1,309 @@
+{
+  "questions": [
+    {
+      "topic": "Reading Comprehension",
+      "passage": "In Lubbock, Sofia found an old journal in her family’s barn. The pages told of her great-grandfather, a cowboy in the 1900s. Curious about her roots, Sofia read his tales of herding cattle across dusty plains. The journal mentioned a hidden locket buried near a windmill. Sofia and her brother, Mateo, searched and found the locket, which held a tiny photo of their family. Sofia felt proud, learning that exploring history connects you to your past.",
+      "question": "Why does Sofia read the journal?",
+      "type": "multiple-choice",
+      "options": ["She is curious about her family", "Her brother finds it", "Her teacher assigns it", "She is bored"],
+      "correct_answer": "She is curious about her family"
+    },
+    {
+      "topic": "Reading Comprehension",
+      "passage": "In Lubbock, Sofia found an old journal in her family’s barn. The pages told of her great-grandfather, a cowboy in the 1900s. Curious about her roots, Sofia read his tales of herding cattle across dusty plains. The journal mentioned a hidden locket buried near a windmill. Sofia and her brother, Mateo, searched and found the locket, which held a tiny photo of their family. Sofia felt proud, learning that exploring history connects you to your past.",
+      "question": "What is the main idea of the passage?",
+      "type": "multiple-choice",
+      "options": ["Sofia learns about her family’s history", "Lubbock is a dusty town", "Journals are hard to read", "Cowboys herd cattle"],
+      "correct_answer": "Sofia learns about her family’s history"
+    },
+    {
+      "topic": "Reading Comprehension",
+      "passage": "In Lubbock, Sofia found an old journal in her family’s barn. The pages told of her great-grandfather, a cowboy in the 1900s. Curious about her roots, Sofia read his tales of herding cattle across dusty plains. The journal mentioned a hidden locket buried near a windmill. Sofia and her brother, Mateo, searched and found the locket, which held a tiny photo of their family. Sofia felt proud, learning that exploring history connects you to your past.",
+      "question": "What does Sofia find near the windmill?",
+      "type": "multiple-choice",
+      "options": ["A journal", "A locket", "A photo", "A windmill"],
+      "correct_answer": "A locket"
+    },
+    {
+      "topic": "Reading Comprehension",
+      "passage": "In Lubbock, Sofia found an old journal in her family’s barn. The pages told of her great-grandfather, a cowboy in the 1900s. Curious about her roots, Sofia read his tales of herding cattle across dusty plains. The journal mentioned a hidden locket buried near a windmill. Sofia and her brother, Mateo, searched and found the locket, which held a tiny photo of their family. Sofia felt proud, learning that exploring history connects you to your past.",
+      "question": "Who helps Sofia find the locket?",
+      "type": "multiple-choice",
+      "options": ["Her teacher", "Her brother, Mateo", "Her friend", "Her great-grandfather"],
+      "correct_answer": "Her brother, Mateo"
+    },
+    {
+      "topic": "Reading Comprehension",
+      "passage": "In Lubbock, Sofia found an old journal in her family’s barn. The pages told of her great-grandfather, a cowboy in the 1900s. Curious about her roots, Sofia read his tales of herding cattle across dusty plains. The journal mentioned a hidden locket buried near a windmill. Sofia and her brother, Mateo, searched and found the locket, which held a tiny photo of their family. Sofia felt proud, learning that exploring history connects you to your past.",
+      "question": "What lesson does Sofia learn?",
+      "type": "multiple-choice",
+      "options": ["History connects you to your past", "Lockets are valuable", "Cattle herding is hard", "Windmills are old"],
+      "correct_answer": "History connects you to your past"
+    },
+    {
+      "topic": "Reading Comprehension",
+      "passage": "Palo Duro Canyon, near Amarillo, is called the 'Grand Canyon of Texas.' Its red rock walls tower over hiking trails. Long ago, Native Americans lived there, leaving behind pottery. Today, visitors hike, camp, and watch wildlife like deer and hawks. The canyon’s beauty inspires artists, and its history teaches about Texas’s past. Rangers lead tours, explaining how erosion shaped the canyon, making it a place where nature and history meet.",
+      "question": "What is the main idea of the passage?",
+      "type": "multiple-choice",
+      "options": ["Palo Duro Canyon is a historic and natural wonder", "Hiking is popular in Texas", "Native Americans made pottery", "Rangers lead tours"],
+      "correct_answer": "Palo Duro Canyon is a historic and natural wonder"
+    },
+    {
+      "topic": "Reading Comprehension",
+      "passage": "Palo Duro Canyon, near Amarillo, is called the 'Grand Canyon of Texas.' Its red rock walls tower over hiking trails. Long ago, Native Americans lived there, leaving behind pottery. Today, visitors hike, camp, and watch wildlife like deer and hawks. The canyon’s beauty inspires artists, and its history teaches about Texas’s past. Rangers lead tours, explaining how erosion shaped the canyon, making it a place where nature and history meet.",
+      "question": "What did Native Americans leave in the canyon?",
+      "type": "multiple-choice",
+      "options": ["Hiking trails", "Pottery", "Red rocks", "Wildlife"],
+      "correct_answer": "Pottery"
+    },
+    {
+      "topic": "Reading Comprehension",
+      "passage": "Palo Duro Canyon, near Amarillo, is called the 'Grand Canyon of Texas.' Its red rock walls tower over hiking trails. Long ago, Native Americans lived there, leaving behind pottery. Today, visitors hike, camp, and watch wildlife like deer and hawks. The canyon’s beauty inspires artists, and its history teaches about Texas’s past. Rangers lead tours, explaining how erosion shaped the canyon, making it a place where nature and history meet.",
+      "question": "What do visitors do in the canyon?",
+      "type": "multiple-choice",
+      "options": ["Hike and camp", "Make pottery", "Build trails", "Paint rocks"],
+      "correct_answer": "Hike and camp"
+    },
+    {
+      "topic": "Reading Comprehension",
+      "passage": "Palo Duro Canyon, near Amarillo, is called the 'Grand Canyon of Texas.' Its red rock walls tower over hiking trails. Long ago, Native Americans lived there, leaving behind pottery. Today, visitors hike, camp, and watch wildlife like deer and hawks. The canyon’s beauty inspires artists, and its history teaches about Texas’s past. Rangers lead tours, explaining how erosion shaped the canyon, making it a place where nature and history meet.",
+      "question": "Who explains how the canyon was shaped?",
+      "type": "multiple-choice",
+      "options": ["Artists", "Rangers", "Visitors", "Native Americans"],
+      "correct_answer": "Rangers"
+    },
+    {
+      "topic": "Reading Comprehension",
+      "passage": "Palo Duro Canyon, near Amarillo, is called the 'Grand Canyon of Texas.' Its red rock walls tower over hiking trails. Long ago, Native Americans lived there, leaving behind pottery. Today, visitors hike, camp, and watch wildlife like deer and hawks. The canyon’s beauty inspires artists, and its history teaches about Texas’s past. Rangers lead tours, explaining how erosion shaped the canyon, making it a place where nature and history meet.",
+      "question": "What inspires artists in the canyon?",
+      "type": "multiple-choice",
+      "options": ["The canyon’s beauty", "The hiking trails", "The wildlife", "The pottery"],
+      "correct_answer": "The canyon’s beauty"
+    },
+    {
+      "topic": "Reading Comprehension",
+      "passage": "In Corpus Christi, Leo joined a sailing race. He was nervous, afraid of the choppy waves. His dad taught him to steer the boat, but Leo worried he’d crash. During the race, a storm hit, and Leo’s boat rocked wildly. He remembered his dad’s advice, stayed calm, and steered through the waves. Leo didn’t win, but he finished safely, learning that facing fears builds courage.",
+      "question": "What is Leo afraid of during the race?",
+      "type": "multiple-choice",
+      "options": ["Choppy waves", "His dad’s advice", "Winning the race", "Steering the boat"],
+      "correct_answer": "Choppy waves"
+    },
+    {
+      "topic": "Reading Comprehension",
+      "passage": "In Corpus Christi, Leo joined a sailing race. He was nervous, afraid of the choppy waves. His dad taught him to steer the boat, but Leo worried he’d crash. During the race, a storm hit, and Leo’s boat rocked wildly. He remembered his dad’s advice, stayed calm, and steered through the waves. Leo didn’t win, but he finished safely, learning that facing fears builds courage.",
+      "question": "What is the main idea of the passage?",
+      "type": "multiple-choice",
+      "options": ["Sailing is dangerous", "Leo learns to face his fears", "Storms are common in races", "Leo’s dad is a sailor"],
+      "correct_answer": "Leo learns to face his fears"
+    },
+    {
+      "topic": "Reading Comprehension",
+      "passage": "In Corpus Christi, Leo joined a sailing race. He was nervous, afraid of the choppy waves. His dad taught him to steer the boat, but Leo worried he’d crash. During the race, a storm hit, and Leo’s boat rocked wildly. He remembered his dad’s advice, stayed calm, and steered through the waves. Leo didn’t win, but he finished safely, learning that facing fears builds courage.",
+      "question": "Who teaches Leo to steer the boat?",
+      "type": "multiple-choice",
+      "options": ["His friend", "His dad", "His coach", "His brother"],
+      "correct_answer": "His dad"
+    },
+    {
+      "topic": "Reading Comprehension",
+      "passage": "In Corpus Christi, Leo joined a sailing race. He was nervous, afraid of the choppy waves. His dad taught him to steer the boat, but Leo worried he’d crash. During the race, a storm hit, and Leo’s boat rocked wildly. He remembered his dad’s advice, stayed calm, and steered through the waves. Leo didn’t win, but he finished safely, learning that facing fears builds courage.",
+      "question": "What happens during the race?",
+      "type": "multiple-choice",
+      "options": ["Leo wins first place", "A storm hits", "Leo’s boat sinks", "Leo forgets how to steer"],
+      "correct_answer": "A storm hits"
+    },
+    {
+      "topic": "Reading Comprehension",
+      "passage": "In Corpus Christi, Leo joined a sailing race. He was nervous, afraid of the choppy waves. His dad taught him to steer the boat, but Leo worried he’d crash. During the race, a storm hit, and Leo’s boat rocked wildly. He remembered his dad’s advice, stayed calm, and steered through the waves. Leo didn’t win, but he finished safely, learning that facing fears builds courage.",
+      "question": "What lesson does Leo learn?",
+      "type": "multiple-choice",
+      "options": ["Facing fears builds courage", "Sailing is easy", "Storms are fun", "Winning is important"],
+      "correct_answer": "Facing fears builds courage"
+    },
+    {
+      "topic": "Reading Comprehension",
+      "passage": "Texas oil shaped the state’s history. In 1901, the Spindletop well in Beaumont struck oil, starting a boom. Workers flocked to Texas, building towns. Oil fueled cars and factories, making Texas rich. Today, museums in Houston show old drilling tools and photos, teaching how oil changed lives. The industry still powers jobs, but it also brings challenges like pollution. Texas’s oil story shows how one discovery can transform a state.",
+      "question": "What is the main idea of the passage?",
+      "type": "multiple-choice",
+      "options": ["Oil caused pollution", "Spindletop started an oil boom", "Museums show tools", "Texas oil shaped history"],
+      "correct_answer": "Texas oil shaped history"
+    },
+    {
+      "topic": "Reading Comprehension",
+      "passage": "Texas oil shaped the state’s history. In 1901, the Spindletop well in Beaumont struck oil, starting a boom. Workers flocked to Texas, building towns. Oil fueled cars and factories, making Texas rich. Today, museums in Houston show old drilling tools and photos, teaching how oil changed lives. The industry still powers jobs, but it also brings challenges like pollution. Texas’s oil story shows how one discovery can transform a state.",
+      "question": "When did the Spindletop well strike oil?",
+      "type": "multiple-choice",
+      "options": ["1800", "1901", "1950", "2000"],
+      "correct_answer": "1901"
+    },
+    {
+      "topic": "Reading Comprehension",
+      "passage": "Texas oil shaped the state’s history. In 1901, the Spindletop well in Beaumont struck oil, starting a boom. Workers flocked to Texas, building towns. Oil fueled cars and factories, making Texas rich. Today, museums in Houston show old drilling tools and photos, teaching how oil changed lives. The industry still powers jobs, but it also brings challenges like pollution. Texas’s oil story shows how one discovery can transform a state.",
+      "question": "What do Houston museums show?",
+      "type": "multiple-choice",
+      "options": ["Drilling tools and photos", "Cars and factories", "Workers’ homes", "Pollution charts"],
+      "correct_answer": "Drilling tools and photos"
+    },
+    {
+      "topic": "Reading Comprehension",
+      "passage": "Texas oil shaped the state’s history. In 1901, the Spindletop well in Beaumont struck oil, starting a boom. Workers flocked to Texas, building towns. Oil fueled cars and factories, making Texas rich. Today, museums in Houston show old drilling tools and photos, teaching how oil changed lives. The industry still powers jobs, but it also brings challenges like pollution. Texas’s oil story shows how one discovery can transform a state.",
+      "question": "What is one challenge of the oil industry?",
+      "type": "multiple-choice",
+      "options": ["Building towns", "Creating jobs", "Pollution", "Finding oil"],
+      "correct_answer": "Pollution"
+    },
+    {
+      "topic": "Reading Comprehension",
+      "passage": "Texas oil shaped the state’s history. In 1901, the Spindletop well in Beaumont struck oil, starting a boom. Workers flocked to Texas, building towns. Oil fueled cars and factories, making Texas rich. Today, museums in Houston show old drilling tools and photos, teaching how oil changed lives. The industry still powers jobs, but it also brings challenges like pollution. Texas’s oil story shows how one discovery can transform a state.",
+      "question": "What did the oil boom help build?",
+      "type": "multiple-choice",
+      "options": ["Museums", "Towns", "Cars", "Factories"],
+      "correct_answer": "Towns"
+    },
+    {
+      "topic": "Reading Comprehension",
+      "passage": "The Rio Grande flows like a silver snake, winding through Texas. Its waters sparkle under the sun, reflecting desert cliffs. Fish swim in its depths, and birds soar above. In El Paso, families picnic by its banks, listening to its gentle rush. The river carries stories of travelers, whispering tales of adventure. Its beauty reminds us to cherish nature’s gifts, a lifeline in the Texas heat.",
+      "question": "What does the poet compare the Rio Grande to?",
+      "type": "multiple-choice",
+      "options": ["A silver snake", "A desert cliff", "A gentle bird", "A hot sun"],
+      "correct_answer": "A silver snake"
+    },
+    {
+      "topic": "Reading Comprehension",
+      "passage": "The Rio Grande flows like a silver snake, winding through Texas. Its waters sparkle under the sun, reflecting desert cliffs. Fish swim in its depths, and birds soar above. In El Paso, families picnic by its banks, listening to its gentle rush. The river carries stories of travelers, whispering tales of adventure. Its beauty reminds us to cherish nature’s gifts, a lifeline in the Texas heat.",
+      "question": "What is the main idea of the poem?",
+      "type": "multiple-choice",
+      "options": ["The Rio Grande is beautiful", "Families picnic in El Paso", "Fish live in rivers", "Travelers tell stories"],
+      "correct_answer": "The Rio Grande is beautiful"
+    },
+    {
+      "topic": "Reading Comprehension",
+      "passage": "The Rio Grande flows like a silver snake, winding through Texas. Its waters sparkle under the sun, reflecting desert cliffs. Fish swim in its depths, and birds soar above. In El Paso, families picnic by its banks, listening to its gentle rush. The river carries stories of travelers, whispering tales of adventure. Its beauty reminds us to cherish nature’s gifts, a lifeline in the Texas heat.",
+      "question": "What do families do by the river?",
+      "type": "multiple-choice",
+      "options": ["Swim with fish", "Picnic in El Paso", "Climb desert cliffs", "Tell stories"],
+      "correct_answer": "Picnic in El Paso"
+    },
+    {
+      "topic": "Reading Comprehension",
+      "passage": "The Rio Grande flows like a silver snake, winding through Texas. Its waters sparkle under the sun, reflecting desert cliffs. Fish swim in its depths, and birds soar above. In El Paso, families picnic by its banks, listening to its gentle rush. The river carries stories of travelers, whispering tales of adventure. Its beauty reminds us to cherish nature’s gifts, a lifeline in the Texas heat.",
+      "question": "What does the river carry?",
+      "type": "multiple-choice",
+      "options": ["Desert cliffs", "Stories of travelers", "Picnicking families", "Fish and birds"],
+      "correct_answer": "Stories of travelers"
+    },
+    {
+      "topic": "Reading Comprehension",
+      "passage": "The Rio Grande flows like a silver snake, winding through Texas. Its waters sparkle under the sun, reflecting desert cliffs. Fish swim in its depths, and birds soar above. In El Paso, families picnic by its banks, listening to its gentle rush. The river carries stories of travelers, whispering tales of adventure. Its beauty reminds us to cherish nature’s gifts, a lifeline in the Texas heat.",
+      "question": "What does the river remind us to do?",
+      "type": "multiple-choice",
+      "options": ["Cherish nature’s gifts", "Swim in the water", "Listen to stories", "Visit El Paso"],
+      "correct_answer": "Cherish nature’s gifts"
+    },
+    {
+      "topic": "Vocabulary",
+      "question": "In the sentence 'The explorer was intrepid,' what does 'intrepid' mean?",
+      "type": "multiple-choice",
+      "options": ["Fearful", "Brave", "Tired", "Confused"],
+      "correct_answer": "Brave"
+    },
+    {
+      "topic": "Vocabulary",
+      "question": "In the sentence 'The storm was tumultuous,' what does 'tumultuous' mean?",
+      "type": "multiple-choice",
+      "options": ["Calm", "Chaotic", "Quiet", "Gentle"],
+      "correct_answer": "Chaotic"
+    },
+    {
+      "topic": "Vocabulary",
+      "question": "In the sentence 'The city was bustling,' what does 'bustling' mean?",
+      "type": "multiple-choice",
+      "options": ["Quiet", "Busy", "Empty", "Dark"],
+      "correct_answer": "Busy"
+    },
+    {
+      "topic": "Grammar",
+      "question": "Which sentence uses the correct verb agreement?",
+      "type": "multiple-choice",
+      "options": ["The team are winning.", "The team is winning.", "The team were winning.", "The team be winning."],
+      "correct_answer": "The team is winning."
+    },
+    {
+      "topic": "Grammar",
+      "question": "Which word is a conjunction?",
+      "type": "multiple-choice",
+      "options": ["Quick", "And", "Run", "Blue"],
+      "correct_answer": "And"
+    },
+    {
+      "topic": "Grammar",
+      "question": "Which sentence uses an adjective correctly?",
+      "type": "multiple-choice",
+      "options": ["The quick fox runs.", "The quickly fox runs.", "The fox quick runs.", "The fox runs quick."],
+      "correct_answer": "The quick fox runs."
+    },
+    {
+      "topic": "Writing Conventions",
+      "question": "Which sentence uses correct punctuation for dialogue?",
+      "type": "multiple-choice",
+      "options": ["I’m ready, said Juan.", "I’m ready” said Juan.", "I’m ready,” said Juan.", "I’m ready, Juan said."],
+      "correct_answer": "I’m ready,” said Juan."
+    },
+    {
+      "topic": "Writing Conventions",
+      "question": "Which sentence uses correct capitalization?",
+      "type": "multiple-choice",
+      "options": ["i went to san antonio.", "I went to san antonio.", "I went to San Antonio.", "i went to San Antonio."],
+      "correct_answer": "I went to San Antonio."
+    },
+    {
+      "topic": "Writing Conventions",
+      "question": "Which sentence uses the correct pronoun case?",
+      "type": "multiple-choice",
+      "options": ["Her and I went hiking.", "She and I went hiking.", "Me and she went hiking.", "Her and me went hiking."],
+      "correct_answer": "She and I went hiking."
+    },
+    {
+      "topic": "Literary Elements",
+      "question": "In a story about a girl who enters a science fair in Houston, what is the main conflict?",
+      "type": "multiple-choice",
+      "options": ["She loses her project", "She is nervous about presenting", "She forgets her research", "She doesn’t like science"],
+      "correct_answer": "She is nervous about presenting"
+    },
+    {
+      "topic": "Literary Elements",
+      "question": "In a story about a family camping in Guadalupe Mountains National Park, what is the setting?",
+      "type": "multiple-choice",
+      "options": ["The family’s tent", "Guadalupe Mountains National Park", "The camping activities", "The family’s emotions"],
+      "correct_answer": "Guadalupe Mountains National Park"
+    },
+    {
+      "topic": "Literary Elements",
+      "question": "In a story about a boy who builds a kite in Lubbock, what is the theme?",
+      "type": "multiple-choice",
+      "options": ["Kites are hard to build", "Perseverance leads to success", "Flying kites is dangerous", "The wind is too strong"],
+      "correct_answer": "Perseverance leads to success"
+    },
+    {
+      "topic": "Text Structure",
+      "question": "In an article about Texas wildlife, the author describes how animals adapt to their environment. What is this text structure called?",
+      "type": "multiple-choice",
+      "options": ["Cause and effect", "Problem and solution", "Compare and contrast", "Description"],
+      "correct_answer": "Description"
+    },
+    {
+      "topic": "Text Structure",
+      "question": "In an article about Texas crops, the author explains the steps to grow cotton. What is this text structure called?",
+      "type": "multiple-choice",
+      "options": ["Cause and effect", "Sequence", "Compare and contrast", "Description"],
+      "correct_answer": "Sequence"
+    },
+    {
+      "topic": "Text Features",
+      "question": "In a book about Texas culture, what is the purpose of a sidebar about cowboy traditions?",
+      "type": "multiple-choice",
+      "options": ["To provide extra details", "To list book chapters", "To show a map", "To define words"],
+      "correct_answer": "To provide extra details"
+    }
+  ]
+}
