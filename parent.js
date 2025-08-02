@@ -1,6 +1,7 @@
 import { db } from './firebaseConfig.js';
 import { collection, query, where, getDocs } from "https://www.gstatic.com/firebasejs/9.6.10/firebase-firestore.js";
 
+// Capitalize names properly
 function capitalize(str) {
   return str.replace(/\b\w/g, l => l.toUpperCase());
 }
@@ -19,125 +20,88 @@ window.loadReport = async function () {
   const q = query(collection(db, "student_results"), where("parentEmail", "==", parentEmail));
   const querySnapshot = await getDocs(q);
 
-  const rawResults = [];
+  const studentResults = [];
   querySnapshot.forEach((doc) => {
     const data = doc.data();
     if (data.studentName.toLowerCase() === studentName) {
-      rawResults.push(data);
+      studentResults.push({ ...data, timestamp: data.submittedAt?.seconds || Date.now() });
     }
   });
 
-  if (rawResults.length === 0) {
+  if (studentResults.length === 0) {
     alert("No records found.");
     return;
   }
 
-  // Group sessions within 1 hour
-  rawResults.sort((a, b) => a.submittedAt.seconds - b.submittedAt.seconds);
-  const groupedSessions = [];
-  let currentGroup = [];
-
-  rawResults.forEach((entry, i) => {
-    const ts = entry.submittedAt.seconds;
-    if (currentGroup.length === 0) {
-      currentGroup.push(entry);
-    } else {
-      const last = currentGroup[currentGroup.length - 1];
-      if (ts - last.submittedAt.seconds <= 3600) {
-        currentGroup.push(entry);
-      } else {
-        groupedSessions.push(currentGroup);
-        currentGroup = [entry];
-      }
-    }
-    if (i === rawResults.length - 1 && currentGroup.length > 0) {
-      groupedSessions.push(currentGroup);
-    }
+  // Group sessions by hour
+  const grouped = {};
+  studentResults.forEach((result) => {
+    const sessionKey = Math.floor(result.timestamp / 3600); // 1 hour group
+    if (!grouped[sessionKey]) grouped[sessionKey] = [];
+    grouped[sessionKey].push(result);
   });
 
-  // Render reports
-  reportContent.innerHTML = groupedSessions.map((group, index) => {
-    const first = group[0];
-    const scores = group.map(r => {
-      const correct = r.answers.filter(a => a === "correct").length;
-      const total = r.answers.length;
-      const percent = Math.round((correct / total) * 100);
-      return { subject: r.subject, percent, topic: r.topic || "General Concepts" };
-    });
+  let blockIndex = 0;
+  reportContent.innerHTML = "";
+  for (const key in grouped) {
+    const session = grouped[key];
+    const { grade, tutorName, location } = session[0];
+    const fullName = capitalize(session[0].studentName);
+    const formattedDate = new Date(session[0].timestamp * 1000).toLocaleString();
 
-    const scoreTable = `
-      <table class="w-full text-sm border mt-2">
-        <thead>
-          <tr class="bg-gray-100">
-            <th class="border p-1">Subject</th>
-            <th class="border p-1">Score (%)</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${scores.map(s => `
-            <tr>
-              <td class="border p-1 text-center">${s.subject.toUpperCase()}</td>
-              <td class="border p-1 text-center">${s.percent}%</td>
-            </tr>`).join("")}
-        </tbody>
-      </table>`;
+    const tableRows = session.map(r => {
+      const score = r.answers.filter(a => a === "correct").length;
+      const percent = Math.round((score / r.answers.length) * 100);
+      return `<tr><td class="border px-2 py-1">${r.subject.toUpperCase()}</td><td class="border px-2 py-1 text-center">${percent}%</td></tr>`;
+    }).join("");
 
-    const knowledgeTable = `
-      <table class="w-full text-sm border mt-2">
-        <thead>
-          <tr class="bg-gray-100">
-            <th class="border p-1">Subject</th>
-            <th class="border p-1">Topics Covered</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${scores.map(s => `
-            <tr>
-              <td class="border p-1 text-center">${s.subject.toUpperCase()}</td>
-              <td class="border p-1 text-center">${s.topic}</td>
-            </tr>`).join("")}
-        </tbody>
-      </table>`;
+    const topicRecommendations = session.map(r => {
+      const topics = (r.topic || r.topics || []).join(", ");
+      return `<li><strong>${r.subject.toUpperCase()}:</strong> ${topics || "General skill development recommended."}</li>`;
+    }).join("");
 
-    const submittedDate = new Date(first.submittedAt.seconds * 1000).toLocaleString();
+    const block = `
+      <div class="border rounded-lg shadow mb-8 p-4 bg-white" id="report-block-${blockIndex}">
+        <h2 class="text-xl font-bold mb-2">Student Name: ${fullName}</h2>
+        <p><strong>Parent Email:</strong> ${parentEmail}</p>
+        <p><strong>Grade:</strong> ${grade}</p>
+        <p><strong>Tutor:</strong> ${tutorName}</p>
+        <p><strong>Location:</strong> ${location}</p>
+        <p><strong>Session:</strong> ${formattedDate}</p>
 
-    return `
-      <div id="report-block-${index}" class="p-4 border rounded mb-6 bg-white shadow">
-        <h2 class="text-xl font-bold mb-1">Assessment Report – Session ${index + 1}</h2>
-        <p class="text-sm text-gray-500 mb-3">Submitted on: ${submittedDate}</p>
+        <h3 class="text-lg font-semibold mt-4 mb-2">Performance Summary</h3>
+        <table class="w-full text-sm mb-4 border border-collapse">
+          <thead class="bg-gray-100">
+            <tr><th class="border px-2 py-1 text-left">Subject</th><th class="border px-2 py-1 text-center">Score (%)</th></tr>
+          </thead>
+          <tbody>${tableRows}</tbody>
+        </table>
 
-        <p><strong>Student:</strong> ${capitalize(first.studentName)}</p>
-        <p><strong>Grade:</strong> ${first.grade}</p>
-        <p><strong>Parent Email:</strong> ${first.parentEmail}</p>
-        <p><strong>Tutor:</strong> ${first.tutorName}</p>
-        <p><strong>Location:</strong> ${first.location}</p>
+        <h3 class="text-lg font-semibold mb-1">Knowledge & Skill Analysis</h3>
+        <ul class="list-disc pl-5 mb-4">${topicRecommendations}</ul>
 
-        <h3 class="mt-4 font-semibold">Performance Summary</h3>
-        ${scoreTable}
+        <h3 class="text-lg font-semibold mb-1">Tutor’s Recommendation</h3>
+        <p class="mb-2 italic">${tutorName} recommends dedicated focus on the skills highlighted above. Regular tutoring sessions will help reinforce understanding and build long-term confidence.</p>
 
-        <h3 class="mt-4 font-semibold">Knowledge & Skill Analysis</h3>
-        ${knowledgeTable}
+        <h3 class="text-lg font-semibold mb-1">Director’s Message</h3>
+        <p class="italic text-sm">At Blooming Kids House, we are committed to helping your child succeed. Personalized support and guidance from ${tutorName} will unlock the full potential of ${fullName}.<br/>– Mrs. Yinka Isikalu, Director</p>
 
-        <h3 class="mt-4 font-semibold">Tutor's Recommendation</h3>
-        <p class="text-sm mt-1 mb-2">We encourage your child to continue practicing especially in areas highlighted. Our tutor, ${first.tutorName}, will support your child with targeted practice and encouragement.</p>
+        <button onclick="downloadSessionReport(${blockIndex})" class="mt-4 btn-yellow px-4 py-2 rounded">Download PDF</button>
+      </div>
+    `;
+    reportContent.innerHTML += block;
+    blockIndex++;
+  }
 
-        <h3 class="mt-4 font-semibold">Director's Message</h3>
-        <p class="text-sm italic">Thank you for trusting Blooming Kids House. We are committed to excellence and growth. Our tailored sessions build confidence and mastery in each child.<br><br>– <strong>Mrs. Yinka Isikalu</strong>, Director</p>
-
-        <div class="mt-4 flex justify-end">
-          <button onclick="downloadSessionReport(${index})" class="bg-yellow-400 text-black px-4 py-1 rounded font-bold">Download PDF</button>
-        </div>
-      </div>`;
-  }).join("");
-
-  document.getElementById("reportArea").classList.remove("hidden");
+  reportArea.classList.remove("hidden");
 };
 
-// ✅ PDF export using html2canvas + jsPDF
 window.downloadSessionReport = function (index) {
   const el = document.getElementById(`report-block-${index}`);
 
-  import("https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js").then(({ jsPDF }) => {
+  import("https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js").then((module) => {
+    const { jsPDF } = module.default;
+
     import("https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js").then(() => {
       html2canvas(el).then((canvas) => {
         const imgData = canvas.toDataURL("image/png");
@@ -154,7 +118,6 @@ window.downloadSessionReport = function (index) {
   });
 };
 
-// 🔁 Logout button
 window.logout = function () {
   window.location.href = "parent.html";
 };
