@@ -1,7 +1,6 @@
 import { db } from './firebaseConfig.js';
 import { collection, query, where, getDocs } from "https://www.gstatic.com/firebasejs/9.6.10/firebase-firestore.js";
 
-// Capitalize names properly
 function capitalize(str) {
   return str.replace(/\b\w/g, l => l.toUpperCase());
 }
@@ -33,10 +32,9 @@ window.loadReport = async function () {
     return;
   }
 
-  // Group sessions by hour
   const grouped = {};
   studentResults.forEach((result) => {
-    const sessionKey = Math.floor(result.timestamp / 3600); // Group by hour
+    const sessionKey = Math.floor(result.timestamp / 3600);
     if (!grouped[sessionKey]) grouped[sessionKey] = [];
     grouped[sessionKey].push(result);
   });
@@ -99,21 +97,26 @@ window.loadReport = async function () {
 window.downloadSessionReport = function (index) {
   const el = document.getElementById(`report-block-${index}`);
 
-  import("https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js").then((module) => {
-    const { jsPDF } = module.jspdf;
+  const clone = el.cloneNode(true);
+  clone.style.width = '800px';
+  clone.style.padding = '20px';
+  clone.style.backgroundColor = '#fff';
+  clone.style.position = 'absolute';
+  clone.style.top = '-10000px';
+  document.body.appendChild(clone);
 
-    import("https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js").then(() => {
-      html2canvas(el).then((canvas) => {
-        const imgData = canvas.toDataURL("image/png");
-        const pdf = new jsPDF("p", "mm", "a4");
+  import("https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js").then(() => {
+    html2canvas(clone).then((canvas) => {
+      const imgData = canvas.toDataURL("image/png");
+      const pdf = new window.jspdf.jsPDF("p", "mm", "a4");
 
-        const pdfWidth = pdf.internal.pageSize.getWidth();
-        const imgProps = pdf.getImageProperties(imgData);
-        const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
+      const pdfWidth = pdf.internal.pageSize.getWidth();
+      const imgProps = pdf.getImageProperties(imgData);
+      const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
 
-        pdf.addImage(imgData, "PNG", 0, 0, pdfWidth, pdfHeight);
-        pdf.save(`Assessment_Report_${index + 1}.pdf`);
-      });
+      pdf.addImage(imgData, "PNG", 0, 0, pdfWidth, pdfHeight);
+      pdf.save(`Assessment_Report_${index + 1}.pdf`);
+      document.body.removeChild(clone);
     });
   });
 };
