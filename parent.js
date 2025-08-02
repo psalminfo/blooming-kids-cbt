@@ -1,4 +1,3 @@
-// parent.js
 import { db } from './firebaseConfig.js';
 import { collection, query, where, getDocs } from "https://www.gstatic.com/firebasejs/9.6.10/firebase-firestore.js";
 
@@ -16,102 +15,98 @@ async function loadReport() {
   const q = query(collection(db, "student_results"), where("parentEmail", "==", parentEmail));
   const querySnapshot = await getDocs(q);
 
-  const grouped = {};
-
+  const studentResults = [];
   querySnapshot.forEach((doc) => {
     const data = doc.data();
     if (data.studentName.toLowerCase() === studentName) {
-      const timeKey = new Date(data.submittedAt.toDate());
-      timeKey.setMinutes(0, 0, 0); // Round to the nearest hour
-      const sessionKey = timeKey.toISOString();
-      if (!grouped[sessionKey]) grouped[sessionKey] = [];
-      grouped[sessionKey].push(data);
+      studentResults.push({ id: doc.id, ...data });
     }
   });
 
-  if (Object.keys(grouped).length === 0) {
+  if (studentResults.length === 0) {
     alert("No records found.");
     return;
   }
 
-  reportContent.innerHTML = "";
-
-  Object.entries(grouped).forEach(([sessionTime, sessionData], index) => {
-    const blockId = `report-block-${index}`;
-    const { grade, tutorName, location } = sessionData[0];
-
-    const scoreTable = sessionData.map((r) => {
-      const correct = r.answers.filter(a => a === "correct").length;
-      const percent = Math.round((correct / r.answers.length) * 100);
-      return `<tr><td class='border px-2 py-1'>${capitalize(r.subject)}</td><td class='border px-2 py-1 text-center'>${percent}%</td></tr>`;
-    }).join("");
-
-    const topicsTable = sessionData.map(r => {
-      const topics = Array.from(new Set((r.questions || []).map(q => q.topic || q.category || "N/A"))).join(", ");
-      return `<tr><td class='border px-2 py-1'>${capitalize(r.subject)}</td><td class='border px-2 py-1'>${topics || 'N/A'}</td></tr>`;
-    }).join("");
-
-    const recommendations = sessionData.map(r => {
-      const topics = Array.from(new Set((r.questions || []).map(q => q.topic || q.category || "key areas"))).join(", ");
-      return `<li><strong>${capitalize(r.subject)}</strong>: Focus on ${topics.toLowerCase()} for improvement with ${tutorName}.</li>`;
-    }).join("");
-
-    reportContent.innerHTML += `
-      <div class="mb-8 border border-gray-300 p-4 rounded-lg bg-white shadow" id="${blockId}">
-        <h2 class="text-xl font-bold mb-2">Assessment Session - ${new Date(sessionTime).toLocaleString()}</h2>
-        <p><strong>Student Name:</strong> ${capitalize(studentName)}</p>
-        <p><strong>Grade:</strong> ${grade}</p>
-        <p><strong>Parent Email:</strong> ${parentEmail}</p>
-        <p><strong>Tutor:</strong> ${tutorName}</p>
-        <p><strong>Location:</strong> ${location}</p>
-
-        <hr class="my-3"/>
-        <h3 class="text-lg font-semibold">Performance Summary</h3>
-        <table class="w-full text-left border border-collapse my-2">
-          <thead><tr class="bg-gray-100"><th class="border px-2 py-1">Subject</th><th class="border px-2 py-1">Score (%)</th></tr></thead>
-          <tbody>${scoreTable}</tbody>
-        </table>
-
-        <h3 class="text-lg font-semibold mt-4">Knowledge & Skill Analysis</h3>
-        <table class="w-full text-left border border-collapse my-2">
-          <thead><tr class="bg-gray-100"><th class="border px-2 py-1">Subject</th><th class="border px-2 py-1">Topics Covered</th></tr></thead>
-          <tbody>${topicsTable}</tbody>
-        </table>
-
-        <h3 class="text-lg font-semibold mt-4">Tutor’s Recommendation</h3>
-        <ul class="list-disc pl-6">${recommendations}</ul>
-
-        <h3 class="text-lg font-semibold mt-4">Director’s Note</h3>
-        <p class="italic text-sm">Thank you for trusting Blooming Kids House. These results highlight your child's areas of strength and areas where support is needed. ${tutorName} is committed to providing tailored tutoring that builds confidence and mastery across key learning areas.</p>
-        <p class="font-semibold text-right mt-2">– Mrs. Yinka Isikalu, Director</p>
-
-        <div class="mt-4 text-right">
-          <button onclick="downloadReport('${blockId}')" class="btn-yellow px-4 py-2 rounded">Download PDF</button>
-        </div>
-      </div>
-    `;
+  // Group results by rounded hour timestamp (same test session)
+  const grouped = {};
+  studentResults.forEach((res) => {
+    const date = new Date(res.submittedAt?.seconds * 1000);
+    const roundedKey = date.toISOString().slice(0, 13); // e.g., 2025-08-01T10
+    if (!grouped[roundedKey]) grouped[roundedKey] = [];
+    grouped[roundedKey].push(res);
   });
 
-  document.getElementById("reportArea").classList.remove("hidden");
+  reportContent.innerHTML = "";
+  Object.entries(grouped).forEach(([session, tests], index) => {
+    const summaryRows = tests.map((r) => {
+      const score = r.answers.filter((a) => a === "correct").length;
+      const percent = Math.round((score / r.answers.length) * 100);
+      return `<tr><td class="border px-4 py-1">${r.subject.toUpperCase()}</td><td class="border px-4 py-1">${percent}%</td></tr>`;
+    }).join("");
+
+    const allTopics = tests.flatMap(r => r.topic || []);
+    const uniqueTopics = [...new Set(allTopics)];
+
+    const topicTable = uniqueTopics.map(topic => `
+      <tr>
+        <td class="border px-4 py-1">${topic}</td>
+        <td class="border px-4 py-1">Needs Practice</td>
+      </tr>
+    `).join("");
+
+    const htmlBlock = `
+      <div class="report-block bg-white p-6 rounded shadow mb-6" id="report-block-${index}">
+        <h2 class="text-xl font-bold mb-2">${capitalize(tests[0].studentName)}</h2>
+        <p><strong>Parent Email:</strong> ${parentEmail}</p>
+        <p><strong>Grade:</strong> ${tests[0].grade}</p>
+        <p><strong>Tutor:</strong> ${tests[0].tutorName}</p>
+        <p><strong>Location:</strong> ${tests[0].location}</p>
+        <p><strong>Test Session:</strong> ${new Date(tests[0].submittedAt.seconds * 1000).toLocaleString()}</p>
+
+        <h3 class="mt-4 font-semibold text-lg">Performance Summary (Percent)</h3>
+        <table class="w-full mb-3 border">
+          <thead><tr><th class="border px-4 py-1">Subject</th><th class="border px-4 py-1">Score</th></tr></thead>
+          <tbody>${summaryRows}</tbody>
+        </table>
+
+        <h3 class="mt-4 font-semibold text-lg">Knowledge & Skills Analysis</h3>
+        <table class="w-full mb-3 border">
+          <thead><tr><th class="border px-4 py-1">Topic</th><th class="border px-4 py-1">Remarks</th></tr></thead>
+          <tbody>${topicTable}</tbody>
+        </table>
+
+        <h3 class="mt-4 font-semibold text-lg">Tutor's Recommendation</h3>
+        <p class="mb-2">It is recommended that ${capitalize(tests[0].studentName)} receive focused tutoring on the topics listed above. Our tutor, ${tests[0].tutorName}, will support your child through personalized sessions.</p>
+
+        <h3 class="mt-4 font-semibold text-lg">Director’s Message</h3>
+        <p class="italic">Thank you for choosing Blooming Kids House. We are committed to nurturing your child’s academic growth through personalized support. We recommend regular practice and guided learning to build confidence and mastery.</p>
+        <p class="mt-2 font-bold">– Mrs. Yinka Isikalu, Director</p>
+
+        <button class="mt-4 bg-yellow-400 px-4 py-2 rounded font-bold" onclick="downloadSessionReport(${index})">Download PDF</button>
+      </div>
+    `;
+    reportContent.innerHTML += htmlBlock;
+  });
+
+  reportArea.classList.remove("hidden");
 }
 
 function capitalize(str) {
   return str.replace(/\b\w/g, l => l.toUpperCase());
 }
 
-window.loadReport = loadReport;
-
-window.downloadReport = function (blockId) {
-  const element = document.getElementById(blockId);
-  const opt = {
-    margin: 0.5,
-    filename: `${blockId}_Assessment_Report.pdf`,
-    image: { type: 'jpeg', quality: 0.98 },
-    html2canvas: { scale: 2 },
-    jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' }
-  };
-  html2pdf().set(opt).from(element).save();
+// ✅ Target only that block for PDF generation
+window.downloadSessionReport = function (index) {
+  const el = document.getElementById(`report-block-${index}`);
+  setTimeout(() => {
+    import("https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js").then(() => {
+      html2pdf().from(el).save(`Assessment_Report_${index + 1}.pdf`);
+    });
+  }, 300); // Wait for layout
 };
+
+window.loadReport = loadReport;
 
 window.logout = function () {
   window.location.href = "parent.html";
