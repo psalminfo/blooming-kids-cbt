@@ -36,7 +36,7 @@ window.loadReport = async function () {
   // Group sessions by hour
   const grouped = {};
   studentResults.forEach((result) => {
-    const sessionKey = Math.floor(result.timestamp / 3600); // 1 hour group
+    const sessionKey = Math.floor(result.timestamp / 3600); // Group by hour
     if (!grouped[sessionKey]) grouped[sessionKey] = [];
     grouped[sessionKey].push(result);
   });
@@ -100,15 +100,15 @@ window.downloadSessionReport = function (index) {
   const el = document.getElementById(`report-block-${index}`);
 
   import("https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js").then((module) => {
-    const { jsPDF } = module.default;
+    const { jsPDF } = module.jspdf;
 
     import("https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js").then(() => {
       html2canvas(el).then((canvas) => {
         const imgData = canvas.toDataURL("image/png");
         const pdf = new jsPDF("p", "mm", "a4");
 
-        const imgProps = pdf.getImageProperties(imgData);
         const pdfWidth = pdf.internal.pageSize.getWidth();
+        const imgProps = pdf.getImageProperties(imgData);
         const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
 
         pdf.addImage(imgData, "PNG", 0, 0, pdfWidth, pdfHeight);
