@@ -2,66 +2,210 @@
   "questions": [
     {
       "topic": "Reading Comprehension",
-      "question": "In a story about a girl named Mia who finds a magical book in her attic, what is the main reason Mia decides to read the book?",
+      "passage": "In Marfa, Texas, Mia found a glowing book in her attic. Its cover sparkled like stars, making her curious. Despite her brother’s warnings about old books, Mia opened it. The pages told of a magical prairie where animals spoke. Mia followed the book’s map to a hidden meadow. There, a talking armadillo greeted her, offering to guide her to a secret spring. With courage, Mia followed, discovering a glowing fountain. She learned that curiosity could lead to amazing adventures.",
+      "question": "Why does Mia open the book?",
       "type": "multiple-choice",
-      "options": ["She wants to learn about history", "She is curious about its glowing cover", "Her teacher assigns it as homework", "Her friend dares her to read it"],
-      "correct_answer": "She is curious about its glowing cover"
-    },
-    {
-      "topic": "Vocabulary",
-      "question": "In the sentence 'The cowboy galloped swiftly across the vast prairie,' what does the word 'vast' mean?",
-      "type": "multiple-choice",
-      "options": ["Small", "Large", "Dry", "Green"],
-      "correct_answer": "Large"
-    },
-    {
-      "topic": "Grammar",
-      "question": "Which sentence is written correctly?",
-      "type": "multiple-choice",
-      "options": ["The dog run fast.", "The dog runs fast.", "The dog running fast.", "The dog runned fast."],
-      "correct_answer": "The dog runs fast."
-    },
-    {
-      "topic": "Literary Elements",
-      "question": "In a story set in a Texas ranch, the main character, Juan, feels nervous before his first rodeo. What is this an example of?",
-      "type": "multiple-choice",
-      "options": ["Setting", "Plot", "Character", "Conflict"],
-      "correct_answer": "Conflict"
+      "options": ["Her brother tells her to", "She is curious about its cover", "She needs it for school", "She wants to sell it"],
+      "correct_answer": "She is curious about its cover"
     },
     {
       "topic": "Reading Comprehension",
-      "question": "In a folktale about a talking armadillo, why does the armadillo help the lost traveler?",
+      "passage": "In Marfa, Texas, Mia found a glowing book in her attic. Its cover sparkled like stars, making her curious. Despite her brother’s warnings about old books, Mia opened it. The pages told of a magical prairie where animals spoke. Mia followed the book’s map to a hidden meadow. There, a talking armadillo greeted her, offering to guide her to a secret spring. With courage, Mia followed, discovering a glowing fountain. She learned that curiosity could lead to amazing adventures.",
+      "question": "What is the main idea of the passage?",
       "type": "multiple-choice",
-      "options": ["He wants to be famous", "He feels sorry for the traveler", "He wants a reward", "He is bored"],
-      "correct_answer": "He feels sorry for the traveler"
+      "options": ["Books are dangerous", "Curiosity leads to adventure", "Marfa is a magical town", "Animals can talk"],
+      "correct_answer": "Curiosity leads to adventure"
+    },
+    {
+      "topic": "Reading Comprehension",
+      "passage": "In Marfa, Texas, Mia found a glowing book in her attic. Its cover sparkled like stars, making her curious. Despite her brother’s warnings about old books, Mia opened it. The pages told of a magical prairie where animals spoke. Mia followed the book’s map to a hidden meadow. There, a talking armadillo greeted her, offering to guide her to a secret spring. With courage, Mia followed, discovering a glowing fountain. She learned that curiosity could lead to amazing adventures.",
+      "question": "What does Mia find in the meadow?",
+      "type": "multiple-choice",
+      "options": ["A talking armadillo", "A glowing book", "A hidden map", "A secret cave"],
+      "correct_answer": "A talking armadillo"
+    },
+    {
+      "topic": "Reading Comprehension",
+      "passage": "In Marfa, Texas, Mia found a glowing book in her attic. Its cover sparkled like stars, making her curious. Despite her brother’s warnings about old books, Mia opened it. The pages told of a magical prairie where animals spoke. Mia followed the book’s map to a hidden meadow. There, a talking armadillo greeted her, offering to guide her to a secret spring. With courage, Mia followed, discovering a glowing fountain. She learned that curiosity could lead to amazing adventures.",
+      "question": "What lesson does Mia learn?",
+      "type": "multiple-choice",
+      "options": ["Books are boring", "Curiosity leads to discoveries", "Prairies are scary", "Armadillos are friendly"],
+      "correct_answer": "Curiosity leads to discoveries"
+    },
+    {
+      "topic": "Reading Comprehension",
+      "passage": "In Marfa, Texas, Mia found a glowing book in her attic. Its cover sparkled like stars, making her curious. Despite her brother’s warnings about old books, Mia opened it. The pages told of a magical prairie where animals spoke. Mia followed the book’s map to a hidden meadow. There, a talking armadillo greeted her, offering to guide her to a secret spring. With courage, Mia followed, discovering a glowing fountain. She learned that curiosity could lead to amazing adventures.",
+      "question": "Where does Mia’s adventure take place?",
+      "type": "multiple-choice",
+      "options": ["A hidden meadow", "Her attic", "A school library", "A desert cave"],
+      "correct_answer": "A hidden meadow"
+    },
+    {
+      "topic": "Reading Comprehension",
+      "passage": "The bluebonnet is Texas’s state flower, blooming across fields each spring. In Austin, people celebrate these flowers with festivals. Bluebonnets grow in clusters, their petals bright blue with white tips, like tiny stars. They thrive in sunny, rocky soil, needing little water. Long ago, Native American legends said bluebonnets were gifts from the sky, bringing hope. Today, families take photos in bluebonnet fields, creating memories. The flower’s beauty reminds Texans of their state’s vibrant spirit and natural wonders.",
+      "question": "What is the main idea of the passage?",
+      "type": "multiple-choice",
+      "options": ["Bluebonnets are Texas’s state flower", "Festivals are popular in Austin", "Flowers need water to grow", "Texans love to take photos"],
+      "correct_answer": "Bluebonnets are Texas’s state flower"
+    },
+    {
+      "topic": "Reading Comprehension",
+      "passage": "The bluebonnet is Texas’s state flower, blooming across fields each spring. In Austin, people celebrate these flowers with festivals. Bluebonnets grow in clusters, their petals bright blue with white tips, like tiny stars. They thrive in sunny, rocky soil, needing little water. Long ago, Native American legends said bluebonnets were gifts from the sky, bringing hope. Today, families take photos in bluebonnet fields, creating memories. The flower’s beauty reminds Texans of their state’s vibrant spirit and natural wonders.",
+      "question": "How are bluebonnets described in the passage?",
+      "type": "multiple-choice",
+      "options": ["Tall and green", "Blue with white tips", "Red and yellow", "Soft and fluffy"],
+      "correct_answer": "Blue with white tips"
+    },
+    {
+      "topic": "Reading Comprehension",
+      "passage": "The bluebonnet is Texas’s state flower, blooming across fields each spring. In Austin, people celebrate these flowers with festivals. Bluebonnets grow in clusters, their petals bright blue with white tips, like tiny stars. They thrive in sunny, rocky soil, needing little water. Long ago, Native American legends said bluebonnets were gifts from the sky, bringing hope. Today, families take photos in bluebonnet fields, creating memories. The flower’s beauty reminds Texans of their state’s vibrant spirit and natural wonders.",
+      "question": "What do Native American legends say about bluebonnets?",
+      "type": "multiple-choice",
+      "options": ["They are hard to grow", "They are gifts from the sky", "They bloom in winter", "They are used in cooking"],
+      "correct_answer": "They are gifts from the sky"
+    },
+    {
+      "topic": "Reading Comprehension",
+      "passage": "The bluebonnet is Texas’s state flower, blooming across fields each spring. In Austin, people celebrate these flowers with festivals. Bluebonnets grow in clusters, their petals bright blue with white tips, like tiny stars. They thrive in sunny, rocky soil, needing little water. Long ago, Native American legends said bluebonnets were gifts from the sky, bringing hope. Today, families take photos in bluebonnet fields, creating memories. The flower’s beauty reminds Texans of their state’s vibrant spirit and natural wonders.",
+      "question": "Why do families take photos in bluebonnet fields?",
+      "type": "multiple-choice",
+      "options": ["To sell the photos", "To create memories", "To study the flowers", "To enter a contest"],
+      "correct_answer": "To create memories"
+    },
+    {
+      "topic": "Reading Comprehension",
+      "passage": "The bluebonnet is Texas’s state flower, blooming across fields each spring. In Austin, people celebrate these flowers with festivals. Bluebonnets grow in clusters, their petals bright blue with white tips, like tiny stars. They thrive in sunny, rocky soil, needing little water. Long ago, Native American legends said bluebonnets were gifts from the sky, bringing hope. Today, families take photos in bluebonnet fields, creating memories. The flower’s beauty reminds Texans of their state’s vibrant spirit and natural wonders.",
+      "question": "Where do bluebonnets thrive?",
+      "type": "multiple-choice",
+      "options": ["Shady forests", "Sunny, rocky soil", "Wet marshes", "Cold mountains"],
+      "correct_answer": "Sunny, rocky soil"
+    },
+    {
+      "topic": "Reading Comprehension",
+      "passage": "In El Paso, Juan found a stray puppy near the Rio Grande. Its fur was matted, and it looked hungry. Juan wanted to help but didn’t know where to start. He decided to make posters to find the owner. After school, he gave the puppy water and food. A neighbor recognized the puppy from the posters and called its owner. The owner was thrilled, and Juan felt proud. Helping the puppy taught him that kindness makes a difference.",
+      "question": "What does Juan do first to help the puppy?",
+      "type": "multiple-choice",
+      "options": ["He feeds it", "He makes posters", "He calls the owner", "He names the puppy"],
+      "correct_answer": "He makes posters"
+    },
+    {
+      "topic": "Reading Comprehension",
+      "passage": "In El Paso, Juan found a stray puppy near the Rio Grande. Its fur was matted, and it looked hungry. Juan wanted to help but didn’t know where to start. He decided to make posters to find the owner. After school, he gave the puppy water and food. A neighbor recognized the puppy from the posters and called its owner. The owner was thrilled, and Juan felt proud. Helping the puppy taught him that kindness makes a difference.",
+      "question": "What is the main idea of the passage?",
+      "type": "multiple-choice",
+      "options": ["Puppies are hard to care for", "Kindness helps others", "El Paso is near the Rio Grande", "Posters are easy to make"],
+      "correct_answer": "Kindness helps others"
+    },
+    {
+      "topic": "Reading Comprehension",
+      "passage": "In El Paso, Juan found a stray puppy near the Rio Grande. Its fur was matted, and it looked hungry. Juan wanted to help but didn’t know where to start. He decided to make posters to find the owner. After school, he gave the puppy water and food. A neighbor recognized the puppy from the posters and called its owner. The owner was thrilled, and Juan felt proud. Helping the puppy taught him that kindness makes a difference.",
+      "question": "Where does Juan find the puppy?",
+      "type": "multiple-choice",
+      "options": ["In a park", "Near the Rio Grande", "At school", "In his backyard"],
+      "correct_answer": "Near the Rio Grande"
+    },
+    {
+      "topic": "Reading Comprehension",
+      "passage": "In El Paso, Juan found a stray puppy near the Rio Grande. Its fur was matted, and it looked hungry. Juan wanted to help but didn’t know where to start. He decided to make posters to find the owner. After school, he gave the puppy water and food. A neighbor recognized the puppy from the posters and called its owner. The owner was thrilled, and Juan felt proud. Helping the puppy taught him that kindness makes a difference.",
+      "question": "What lesson does Juan learn?",
+      "type": "multiple-choice",
+      "options": ["Kindness makes a difference", "Puppies are friendly", "Posters are fun to make", "The Rio Grande is wide"],
+      "correct_answer": "Kindness makes a difference"
+    },
+    {
+      "topic": "Reading Comprehension",
+      "passage": "In El Paso, Juan found a stray puppy near the Rio Grande. Its fur was matted, and it looked hungry. Juan wanted to help but didn’t know where to start. He decided to make posters to find the owner. After school, he gave the puppy water and food. A neighbor recognized the puppy from the posters and called its owner. The owner was thrilled, and Juan felt proud. Helping the puppy taught him that kindness makes a difference.",
+      "question": "Who helps Juan find the puppy’s owner?",
+      "type": "multiple-choice",
+      "options": ["His teacher", "A neighbor", "His friend", "The puppy"],
+      "correct_answer": "A neighbor"
+    },
+    {
+      "topic": "Reading Comprehension",
+      "passage": "The Texas longhorn, a symbol of the state, roams ranches near San Antonio. These cattle have wide, curved horns, sometimes stretching seven feet. Longhorns are tough, surviving heat and drought. In the 1800s, cowboys drove them across plains to markets. Today, ranchers raise longhorns for their history and strength. Visitors to Texas ranches love seeing these majestic animals, which represent the state’s rugged past and enduring spirit.",
+      "question": "What is the main idea of the passage?",
+      "type": "multiple-choice",
+      "options": ["Longhorns are a symbol of Texas", "Cowboys were brave", "Ranches are popular", "Horns are dangerous"],
+      "correct_answer": "Longhorns are a symbol of Texas"
+    },
+    {
+      "topic": "Reading Comprehension",
+      "passage": "The Texas longhorn, a symbol of the state, roams ranches near San Antonio. These cattle have wide, curved horns, sometimes stretching seven feet. Longhorns are tough, surviving heat and drought. In the 1800s, cowboys drove them across plains to markets. Today, ranchers raise longhorns for their history and strength. Visitors to Texas ranches love seeing these majestic animals, which represent the state’s rugged past and enduring spirit.",
+      "question": "What are longhorns known for?",
+      "type": "multiple-choice",
+      "options": ["Their small size", "Their curved horns", "Their soft fur", "Their fast speed"],
+      "correct_answer": "Their curved horns"
+    },
+    {
+      "topic": "Reading Comprehension",
+      "passage": "The Texas longhorn, a symbol of the state, roams ranches near San Antonio. These cattle have wide, curved horns, sometimes stretching seven feet. Longhorns are tough, surviving heat and drought. In the 1800s, cowboys drove them across plains to markets. Today, ranchers raise longhorns for their history and strength. Visitors to Texas ranches love seeing these majestic animals, which represent the state’s rugged past and enduring spirit.",
+      "question": "Why do ranchers raise longhorns today?",
+      "type": "multiple-choice",
+      "options": ["For their meat", "For their history and strength", "To race them", "To sell their horns"],
+      "correct_answer": "For their history and strength"
+    },
+    {
+      "topic": "Reading Comprehension",
+      "passage": "The Texas longhorn, a symbol of the state, roams ranches near San Antonio. These cattle have wide, curved horns, sometimes stretching seven feet. Longhorns are tough, surviving heat and drought. In the 1800s, cowboys drove them across plains to markets. Today, ranchers raise longhorns for their history and strength. Visitors to Texas ranches love seeing these majestic animals, which represent the state’s rugged past and enduring spirit.",
+      "question": "What do longhorns represent?",
+      "type": "multiple-choice",
+      "options": ["Texas’s rugged past", "Modern farming", "City life", "Fast transportation"],
+      "correct_answer": "Texas’s rugged past"
+    },
+    {
+      "topic": "Reading Comprehension",
+      "passage": "The Texas longhorn, a symbol of the state, roams ranches near San Antonio. These cattle have wide, curved horns, sometimes stretching seven feet. Longhorns are tough, surviving heat and drought. In the 1800s, cowboys drove them across plains to markets. Today, ranchers raise longhorns for their history and strength. Visitors to Texas ranches love seeing these majestic animals, which represent the state’s rugged past and enduring spirit.",
+      "question": "Where do longhorns roam?",
+      "type": "multiple-choice",
+      "options": ["Near Houston", "Near San Antonio", "In Austin", "In Dallas"],
+      "correct_answer": "Near San Antonio"
+    },
+    {
+      "topic": "Reading Comprehension",
+      "passage": "In a Texas sunset, / The sky burns red and gold, / Like a cowboy’s campfire, / Warming stories old. / The horizon glows, / With colors bold and bright, / Painting the wide prairie, / In the fading light. / Stars begin to twinkle, / As day turns into night. / Oh, Texas sunset, / You are a wondrous sight.",
+      "question": "What does the poet compare the sunset to?",
+      "type": "multiple-choice",
+      "options": ["A quiet river", "A cowboy’s campfire", "A bright star", "A tall mountain"],
+      "correct_answer": "A cowboy’s campfire"
+    },
+    {
+      "topic": "Reading Comprehension",
+      "passage": "In a Texas sunset, / The sky burns red and gold, / Like a cowboy’s campfire, / Warming stories old. / The horizon glows, / With colors bold and bright, / Painting the wide prairie, / In the fading light. / Stars begin to twinkle, / As day turns into night. / Oh, Texas sunset, / You are a wondrous sight.",
+      "question": "What is the main idea of the poem?",
+      "type": "multiple-choice",
+      "options": ["The prairie is wide", "The Texas sunset is beautiful", "Cowboys tell stories", "Stars shine at night"],
+      "correct_answer": "The Texas sunset is beautiful"
+    },
+    {
+      "topic": "Reading Comprehension",
+      "passage": "In a Texas sunset, / The sky burns red and gold, / Like a cowboy’s campfire, / Warming stories old. / The horizon glows, / With colors bold and bright, / Painting the wide prairie, / In the fading light. / Stars begin to twinkle, / As day turns into night. / Oh, Texas sunset, / You are a wondrous sight.",
+      "question": "What colors are in the sunset?",
+      "type": "multiple-choice",
+      "options": ["Blue and green", "Red and gold", "Black and white", "Purple and orange"],
+      "correct_answer": "Red and gold"
+    },
+    {
+      "topic": "Reading Comprehension",
+      "passage": "In a Texas sunset, / The sky burns red and gold, / Like a cowboy’s campfire, / Warming stories old. / The horizon glows, / With colors bold and bright, / Painting the wide prairie, / In the fading light. / Stars begin to twinkle, / As day turns into night. / Oh, Texas sunset, / You are a wondrous sight.",
+      "question": "What happens as day turns to night?",
+      "type": "multiple-choice",
+      "options": ["The prairie grows dark", "Stars begin to twinkle", "The campfire burns out", "The horizon fades"],
+      "correct_answer": "Stars begin to twinkle"
+    },
+    {
+      "topic": "Reading Comprehension",
+      "passage": "In a Texas sunset, / The sky burns red and gold, / Like a cowboy’s campfire, / Warming stories old. / The horizon glows, / With colors bold and bright, / Painting the wide prairie, / In the fading light. / Stars begin to twinkle, / As day turns into night. / Oh, Texas sunset, / You are a wondrous sight.",
+      "question": "What does the poet call the sunset?",
+      "type": "multiple-choice",
+      "options": ["A quiet moment", "A wondrous sight", "A dark shadow", "A soft breeze"],
+      "correct_answer": "A wondrous sight"
     },
     {
       "topic": "Vocabulary",
-      "question": "In the sentence 'The festival was a jubilant celebration,' what does 'jubilant' mean?",
+      "question": "In the sentence 'The festival was jubilant,' what does 'jubilant' mean?",
       "type": "multiple-choice",
       "options": ["Quiet", "Joyful", "Sad", "Tired"],
       "correct_answer": "Joyful"
-    },
-    {
-      "topic": "Writing Conventions",
-      "question": "Which sentence uses correct punctuation?",
-      "type": "multiple-choice",
-      "options": ["I have two cats a dog and a bird.", "I have two cats, a dog, and a bird.", "I have two cats a dog, and a bird.", "I have two cats, a dog and a bird."],
-      "correct_answer": "I have two cats, a dog, and a bird."
-    },
-    {
-      "topic": "Text Features",
-      "question": "In a book about Texas wildlife, what is the purpose of a caption under a picture of a longhorn?",
-      "type": "multiple-choice",
-      "options": ["To tell the main idea", "To explain the picture", "To list the chapters", "To give the author’s name"],
-      "correct_answer": "To explain the picture"
-    },
-    {
-      "topic": "Reading Comprehension",
-      "question": "In a story about a boy exploring a cave in the Texas Hill Country, what is the main idea of the passage?",
-      "type": "multiple-choice",
-      "options": ["Caves are dark and scary", "Exploring can lead to new discoveries", "Bats live in caves", "The boy likes to hike"],
-      "correct_answer": "Exploring can lead to new discoveries"
     },
     {
       "topic": "Vocabulary",
@@ -71,27 +215,6 @@
       "correct_answer": "Wound slowly"
     },
     {
-      "topic": "Grammar",
-      "question": "Which word is a plural noun?",
-      "type": "multiple-choice",
-      "options": ["Horse", "Horses", "Ride", "Riding"],
-      "correct_answer": "Horses"
-    },
-    {
-      "topic": "Literary Elements",
-      "question": "In a story about a girl training her horse in San Antonio, what is the setting?",
-      "type": "multiple-choice",
-      "options": ["The girl’s emotions", "The horse’s actions", "San Antonio", "The training process"],
-      "correct_answer": "San Antonio"
-    },
-    {
-      "topic": "Reading Comprehension",
-      "question": "In a poem about the Texas bluebonnet, what does the poet compare the flower to?",
-      "type": "multiple-choice",
-      "options": ["A sparkling jewel", "A tall tree", "A soft cloud", "A rushing river"],
-      "correct_answer": "A sparkling jewel"
-    },
-    {
       "topic": "Vocabulary",
       "question": "In the sentence 'The hiker was cautious near the cliff,' what does 'cautious' mean?",
       "type": "multiple-choice",
@@ -99,32 +222,18 @@
       "correct_answer": "Careful"
     },
     {
-      "topic": "Writing Conventions",
-      "question": "Which sentence uses the correct form of the verb?",
+      "topic": "Grammar",
+      "question": "Which sentence is written correctly?",
       "type": "multiple-choice",
-      "options": ["She sing beautifully.", "She sings beautifully.", "She singing beautifully.", "She sung beautifully."],
-      "correct_answer": "She sings beautifully."
+      "options": ["The dog run fast.", "The dog runs fast.", "The dog running fast.", "The dog runned fast."],
+      "correct_answer": "The dog runs fast."
     },
     {
-      "topic": "Text Structure",
-      "question": "In an article about the Alamo, the author describes events in the order they happened. What is this text structure called?",
+      "topic": "Grammar",
+      "question": "Which word is a plural noun?",
       "type": "multiple-choice",
-      "options": ["Cause and effect", "Problem and solution", "Chronological order", "Compare and contrast"],
-      "correct_answer": "Chronological order"
-    },
-    {
-      "topic": "Reading Comprehension",
-      "question": "In a story about a boy who builds a kite in Houston, what lesson does he learn?",
-      "type": "multiple-choice",
-      "options": ["Kites are hard to fly", "Patience leads to success", "The wind is too strong", "Building kites is expensive"],
-      "correct_answer": "Patience leads to success"
-    },
-    {
-      "topic": "Vocabulary",
-      "question": "In the sentence 'The storm was ferocious,' what does 'ferocious' mean?",
-      "type": "multiple-choice",
-      "options": ["Gentle", "Fierce", "Calm", "Weak"],
-      "correct_answer": "Fierce"
+      "options": ["Horse", "Horses", "Ride", "Riding"],
+      "correct_answer": "Horses"
     },
     {
       "topic": "Grammar",
@@ -134,25 +243,11 @@
       "correct_answer": "The dog’s bone is buried."
     },
     {
-      "topic": "Literary Elements",
-      "question": "In a story about a girl who enters a storytelling contest in Austin, what is the main conflict?",
+      "topic": "Writing Conventions",
+      "question": "Which sentence uses correct punctuation?",
       "type": "multiple-choice",
-      "options": ["She loses her story", "She is nervous about speaking", "She forgets her lines", "She doesn’t like contests"],
-      "correct_answer": "She is nervous about speaking"
-    },
-    {
-      "topic": "Reading Comprehension",
-      "question": "In a biography about a Texas artist, what is the author’s purpose?",
-      "type": "multiple-choice",
-      "options": ["To entertain with a funny story", "To inform about the artist’s life", "To persuade people to buy art", "To describe a painting"],
-      "correct_answer": "To inform about the artist’s life"
-    },
-    {
-      "topic": "Vocabulary",
-      "question": "In the sentence 'The eagle soared majestically,' what does 'majestically' mean?",
-      "type": "multiple-choice",
-      "options": ["Quickly", "Gracefully", "Loudly", "Slowly"],
-      "correct_answer": "Gracefully"
+      "options": ["I have two cats a dog and a bird.", "I have two cats, a dog, and a bird.", "I have two cats a dog, and a bird.", "I have two cats, a dog and a bird."],
+      "correct_answer": "I have two cats, a dog, and a bird."
     },
     {
       "topic": "Writing Conventions",
@@ -162,32 +257,25 @@
       "correct_answer": "I went to Dallas."
     },
     {
-      "topic": "Text Features",
-      "question": "In a book about Texas history, what is the purpose of a timeline?",
+      "topic": "Writing Conventions",
+      "question": "Which sentence uses the correct pronoun?",
       "type": "multiple-choice",
-      "options": ["To show pictures", "To list important dates", "To explain vocabulary", "To give directions"],
-      "correct_answer": "To list important dates"
+      "options": ["Me went to the park.", "I went to the park.", "Him went to the park.", "Us went to the park."],
+      "correct_answer": "I went to the park."
     },
     {
-      "topic": "Reading Comprehension",
-      "question": "In a story about a boy who finds a lost puppy in El Paso, what does he do first?",
+      "topic": "Literary Elements",
+      "question": "In a story about a girl training her horse in San Antonio, what is the setting?",
       "type": "multiple-choice",
-      "options": ["He takes the puppy home", "He looks for the owner", "He gives the puppy food", "He names the puppy"],
-      "correct_answer": "He looks for the owner"
+      "options": ["The girl’s emotions", "The horse’s actions", "San Antonio", "The training process"],
+      "correct_answer": "San Antonio"
     },
     {
-      "topic": "Vocabulary",
-      "question": "In the sentence 'The desert was barren,' what does 'barren' mean?",
+      "topic": "Literary Elements",
+      "question": "In a story about a boy who enters a storytelling contest in Austin, what is the main conflict?",
       "type": "multiple-choice",
-      "options": ["Full of life", "Empty and lifeless", "Hot and sunny", "Cold and windy"],
-      "correct_answer": "Empty and lifeless"
-    },
-    {
-      "topic": "Grammar",
-      "question": "Which word is an adjective?",
-      "type": "multiple-choice",
-      "options": ["Run", "Quick", "Dog", "Jump"],
-      "correct_answer": "Quick"
+      "options": ["He loses his story", "He is nervous about speaking", "He forgets his lines", "He doesn’t like contests"],
+      "correct_answer": "He is nervous about speaking"
     },
     {
       "topic": "Literary Elements",
@@ -197,81 +285,11 @@
       "correct_answer": "Family teamwork is important"
     },
     {
-      "topic": "Reading Comprehension",
-      "question": "In a poem about a Texas sunset, what does the poet use to describe the sky?",
+      "topic": "Text Features",
+      "question": "In a book about Texas history, what is the purpose of a timeline?",
       "type": "multiple-choice",
-      "options": ["A quiet whisper", "A blazing fire", "A soft blanket", "A rushing stream"],
-      "correct_answer": "A blazing fire"
-    },
-    {
-      "topic": "Vocabulary",
-      "question": "In the sentence 'The festival was vibrant,' what does 'vibrant' mean?",
-      "type": "multiple-choice",
-      "options": ["Dull", "Lively", "Quiet", "Dark"],
-      "correct_answer": "Lively"
-    },
-    {
-      "topic": "Writing Conventions",
-      "question": "Which sentence uses the correct pronoun?",
-      "type": "multiple-choice",
-      "options": ["Me went to the park.", "I went to the park.", "Him went to the park.", "Us went to the park."],
-      "correct_answer": "I went to the park."
-    },
-    {
-      "topic": "Text Structure",
-      "question": "In an article about Texas rivers, the author explains why rivers flood. What is this text structure called?",
-      "type": "multiple-choice",
-      "options": ["Cause and effect", "Sequence", "Description", "Problem and solution"],
-      "correct_answer": "Cause and effect"
-    },
-    {
-      "topic": "Reading Comprehension",
-      "question": "In a story about a girl who joins a mariachi band in Laredo, what is her main goal?",
-      "type": "multiple-choice",
-      "options": ["To learn to play the guitar", "To win a competition", "To make new friends", "To travel to Mexico"],
-      "correct_answer": "To learn to play the guitar"
-    },
-    {
-      "topic": "Vocabulary",
-      "question": "In the sentence 'The wind howled ominously,' what does 'ominously' mean?",
-      "type": "multiple-choice",
-      "options": ["Softly", "Threateningly", "Cheerfully", "Quickly"],
-      "correct_answer": "Threateningly"
-    },
-    {
-      "topic": "Grammar",
-      "question": "Which sentence uses the correct verb tense?",
-      "type": "multiple-choice",
-      "options": ["She will dance yesterday.", "She danced yesterday.", "She dances yesterday.", "She dancing yesterday."],
-      "correct_answer": "She danced yesterday."
-    },
-    {
-      "topic": "Literary Elements",
-      "question": "In a story about a boy who builds a raft in Galveston, what is the main plot event?",
-      "type": "multiple-choice",
-      "options": ["He sails to an island", "He learns to swim", "He meets a fisherman", "He finds a treasure"],
-      "correct_answer": "He sails to an island"
-    },
-    {
-      "topic": "Reading Comprehension",
-      "question": "In an article about Texas cowboys, what is the author’s main purpose?",
-      "type": "multiple-choice",
-      "options": ["To describe cowboy life", "To persuade people to become cowboys", "To entertain with a funny story", "To compare cowboys to farmers"],
-      "correct_answer": "To describe cowboy life"
-    },
-    {
-      "topic": "Vocabulary",
-      "question": "In the sentence 'The stars twinkled brilliantly,' what does 'brilliantly' mean?",
-      "type": "multiple-choice",
-      "options": ["Dimly", "Brightly", "Slowly", "Softly"],
-      "correct_answer": "Brightly"
-    },
-    {
-      "topic": "Writing Conventions",
-      "question": "Which sentence uses correct commas in a list?",
-      "type": "multiple-choice",
-      "options": ["I need pens pencils and paper.", "I need pens, pencils and paper.", "I need pens, pencils, and paper.", "I need pens pencils, and paper."],
-      "correct_answer": "I need pens, pencils, and paper."
+      "options": ["To show pictures", "To list important dates", "To explain vocabulary", "To give the author’s name"],
+      "correct_answer": "To list important dates"
     },
     {
       "topic": "Text Features",
@@ -279,6 +297,13 @@
       "type": "multiple-choice",
       "options": ["To show pictures", "To define words", "To list chapters", "To give directions"],
       "correct_answer": "To define words"
+    },
+    {
+      "topic": "Text Structure",
+      "question": "In an article about the Alamo, the author describes events in the order they happened. What is this text structure called?",
+      "type": "multiple-choice",
+      "options": ["Cause and effect", "Problem and solution", "Chronological order", "Compare and contrast"],
+      "correct_answer": "Chronological order"
     }
   ]
 }
