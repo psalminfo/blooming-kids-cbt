@@ -1,246 +1,284 @@
 {
-  "math_questions": {
-    "grade_5": [
-      {
-        "question": "What is the value of 4.56 × 3?",
-        "options": ["₦13.68", "₦14.68", "₦12.68", "₦13.58"],
-        "answer": "₦13.68",
-        "category": "Number and Operations"
-      },
-      {
-        "question": "What is 15% of ₦200?",
-        "options": ["₦25", "₦30", "₦35", "₦40"],
-        "answer": "₦30",
-        "category": "Number - Fractions"
-      },
-      {
-        "question": "Explain how to find the volume of a rectangular prism with dimensions 5 cm, 4 cm, and 3 cm.",
-        "options": [],
-        "answer": "Multiply length × width × height: 5 × 4 × 3 = 60 cubic cm.",
-        "category": "Spatial Sense"
-      },
-      {
-        "question": "Which expression is equivalent to 6 × (3 + 4)?",
-        "options": ["(6 × 3) + (6 × 4)", "(6 × 3) + 4", "(6 + 3) × 4", "6 + (3 × 4)"],
-        "answer": "(6 × 3) + (6 × 4)",
-        "category": "Algebraic Thinking"
-      },
-      {
-        "question": "How many milliliters are in 4.5 liters?",
-        "options": ["₦4,500", "₦450", "₦45,000", "₦450,000"],
-        "answer": "₦4,500",
-        "category": "Measurement"
-      },
-      {
-        "question": "What is 3/4 ÷ 1/2?",
-        "options": ["1/2", "3/2", "2/3", "4/3"],
-        "answer": "3/2",
-        "category": "Number and Operations"
-      },
-      {
-        "question": "A bar graph shows 15 votes for blue, 10 for red, and 5 for green. How many votes were cast in total?",
-        "options": ["₦25", "₦30", "₦35", "₦40"],
-        "answer": "₦30",
-        "category": "Data Analysis"
-      },
-      {
-        "question": "Write 0.8 as a fraction in its simplest form.",
-        "options": [],
-        "answer": "4/5",
-        "category": "Number - Fractions"
-      },
-      {
-        "question": "What is the area of a triangle with a base of 8 cm and a height of 6 cm?",
-        "options": ["₦24 cm²", "₦48 cm²", "₦20 cm²", "₦28 cm²"],
-        "answer": "₦24 cm²",
-        "category": "Spatial Sense"
-      },
-      {
-        "question": "A savings account earns ₦1.25 interest per month. How much interest is earned in 4 months?",
-        "options": ["₦4.50", "₦5.00", "₦5.50", "₦6.00"],
-        "answer": "₦5.00",
-        "category": "Personal Financial Literacy"
-      },
-      {
-        "question": "What is the value of (3 × 1,000) + (5 × 100) + (2 × 10) + (7 × 1)?",
-        "options": ["3,527", "3,257", "5,327", "3,572"],
-        "answer": "3,527",
-        "category": "Number and Place Value"
-      },
-      {
-        "question": "What is 3/5 + 2/5?",
-        "options": ["1/5", "2/5", "1", "5/5"],
-        "answer": "1",
-        "category": "Number - Fractions"
-      },
-      {
-        "question": "What is 456 ÷ 3?",
-        "options": ["151", "152", "153", "154"],
-        "answer": "152",
-        "category": "Number and Operations"
-      },
-      {
-        "question": "Which number is 10,000 more than 23,456?",
-        "options": ["33,456", "23,566", "33,566", "43,456"],
-        "answer": "33,456",
-        "category": "Number and Place Value"
-      },
-      {
-        "question": "What is 25% of ₦400?",
-        "options": ["₦75", "₦100", "₦125", "₦150"],
-        "answer": "₦100",
-        "category": "Number - Fractions"
-      },
-      {
-        "question": "What is the perimeter of a rectangle with a length of 10 cm and a width of 6 cm?",
-        "options": ["₦16 cm", "₦32 cm", "₦36 cm", "₦60 cm"],
-        "answer": "₦32 cm",
-        "category": "Spatial Sense"
-      },
-      {
-        "question": "A store sells pencils for ₦2.50 each. How much will 6 pencils cost?",
-        "options": ["₦12.50", "₦15.00", "₦17.50", "₦20.00"],
-        "answer": "₦15.00",
-        "category": "Personal Financial Literacy"
-      },
-      {
-        "question": "What is 7.8 – 2.3?",
-        "options": ["₦5.5", "₦5.4", "₦5.3", "₦5.2"],
-        "answer": "₦5.5",
-        "category": "Number and Operations"
-      },
-      {
-        "question": "What is the next number in the pattern: 5, 10, 15, 20?",
-        "options": ["25", "30", "35", "40"],
-        "answer": "25",
-        "category": "Patterns"
-      },
-      {
-        "question": "Which number is rounded to 6,000 when rounded to the nearest thousand?",
-        "options": ["5,499", "5,501", "6,501", "6,599"],
-        "answer": "5,501",
-        "category": "Number and Place Value"
-      },
-      {
-        "question": "What is 9 × 7?",
-        "options": ["63", "64", "72", "81"],
-        "answer": "63",
-        "category": "Number - Multiplication and Division"
-      },
-      {
-        "question": "What is the value of the digit 4 in 34,567?",
-        "options": ["4", "40", "400", "4,000"],
-        "answer": "4,000",
-        "category": "Number and Place Value"
-      },
-      {
-        "question": "Which fraction is equivalent to 0.25?",
-        "options": ["1/2", "1/3", "1/4", "1/5"],
-        "answer": "1/4",
-        "category": "Number - Fractions"
-      },
-      {
-        "question": "How many centimeters are in 3.2 meters?",
-        "options": ["₦32", "₦320", "₦3,200", "₦32,000"],
-        "answer": "₦320",
-        "category": "Measurement"
-      },
-      {
-        "question": "What is 5/6 – 1/3?",
-        "options": ["1/3", "1/2", "2/3", "3/4"],
-        "answer": "1/2",
-        "category": "Number and Operations"
-      },
-      {
-        "question": "A dot plot shows the number of books read: 3, 4, 4, 5, 6. What is the most common number of books?",
-        "options": ["3", "4", "5", "6"],
-        "answer": "4",
-        "category": "Data Analysis"
-      },
-      {
-        "question": "What is 10% of ₦500?",
-        "options": ["₦40", "₦50", "₦60", "₦70"],
-        "answer": "₦50",
-        "category": "Number - Fractions"
-      },
-      {
-        "question": "Which shape has exactly two pairs of parallel sides?",
-        "options": ["Trapezoid", "Parallelogram", "Triangle", "Pentagon"],
-        "answer": "Parallelogram",
-        "category": "Geometry"
-      },
-      {
-        "question": "A toy costs ₦12.75. How much change will you get from ₦20.00?",
-        "options": ["₦7.25", "₦7.75", "₦8.25", "₦8.75"],
-        "answer": "₦7.25",
-        "category": "Personal Financial Literacy"
-      },
-      {
-        "question": "What is 3.24 rounded to the nearest whole number?",
-        "options": ["3", "3.2", "3.3", "4"],
-        "answer": "3",
-        "category": "Number and Place Value"
-      },
-      {
-        "question": "What is 72 ÷ 8?",
-        "options": ["8", "9", "10", "11"],
-        "answer": "9",
-        "category": "Number - Multiplication and Division"
-      },
-      {
-        "question": "Explain how to multiply 34 × 5 using the standard algorithm.",
-        "options": [],
-        "answer": "Write 34 × 5 vertically. Multiply 5 × 4 ones = 20 ones, write 0, carry 2 tens. Multiply 5 × 3 tens = 15 tens, add 2 tens = 17 tens. The answer is 170.",
-        "category": "Number and Operations"
-      },
-      {
-        "question": "Which number is 100 less than 5,678?",
-        "options": ["5,578", "5,678", "5,778", "5,878"],
-        "answer": "5,578",
-        "category": "Number and Place Value"
-      },
-      {
-        "question": "What time is it 1 hour and 45 minutes after 2:30 p.m.?",
-        "options": ["3:15 p.m.", "4:00 p.m.", "4:15 p.m.", "4:30 p.m."],
-        "answer": "4:15 p.m.",
-        "category": "Measurement"
-      },
-      {
-        "question": "What is the area of a rectangle with a length of 7 cm and a width of 5 cm?",
-        "options": ["₦12 cm²", "₦30 cm²", "₦35 cm²", "₦42 cm²"],
-        "answer": "₦35 cm²",
-        "category": "Spatial Sense"
-      },
-      {
-        "question": "Which expression represents the total cost of 4 items at ₦3.50 each?",
-        "options": ["4 + ₦3.50", "4 × ₦3.50", "₦3.50 ÷ 4", "₦3.50 – 4"],
-        "answer": "4 × ₦3.50",
-        "category": "Personal Financial Literacy"
-      },
-      {
-        "question": "What is 2.5 + 3.7?",
-        "options": ["₦5.2", "₦5.7", "₦6.2", "₦6.7"],
-        "answer": "₦6.2",
-        "category": "Number and Operations"
-      },
-      {
-        "question": "What is the next number in the sequence 8, 12, 16, 20?",
-        "options": ["24", "25", "26", "28"],
-        "answer": "24",
-        "category": "Patterns"
-      },
-      {
-        "question": "Explain how to compare the fractions 3/4 and 2/3 using a common denominator.",
-        "options": [],
-        "answer": "Find a common denominator, such as 12. Convert 3/4 to 9/12 and 2/3 to 8/12. Since 9/12 > 8/12, 3/4 is greater than 2/3.",
-        "category": "Number - Fractions"
-      },
-      {
-        "question": "What is 567 – 289?",
-        "options": ["278", "288", "298", "308"],
-        "answer": "278",
-        "category": "Number and Operations"
-      }
-    ]
-  }
+  "questions": [
+    {
+      "topic": "Multiplication",
+      "question": "What is 12 × 7?",
+      "type": "multiple-choice",
+      "options": ["82", "84", "86", "88"],
+      "correct_answer": "84"
+    },
+    {
+      "topic": "Division",
+      "question": "If 54 books are divided equally among 6 shelves, how many books are on each shelf?",
+      "type": "multiple-choice",
+      "options": ["7 books", "8 books", "9 books", "10 books"],
+      "correct_answer": "9 books"
+    },
+    {
+      "topic": "Fractions",
+      "question": "What is 2/5 + 3/5?",
+      "type": "multiple-choice",
+      "options": ["4/5", "5/5", "6/5", "7/5"],
+      "correct_answer": "5/5"
+    },
+    {
+      "topic": "Area",
+      "question": "What is the area of a rectangle with a length of 8 cm and a width of 5 cm?",
+      "type": "multiple-choice",
+      "options": ["36 cm²", "38 cm²", "40 cm²", "42 cm²"],
+      "correct_answer": "40 cm²"
+    },
+    {
+      "topic": "Perimeter",
+      "question": "What is the perimeter of a triangle with sides 5 cm, 6 cm, and 7 cm?",
+      "type": "multiple-choice",
+      "options": ["16 cm", "17 cm", "18 cm", "19 cm"],
+      "correct_answer": "18 cm"
+    },
+    {
+      "topic": "Shapes",
+      "question": "Which shape has 6 sides?",
+      "type": "multiple-choice",
+      "options": ["Pentagon", "Hexagon", "Heptagon", "Octagon"],
+      "correct_answer": "Hexagon"
+    },
+    {
+      "topic": "Rates",
+      "question": "If a cyclist rides 18 miles in 3 hours, how many miles does she ride in 1 hour?",
+      "type": "multiple-choice",
+      "options": ["5 miles", "6 miles", "7 miles", "8 miles"],
+      "correct_answer": "6 miles"
+    },
+    {
+      "topic": "Fractions",
+      "question": "What is 3/4 of 16?",
+      "type": "multiple-choice",
+      "options": ["10", "11", "12", "13"],
+      "correct_answer": "12"
+    },
+    {
+      "topic": "Multiples",
+      "question": "Which number is a multiple of 6?",
+      "type": "multiple-choice",
+      "options": ["15", "16", "17", "18"],
+      "correct_answer": "18"
+    },
+    {
+      "topic": "Division",
+      "question": "What is 72 ÷ 8?",
+      "type": "multiple-choice",
+      "options": ["8", "9", "10", "11"],
+      "correct_answer": "9"
+    },
+    {
+      "topic": "Addition",
+      "question": "A store has 47 pens and 28 pencils. How many items are there in total?",
+      "type": "multiple-choice",
+      "options": ["73", "74", "75", "76"],
+      "correct_answer": "75"
+    },
+    {
+      "topic": "Subtraction",
+      "question": "What is 93 - 47?",
+      "type": "multiple-choice",
+      "options": ["44", "45", "46", "47"],
+      "correct_answer": "46"
+    },
+    {
+      "topic": "Area",
+      "question": "What is the area of a square with a side length of 6 cm?",
+      "type": "multiple-choice",
+      "options": ["30 cm²", "32 cm²", "34 cm²", "36 cm²"],
+      "correct_answer": "36 cm²"
+    },
+    {
+      "topic": "Fractions",
+      "question": "What is 4/6 - 2/6?",
+      "type": "multiple-choice",
+      "options": ["1/6", "2/6", "3/6", "4/6"],
+      "correct_answer": "2/6"
+    },
+    {
+      "topic": "Shapes",
+      "question": "Which shape has exactly 8 sides?",
+      "type": "multiple-choice",
+      "options": ["Heptagon", "Octagon", "Nonagon", "Decagon"],
+      "correct_answer": "Octagon"
+    },
+    {
+      "topic": "Multiplication",
+      "question": "If a crate holds 10 bottles and 5 crates are filled, how many bottles are there?",
+      "type": "multiple-choice",
+      "options": ["45 bottles", "50 bottles", "55 bottles", "60 bottles"],
+      "correct_answer": "50 bottles"
+    },
+    {
+      "topic": "Time Conversion",
+      "question": "How many seconds are in 3 minutes?",
+      "type": "multiple-choice",
+      "options": ["160 seconds", "180 seconds", "200 seconds", "220 seconds"],
+      "correct_answer": "180 seconds"
+    },
+    {
+      "topic": "Factors",
+      "question": "Which number is a factor of 15?",
+      "type": "multiple-choice",
+      "options": ["4", "5", "6", "7"],
+      "correct_answer": "5"
+    },
+    {
+      "topic": "Perimeter",
+      "question": "What is the perimeter of a square with a side length of 9 cm?",
+      "type": "multiple-choice",
+      "options": ["32 cm", "34 cm", "36 cm", "38 cm"],
+      "correct_answer": "36 cm"
+    },
+    {
+      "topic": "Fractions",
+      "question": "What fraction of a pie is left if 5 out of 10 slices are eaten?",
+      "type": "multiple-choice",
+      "options": ["3/10", "4/10", "5/10", "6/10"],
+      "correct_answer": "5/10"
+    },
+    {
+      "topic": "Multiplication",
+      "question": "What is 11 × 8?",
+      "type": "multiple-choice",
+      "options": ["86", "87", "88", "89"],
+      "correct_answer": "88"
+    },
+    {
+      "topic": "Division",
+      "question": "If a rope is 48 meters long and cut into 6 equal pieces, how long is each piece?",
+      "type": "multiple-choice",
+      "options": ["6 meters", "7 meters", "8 meters", "9 meters"],
+      "correct_answer": "8 meters"
+    },
+    {
+      "topic": "Rates",
+      "question": "If a train travels 45 miles in 5 hours, how far does it travel in 1 hour?",
+      "type": "multiple-choice",
+      "options": ["8 miles", "9 miles", "10 miles", "11 miles"],
+      "correct_answer": "9 miles"
+    },
+    {
+      "topic": "Fractions",
+      "question": "What is 2/3 of 12?",
+      "type": "multiple-choice",
+      "options": ["6", "7", "8", "9"],
+      "correct_answer": "8"
+    },
+    {
+      "topic": "Shapes",
+      "question": "Which shape has 7 sides?",
+      "type": "multiple-choice",
+      "options": ["Hexagon", "Heptagon", "Octagon", "Nonagon"],
+      "correct_answer": "Heptagon"
+    },
+    {
+      "topic": "Area",
+      "question": "What is the area of a rectangle with a length of 10 cm and a width of 3 cm?",
+      "type": "multiple-choice",
+      "options": ["28 cm²", "30 cm²", "32 cm²", "34 cm²"],
+      "correct_answer": "30 cm²"
+    },
+    {
+      "topic": "Multiples",
+      "question": "Which number is a multiple of 3?",
+      "type": "multiple-choice",
+      "options": ["13", "14", "15", "16"],
+      "correct_answer": "15"
+    },
+    {
+      "topic": "Addition",
+      "question": "What is 65 + 39?",
+      "type": "multiple-choice",
+      "options": ["102", "103", "104", "105"],
+      "correct_answer": "104"
+    },
+    {
+      "topic": "Subtraction",
+      "question": "What is 87 - 29?",
+      "type": "multiple-choice",
+      "options": ["56", "57", "58", "59"],
+      "correct_answer": "58"
+    },
+    {
+      "topic": "Division",
+      "question": "What is 63 ÷ 7?",
+      "type": "multiple-choice",
+      "options": ["8", "9", "10", "11"],
+      "correct_answer": "9"
+    },
+    {
+      "topic": "Fractions",
+      "question": "What is 5/8 - 3/8?",
+      "type": "multiple-choice",
+      "options": ["1/8", "2/8", "3/8", "4/8"],
+      "correct_answer": "2/8"
+    },
+    {
+      "topic": "Perimeter",
+      "question": "What is the perimeter of a rectangle with a length of 12 cm and a width of 5 cm?",
+      "type": "multiple-choice",
+      "options": ["32 cm", "34 cm", "36 cm", "38 cm"],
+      "correct_answer": "34 cm"
+    },
+    {
+      "topic": "Multiplication",
+      "question": "If a garden has 9 rows with 6 plants in each row, how many plants are there?",
+      "type": "multiple-choice",
+      "options": ["50 plants", "52 plants", "54 plants", "56 plants"],
+      "correct_answer": "54 plants"
+    },
+    {
+      "topic": "Time Conversion",
+      "question": "How many minutes are in 5 hours?",
+      "type": "multiple-choice",
+      "options": ["280 minutes", "290 minutes", "300 minutes", "310 minutes"],
+      "correct_answer": "300 minutes"
+    },
+    {
+      "topic": "Factors",
+      "question": "Which number is a factor of 24?",
+      "type": "multiple-choice",
+      "options": ["5", "6", "7", "9"],
+      "correct_answer": "6"
+    },
+    {
+      "topic": "Fractions",
+      "question": "What is 1/4 + 2/4?",
+      "type": "multiple-choice",
+      "options": ["2/4", "3/4", "4/4", "5/4"],
+      "correct_answer": "3/4"
+    },
+    {
+      "topic": "Shapes",
+      "question": "Which shape has no corners?",
+      "type": "multiple-choice",
+      "options": ["Triangle", "Square", "Circle", "Pentagon"],
+      "correct_answer": "Circle"
+    },
+    {
+      "topic": "Rates",
+      "question": "If a boat travels 36 miles in 4 hours, how far does it travel in 1 hour?",
+      "type": "multiple-choice",
+      "options": ["8 miles", "9 miles", "10 miles", "11 miles"],
+      "correct_answer": "9 miles"
+    },
+    {
+      "topic": "Multiplication",
+      "question": "What is 15 × 5?",
+      "type": "multiple-choice",
+      "options": ["70", "75", "80", "85"],
+      "correct_answer": "75"
+    },
+    {
+      "topic": "Division",
+      "question": "If 80 apples are divided equally among 10 baskets, how many apples are in each basket?",
+      "type": "multiple-choice",
+      "options": ["7 apples", "8 apples", "9 apples", "10 apples"],
+      "correct_answer": "8 apples"
+    }
+  ]
 }
