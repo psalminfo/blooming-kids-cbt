@@ -1,27 +1,19 @@
-// parent.js (final working version with full validation, charts, accurate score, and PDF download)
-
 import { db } from './firebaseConfig.js';
 import { collection, query, where, getDocs } from "https://www.gstatic.com/firebasejs/9.6.10/firebase-firestore.js";
 
-// Helper: Capitalize name
 function capitalize(str) {
   return str.replace(/\b\w/g, l => l.toUpperCase());
 }
 
-// Helper: Load correct answers for a subject/grade from GitHub
-async function fetchCorrectAnswers(subject, grade) {
+// Helper to fetch correct answers from GitHub
+async function fetchSubjectData(grade, subject) {
   const url = `https://raw.githubusercontent.com/psalminfo/blooming-kids-cbt/main/${grade}-${subject}.json`;
-  try {
-    const res = await fetch(url);
-    const data = await res.json();
-    return data.questions.map(q => ({ answer: q.correct_answer, topic: q.topic || '', skill_detail: q.skill_detail || '' }));
-  } catch (err) {
-    console.error("Failed to load correct answers for:", subject, grade, err);
-    return [];
-  }
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`Failed to load ${subject} questions`);
+  const data = await res.json();
+  return data.questions || [];
 }
 
-// Load student report from Firebase
 window.loadReport = async function () {
   const studentName = document.getElementById("studentName").value.trim().toLowerCase();
   const parentEmail = document.getElementById("parentEmail").value.trim().toLowerCase();
@@ -35,9 +27,9 @@ window.loadReport = async function () {
 
   const q = query(collection(db, "student_results"), where("parentEmail", "==", parentEmail));
   const querySnapshot = await getDocs(q);
-  const studentResults = [];
 
-  querySnapshot.forEach(doc => {
+  const studentResults = [];
+  querySnapshot.forEach((doc) => {
     const data = doc.data();
     if (data.studentName.toLowerCase() === studentName) {
       studentResults.push({ ...data, timestamp: data.submittedAt?.seconds || Date.now() });
@@ -49,16 +41,16 @@ window.loadReport = async function () {
     return;
   }
 
-  // Group sessions by hour
+  // Group sessions by 1 hour timestamp
   const grouped = {};
-  studentResults.forEach((result) => {
+  studentResults.forEach(result => {
     const sessionKey = Math.floor(result.timestamp / 3600);
     if (!grouped[sessionKey]) grouped[sessionKey] = [];
     grouped[sessionKey].push(result);
   });
 
-  reportContent.innerHTML = "";
   let blockIndex = 0;
+  reportContent.innerHTML = "";
 
   for (const key in grouped) {
     const session = grouped[key];
@@ -66,32 +58,41 @@ window.loadReport = async function () {
     const fullName = capitalize(session[0].studentName);
     const formattedDate = new Date(session[0].timestamp * 1000).toLocaleString();
 
-    const performanceRows = [];
-    const topicList = [];
+    let tableRows = "";
+    let skillAnalysisRows = "";
 
-    for (const result of session) {
-      const correctSet = await fetchCorrectAnswers(result.subject, result.grade);
-      let correct = 0;
-      const answered = result.answers || [];
+    for (let r of session) {
+      try {
+        const questionSet = await fetchSubjectData(grade, r.subject);
+        const submittedAnswers = r.answers || [];
+        const correctAnswers = questionSet.map(q => q.correct_answer);
+        let correctCount = 0;
 
-      answered.forEach((ans, i) => {
-        if (correctSet[i] && ans === correctSet[i].answer) correct++;
-        if (correctSet[i]) topicList.push({
-          subject: result.subject,
-          topic: correctSet[i].topic,
-          skill: correctSet[i].skill_detail
-        });
-      });
+        // Match questions directly
+        for (let i = 0; i < submittedAnswers.length; i++) {
+          if (submittedAnswers[i] === correctAnswers[i]) {
+            correctCount++;
+          }
+        }
 
-      performanceRows.push(`<tr><td class='border px-2 py-1'>${result.subject.toUpperCase()}</td><td class='border px-2 py-1 text-center'>${correct} / ${answered.length}</td></tr>`);
+        tableRows += `<tr><td class="border px-2 py-1">${r.subject.toUpperCase()}</td><td class="border px-2 py-1 text-center">${correctCount}/${submittedAnswers.length}</td></tr>`;
+
+        // Topics + skills
+        const topics = {};
+        for (let i = 0; i < questionSet.length && i < submittedAnswers.length; i++) {
+          const topic = questionSet[i].topic || "General";
+          const skill = questionSet[i].skill_detail || "";
+          if (!topics[topic]) topics[topic] = new Set();
+          if (skill) topics[topic].add(skill);
+        }
+
+        for (let topic in topics) {
+          skillAnalysisRows += `<tr><td class="border px-2 py-1">${r.subject.toUpperCase()}</td><td class="border px-2 py-1">${topic}</td><td class="border px-2 py-1">${[...topics[topic]].join(", ") || "General skills"}</td></tr>`;
+        }
+      } catch (err) {
+        console.warn("Question fetch error:", err.message);
+      }
     }
-
-    const topicTable = Object.values(topicList.reduce((acc, curr) => {
-      const key = curr.subject + '-' + curr.topic;
-      if (!acc[key]) acc[key] = { ...curr, count: 1 };
-      else acc[key].count++;
-      return acc;
-    }, {})).map(t => `<tr><td class='border px-2 py-1'>${t.subject.toUpperCase()}</td><td class='border px-2 py-1'>${t.topic}</td><td class='border px-2 py-1'>${t.skill}</td></tr>`).join('');
 
     const block = `
       <div class="border rounded-lg shadow mb-8 p-4 bg-white" id="report-block-${blockIndex}">
@@ -107,7 +108,7 @@ window.loadReport = async function () {
           <thead class="bg-gray-100">
             <tr><th class="border px-2 py-1 text-left">Subject</th><th class="border px-2 py-1 text-center">Score</th></tr>
           </thead>
-          <tbody>${performanceRows.join("")}</tbody>
+          <tbody>${tableRows}</tbody>
         </table>
 
         <h3 class="text-lg font-semibold mb-2">Knowledge & Skill Analysis</h3>
@@ -115,19 +116,18 @@ window.loadReport = async function () {
           <thead class="bg-gray-100">
             <tr><th class="border px-2 py-1">Subject</th><th class="border px-2 py-1">Topic</th><th class="border px-2 py-1">Skill Detail</th></tr>
           </thead>
-          <tbody>${topicTable}</tbody>
+          <tbody>${skillAnalysisRows}</tbody>
         </table>
 
-        <h3 class="text-lg font-semibold mb-1">Tutor’s Recommendation</h3>
-        <p class="mb-2 italic">${tutorName} recommends continued support in the skill areas listed above. Regular tutoring sessions will deepen your child’s understanding and confidence.</p>
+        <h3 class="text-lg font-semibold mb-2">Tutor’s Recommendation</h3>
+        <p class="italic">${tutorName} recommends focused revision on the topics listed above. Consistent tutoring sessions will help strengthen weak areas and boost confidence.</p>
 
-        <h3 class="text-lg font-semibold mb-1">Director’s Message</h3>
-        <p class="italic text-sm">At Blooming Kids House, we are committed to helping your child thrive. Personalized learning support and expert guidance from ${tutorName} will unlock their full potential.<br/>– Mrs. Yinka Isikalu, Director</p>
+        <h3 class="text-lg font-semibold mb-2">Director’s Message</h3>
+        <p class="italic text-sm">At Blooming Kids House, we are committed to helping your child succeed. Personalized support and guidance from ${tutorName} will unlock ${fullName}’s full potential.<br/>– Mrs. Yinka Isikalu, Director</p>
 
         <button onclick="downloadSessionReport(${blockIndex})" class="mt-4 btn-yellow px-4 py-2 rounded">Download PDF</button>
       </div>
     `;
-
     reportContent.innerHTML += block;
     blockIndex++;
   }
@@ -137,17 +137,15 @@ window.loadReport = async function () {
 
 window.downloadSessionReport = function (index) {
   const el = document.getElementById(`report-block-${index}`);
-  setTimeout(() => {
-    import("https://cdn.jsdelivr.net/npm/html2pdf.js@0.10.1/dist/html2pdf.bundle.min.js").then(() => {
-      html2pdf().set({
-        margin: 0.5,
-        filename: `Assessment_Report_${index + 1}.pdf`,
-        image: { type: 'jpeg', quality: 0.98 },
-        html2canvas: { scale: 2 },
-        jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' }
-      }).from(el).save();
-    });
-  }, 500);
+  import("https://rawcdn.githack.com/eKoopmans/html2pdf.js/0.9.3/dist/html2pdf.bundle.js").then(() => {
+    html2pdf().set({
+      margin: 10,
+      filename: `Assessment_Report_${index + 1}.pdf`,
+      image: { type: 'jpeg', quality: 0.98 },
+      html2canvas: { scale: 2 },
+      jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+    }).from(el).save();
+  });
 };
 
 window.logout = function () {
