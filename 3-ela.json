@@ -1,6 +1,7 @@
 {
   "questions": [
     {
+      "topic": "Parts of Speech",
       "question": "Which word is a noun?",
       "type": "multiple-choice",
       "options": [
@@ -12,6 +13,7 @@
       "correct_answer": "cat"
     },
     {
+      "topic": "Plural Forms",
       "question": "What is the plural of 'child'?",
       "type": "multiple-choice",
       "options": [
@@ -23,6 +25,7 @@
       "correct_answer": "children"
     },
     {
+      "topic": "Parts of Speech",
       "question": "Which word is a verb?",
       "type": "multiple-choice",
       "options": [
@@ -34,6 +37,7 @@
       "correct_answer": "jump"
     },
     {
+      "topic": "Sentence Structure",
       "question": "Which sentence is written correctly?",
       "type": "multiple-choice",
       "options": [
@@ -45,6 +49,7 @@
       "correct_answer": "He went to school."
     },
     {
+      "topic": "Parts of Speech",
       "question": "What does an adjective describe?",
       "type": "multiple-choice",
       "options": [
@@ -56,6 +61,7 @@
       "correct_answer": "a noun"
     },
     {
+      "topic": "Parts of Speech",
       "question": "Which word is an adjective?",
       "type": "multiple-choice",
       "options": [
@@ -67,6 +73,7 @@
       "correct_answer": "quick"
     },
     {
+      "topic": "Vocabulary",
       "question": "What is the opposite of 'happy'?",
       "type": "multiple-choice",
       "options": [
@@ -78,6 +85,7 @@
       "correct_answer": "sad"
     },
     {
+      "topic": "Sentence Types",
       "question": "Which sentence is a question?",
       "type": "multiple-choice",
       "options": [
@@ -89,6 +97,7 @@
       "correct_answer": "Can I have some water?"
     },
     {
+      "topic": "Vocabulary",
       "question": "Which word is a synonym for 'fast'?",
       "type": "multiple-choice",
       "options": [
@@ -100,6 +109,7 @@
       "correct_answer": "quick"
     },
     {
+      "topic": "Punctuation",
       "question": "What punctuation ends a statement?",
       "type": "multiple-choice",
       "options": [
@@ -111,6 +121,7 @@
       "correct_answer": "."
     },
     {
+      "topic": "Word Formation",
       "question": "Which is a compound word?",
       "type": "multiple-choice",
       "options": [
@@ -122,6 +133,7 @@
       "correct_answer": "butterfly"
     },
     {
+      "topic": "Parts of Speech",
       "question": "What is a pronoun?",
       "type": "multiple-choice",
       "options": [
@@ -133,6 +145,7 @@
       "correct_answer": "A word that replaces a noun"
     },
     {
+      "topic": "Verb Tenses",
       "question": "Which word best completes: 'The boy ___ the ball.'",
       "type": "multiple-choice",
       "options": [
@@ -144,6 +157,7 @@
       "correct_answer": "threw"
     },
     {
+      "topic": "Parts of Speech",
       "question": "What part of speech is 'quickly'?",
       "type": "multiple-choice",
       "options": [
@@ -155,6 +169,7 @@
       "correct_answer": "adverb"
     },
     {
+      "topic": "Capitalization",
       "question": "Which sentence shows correct capitalization?",
       "type": "multiple-choice",
       "options": [
@@ -166,6 +181,7 @@
       "correct_answer": "My mom is a teacher."
     },
     {
+      "topic": "Verb Tenses",
       "question": "What is the past tense of 'go'?",
       "type": "multiple-choice",
       "options": [
@@ -177,6 +193,7 @@
       "correct_answer": "went"
     },
     {
+      "topic": "Sentence Structure",
       "question": "Which is a complete sentence?",
       "type": "multiple-choice",
       "options": [
@@ -188,6 +205,7 @@
       "correct_answer": "She eats breakfast"
     },
     {
+      "topic": "Parts of Speech",
       "question": "Which is a proper noun?",
       "type": "multiple-choice",
       "options": [
@@ -199,6 +217,7 @@
       "correct_answer": "Lagos"
     },
     {
+      "topic": "Punctuation",
       "question": "Which is an example of a question mark?",
       "type": "multiple-choice",
       "options": [
@@ -210,6 +229,7 @@
       "correct_answer": "?"
     },
     {
+      "topic": "Word Formation",
       "question": "What is the root word in 'unhappy'?",
       "type": "multiple-choice",
       "options": [
@@ -221,6 +241,7 @@
       "correct_answer": "happy"
     },
     {
+      "topic": "Spelling",
       "question": "Which word is spelled correctly?",
       "type": "multiple-choice",
       "options": [
@@ -232,6 +253,7 @@
       "correct_answer": "because"
     },
     {
+      "topic": "Punctuation",
       "question": "Which sentence uses a comma correctly?",
       "type": "multiple-choice",
       "options": [
@@ -243,6 +265,7 @@
       "correct_answer": "I like apples, oranges, and bananas."
     },
     {
+      "topic": "Verb Tenses",
       "question": "Which word best completes: 'She ___ a new dress.'",
       "type": "multiple-choice",
       "options": [
@@ -254,6 +277,7 @@
       "correct_answer": "wore"
     },
     {
+      "topic": "Vocabulary",
       "question": "Which word is an antonym for 'hot'?",
       "type": "multiple-choice",
       "options": [
@@ -265,6 +289,7 @@
       "correct_answer": "cold"
     },
     {
+      "topic": "Sentence Structure",
       "question": "Which is a sentence fragment?",
       "type": "multiple-choice",
       "options": [
@@ -276,6 +301,7 @@
       "correct_answer": "Because it was raining."
     },
     {
+      "topic": "Reading Comprehension",
       "question": "What is the main idea of a paragraph?",
       "type": "multiple-choice",
       "options": [
@@ -287,6 +313,7 @@
       "correct_answer": "The central message"
     },
     {
+      "topic": "Plural Forms",
       "question": "Which is a plural noun?",
       "type": "multiple-choice",
       "options": [
@@ -298,6 +325,7 @@
       "correct_answer": "children"
     },
     {
+      "topic": "Vocabulary",
       "question": "Which word is a homophone for 'two'?",
       "type": "multiple-choice",
       "options": [
@@ -309,17 +337,19 @@
       "correct_answer": "too"
     },
     {
+      "topic": "Sentence Types",
       "question": "Which is an imperative sentence?",
       "type": "multiple-choice",
       "options": [
         "Close the door.",
         "Where is my pen?",
-        "That\u2019s my bag.",
+        "That’s my bag.",
         "He is running."
       ],
       "correct_answer": "Close the door."
     },
     {
+      "topic": "Word Formation",
       "question": "What is the suffix in 'careless'?",
       "type": "multiple-choice",
       "options": [
