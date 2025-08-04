@@ -84,7 +84,9 @@ window.loadReport = async function () {
         <h3 class="text-lg font-semibold mb-1">Director’s Message</h3>
         <p class="italic text-sm">At Blooming Kids House, we are committed to helping your child succeed. Personalized support and guidance from ${tutorName} will unlock the full potential of ${fullName}.<br/>– Mrs. Yinka Isikalu, Director</p>
 
-        <button onclick="downloadSessionReport(${blockIndex})" class="mt-4 btn-yellow px-4 py-2 rounded">Download PDF</button>
+        <div class="text-right">
+          <button onclick="downloadSessionReport(${blockIndex})" class="mt-4 btn-yellow px-4 py-2 rounded">Download PDF</button>
+        </div>
       </div>
     `;
     reportContent.innerHTML += block;
@@ -97,27 +99,25 @@ window.loadReport = async function () {
 window.downloadSessionReport = function (index) {
   const el = document.getElementById(`report-block-${index}`);
 
-  const clone = el.cloneNode(true);
-  clone.style.width = '800px';
-  clone.style.padding = '20px';
-  clone.style.backgroundColor = '#fff';
-  clone.style.position = 'absolute';
-  clone.style.top = '-10000px';
-  document.body.appendChild(clone);
-
-  import("https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js").then(() => {
-    html2canvas(clone).then((canvas) => {
+  Promise.all([
+    import("https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"),
+    import("https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js")
+  ]).then(([jspdfModule]) => {
+    const { jsPDF } = jspdfModule.jspdf;
+    html2canvas(el).then((canvas) => {
       const imgData = canvas.toDataURL("image/png");
-      const pdf = new window.jspdf.jsPDF("p", "mm", "a4");
+      const pdf = new jsPDF("p", "mm", "a4");
 
-      const pdfWidth = pdf.internal.pageSize.getWidth();
       const imgProps = pdf.getImageProperties(imgData);
+      const pdfWidth = pdf.internal.pageSize.getWidth();
       const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
 
       pdf.addImage(imgData, "PNG", 0, 0, pdfWidth, pdfHeight);
       pdf.save(`Assessment_Report_${index + 1}.pdf`);
-      document.body.removeChild(clone);
     });
+  }).catch(err => {
+    console.error("Download error:", err);
+    alert("Failed to download report.");
   });
 };
 
