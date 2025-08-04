@@ -1,3 +1,4 @@
+// parent.js
 import { db } from './firebaseConfig.js';
 import { collection, query, where, getDocs } from "https://www.gstatic.com/firebasejs/9.6.10/firebase-firestore.js";
 
@@ -5,13 +6,11 @@ function capitalize(str) {
   return str.replace(/\b\w/g, l => l.toUpperCase());
 }
 
-// Helper to fetch correct answers from GitHub
 async function fetchSubjectData(grade, subject) {
-  const url = `https://raw.githubusercontent.com/psalminfo/blooming-kids-cbt/main/${grade}-${subject}.json`;
+  const url = `https://raw.githubusercontent.com/psalminfo/blooming-kids-cbt/main/${grade}-${subject.toLowerCase()}.json`;
   const res = await fetch(url);
-  if (!res.ok) throw new Error(`Failed to load ${subject} questions`);
   const data = await res.json();
-  return data.questions || [];
+  return data.questions;
 }
 
 window.loadReport = async function () {
@@ -41,9 +40,8 @@ window.loadReport = async function () {
     return;
   }
 
-  // Group sessions by 1 hour timestamp
   const grouped = {};
-  studentResults.forEach(result => {
+  studentResults.forEach((result) => {
     const sessionKey = Math.floor(result.timestamp / 3600);
     if (!grouped[sessionKey]) grouped[sessionKey] = [];
     grouped[sessionKey].push(result);
@@ -51,47 +49,43 @@ window.loadReport = async function () {
 
   let blockIndex = 0;
   reportContent.innerHTML = "";
-
   for (const key in grouped) {
     const session = grouped[key];
     const { grade, tutorName, location } = session[0];
     const fullName = capitalize(session[0].studentName);
     const formattedDate = new Date(session[0].timestamp * 1000).toLocaleString();
 
-    let tableRows = "";
-    let skillAnalysisRows = "";
+    const tableRows = await Promise.all(session.map(async r => {
+      const questionSet = await fetchSubjectData(grade, r.subject);
+      let correct = 0;
+      for (let i = 0; i < r.answers.length; i++) {
+        if (questionSet[i] && r.answers[i] === questionSet[i].correct_answer) correct++;
+      }
+      return `<tr><td class="border px-2 py-1">${r.subject.toUpperCase()}</td><td class="border px-2 py-1 text-center">${correct}/${r.answers.length}</td></tr>`;
+    }));
 
+    let skillAnalysisRows = "";
+    const topicMap = {};
     for (let r of session) {
       try {
         const questionSet = await fetchSubjectData(grade, r.subject);
-        const submittedAnswers = r.answers || [];
-        const correctAnswers = questionSet.map(q => q.correct_answer);
-        let correctCount = 0;
-
-        // Match questions directly
-        for (let i = 0; i < submittedAnswers.length; i++) {
-          if (submittedAnswers[i] === correctAnswers[i]) {
-            correctCount++;
-          }
-        }
-
-        tableRows += `<tr><td class="border px-2 py-1">${r.subject.toUpperCase()}</td><td class="border px-2 py-1 text-center">${correctCount}/${submittedAnswers.length}</td></tr>`;
-
-        // Topics + skills
-        const topics = {};
-        for (let i = 0; i < questionSet.length && i < submittedAnswers.length; i++) {
+        for (let i = 0; i < questionSet.length && i < r.answers.length; i++) {
           const topic = questionSet[i].topic || "General";
           const skill = questionSet[i].skill_detail || "";
-          if (!topics[topic]) topics[topic] = new Set();
-          if (skill) topics[topic].add(skill);
+          if (!topicMap[r.subject]) topicMap[r.subject] = { topics: new Set(), skills: new Set() };
+          topicMap[r.subject].topics.add(topic);
+          if (skill) topicMap[r.subject].skills.add(skill);
         }
-
-        for (let topic in topics) {
-          skillAnalysisRows += `<tr><td class="border px-2 py-1">${r.subject.toUpperCase()}</td><td class="border px-2 py-1">${topic}</td><td class="border px-2 py-1">${[...topics[topic]].join(", ") || "General skills"}</td></tr>`;
-        }
-      } catch (err) {
-        console.warn("Question fetch error:", err.message);
+      } catch (e) {
+        console.warn("Error loading question set:", e.message);
       }
+    }
+
+    for (let subject in topicMap) {
+      skillAnalysisRows += `
+        <tr><td class="border px-2 py-1 font-bold">${subject.toUpperCase()}</td><td class="border px-2 py-1">${[...topicMap[subject].topics].join(", ")}</td></tr>
+        <tr><td class="border px-2 py-1 italic">Skill Details</td><td class="border px-2 py-1 italic">${[...topicMap[subject].skills].join(", ") || "General skills"}</td></tr>
+      `;
     }
 
     const block = `
@@ -108,26 +102,26 @@ window.loadReport = async function () {
           <thead class="bg-gray-100">
             <tr><th class="border px-2 py-1 text-left">Subject</th><th class="border px-2 py-1 text-center">Score</th></tr>
           </thead>
-          <tbody>${tableRows}</tbody>
+          <tbody>${tableRows.join("")}</tbody>
         </table>
 
         <h3 class="text-lg font-semibold mb-2">Knowledge & Skill Analysis</h3>
         <table class="w-full text-sm mb-4 border border-collapse">
-          <thead class="bg-gray-100">
-            <tr><th class="border px-2 py-1">Subject</th><th class="border px-2 py-1">Topic</th><th class="border px-2 py-1">Skill Detail</th></tr>
-          </thead>
           <tbody>${skillAnalysisRows}</tbody>
         </table>
 
-        <h3 class="text-lg font-semibold mb-2">Tutor’s Recommendation</h3>
-        <p class="italic">${tutorName} recommends focused revision on the topics listed above. Consistent tutoring sessions will help strengthen weak areas and boost confidence.</p>
+        <h3 class="text-lg font-semibold mb-1">Tutor’s Recommendation</h3>
+        <p class="mb-2 italic">${tutorName} recommends dedicated focus on the skills highlighted above. Regular tutoring sessions will help reinforce understanding and build long-term confidence.</p>
 
-        <h3 class="text-lg font-semibold mb-2">Director’s Message</h3>
-        <p class="italic text-sm">At Blooming Kids House, we are committed to helping your child succeed. Personalized support and guidance from ${tutorName} will unlock ${fullName}’s full potential.<br/>– Mrs. Yinka Isikalu, Director</p>
+        <h3 class="text-lg font-semibold mb-1">Director’s Message</h3>
+        <p class="italic text-sm">At Blooming Kids House, we are committed to helping your child succeed. Personalized support and guidance from ${tutorName} will unlock the full potential of ${fullName}.<br/>– Mrs. Yinka Isikalu, Director</p>
 
-        <button onclick="downloadSessionReport(${blockIndex})" class="mt-4 btn-yellow px-4 py-2 rounded">Download PDF</button>
+        <div class="flex justify-end mt-4">
+          <button onclick="downloadSessionReport(${blockIndex})" class="btn-yellow px-4 py-2 rounded">Download PDF</button>
+        </div>
       </div>
     `;
+
     reportContent.innerHTML += block;
     blockIndex++;
   }
@@ -137,15 +131,13 @@ window.loadReport = async function () {
 
 window.downloadSessionReport = function (index) {
   const el = document.getElementById(`report-block-${index}`);
-  import("https://rawcdn.githack.com/eKoopmans/html2pdf.js/0.9.3/dist/html2pdf.bundle.js").then(() => {
-    html2pdf().set({
-      margin: 10,
-      filename: `Assessment_Report_${index + 1}.pdf`,
-      image: { type: 'jpeg', quality: 0.98 },
-      html2canvas: { scale: 2 },
-      jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
-    }).from(el).save();
-  });
+  html2pdf().set({
+    margin: 10,
+    filename: `Assessment_Report_${index + 1}.pdf`,
+    image: { type: 'jpeg', quality: 0.98 },
+    html2canvas: { scale: 2 },
+    jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+  }).from(el).save();
 };
 
 window.logout = function () {
