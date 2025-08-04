@@ -4,8 +4,8 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Parent Portal - Blooming Kids House</title>
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" />
   <link rel="icon" href="favicon.ico" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" />
   <style>
     body {
       background-color: #f9f9f9;
@@ -15,6 +15,8 @@
     .text-blooming-yellow { color: #FFEB3B; }
     .btn-yellow { background-color: #FFEB3B; color: #000; }
   </style>
+  <!-- Chart.js for bar chart performance -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 </head>
 <body class="min-h-screen flex flex-col items-center p-4">
   <header class="w-full text-center py-4 bg-blooming-green text-white text-2xl font-bold">
@@ -31,9 +33,6 @@
 
     <div id="reportArea" class="bg-white p-4 shadow rounded hidden">
       <div id="reportContent"></div>
-      <div class="flex justify-end mt-6">
-        <button onclick="logout()" class="bg-red-500 text-white px-4 py-2 rounded">Logout</button>
-      </div>
     </div>
   </main>
 
