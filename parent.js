@@ -1,145 +1,123 @@
-// parent.js
-import { db } from './firebaseConfig.js';
-import { collection, query, where, getDocs } from "https://www.gstatic.com/firebasejs/9.6.10/firebase-firestore.js";
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import {
+  getFirestore,
+  collection,
+  query,
+  where,
+  getDocs,
+} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import {
+  getStorage,
+  ref as storageRef,
+  getDownloadURL,
+} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-storage.js";
 
-function capitalize(str) {
-  return str.replace(/\b\w/g, l => l.toUpperCase());
-}
+const firebaseConfig = {
+  apiKey: "AIzaSyBpwxvEoeuT8e6F5vGmDc1VkVfWTUdxavY",
+  authDomain: "blooming-kids-house.firebaseapp.com",
+  projectId: "blooming-kids-house",
+  storageBucket: "blooming-kids-house.appspot.com",
+  messagingSenderId: "739684305208",
+  appId: "1:739684305208:web:ee1cc9e998b37e1f002f84",
+};
 
-async function fetchSubjectData(grade, subject) {
-  const url = `https://raw.githubusercontent.com/psalminfo/blooming-kids-cbt/main/${grade}-${subject.toLowerCase()}.json`;
-  const res = await fetch(url);
-  const data = await res.json();
-  return data.questions;
-}
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+const storage = getStorage(app);
 
-window.loadReport = async function () {
-  const studentName = document.getElementById("studentName").value.trim().toLowerCase();
-  const parentEmail = document.getElementById("parentEmail").value.trim().toLowerCase();
+const urlParams = new URLSearchParams(window.location.search);
+const studentName = urlParams.get("student");
+const parentEmail = urlParams.get("parent");
+
+async function loadReport() {
   const reportArea = document.getElementById("reportArea");
-  const reportContent = document.getElementById("reportContent");
+  const loading = document.getElementById("loading");
 
-  if (!studentName || !parentEmail) {
-    alert("Please enter both student name and parent email.");
-    return;
-  }
+  const q = query(
+    collection(db, "testResults"),
+    where("studentName", "==", studentName),
+    where("parentEmail", "==", parentEmail)
+  );
 
-  const q = query(collection(db, "student_results"), where("parentEmail", "==", parentEmail));
-  const querySnapshot = await getDocs(q);
-
-  const studentResults = [];
-  querySnapshot.forEach((doc) => {
-    const data = doc.data();
-    if (data.studentName.toLowerCase() === studentName) {
-      studentResults.push({ ...data, timestamp: data.submittedAt?.seconds || Date.now() });
-    }
-  });
-
-  if (studentResults.length === 0) {
-    alert("No records found.");
-    return;
-  }
-
-  const grouped = {};
-  studentResults.forEach((result) => {
-    const sessionKey = Math.floor(result.timestamp / 3600);
-    if (!grouped[sessionKey]) grouped[sessionKey] = [];
-    grouped[sessionKey].push(result);
-  });
-
-  let blockIndex = 0;
-  reportContent.innerHTML = "";
-  for (const key in grouped) {
-    const session = grouped[key];
-    const { grade, tutorName, location } = session[0];
-    const fullName = capitalize(session[0].studentName);
-    const formattedDate = new Date(session[0].timestamp * 1000).toLocaleString();
-
-    const tableRows = await Promise.all(session.map(async r => {
-      const questionSet = await fetchSubjectData(grade, r.subject);
-      let correct = 0;
-      for (let i = 0; i < r.answers.length; i++) {
-        if (questionSet[i] && r.answers[i] === questionSet[i].correct_answer) correct++;
-      }
-      return `<tr><td class="border px-2 py-1">${r.subject.toUpperCase()}</td><td class="border px-2 py-1 text-center">${correct}/${r.answers.length}</td></tr>`;
-    }));
-
-    let skillAnalysisRows = "";
-    const topicMap = {};
-    for (let r of session) {
-      try {
-        const questionSet = await fetchSubjectData(grade, r.subject);
-        for (let i = 0; i < questionSet.length && i < r.answers.length; i++) {
-          const topic = questionSet[i].topic || "General";
-          const skill = questionSet[i].skill_detail || "";
-          if (!topicMap[r.subject]) topicMap[r.subject] = { topics: new Set(), skills: new Set() };
-          topicMap[r.subject].topics.add(topic);
-          if (skill) topicMap[r.subject].skills.add(skill);
-        }
-      } catch (e) {
-        console.warn("Error loading question set:", e.message);
-      }
+  try {
+    const querySnapshot = await getDocs(q);
+    if (querySnapshot.empty) {
+      loading.innerHTML =
+        "<p class='text-red-500'>No reports found for this student and parent email.</p>";
+      return;
     }
 
-    for (let subject in topicMap) {
-      skillAnalysisRows += `
-        <tr><td class="border px-2 py-1 font-bold">${subject.toUpperCase()}</td><td class="border px-2 py-1">${[...topicMap[subject].topics].join(", ")}</td></tr>
-        <tr><td class="border px-2 py-1 italic">Skill Details</td><td class="border px-2 py-1 italic">${[...topicMap[subject].skills].join(", ") || "General skills"}</td></tr>
-      `;
-    }
+    const data = [];
+    querySnapshot.forEach((doc) => {
+      data.push({ id: doc.id, ...doc.data() });
+    });
 
-    const block = `
-      <div class="border rounded-lg shadow mb-8 p-4 bg-white" id="report-block-${blockIndex}">
-        <h2 class="text-xl font-bold mb-2">Student Name: ${fullName}</h2>
-        <p><strong>Parent Email:</strong> ${parentEmail}</p>
-        <p><strong>Grade:</strong> ${grade}</p>
-        <p><strong>Tutor:</strong> ${tutorName}</p>
-        <p><strong>Location:</strong> ${location}</p>
-        <p><strong>Session:</strong> ${formattedDate}</p>
+    const latest = data.sort((a, b) => b.timestamp - a.timestamp)[0];
 
-        <h3 class="text-lg font-semibold mt-4 mb-2">Performance Summary</h3>
-        <table class="w-full text-sm mb-4 border border-collapse">
-          <thead class="bg-gray-100">
-            <tr><th class="border px-2 py-1 text-left">Subject</th><th class="border px-2 py-1 text-center">Score</th></tr>
-          </thead>
-          <tbody>${tableRows.join("")}</tbody>
-        </table>
+    document.getElementById("studentName").textContent = latest.studentName;
+    document.getElementById("grade").textContent = latest.grade;
+    document.getElementById("tutorName").textContent = latest.tutorName;
 
-        <h3 class="text-lg font-semibold mb-2">Knowledge & Skill Analysis</h3>
-        <table class="w-full text-sm mb-4 border border-collapse">
-          <tbody>${skillAnalysisRows}</tbody>
-        </table>
+    const subjectScores = document.getElementById("subjectScores");
+    subjectScores.innerHTML = "";
+    Object.entries(latest.scores).forEach(([subject, score]) => {
+      const li = document.createElement("li");
+      li.textContent = `${subject}: ${score}/30`;
+      subjectScores.appendChild(li);
+    });
 
-        <h3 class="text-lg font-semibold mb-1">Tutor’s Recommendation</h3>
-        <p class="mb-2 italic">${tutorName} recommends dedicated focus on the skills highlighted above. Regular tutoring sessions will help reinforce understanding and build long-term confidence.</p>
-
-        <h3 class="text-lg font-semibold mb-1">Director’s Message</h3>
-        <p class="italic text-sm">At Blooming Kids House, we are committed to helping your child succeed. Personalized support and guidance from ${tutorName} will unlock the full potential of ${fullName}.<br/>– Mrs. Yinka Isikalu, Director</p>
-
-        <div class="flex justify-end mt-4">
-          <button onclick="downloadSessionReport(${blockIndex})" class="btn-yellow px-4 py-2 rounded">Download PDF</button>
-        </div>
-      </div>
+    const messageArea = document.getElementById("directorMessage");
+    messageArea.innerHTML = `
+      <p>Dear Parent,</p>
+      <p>Thank you for trusting Blooming Kids House with your child's academic journey. Based on the assessment, our professional tutors have carefully reviewed ${latest.studentName}'s results.</p>
+      <p>We believe that with the right guidance and consistent tutoring, your child can significantly improve and excel in these subjects. We recommend enrolling your child in a personalized tutoring plan led by ${latest.tutorName}, who is well-equipped to support ${latest.studentName}'s learning journey.</p>
+      <p>Warm regards,</p>
+      <p><strong>Mrs. Yinka Isikalu</strong><br/>Director, Blooming Kids House</p>
     `;
 
-    reportContent.innerHTML += block;
-    blockIndex++;
+    const recommendationArea = document.getElementById("recommendations");
+    recommendationArea.innerHTML = generateRecommendations(latest.scores, latest.grade, latest.tutorName, latest.studentName);
+
+    const storageReference = storageRef(storage, `reports/${latest.id}.pdf`);
+    const downloadURL = await getDownloadURL(storageReference);
+
+    const downloadLink = document.getElementById("downloadLink");
+    downloadLink.href = downloadURL;
+    downloadLink.classList.remove("hidden");
+
+    loading.classList.add("hidden");
+    reportArea.classList.remove("hidden");
+
+    // ✅ Make logout button visible
+    document.getElementById("logoutArea").style.display = "flex";
+
+  } catch (error) {
+    loading.innerHTML =
+      "<p class='text-red-500'>Error loading report. Please try again.</p>";
+    console.error("Error loading report:", error);
   }
+}
 
-  reportArea.classList.remove("hidden");
-};
+function generateRecommendations(scores, grade, tutorName, studentName) {
+  let recommendations = "<ul class='list-disc pl-5'>";
+  for (const [subject, score] of Object.entries(scores)) {
+    let suggestion = "";
+    if (score < 15) {
+      suggestion = `We recommend focused tutoring sessions in ${subject} to address foundational gaps. Key areas covered in the test include reading comprehension, arithmetic, critical thinking, and curriculum-specific skills aligned with Texas and UK standards.`;
+    } else if (score < 25) {
+      suggestion = `${studentName} shows potential in ${subject}, but would benefit from additional support in advanced concepts. Regular practice and targeted intervention by ${tutorName} can help solidify mastery.`;
+    } else {
+      suggestion = `${studentName} performed well in ${subject}. Continued tutoring with ${tutorName} can help sustain and build upon this performance, especially as the curriculum advances.`;
+    }
+    recommendations += `<li><strong>${subject}:</strong> ${suggestion}</li>`;
+  }
+  recommendations += "</ul>";
+  return recommendations;
+}
 
-window.downloadSessionReport = function (index) {
-  const el = document.getElementById(`report-block-${index}`);
-  html2pdf().set({
-    margin: 10,
-    filename: `Assessment_Report_${index + 1}.pdf`,
-    image: { type: 'jpeg', quality: 0.98 },
-    html2canvas: { scale: 2 },
-    jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
-  }).from(el).save();
-};
-
-window.logout = function () {
+function logout() {
   window.location.href = "parent.html";
-};
+}
+
+window.addEventListener("DOMContentLoaded", loadReport);
+window.logout = logout;
