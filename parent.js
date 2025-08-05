@@ -7,7 +7,7 @@ function capitalize(str) {
 }
 
 async function fetchSubjectData(grade, subject) {
-  const url = `https://raw.githubusercontent.com/psalminfo/blooming-kids-cbt/main/${grade}-${subject.toLowerCase()}.json`;
+  const url = https://raw.githubusercontent.com/psalminfo/blooming-kids-cbt/main/${grade}-${subject.toLowerCase()}.json;
   const res = await fetch(url);
   const data = await res.json();
   return data.questions;
@@ -61,7 +61,7 @@ window.loadReport = async function () {
       for (let i = 0; i < r.answers.length; i++) {
         if (questionSet[i] && r.answers[i] === questionSet[i].correct_answer) correct++;
       }
-      return `<tr><td class="border px-2 py-1">${r.subject.toUpperCase()}</td><td class="border px-2 py-1 text-center">${correct}/${r.answers.length}</td></tr>`;
+      return <tr><td class="border px-2 py-1">${r.subject.toUpperCase()}</td><td class="border px-2 py-1 text-center">${correct}/${r.answers.length}</td></tr>;
     }));
 
     let skillAnalysisRows = "";
@@ -82,13 +82,13 @@ window.loadReport = async function () {
     }
 
     for (let subject in topicMap) {
-      skillAnalysisRows += `
+      skillAnalysisRows += 
         <tr><td class="border px-2 py-1 font-bold">${subject.toUpperCase()}</td><td class="border px-2 py-1">${[...topicMap[subject].topics].join(", ")}</td></tr>
         <tr><td class="border px-2 py-1 italic">Skill Details</td><td class="border px-2 py-1 italic">${[...topicMap[subject].skills].join(", ") || "General skills"}</td></tr>
-      `;
+      ;
     }
 
-    const block = `
+    const block = 
       <div class="border rounded-lg shadow mb-8 p-4 bg-white" id="report-block-${blockIndex}">
         <h2 class="text-xl font-bold mb-2">Student Name: ${fullName}</h2>
         <p><strong>Parent Email:</strong> ${parentEmail}</p>
@@ -120,7 +120,7 @@ window.loadReport = async function () {
           <button onclick="downloadSessionReport(${blockIndex})" class="btn-yellow px-4 py-2 rounded">Download PDF</button>
         </div>
       </div>
-    `;
+    ;
 
     reportContent.innerHTML += block;
     blockIndex++;
@@ -130,10 +130,10 @@ window.loadReport = async function () {
 };
 
 window.downloadSessionReport = function (index) {
-  const el = document.getElementById(`report-block-${index}`);
+  const el = document.getElementById(report-block-${index});
   html2pdf().set({
     margin: 10,
-    filename: `Assessment_Report_${index + 1}.pdf`,
+    filename: Assessment_Report_${index + 1}.pdf,
     image: { type: 'jpeg', quality: 0.98 },
     html2canvas: { scale: 2 },
     jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
