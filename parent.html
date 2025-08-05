@@ -15,6 +15,7 @@
     .text-blooming-yellow { color: #FFEB3B; }
     .btn-yellow { background-color: #FFEB3B; color: #000; }
   </style>
+  <!-- ✅ PDF generation -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.9.2/html2pdf.bundle.min.js"></script>
 </head>
 <body class="min-h-screen flex flex-col items-center p-4">
@@ -39,6 +40,7 @@
     </div>
   </main>
 
-  <script src="parent.js"></script>
+  <!-- ✅ FIX: Use module so import/export works -->
+  <script type="module" src="parent.js"></script>
 </body>
 </html>
