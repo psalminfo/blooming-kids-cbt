@@ -2,36 +2,43 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <link rel="icon" href="favicon.ico" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Parent Portal - Blooming Kids House</title>
-  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" />
+  <link rel="icon" href="favicon.ico" />
+  <style>
+    body {
+      background-color: #f9f9f9;
+      font-family: 'Segoe UI', sans-serif;
+    }
+    .bg-blooming-green { background-color: #4CAF50; }
+    .text-blooming-yellow { color: #FFEB3B; }
+    .btn-yellow { background-color: #FFEB3B; color: #000; }
+  </style>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.9.2/html2pdf.bundle.min.js"></script>
 </head>
-<body class="bg-gray-100 text-gray-800">
-  <div class="max-w-2xl mx-auto mt-10 p-6 bg-white rounded-lg shadow-md">
-    <h1 class="text-2xl font-bold mb-4 text-center">Parent Report Portal</h1>
-    <div class="mb-4">
-      <label for="studentName" class="block font-semibold mb-1">Student Name</label>
-      <input type="text" id="studentName" class="w-full border rounded px-3 py-2" placeholder="Enter your child's name">
-    </div>
-    <div class="mb-4">
-      <label for="parentEmail" class="block font-semibold mb-1">Parent Email</label>
-      <input type="email" id="parentEmail" class="w-full border rounded px-3 py-2" placeholder="Enter your email">
-    </div>
-    <button onclick="loadReport()" class="w-full bg-blue-500 text-white py-2 rounded hover:bg-blue-600">Load Report</button>
-    <div id="reportSection" class="hidden mt-6">
-      <div id="reportContent" class="bg-gray-50 p-4 rounded border"></div>
-      <div class="flex justify-between mt-4">
-        <button onclick="downloadSessionReport()" class="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600">Download PDF</button>
-        <button onclick="logout()" class="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600">Logout</button>
-      </div>
-    </div>
-  </div>
+<body class="min-h-screen flex flex-col items-center p-4">
+  <header class="w-full text-center py-4 bg-blooming-green text-white text-2xl font-bold">
+    BLOOMING KIDS HOUSE ASSESSMENT REPORT
+  </header>
 
-  <!-- Firebase -->
-  <script type="module" src="parent.js"></script>
+  <main class="w-full max-w-2xl mt-6">
+    <div class="bg-white shadow p-4 rounded mb-4">
+      <h2 class="text-xl font-semibold mb-2">Enter Student Details</h2>
+      <input id="studentName" type="text" placeholder="Student Full Name" class="w-full mb-2 p-2 border rounded" />
+      <input id="parentEmail" type="email" placeholder="Parent Email" class="w-full mb-4 p-2 border rounded" />
+      <button onclick="loadReport()" class="w-full py-2 px-4 btn-yellow font-bold rounded">Generate Report</button>
+    </div>
 
-  <!-- html2pdf CDN -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <div id="reportArea" class="bg-white p-4 shadow rounded hidden">
+      <div id="reportContent"></div>
+    </div>
+
+    <div class="flex justify-end mt-4" id="logoutArea" style="display:none">
+      <button onclick="logout()" class="bg-red-500 text-white px-4 py-2 rounded">Logout</button>
+    </div>
+  </main>
+
+  <script src="parent.js"></script>
 </body>
 </html>
