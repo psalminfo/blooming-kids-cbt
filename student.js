@@ -50,10 +50,24 @@ document.addEventListener("DOMContentLoaded", async () => {
     `).join("");
   }
 
-  function startTimer(mins) { /* ... This function does not need to change ... */ }
+  function startTimer(mins) {
+    let time = mins * 60;
+    const timerEl = document.getElementById("timer");
+    if (!timerEl) return;
+    const interval = setInterval(() => {
+      const m = String(Math.floor(time / 60)).padStart(2, "0");
+      const s = String(time % 60).padStart(2, "0");
+      timerEl.textContent = `Time Left: ${m}:${s}`;
+      if (--time < 0) {
+        clearInterval(interval);
+        alert("Time is up! Submitting your answers.");
+        submitTest();
+      }
+    }, 1000);
+  }
 
   async function submitTest() {
-    // --- NEW LOGIC: Create a rich array of result objects ---
+    // Create a rich array of result objects
     const resultsPayload = questions.map((q, i) => {
       const selectedInput = document.querySelector(`input[name="q${i}"]:checked`);
       return {
