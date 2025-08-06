@@ -1,3 +1,6 @@
+import { db } from './firebaseConfig.js';
+import { collection, query, where, getDocs } from "https://www.gstatic.com/firebasejs/9.6.10/firebase-firestore.js";
+
 function capitalize(str) {
   return str.replace(/\b\w/g, l => l.toUpperCase());
 }
@@ -13,11 +16,11 @@ window.loadReport = async function () {
     return;
   }
 
-  const db = firebase.firestore();
-  const snapshot = await db.collection("student_results").where("parentEmail", "==", parentEmail).get();
+  const q = query(collection(db, "student_results"), where("parentEmail", "==", parentEmail));
+  const querySnapshot = await getDocs(q);
 
   const studentResults = [];
-  snapshot.forEach(doc => {
+  querySnapshot.forEach((doc) => {
     const data = doc.data();
     if (data.studentName.toLowerCase() === studentName) {
       studentResults.push({ ...data, timestamp: data.submittedAt?.seconds || Date.now() });
@@ -30,8 +33,8 @@ window.loadReport = async function () {
   }
 
   const grouped = {};
-  studentResults.forEach(result => {
-    const sessionKey = Math.floor(result.timestamp / 3600); // Group by hour
+  studentResults.forEach((result) => {
+    const sessionKey = Math.floor(result.timestamp / 3600);
     if (!grouped[sessionKey]) grouped[sessionKey] = [];
     grouped[sessionKey].push(result);
   });
@@ -50,26 +53,27 @@ window.loadReport = async function () {
       return `<tr><td class="border px-2 py-1">${r.subject.toUpperCase()}</td><td class="border px-2 py-1 text-center">${correct} / ${r.answers.length}</td></tr>`;
     }).join("");
 
-    const topicMap = {};
-    session.forEach(r => {
-      const subject = r.subject.toUpperCase();
-      const topics = r.topics || r.topic || [];
-      const skills = r.skill_detail || [];
-
-      if (!topicMap[subject]) topicMap[subject] = { topics: new Set(), skills: new Set() };
-      topics.forEach(t => topicMap[subject].topics.add(t));
-      skills.forEach(s => topicMap[subject].skills.add(s));
-    });
-
-    const topicTable = Object.entries(topicMap).map(([subject, { topics, skills }]) => {
-      return `
-        <tr>
-          <td class="border px-2 py-1 align-top"><strong>${subject}</strong></td>
-          <td class="border px-2 py-1">${Array.from(topics).join(", ")}</td>
-          <td class="border px-2 py-1">${Array.from(skills).join(", ") || "—"}</td>
-        </tr>
-      `;
-    }).join("");
+    const topicRecommendations = `
+      <table class="w-full text-sm mb-4 border border-collapse">
+        <thead class="bg-gray-100">
+          <tr>
+            <th class="border px-2 py-1 text-left">Subject</th>
+            <th class="border px-2 py-1 text-left">Topics</th>
+            <th class="border px-2 py-1 text-left">Skills</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${session.map(r => {
+            const topics = (r.topic || r.topics || []).join(", ") || "N/A";
+            const skills = (r.skill_detail || []).join(", ") || "N/A";
+            return `<tr>
+              <td class="border px-2 py-1">${r.subject.toUpperCase()}</td>
+              <td class="border px-2 py-1">${topics}</td>
+              <td class="border px-2 py-1">${skills}</td>
+            </tr>`;
+          }).join("")}
+        </tbody>
+      </table>`;
 
     const block = `
       <div class="border rounded-lg shadow mb-8 p-4 bg-white" id="report-block-${blockIndex}">
@@ -88,13 +92,10 @@ window.loadReport = async function () {
           <tbody>${tableRows}</tbody>
         </table>
 
-        <h3 class="text-lg font-semibold mt-2">Knowledge & Skill Analysis</h3>
-        <table class="w-full text-sm mb-4 border border-collapse">
-          <thead class="bg-gray-100">
-            <tr><th class="border px-2 py-1">Subject</th><th class="border px-2 py-1">Topics</th><th class="border px-2 py-1">Skill Details</th></tr>
-          </thead>
-          <tbody>${topicTable}</tbody>
-        </table>
+        <canvas id="chart-${blockIndex}" class="w-full h-48 mb-4"></canvas>
+
+        <h3 class="text-lg font-semibold mb-1">Knowledge & Skill Analysis</h3>
+        ${topicRecommendations}
 
         <h3 class="text-lg font-semibold mb-1">Tutor’s Recommendation</h3>
         <p class="mb-2 italic">${tutorName} recommends dedicated focus on the skills highlighted above. Regular tutoring sessions will help reinforce understanding and build long-term confidence.</p>
@@ -105,9 +106,38 @@ window.loadReport = async function () {
         <div class="mt-4">
           <button onclick="downloadSessionReport(${blockIndex})" class="btn-yellow px-4 py-2 rounded">Download PDF</button>
         </div>
-      </div>
-    `;
+      </div>`;
+
     reportContent.innerHTML += block;
+
+    const subjectLabels = session.map(r => r.subject.toUpperCase());
+    const correctScores = session.map(r => r.answers.filter(a => a === "correct").length);
+    const totalScores = session.map(r => r.answers.length);
+
+    const ctx = document.getElementById(`chart-${blockIndex}`).getContext('2d');
+    new Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels: subjectLabels,
+        datasets: [
+          {
+            label: 'Correct Answers',
+            data: correctScores,
+            backgroundColor: '#4CAF50'
+          },
+          {
+            label: 'Total Questions',
+            data: totalScores,
+            backgroundColor: '#FFEB3B'
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        scales: { y: { beginAtZero: true } }
+      }
+    });
+
     blockIndex++;
   }
 
@@ -115,8 +145,15 @@ window.loadReport = async function () {
 };
 
 window.downloadSessionReport = function (index) {
-  const el = document.getElementById(`report-block-${index}`);
-  html2pdf().from(el).save(`Assessment_Report_${index + 1}.pdf`);
+  const element = document.getElementById(`report-block-${index}`);
+  const opt = {
+    margin:       0.5,
+    filename:     `Assessment_Report_${index + 1}.pdf`,
+    image:        { type: 'jpeg', quality: 0.98 },
+    html2canvas:  { scale: 2 },
+    jsPDF:        { unit: 'in', format: 'letter', orientation: 'portrait' }
+  };
+  html2pdf().set(opt).from(element).save();
 };
 
 window.logout = function () {
