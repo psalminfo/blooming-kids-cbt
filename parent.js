@@ -14,6 +14,58 @@ function capitalize(str) {
   return str.replace(/\b\w/g, l => l.toUpperCase());
 }
 
+/**
+ * Fetches answers from GitHub for old data formats.
+ * @returns {Promise<{correct: number, total: number, topics: Array<string>}>}
+ */
+async function calculateScoreFromGitHub(grade, subject, studentAnswers) {
+  const baseURL = "https://raw.githubusercontent.com/psalminfo/blooming-kids-cbt/main/";
+  const gradeNumber = grade.match(/\d+/)?.[0] || '1';
+  const subjectLower = subject.toLowerCase();
+  
+  const subjectNameMap = {
+      'chemistry': 'chemistry',
+      'biology': 'biology',
+      'physics': 'physics',
+      'math': 'math',
+      'english language arts': 'ela',
+      'ela': 'ela'
+  };
+  const subjectForFile = subjectNameMap[subjectLower] || subjectLower;
+  const fileName = `${gradeNumber}-${subjectForFile}.json`;
+  const fetchURL = baseURL + fileName;
+
+  try {
+    const response = await fetch(fetchURL);
+    if (!response.ok) {
+      console.error(`Could not find answer file at: ${fetchURL}`);
+      return { correct: 0, total: 0, topics: [] };
+    }
+    const data = await response.json();
+    if (!data || !data.questions) {
+      console.error(`Error: The file ${fileName} is missing the "questions" key.`);
+      return { correct: 0, total: 0, topics: [] };
+    }
+
+    const correctAnswers = data.questions.map(q => q.correct_answer);
+    const topics = [...new Set(data.questions.map(q => q.topic))];
+
+    let score = 0;
+    studentAnswers.forEach((answer, index) => {
+      if (index < correctAnswers.length && String(answer).toLowerCase() === String(correctAnswers[index]).toLowerCase()) {
+        score++;
+      }
+    });
+
+    return { correct: score, total: correctAnswers.length, topics: topics };
+
+  } catch (error) {
+    console.error(`Error processing ${fileName}:`, error);
+    return { correct: 0, total: 0, topics: [] };
+  }
+}
+
+
 // Main function to load the report
 async function loadReport() {
   const studentName = document.getElementById("studentName").value.trim().toLowerCase();
@@ -68,47 +120,46 @@ async function loadReport() {
       const fullName = capitalize(session[0].studentName);
       const formattedDate = new Date(session[0].timestamp * 1000).toLocaleString('en-US', { dateStyle: 'long', timeStyle: 'short' });
       
-      // --- FINAL ROBUST SCORE & TOPIC CALCULATION ---
-      const results = session.map(testResult => {
-        // Check if the 'answers' field is in the new format (an array of objects)
-        if (typeof testResult.answers[0] === 'object' && testResult.answers[0] !== null) {
+      // --- FINAL BACKWARD-COMPATIBLE SCORE & TOPIC CALCULATION ---
+      const results = await Promise.all(session.map(async (testResult) => {
+        // Check if the 'answers' field exists and is in the new format (an array of objects)
+        if (Array.isArray(testResult.answers) && testResult.answers.length > 0 && typeof testResult.answers[0] === 'object' && testResult.answers[0] !== null) {
           // --- Logic for NEW data format ---
+          console.log(`New data format detected for ${testResult.subject}.`);
           let correctCount = 0;
           testResult.answers.forEach(answerObject => {
             if (String(answerObject.studentAnswer).toLowerCase() === String(answerObject.correctAnswer).toLowerCase()) {
               correctCount++;
             }
           });
-          const topics = [...new Set(testResult.answers.map(a => a.topic).filter(t => t))]; // Filter out any undefined topics
+          const topics = [...new Set(testResult.answers.map(a => a.topic).filter(t => t))];
           return {
             subject: testResult.subject,
             correct: correctCount,
             total: testResult.answers.length,
             topics: topics,
-            isNewFormat: true
           };
         } else {
-          // --- Logic for OLD data format ---
+          // --- Logic for OLD data format: Fallback to GitHub fetch ---
+          console.log(`Old data format detected for ${testResult.subject}. Fetching answers from GitHub...`);
+          const githubResult = await calculateScoreFromGitHub(testResult.grade, testResult.subject, testResult.answers);
           return {
             subject: testResult.subject,
-            correct: 0,
-            total: testResult.answers.length,
-            topics: [],
-            isNewFormat: false
+            correct: githubResult.correct,
+            total: githubResult.total,
+            topics: githubResult.topics
           };
         }
-      });
+      }));
 
       const tableRows = results.map(res => {
-        const scoreDisplay = res.isNewFormat ? `${res.correct} / ${res.total}` : 'N/A';
-        return `<tr><td class="border px-2 py-1">${res.subject.toUpperCase()}</td><td class="border px-2 py-1 text-center">${scoreDisplay}</td></tr>`;
+        return `<tr><td class="border px-2 py-1">${res.subject.toUpperCase()}</td><td class="border px-2 py-1 text-center">${res.correct} / ${res.total}</td></tr>`;
       }).join("");
       
       const topicsTableRows = results.map(res => {
-          const topicsDisplay = res.isNewFormat ? (res.topics.join(', ') || 'Topics not available') : 'Cannot display topics for old test format.';
           return `<tr>
                     <td class="border px-2 py-1 font-semibold">${res.subject.toUpperCase()}</td>
-                    <td class="border px-2 py-1">${topicsDisplay}</td>
+                    <td class="border px-2 py-1">${res.topics.join(', ') || 'N/A'}</td>
                   </tr>`;
       }).join("");
 
