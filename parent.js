@@ -15,7 +15,7 @@ function capitalize(str) {
 }
 
 /**
- * Fetches answers from GitHub for old data formats.
+ * Fetches answers from GitHub for old data formats and adds debugging logs.
  * @returns {Promise<{correct: number, total: number, topics: Array<string>}>}
  */
 async function calculateScoreFromGitHub(grade, subject, studentAnswers) {
@@ -50,9 +50,16 @@ async function calculateScoreFromGitHub(grade, subject, studentAnswers) {
     const correctAnswers = data.questions.map(q => q.correct_answer);
     const topics = [...new Set(data.questions.map(q => q.topic))];
 
+    // --- NEW DEBUGGING LOGS ---
+    console.log(`--- DEBUGGING ${subject.toUpperCase()} ---`);
+    console.log("Student's answers from Firebase:", studentAnswers);
+    console.log("Correct answers from GitHub:", correctAnswers.slice(0, studentAnswers.length));
+    console.log("---------------------------------");
+
     let score = 0;
     studentAnswers.forEach((answer, index) => {
-      if (index < correctAnswers.length && String(answer).toLowerCase() === String(correctAnswers[index]).toLowerCase()) {
+      // Added .trim() to remove any accidental whitespace from answers
+      if (index < correctAnswers.length && String(answer).trim().toLowerCase() === String(correctAnswers[index]).trim().toLowerCase()) {
         score++;
       }
     });
