@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Diagnostic Test Page</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 flex items-center justify-center h-screen">
+    <div class="text-center bg-white p-8 rounded-lg shadow-md">
+        <h1 class="text-2xl font-bold mb-4">Diagnostic Test Tool</h1>
+        <p class="mb-6 text-gray-600">Click a button to simulate taking a test and saving the results to Firebase. Watch the console for output.</p>
+        <div class="space-x-4">
+            <button id="mathBtn" class="bg-blue-500 text-white font-bold py-2 px-4 rounded hover:bg-blue-700">
+                Run Grade 3 MATH Test
+            </button>
+            <button id="elaBtn" class="bg-green-500 text-white font-bold py-2 px-4 rounded hover:bg-green-700">
+                Run Grade 3 ELA Test
+            </button>
+        </div>
+    </div>
+
+    <!-- We will use the modular Firebase SDK v9+ -->
+    <script type="module" src="diagnostic.js"></script>
+</body>
+</html>
