@@ -1,11 +1,11 @@
-// Firebase config
+// Firebase config for the 'bloomingkidsassessment' project
 firebase.initializeApp({
-  apiKey: "AIzaSyBpwxvEoeuT8e6F5vGmDc1VkVfWTUdxavY", // Your API Key
-  authDomain: "blooming-kids-house.firebaseapp.com",
-  projectId: "blooming-kids-house",
-  storageBucket: "blooming-kids-house.appspot.com",
-  messagingSenderId: "739684305208",
-  appId: "1:739684305208:web:ee1cc9e998b37e1f002f84"
+  apiKey: "AIzaSyD1lJhsWMMs_qerLBSzk7wKhjLyI_11RJg",
+  authDomain: "bloomingkidsassessment.firebaseapp.com",
+  projectId: "bloomingkidsassessment",
+  storageBucket: "bloomingkidsassessment.firebasestorage.app",
+  messagingSenderId: "238975054977",
+  appId: "1:238975054977:web:87c70b4db044998a204980"
 });
 
 const db = firebase.firestore();
@@ -138,7 +138,7 @@ function loadReport() {
         const ctx = document.getElementById(`chart-${blockIndex}`).getContext('2d');
         const subjectLabels = session.map(r => r.subject.toUpperCase());
         const correctScores = session.map(r => r.answers.filter(a => a === "correct").length);
-        const incorrectScores = session.map(r => r.answers.filter(a => a !== "correct").length); // Calculate wrong/unanswered
+        const incorrectScores = session.map(r => r.answers.filter(a => a !== "correct").length);
 
         new Chart(ctx, {
           type: 'bar',
@@ -182,7 +182,6 @@ function downloadSessionReport(index, studentName) {
   const safeStudentName = studentName.replace(/ /g, '_');
   const fileName = `Assessment_Report_${safeStudentName}_Session_${index + 1}.pdf`;
   
-  // Options to improve PDF layout
   const opt = {
     margin:       0.5,
     filename:     fileName,
