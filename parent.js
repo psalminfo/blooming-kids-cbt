@@ -1,22 +1,123 @@
-// Firebase config...
-firebase.initializeApp({ /* ... */ });
+// UPDATED: Firebase config with the 'projectId' included
+firebase.initializeApp({
+  apiKey: "AIzaSyD1lJhsWMMs_qerLBSzk7wKhjLyI_11RJg",
+  authDomain: "bloomingkidsassessment.firebaseapp.com",
+  projectId: "bloomingkidsassessment", // This line was missing
+  storageBucket: "bloomingkidsassessment.firebasestorage.app",
+  messagingSenderId: "238975054977",
+  appId: "1:238975054977:web:87c70b4db044998a204980"
+});
+
 const db = firebase.firestore();
 
-// capitalize and calculateScoreFromGitHub functions remain the same...
-function capitalize(str) { /* ... */ }
-async function calculateScoreFromGitHub(grade, subject, studentAnswers) { /* ... */ }
+// Helper function to capitalize names
+function capitalize(str) {
+  return str.replace(/\b\w/g, l => l.toUpperCase());
+}
 
+/**
+ * Asynchronously calculates score and topics, and performs a case-insensitive comparison.
+ * @returns {Promise<{correct: number, total: number, topics: Array<string>}>}
+ */
+async function calculateScoreFromGitHub(grade, subject, studentAnswers) {
+  const baseURL = "https://raw.githubusercontent.com/psalminfo/blooming-kids-cbt/main/";
+  const gradeNumber = grade.match(/\d+/)?.[0] || '1';
+  const subjectLower = subject.toLowerCase();
+  
+  const subjectNameMap = {
+      'chemistry': 'chemistry',
+      'biology': 'biology',
+      'physics': 'physics',
+      'math': 'math',
+      'english language arts': 'ela',
+      'ela': 'ela'
+  };
+  const subjectForFile = subjectNameMap[subjectLower] || subjectLower;
+  const fileName = `${gradeNumber}-${subjectForFile}.json`;
+  const fetchURL = baseURL + fileName;
+
+  try {
+    const response = await fetch(fetchURL);
+    if (!response.ok) {
+      console.error(`Could not find answer file at: ${fetchURL}`);
+      return { correct: 0, total: 0, topics: [] };
+    }
+    const data = await response.json();
+    if (!data || !data.questions) {
+      console.error(`Error: The file ${fileName} is missing the "questions" key.`);
+      return { correct: 0, total: 0, topics: [] };
+    }
+
+    const correctAnswers = data.questions.map(q => q.correct_answer);
+    const topics = [...new Set(data.questions.map(q => q.topic))];
+
+    let score = 0;
+    studentAnswers.forEach((answer, index) => {
+      if (index < correctAnswers.length && String(answer).toLowerCase() === String(correctAnswers[index]).toLowerCase()) {
+        score++;
+      }
+    });
+
+    return { correct: score, total: correctAnswers.length, topics: topics };
+
+  } catch (error) {
+    console.error(`Error processing ${fileName}:`, error);
+    return { correct: 0, total: 0, topics: [] };
+  }
+}
 
 // Main function to load the report
 async function loadReport() {
-  // ... (The beginning of this function is the same, it fetches studentResults) ...
+  const studentName = document.getElementById("studentName").value.trim().toLowerCase();
+  const parentEmail = document.getElementById("parentEmail").value.trim().toLowerCase();
+  const reportArea = document.getElementById("reportArea");
+  const reportContent = document.getElementById("reportContent");
+  const loader = document.getElementById("loader");
+  const generateBtn = document.getElementById("generateBtn");
+
+  if (!studentName || !parentEmail) {
+    alert("Please enter both the student's full name and the parent's email.");
+    return;
+  }
+
+  loader.classList.remove("hidden");
+  generateBtn.disabled = true;
+  generateBtn.textContent = "Generating...";
 
   try {
-    // ... (The code to get and group studentResults is the same) ...
+    const querySnapshot = await db.collection("student_results").where("parentEmail", "==", parentEmail).get();
+    
+    const studentResults = [];
+    querySnapshot.forEach((doc) => {
+      const data = doc.data();
+      if (data.studentName && data.studentName.toLowerCase() === studentName) {
+        studentResults.push({ ...data, timestamp: data.submittedAt?.seconds || Date.now() / 1000 });
+      }
+    });
+
+    if (studentResults.length === 0) {
+      alert("No records found. Please check the name and email.");
+      loader.classList.add("hidden");
+      generateBtn.disabled = false;
+      generateBtn.textContent = "Generate Report";
+      return;
+    }
+
+    const grouped = {};
+    studentResults.forEach((result) => {
+      const sessionKey = Math.floor(result.timestamp / 3600);
+      if (!grouped[sessionKey]) grouped[sessionKey] = [];
+      grouped[sessionKey].push(result);
+    });
+
+    reportContent.innerHTML = "";
+    let blockIndex = 0;
 
     for (const key in grouped) {
       const session = grouped[key];
-      // ... (The code to get session details is the same) ...
+      const { tutorName, location } = session[0];
+      const fullName = capitalize(session[0].studentName);
+      const formattedDate = new Date(session[0].timestamp * 1000).toLocaleString('en-US', { dateStyle: 'long', timeStyle: 'short' });
       
       const results = await Promise.all(session.map(r => calculateScoreFromGitHub(r.grade, r.subject, r.answers)));
 
@@ -25,7 +126,6 @@ async function loadReport() {
         return `<tr><td class="border px-2 py-1">${r.subject.toUpperCase()}</td><td class="border px-2 py-1 text-center">${score.correct} / ${score.total}</td></tr>`;
       }).join("");
       
-      // --- NEW: Create a table for the topics covered ---
       const topicsTableRows = results.map((res, i) => {
         const subject = session[i].subject.toUpperCase();
         const topics = res.topics.join(', ');
@@ -48,12 +148,20 @@ async function loadReport() {
           </tbody>
         </table>`;
 
-      // --- UPDATED fullBlock to include the new topicsTable ---
       const fullBlock = `
         <div class="border rounded-lg shadow mb-8 p-4 bg-white" id="report-block-${blockIndex}">
           <h2 class="text-xl font-bold mb-2">Student Name: ${fullName}</h2>
+          <p><strong>Parent Email:</strong> ${parentEmail}</p>
+          <p><strong>Grade:</strong> ${session[0].grade}</p>
+          <p><strong>Tutor:</strong> ${tutorName}</p>
+          <p><strong>Location:</strong> ${location}</p>
+          <p><strong>Session Date:</strong> ${formattedDate}</p>
+
           <h3 class="text-lg font-semibold mt-4 mb-2">Performance Summary</h3>
           <table class="w-full text-sm mb-4 border border-collapse">
+            <thead class="bg-gray-100">
+              <tr><th class="border px-2 py-1 text-left">Subject</th><th class="border px-2 py-1 text-center">Score</th></tr>
+            </thead>
             <tbody>${tableRows}</tbody>
           </table>
           
@@ -63,19 +171,72 @@ async function loadReport() {
           <canvas id="chart-${blockIndex}" class="w-full h-48 mb-4"></canvas>
           
           <h3 class="text-lg font-semibold mb-1">Tutor’s Recommendation</h3>
-          </div>`;
+          <p class="mb-2 italic">Based on this assessment, ${tutorName} recommends dedicated focus on the topics highlighted above. Regular practice will help reinforce understanding and build long-term confidence.</p>
+
+          <h3 class="text-lg font-semibold mb-1">Director’s Message</h3>
+          <p class="italic text-sm">At Blooming Kids House, we are committed to helping every child succeed. We believe that with personalized support from our tutors, ${fullName} will unlock their full potential. Keep up the great work!<br/>– Mrs. Yinka Isikalu, Director</p>
+
+          <div class="mt-4">
+            <button onclick="downloadSessionReport(${blockIndex}, '${fullName}')" class="btn-yellow px-4 py-2 rounded">Download Session PDF</button>
+          </div>
+        </div>`;
 
       reportContent.innerHTML += fullBlock;
       
-      // ... (The chart generation and rest of the function remain the same) ...
+      const ctx = document.getElementById(`chart-${blockIndex}`).getContext('2d');
+      const subjectLabels = session.map(r => r.subject.toUpperCase());
+      const correctScores = results.map(s => s.correct);
+      const incorrectScores = results.map(s => s.total - s.correct);
+      
+      new Chart(ctx, {
+          type: 'bar',
+          data: {
+            labels: subjectLabels,
+            datasets: [
+              { label: 'Correct Answers', data: correctScores, backgroundColor: '#4CAF50' },
+              { label: 'Incorrect/Unanswered', data: incorrectScores, backgroundColor: '#FFCD56' }
+            ]
+          },
+          options: {
+            responsive: true,
+            scales: { x: { stacked: true }, y: { stacked: true, beginAtZero: true } },
+            plugins: { title: { display: true, text: 'Score Distribution by Subject' } }
+          }
+        });
+
+      blockIndex++;
     }
 
-    // ... (The final part of the function is the same) ...
+    document.getElementById("inputArea").classList.add("hidden");
+    reportArea.classList.remove("hidden");
+    document.getElementById("logoutArea").style.display = "flex";
 
-  } catch (error) { /* ... */ } 
-  finally { /* ... */ }
+  } catch (error) {
+    console.error("Error generating report: ", error);
+    alert("A critical error occurred while generating the report. Please check the console for details.");
+  } finally {
+    loader.classList.add("hidden");
+    generateBtn.disabled = false;
+    generateBtn.textContent = "Generate Report";
+  }
 }
 
-// downloadSessionReport and logout functions remain unchanged
-function downloadSessionReport(index, studentName) { /* ... */ }
-function logout() { /* ... */ }
+function downloadSessionReport(index, studentName) {
+  const element = document.getElementById(`report-block-${index}`);
+  const safeStudentName = studentName.replace(/ /g, '_');
+  const fileName = `Assessment_Report_${safeStudentName}_Session_${index + 1}.pdf`;
+  
+  const opt = {
+    margin: 0.5,
+    filename: fileName,
+    image: { type: 'jpeg', quality: 0.98 },
+    html2canvas: { scale: 2, useCORS: true },
+    jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' }
+  };
+
+  html2pdf().from(element).set(opt).save();
+}
+
+function logout() {
+  window.location.href = "parent.html";
+}
