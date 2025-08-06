@@ -1,8 +1,8 @@
-// UPDATED: Firebase config with the 'projectId' included
+// Firebase config for the 'bloomingkidsassessment' project
 firebase.initializeApp({
   apiKey: "AIzaSyD1lJhsWMMs_qerLBSzk7wKhjLyI_11RJg",
   authDomain: "bloomingkidsassessment.firebaseapp.com",
-  projectId: "bloomingkidsassessment", // This line was missing
+  projectId: "bloomingkidsassessment",
   storageBucket: "bloomingkidsassessment.firebasestorage.app",
   messagingSenderId: "238975054977",
   appId: "1:238975054977:web:87c70b4db044998a204980"
@@ -69,7 +69,9 @@ async function calculateScoreFromGitHub(grade, subject, studentAnswers) {
 // Main function to load the report
 async function loadReport() {
   const studentName = document.getElementById("studentName").value.trim().toLowerCase();
-  const parentEmail = document.getElementById("parentEmail").value.trim().toLowerCase();
+  // --- THE FINAL FIX IS HERE: Removed .toLowerCase() to allow for case-sensitive email matching ---
+  const parentEmail = document.getElementById("parentEmail").value.trim();
+  
   const reportArea = document.getElementById("reportArea");
   const reportContent = document.getElementById("reportContent");
   const loader = document.getElementById("loader");
