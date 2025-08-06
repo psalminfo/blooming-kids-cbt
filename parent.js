@@ -2,18 +2,6 @@ function capitalize(str) {
   return str.replace(/\b\w/g, l => l.toUpperCase());
 }
 
-async function fetchCorrectAnswers(subject, grade) {
-  const url = `https://raw.githubusercontent.com/psalminfo/blooming-kids-cbt/main/${grade}-${subject.toLowerCase()}.json`;
-  try {
-    const response = await fetch(url);
-    const data = await response.json();
-    return data.questions || [];
-  } catch (e) {
-    console.warn("GitHub load failed:", e);
-    return [];
-  }
-}
-
 window.loadReport = async function () {
   const studentName = document.getElementById("studentName").value.trim().toLowerCase();
   const parentEmail = document.getElementById("parentEmail").value.trim().toLowerCase();
@@ -26,11 +14,10 @@ window.loadReport = async function () {
   }
 
   const db = firebase.firestore();
-  const q = db.collection("student_results").where("parentEmail", "==", parentEmail);
-  const snapshot = await q.get();
+  const snapshot = await db.collection("student_results").where("parentEmail", "==", parentEmail).get();
 
   const studentResults = [];
-  snapshot.forEach((doc) => {
+  snapshot.forEach(doc => {
     const data = doc.data();
     if (data.studentName.toLowerCase() === studentName) {
       studentResults.push({ ...data, timestamp: data.submittedAt?.seconds || Date.now() });
@@ -43,8 +30,8 @@ window.loadReport = async function () {
   }
 
   const grouped = {};
-  studentResults.forEach((result) => {
-    const sessionKey = Math.floor(result.timestamp / 3600);
+  studentResults.forEach(result => {
+    const sessionKey = Math.floor(result.timestamp / 3600); // Group by hour
     if (!grouped[sessionKey]) grouped[sessionKey] = [];
     grouped[sessionKey].push(result);
   });
@@ -58,39 +45,31 @@ window.loadReport = async function () {
     const fullName = capitalize(session[0].studentName);
     const formattedDate = new Date(session[0].timestamp * 1000).toLocaleString();
 
-    const scoreTable = [];
+    const tableRows = session.map(r => {
+      const correct = r.answers.filter(a => a === "correct").length;
+      return `<tr><td class="border px-2 py-1">${r.subject.toUpperCase()}</td><td class="border px-2 py-1 text-center">${correct} / ${r.answers.length}</td></tr>`;
+    }).join("");
+
     const topicMap = {};
-    const skillMap = {};
+    session.forEach(r => {
+      const subject = r.subject.toUpperCase();
+      const topics = r.topics || r.topic || [];
+      const skills = r.skill_detail || [];
 
-    for (const r of session) {
-      const correctAnswers = await fetchCorrectAnswers(r.subject, r.grade);
-      const correctSet = new Set(correctAnswers.map(q => q.correct_answer));
-      let score = 0;
-      if (r.answers?.length) {
-        for (let i = 0; i < r.answers.length; i++) {
-          if (r.answers[i] === correctAnswers[i]?.correct_answer) score++;
-        }
-      }
+      if (!topicMap[subject]) topicMap[subject] = { topics: new Set(), skills: new Set() };
+      topics.forEach(t => topicMap[subject].topics.add(t));
+      skills.forEach(s => topicMap[subject].skills.add(s));
+    });
 
-      const topicList = (r.topic || r.topics || []);
-      const skillList = (r.skill_detail || []);
-
-      topicMap[r.subject] = topicList;
-      skillMap[r.subject] = skillList;
-      scoreTable.push({ subject: r.subject, score, total: r.answers.length });
-    }
-
-    const tableRows = scoreTable.map(r =>
-      `<tr><td class="border px-2 py-1">${r.subject.toUpperCase()}</td><td class="border px-2 py-1 text-center">${r.score} / ${r.total}</td></tr>`
-    ).join("");
-
-    const knowledgeAnalysis = Object.entries(topicMap).map(([subject, topics]) =>
-      `<tr><td class="border px-2 py-1 font-semibold">${subject.toUpperCase()}</td><td class="border px-2 py-1">${topics.join(", ") || "N/A"}</td></tr>`
-    ).join("");
-
-    const skillDetails = Object.entries(skillMap).map(([subject, skills]) =>
-      `<tr><td class="border px-2 py-1 font-semibold">${subject.toUpperCase()}</td><td class="border px-2 py-1">${skills.join(", ") || "N/A"}</td></tr>`
-    ).join("");
+    const topicTable = Object.entries(topicMap).map(([subject, { topics, skills }]) => {
+      return `
+        <tr>
+          <td class="border px-2 py-1 align-top"><strong>${subject}</strong></td>
+          <td class="border px-2 py-1">${Array.from(topics).join(", ")}</td>
+          <td class="border px-2 py-1">${Array.from(skills).join(", ") || "—"}</td>
+        </tr>
+      `;
+    }).join("");
 
     const block = `
       <div class="border rounded-lg shadow mb-8 p-4 bg-white" id="report-block-${blockIndex}">
@@ -109,25 +88,19 @@ window.loadReport = async function () {
           <tbody>${tableRows}</tbody>
         </table>
 
-        <canvas id="chart-${blockIndex}" class="my-4"></canvas>
-
-        <h3 class="text-lg font-semibold mb-2">Knowledge & Skill Analysis</h3>
+        <h3 class="text-lg font-semibold mt-2">Knowledge & Skill Analysis</h3>
         <table class="w-full text-sm mb-4 border border-collapse">
-          <thead class="bg-gray-100"><tr><th class="border px-2 py-1">Subject</th><th class="border px-2 py-1">Topics</th></tr></thead>
-          <tbody>${knowledgeAnalysis}</tbody>
+          <thead class="bg-gray-100">
+            <tr><th class="border px-2 py-1">Subject</th><th class="border px-2 py-1">Topics</th><th class="border px-2 py-1">Skill Details</th></tr>
+          </thead>
+          <tbody>${topicTable}</tbody>
         </table>
 
-        <h3 class="text-lg font-semibold mb-2">Skill Details</h3>
-        <table class="w-full text-sm mb-4 border border-collapse">
-          <thead class="bg-gray-100"><tr><th class="border px-2 py-1">Subject</th><th class="border px-2 py-1">Skills</th></tr></thead>
-          <tbody>${skillDetails}</tbody>
-        </table>
+        <h3 class="text-lg font-semibold mb-1">Tutor’s Recommendation</h3>
+        <p class="mb-2 italic">${tutorName} recommends dedicated focus on the skills highlighted above. Regular tutoring sessions will help reinforce understanding and build long-term confidence.</p>
 
-        <h3 class="text-lg font-semibold mb-2">Tutor’s Recommendation</h3>
-        <p class="mb-4 italic">${tutorName} recommends dedicated focus on the topics and skills highlighted above. Consistent tutoring will strengthen your child's mastery.</p>
-
-        <h3 class="text-lg font-semibold mb-2">Director’s Message</h3>
-        <p class="italic text-sm">At Blooming Kids House, we believe in nurturing potential through tailored support. With guidance from ${tutorName}, your child is on the path to excellence.<br/>– Mrs. Yinka Isikalu, Director</p>
+        <h3 class="text-lg font-semibold mb-1">Director’s Message</h3>
+        <p class="italic text-sm">At Blooming Kids House, we are committed to helping your child succeed. Personalized support and guidance from ${tutorName} will unlock the full potential of ${fullName}.<br/>– Mrs. Yinka Isikalu, Director</p>
 
         <div class="mt-4">
           <button onclick="downloadSessionReport(${blockIndex})" class="btn-yellow px-4 py-2 rounded">Download PDF</button>
@@ -135,24 +108,6 @@ window.loadReport = async function () {
       </div>
     `;
     reportContent.innerHTML += block;
-
-    setTimeout(() => {
-      const ctx = document.getElementById(`chart-${blockIndex}`).getContext("2d");
-      const chartData = {
-        labels: scoreTable.map(r => r.subject.toUpperCase()),
-        datasets: [{
-          label: 'Score',
-          data: scoreTable.map(r => r.score),
-          backgroundColor: '#4CAF50'
-        }]
-      };
-      new Chart(ctx, {
-        type: 'bar',
-        data: chartData,
-        options: { responsive: true, plugins: { legend: { display: false } } }
-      });
-    }, 500);
-
     blockIndex++;
   }
 
