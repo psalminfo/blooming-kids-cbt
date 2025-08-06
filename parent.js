@@ -16,8 +16,8 @@ function capitalize(str) {
 }
 
 /**
- * NEW: Asynchronously calculates a score by fetching correct answers from GitHub.
- * This version uses a specific mapping for subjects like chemistry, biology, physics, maths, and ELA.
+ * Asynchronously calculates a score by fetching correct answers from GitHub.
+ * This version uses a specific mapping for subjects.
  * @param {string} grade The student's grade (e.g., "Grade 3").
  * @param {string} subject The test subject (e.g., "Chemistry").
  * @param {Array<string>} studentAnswers The answers submitted by the student.
@@ -26,10 +26,7 @@ function capitalize(str) {
 async function calculateScoreFromGitHub(grade, subject, studentAnswers) {
   const baseURL = "https://raw.githubusercontent.com/psalminfo/blooming-kids-cbt/main/";
   
-  // Extract number from grade string, e.g., "Grade 3" -> "3"
   const gradeNumber = grade.match(/\d+/)?.[0] || '1'; 
-
-  // --- UPDATED LOGIC for subject name ---
   const subjectLower = subject.toLowerCase();
   
   // Mapping for your specific subject filenames
@@ -37,19 +34,16 @@ async function calculateScoreFromGitHub(grade, subject, studentAnswers) {
       'chemistry': 'chemistry',
       'biology': 'biology',
       'physics': 'physics',
-      'math': 'maths', // Handles if subject is "Math" in Firebase
-      'maths': 'maths', // Handles if subject is "Maths"
-      'english language arts': 'ela', // Handles long name for ELA
+      'math': 'math', // UPDATED: Corrected from 'maths' to 'math'
+      'english language arts': 'ela',
       'ela': 'ela'
   };
 
-  // Use the mapped name if it exists, otherwise, use the lowercase subject name
   const subjectForFile = subjectNameMap[subjectLower] || subjectLower;
-  
   const fileName = `${gradeNumber}-${subjectForFile}.json`;
   const fetchURL = baseURL + fileName;
 
-  console.log(`Attempting to fetch answers from: ${fetchURL}`); // For debugging
+  console.log(`Attempting to fetch answers from: ${fetchURL}`);
 
   try {
     const response = await fetch(fetchURL);
@@ -59,8 +53,13 @@ async function calculateScoreFromGitHub(grade, subject, studentAnswers) {
     }
 
     const data = await response.json();
-    const correctAnswers = data.answers;
 
+    if (!data || !data.answers) {
+      console.error(`Error: The file ${fileName} is missing the "answers": [...] key inside it.`);
+      return { correct: 0, total: studentAnswers.length };
+    }
+
+    const correctAnswers = data.answers;
     let score = 0;
     studentAnswers.forEach((answer, index) => {
       if (index < correctAnswers.length && String(answer).toLowerCase() === String(correctAnswers[index]).toLowerCase()) {
