@@ -1,6 +1,3 @@
-import { db } from './firebaseConfig.js';
-import { collection, query, where, getDocs } from "https://www.gstatic.com/firebasejs/9.6.10/firebase-firestore.js";
-
 function capitalize(str) {
   return str.replace(/\b\w/g, l => l.toUpperCase());
 }
@@ -28,11 +25,12 @@ window.loadReport = async function () {
     return;
   }
 
-  const q = query(collection(db, "student_results"), where("parentEmail", "==", parentEmail));
-  const querySnapshot = await getDocs(q);
+  const db = firebase.firestore();
+  const q = db.collection("student_results").where("parentEmail", "==", parentEmail);
+  const snapshot = await q.get();
 
   const studentResults = [];
-  querySnapshot.forEach((doc) => {
+  snapshot.forEach((doc) => {
     const data = doc.data();
     if (data.studentName.toLowerCase() === studentName) {
       studentResults.push({ ...data, timestamp: data.submittedAt?.seconds || Date.now() });
@@ -138,7 +136,6 @@ window.loadReport = async function () {
     `;
     reportContent.innerHTML += block;
 
-    // After render, build chart
     setTimeout(() => {
       const ctx = document.getElementById(`chart-${blockIndex}`).getContext("2d");
       const chartData = {
@@ -163,8 +160,8 @@ window.loadReport = async function () {
 };
 
 window.downloadSessionReport = function (index) {
-  const element = document.getElementById(`report-block-${index}`);
-  html2pdf().from(element).save(`Assessment_Report_${index + 1}.pdf`);
+  const el = document.getElementById(`report-block-${index}`);
+  html2pdf().from(el).save(`Assessment_Report_${index + 1}.pdf`);
 };
 
 window.logout = function () {
