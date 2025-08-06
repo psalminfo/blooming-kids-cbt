@@ -1,4 +1,4 @@
-// Firebase config...
+// Firebase config for the 'bloomingkidsassessment' project
 firebase.initializeApp({
   apiKey: "AIzaSyD1lJhsWMMs_qerLBSzk7wKhjLyI_11RJg",
   authDomain: "bloomingkidsassessment.firebaseapp.com",
@@ -24,7 +24,10 @@ async function loadReport() {
   const loader = document.getElementById("loader");
   const generateBtn = document.getElementById("generateBtn");
 
-  if (!studentName || !parentEmail) { /* ... validation ... */ }
+  if (!studentName || !parentEmail) {
+    alert("Please enter both the student's full name and the parent's email.");
+    return;
+  }
   
   loader.classList.remove("hidden");
   generateBtn.disabled = true;
@@ -41,7 +44,13 @@ async function loadReport() {
       }
     });
 
-    if (studentResults.length === 0) { /* ... handle no records ... */ }
+    if (studentResults.length === 0) {
+      alert("No records found. Please check the name and email.");
+      loader.classList.add("hidden");
+      generateBtn.disabled = false;
+      generateBtn.textContent = "Generate Report";
+      return;
+    }
 
     const grouped = {};
     studentResults.forEach((result) => {
@@ -59,11 +68,12 @@ async function loadReport() {
       const fullName = capitalize(session[0].studentName);
       const formattedDate = new Date(session[0].timestamp * 1000).toLocaleString('en-US', { dateStyle: 'long', timeStyle: 'short' });
       
-      // --- NEW, SIMPLIFIED SCORE & TOPIC CALCULATION ---
+      // --- CORRECTED SCORE & TOPIC CALCULATION ---
       const results = session.map(testResult => {
         let correctCount = 0;
-        // The 'answers' field is now the array of objects
+        // The 'answers' field is an array of objects
         testResult.answers.forEach(answerObject => {
+          // BUG FIX #1: Compare studentAnswer to correctAnswer
           if (String(answerObject.studentAnswer).toLowerCase() === String(answerObject.correctAnswer).toLowerCase()) {
             correctCount++;
           }
@@ -79,7 +89,13 @@ async function loadReport() {
 
       const tableRows = results.map(res => `<tr><td class="border px-2 py-1">${res.subject.toUpperCase()}</td><td class="border px-2 py-1 text-center">${res.correct} / ${res.total}</td></tr>`).join("");
       
-      const topicsTableRows = results.map(res => `<tr><td class="border px-2 py-1 font-semibold">${res.subject.toUpperCase()}</td><td class="border px-2 py-1">${res.topics.join(', ') || 'N/A'}</td></tr>`).join("");
+      // BUG FIX #2: Correctly generate table rows for topics
+      const topicsTableRows = results.map(res => {
+          return `<tr>
+                    <td class="border px-2 py-1 font-semibold">${res.subject.toUpperCase()}</td>
+                    <td class="border px-2 py-1">${res.topics.join(', ') || 'N/A'}</td>
+                  </tr>`;
+      }).join("");
 
       const topicsTable = `
         <table class="w-full text-sm mb-4 border border-collapse">
@@ -90,12 +106,6 @@ async function loadReport() {
         </table>`;
 
       const fullBlock = `
-        <div class="border rounded-lg shadow mb-8 p-4 bg-white" id="report-block-${blockIndex}">
-          <!-- ... The rest of the HTML block is the same ... -->
-        </div>`;
-      
-      // (This part is simplified as we just need to inject the variables)
-      reportContent.innerHTML += `
         <div class="border rounded-lg shadow mb-8 p-4 bg-white" id="report-block-${blockIndex}">
           <h2 class="text-xl font-bold mb-2">Student Name: ${fullName}</h2>
           <p><strong>Parent Email:</strong> ${parentEmail}</p>
@@ -123,8 +133,30 @@ async function loadReport() {
         </div>
       `;
       
+      reportContent.innerHTML += fullBlock;
+      
+      // BUG FIX #3: Correctly get data for the chart
       const ctx = document.getElementById(`chart-${blockIndex}`).getContext('2d');
-      new Chart(ctx, { /* ... Chart config is the same, using 'results' data ... */ });
+      const subjectLabels = results.map(r => r.subject.toUpperCase());
+      const correctScores = results.map(s => s.correct);
+      const incorrectScores = results.map(s => s.total - s.correct);
+
+      new Chart(ctx, {
+          type: 'bar',
+          data: {
+            labels: subjectLabels,
+            datasets: [
+              { label: 'Correct Answers', data: correctScores, backgroundColor: '#4CAF50' },
+              { label: 'Incorrect/Unanswered', data: incorrectScores, backgroundColor: '#FFCD56' }
+            ]
+          },
+          options: {
+            responsive: true,
+            scales: { x: { stacked: true }, y: { stacked: true, beginAtZero: true } },
+            plugins: { title: { display: true, text: 'Score Distribution by Subject' } }
+          }
+        });
+
       blockIndex++;
     }
 
@@ -132,9 +164,32 @@ async function loadReport() {
     reportArea.classList.remove("hidden");
     document.getElementById("logoutArea").style.display = "flex";
 
-  } catch (error) { /* ... error handling ... */ } 
-  finally { /* ... reset button ... */ }
+  } catch (error) {
+    console.error("Error generating report: ", error);
+    alert("A critical error occurred while generating the report. Please check the console for details.");
+  } finally {
+    loader.classList.add("hidden");
+    generateBtn.disabled = false;
+    generateBtn.textContent = "Generate Report";
+  }
 }
 
-function downloadSessionReport(index, studentName) { /* ... */ }
-function logout() { /* ... */ }
+function downloadSessionReport(index, studentName) {
+  const element = document.getElementById(`report-block-${index}`);
+  const safeStudentName = studentName.replace(/ /g, '_');
+  const fileName = `Assessment_Report_${safeStudentName}_Session_${index + 1}.pdf`;
+  
+  const opt = {
+    margin: 0.5,
+    filename: fileName,
+    image: { type: 'jpeg', quality: 0.98 },
+    html2canvas: { scale: 2, useCORS: true },
+    jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' }
+  };
+
+  html2pdf().from(element).set(opt).save();
+}
+
+function logout() {
+  window.location.href = "parent.html";
+}
