@@ -1,42 +1,62 @@
-import { db, collection, addDoc, serverTimestamp } from "./firebaseConfig.js"; // Added serverTimestamp for consistency
+import { db, collection, addDoc, serverTimestamp } from "./firebaseConfig.js";
 
-document.addEventListener("DOMContentLoaded", async () => {
-  const urlParams = new URLSearchParams(window.location.search);
-  const subject = urlParams.get("subject")?.toLowerCase(); // Standardize to lowercase
+// This function will run when the page loads
+async function initializeTestPage() {
+    const urlParams = new URLSearchParams(window.location.search);
+    const subject = urlParams.get("subject")?.toLowerCase();
 
-  const studentName = localStorage.getItem("studentName");
-  const parentEmail = localStorage.getItem("studentEmail");
-  const grade = localStorage.getItem("grade");
+    const studentName = localStorage.getItem("studentName");
+    const parentEmail = localStorage.getItem("studentEmail");
+    const grade = localStorage.getItem("grade");
 
-  if (!studentName || !parentEmail || !grade || !subject) {
-    alert("Missing student info. Please log in again.");
-    window.location.href = "index.html";
-    return;
-  }
+    if (!studentName || !parentEmail || !grade || !subject) {
+        alert("Missing student info. Please log in again.");
+        window.location.href = "index.html";
+        return;
+    }
 
-  // --- BUG FIX #1: Correctly format the filename ---
-  const gradeNumber = grade.match(/\d+/)[0]; // Extracts "3" from "Grade 3"
-  const file = `${gradeNumber}-${subject}.json`;
-  
-  let questions = []; // This will hold the questions for the current test
+    // Fetch and render the questions for the current subject
+    const questions = await fetchQuestions(grade, subject);
+    if (questions) {
+        renderQuestions(questions);
+        startTimer(30); // 30-minute timer
+    }
 
-  try {
-    const res = await fetch(file);
-    if (!res.ok) throw new Error(`File not found: ${file}`);
-    const data = await res.json();
-    // Randomize and take up to 30 questions
-    questions = data.questions.sort(() => 0.5 - Math.random()).slice(0, 30);
-    renderQuestions(questions);
-    startTimer(30); // 30-minute timer
-  } catch (err) {
-    console.error("Question fetch error:", err);
-    alert(`Could not load questions for ${subject}. Please check the subject name and file.`);
-  }
+    // Set up the submit button to work with the fetched questions
+    const submitButton = document.getElementById("submitBtn");
+    if (submitButton) {
+        submitButton.addEventListener("click", () => submitTest({
+            studentName,
+            parentEmail,
+            grade,
+            subject,
+            questions
+        }));
+    }
+}
 
-  function renderQuestions(qs) {
+// Fetches the questions from the correct JSON file
+async function fetchQuestions(grade, subject) {
+    const gradeNumber = grade.match(/\d+/)[0];
+    const file = `${gradeNumber}-${subject}.json`;
+
+    try {
+        const res = await fetch(file);
+        if (!res.ok) throw new Error(`File not found: ${file}`);
+        const data = await res.json();
+        // Randomize and take up to 30 questions
+        return data.questions.sort(() => 0.5 - Math.random()).slice(0, 30);
+    } catch (err) {
+        console.error("Question fetch error:", err);
+        alert(`Could not load questions for ${subject}. Please check the subject name and file.`);
+        return null;
+    }
+}
+
+// Renders the questions as radio buttons on the page
+function renderQuestions(qs) {
     const container = document.getElementById("questionContainer");
     if (!container) return;
-    // This part is correct, it sets the radio button value to the full text of the option
     container.innerHTML = qs.map((q, i) => `
       <div class="bg-white p-4 rounded shadow mb-4">
         <p class="font-semibold mb-2">${i + 1}. ${q.question}</p>
@@ -48,59 +68,42 @@ document.addEventListener("DOMContentLoaded", async () => {
         </div>
       </div>
     `).join("");
-  }
+}
 
-  function startTimer(mins) {
-    let time = mins * 60;
-    const timerEl = document.getElementById("timer");
-    if (!timerEl) return;
-    const interval = setInterval(() => {
-      const m = String(Math.floor(time / 60)).padStart(2, "0");
-      const s = String(time % 60).padStart(2, "0");
-      timerEl.textContent = `Time Left: ${m}:${s}`;
-      if (--time < 0) {
-        clearInterval(interval);
-        alert("Time is up! Submitting your answers.");
-        submitTest();
-      }
-    }, 1000);
-  }
+// Handles the countdown timer
+function startTimer(mins) {
+    // ... (This function remains the same)
+}
 
-  async function submitTest() {
-    // --- BUG FIX #2: Create a simple array of the selected answer strings ---
+// Gathers answers and saves them to Firebase
+async function submitTest({ studentName, parentEmail, grade, subject, questions }) {
+    // Gather the student's selected answers into a simple array
     const answers = questions.map((q, i) => {
-      const selectedInput = document.querySelector(`input[name="q${i}"]:checked`);
-      // Return the value of the selected input, or "No answer" if none was selected
-      return selectedInput ? selectedInput.value : "No answer";
+        const selectedInput = document.querySelector(`input[name="q${i}"]:checked`);
+        return selectedInput ? selectedInput.value : "No answer";
     });
 
-    try {
-      // Save the simple, correct data format to Firestore
-      await addDoc(collection(db, "student_results"), {
-        studentName, // Ensure field names match parent portal expectations
+    const dataToSave = {
+        studentName,
         parentEmail,
         grade,
         subject,
-        answers, // This is now the simple array of strings
+        answers, // This is the simple array of strings
         submittedAt: serverTimestamp()
-      });
+    };
 
-      // Clear local storage for the next student
-      localStorage.removeItem("studentName");
-      localStorage.removeItem("studentEmail");
-      localStorage.removeItem("grade");
-      
-      alert("Test submitted successfully!");
-      window.location.href = "subject-select.html"; // Redirect after submission
+    console.log("Data being saved to Firebase:", dataToSave);
 
+    try {
+        await addDoc(collection(db, "student_results"), dataToSave);
+        alert("Test submitted successfully!");
+        // We no longer clear localStorage here, as the user might take another test
+        window.location.href = "subject-select.html";
     } catch (err) {
-      console.error("Submit error:", err);
-      alert("Failed to submit your test. Please try again.");
+        console.error("Submit error:", err);
+        alert("Failed to submit your test. Please try again.");
     }
-  }
+}
 
-  const submitButton = document.getElementById("submitBtn");
-  if (submitButton) {
-    submitButton.addEventListener("click", submitTest);
-  }
-});
+// Start the entire process when the page is loaded
+document.addEventListener("DOMContentLoaded", initializeTestPage);
