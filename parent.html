@@ -1,52 +1,52 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Parent Portal - Blooming Kids House</title>
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" />
-  <link rel="icon" href="favicon.ico" />
-  
-  <!-- Firebase App (compat) and Firestore -->
-  <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-firestore-compat.js"></script>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Parent Portal - Blooming Kids House</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" />
+    <link rel="icon" href="favicon.ico" />
 
-  <!-- Chart.js & html2pdf -->
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.9.2/html2pdf.bundle.min.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-firestore-compat.js"></script>
 
-  <style>
-    body {
-      background-color: #f9f9f9;
-      font-family: 'Segoe UI', sans-serif;
-    }
-    .bg-blooming-green { background-color: #4CAF50; }
-    .text-blooming-yellow { color: #FFEB3B; }
-    .btn-yellow { background-color: #FFEB3B; color: #000; }
-  </style>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.9.2/html2pdf.bundle.min.js"></script>
+
+    <style>
+      body {
+        background-color: #f9f9f9;
+        font-family: 'Segoe UI', sans-serif;
+      }
+      .bg-blooming-green { background-color: #4CAF50; }
+      .text-blooming-yellow { color: #FFEB3B; }
+      .btn-yellow { background-color: #FFEB3B; color: #000; }
+      .hidden { display: none; }
+    </style>
 </head>
 <body class="min-h-screen flex flex-col items-center p-4">
-  <header class="w-full text-center py-4 bg-blooming-green text-white text-2xl font-bold">
-    BLOOMING KIDS HOUSE ASSESSMENT REPORT
-  </header>
+    <header class="w-full text-center py-4 bg-blooming-green text-white text-2xl font-bold">
+        BLOOMING KIDS HOUSE ASSESSMENT REPORT
+    </header>
 
-  <main class="w-full max-w-2xl mt-6">
-    <div class="bg-white shadow p-4 rounded mb-4">
-      <h2 class="text-xl font-semibold mb-2">Enter Student Details</h2>
-      <input id="studentName" type="text" placeholder="Student Full Name" class="w-full mb-2 p-2 border rounded" />
-      <input id="parentEmail" type="email" placeholder="Parent Email" class="w-full mb-4 p-2 border rounded" />
-      <button onclick="loadReport()" class="w-full py-2 px-4 btn-yellow font-bold rounded">Generate Report</button>
-    </div>
+    <main class="w-full max-w-2xl mt-6">
+        <div id="inputArea" class="bg-white shadow p-4 rounded mb-4">
+            <h2 class="text-xl font-semibold mb-2">Enter Student Details</h2>
+            <input id="studentName" type="text" placeholder="Student Full Name" class="w-full mb-2 p-2 border rounded" />
+            <input id="parentEmail" type="email" placeholder="Parent Email" class="w-full mb-4 p-2 border rounded" />
+            <button id="generateBtn" onclick="loadReport()" class="w-full py-2 px-4 btn-yellow font-bold rounded">Generate Report</button>
+            <p id="loader" class="text-center mt-4 font-semibold text-gray-600 hidden">Generating... Please wait.</p>
+        </div>
 
-    <div id="reportArea" class="bg-white p-4 shadow rounded hidden">
-      <div id="reportContent"></div>
-    </div>
+        <div id="reportArea" class="bg-white p-4 shadow rounded hidden">
+            <div id="reportContent"></div>
+        </div>
 
-    <div class="flex justify-end mt-4" id="logoutArea" style="display:none">
-      <button onclick="logout()" class="bg-red-500 text-white px-4 py-2 rounded">Logout</button>
-    </div>
-  </main>
+        <div class="flex justify-end mt-4" id="logoutArea" style="display:none;">
+            <button onclick="logout()" class="bg-red-500 text-white px-4 py-2 rounded">Logout</button>
+        </div>
+    </main>
 
-  <script src="parent.js"></script>
+    <script src="parent.js"></script>
 </body>
 </html>
