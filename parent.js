@@ -68,32 +68,47 @@ async function loadReport() {
       const fullName = capitalize(session[0].studentName);
       const formattedDate = new Date(session[0].timestamp * 1000).toLocaleString('en-US', { dateStyle: 'long', timeStyle: 'short' });
       
-      // --- CORRECTED SCORE & TOPIC CALCULATION ---
+      // --- FINAL ROBUST SCORE & TOPIC CALCULATION ---
       const results = session.map(testResult => {
-        let correctCount = 0;
-        // The 'answers' field is an array of objects
-        testResult.answers.forEach(answerObject => {
-          // BUG FIX #1: Compare studentAnswer to correctAnswer
-          if (String(answerObject.studentAnswer).toLowerCase() === String(answerObject.correctAnswer).toLowerCase()) {
-            correctCount++;
-          }
-        });
-        const topics = [...new Set(testResult.answers.map(a => a.topic))];
-        return {
-          subject: testResult.subject,
-          correct: correctCount,
-          total: testResult.answers.length,
-          topics: topics
-        };
+        // Check if the 'answers' field is in the new format (an array of objects)
+        if (typeof testResult.answers[0] === 'object' && testResult.answers[0] !== null) {
+          // --- Logic for NEW data format ---
+          let correctCount = 0;
+          testResult.answers.forEach(answerObject => {
+            if (String(answerObject.studentAnswer).toLowerCase() === String(answerObject.correctAnswer).toLowerCase()) {
+              correctCount++;
+            }
+          });
+          const topics = [...new Set(testResult.answers.map(a => a.topic).filter(t => t))]; // Filter out any undefined topics
+          return {
+            subject: testResult.subject,
+            correct: correctCount,
+            total: testResult.answers.length,
+            topics: topics,
+            isNewFormat: true
+          };
+        } else {
+          // --- Logic for OLD data format ---
+          return {
+            subject: testResult.subject,
+            correct: 0,
+            total: testResult.answers.length,
+            topics: [],
+            isNewFormat: false
+          };
+        }
       });
 
-      const tableRows = results.map(res => `<tr><td class="border px-2 py-1">${res.subject.toUpperCase()}</td><td class="border px-2 py-1 text-center">${res.correct} / ${res.total}</td></tr>`).join("");
+      const tableRows = results.map(res => {
+        const scoreDisplay = res.isNewFormat ? `${res.correct} / ${res.total}` : 'N/A';
+        return `<tr><td class="border px-2 py-1">${res.subject.toUpperCase()}</td><td class="border px-2 py-1 text-center">${scoreDisplay}</td></tr>`;
+      }).join("");
       
-      // BUG FIX #2: Correctly generate table rows for topics
       const topicsTableRows = results.map(res => {
+          const topicsDisplay = res.isNewFormat ? (res.topics.join(', ') || 'Topics not available') : 'Cannot display topics for old test format.';
           return `<tr>
                     <td class="border px-2 py-1 font-semibold">${res.subject.toUpperCase()}</td>
-                    <td class="border px-2 py-1">${res.topics.join(', ') || 'N/A'}</td>
+                    <td class="border px-2 py-1">${topicsDisplay}</td>
                   </tr>`;
       }).join("");
 
@@ -135,7 +150,6 @@ async function loadReport() {
       
       reportContent.innerHTML += fullBlock;
       
-      // BUG FIX #3: Correctly get data for the chart
       const ctx = document.getElementById(`chart-${blockIndex}`).getContext('2d');
       const subjectLabels = results.map(r => r.subject.toUpperCase());
       const correctScores = results.map(s => s.correct);
