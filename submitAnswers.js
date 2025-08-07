@@ -40,12 +40,12 @@ document.getElementById("submitBtn")?.addEventListener("click", async () => {
 
     for (let i = 0; i < questionBlocks.length; i++) {
         const block = questionBlocks[i];
-        const questionText = block.querySelector(".question-text").innerText;
+        const questionText = block.querySelector(".question-text").innerText.trim();
         const selectedOption = block.querySelector("input[type='radio']:checked");
         
         const studentAnswer = selectedOption ? selectedOption.value : "No answer";
 
-        const originalQuestion = loadedQuestions.find(q => q.question === questionText);
+        const originalQuestion = loadedQuestions.find(q => q.question.trim() === questionText);
         
         const correctAnswer = originalQuestion ? originalQuestion.correct_answer : 'N/A';
 
