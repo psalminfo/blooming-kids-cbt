@@ -1,77 +1,49 @@
-import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-app.js";
-import {
-    getFirestore,
-    collection,
-    addDoc,
-    Timestamp
-} from "https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore.js";
-import { getLoadedQuestions } from './autoQuestionGen.js'; 
+let loadedQuestions = [];
 
-const firebaseConfig = {
-    apiKey: "AIzaSyD1lJhsWMMs_qerLBSzk7wKhjLyI_11RJg",
-    authDomain: "bloomingkidsassessment.firebaseapp.com",
-    projectId: "bloomingkidsassessment",
-    storageBucket: "bloomingkidsassessment.firebasestorage.app",
-    messagingSenderId: "238975054977",
-    appId: "1:238975054977:web:87c70b4db044998a204980"
-};
+export async function loadQuestions(subject, grade) {
+    const container = document.getElementById("question-container");
+    const fileName = `${grade}-${subject}`.toLowerCase();
+    const GITHUB_URL = `https://raw.githubusercontent.com/psalminfo/blooming-kids-cbt/main/${fileName}.json`;
 
-const app = initializeApp(firebaseConfig);
-const db = getFirestore(app);
+    container.innerHTML = `<p class="text-gray-500">Please wait, loading questions...</p>`;
 
-document.getElementById("submitBtn")?.addEventListener("click", async () => {
-    const urlParams = new URLSearchParams(window.location.search);
-    const studentName = urlParams.get("studentName");
-    const parentEmail = urlParams.get("parentEmail");
-    const grade = urlParams.get("grade");
-    const tutorName = urlParams.get("tutorName");
-    const location = urlParams.get("location");
-    const subject = urlParams.get("subject");
+    try {
+        const res = await fetch(GITHUB_URL);
+        if (!res.ok) throw new Error("Question file not found");
+        const data = await res.json();
+        
+        // Add a unique ID to each question
+        const questionsWithIds = data.questions.map((q, index) => ({ ...q, id: index }));
+        
+        loadedQuestions = questionsWithIds.sort(() => 0.5 - Math.random()).slice(0, 30);
+        
+        displayQuestions(loadedQuestions);
+    } catch (err) {
+        console.error("GitHub load failed:", err);
+        container.innerHTML = `<p class="text-red-600">❌ No questions found for ${subject.toUpperCase()} Grade ${grade}.</p>`;
+    }
+}
 
-    if (!studentName || !parentEmail || !grade || !tutorName || !location || !subject) {
-        alert("Missing student information from the URL. Please start over.");
-        window.location.href = "index.html";
+export function getLoadedQuestions() {
+    return loadedQuestions;
+}
+
+function displayQuestions(questions) {
+    const container = document.getElementById("question-container");
+
+    if (!questions || questions.length === 0) {
+        container.innerHTML = `<p class="text-red-600">❌ This subject has no questions yet.</p>`;
         return;
     }
 
-    const loadedQuestions = getLoadedQuestions();
-    const answers = [];
-    const questionBlocks = document.querySelectorAll(".question-block");
-
-    for (let i = 0; i < questionBlocks.length; i++) {
-        const block = questionBlocks[i];
-        const questionText = block.querySelector(".question-text").innerText.trim();
-        const selectedOption = block.querySelector("input[type='radio']:checked");
-        
-        const studentAnswer = selectedOption ? selectedOption.value : "No answer";
-
-        const originalQuestion = loadedQuestions.find(q => q.question.trim() === questionText);
-        
-        const correctAnswer = originalQuestion ? originalQuestion.correct_answer : 'N/A';
-
-        answers.push({
-            questionText: questionText,
-            studentAnswer: studentAnswer,
-            correctAnswer: correctAnswer
-        });
-    }
-
-    try {
-        await addDoc(collection(db, "student_results"), {
-            studentName,
-            parentEmail,
-            grade,
-            subject,
-            tutorName,
-            location,
-            answers,
-            submittedAt: Timestamp.now()
-        });
-
-        alert("Test submitted successfully!");
-        window.location.href = "subject-select.html";
-    } catch (err) {
-        console.error("Error submitting test results to Firebase:", err);
-        alert("Failed to submit your test. Please check your connection and try again.");
-    }
-});
+    container.innerHTML = questions.map((q, i) => `
+        <div class="bg-white p-4 border rounded-lg shadow-sm question-block" data-question-id="${q.id}">
+            <p class="font-semibold mb-2 question-text">${i + 1}. ${q.question}</p>
+            ${q.options.map(opt => `
+                <label class="block ml-4">
+                    <input type="radio" name="q${i}" value="${opt}" class="mr-2"> ${opt}
+                </label>
+            `).join('')}
+        </div>
+    `).join('');
+}
