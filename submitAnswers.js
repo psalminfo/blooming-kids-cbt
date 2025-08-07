@@ -5,7 +5,7 @@ import {
   addDoc,
   Timestamp
 } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore.js";
-// Note: Storage and jsPDF imports are no longer needed in this simplified version.
+import { loadedQuestions } from './autoQuestionGen.js'; // This line is new or modified
 
 // UPDATED Firebase config to point to the correct project
 const firebaseConfig = {
@@ -38,22 +38,34 @@ document.getElementById("submitBtn")?.addEventListener("click", async () => {
     return;
   }
 
-  const answers = []; // This will be our simple list of student answers
+  // We are now creating a detailed array of objects
+  const answers = [];
   const questionBlocks = document.querySelectorAll(".question-block");
 
   for (let i = 0; i < questionBlocks.length; i++) {
     const block = questionBlocks[i];
+    const questionText = block.querySelector(".question-text").innerText; // Assuming you have a class for the question text
     const selectedOption = block.querySelector("input[type='radio']:checked");
     
-    // Get the value of the selected option, or use "No answer" if nothing is selected
-    const selected = selectedOption ? selectedOption.value : "No answer";
+    // Get the student's chosen answer
+    const studentAnswer = selectedOption ? selectedOption.value : "No answer";
 
-    // This now saves just the text of the selected answer
-    answers.push(selected);
+    // Find the original question from the loaded JSON data
+    const originalQuestion = loadedQuestions.find(q => q.question === questionText);
+    
+    // Get the correct answer from the original question object
+    const correctAnswer = originalQuestion ? originalQuestion.correct_answer : 'N/A';
+
+    // Push a detailed object into the answers array
+    answers.push({
+      questionText: questionText,
+      studentAnswer: studentAnswer,
+      correctAnswer: correctAnswer
+    });
   }
 
   try {
-    // Save the simplified data to Firestore
+    // Save the detailed data to Firestore
     await addDoc(collection(db, "student_results"), {
       studentName,
       parentEmail,
@@ -61,12 +73,12 @@ document.getElementById("submitBtn")?.addEventListener("click", async () => {
       subject,
       tutorName,
       location,
-      answers, // This is now the simple array of strings the parent portal needs
+      answers, // This is now the detailed array the parent portal needs
       submittedAt: Timestamp.now()
     });
 
     alert("Test submitted successfully!");
-    window.location.href = "subject-select.html"; // Or a 'thank you' page
+    window.location.href = "subject-select.html"; 
 
   } catch (err) {
     console.error("Error submitting test results to Firebase:", err);
