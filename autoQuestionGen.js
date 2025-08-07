@@ -1,4 +1,3 @@
-// Variable to store the fetched and shuffled questions
 let loadedQuestions = [];
 
 export async function loadQuestions(subject, grade) {
@@ -13,7 +12,6 @@ export async function loadQuestions(subject, grade) {
         if (!res.ok) throw new Error("Question file not found");
         const data = await res.json();
         
-        // Store the shuffled questions in the global variable
         loadedQuestions = data.questions.sort(() => 0.5 - Math.random()).slice(0, 30);
         
         displayQuestions(loadedQuestions);
@@ -23,7 +21,6 @@ export async function loadQuestions(subject, grade) {
     }
 }
 
-// New function to export the loaded questions
 export function getLoadedQuestions() {
     return loadedQuestions;
 }
