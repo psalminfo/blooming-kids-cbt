@@ -12,7 +12,9 @@ export async function loadQuestions(subject, grade) {
         if (!res.ok) throw new Error("Question file not found");
         const data = await res.json();
         
-        loadedQuestions = data.questions.sort(() => 0.5 - Math.random()).slice(0, 30);
+        // Add a unique ID to each question and shuffle them
+        const questionsWithIds = data.questions.map((q, index) => ({ ...q, id: index }));
+        loadedQuestions = questionsWithIds.sort(() => 0.5 - Math.random()).slice(0, 30);
         
         displayQuestions(loadedQuestions);
     } catch (err) {
@@ -34,7 +36,7 @@ function displayQuestions(questions) {
     }
 
     container.innerHTML = questions.map((q, i) => `
-        <div class="bg-white p-4 border rounded-lg shadow-sm question-block">
+        <div class="bg-white p-4 border rounded-lg shadow-sm question-block" data-question-id="${q.id}">
             <p class="font-semibold mb-2 question-text">${i + 1}. ${q.question}</p>
             ${q.options.map(opt => `
                 <label class="block ml-4">
