@@ -1,32 +1,53 @@
-import { db } from './firebaseConfig.js';
-import { collection, addDoc, Timestamp } from "https://www.gstatic.com/firebasejs/9.6.10/firebase-firestore.js";
-import { getLoadedQuestions } from './autoQuestionGen.js';
+import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-app.js";
+import {
+    getFirestore,
+    collection,
+    addDoc,
+    Timestamp
+} from "https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore.js";
+import { getLoadedQuestions } from './autoQuestionGen.js'; 
 
+// Your Firebase configuration
+const firebaseConfig = {
+    apiKey: "AIzaSyD1lJhsWMMs_qerLBSzk7wKhjLyI_11RJg",
+    authDomain: "bloomingkidsassessment.firebaseapp.com",
+    projectId: "bloomingkidsassessment",
+    storageBucket: "bloomingkidsassessment.firebasestorage.app",
+    messagingSenderId: "238975054977",
+    appId: "1:238975054977:web:87c70b4db044998a204980"
+};
+
+// Initialize Firebase
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+
+// This function is called from student.html
 export async function submitTestToFirebase(subject, grade, studentName, parentEmail, tutorName, location) {
-    // 1. Get the questions that were loaded and displayed on the page.
+    // Get the questions that were displayed on the page
     const loadedQuestions = getLoadedQuestions();
     const answers = [];
     const questionBlocks = document.querySelectorAll(".question-block");
 
-    // 2. Loop through each question block to get the student's answer and the correct answer.
+    // Loop through each question on the page
     for (let i = 0; i < questionBlocks.length; i++) {
         const block = questionBlocks[i];
-        const questionText = block.querySelector(".question-text").innerText.trim();
-        const selectedOption = block.querySelector("input[type='radio']:checked");
         
-        // Use the unique ID from the HTML to find the correct question.
+        // Get the question's unique ID from the HTML element
         const questionId = block.getAttribute('data-question-id');
 
-        const studentAnswer = selectedOption ? selectedOption.value : "No answer";
-
-        // 3. Find the original question object using the ID. This is the key step.
+        // Find the matching question in the loaded data using the ID
         const originalQuestion = loadedQuestions.find(q => q.id === parseInt(questionId));
         
-        // 4. Extract the correct answer and topic from the found question object.
+        // Get the student's selected answer
+        const selectedOption = block.querySelector("input[type='radio']:checked");
+        const studentAnswer = selectedOption ? selectedOption.value : "No answer";
+
+        // Extract the correct answer and topic from the matching question object
         const correctAnswer = originalQuestion ? originalQuestion.correct_answer : 'N/A';
         const topic = originalQuestion ? originalQuestion.topic : 'N/A';
+        const questionText = originalQuestion ? originalQuestion.question : 'N/A';
 
-        // 5. Create a detailed object for this answer and add it to the array.
+        // Build the detailed object for this answer
         answers.push({
             questionText: questionText,
             studentAnswer: studentAnswer,
@@ -35,6 +56,7 @@ export async function submitTestToFirebase(subject, grade, studentName, parentEm
         });
     }
 
+    // Prepare the full data payload for Firebase
     const resultData = {
         subject,
         grade,
