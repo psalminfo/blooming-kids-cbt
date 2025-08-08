@@ -2,10 +2,6 @@ import { auth, db } from './firebaseConfig.js';
 import { collection, getDocs, doc, updateDoc, getDoc, where, query } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
 import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-auth.js";
 
-const CLOUDINARY_CLOUD_NAME = 'dy2hxcyaf';
-const CLOUDINARY_UPLOAD_PRESET = 'bkh_assessments';
-const CLOUDINARY_UPLOAD_URL = `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`;
-
 function renderTutorPanel(tutor) {
     const tutorContent = document.getElementById('tutorContent');
     tutorContent.innerHTML = `
@@ -15,6 +11,7 @@ function renderTutorPanel(tutor) {
                 <input type="email" id="searchEmail" class="w-full mt-1 p-2 border rounded" placeholder="Search by parent email...">
                 <button id="searchBtn" class="bg-blue-600 text-white px-4 py-2 rounded mt-2 hover:bg-blue-700">Search</button>
             </div>
+            <div id="studentCount" class="text-center font-bold text-lg"></div>
         </div>
 
         <div id="reportsContainer" class="space-y-4">
@@ -23,11 +20,18 @@ function renderTutorPanel(tutor) {
     `;
 
     document.getElementById('searchBtn').addEventListener('click', async () => {
-        const email = document.getElementById('searchEmail').value;
-        await loadTutorReports(tutor.email, email);
+        const email = document.getElementById('searchEmail').value.trim();
+        await loadTutorReports(tutor.email, email || null);
     });
 
     loadTutorReports(tutor.email);
+    loadStudentCount(tutor.email);
+}
+
+async function loadStudentCount(tutorEmail) {
+    const studentCount = document.getElementById('studentCount');
+    const querySnapshot = await getDocs(query(collection(db, "student_results"), where("tutorEmail", "==", tutorEmail)));
+    studentCount.textContent = `Total Student Reports: ${querySnapshot.docs.length}`;
 }
 
 async function loadTutorReports(tutorEmail, parentEmail = null) {
@@ -46,27 +50,13 @@ async function loadTutorReports(tutorEmail, parentEmail = null) {
         querySnapshot.forEach(doc => {
             const data = doc.data();
             const creativeWritingAnswer = data.answers.find(a => a.type === 'creative-writing');
-            
-            let correctCount = 0;
-            data.answers.forEach(answerObject => {
-                if (answerObject.type !== 'creative-writing' && String(answerObject.studentAnswer).toLowerCase() === String(answerObject.correctAnswer).toLowerCase()) {
-                    correctCount++;
-                }
-            });
-            const totalScoreable = data.totalScoreableQuestions;
-            const topics = [...new Set(data.answers.map(a => a.topic).filter(t => t))];
 
-            reportHTML += `
-                <div class="border rounded-lg p-4 shadow-sm bg-white mb-6">
-                    <h4 class="text-xl font-semibold">Student: ${data.studentName} (${data.subject.toUpperCase()})</h4>
-                    <p><strong>Grade:</strong> ${data.grade}</p>
-                    <p><strong>Submitted At:</strong> ${new Date(data.submittedAt.seconds * 1000).toLocaleString()}</p>
-                    <h5 class="font-semibold mt-4">Performance: <span class="text-green-600">${correctCount} / ${totalScoreable}</span></h5>
-                    
-                    <h5 class="font-semibold mt-4">Topics:</h5>
-                    <p>${topics.join(', ') || 'N/A'}</p>
-
-                    ${creativeWritingAnswer ? `
+            if (creativeWritingAnswer) {
+                reportHTML += `
+                    <div class="border rounded-lg p-4 shadow-sm bg-white mb-6">
+                        <h4 class="text-xl font-semibold">Student: ${data.studentName} (${data.subject.toUpperCase()})</h4>
+                        <p><strong>Grade:</strong> ${data.grade}</p>
+                        <p><strong>Submitted At:</strong> ${new Date(data.submittedAt.seconds * 1000).toLocaleString()}</p>
                         <div class="mt-4 border-t pt-4">
                             <h4 class="font-semibold">Creative Writing Submission:</h4>
                             <p class="italic">${creativeWritingAnswer.studentResponse || "No response"}</p>
@@ -79,12 +69,12 @@ async function loadTutorReports(tutorEmail, parentEmail = null) {
                                 <p class="mt-2"><strong>Tutor's Report:</strong> ${creativeWritingAnswer.tutorReport || 'N/A'}</p>
                             `}
                         </div>
-                    ` : ''}
-                </div>
-            `;
+                    </div>
+                `;
+            }
         });
 
-        reportsContainer.innerHTML = reportHTML || `<p class="text-gray-500">No reports found.</p>`;
+        reportsContainer.innerHTML = reportHTML || `<p class="text-gray-500">No creative writing submissions found.</p>`;
 
         document.querySelectorAll('.submit-report-btn').forEach(button => {
             button.addEventListener('click', async (e) => {
@@ -102,7 +92,7 @@ async function loadTutorReports(tutorEmail, parentEmail = null) {
                     );
 
                     await updateDoc(docRef, { answers: updatedAnswers });
-                    loadTutorReports(tutorEmail); // Refresh the list
+                    loadTutorReports(tutorEmail, parentEmail); // Refresh the list
                 }
             });
         });
