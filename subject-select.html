@@ -1,68 +1,71 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Select Subject - Blooming Kids House</title>
-  <link rel="icon" href="favicon.ico" />
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" />
-  <link rel="stylesheet" href="style.css" />
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Select Subject - Blooming Kids House</title>
+  <link rel="icon" href="favicon.ico" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" />
+  <link rel="stylesheet" href="style.css" />
 </head>
 <body class="bg-green-50 min-h-screen flex items-center justify-center">
-  <div class="bg-white p-8 rounded-xl shadow-xl w-full max-w-md">
-    <div class="flex justify-between items-center mb-4">
-      <h2 class="text-2xl font-bold text-green-800">Select a Subject</h2>
-      <button onclick="logout()" class="bg-yellow-400 text-white px-4 py-2 rounded hover:bg-yellow-500 text-sm">Logout</button>
-    </div>
+  <div class="bg-white p-8 rounded-xl shadow-xl w-full max-w-md">
+    <div class="flex justify-between items-center mb-4">
+      <h2 class="text-2xl font-bold text-green-800">Select a Subject</h2>
+      <button onclick="logout()" class="bg-yellow-400 text-white px-4 py-2 rounded hover:bg-yellow-500 text-sm">Logout</button>
+    </div>
 
-    <div id="subjectButtons" class="space-y-4 mt-4"></div>
+    <div id="subjectButtons" class="space-y-4 mt-4"></div>
 
-    <p class="text-xs text-center mt-6 text-gray-600">
-      POWERED BY <span style="color:#FFEB3B">POG</span>
-    </p>
-  </div>
+    <p class="text-xs text-center mt-6 text-gray-600">
+      POWERED BY <span style="color:#FFEB3B">POG</span>
+    </p>
+  </div>
 
-  <script type="module">
-    import { getStudentData, logout } from './utils.js';
+  <script type="module">
+    const urlParams = new URLSearchParams(window.location.search);
+    const studentName = urlParams.get('studentName');
+    const parentEmail = urlParams.get('parentEmail');
+    const grade = urlParams.get('grade');
+    const tutorEmail = urlParams.get('tutorEmail');
+    const studentCountry = urlParams.get('country');
 
-    const studentData = getStudentData();
-    const subjectButtons = document.getElementById("subjectButtons");
+    if (!studentName || !parentEmail || !grade || !tutorEmail || !studentCountry) {
+      alert("Missing student info. Redirecting...");
+      window.location.href = "index.html";
+    }
 
-    if (!studentData || !studentData.grade) {
-      alert("Missing student info. Redirecting...");
-      window.location.href = "index.html";
-    }
-
-    const grade = parseInt(studentData.grade);
-
-    const coreSubjects = ["math", "ela"];
-    const scienceSubjects = ["chemistry", "biology", "physics"];
-
-    let subjectsToShow = coreSubjects;
-    if (grade >= 7) {
-      subjectsToShow = [...coreSubjects, ...scienceSubjects];
-    }
-
-    subjectsToShow.forEach(subject => {
-      const label = subject === "ela" ? "English Language Arts" : subject.charAt(0).toUpperCase() + subject.slice(1);
-      const btn = document.createElement("button");
-      btn.textContent = label;
-      btn.className = "bg-green-600 text-white w-full py-2 rounded hover:bg-green-700";
-      btn.onclick = () => {
-        const query = new URLSearchParams({
-          subject,
-          grade: studentData.grade,
-          studentName: studentData.studentName,
-          parentEmail: studentData.parentEmail,
-          tutorName: studentData.tutorName,
-          location: studentData.location
-        }).toString();
-        window.location.href = `student.html?${query}`;
-      };
-      subjectButtons.appendChild(btn);
-    });
-
-    window.logout = logout;
-  </script>
+    const gradeInt = parseInt(grade);
+    const subjectButtons = document.getElementById("subjectButtons");
+    const coreSubjects = ["math", "ela"];
+    const scienceSubjects = ["science", "chemistry", "biology", "physics"];
+    
+    let subjectsToShow = coreSubjects;
+    if (gradeInt >= 7) {
+      subjectsToShow = [...coreSubjects, ...scienceSubjects];
+    }
+    
+    subjectsToShow.forEach(subject => {
+      const label = subject === "ela" ? "English Language Arts" : subject.charAt(0).toUpperCase() + subject.slice(1);
+      const btn = document.createElement("button");
+      btn.textContent = label;
+      btn.className = "bg-green-600 text-white w-full py-2 rounded hover:bg-green-700";
+      btn.onclick = () => {
+        const params = new URLSearchParams();
+        params.append('studentName', studentName);
+        params.append('parentEmail', parentEmail);
+        params.append('grade', grade);
+        params.append('tutorEmail', tutorEmail);
+        params.append('country', studentCountry);
+        params.append('subject', subject);
+        window.location.href = `student.html?${params.toString()}`;
+      };
+      subjectButtons.appendChild(btn);
+    });
+    
+    window.logout = () => {
+      window.location.href = 'index.html';
+    };
+  </script>
 </body>
 </html>
