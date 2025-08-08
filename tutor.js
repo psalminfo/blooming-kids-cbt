@@ -13,11 +13,8 @@ function renderTutorPanel(tutor) {
             </div>
         </div>
 
-        <div class="bg-white p-6 rounded-lg shadow-md mb-6">
-            <h2 class="text-2xl font-bold text-green-700 mb-4">Pending Creative Writing Submissions</h2>
-            <div id="pendingReportsContainer" class="space-y-4">
-                <p class="text-gray-500">Loading pending submissions...</p>
-            </div>
+        <div id="reportsContainer" class="space-y-4">
+            <p class="text-gray-500">Loading reports...</p>
         </div>
     `;
 
@@ -30,10 +27,9 @@ function renderTutorPanel(tutor) {
 }
 
 async function loadTutorReports(tutorEmail, parentEmail = null) {
-    const pendingReportsContainer = document.getElementById('pendingReportsContainer');
+    const reportsContainer = document.getElementById('reportsContainer');
+    reportsContainer.innerHTML = `<p class="text-gray-500">Loading reports...</p>`;
     
-    pendingReportsContainer.innerHTML = `<p class="text-gray-500">Loading pending submissions...</p>`;
-
     let resultsQuery = query(collection(db, "student_results"), where("tutorEmail", "==", tutorEmail));
     if (parentEmail) {
         resultsQuery = query(resultsQuery, where("parentEmail", "==", parentEmail));
@@ -41,33 +37,46 @@ async function loadTutorReports(tutorEmail, parentEmail = null) {
     
     try {
         const querySnapshot = await getDocs(resultsQuery);
-        let pendingHTML = '';
+        let reportHTML = '';
 
         querySnapshot.forEach(doc => {
             const data = doc.data();
             const creativeWritingAnswer = data.answers.find(a => a.type === 'creative-writing');
-            if (creativeWritingAnswer && creativeWritingAnswer.tutorGrade === 'Pending') {
-                const reportCardHTML = `
-                    <div class="border rounded-lg p-4 shadow-sm bg-white">
-                        <p><strong>Student:</strong> ${data.studentName}</p>
-                        <p><strong>Email:</strong> ${data.parentEmail}</p>
-                        <p><strong>Subject:</strong> ${data.subject}</p>
-                        <p><strong>Submitted At:</strong> ${new Date(data.submittedAt.seconds * 1000).toLocaleString()}</p>
+            
+            let correctCount = 0;
+            data.answers.forEach(answerObject => {
+                if (answerObject.type !== 'creative-writing' && String(answerObject.studentAnswer).toLowerCase() === String(answerObject.correctAnswer).toLowerCase()) {
+                    correctCount++;
+                }
+            });
+            const totalScoreable = data.totalScoreableQuestions;
+
+            reportHTML += `
+                <div class="border rounded-lg p-4 shadow-sm bg-white mb-6">
+                    <h4 class="text-xl font-semibold">Student: ${data.studentName} (${data.subject.toUpperCase()})</h4>
+                    <p><strong>Grade:</strong> ${data.grade}</p>
+                    <p><strong>Submitted At:</strong> ${new Date(data.submittedAt.seconds * 1000).toLocaleString()}</p>
+                    <h5 class="font-semibold mt-4">Performance: <span class="text-green-600">${correctCount} / ${totalScoreable}</span></h5>
+
+                    ${creativeWritingAnswer ? `
                         <div class="mt-4 border-t pt-4">
                             <h4 class="font-semibold">Creative Writing Submission:</h4>
                             <p class="italic">${creativeWritingAnswer.studentResponse || "No response"}</p>
                             ${creativeWritingAnswer.fileUrl ? `<a href="${creativeWritingAnswer.fileUrl}" target="_blank" class="text-blue-500 hover:underline">Download File</a>` : ''}
                             <p class="mt-2"><strong>Status:</strong> ${creativeWritingAnswer.tutorGrade || 'Pending'}</p>
-                            <textarea class="tutor-report w-full mt-2 p-2 border rounded" rows="3" placeholder="Write your report here..."></textarea>
-                            <button class="submit-report-btn bg-green-600 text-white px-4 py-2 rounded mt-2" data-doc-id="${doc.id}">Submit Report</button>
+                            ${creativeWritingAnswer.tutorGrade === 'Pending' ? `
+                                <textarea class="tutor-report w-full mt-2 p-2 border rounded" rows="3" placeholder="Write your report here..."></textarea>
+                                <button class="submit-report-btn bg-green-600 text-white px-4 py-2 rounded mt-2" data-doc-id="${doc.id}">Submit Report</button>
+                            ` : `
+                                <p class="mt-2"><strong>Tutor's Report:</strong> ${creativeWritingAnswer.tutorReport || 'N/A'}</p>
+                            `}
                         </div>
-                    </div>
-                `;
-                pendingHTML += reportCardHTML;
-            }
+                    ` : ''}
+                </div>
+            `;
         });
 
-        pendingReportsContainer.innerHTML = pendingHTML || `<p class="text-gray-500">No pending submissions found.</p>`;
+        reportsContainer.innerHTML = reportHTML || `<p class="text-gray-500">No reports found.</p>`;
 
         document.querySelectorAll('.submit-report-btn').forEach(button => {
             button.addEventListener('click', async (e) => {
@@ -92,7 +101,7 @@ async function loadTutorReports(tutorEmail, parentEmail = null) {
 
     } catch (error) {
         console.error("Error loading tutor reports:", error);
-        pendingReportsContainer.innerHTML = `<p class="text-red-500">Failed to load reports.</p>`;
+        reportsContainer.innerHTML = `<p class="text-red-500">Failed to load reports.</p>`;
     }
 }
 
