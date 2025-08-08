@@ -19,13 +19,6 @@ function renderTutorPanel(tutor) {
                 <p class="text-gray-500">Loading pending submissions...</p>
             </div>
         </div>
-        
-        <div class="bg-white p-6 rounded-lg shadow-md">
-            <h2 class="text-2xl font-bold text-green-700 mb-4">Already Graded Submissions</h2>
-            <div id="gradedReportsContainer" class="space-y-4">
-                <p class="text-gray-500">Loading graded submissions...</p>
-            </div>
-        </div>
     `;
 
     document.getElementById('searchBtn').addEventListener('click', async () => {
@@ -38,10 +31,8 @@ function renderTutorPanel(tutor) {
 
 async function loadTutorReports(tutorEmail, parentEmail = null) {
     const pendingReportsContainer = document.getElementById('pendingReportsContainer');
-    const gradedReportsContainer = document.getElementById('gradedReportsContainer');
     
     pendingReportsContainer.innerHTML = `<p class="text-gray-500">Loading pending submissions...</p>`;
-    gradedReportsContainer.innerHTML = `<p class="text-gray-500">Loading graded submissions...</p>`;
 
     let resultsQuery = query(collection(db, "student_results"), where("tutorEmail", "==", tutorEmail));
     if (parentEmail) {
@@ -51,12 +42,11 @@ async function loadTutorReports(tutorEmail, parentEmail = null) {
     try {
         const querySnapshot = await getDocs(resultsQuery);
         let pendingHTML = '';
-        let gradedHTML = '';
 
         querySnapshot.forEach(doc => {
             const data = doc.data();
             const creativeWritingAnswer = data.answers.find(a => a.type === 'creative-writing');
-            if (creativeWritingAnswer) {
+            if (creativeWritingAnswer && creativeWritingAnswer.tutorGrade === 'Pending') {
                 const reportCardHTML = `
                     <div class="border rounded-lg p-4 shadow-sm bg-white">
                         <p><strong>Student:</strong> ${data.studentName}</p>
@@ -68,25 +58,16 @@ async function loadTutorReports(tutorEmail, parentEmail = null) {
                             <p class="italic">${creativeWritingAnswer.studentResponse || "No response"}</p>
                             ${creativeWritingAnswer.fileUrl ? `<a href="${creativeWritingAnswer.fileUrl}" target="_blank" class="text-blue-500 hover:underline">Download File</a>` : ''}
                             <p class="mt-2"><strong>Status:</strong> ${creativeWritingAnswer.tutorGrade || 'Pending'}</p>
-                            ${creativeWritingAnswer.tutorGrade === 'Graded' ? `
-                                <p class="mt-2"><strong>Tutor's Report:</strong> ${creativeWritingAnswer.tutorReport || 'N/A'}</p>
-                            ` : `
-                                <textarea class="tutor-report w-full mt-2 p-2 border rounded" rows="3" placeholder="Write your report here..."></textarea>
-                                <button class="submit-report-btn bg-green-600 text-white px-4 py-2 rounded mt-2" data-doc-id="${doc.id}">Submit Report</button>
-                            `}
+                            <textarea class="tutor-report w-full mt-2 p-2 border rounded" rows="3" placeholder="Write your report here..."></textarea>
+                            <button class="submit-report-btn bg-green-600 text-white px-4 py-2 rounded mt-2" data-doc-id="${doc.id}">Submit Report</button>
                         </div>
                     </div>
                 `;
-                if (creativeWritingAnswer.tutorGrade === 'Pending') {
-                    pendingHTML += reportCardHTML;
-                } else {
-                    gradedHTML += reportCardHTML;
-                }
+                pendingHTML += reportCardHTML;
             }
         });
 
         pendingReportsContainer.innerHTML = pendingHTML || `<p class="text-gray-500">No pending submissions found.</p>`;
-        gradedReportsContainer.innerHTML = gradedHTML || `<p class="text-gray-500">No graded submissions found.</p>`;
 
         document.querySelectorAll('.submit-report-btn').forEach(button => {
             button.addEventListener('click', async (e) => {
@@ -112,7 +93,6 @@ async function loadTutorReports(tutorEmail, parentEmail = null) {
     } catch (error) {
         console.error("Error loading tutor reports:", error);
         pendingReportsContainer.innerHTML = `<p class="text-red-500">Failed to load reports.</p>`;
-        gradedReportsContainer.innerHTML = `<p class="text-red-500">Failed to load reports.</p>`;
     }
 }
 
