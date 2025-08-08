@@ -1,5 +1,5 @@
 import { auth, db } from './firebaseConfig.js';
-import { createUserWithEmailAndPassword, signInWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-auth.js";
+import { createUserWithEmailAndPassword, signInWithEmailAndPassword, setPersistence, browserSessionPersistence, browserLocalPersistence } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-auth.js";
 import { doc, setDoc } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
 
 const signupForm = document.getElementById('tutorSignupForm');
@@ -25,13 +25,33 @@ if (showSignupLink) {
     });
 }
 
+function validatePassword(name, password) {
+    if (password.length < 6) {
+        alert('Password must be at least 6 characters long.');
+        return false;
+    }
+    if (!/\d/.test(password)) {
+        alert('Password must contain at least one number.');
+        return false;
+    }
+    if (password.toLowerCase().includes(name.toLowerCase())) {
+        alert('Password cannot contain your name.');
+        return false;
+    }
+    return true;
+}
+
 if (signupForm) {
     signupForm.addEventListener('submit', async (e) => {
         e.preventDefault();
-        const name = signupForm.signupName.value;
-        const email = signupForm.signupEmail.value;
-        const password = signupForm.signupPassword.value;
+        const name = signupForm.querySelector('#signupName').value;
+        const email = signupForm.querySelector('#signupEmail').value;
+        const password = signupForm.querySelector('#signupPassword').value;
         
+        if (!validatePassword(name, password)) {
+            return;
+        }
+
         try {
             const userCredential = await createUserWithEmailAndPassword(auth, email, password);
             const user = userCredential.user;
@@ -53,10 +73,14 @@ if (signupForm) {
 if (loginForm) {
     loginForm.addEventListener('submit', async (e) => {
         e.preventDefault();
-        const email = loginForm.loginEmail.value;
-        const password = loginForm.loginPassword.value;
+        const email = loginForm.querySelector('#loginEmail').value;
+        const password = loginForm.querySelector('#loginPassword').value;
+        const rememberMe = loginForm.querySelector('#rememberMe').checked;
 
+        const persistence = rememberMe ? browserLocalPersistence : browserSessionPersistence;
+        
         try {
+            await setPersistence(auth, persistence);
             await signInWithEmailAndPassword(auth, email, password);
             window.location.href = 'tutor.html';
         } catch (error) {
