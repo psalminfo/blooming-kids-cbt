@@ -1,4 +1,4 @@
-import { firebaseConfig } from './firebaseConfig.js';
+import { firebaseConfig, auth } from './firebaseConfig.js';
 
 document.getElementById('studentLoginForm').addEventListener('submit', function(e) {
     e.preventDefault();
