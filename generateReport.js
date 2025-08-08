@@ -36,8 +36,8 @@ export async function submitTestToFirebase(subject, grade, studentName, parentEm
             answers.push({
                 questionText: originalQuestion.question,
                 type: 'creative-writing',
-                studentResponse: creativeWritingContent,
-                fileUrl: creativeWritingFileUrl,
+                studentResponse: creativeWritingContent || null,
+                fileUrl: creativeWritingFileUrl || null,
                 tutorGrade: 'Pending'
             });
             continue;
@@ -51,13 +51,13 @@ export async function submitTestToFirebase(subject, grade, studentName, parentEm
         }
         
         const studentAnswer = selectedOption.value;
-        const correctAnswer = originalQuestion.correct_answer;
-        const topic = originalQuestion.topic;
-        const imageUrl = originalQuestion.image_url;
-        const imagePosition = originalQuestion.image_position;
+        const correctAnswer = originalQuestion.correct_answer || null;
+        const topic = originalQuestion.topic || null;
+        const imageUrl = originalQuestion.image_url || null;
+        const imagePosition = originalQuestion.image_position || null;
         
         answers.push({
-            questionText: originalQuestion.question,
+            questionText: originalQuestion.question || null,
             studentAnswer: studentAnswer,
             correctAnswer: correctAnswer,
             topic: topic,
