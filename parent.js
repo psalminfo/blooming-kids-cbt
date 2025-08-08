@@ -14,7 +14,6 @@ function capitalize(str) {
   return str.replace(/\b\w/g, l => l.toUpperCase());
 }
 
-// Main function to load the report
 async function loadReport() {
   const studentName = document.getElementById("studentName").value.trim().toLowerCase();
   const parentEmail = document.getElementById("parentEmail").value.trim();
@@ -69,11 +68,9 @@ async function loadReport() {
       const fullName = capitalize(session[0].studentName);
       const formattedDate = new Date(session[0].timestamp * 1000).toLocaleString('en-US', { dateStyle: 'long', timeStyle: 'short' });
       
-      // Fetch tutor's name using tutorEmail
       const tutorDoc = await db.collection("tutors").doc(tutorEmail).get();
       const tutorName = tutorDoc.exists ? tutorDoc.data().name : 'N/A';
 
-      // --- SIMPLIFIED SCORE & TOPIC CALCULATION ---
       const results = session.map(testResult => {
         if (!Array.isArray(testResult.answers) || testResult.answers.length === 0 || typeof testResult.answers[0] !== 'object' || testResult.answers[0] === null) {
             console.error("Invalid or old data format for subject:", testResult.subject);
@@ -108,9 +105,9 @@ async function loadReport() {
                   </tr>`;
       }).join("");
 
-      const creativeWritingReport = session[0].answers.find(a => a.type === 'creative-writing');
-      const tutorReport = creativeWritingReport?.tutorReport || 'N/A';
-      const creativeWritingContent = creativeWritingReport?.studentResponse || 'N/A';
+      const creativeWritingAnswer = session[0].answers.find(a => a.type === 'creative-writing');
+      const tutorReport = creativeWritingAnswer?.tutorReport || 'N/A';
+      const creativeWritingContent = creativeWritingAnswer?.studentResponse || 'N/A';
 
       const fullBlock = `
         <div class="border rounded-lg shadow mb-8 p-4 bg-white" id="report-block-${blockIndex}">
