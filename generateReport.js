@@ -1,48 +1,68 @@
-import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-app.js";
-import {
-    getFirestore,
-    collection,
-    addDoc,
-    Timestamp
-} from "https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore.js";
+import { db } from './firebaseConfig.js';
+import { collection, addDoc, Timestamp } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
 import { getLoadedQuestions } from './autoQuestionGen.js'; 
 
-const firebaseConfig = {
-    apiKey: "AIzaSyD1lJhsWMMs_qerLBSzk7wKhjLyI_11RJg",
-    authDomain: "bloomingkidsassessment.firebaseapp.com",
-    projectId: "bloomingkidsassessment",
-    storageBucket: "bloomingkidsassessment.firebasestorage.app",
-    messagingSenderId: "238975054977",
-    appId: "1:238975054977:web:87c70b4db044998a204980"
-};
-
-const app = initializeApp(firebaseConfig);
-const db = getFirestore(app);
-
-export async function submitTestToFirebase(subject, grade, studentName, parentEmail, tutorName, location) {
+export async function submitTestToFirebase(subject, grade, studentName, parentEmail, tutorEmail, studentCountry) {
     const loadedQuestions = getLoadedQuestions();
     const answers = [];
+    let creativeWritingContent = null;
+    let creativeWritingFileUrl = null;
+    let totalScoreableQuestions = 0;
+
+    const creativeWritingQuestion = loadedQuestions.find(q => q.type === 'creative-writing');
+    const creativeWritingBlock = creativeWritingQuestion ? document.querySelector(`.question-block[data-question-id="${creativeWritingQuestion.id}"]`) : null;
+    
+    if (creativeWritingBlock) {
+        creativeWritingContent = creativeWritingBlock.querySelector('textarea').value.trim();
+        const creativeWritingFile = creativeWritingBlock.querySelector('input[type="file"]').files[0];
+        
+        if (!creativeWritingContent && !creativeWritingFile) {
+            alert("Please provide a response or upload a file for the creative writing question.");
+            throw new Error("Creative writing submission required.");
+        }
+        if (creativeWritingFile) {
+            // Placeholder for Cloudinary upload logic for creative writing files
+            // You must implement this with your Cloudinary credentials
+            // creativeWritingFileUrl = await uploadCreativeWritingFile(creativeWritingFile);
+        }
+    }
+
     const questionBlocks = document.querySelectorAll(".question-block");
-
-    for (let i = 0; i < questionBlocks.length; i++) {
-        const block = questionBlocks[i];
-        
+    for (const block of questionBlocks) {
         const questionId = block.getAttribute('data-question-id');
-
         const originalQuestion = loadedQuestions.find(q => q.id === parseInt(questionId));
-        
+
+        if (originalQuestion.type === 'creative-writing') {
+            answers.push({
+                questionText: originalQuestion.question,
+                type: 'creative-writing',
+                studentResponse: creativeWritingContent,
+                fileUrl: creativeWritingFileUrl,
+                tutorGrade: 'Pending'
+            });
+            continue;
+        }
+
+        totalScoreableQuestions++;
         const selectedOption = block.querySelector("input[type='radio']:checked");
-        const studentAnswer = selectedOption ? selectedOption.value : "No answer";
-
-        const correctAnswer = originalQuestion ? originalQuestion.correct_answer : 'N/A';
-        const topic = originalQuestion ? originalQuestion.topic : 'N/A';
-        const questionText = originalQuestion ? originalQuestion.question : 'N/A';
-
+        if (!selectedOption) {
+            alert("Please answer all multiple-choice questions before submitting.");
+            throw new Error("All multiple-choice questions must be answered.");
+        }
+        
+        const studentAnswer = selectedOption.value;
+        const correctAnswer = originalQuestion.correct_answer;
+        const topic = originalQuestion.topic;
+        const imageUrl = originalQuestion.image_url;
+        const imagePosition = originalQuestion.image_position;
+        
         answers.push({
-            questionText: questionText,
+            questionText: originalQuestion.question,
             studentAnswer: studentAnswer,
             correctAnswer: correctAnswer,
-            topic: topic
+            topic: topic,
+            imageUrl: imageUrl,
+            imagePosition: imagePosition
         });
     }
 
@@ -51,9 +71,10 @@ export async function submitTestToFirebase(subject, grade, studentName, parentEm
         grade,
         studentName,
         parentEmail,
-        tutorName,
-        location,
+        tutorEmail,
+        studentCountry,
         answers,
+        totalScoreableQuestions,
         submittedAt: Timestamp.now()
     };
 

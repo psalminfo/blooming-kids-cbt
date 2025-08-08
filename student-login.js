@@ -1,27 +1,25 @@
-document.getElementById("studentLoginForm").addEventListener("submit", function (e) {
-  e.preventDefault();
+import { firebaseConfig } from './firebaseConfig.js';
 
-  const studentName = document.getElementById("studentName").value;
-  const parentEmail = document.getElementById("parentEmail").value;
-  const grade = document.getElementById("grade").value;
-  const tutorName = document.getElementById("tutorName").value;
-  const location = document.getElementById("location").value;
-  const accessCode = document.getElementById("accessCode").value;
+document.getElementById('studentLoginForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    const studentName = document.getElementById('studentName').value;
+    const parentEmail = document.getElementById('parentEmail').value;
+    const grade = document.getElementById('grade').value;
+    const tutorEmail = document.getElementById('tutorEmail').value;
+    const studentCountry = document.getElementById('country').value;
+    const accessCode = document.getElementById('accessCode').value;
 
-  if (accessCode !== "bkh2025") {
-    alert("Invalid access code");
-    return;
-  }
+    if (accessCode !== 'bkh2025') {
+        alert('Invalid access code.');
+        return;
+    }
 
-  const studentData = {
-    studentName,
-    parentEmail,
-    grade,
-    tutorName,
-    location
-  };
+    const params = new URLSearchParams();
+    params.append('studentName', studentName);
+    params.append('parentEmail', parentEmail);
+    params.append('grade', grade);
+    params.append('tutorEmail', tutorEmail);
+    params.append('country', studentCountry);
 
-  localStorage.setItem("studentData", JSON.stringify(studentData));
-
-  window.location.href = "subject-select.html";
+    window.location.href = `subject-select.html?${params.toString()}`;
 });

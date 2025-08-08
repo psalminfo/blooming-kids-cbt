@@ -1,14 +1,10 @@
 import { auth, db } from './firebaseConfig.js';
-import { collection, getDocs, addDoc } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
+import { collection, getDocs, doc, updateDoc, addDoc, getDoc } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
 import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-auth.js";
 
-const ADMIN_EMAIL = 'psalm4all@gmail.com';
-
-// Your Cloudinary details
 const CLOUDINARY_CLOUD_NAME = 'dy2hxcyaf';
 const CLOUDINARY_UPLOAD_PRESET = 'bkh_assessments';
 const CLOUDINARY_UPLOAD_URL = `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`;
-
 
 async function uploadImageToCloudinary(file) {
     const formData = new FormData();
@@ -26,9 +22,9 @@ async function uploadImageToCloudinary(file) {
     return data.secure_url;
 }
 
-function renderAdminPanel() {
-    const adminContent = document.getElementById('adminContent');
-    adminContent.innerHTML = `
+function renderTutorPanel(tutor) {
+    const tutorContent = document.getElementById('tutorContent');
+    tutorContent.innerHTML = `
         <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div class="bg-white p-6 rounded-lg shadow-md">
                 <h2 class="text-2xl font-bold text-green-700 mb-4">Add New Question</h2>
@@ -86,12 +82,12 @@ function renderAdminPanel() {
             </div>
 
             <div class="bg-white p-6 rounded-lg shadow-md">
-                <h2 class="text-2xl font-bold text-green-700 mb-4">All Student Reports</h2>
+                <h2 class="text-2xl font-bold text-green-700 mb-4">Your Students' Reports</h2>
                 <div class="mb-4">
                     <input type="email" id="searchEmail" class="w-full mt-1 p-2 border rounded" placeholder="Search by parent email...">
                     <button id="searchBtn" class="bg-blue-600 text-white px-4 py-2 rounded mt-2 hover:bg-blue-700">Search</button>
                 </div>
-                <div id="allReportsContainer" class="space-y-4">
+                <div id="reportsContainer" class="space-y-4">
                     <p class="text-gray-500">Loading reports...</p>
                 </div>
             </div>
@@ -132,7 +128,8 @@ function renderAdminPanel() {
                 options: options,
                 correct_answer: correctAnswer,
                 image_url: imageUrl,
-                image_position: form.imagePosition.value
+                image_position: form.imagePosition.value,
+                uploadedBy: tutor.email
             };
 
             await addDoc(collection(db, "admin_questions"), newQuestion);
@@ -149,19 +146,21 @@ function renderAdminPanel() {
 
     document.getElementById('searchBtn').addEventListener('click', async () => {
         const email = document.getElementById('searchEmail').value;
-        await loadAllReports(email);
+        await loadTutorReports(tutor.email, email);
     });
 
-    loadAllReports();
+    loadTutorReports(tutor.email);
 }
 
-async function loadAllReports(email = null) {
-    const reportsContainer = document.getElementById('allReportsContainer');
+async function loadTutorReports(tutorEmail, parentEmail = null) {
+    const reportsContainer = document.getElementById('reportsContainer');
     reportsContainer.innerHTML = `<p class="text-gray-500">Loading reports...</p>`;
     
     let query = collection(db, "student_results");
-    if (email) {
-        query = query.where("parentEmail", "==", email);
+    query = query.where("tutorEmail", "==", tutorEmail);
+
+    if (parentEmail) {
+        query = query.where("parentEmail", "==", parentEmail);
     }
     
     try {
@@ -169,6 +168,7 @@ async function loadAllReports(email = null) {
         let reportHTML = '';
         querySnapshot.forEach(doc => {
             const data = doc.data();
+            const creativeWritingAnswer = data.answers.find(a => a.type === 'creative-writing');
             reportHTML += `
                 <div class="border rounded-lg p-4 shadow-sm bg-white">
                     <p><strong>Student:</strong> ${data.studentName}</p>
@@ -176,32 +176,67 @@ async function loadAllReports(email = null) {
                     <p><strong>Subject:</strong> ${data.subject}</p>
                     <p><strong>Grade:</strong> ${data.grade}</p>
                     <p><strong>Submitted At:</strong> ${new Date(data.submittedAt.seconds * 1000).toLocaleString()}</p>
+                    ${creativeWritingAnswer ? `
+                        <div class="mt-4 border-t pt-4">
+                            <h4 class="font-semibold">Creative Writing Submission:</h4>
+                            <p class="italic">${creativeWritingAnswer.studentResponse || "No response"}</p>
+                            ${creativeWritingAnswer.fileUrl ? `<a href="${creativeWritingAnswer.fileUrl}" target="_blank" class="text-blue-500 hover:underline">Download File</a>` : ''}
+                            <p class="mt-2"><strong>Grade:</strong> ${creativeWritingAnswer.tutorGrade || 'Pending'}</p>
+                            <textarea class="tutor-report w-full mt-2 p-2 border rounded" rows="3" placeholder="Write your report here..."></textarea>
+                            <button class="submit-report-btn bg-green-600 text-white px-4 py-2 rounded mt-2" data-doc-id="${doc.id}">Submit Report</button>
+                        </div>
+                    ` : ''}
                 </div>
             `;
         });
         reportsContainer.innerHTML = reportHTML || `<p class="text-gray-500">No reports found.</p>`;
+
+        document.querySelectorAll('.submit-report-btn').forEach(button => {
+            button.addEventListener('click', async (e) => {
+                const docId = e.target.getAttribute('data-doc-id');
+                const reportTextarea = e.target.closest('.border').querySelector('.tutor-report');
+                const tutorReport = reportTextarea.value.trim();
+
+                if (tutorReport) {
+                    const docRef = doc(db, "student_results", docId);
+                    await updateDoc(docRef, {
+                        "answers": data.answers.map(a => a.type === 'creative-writing' ? { ...a, tutorReport: tutorReport, tutorGrade: 'Graded' } : a)
+                    });
+                    loadTutorReports(tutorEmail); // Refresh the list
+                }
+            });
+        });
     } catch (error) {
-        console.error("Error loading reports:", error);
+        console.error("Error loading tutor reports:", error);
         reportsContainer.innerHTML = `<p class="text-red-500">Failed to load reports.</p>`;
     }
 }
 
 
-onAuthStateChanged(auth, (user) => {
-    const adminContent = document.getElementById('adminContent');
+onAuthStateChanged(auth, async (user) => {
+    const tutorContent = document.getElementById('tutorContent');
     const logoutBtn = document.getElementById('logoutBtn');
 
-    if (user && user.email === ADMIN_EMAIL) {
-        renderAdminPanel();
-        logoutBtn.addEventListener('click', async () => {
-            await signOut(auth);
-            window.location.href = "index.html";
-        });
+    if (user) {
+        const tutorRef = doc(db, "tutors", user.email);
+        const tutorSnap = await getDoc(tutorRef);
+
+        if (tutorSnap.exists()) {
+            renderTutorPanel(tutorSnap.data());
+            logoutBtn.addEventListener('click', async () => {
+                await signOut(auth);
+                window.location.href = "index.html";
+            });
+        } else {
+            tutorContent.innerHTML = `<p class="text-center mt-12 text-red-600">Your account is not registered as a tutor.</p>`;
+            logoutBtn.classList.add('hidden');
+        }
+
     } else {
-        adminContent.innerHTML = `
+        tutorContent.innerHTML = `
             <div class="text-center mt-12">
                 <h2 class="text-2xl font-bold text-red-600">Access Denied</h2>
-                <p class="text-gray-600 mt-2">You must be logged in with the admin email to view this page.</p>
+                <p class="text-gray-600 mt-2">You must be logged in as a tutor to view this page.</p>
                 <a href="index.html" class="mt-4 inline-block bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Go to Login</a>
             </div>
         `;
