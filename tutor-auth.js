@@ -44,9 +44,9 @@ function validatePassword(name, password) {
 if (signupForm) {
     signupForm.addEventListener('submit', async (e) => {
         e.preventDefault();
-        const name = signupForm.querySelector('#signupName').value;
-        const email = signupForm.querySelector('#signupEmail').value;
-        const password = signupForm.querySelector('#signupPassword').value;
+        const name = document.getElementById('signupName').value;
+        const email = document.getElementById('signupEmail').value;
+        const password = document.getElementById('signupPassword').value;
         
         if (!validatePassword(name, password)) {
             return;
@@ -73,9 +73,9 @@ if (signupForm) {
 if (loginForm) {
     loginForm.addEventListener('submit', async (e) => {
         e.preventDefault();
-        const email = loginForm.querySelector('#loginEmail').value;
-        const password = loginForm.querySelector('#loginPassword').value;
-        const rememberMe = loginForm.querySelector('#rememberMe').checked;
+        const email = document.getElementById('loginEmail').value;
+        const password = document.getElementById('loginPassword').value;
+        const rememberMe = document.getElementById('rememberMe').checked;
 
         const persistence = rememberMe ? browserLocalPersistence : browserSessionPersistence;
         
