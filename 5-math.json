@@ -12,10 +12,149 @@
       "image_url": null,
       "image_position": "after"
     },
-    // ... (12 more STAAR questions)
+    {
+      "id": "2022-Q3",
+      "topic": "Decimal Comparison",
+      "question": "Car weights: Q=1.269 tons, R=1.314 tons, S=1.281 tons, T=1.238 tons. Which is true?",
+      "type": "multiple-choice",
+      "location": "USA",
+      "options": ["Car S < Car T", "Car Q > Car R", "Car R < Car T", "Car S > Car Q"],
+      "correct_answer": "Car S > Car Q",
+      "year": 2022,
+      "image_url": null,
+      "image_position": "after"
+    },
+    {
+      "id": "2022-Q4",
+      "topic": "Division",
+      "question": "7 friends split a $99.96 bill equally. How much did each pay?",
+      "type": "griddable",
+      "location": "USA",
+      "options": null,
+      "correct_answer": "14.28",
+      "year": 2022,
+      "image_url": null,
+      "image_position": "after"
+    },
+    {
+      "id": "2021-Q1",
+      "topic": "Multiplication",
+      "question": "Kelsi spends $6.75 every Saturday for breakfast. What is her total cost for 14 Saturdays?",
+      "type": "multiple-choice",
+      "location": "USA",
+      "options": ["$94.50", "$20.75", "$92.30", "$33.75"],
+      "correct_answer": "$94.50",
+      "year": 2021,
+      "image_url": null,
+      "image_position": "after"
+    },
+    {
+      "id": "2021-Q2",
+      "topic": "Volume",
+      "question": "A rectangular prism has dimensions 20 in × 11 in × 13 in. What is its volume?",
+      "type": "multiple-choice",
+      "location": "USA",
+      "options": ["233 in³", "2,860 in³", "160 in³", "88 in³"],
+      "correct_answer": "2,860 in³",
+      "year": 2021,
+      "image_url": null,
+      "image_position": "after"
+    },
+    {
+      "id": "2021-Q3",
+      "topic": "Division",
+      "question": "Nicholas put 1,012 baseball cards into boxes with 22 cards each. How many boxes did he need?",
+      "type": "multiple-choice",
+      "location": "USA",
+      "options": ["55", "50", "46", "47"],
+      "correct_answer": "46",
+      "year": 2021,
+      "image_url": null,
+      "image_position": "after"
+    },
+    {
+      "id": "2019-Q1",
+      "topic": "Linear Equations",
+      "question": "A pet store orders dog beds using y = 12x (x=boxes, y=beds). Which table matches this?",
+      "type": "multiple-choice",
+      "location": "USA",
+      "options": ["Table A", "Table B", "Table C", "Table D"],
+      "correct_answer": "Table A",
+      "year": 2019,
+      "image_url": null,
+      "image_position": "after"
+    },
+    {
+      "id": "2019-Q2",
+      "topic": "Arithmetic",
+      "question": "Rebecca bought 8 air filters at $16.95 each, with a $7.50 coupon. What was her total cost?",
+      "type": "multiple-choice",
+      "location": "USA",
+      "options": ["$80.70", "$143.10", "$128.10", "$75.60"],
+      "correct_answer": "$128.10",
+      "year": 2019,
+      "image_url": null,
+      "image_position": "after"
+    },
+    {
+      "id": "2019-Q3",
+      "topic": "Coordinate Geometry",
+      "question": "Jim plotted points (1,3), (3,6), (7,6), (9,3) to form a polygon. Which point is inside it?",
+      "type": "multiple-choice",
+      "location": "USA",
+      "options": ["(4,5)", "(8,6)", "(5,7)", "(3,1)"],
+      "correct_answer": "(4,5)",
+      "year": 2019,
+      "image_url": null,
+      "image_position": "after"
+    },
+    {
+      "id": "2018-Q1",
+      "topic": "Money",
+      "question": "Paul found 7¢ on his desk, 98¢ under his bed, and $2.04 in his closet. What was his total?",
+      "type": "multiple-choice",
+      "location": "USA",
+      "options": ["$2.09", "$3.09", "$3.72", "$4.08"],
+      "correct_answer": "$3.09",
+      "year": 2018,
+      "image_url": null,
+      "image_position": "after"
+    },
+    {
+      "id": "2018-Q2",
+      "topic": "Decimal Comparison",
+      "question": "Which comparison is NOT true?",
+      "type": "multiple-choice",
+      "location": "USA",
+      "options": ["3.375 > 3.275", "6.875 < 6.9", "2.65 > 2.675", "7.675 < 7.75"],
+      "correct_answer": "2.65 > 2.675",
+      "year": 2018,
+      "image_url": null,
+      "image_position": "after"
+    },
+    {
+      "id": "2018-Q3",
+      "topic": "Proportional Relationships",
+      "question": "The equation y = 1.5x relates cups of water (y) to cups of rice (x). Which table matches this?",
+      "type": "multiple-choice",
+      "location": "USA",
+      "options": ["Table A", "Table B", "Table C", "Table D"],
+      "correct_answer": "Table A",
+      "year": 2018,
+      "image_url": null,
+      "image_position": "after"
+    }
   ],
   "metadata": {
     "total_questions": 13,
-    "years_included": [2018, 2019, 2021, 2022]
+    "years_included": [2018, 2019, 2021, 2022],
+    "question_types": {
+      "multiple_choice": 12,
+      "griddable": 1
+    },
+    "exclusions": {
+      "reason": "Omitted questions requiring diagrams/graphs",
+      "count": 23
+    }
   }
 }
