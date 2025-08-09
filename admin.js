@@ -1,5 +1,5 @@
 import { auth, db } from './firebaseConfig.js';
-import { collection, getDocs, doc, addDoc, query, where, getDoc } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
+import { collection, getDocs, doc, addDoc } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
 import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-auth.js";
 
 const ADMIN_EMAIL = 'psalm4all@gmail.com';
@@ -36,6 +36,14 @@ async function renderAdminPanel() {
                     <div class="mb-4">
                         <label for="topic" class="block text-gray-700">Topic</label>
                         <input type="text" id="topic" class="w-full mt-1 p-2 border rounded" required>
+                    </div>
+                    <div class="mb-4">
+                        <label for="subject" class="block text-gray-700">Subject</label>
+                        <select id="subject" required class="w-full mt-1 p-2 border rounded">
+                            <option value="">Select Subject</option>
+                            <option value="math">Math</option>
+                            <option value="ela">English Language Arts</option>
+                        </select>
                     </div>
                     <div class="mb-4">
                         <label for="grade" class="block text-gray-700">Grade</label>
@@ -166,12 +174,12 @@ async function renderAdminPanel() {
         const newQuestionGroup = document.createElement('div');
         newQuestionGroup.className = 'question-group mb-4 p-4 border rounded';
         newQuestionGroup.innerHTML = `
-            <textarea class="comp-question w-full mt-1 p-2 border rounded" rows="2" placeholder="Question ${questionCount + 1}"></textarea>
+            <textarea class="comp-question w-full mt-1 p-2 border rounded" rows="2" placeholder="Question"></textarea>
             <div class="options-group flex space-x-2 mt-2">
                 <input type="text" class="comp-option w-1/2 p-2 border rounded" placeholder="Option 1">
                 <input type="text" class="comp-option w-1/2 p-2 border rounded" placeholder="Option 2">
             </div>
-            <input type="text" class="comp-correct-answer w-full mt-2 p-2 border rounded" placeholder="Correct Answer for Q${questionCount + 1}">
+            <input type="text" class="comp-correct-answer w-full mt-2 p-2 border rounded" placeholder="Correct Answer">
             <button type="button" class="add-comp-option-btn bg-gray-200 px-3 py-1 rounded text-sm mt-2">+ Add Option</button>
         `;
         compQuestionsContainer.appendChild(newQuestionGroup);
@@ -284,9 +292,9 @@ async function renderAdminPanel() {
             form.reset();
             loadCounters();
         } catch (error) {
-            console.error("Error adding question:", error);
-            message.textContent = "Error saving question.";
-            message.style.color = 'red';
+                console.error("Error adding question:", error);
+                message.textContent = "Error saving question.";
+                message.style.color = 'red';
         }
     });
 }
