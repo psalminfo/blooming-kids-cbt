@@ -78,11 +78,12 @@ async function renderAdminPanel() {
                             <h4 class="font-semibold mb-2">Questions for this Passage</h4>
                             <div class="question-group mb-4 p-4 border rounded">
                                 <textarea class="comp-question w-full mt-1 p-2 border rounded" rows="2" placeholder="Question"></textarea>
-                                <div class="flex space-x-2 mt-2">
+                                <div class="options-group flex space-x-2 mt-2">
                                     <input type="text" class="comp-option w-1/2 p-2 border rounded" placeholder="Option 1">
                                     <input type="text" class="comp-option w-1/2 p-2 border rounded" placeholder="Option 2">
                                 </div>
                                 <input type="text" class="comp-correct-answer w-full mt-2 p-2 border rounded" placeholder="Correct Answer">
+                                <button type="button" class="add-comp-option-btn bg-gray-200 px-3 py-1 rounded text-sm mt-2">+ Add Option</button>
                             </div>
                         </div>
                         <button type="button" id="addCompQuestionBtn" class="bg-gray-200 px-3 py-1 rounded text-sm mt-2">+ Add Question</button>
@@ -157,18 +158,39 @@ async function renderAdminPanel() {
 
     addCompQuestionBtn.addEventListener('click', () => {
         const compQuestionsContainer = document.getElementById('comprehensionQuestions');
-        const questionCount = compQuestionsContainer.children.length;
+        const questionCount = compQuestionsContainer.querySelectorAll('.question-group').length;
         const newQuestionGroup = document.createElement('div');
         newQuestionGroup.className = 'question-group mb-4 p-4 border rounded';
         newQuestionGroup.innerHTML = `
             <textarea class="comp-question w-full mt-1 p-2 border rounded" rows="2" placeholder="Question ${questionCount + 1}"></textarea>
-            <div class="flex space-x-2 mt-2">
+            <div class="options-group flex space-x-2 mt-2">
                 <input type="text" class="comp-option w-1/2 p-2 border rounded" placeholder="Option 1">
                 <input type="text" class="comp-option w-1/2 p-2 border rounded" placeholder="Option 2">
             </div>
             <input type="text" class="comp-correct-answer w-full mt-2 p-2 border rounded" placeholder="Correct Answer for Q${questionCount + 1}">
+            <button type="button" class="add-comp-option-btn bg-gray-200 px-3 py-1 rounded text-sm mt-2">+ Add Option</button>
         `;
         compQuestionsContainer.appendChild(newQuestionGroup);
+        // Add event listener for the new button
+        newQuestionGroup.querySelector('.add-comp-option-btn').addEventListener('click', (e) => {
+            const optionsGroup = e.target.closest('.question-group').querySelector('.options-group');
+            const newOption = document.createElement('input');
+            newOption.type = 'text';
+            newOption.className = 'comp-option w-1/2 p-2 border rounded';
+            newOption.placeholder = `Option ${optionsGroup.children.length + 1}`;
+            optionsGroup.appendChild(newOption);
+        });
+    });
+
+    document.getElementById('comprehensionQuestions').addEventListener('click', (e) => {
+        if (e.target.classList.contains('add-comp-option-btn')) {
+            const optionsGroup = e.target.closest('.question-group').querySelector('.options-group');
+            const newInput = document.createElement('input');
+            newInput.type = 'text';
+            newInput.className = 'comp-option w-1/2 p-2 border rounded';
+            newInput.placeholder = `Option ${optionsGroup.children.length + 1}`;
+            optionsGroup.appendChild(newInput);
+        }
     });
 
     // Fetch and populate student dropdown
