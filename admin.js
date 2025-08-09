@@ -1,5 +1,5 @@
 import { auth, db } from './firebaseConfig.js';
-import { collection, getDocs, doc, addDoc } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
+import { collection, getDocs, doc, addDoc, query, where } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
 import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-auth.js";
 
 const ADMIN_EMAIL = 'psalm4all@gmail.com';
@@ -26,7 +26,7 @@ async function uploadImageToCloudinary(file) {
 }
 
 
-function renderAdminPanel() {
+async function renderAdminPanel() {
     const adminContent = document.getElementById('adminContent');
     adminContent.innerHTML = `
         <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -36,10 +36,6 @@ function renderAdminPanel() {
                     <div class="mb-4">
                         <label for="topic" class="block text-gray-700">Topic</label>
                         <input type="text" id="topic" class="w-full mt-1 p-2 border rounded" required>
-                    </div>
-                    <div class="mb-4">
-                        <label for="questionText" class="block text-gray-700">Question Text</label>
-                        <textarea id="questionText" class="w-full mt-1 p-2 border rounded" rows="3" required></textarea>
                     </div>
                     <div class="mb-4">
                         <label for="grade" class="block text-gray-700">Grade</label>
@@ -78,6 +74,18 @@ function renderAdminPanel() {
                     <div class="mb-4" id="comprehensionSection" style="display:none;">
                         <label for="passage" class="block text-gray-700">Comprehension Passage</label>
                         <textarea id="passage" class="w-full mt-1 p-2 border rounded" rows="6" placeholder="Paste the full passage here..."></textarea>
+                        <div id="comprehensionQuestions" class="mt-4">
+                            <h4 class="font-semibold mb-2">Questions for this Passage</h4>
+                            <div class="question-group mb-4 p-4 border rounded">
+                                <textarea class="comp-question w-full mt-1 p-2 border rounded" rows="2" placeholder="Question"></textarea>
+                                <div class="flex space-x-2 mt-2">
+                                    <input type="text" class="comp-option w-1/2 p-2 border rounded" placeholder="Option 1">
+                                    <input type="text" class="comp-option w-1/2 p-2 border rounded" placeholder="Option 2">
+                                </div>
+                                <input type="text" class="comp-correct-answer w-full mt-2 p-2 border rounded" placeholder="Correct Answer">
+                            </div>
+                        </div>
+                        <button type="button" id="addCompQuestionBtn" class="bg-gray-200 px-3 py-1 rounded text-sm mt-2">+ Add Question</button>
                     </div>
                     <div class="mb-4">
                         <label for="questionLocation" class="block text-gray-700">Location</label>
@@ -132,21 +140,41 @@ function renderAdminPanel() {
     const addQuestionForm = document.getElementById('addQuestionForm');
     const questionTypeDropdown = document.getElementById('questionType');
     const optionsContainer = document.getElementById('optionsContainer');
+    const addOptionBtn = document.getElementById('addOptionBtn');
     const correctAnswerSection = document.getElementById('correctAnswerSection');
     const writingTypeSection = document.getElementById('writingTypeSection');
     const comprehensionSection = document.getElementById('comprehensionSection');
+    const addCompQuestionBtn = document.getElementById('addCompQuestionBtn');
     
     questionTypeDropdown.addEventListener('change', (e) => {
         const type = e.target.value;
         optionsContainer.style.display = type === 'multiple-choice' ? 'block' : 'none';
+        addOptionBtn.style.display = type === 'multiple-choice' ? 'inline-block' : 'none';
         correctAnswerSection.style.display = type === 'multiple-choice' ? 'block' : 'none';
         writingTypeSection.style.display = type === 'creative-writing' ? 'block' : 'none';
         comprehensionSection.style.display = type === 'comprehension' ? 'block' : 'none';
     });
 
+    addCompQuestionBtn.addEventListener('click', () => {
+        const compQuestionsContainer = document.getElementById('comprehensionQuestions');
+        const questionCount = compQuestionsContainer.children.length;
+        const newQuestionGroup = document.createElement('div');
+        newQuestionGroup.className = 'question-group mb-4 p-4 border rounded';
+        newQuestionGroup.innerHTML = `
+            <textarea class="comp-question w-full mt-1 p-2 border rounded" rows="2" placeholder="Question ${questionCount + 1}"></textarea>
+            <div class="flex space-x-2 mt-2">
+                <input type="text" class="comp-option w-1/2 p-2 border rounded" placeholder="Option 1">
+                <input type="text" class="comp-option w-1/2 p-2 border rounded" placeholder="Option 2">
+            </div>
+            <input type="text" class="comp-correct-answer w-full mt-2 p-2 border rounded" placeholder="Correct Answer for Q${questionCount + 1}">
+        `;
+        compQuestionsContainer.appendChild(newQuestionGroup);
+    });
+
     // Fetch and populate student dropdown
     const studentDropdown = document.getElementById('studentDropdown');
     getDocs(collection(db, "student_results")).then(studentReportsSnapshot => {
+        studentDropdown.innerHTML = `<option value="">Select Student</option>`;
         studentReportsSnapshot.forEach(doc => {
             const student = doc.data();
             const option = document.createElement('option');
@@ -165,7 +193,7 @@ function renderAdminPanel() {
         }
     });
 
-    document.getElementById('addOptionBtn').addEventListener('click', () => {
+    addOptionBtn.addEventListener('click', () => {
         const optionsContainer = document.getElementById('optionsContainer');
         const newInput = document.createElement('input');
         newInput.type = 'text';
@@ -188,30 +216,56 @@ function renderAdminPanel() {
             }
 
             const questionType = form.questionType.value;
-            const options = questionType === 'multiple-choice' ? Array.from(form.querySelectorAll('.option-input')).map(input => input.value).filter(v => v) : null;
-            const correctAnswer = questionType === 'multiple-choice' ? form.correctAnswer.value : null;
-            const writingType = questionType === 'creative-writing' ? form.writingType.value : null;
-            const passage = questionType === 'comprehension' ? form.passage.value : null;
+            let newQuestion;
 
-            const newQuestion = {
-                topic: form.topic.value,
-                grade: form.grade.value,
-                question: form.questionText.value,
-                type: questionType,
-                location: form.questionLocation.value,
-                options: options,
-                correct_answer: correctAnswer,
-                image_url: imageUrl,
-                image_position: form.imagePosition.value,
-                writing_type: writingType,
-                passage: passage
-            };
+            if (questionType === 'comprehension') {
+                const questionsArray = [];
+                form.querySelectorAll('.question-group').forEach(group => {
+                    const compQuestion = group.querySelector('.comp-question').value;
+                    const compOptions = Array.from(group.querySelectorAll('.comp-option')).map(input => input.value).filter(v => v);
+                    const compCorrectAnswer = group.querySelector('.comp-correct-answer').value;
+
+                    questionsArray.push({
+                        question: compQuestion,
+                        options: compOptions,
+                        correct_answer: compCorrectAnswer,
+                        type: 'multiple-choice',
+                    });
+                });
+                newQuestion = {
+                    topic: form.topic.value,
+                    grade: form.grade.value,
+                    passage: form.passage.value,
+                    type: questionType,
+                    location: form.questionLocation.value,
+                    image_url: imageUrl,
+                    image_position: form.imagePosition.value,
+                    sub_questions: questionsArray
+                };
+            } else {
+                const options = questionType === 'multiple-choice' ? Array.from(form.querySelectorAll('.option-input')).map(input => input.value).filter(v => v) : null;
+                const correctAnswer = questionType === 'multiple-choice' ? form.correctAnswer.value : null;
+                const writingType = questionType === 'creative-writing' ? form.writingType.value : null;
+            
+                newQuestion = {
+                    topic: form.topic.value,
+                    grade: form.grade.value,
+                    question: form.questionText.value,
+                    type: questionType,
+                    location: form.questionLocation.value,
+                    options: options,
+                    correct_answer: correctAnswer,
+                    image_url: imageUrl,
+                    image_position: form.imagePosition.value,
+                    writing_type: writingType,
+                };
+            }
 
             await addDoc(collection(db, "admin_questions"), newQuestion);
             message.textContent = "Question saved successfully!";
             message.style.color = 'green';
             form.reset();
-
+            loadCounters();
         } catch (error) {
             console.error("Error adding question:", error);
             message.textContent = "Error saving question.";
@@ -223,7 +277,6 @@ function renderAdminPanel() {
 function capitalize(str) {
   return str.replace(/\b\w/g, l => l.toUpperCase());
 }
-
 
 async function loadAndRenderReport(docId) {
     const reportContent = document.getElementById('reportContent');
@@ -284,13 +337,39 @@ async function loadAndRenderReport(docId) {
     }
 }
 
+async function loadCounters() {
+    const totalStudentsCount = document.getElementById('totalStudentsCount');
+    const totalTutorsCount = document.getElementById('totalTutorsCount');
+    const studentsPerTutorList = document.getElementById('studentsPerTutorList');
 
-onAuthStateChanged(auth, (user) => {
+    const [studentsSnapshot, tutorsSnapshot] = await Promise.all([
+        getDocs(collection(db, "student_results")),
+        getDocs(collection(db, "tutors"))
+    ]);
+
+    totalStudentsCount.textContent = studentsSnapshot.docs.length;
+    totalTutorsCount.textContent = tutorsSnapshot.docs.length;
+    
+    studentsPerTutorList.innerHTML = '';
+    for (const tutorDoc of tutorsSnapshot.docs) {
+        const tutor = tutorDoc.data();
+        const studentsQuery = query(collection(db, "student_results"), where("tutorEmail", "==", tutor.email));
+        const studentsUnderTutor = await getDocs(studentsQuery);
+        
+        const listItem = document.createElement('li');
+        listItem.textContent = `${tutor.name} (${studentsUnderTutor.docs.length} students)`;
+        studentsPerTutorList.appendChild(listItem);
+    }
+}
+
+
+onAuthStateChanged(auth, async (user) => {
     const adminContent = document.getElementById('adminContent');
     const logoutBtn = document.getElementById('logoutBtn');
 
     if (user && user.email === ADMIN_EMAIL) {
         renderAdminPanel();
+        await loadCounters();
         logoutBtn.addEventListener('click', async () => {
             await signOut(auth);
             window.location.href = "admin-auth.html";
