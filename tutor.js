@@ -5,18 +5,13 @@ import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/
 function renderTutorPanel(tutor) {
     const tutorContent = document.getElementById('tutorContent');
     tutorContent.innerHTML = `
-        <div class="flex justify-between items-center mb-6">
-            <h1 class="text-3xl font-bold text-green-800">Tutor Portal</h1>
-            <div id="studentCount" class="text-center font-bold text-xl"></div>
-            <button id="logoutBtn" class="bg-yellow-400 text-white px-4 py-2 rounded hover:bg-yellow-500">Logout</button>
-        </div>
-
         <div class="bg-white p-6 rounded-lg shadow-md mb-6">
             <h2 class="text-2xl font-bold text-green-700 mb-4">Welcome, ${tutor.name}</h2>
             <div class="mb-4">
                 <input type="email" id="searchEmail" class="w-full mt-1 p-2 border rounded" placeholder="Search by parent email...">
                 <button id="searchBtn" class="bg-blue-600 text-white px-4 py-2 rounded mt-2 hover:bg-blue-700">Search</button>
             </div>
+            <div id="studentCount" class="text-center font-bold text-lg"></div>
         </div>
 
         <div id="reportsContainer" class="space-y-4">
@@ -36,7 +31,7 @@ function renderTutorPanel(tutor) {
 async function loadStudentCount(tutorEmail) {
     const studentCount = document.getElementById('studentCount');
     const querySnapshot = await getDocs(query(collection(db, "student_results"), where("tutorEmail", "==", tutorEmail)));
-    studentCount.textContent = `Total Students: ${querySnapshot.docs.length}`;
+    studentCount.textContent = `Total Student Reports: ${querySnapshot.docs.length}`;
 }
 
 async function loadTutorReports(tutorEmail, parentEmail = null) {
@@ -82,23 +77,29 @@ async function loadTutorReports(tutorEmail, parentEmail = null) {
                             ${creativeWritingAnswer.fileUrl ? `<a href="${creativeWritingAnswer.fileUrl}" target="_blank" class="text-blue-500 hover:underline">Download File</a>` : ''}
                             <p class="mt-2"><strong>Status:</strong> ${creativeWritingAnswer.tutorGrade || 'Pending'}</p>
                             ${creativeWritingAnswer.tutorGrade === 'Pending' ? `
-                                <textarea class="tutor-report w-full mt-2 p-2 border rounded" rows="3" placeholder="Write your report here..."></textarea>
-                                <button class="submit-report-btn bg-green-600 text-white px-4 py-2 rounded mt-2" data-doc-id="${doc.id}">Submit Report</button>
+                                <textarea class="creative-writing-report w-full mt-2 p-2 border rounded" rows="3" placeholder="Write your report here..."></textarea>
+                                <button class="submit-creative-writing-report-btn bg-green-600 text-white px-4 py-2 rounded mt-2" data-doc-id="${doc.id}">Submit Creative Writing Report</button>
                             ` : `
                                 <p class="mt-2"><strong>Tutor's Report:</strong> ${creativeWritingAnswer.tutorReport || 'N/A'}</p>
                             `}
                         </div>
                     ` : ''}
+                    
+                    <div class="mt-4 border-t pt-4">
+                        <h4 class="font-semibold">General Tutor Comment</h4>
+                        <textarea class="general-tutor-comment w-full mt-2 p-2 border rounded" rows="3" placeholder="Leave a general comment here...">${data.generalTutorComment || ''}</textarea>
+                        <button class="submit-general-comment-btn bg-blue-600 text-white px-4 py-2 rounded mt-2" data-doc-id="${doc.id}">Submit General Comment</button>
+                    </div>
                 </div>
             `;
         });
 
         reportsContainer.innerHTML = reportHTML || `<p class="text-gray-500">No reports found.</p>`;
 
-        document.querySelectorAll('.submit-report-btn').forEach(button => {
+        document.querySelectorAll('.submit-creative-writing-report-btn').forEach(button => {
             button.addEventListener('click', async (e) => {
                 const docId = e.target.getAttribute('data-doc-id');
-                const reportTextarea = e.target.closest('.border').querySelector('.tutor-report');
+                const reportTextarea = e.target.closest('.border').querySelector('.creative-writing-report');
                 const tutorReport = reportTextarea.value.trim();
 
                 if (tutorReport) {
@@ -111,8 +112,20 @@ async function loadTutorReports(tutorEmail, parentEmail = null) {
                     );
 
                     await updateDoc(docRef, { answers: updatedAnswers });
-                    loadTutorReports(tutorEmail); // Refresh the list
+                    loadTutorReports(tutorEmail, parentEmail); // Refresh the list
                 }
+            });
+        });
+
+        document.querySelectorAll('.submit-general-comment-btn').forEach(button => {
+            button.addEventListener('click', async (e) => {
+                const docId = e.target.getAttribute('data-doc-id');
+                const commentTextarea = e.target.closest('.border').querySelector('.general-tutor-comment');
+                const generalComment = commentTextarea.value.trim();
+
+                const docRef = doc(db, "student_results", docId);
+                await updateDoc(docRef, { generalTutorComment: generalComment });
+                alert("General comment saved!");
             });
         });
 
