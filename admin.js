@@ -1,5 +1,5 @@
 import { auth, db } from './firebaseConfig.js';
-import { collection, getDocs, doc, addDoc } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
+import { collection, getDocs, doc, addDoc, query, where, getDoc } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
 import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-auth.js";
 
 const ADMIN_EMAIL = 'psalm4all@gmail.com';
@@ -36,14 +36,6 @@ async function renderAdminPanel() {
                     <div class="mb-4">
                         <label for="topic" class="block text-gray-700">Topic</label>
                         <input type="text" id="topic" class="w-full mt-1 p-2 border rounded" required>
-                    </div>
-                    <div class="mb-4">
-                        <label for="subject" class="block text-gray-700">Subject</label>
-                        <select id="subject" required class="w-full mt-1 p-2 border rounded">
-                            <option value="">Select Subject</option>
-                            <option value="math">Math</option>
-                            <option value="ela">English Language Arts</option>
-                        </select>
                     </div>
                     <div class="mb-4">
                         <label for="grade" class="block text-gray-700">Grade</label>
@@ -292,9 +284,9 @@ async function renderAdminPanel() {
             form.reset();
             loadCounters();
         } catch (error) {
-                console.error("Error adding question:", error);
-                message.textContent = "Error saving question.";
-                message.style.color = 'red';
+            console.error("Error adding question:", error);
+            message.textContent = "Error saving question.";
+            message.style.color = 'red';
         }
     });
 }
@@ -318,7 +310,6 @@ async function loadAndRenderReport(docId) {
 
         const creativeWritingAnswer = data.answers.find(a => a.type === 'creative-writing');
         const tutorReport = creativeWritingAnswer?.tutorReport || 'N/A';
-        const creativeWritingContent = creativeWritingAnswer?.studentResponse || 'N/A';
         
         let correctCount = 0;
         data.answers.forEach(answerObject => {
@@ -342,8 +333,7 @@ async function loadAndRenderReport(docId) {
                 <p class="font-bold">Score: ${correctCount} / ${totalScoreable}</p>
                 <h3 class="text-lg font-semibold mt-4 mb-2">Knowledge & Skill Analysis</h3>
                 <p>${topics.join(', ') || 'N/A'}</p>
-                <h3 class="text-lg font-semibold mt-4 mb-2">Creative Writing Report</h3>
-                <p class="mb-2"><strong>Submission:</strong> ${creativeWritingContent}</p>
+                <h3 class="text-lg font-semibold mt-4 mb-2">Tutor’s Recommendation</h3>
                 <p class="mb-2"><strong>Tutor's Report:</strong> ${tutorReport}</p>
                 <div class="mt-4">
                     <button id="downloadPdfBtn" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Download Report PDF</button>
