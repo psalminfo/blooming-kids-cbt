@@ -305,5 +305,969 @@
       "options": ["To provide extra details", "To list book chapters", "To show a map", "To define words"],
       "correct_answer": "To provide extra details"
     }
+    {
+  "questions": [
+    {
+      "topic": "Vocabulary",
+      "question": "What is the meaning of wistfully in paragraph 12?",
+      "type": "multiple-choice",
+      "options": [
+        "With sadness",
+        "With relief",
+        "With anxiety",
+        "With curiosity"
+      ],
+      "correct_answer": "With sadness"
+    },
+    {
+      "topic": "Figurative Language",
+      "question": "The author includes the figurative language in paragraph 23 ('As the tidal wave of customers trickled to a stream...') to show that the —",
+      "type": "multiple-choice",
+      "options": [
+        "customers come in and out of the deli at a steady pace",
+        "new customers got wet from the firefighters’ hoses at the festival",
+        "number of customers at the deli has become manageable",
+        "customers are upset at first but calm by the time they leave"
+      ],
+      "correct_answer": "number of customers at the deli has become manageable"
+    },
+    {
+      "topic": "Character Development",
+      "question": "Eric’s actions at the end of the story are significant because they reveal that he —",
+      "type": "multiple-choice",
+      "options": [
+        "has learned that working in the deli is more fun than being with friends",
+        "understands that his parents deserve to rest before they return to work",
+        "is ready to accept more responsibilities at the deli",
+        "realizes the importance of loyal customers"
+      ],
+      "correct_answer": "realizes the importance of loyal customers"
+    },
+    {
+      "topic": "Conflict",
+      "question": "Which of the following best describes Eric’s main conflict in the story?",
+      "type": "multiple-choice",
+      "options": [
+        "He does not know the names of the customers who frequently eat at his parents’ deli.",
+        "He thinks his parents need to offer a better variety of sandwiches at the deli.",
+        "He has to help his parents on a day that he has plans with his friends.",
+        "He is bothered by the lack of excitement in his parents’ deli."
+      ],
+      "correct_answer": "He has to help his parents on a day that he has plans with his friends."
+    },
+    {
+      "topic": "Point of View",
+      "question": "The first-person point of view of the story allows the reader to understand the —",
+      "type": "multiple-choice",
+      "options": [
+        "actions of only the regulars at the deli",
+        "narrator’s changing perspective on the busy deli",
+        "reasons the narrator’s parents are not at the deli",
+        "inner thoughts of the customers at the deli"
+      ],
+      "correct_answer": "narrator’s changing perspective on the busy deli"
+    },
+    {
+      "topic": "Theme",
+      "question": "Which sentence from the story best expresses its theme?",
+      "type": "multiple-choice",
+      "options": [
+        "“We have to take care of our regulars because they’re part of what makes Sam’s Deli a special place.”",
+        "Personally, I didn’t think it would hurt for some of our regulars to try a new restaurant every now and then—or at least consider ordering a different type of sandwich.",
+        "“Your dad and I appreciate your help.”",
+        "I took orders and made sandwiches while they kept the restaurant clean and visited with customers."
+      ],
+      "correct_answer": "“We have to take care of our regulars because they’re part of what makes Sam’s Deli a special place.”"
+    },
+    {
+      "topic": "Poetry Analysis",
+      "question": "In lines 5 and 25 of the poem, the words 'bury myself' and 'hidden' highlight that the speaker —",
+      "type": "multiple-choice",
+      "options": [
+        "wishes he could live permanently with Abuelita",
+        "fears being seen by others when he hugs Abuelita",
+        "feels safe and content with Abuelita",
+        "is able to forget where he is when he is with Abuelita"
+      ],
+      "correct_answer": "feels safe and content with Abuelita"
+    },
+    {
+      "topic": "Poetry Analysis",
+      "question": "What is the most likely reason the poet uses exclamation points in the third stanza?",
+      "type": "multiple-choice",
+      "options": [
+        "To emphasize how much respect the speaker has for Abuelita",
+        "To show the speaker’s excitement about his long visit with Abuelita",
+        "To convey Papa’s hesitation about leaving the speaker with Abuelita",
+        "To highlight how long it has been since the speaker last saw Abuelita"
+      ],
+      "correct_answer": "To show the speaker’s excitement about his long visit with Abuelita"
+    },
+    {
+      "topic": "Figurative Language",
+      "question": "The poet includes the similes in lines 14 and 15 most likely to —",
+      "type": "multiple-choice",
+      "options": [
+        "suggest that the speaker has not visited Abuelita in a long time",
+        "help the reader visualize Abuelita’s house",
+        "identify the speaker’s favorite holiday to spend with Abuelita",
+        "help the reader imagine a specific place in Abuelita’s house"
+      ],
+      "correct_answer": "help the reader visualize Abuelita’s house"
+    },
+    {
+      "topic": "Character Analysis",
+      "question": "The lines 'You are so big! My big boy!' and 'And I laugh and stand on my toes to be even bigger' are included to suggest that the speaker —",
+      "type": "multiple-choice",
+      "options": [
+        "wishes he could be taller than he is",
+        "is embarrassed by the name Abuelita calls him",
+        "thinks Abuelita is very amusing",
+        "enjoys making Abuelita feel proud of him"
+      ],
+      "correct_answer": "enjoys making Abuelita feel proud of him"
+    },
+    {
+      "topic": "Theme",
+      "question": "From the speaker’s experience, the reader can learn that —",
+      "type": "multiple-choice",
+      "options": [
+        "parents are to be appreciated",
+        "happiness can be found in trying new things",
+        "time spent with family should be cherished",
+        "relationships can strengthen with time"
+      ],
+      "correct_answer": "time spent with family should be cherished"
+    },
+    {
+      "topic": "Poetry Analysis",
+      "question": "By including Abuelita’s dialogue in the poem, the poet is able to —",
+      "type": "multiple-choice",
+      "options": [
+        "tell the qualities Abuelita likes about the speaker",
+        "indicate what Abuelita and the speaker enjoy doing together",
+        "reveal how Abuelita feels about the speaker",
+        "suggest that Abuelita enjoys speaking Spanish with the speaker"
+      ],
+      "correct_answer": "reveal how Abuelita feels about the speaker"
+    },
+    {
+      "topic": "Theme Development",
+      "question": "How does the poet develop the theme of this poem?",
+      "type": "multiple-choice",
+      "options": [
+        "By comparing the actions of Papa and Abuelita",
+        "By explaining the reasons the speaker visits Abuelita",
+        "By telling about the photographs in Abuelita’s house",
+        "By describing the speaker’s interaction with Abuelita"
+      ],
+      "correct_answer": "By describing the speaker’s interaction with Abuelita"
+    },
+    {
+      "topic": "Vocabulary",
+      "question": "Which words from paragraph 2 help the reader understand the meaning of 'engaged'?",
+      "type": "multiple-choice",
+      "options": [
+        "charm as a person",
+        "sat for a portrait",
+        "practiced at the time",
+        "interesting conversation"
+      ],
+      "correct_answer": "interesting conversation"
+    },
+    {
+      "topic": "Main Idea",
+      "question": "Paragraph 2 is mainly about the —",
+      "type": "multiple-choice",
+      "options": [
+        "method Stuart used when he was painting portraits",
+        "number of portraits Stuart painted during his lifetime",
+        "reason Stuart wanted to paint portraits of famous people",
+        "popularity of the portraits Stuart painted during his lifetime"
+      ],
+      "correct_answer": "method Stuart used when he was painting portraits"
+    },
+    {
+      "topic": "Inference",
+      "question": "The reader can conclude from the information in paragraph 3 that Stuart —",
+      "type": "multiple-choice",
+      "options": [
+        "worried that his portrait would not please Washington",
+        "was determined to create a portrait of Washington",
+        "was nervous in the presence of Washington",
+        "shared similar interests with Washington"
+      ],
+      "correct_answer": "was determined to create a portrait of Washington"
+    },
+    {
+      "topic": "Author's Purpose",
+      "question": "The author includes the details in paragraph 5 most likely to —",
+      "type": "multiple-choice",
+      "options": [
+        "explain why this particular portrait of Washington is so well known",
+        "express regret that the painting of Washington became famous only after Stuart’s death",
+        "demonstrate that Washington was an important figure in history",
+        "emphasize that most of Washington’s portraits were left unfinished"
+      ],
+      "correct_answer": "explain why this particular portrait of Washington is so well known"
+    },
+    {
+      "topic": "Summary",
+      "question": "What is the best summary of the selection?",
+      "type": "multiple-choice",
+      "options": [
+        "In 1796 painter Gilbert Stuart had the opportunity to paint a portrait of George Washington. It had been difficult to arrange time for the two men to get together. While Stuart painted Washington, the two men talked about horses.",
+        "The most famous portrait of George Washington was painted by Gilbert Stuart, who lived from 1755 to 1828. Stuart painted portraits of other famous people as well. He never finished his portrait of Washington, but Stuart kept the original and sold copies of it anyway.",
+        "An accomplished painter who completed hundreds of portraits, Gilbert Stuart lived from 1755 to 1828. Stuart wanted the subjects of his portraits to feel relaxed so that he could create a portrait of them that looked natural. One of Stuart’s most famous paintings is a portrait of President George Washington.",
+        "During his career Gilbert Stuart painted portraits of many famous people, including George Washington. Although Stuart was unable to complete a portrait of Washington during the time they had together in 1796, the work became the most popular portrait of Washington ever painted."
+      ],
+      "correct_answer": "During his career Gilbert Stuart painted portraits of many famous people, including George Washington. Although Stuart was unable to complete a portrait of Washington during the time they had together in 1796, the work became the most popular portrait of Washington ever painted."
+    },
+    {
+      "topic": "Vocabulary",
+      "question": "The origin of the word 'amass' helps the reader understand that 'amassed' in paragraph 3 means —",
+      "type": "multiple-choice",
+      "options": [
+        "searched for",
+        "shared with a group",
+        "gathered together",
+        "stored in a safe place"
+      ],
+      "correct_answer": "gathered together"
+    },
+    {
+      "topic": "Text Structure",
+      "question": "By using a problem-and-solution organizational pattern in paragraphs 3 through 5, the author is able to —",
+      "type": "multiple-choice",
+      "options": [
+        "demonstrate that Tolkien needed help completing his book and describe how only certain parts of his story were used",
+        "show that Christopher needed to work with another author and tell how he was able to persuade his friend to work with him",
+        "highlight that Christopher had trouble deciding which of his father’s writings to include in the book and identify how he made his choices",
+        "emphasize that Tolkien could not finish his book and explain how Christopher’s efforts led to the completion and publication of the work"
+      ],
+      "correct_answer": "emphasize that Tolkien could not finish his book and explain how Christopher’s efforts led to the completion and publication of the work"
+    },
+    {
+      "topic": "Inference",
+      "question": "Based on the information in paragraph 5, the reader can conclude that Christopher —",
+      "type": "multiple-choice",
+      "options": [
+        "had little prior experience writing books",
+        "tried to include alternate endings in the book",
+        "encountered many challenges while organizing the book",
+        "planned to publish more than one book of his father’s work"
+      ],
+      "correct_answer": "encountered many challenges while organizing the book"
+    },
+    {
+      "topic": "Text Evidence",
+      "question": "According to the selection, why did Christopher decide not to include all his father’s writings in The Silmarillion?",
+      "type": "multiple-choice",
+      "options": [
+        "He believed they would cause the reader to become very confused.",
+        "He worried that some of the ideas would be unfamiliar to the reader.",
+        "He planned to create a different ending for the story.",
+        "He wanted the final book to have only five parts."
+      ],
+      "correct_answer": "He believed they would cause the reader to become very confused."
+    },
+    {
+      "topic": "Author's Attitude",
+      "question": "Which sentence best shows the author’s attitude toward the writing of The Silmarillion?",
+      "type": "multiple-choice",
+      "options": [
+        "The Silmarillion can be thought of as a prequel to The Hobbit and The Lord of the Rings.",
+        "But the story of how The Silmarillion was created may be just as interesting as the story told on its pages.",
+        "Kay’s work on The Silmarillion undoubtedly provided training and valuable experience on his journey to become an author.",
+        "The Silmarillion was published in 1977 to mixed reviews."
+      ],
+      "correct_answer": "But the story of how The Silmarillion was created may be just as interesting as the story told on its pages."
+    },
+    {
+      "topic": "Text Features",
+      "question": "What makes The Silmarillion unique among Tolkien’s writings?",
+      "type": "multiple-choice",
+      "options": [
+        "The story takes place in an imaginary land.",
+        "It was the only piece of writing published after his death.",
+        "The story includes fictional creatures and humans.",
+        "It was both the first and last book he ever worked on."
+      ],
+      "correct_answer": "It was both the first and last book he ever worked on."
+    },
+    {
+      "topic": "Comparison",
+      "question": "Which sentence from the second selection shows that Tolkien’s The Silmarillion was not as well received as Stuart’s portrait of Washington?",
+      "type": "multiple-choice",
+      "options": [
+        "It is an account of the history of this fantasy world before The Hobbit takes place.",
+        "Some stories required organizing, and some parts were still incomplete and needed finishing.",
+        "Some people believed it was too different from what they had come to expect from Tolkien’s writing.",
+        "They knew that Christopher had started the task with many incomplete pieces."
+      ],
+      "correct_answer": "Some people believed it was too different from what they had come to expect from Tolkien’s writing."
+    },
+    {
+      "topic": "Comparison",
+      "question": "One similarity between painter Gilbert Stuart and author J. R. R. Tolkien is that both men —",
+      "type": "multiple-choice",
+      "options": [
+        "were accomplished in their field of creative art",
+        "spent several decades working on a single project",
+        "needed the assistance of another person to complete their work",
+        "were known for their interest in having conversations with others"
+      ],
+      "correct_answer": "were accomplished in their field of creative art"
+    },
+    {
+      "topic": "Comparison",
+      "question": "One difference between the portrait and the book discussed in the selections is that —",
+      "type": "multiple-choice",
+      "options": [
+        "copies of the incomplete portrait were sold, but the book was sold only after it was completed",
+        "few people saw the portrait while Stuart was alive, but many saw the book manuscript while Tolkien was alive",
+        "Stuart did not prepare before he painted his portrait, but Tolkien spent time preparing to write his book",
+        "the portrait was not considered Stuart’s best work, but the book was considered Tolkien’s masterpiece"
+      ],
+      "correct_answer": "copies of the incomplete portrait were sold, but the book was sold only after it was completed"
+    },
+    {
+      "topic": "Comparison",
+      "question": "In what way are the portrait of George Washington and the book The Silmarillion similar?",
+      "type": "multiple-choice",
+      "options": [
+        "Each earned a great amount of money for its creator.",
+        "Each remained incomplete at the time of its creator’s death.",
+        "Each was included in a larger body of work that its creator had made.",
+        "Each required that people other than its creator work on it."
+      ],
+      "correct_answer": "Each remained incomplete at the time of its creator’s death."
+    },
+    {
+      "topic": "Theme",
+      "question": "What is the primary theme of 'The Raven and the Star Fruit Tree'?",
+      "type": "multiple-choice",
+      "options": [
+        "Sharing with others helps develop strong relationships.",
+        "Focusing on work can produce great rewards.",
+        "Role models often have faults.",
+        "Greed can have harmful consequences."
+      ],
+      "correct_answer": "Greed can have harmful consequences."
+    },
+    {
+      "topic": "Tone",
+      "question": "The raven’s words in paragraph 4 ('Don’t be afraid...') can best be described as —",
+      "type": "multiple-choice",
+      "options": [
+        "comforting",
+        "mocking",
+        "insincere",
+        "joyful"
+      ],
+      "correct_answer": "comforting"
+    },
+    {
+      "topic": "Character Analysis",
+      "question": "The actions of the younger brother in paragraph 7 are significant because they show that —",
+      "type": "multiple-choice",
+      "options": [
+        "he is more interested in flying than in growing star fruit",
+        "his relationship with the raven is beneficial only to him",
+        "his attitude toward wealth protects him from harm",
+        "he depends on the raven to show him the best way to help his brother"
+      ],
+      "correct_answer": "his attitude toward wealth protects him from harm"
+    },
+    {
+      "topic": "Conflict",
+      "question": "What is the main problem in 'The Raven and the Star Fruit Tree'?",
+      "type": "multiple-choice",
+      "options": [
+        "One brother is left an unusually small inheritance.",
+        "One brother is never satisfied with what he has.",
+        "One brother does not know how to spend money wisely.",
+        "One brother shares his wealth with others who are in need."
+      ],
+      "correct_answer": "One brother is never satisfied with what he has."
+    },
+    {
+      "topic": "Summary",
+      "question": "Which of the following is the best summary of paragraphs 8 through 10?",
+      "type": "multiple-choice",
+      "options": [
+        "The younger brother invites the older brother to dinner several times. The older brother finally agrees and is surprised when he sees the younger one’s house. After being told the story of the raven, the older brother wants to trade his inheritance for what his brother has. The younger brother refuses.",
+        "One day the older brother goes to the younger brother’s house for dinner and is surprised by what he sees. He likes his brother’s house so much that he offers to trade his inheritance for it. The younger brother does not want to trade, however, and refuses the other’s offer.",
+        "The younger brother repeatedly pleads with the older brother to come over for dinner. When the older brother finally comes over, he asks the younger brother where he got all the fine things in his house. The younger brother then tells his brother about the raven.",
+        "The younger brother repeatedly invites the older brother to dinner. The older brother finally comes over after refusing this request many times. The younger brother tells him about the raven that came to the star fruit tree. The older brother wants to own the tree so that he can meet the raven."
+      ],
+      "correct_answer": "The younger brother invites the older brother to dinner several times. The older brother finally agrees and is surprised when he sees the younger one’s house. After being told the story of the raven, the older brother wants to trade his inheritance for what his brother has. The younger brother refuses."
+    },
+    {
+      "topic": "Vocabulary",
+      "question": "Which dictionary definition best matches the way the word 'credited' is used in paragraph 6?",
+      "type": "multiple-choice",
+      "options": [
+        "to believe something such as a report",
+        "to assign responsibility to someone or something",
+        "to add money to an account",
+        "to award a passing mark or grade in school"
+      ],
+      "correct_answer": "to assign responsibility to someone or something"
+    },
+    {
+      "topic": "Text Features",
+      "question": "The map next to paragraph 2 helps the reader better understand the information in the selection because it —",
+      "type": "multiple-choice",
+      "options": [
+        "illustrates how wide Lake Maracaibo is",
+        "provides the names of other countries in South America",
+        "helps the reader understand the causes of the lightning in Venezuela",
+        "shows the reader where the lightning occurs in Venezuela"
+      ],
+      "correct_answer": "shows the reader where the lightning occurs in Venezuela"
+    },
+    {
+      "topic": "Text Structure",
+      "question": "By stating a main idea and supporting it with specific details in paragraphs 2 through 4, the author is able to —",
+      "type": "multiple-choice",
+      "options": [
+        "offer a vivid picture of what the Catatumbo Lightning looks like to observers",
+        "give a thorough explanation of why the Catatumbo Lightning is unique",
+        "add a sense of drama and suspense regarding the Catatumbo Lightning strikes",
+        "provide scientific reasons for the colorful display during a Catatumbo Lightning storm"
+      ],
+      "correct_answer": "give a thorough explanation of why the Catatumbo Lightning is unique"
+    },
+    {
+      "topic": "Main Idea",
+      "question": "The main idea of paragraphs 8 and 9 is that —",
+      "type": "multiple-choice",
+      "options": [
+        "an increase in methane gas in the area may be responsible for the lightning",
+        "there are some theories about what causes the lightning but no definite answer",
+        "the lightning may be caused by warm air from a river and a lake meeting cool mountain air",
+        "when lightning strikes stopped during a drought, scientists studied how weather affects the lightning"
+      ],
+      "correct_answer": "there are some theories about what causes the lightning but no definite answer"
+    },
+    {
+      "topic": "Text Evidence",
+      "question": "Which of these facts from the selection supports the idea that the local people embrace the Catatumbo Lightning?",
+      "type": "multiple-choice",
+      "options": [
+        "This natural phenomenon is called the Relámpago del Catatumbo, or the Catatumbo Lightning.",
+        "The color of the lightning changes depending on the presence of dust, water, and various gases in the air.",
+        "The lightning is mentioned in poetry and songs; the state of Zulia even has a lightning bolt on its flag.",
+        "The mystery of what causes the lightning deepened when, beginning in January 2010, the lightning did not appear for a period of several months."
+      ],
+      "correct_answer": "The lightning is mentioned in poetry and songs; the state of Zulia even has a lightning bolt on its flag."
+    },
+    {
+      "topic": "Inference",
+      "question": "Based on the information throughout the selection, how do the native people of Zulia feel about the Catatumbo Lightning?",
+      "type": "multiple-choice",
+      "options": [
+        "They are indifferent to it.",
+        "They fear it as a powerful force of nature.",
+        "They believe it is problematic for their community.",
+        "They appreciate it as a special feature of their area."
+      ],
+      "correct_answer": "They appreciate it as a special feature of their area."
+    },
+    {
+      "topic": "Author's Purpose",
+      "question": "The author’s main purpose for writing this selection is to —",
+      "type": "multiple-choice",
+      "options": [
+        "warn readers about the dangers of lightning",
+        "discuss the mysterious lightning found in a region",
+        "compare and contrast lightning storms around the world",
+        "explain the weather conditions that cause lightning"
+      ],
+      "correct_answer": "discuss the mysterious lightning found in a region"
+    },
+    {
+      "topic": "Simile",
+      "question": "The author’s use of a simile in paragraph 14 ('as active as a fly in a doughnut shop') conveys to the reader that Zach usually —",
+      "type": "multiple-choice",
+      "options": [
+        "has trouble falling asleep",
+        "feels sick from eating sweets",
+        "has a great amount of energy",
+        "likes to sleep late in the morning"
+      ],
+      "correct_answer": "has a great amount of energy"
+    },
+    {
+      "topic": "Theme",
+      "question": "What is the main theme of 'A Picture of Peace'?",
+      "type": "multiple-choice",
+      "options": [
+        "Recognizing an unexpected opportunity can have surprising results.",
+        "Enjoying an activity is more important than winning.",
+        "Younger siblings require a lot of patience and kindness.",
+        "It is more rewarding to work with others on a task than to work alone."
+      ],
+      "correct_answer": "Recognizing an unexpected opportunity can have surprising results."
+    },
+    {
+      "topic": "Vocabulary",
+      "question": "Which dictionary definition most closely matches the way the word 'capture' is used in paragraph 2?",
+      "type": "multiple-choice",
+      "options": [
+        "to gain control by force",
+        "to hold someone’s interest",
+        "to take an opponent’s piece in a game",
+        "to preserve a mood, scene, or quality"
+      ],
+      "correct_answer": "to preserve a mood, scene, or quality"
+    },
+    {
+      "topic": "Summary",
+      "question": "What is the best summary of 'A Picture of Peace'?",
+      "type": "multiple-choice",
+      "options": [
+        "Michelle has been interested in photography since she was seven years old. She decides to enter a photography contest hosted by a local photo shop and must take a picture to express the theme of the contest, which is tranquillity. She takes pictures of a sunset, a cat, a still pond, and her sleeping brother.",
+        "Michelle tries to take a photograph of a sunset for a contest. Her little brother is very interested in what she is doing, and he wants her to take a photograph of him. After she is satisfied with her sunset picture, Michelle photographs her brother while he is sleeping.",
+        "Michelle has difficulty photographing a sunset for a photography contest she wants to enter. She finally gets a good sunset picture, and she also takes a picture of her sleeping brother. At the last minute she selects the photo she thinks best illustrates the contest theme of tranquillity.",
+        "Michelle enters a photography contest that requires the use of a traditional camera. The theme of the contest is tranquillity. After getting the pictures developed at the photo shop, Michelle reviews her photos and selects the one she thinks will help her win the contest."
+      ],
+      "correct_answer": "Michelle has difficulty photographing a sunset for a photography contest she wants to enter. She finally gets a good sunset picture, and she also takes a picture of her sleeping brother. At the last minute she selects the photo she thinks best illustrates the contest theme of tranquillity."
+    },
+    {
+      "topic": "Imagery",
+      "question": "In what way does the imagery in paragraph 10 ('Soon the sky glowed orange, gold, and pink...') contribute to the story?",
+      "type": "multiple-choice",
+      "options": [
+        "It emphasizes how difficult it is to photograph the colors of a sunset.",
+        "It explains why Michelle thinks a sunset is a good subject for a photo.",
+        "It shows that nature is the best source of inspiration.",
+        "It suggests that Michelle is a talented photographer."
+      ],
+      "correct_answer": "It explains why Michelle thinks a sunset is a good subject for a photo."
+    },
+    {
+      "topic": "Plot Development",
+      "question": "Why are the events in paragraph 14 important to the plot?",
+      "type": "multiple-choice",
+      "options": [
+        "Michelle takes the photo she will decide to submit for the contest.",
+        "Michelle has more film available than she realizes.",
+        "Michelle takes a photo that will please her mother.",
+        "Michelle keeps her promise to her brother."
+      ],
+      "correct_answer": "Michelle takes the photo she will decide to submit for the contest."
+    },
+    {
+      "topic": "Text Evidence",
+      "question": "Which sentence from the story best supports the idea that taking great photographs requires some effort?",
+      "type": "multiple-choice",
+      "options": [
+        "When her father examined her blurred images and aimless shots, he advised Michelle to look through the lens and think about what the resulting picture would look like.",
+        "That picture still hangs on her bedroom wall.",
+        "\"We turn in the roll of film, it gets developed, and then we choose which picture we want to enter into the contest, just to make sure everything is fair.\"",
+        "\"I have to do my homework and think about something besides the contest.\""
+      ],
+      "correct_answer": "When her father examined her blurred images and aimless shots, he advised Michelle to look through the lens and think about what the resulting picture would look like."
+    },
+    {
+      "topic": "Inference",
+      "question": "Based on information presented in 'Fire Birds', what can the reader conclude about the black-backed woodpecker?",
+      "type": "multiple-choice",
+      "options": [
+        "It prefers to eat small insects but also consumes a variety of fruits and seeds.",
+        "It is better protected from danger when living in a burned forest than when living in an unburned forest.",
+        "It moves from forests in Canada to forests in the United States each year.",
+        "It leaves the burned forest because other birds invade its habitat."
+      ],
+      "correct_answer": "It is better protected from danger when living in a burned forest than when living in an unburned forest."
+    },
+    {
+      "topic": "Vocabulary",
+      "question": "The origin of the word 'devastate' helps the reader understand that 'devastated' in paragraph 1 means —",
+      "type": "multiple-choice",
+      "options": [
+        "ruined",
+        "empty",
+        "harsh",
+        "remote"
+      ],
+      "correct_answer": "ruined"
+    },
+    {
+      "topic": "Author's Purpose",
+      "question": "The author wrote 'Fire Birds' most likely to —",
+      "type": "multiple-choice",
+      "options": [
+        "describe ways that forest fires affect an area",
+        "explain how burned forests benefit from the black-backed woodpecker",
+        "convince the reader that the black-backed woodpecker is an unusual type of bird",
+        "demonstrate the ways animals survive in different types of forests"
+      ],
+      "correct_answer": "explain how burned forests benefit from the black-backed woodpecker"
+    },
+    {
+      "topic": "Text Evidence",
+      "question": "Which sentence from 'Fire Birds' best explains why the black-backed woodpecker is able to build its unique type of home?",
+      "type": "multiple-choice",
+      "options": [
+        "This woodpecker relies on the environment of the burned forest.",
+        "This nest is usually built inside a tree trunk or a fallen log.",
+        "It also has a very thick skull bone and a strong neck.",
+        "The woodpecker can move into the nest cavity as soon as it is drilled."
+      ],
+      "correct_answer": "It also has a very thick skull bone and a strong neck."
+    },
+    {
+      "topic": "Inference",
+      "question": "What can the reader conclude from paragraphs 5 through 8 of 'Fire Birds'?",
+      "type": "multiple-choice",
+      "options": [
+        "The work of the black-backed woodpecker has a lasting impact on the survival of other forest birds and animals.",
+        "The black-backed woodpecker moves to another forest when it has difficulty finding food.",
+        "Plants on the forest floor produce fruits and seeds that attract black-backed woodpeckers to the burned forest.",
+        "The black-backed woodpecker is without a home when people try to clean up a burned forest."
+      ],
+      "correct_answer": "The work of the black-backed woodpecker has a lasting impact on the survival of other forest birds and animals."
+    },
+    {
+      "topic": "Text Features",
+      "question": "The photograph and caption next to paragraphs 5 and 6 in 'Fire Birds' convey the idea that the nest cavity —",
+      "type": "multiple-choice",
+      "options": [
+        "extends beyond the tree",
+        "is fast and easy to construct",
+        "can only be used in certain seasons",
+        "provides a safe environment"
+      ],
+      "correct_answer": "provides a safe environment"
+    },
+    {
+      "topic": "Main Idea",
+      "question": "Which sentence best expresses the main idea of paragraph 2 in 'Soaring to New Heights'?",
+      "type": "multiple-choice",
+      "options": [
+        "Brown adapted her technique as her vision worsened.",
+        "Brown believed that being a junior in high school was easy.",
+        "Brown succeeded at pole vaulting despite her disability.",
+        "Brown competed in the Texas state championships twice."
+      ],
+      "correct_answer": "Brown adapted her technique as her vision worsened."
+    },
+    {
+      "topic": "Text Features",
+      "question": "The photograph and caption below paragraph 1 help the reader understand that —",
+      "type": "multiple-choice",
+      "options": [
+        "Brown requires special tools to compete",
+        "Brown needs to confirm her placement on the track",
+        "Brown is becoming more successful at pole vaulting",
+        "Brown appreciates the support of her coach"
+      ],
+      "correct_answer": "Brown needs to confirm her placement on the track"
+    },
+    {
+      "topic": "Author's Perspective",
+      "question": "Which sentence from 'Soaring to New Heights' best highlights that the author is impressed with Brown?",
+      "type": "multiple-choice",
+      "options": [
+        "Because she could distinguish between light and dark, she and her coach developed a system that enabled Brown to vault competitively.",
+        "She had made it back to the state championships in the pole vault.",
+        "She has even considered competing in the Olympics.",
+        "With these goals in mind, Brown will surely continue to soar to new heights."
+      ],
+      "correct_answer": "With these goals in mind, Brown will surely continue to soar to new heights."
+    },
+    {
+      "topic": "Vocabulary",
+      "question": "In paragraph 3 of 'Soaring to New Heights', what does the word 'diminished' mean?",
+      "type": "multiple-choice",
+      "options": [
+        "Changed constantly",
+        "Been reduced",
+        "Caused defeat",
+        "Produced confusion"
+      ],
+      "correct_answer": "Been reduced"
+    },
+    {
+      "topic": "Text Structure",
+      "question": "The organization of paragraphs 1 and 2 contributes to the author’s main idea by —",
+      "type": "multiple-choice",
+      "options": [
+        "comparing Brown with the other athletes she competes against",
+        "explaining how Brown overcame her challenges over time",
+        "highlighting the competitions Brown has participated in",
+        "showing the cause of Brown’s disability and its effects on her activities"
+      ],
+      "correct_answer": "explaining how Brown overcame her challenges over time"
+    },
+    {
+      "topic": "Theme",
+      "question": "What is one message the author conveys in 'See It Through'?",
+      "type": "multiple-choice",
+      "options": [
+        "Plan ahead for difficult times.",
+        "Be honest with those you love.",
+        "Take risks in order to be successful.",
+        "Treat others as you would like to be treated."
+      ],
+      "correct_answer": "Take risks in order to be successful."
+    },
+    {
+      "topic": "Character Analysis",
+      "question": "The author admires her mother mostly because her mother —",
+      "type": "multiple-choice",
+      "options": [
+        "offers advice on a variety of topics",
+        "exposes the author to many new experiences",
+        "has been in a wheelchair for the author’s entire life",
+        "lives in a way that demonstrates perseverance"
+      ],
+      "correct_answer": "lives in a way that demonstrates perseverance"
+    },
+    {
+      "topic": "Character Analysis",
+      "question": "What is the most likely reason the author does not tell her friends that her mother is paralyzed?",
+      "type": "multiple-choice",
+      "options": [
+        "She does not want people to judge her mother because of her disability.",
+        "She prefers to let her mother explain her own situation to others.",
+        "She does not think it is an important characteristic of her mother.",
+        "She thinks that most people already know her mother uses a wheelchair."
+      ],
+      "correct_answer": "She does not think it is an important characteristic of her mother."
+    },
+    {
+      "topic": "Comparison",
+      "question": "The author compares her mother with other mothers in order to show that —",
+      "type": "multiple-choice",
+      "options": [
+        "her mother is more supportive than other mothers",
+        "her mother does many of the positive things that other mothers do",
+        "other mothers help the author as much as her own mother does",
+        "other mothers do not understand the difficulties her mother experiences"
+      ],
+      "correct_answer": "her mother does many of the positive things that other mothers do"
+    },
+    {
+      "topic": "Character Analysis",
+      "question": "Which sentence from 'See It Through' best establishes how the author’s mother approaches her situation?",
+      "type": "multiple-choice",
+      "options": [
+        "Like most mothers, my mom wants the best for me.",
+        "She has been paralyzed from the waist down for most of her life, and all of mine.",
+        "She couldn’t hike the volcano in Hawaii with the rest of the family or go cliff-jumping in Mexico.",
+        "No matter how good or bad the chances are of something working out in her favor, she always tries."
+      ],
+      "correct_answer": "No matter how good or bad the chances are of something working out in her favor, she always tries."
+    },
+    {
+      "topic": "Family Dynamics",
+      "question": "Paragraph 4 shows that the author’s family —",
+      "type": "multiple-choice",
+      "options": [
+        "comforts the mother when she is unable to participate",
+        "supports the mother in her efforts to enjoy life to the fullest",
+        "wants to prevent the mother from taking unnecessary risks",
+        "thinks the mother should try activities designed specifically for people in wheelchairs"
+      ],
+      "correct_answer": "supports the mother in her efforts to enjoy life to the fullest"
+    },
+    {
+      "topic": "Comparison",
+      "question": "The authors of 'Soaring to New Heights' and 'See It Through' most likely think their subject is someone who exhibits —",
+      "type": "multiple-choice",
+      "options": [
+        "bravery",
+        "humor",
+        "sympathy",
+        "forgiveness"
+      ],
+      "correct_answer": "bravery"
+    },
+    {
+      "topic": "Comparison",
+      "question": "Which phrase from 'See It Through' illustrates that the mother also accomplishes tasks in a creative way, similar to how Brown uses a beeper in 'Soaring to New Heights'?",
+      "type": "multiple-choice",
+      "options": [
+        "mention that my mom is in a wheelchair",
+        "a cheerleader on the sideline of my soccer games",
+        "strapping herself to some stranger’s lap in order to zip-line",
+        "mother showed me how to live outside of limits"
+      ],
+      "correct_answer": "strapping herself to some stranger’s lap in order to zip-line"
+    },
+    {
+      "topic": "Comparison",
+      "question": "One difference between 'Soaring to New Heights' and 'See It Through' is that only 'See It Through' —",
+      "type": "multiple-choice",
+      "options": [
+        "shows how problems caused by a physical challenge become less important over time",
+        "illustrates how certain activities can enhance the quality of a person’s life",
+        "tells of the athletic accomplishments of a person who has limited mobility",
+        "describes a personal experience of living with someone who is disabled"
+      ],
+      "correct_answer": "describes a personal experience of living with someone who is disabled"
+    },
+    {
+      "topic": "Comparison",
+      "question": "What does Charlotte Brown in 'Soaring to New Heights' have in common with the author’s mother in 'See It Through'?",
+      "type": "multiple-choice",
+      "options": [
+        "They both want people to ignore the fact that they sometimes need assistance.",
+        "They both believe that their situation will improve someday.",
+        "They both are unwilling to use special accommodations.",
+        "They both refuse to let their circumstances limit their goals."
+      ],
+      "correct_answer": "They both refuse to let their circumstances limit their goals."
+    },
+    {
+      "topic": "Poetry Analysis",
+      "question": "Which line from 'A Walk Through My Rain Forest' best helps the reader imagine the flowers and fruits of the rain forest?",
+      "type": "multiple-choice",
+      "options": [
+        "Is more than can be described.",
+        "Its ponds are crowded",
+        "A palace of fragrance and tastes",
+        "Is pure paradise."
+      ],
+      "correct_answer": "A palace of fragrance and tastes"
+    },
+    {
+      "topic": "Poetry Analysis",
+      "question": "In stanza 3, the phrase 'Everywhere there is music' indicates that the speaker —",
+      "type": "multiple-choice",
+      "options": [
+        "is distracted by the different sounds of nature",
+        "finds the sounds of the rain forest enchanting",
+        "wishes he could imitate the sounds he hears",
+        "can recognize certain birds by the sounds they make"
+      ],
+      "correct_answer": "finds the sounds of the rain forest enchanting"
+    },
+    {
+      "topic": "Vocabulary",
+      "question": "Which dictionary definition best matches the way the word 'brilliant' is used in line 4?",
+      "type": "multiple-choice",
+      "options": [
+        "showing great intelligence",
+        "vivid in appearance",
+        "full of light",
+        "excellent or superior in performance"
+      ],
+      "correct_answer": "vivid in appearance"
+    },
+    {
+      "topic": "Poetry Analysis",
+      "question": "Throughout 'A Walk Through My Rain Forest', the rain forest is presented as a place that is —",
+      "type": "multiple-choice",
+      "options": [
+        "attractive to many visitors",
+        "highly adaptable to change",
+        "without any imperfections",
+        "best experienced early in the morning"
+      ],
+      "correct_answer": "without any imperfections"
+    },
+    {
+      "topic": "Poetic Structure",
+      "question": "The poem’s structure helps the reader —",
+      "type": "multiple-choice",
+      "options": [
+        "picture what a trip to the rain forest is like for the speaker",
+        "understand how much time the speaker spends in the rain forest",
+        "examine how the speaker’s emotions about the rain forest change",
+        "realize how the speaker feels about the rain forest compared with other places"
+      ],
+      "correct_answer": "picture what a trip to the rain forest is like for the speaker"
+    },
+    {
+      "topic": "Poetry Analysis",
+      "question": "The line 'Its greatness makes me feel very small' helps the reader understand that the speaker —",
+      "type": "multiple-choice",
+      "options": [
+        "feels unpleasantly overwhelmed by his surroundings",
+        "would prefer to visit the rain forest with a group of people",
+        "has a deep appreciation for his surroundings",
+        "wants to view the rain forest from a higher location"
+      ],
+      "correct_answer": "has a deep appreciation for his surroundings"
+    },
+    {
+      "topic": "Main Idea",
+      "question": "Which idea is supported throughout 'Flying into History'?",
+      "type": "multiple-choice",
+      "options": [
+        "Lindbergh was younger than most pilots hoping to fly from New York to Paris.",
+        "Airplanes with multiple engines were safest for crossing the Atlantic Ocean.",
+        "It took Lindbergh years to get the money he needed to build his plane.",
+        "Lindbergh believed a new strategy was needed to fly from New York to Paris."
+      ],
+      "correct_answer": "Lindbergh believed a new strategy was needed to fly from New York to Paris."
+    },
+    {
+      "topic": "Text Evidence",
+      "question": "Which detail about Lindbergh’s flight supports the idea that he flew the plane low in the sky?",
+      "type": "multiple-choice",
+      "options": [
+        "Lindbergh used the stars to guide him.",
+        "Lindbergh called out to fishermen for directions.",
+        "The plane traveled through poor weather conditions.",
+        "The plane was equipped with hundreds of gallons of fuel."
+      ],
+      "correct_answer": "Lindbergh called out to fishermen for directions."
+    },
+    {
+      "topic": "Text Features",
+      "question": "The map of Lindbergh’s flight path helps the reader understand —",
+      "type": "multiple-choice",
+      "options": [
+        "that the hotel owner wanted Lindbergh to be the first pilot to reach Paris",
+        "why people were able to see the plane when Lindbergh flew over the ocean",
+        "that Lindbergh had to fly over a large body of water in order to get to Paris",
+        "why Lindbergh made so many test flights over land before his flight across the ocean"
+      ],
+      "correct_answer": "that Lindbergh had to fly over a large body of water in order to get to Paris"
+    },
+    {
+      "topic": "Author's Purpose",
+      "question": "What is the most likely reason the author wrote 'Flying into History'?",
+      "type": "multiple-choice",
+      "options": [
+        "To give the history of pilots who have been honored for their contributions to air travel",
+        "To explain how businesses have impacted the production of planes throughout history",
+        "To provide information about how the design of planes has changed throughout history",
+        "To relate the details of an important event in the history of air travel"
+      ],
+      "correct_answer": "To relate the details of an important event in the history of air travel"
+    },
+    {
+      "topic": "Summary",
+      "question": "What is the best summary of the section titled 'The Flight' in 'Flying into History'?",
+      "type": "multiple-choice",
+      "options": [
+        "Charles Lindbergh asked people for directions as he flew over fishing boats on his long flight to Paris, France.",
+        "Charles Lindbergh received awards from royalty and the president of the United States after he flew from New York to Paris.",
+        "Charles Lindbergh was the first pilot to complete the difficult nonstop flight from New York to Paris and became an international hero.",
+        "Charles Lindbergh flew across the Atlantic Ocean with only a compass and the stars to help him navigate through fog and darkness."
+      ],
+      "correct_answer": "Charles Lindbergh flew across the Atlantic Ocean with only a compass and the stars to help him navigate through fog and darkness."
+    },
+    {
+      "topic": "Main Idea",
+      "question": "The main idea of paragraphs 4 and 5 in 'Flying into History' is that the Spirit of St. Louis was —",
+      "type": "multiple-choice",
+      "options": [
+        "rejected by most manufacturers Lindbergh approached",
+        "sponsored by local businessmen",
+        "completed in a short period of time",
+        "constructed specifically to satisfy Lindbergh’s requirements"
+      ],
+      "correct_answer": "constructed specifically to satisfy Lindbergh’s requirements"
+    }
+  ]
+}
   ]
 }
