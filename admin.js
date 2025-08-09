@@ -1,5 +1,5 @@
 import { auth, db } from './firebaseConfig.js';
-import { collection, getDocs, doc, addDoc, query, where } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
+import { collection, getDocs, doc, addDoc } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
 import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-auth.js";
 
 const ADMIN_EMAIL = 'psalm4all@gmail.com';
@@ -89,6 +89,10 @@ async function renderAdminPanel() {
                         <button type="button" id="addCompQuestionBtn" class="bg-gray-200 px-3 py-1 rounded text-sm mt-2">+ Add Question</button>
                     </div>
                     <div class="mb-4">
+                        <label for="questionText" class="block text-gray-700">Question Text</label>
+                        <textarea id="questionText" class="w-full mt-1 p-2 border rounded" rows="3" required></textarea>
+                    </div>
+                    <div class="mb-4">
                         <label for="questionLocation" class="block text-gray-700">Location</label>
                         <select id="questionLocation" class="w-full mt-1 p-2 border rounded">
                             <option value="USA">USA</option>
@@ -171,15 +175,6 @@ async function renderAdminPanel() {
             <button type="button" class="add-comp-option-btn bg-gray-200 px-3 py-1 rounded text-sm mt-2">+ Add Option</button>
         `;
         compQuestionsContainer.appendChild(newQuestionGroup);
-        // Add event listener for the new button
-        newQuestionGroup.querySelector('.add-comp-option-btn').addEventListener('click', (e) => {
-            const optionsGroup = e.target.closest('.question-group').querySelector('.options-group');
-            const newOption = document.createElement('input');
-            newOption.type = 'text';
-            newOption.className = 'comp-option w-1/2 p-2 border rounded';
-            newOption.placeholder = `Option ${optionsGroup.children.length + 1}`;
-            optionsGroup.appendChild(newOption);
-        });
     });
 
     document.getElementById('comprehensionQuestions').addEventListener('click', (e) => {
@@ -362,7 +357,7 @@ async function loadAndRenderReport(docId) {
 async function loadCounters() {
     const totalStudentsCount = document.getElementById('totalStudentsCount');
     const totalTutorsCount = document.getElementById('totalTutorsCount');
-    const studentsPerTutorList = document.getElementById('studentsPerTutorList');
+    const studentsPerTutorSelect = document.getElementById('studentsPerTutorSelect');
 
     const [studentsSnapshot, tutorsSnapshot] = await Promise.all([
         getDocs(collection(db, "student_results")),
@@ -372,15 +367,16 @@ async function loadCounters() {
     totalStudentsCount.textContent = studentsSnapshot.docs.length;
     totalTutorsCount.textContent = tutorsSnapshot.docs.length;
     
-    studentsPerTutorList.innerHTML = '';
+    studentsPerTutorSelect.innerHTML = `<option value="">Students Per Tutor</option>`;
     for (const tutorDoc of tutorsSnapshot.docs) {
         const tutor = tutorDoc.data();
         const studentsQuery = query(collection(db, "student_results"), where("tutorEmail", "==", tutor.email));
         const studentsUnderTutor = await getDocs(studentsQuery);
         
-        const listItem = document.createElement('li');
-        listItem.textContent = `${tutor.name} (${studentsUnderTutor.docs.length} students)`;
-        studentsPerTutorList.appendChild(listItem);
+        const option = document.createElement('option');
+        option.textContent = `${tutor.name} (${studentsUnderTutor.docs.length} students)`;
+        option.value = tutor.email;
+        studentsPerTutorSelect.appendChild(option);
     }
 }
 
