@@ -1,5 +1,5 @@
 import { auth, db } from './firebaseConfig.js';
-import { collection, getDocs, doc, addDoc } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
+import { collection, getDocs, doc, addDoc, query, where, getDoc } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
 import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-auth.js";
 
 const ADMIN_EMAIL = 'psalm4all@gmail.com';
@@ -300,12 +300,12 @@ async function loadAndRenderReport(docId) {
     reportContent.innerHTML = `<p class="text-gray-500">Loading report...</p>`;
 
     try {
-        const reportDoc = await doc(db, "student_results", docId).get();
+        const reportDoc = await getDoc(doc(db, "student_results", docId));
         const data = reportDoc.data();
 
         const tutorEmail = data.tutorEmail || 'N/A';
-        const tutorDoc = await doc(db, "tutors", tutorEmail).get();
-        const tutorName = tutorDoc.exists ? tutorDoc.data().name : 'N/A';
+        const tutorDoc = await getDoc(doc(db, "tutors", tutorEmail));
+        const tutorName = tutorDoc.exists() ? tutorDoc.data().name : 'N/A';
         const fullName = capitalize(data.studentName);
 
         const creativeWritingAnswer = data.answers.find(a => a.type === 'creative-writing');
