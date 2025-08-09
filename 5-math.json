@@ -73,18 +73,6 @@
       "image_position": "after"
     },
     {
-      "id": "2019-Q1",
-      "topic": "Linear Equations",
-      "question": "A pet store orders dog beds using y = 12x (x=boxes, y=beds). Which table matches this?",
-      "type": "multiple-choice",
-      "location": "USA",
-      "options": ["Table A", "Table B", "Table C", "Table D"],
-      "correct_answer": "Table A",
-      "year": 2019,
-      "image_url": null,
-      "image_position": "after"
-    },
-    {
       "id": "2019-Q2",
       "topic": "Arithmetic",
       "question": "Rebecca bought 8 air filters at $16.95 each, with a $7.50 coupon. What was her total cost?",
@@ -132,29 +120,6 @@
       "image_url": null,
       "image_position": "after"
     },
-    {
-      "id": "2018-Q3",
-      "topic": "Proportional Relationships",
-      "question": "The equation y = 1.5x relates cups of water (y) to cups of rice (x). Which table matches this?",
-      "type": "multiple-choice",
-      "location": "USA",
-      "options": ["Table A", "Table B", "Table C", "Table D"],
-      "correct_answer": "Table A",
-      "year": 2018,
-      "image_url": null,
-      "image_position": "after"
-    }
-  ],
-  "metadata": {
-    "total_questions": 13,
-    "years_included": [2018, 2019, 2021, 2022],
-    "question_types": {
-      "multiple_choice": 12,
-      "griddable": 1
-    },
-    "exclusions": {
-      "reason": "Omitted questions requiring diagrams/graphs",
-      "count": 23
     }
   }
 }
