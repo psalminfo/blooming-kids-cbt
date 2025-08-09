@@ -132,16 +132,9 @@ async function loadReport() {
                 <tbody>${topicsTableRows}</tbody>
               </table>
             ` : `<p class="italic">No topics found for this test.</p>`}
-          
-          ${creativeWritingAnswer ? `
-              <h3 class="text-lg font-semibold mt-4 mb-2">Creative Writing Report</h3>
-              <p class="mb-2"><strong>Submission:</strong> ${creativeWritingContent}</p>
-              <p class="mb-2"><strong>Tutor's Report:</strong> ${tutorReport}</p>
-            ` : ''}
-          
+          <h3 class="text-lg font-semibold mt-4 mb-2">Tutor's Recommendation</h3>
+          <p class="mb-2"><strong>Tutor's Report:</strong> ${tutorReport}</p>
           <canvas id="chart-${blockIndex}" class="w-full h-48 mb-4"></canvas>
-          <h3 class="text-lg font-semibold mb-1">Tutor’s Recommendation</h3>
-          <p class="mb-2 italic">Based on this assessment, the tutor recommends dedicated focus on the topics highlighted above. Regular practice will help reinforce understanding and build long-term confidence.</p>
           <h3 class="text-lg font-semibold mb-1">Director’s Message</h3>
           <p class="italic text-sm">At Blooming Kids House, we are committed to helping every child succeed. We believe that with personalized support from our tutors, ${fullName} will unlock their full potential. Keep up the great work!<br/>– Mrs. Yinka Isikalu, Director</p>
           <div class="mt-4">
