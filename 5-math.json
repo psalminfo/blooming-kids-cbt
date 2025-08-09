@@ -280,5 +280,151 @@
       "options": ["7 apples", "8 apples", "9 apples", "10 apples"],
       "correct_answer": "8 apples"
     }
+    {
+  "questions": [
+    // ================= 2022 Test =================
+    {
+      "id": "2022-Q1",
+      "topic": "Estimation",
+      "question": "Mr. Maclane drove 577.2 miles. Ms. Lopez drove 165.4 miles. About how many more miles did Mr. Maclane drive than Ms. Lopez?",
+      "type": "multiple-choice",
+      "options": ["400 miles", "300 miles", "800 miles", "700 miles"],
+      "correct_answer": "400 miles",
+      "year": 2022
+    },
+    {
+      "id": "2022-Q2",
+      "topic": "Linear Equations",
+      "question": "A worker builds toys at a rate of y = 9x (x=hours, y=toys). Which graph represents this?",
+      "type": "multiple-choice",
+      "options": ["Graph A", "Graph B", "Graph C", "Graph D"],
+      "correct_answer": "Graph B",
+      "year": 2022
+    },
+    {
+      "id": "2022-Q3",
+      "topic": "Decimal Comparison",
+      "question": "Car weights: Q=1.269 tons, R=1.314 tons, S=1.281 tons, T=1.238 tons. Which is true?",
+      "type": "multiple-choice",
+      "options": [
+        "Car S < Car T",
+        "Car Q > Car R",
+        "Car R < Car T",
+        "Car S > Car Q"
+      ],
+      "correct_answer": "Car S > Car Q",
+      "year": 2022
+    },
+    {
+      "id": "2022-Q4",
+      "topic": "Division",
+      "question": "7 friends split a $99.96 bill equally. How much did each pay?",
+      "type": "griddable",
+      "correct_answer": "14.28",
+      "year": 2022
+    },
+    // ================= 2021 Test =================
+    {
+      "id": "2021-Q1",
+      "topic": "Multiplication",
+      "question": "Kelsi spends $6.75 every Saturday for breakfast. What is her total cost for 14 Saturdays?",
+      "type": "multiple-choice",
+      "options": ["$94.50", "$20.75", "$92.30", "$33.75"],
+      "correct_answer": "$94.50",
+      "year": 2021
+    },
+    {
+      "id": "2021-Q2",
+      "topic": "Volume",
+      "question": "A rectangular prism has dimensions 20 in × 11 in × 13 in. What is its volume?",
+      "type": "multiple-choice",
+      "options": ["233 in³", "2,860 in³", "160 in³", "88 in³"],
+      "correct_answer": "2,860 in³",
+      "year": 2021
+    },
+    {
+      "id": "2021-Q3",
+      "topic": "Division",
+      "question": "Nicholas put 1,012 baseball cards into boxes with 22 cards each. How many boxes did he need?",
+      "type": "multiple-choice",
+      "options": ["55", "50", "46", "47"],
+      "correct_answer": "46",
+      "year": 2021
+    },
+    // ================= 2019 Test =================
+    {
+      "id": "2019-Q1",
+      "topic": "Linear Equations",
+      "question": "A pet store orders dog beds using y = 12x (x=boxes, y=beds). Which table matches this?",
+      "type": "multiple-choice",
+      "options": ["Table A", "Table B", "Table C", "Table D"],
+      "correct_answer": "Table A",
+      "year": 2019
+    },
+    {
+      "id": "2019-Q2",
+      "topic": "Arithmetic",
+      "question": "Rebecca bought 8 air filters at $16.95 each, with a $7.50 coupon. What was her total cost?",
+      "type": "multiple-choice",
+      "options": ["$80.70", "$143.10", "$128.10", "$75.60"],
+      "correct_answer": "$128.10",
+      "year": 2019
+    },
+    {
+      "id": "2019-Q3",
+      "topic": "Coordinate Geometry",
+      "question": "Jim plotted points (1,3), (3,6), (7,6), (9,3) to form a polygon. Which point is inside it?",
+      "type": "multiple-choice",
+      "options": ["(4,5)", "(8,6)", "(5,7)", "(3,1)"],
+      "correct_answer": "(4,5)",
+      "year": 2019
+    },
+    // ================= 2018 Test =================
+    {
+      "id": "2018-Q1",
+      "topic": "Money",
+      "question": "Paul found 7¢ on his desk, 98¢ under his bed, and $2.04 in his closet. What was his total?",
+      "type": "multiple-choice",
+      "options": ["$2.09", "$3.09", "$3.72", "$4.08"],
+      "correct_answer": "$3.09",
+      "year": 2018
+    },
+    {
+      "id": "2018-Q2",
+      "topic": "Decimal Comparison",
+      "question": "Which comparison is NOT true?",
+      "type": "multiple-choice",
+      "options": [
+        "3.375 > 3.275",
+        "6.875 < 6.9",
+        "2.65 > 2.675",
+        "7.675 < 7.75"
+      ],
+      "correct_answer": "2.65 > 2.675",
+      "year": 2018
+    },
+    {
+      "id": "2018-Q3",
+      "topic": "Proportional Relationships",
+      "question": "The equation y = 1.5x relates cups of water (y) to cups of rice (x). Which table matches this?",
+      "type": "multiple-choice",
+      "options": ["Table A", "Table B", "Table C", "Table D"],
+      "correct_answer": "Table A",
+      "year": 2018
+    }
+  ],
+  "metadata": {
+    "total_questions": 13,
+    "years_included": [2018, 2019, 2021, 2022],
+    "exclusions": {
+      "reason": "Omitted questions requiring diagrams/graphs",
+      "count": 23
+    },
+    "question_types": {
+      "multiple_choice": 12,
+      "griddable": 1
+    }
+  }
+}
   ]
 }
