@@ -17,7 +17,13 @@ export async function loadQuestions(subject, grade, studentCountry) {
         const firestoreSnapshot = await getDocs(collection(db, "admin_questions"));
         const firestoreData = firestoreSnapshot.docs.map(doc => doc.data());
 
-        let combinedQuestions = [...gitHubData, ...firestoreData];
+        let combinedQuestions = [...(gitHubData || []), ...(firestoreData || [])];
+
+        if (combinedQuestions.length === 0) {
+            container.innerHTML = `<p class="text-red-600">❌ No questions found for ${subject.toUpperCase()} Grade ${grade}.</p>`;
+            return;
+        }
+
         let countrySpecificQuestions = combinedQuestions.filter(q => q.location === studentCountry);
 
         if (countrySpecificQuestions.length < 30) {
@@ -56,7 +62,7 @@ export function getLoadedQuestions() {
 
 function displayQuestions(questions) {
     const container = document.getElementById("question-container");
-    container.innerHTML = questions.map((q, i) => `
+    container.innerHTML = (questions || []).map((q, i) => `
         <div class="bg-white p-4 border rounded-lg shadow-sm question-block" data-question-id="${q.id}">
             ${(q.image_url && q.image_position === 'before') ? `<img src="${q.image_url}" class="mb-2 w-full rounded" />` : ''}
             <p class="font-semibold mb-2 question-text">${i + 1}. ${q.question}</p>
@@ -68,7 +74,7 @@ function displayQuestions(questions) {
                     <input type="file" id="creativeWritingFile" class="w-full mt-1">
                 </div>
             ` : `
-                ${q.options.map(opt => `
+                ${(q.options || []).map(opt => `
                     <label class="block ml-4">
                         <input type="radio" name="q${i}" value="${opt}" class="mr-2"> ${opt}
                     </label>
