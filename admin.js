@@ -1,10 +1,9 @@
 import { auth, db } from './firebaseConfig.js';
-import { collection, getDocs, addDoc } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
+import { collection, getDocs, doc, addDoc } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
 import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-auth.js";
 
 const ADMIN_EMAIL = 'psalm4all@gmail.com';
 
-// Your Cloudinary details
 const CLOUDINARY_CLOUD_NAME = 'dy2hxcyaf';
 const CLOUDINARY_UPLOAD_PRESET = 'bkh_assessments';
 const CLOUDINARY_UPLOAD_URL = `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`;
@@ -26,6 +25,7 @@ async function uploadImageToCloudinary(file) {
     return data.secure_url;
 }
 
+
 function renderAdminPanel() {
     const adminContent = document.getElementById('adminContent');
     adminContent.innerHTML = `
@@ -42,11 +42,42 @@ function renderAdminPanel() {
                         <textarea id="questionText" class="w-full mt-1 p-2 border rounded" rows="3" required></textarea>
                     </div>
                     <div class="mb-4">
+                        <label for="grade" class="block text-gray-700">Grade</label>
+                        <select id="grade" required class="w-full mt-1 p-2 border rounded">
+                            <option value="">Select Grade</option>
+                            <option value="3">Grade 3</option>
+                            <option value="4">Grade 4</option>
+                            <option value="5">Grade 5</option>
+                            <option value="6">Grade 6</option>
+                            <option value="7">Grade 7</option>
+                            <option value="8">Grade 8</option>
+                            <option value="9">Grade 9</option>
+                            <option value="10">Grade 10</option>
+                            <option value="11">Grade 11</option>
+                            <option value="12">Grade 12</option>
+                        </select>
+                    </div>
+                    <div class="mb-4">
                         <label for="questionType" class="block text-gray-700">Question Type</label>
                         <select id="questionType" class="w-full mt-1 p-2 border rounded">
                             <option value="multiple-choice">Multiple Choice</option>
                             <option value="creative-writing">Creative Writing</option>
+                            <option value="comprehension">Comprehension</option>
                         </select>
+                    </div>
+                    <div class="mb-4" id="writingTypeSection" style="display:none;">
+                        <label for="writingType" class="block text-gray-700">Writing Type</label>
+                        <select id="writingType" class="w-full mt-1 p-2 border rounded">
+                            <option value="Narrative">Narrative</option>
+                            <option value="Descriptive">Descriptive</option>
+                            <option value="Persuasive">Persuasive</option>
+                            <option value="Expository">Expository</option>
+                            <option value="Poetry">Poetry</option>
+                        </select>
+                    </div>
+                    <div class="mb-4" id="comprehensionSection" style="display:none;">
+                        <label for="passage" class="block text-gray-700">Comprehension Passage</label>
+                        <textarea id="passage" class="w-full mt-1 p-2 border rounded" rows="6" placeholder="Paste the full passage here..."></textarea>
                     </div>
                     <div class="mb-4">
                         <label for="questionLocation" class="block text-gray-700">Location</label>
@@ -76,7 +107,7 @@ function renderAdminPanel() {
                         <input type="text" class="option-input w-full mt-1 p-2 border rounded" placeholder="Option 2">
                     </div>
                     <button type="button" id="addOptionBtn" class="bg-gray-200 px-3 py-1 rounded text-sm mb-4">+ Add Option</button>
-                    <div class="mb-4">
+                    <div class="mb-4" id="correctAnswerSection">
                         <label for="correctAnswer" class="block text-gray-700">Correct Answer</label>
                         <input type="text" id="correctAnswer" class="w-full mt-1 p-2 border rounded">
                     </div>
@@ -86,17 +117,53 @@ function renderAdminPanel() {
             </div>
 
             <div class="bg-white p-6 rounded-lg shadow-md">
-                <h2 class="text-2xl font-bold text-green-700 mb-4">All Student Reports</h2>
+                <h2 class="text-2xl font-bold text-green-700 mb-4">View Student Reports</h2>
                 <div class="mb-4">
-                    <input type="email" id="searchEmail" class="w-full mt-1 p-2 border rounded" placeholder="Search by parent email...">
-                    <button id="searchBtn" class="bg-blue-600 text-white px-4 py-2 rounded mt-2 hover:bg-blue-700">Search</button>
+                    <label for="studentDropdown" class="block text-gray-700">Select Student</label>
+                    <select id="studentDropdown" class="w-full mt-1 p-2 border rounded"></select>
                 </div>
-                <div id="allReportsContainer" class="space-y-4">
-                    <p class="text-gray-500">Loading reports...</p>
+                <div id="reportContent" class="space-y-4">
+                    <p class="text-gray-500">Please select a student to view their report.</p>
                 </div>
             </div>
         </div>
     `;
+
+    const addQuestionForm = document.getElementById('addQuestionForm');
+    const questionTypeDropdown = document.getElementById('questionType');
+    const optionsContainer = document.getElementById('optionsContainer');
+    const correctAnswerSection = document.getElementById('correctAnswerSection');
+    const writingTypeSection = document.getElementById('writingTypeSection');
+    const comprehensionSection = document.getElementById('comprehensionSection');
+    
+    questionTypeDropdown.addEventListener('change', (e) => {
+        const type = e.target.value;
+        optionsContainer.style.display = type === 'multiple-choice' ? 'block' : 'none';
+        correctAnswerSection.style.display = type === 'multiple-choice' ? 'block' : 'none';
+        writingTypeSection.style.display = type === 'creative-writing' ? 'block' : 'none';
+        comprehensionSection.style.display = type === 'comprehension' ? 'block' : 'none';
+    });
+
+    // Fetch and populate student dropdown
+    const studentDropdown = document.getElementById('studentDropdown');
+    getDocs(collection(db, "student_results")).then(studentReportsSnapshot => {
+        studentReportsSnapshot.forEach(doc => {
+            const student = doc.data();
+            const option = document.createElement('option');
+            option.value = doc.id;
+            option.textContent = `${student.studentName} (${student.parentEmail})`;
+            studentDropdown.appendChild(option);
+        });
+    });
+
+    studentDropdown.addEventListener('change', async (e) => {
+        const docId = e.target.value;
+        if (docId) {
+            await loadAndRenderReport(docId);
+        } else {
+            document.getElementById('reportContent').innerHTML = `<p class="text-gray-500">Please select a student to view their report.</p>`;
+        }
+    });
 
     document.getElementById('addOptionBtn').addEventListener('click', () => {
         const optionsContainer = document.getElementById('optionsContainer');
@@ -107,7 +174,7 @@ function renderAdminPanel() {
         optionsContainer.appendChild(newInput);
     });
 
-    document.getElementById('addQuestionForm').addEventListener('submit', async (e) => {
+    addQuestionForm.addEventListener('submit', async (e) => {
         e.preventDefault();
         const form = e.target;
         const message = document.getElementById('formMessage');
@@ -123,16 +190,21 @@ function renderAdminPanel() {
             const questionType = form.questionType.value;
             const options = questionType === 'multiple-choice' ? Array.from(form.querySelectorAll('.option-input')).map(input => input.value).filter(v => v) : null;
             const correctAnswer = questionType === 'multiple-choice' ? form.correctAnswer.value : null;
-            
+            const writingType = questionType === 'creative-writing' ? form.writingType.value : null;
+            const passage = questionType === 'comprehension' ? form.passage.value : null;
+
             const newQuestion = {
                 topic: form.topic.value,
+                grade: form.grade.value,
                 question: form.questionText.value,
                 type: questionType,
                 location: form.questionLocation.value,
                 options: options,
                 correct_answer: correctAnswer,
                 image_url: imageUrl,
-                image_position: form.imagePosition.value
+                image_position: form.imagePosition.value,
+                writing_type: writingType,
+                passage: passage
             };
 
             await addDoc(collection(db, "admin_questions"), newQuestion);
@@ -146,43 +218,69 @@ function renderAdminPanel() {
             message.style.color = 'red';
         }
     });
-
-    document.getElementById('searchBtn').addEventListener('click', async () => {
-        const email = document.getElementById('searchEmail').value;
-        await loadAllReports(email);
-    });
-
-    loadAllReports();
 }
 
-async function loadAllReports(email = null) {
-    const reportsContainer = document.getElementById('allReportsContainer');
-    reportsContainer.innerHTML = `<p class="text-gray-500">Loading reports...</p>`;
-    
-    let query = collection(db, "student_results");
-    if (email) {
-        query = query.where("parentEmail", "==", email);
-    }
-    
+function capitalize(str) {
+  return str.replace(/\b\w/g, l => l.toUpperCase());
+}
+
+
+async function loadAndRenderReport(docId) {
+    const reportContent = document.getElementById('reportContent');
+    reportContent.innerHTML = `<p class="text-gray-500">Loading report...</p>`;
+
     try {
-        const querySnapshot = await getDocs(query);
-        let reportHTML = '';
-        querySnapshot.forEach(doc => {
-            const data = doc.data();
-            reportHTML += `
-                <div class="border rounded-lg p-4 shadow-sm bg-white">
-                    <p><strong>Student:</strong> ${data.studentName}</p>
-                    <p><strong>Email:</strong> ${data.parentEmail}</p>
-                    <p><strong>Subject:</strong> ${data.subject}</p>
-                    <p><strong>Grade:</strong> ${data.grade}</p>
-                    <p><strong>Submitted At:</strong> ${new Date(data.submittedAt.seconds * 1000).toLocaleString()}</p>
-                </div>
-            `;
+        const reportDoc = await doc(db, "student_results", docId).get();
+        const data = reportDoc.data();
+
+        const tutorEmail = data.tutorEmail || 'N/A';
+        const tutorDoc = await doc(db, "tutors", tutorEmail).get();
+        const tutorName = tutorDoc.exists ? tutorDoc.data().name : 'N/A';
+        const fullName = capitalize(data.studentName);
+
+        const creativeWritingAnswer = data.answers.find(a => a.type === 'creative-writing');
+        const tutorReport = creativeWritingAnswer?.tutorReport || 'N/A';
+        const creativeWritingContent = creativeWritingAnswer?.studentResponse || 'N/A';
+        
+        let correctCount = 0;
+        data.answers.forEach(answerObject => {
+            if (answerObject.type !== 'creative-writing' && String(answerObject.studentAnswer).toLowerCase() === String(answerObject.correctAnswer).toLowerCase()) {
+                correctCount++;
+            }
         });
-        reportsContainer.innerHTML = reportHTML || `<p class="text-gray-500">No reports found.</p>`;
+        const totalScoreable = data.totalScoreableQuestions;
+        const topics = [...new Set(data.answers.map(a => a.topic).filter(t => t))];
+
+
+        reportContent.innerHTML = `
+            <div class="border rounded-lg shadow mb-8 p-4 bg-white" id="report-block">
+                <h2 class="text-xl font-bold mb-2">Student Name: ${fullName}</h2>
+                <p><strong>Parent Email:</strong> ${data.parentEmail}</p>
+                <p><strong>Grade:</strong> ${data.grade}</p>
+                <p><strong>Tutor:</strong> ${tutorName || 'N/A'}</p>
+                <p><strong>Location:</strong> ${data.studentCountry || 'N/A'}</p>
+                <p><strong>Session Date:</strong> ${new Date(data.submittedAt.seconds * 1000).toLocaleString()}</p>
+                <h3 class="text-lg font-semibold mt-4 mb-2">Performance Summary</h3>
+                <p class="font-bold">Score: ${correctCount} / ${totalScoreable}</p>
+                <h3 class="text-lg font-semibold mt-4 mb-2">Knowledge & Skill Analysis</h3>
+                <p>${topics.join(', ') || 'N/A'}</p>
+                <h3 class="text-lg font-semibold mt-4 mb-2">Creative Writing Report</h3>
+                <p class="mb-2"><strong>Submission:</strong> ${creativeWritingContent}</p>
+                <p class="mb-2"><strong>Tutor's Report:</strong> ${tutorReport}</p>
+                <div class="mt-4">
+                    <button id="downloadPdfBtn" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Download Report PDF</button>
+                </div>
+            </div>
+        `;
+        
+        document.getElementById('downloadPdfBtn').addEventListener('click', () => {
+            const element = document.getElementById('report-block');
+            html2pdf().from(element).save();
+        });
+
     } catch (error) {
-        console.error("Error loading reports:", error);
-        reportsContainer.innerHTML = `<p class="text-red-500">Failed to load reports.</p>`;
+        console.error("Error loading report:", error);
+        reportContent.innerHTML = `<p class="text-red-500">Failed to load report.</p>`;
     }
 }
 
@@ -195,16 +293,9 @@ onAuthStateChanged(auth, (user) => {
         renderAdminPanel();
         logoutBtn.addEventListener('click', async () => {
             await signOut(auth);
-            window.location.href = "index.html";
+            window.location.href = "admin-auth.html";
         });
     } else {
-        adminContent.innerHTML = `
-            <div class="text-center mt-12">
-                <h2 class="text-2xl font-bold text-red-600">Access Denied</h2>
-                <p class="text-gray-600 mt-2">You must be logged in with the admin email to view this page.</p>
-                <a href="index.html" class="mt-4 inline-block bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Go to Login</a>
-            </div>
-        `;
-        logoutBtn.classList.add('hidden');
+        window.location.href = "admin-auth.html";
     }
 });
