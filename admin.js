@@ -1,5 +1,5 @@
 import { auth, db } from './firebaseConfig.js';
-import { collection, getDocs, doc, addDoc, query, where, getDoc, updateDoc } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
+import { collection, getDocs, doc, addDoc, query, where, getDoc } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
 import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-auth.js";
 
 const ADMIN_EMAIL = 'psalm4all@gmail.com';
@@ -30,21 +30,22 @@ async function renderAdminPanel() {
     const adminContent = document.getElementById('adminContent');
     adminContent.innerHTML = `
         <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <!-- Content Checklist and Uploads -->
-            <div class="bg-white p-6 rounded-lg shadow-md">
-                <h2 class="text-2xl font-bold text-green-700 mb-4">Content Checklist</h2>
-                <div id="checklistContent" class="space-y-4 text-sm">
-                    <p class="text-gray-500">Loading checklist...</p>
-                </div>
-            </div>
-
-            <!-- Add Question Form -->
             <div class="bg-white p-6 rounded-lg shadow-md">
                 <h2 class="text-2xl font-bold text-green-700 mb-4">Add New Question</h2>
                 <form id="addQuestionForm">
                     <div class="mb-4">
                         <label for="topic" class="block text-gray-700">Topic</label>
                         <input type="text" id="topic" class="w-full mt-1 p-2 border rounded" required>
+                    </div>
+                    <div class="mb-4">
+                        <label for="subject" class="block text-gray-700">Subject</label>
+                        <select id="subject" required class="w-full mt-1 p-2 border rounded">
+                            <option value="">Select Subject</option>
+                            <option value="Math">Math</option>
+                            <option value="English">English</option>
+                            <option value="Science">Science</option>
+                            <option value="Social Studies">Social Studies</option>
+                        </select>
                     </div>
                     <div class="mb-4">
                         <label for="grade" class="block text-gray-700">Grade</label>
@@ -137,16 +138,8 @@ async function renderAdminPanel() {
                     <p id="formMessage" class="mt-4 text-sm"></p>
                 </form>
             </div>
-            <!-- Missing Content Checklist -->
-            <div class="bg-white p-6 rounded-lg shadow-md col-span-1">
-                <h2 class="text-2xl font-bold text-green-700 mb-4">Content Checklist</h2>
-                <p class="text-gray-600 mb-2">Questions from your GitHub that need content:</p>
-                <div id="checklistContent" class="space-y-4 text-sm">
-                    <p class="text-gray-500">Loading checklist...</p>
-                </div>
-            </div>
-            <!-- Report Section -->
-            <div class="bg-white p-6 rounded-lg shadow-md col-span-2">
+
+            <div class="bg-white p-6 rounded-lg shadow-md">
                 <h2 class="text-2xl font-bold text-green-700 mb-4">View Student Reports</h2>
                 <div class="mb-4">
                     <label for="studentDropdown" class="block text-gray-700">Select Student</label>
@@ -160,171 +153,6 @@ async function renderAdminPanel() {
     `;
 
     const addQuestionForm = document.getElementById('addQuestionForm');
-    const questionTypeDropdown = document.getElementById('questionType');
-    const optionsContainer = document.getElementById('optionsContainer');
-    const addOptionBtn = document.getElementById('addOptionBtn');
-    const correctAnswerSection = document.getElementById('correctAnswerSection');
-    const writingTypeSection = document.getElementById('writingTypeSection');
-    const comprehensionSection = document.getElementById('comprehensionSection');
-    const addCompQuestionBtn = document.getElementById('addCompQuestionBtn');
-    const checklistContent = document.getElementById('checklistContent');
-
-    async function loadChecklist() {
-        checklistContent.innerHTML = `<p class="text-gray-500">Loading checklist...</p>`;
-        const GITHUB_URL = `https://raw.githubusercontent.com/psalminfo/blooming-kids-cbt/main/6-ela.json`;
-        const firestoreSnapshot = await getDocs(collection(db, "admin_questions"));
-        const existingQuestions = firestoreSnapshot.docs.map(doc => ({id: doc.id, ...doc.data()}));
-
-        try {
-            const githubRes = await fetch(GITHUB_URL);
-            const githubData = githubRes.ok ? (await githubRes.json()).questions : [];
-
-            let checklistHTML = '';
-            githubData.forEach(q => {
-                const needsImage = q.image_url === null || q.image_url === undefined;
-                const needsPassage = q.passageId !== null && !existingQuestions.some(eq => eq.passageId === q.passageId && eq.passage);
-
-                if (needsImage || needsPassage) {
-                    checklistHTML += `
-                        <div class="p-4 border rounded-lg bg-gray-50">
-                            <p class="font-semibold">${q.questionText || 'Comprehension Question'} (ID: ${q.id})</p>
-                            ${needsImage ? `<p class="text-red-500">❌ Missing Image</p>` : ''}
-                            ${needsPassage ? `<p class="text-red-500">❌ Missing Passage</p>` : ''}
-                            <button class="update-content-btn bg-green-500 text-white px-4 py-2 rounded mt-2" data-question-id="${q.id}">Add Content</button>
-                        </div>
-                    `;
-                }
-            });
-            checklistContent.innerHTML = checklistHTML || `<p class="text-gray-500">No content is missing from your GitHub files.</p>`;
-        } catch (error) {
-            console.error("Error loading checklist:", error);
-            checklistContent.innerHTML = `<p class="text-red-500">Failed to load checklist from GitHub.</p>`;
-        }
-    }
-
-    addQuestionForm.addEventListener('submit', async (e) => {
-        e.preventDefault();
-        const form = e.target;
-        const message = document.getElementById('formMessage');
-        const imageFile = document.getElementById('imageUpload').files[0];
-
-        try {
-            message.textContent = "Uploading...";
-            let imageUrl = null;
-            if (imageFile) {
-                imageUrl = await uploadImageToCloudinary(imageFile);
-            }
-
-            const questionType = form.questionType.value;
-            let newQuestion;
-
-            if (questionType === 'comprehension') {
-                const questionsArray = [];
-                form.querySelectorAll('.question-group').forEach(group => {
-                    const compQuestion = group.querySelector('.comp-question').value;
-                    const compOptions = Array.from(group.querySelectorAll('.comp-option')).map(input => input.value).filter(v => v);
-                    const compCorrectAnswer = group.querySelector('.comp-correct-answer').value;
-
-                    questionsArray.push({
-                        question: compQuestion,
-                        options: compOptions,
-                        correct_answer: compCorrectAnswer,
-                        type: 'multiple-choice',
-                    });
-                });
-                newQuestion = {
-                    topic: form.topic.value,
-                    grade: form.grade.value,
-                    passage: form.passage.value,
-                    type: questionType,
-                    location: form.questionLocation.value,
-                    image_url: imageUrl,
-                    image_position: form.imagePosition.value,
-                    sub_questions: questionsArray
-                };
-            } else {
-                const options = questionType === 'multiple-choice' ? Array.from(form.querySelectorAll('.option-input')).map(input => input.value).filter(v => v) : null;
-                const correctAnswer = questionType === 'multiple-choice' ? form.correctAnswer.value : null;
-                const writingType = questionType === 'creative-writing' ? form.writingType.value : null;
-            
-                newQuestion = {
-                    topic: form.topic.value,
-                    grade: form.grade.value,
-                    question: form.questionText.value,
-                    type: questionType,
-                    location: form.questionLocation.value,
-                    options: options,
-                    correct_answer: correctAnswer,
-                    image_url: imageUrl,
-                    image_position: form.imagePosition.value,
-                    writing_type: writingType,
-                };
-            }
-
-            await addDoc(collection(db, "admin_questions"), newQuestion);
-            message.textContent = "Question saved successfully!";
-            message.style.color = 'green';
-            form.reset();
-            loadCounters();
-            loadChecklist();
-        } catch (error) {
-            console.error("Error adding question:", error);
-            message.textContent = "Error saving question.";
-            message.style.color = 'red';
-        }
-    });
-
-    document.getElementById('checklistContent').addEventListener('submit', async (e) => {
-        e.preventDefault();
-        const form = e.target;
-        const questionId = form.getAttribute('data-question-id');
-        const imageFile = form.querySelector('input[type="file"]')?.files[0];
-        const passageText = form.querySelector('textarea')?.value.trim();
-
-        try {
-            let updateData = {};
-            if (imageFile) {
-                const imageUrl = await uploadImageToCloudinary(imageFile);
-                updateData.image_url = imageUrl;
-            }
-            if (passageText) {
-                updateData.passage = passageText;
-            }
-
-            if (Object.keys(updateData).length > 0) {
-                await updateDoc(doc(db, "admin_questions", questionId), updateData);
-                alert("Content uploaded successfully!");
-                loadChecklist(); // Refresh the checklist
-            }
-
-        } catch (error) {
-            console.error("Error updating content:", error);
-            alert("Error updating content.");
-        }
-    });
-
-    const studentDropdown = document.getElementById('studentDropdown');
-    getDocs(collection(db, "student_results")).then(studentReportsSnapshot => {
-        studentDropdown.innerHTML = `<option value="">Select Student</option>`;
-        studentReportsSnapshot.forEach(doc => {
-            const student = doc.data();
-            const option = document.createElement('option');
-            option.value = doc.id;
-            option.textContent = `${student.studentName} (${student.parentEmail})`;
-            studentDropdown.appendChild(option);
-        });
-    });
-
-    studentDropdown.addEventListener('change', async (e) => {
-        const docId = e.target.value;
-        if (docId) {
-            await loadAndRenderReport(docId);
-        } else {
-            document.getElementById('reportContent').innerHTML = `<p class="text-gray-500">Please select a student to view their report.</p>`;
-        }
-    });
-
-
     const questionTypeDropdown = document.getElementById('questionType');
     const optionsContainer = document.getElementById('optionsContainer');
     const addOptionBtn = document.getElementById('addOptionBtn');
@@ -369,10 +197,114 @@ async function renderAdminPanel() {
             optionsGroup.appendChild(newInput);
         }
     });
+
+    // Fetch and populate student dropdown
+    const studentDropdown = document.getElementById('studentDropdown');
+    getDocs(collection(db, "student_results")).then(studentReportsSnapshot => {
+        studentDropdown.innerHTML = `<option value="">Select Student</option>`;
+        studentReportsSnapshot.forEach(doc => {
+            const student = doc.data();
+            const option = document.createElement('option');
+            option.value = doc.id;
+            option.textContent = `${student.studentName} (${student.parentEmail})`;
+            studentDropdown.appendChild(option);
+        });
+    });
+
+    studentDropdown.addEventListener('change', async (e) => {
+        const docId = e.target.value;
+        if (docId) {
+            await loadAndRenderReport(docId);
+        } else {
+            document.getElementById('reportContent').innerHTML = `<p class="text-gray-500">Please select a student to view their report.</p>`;
+        }
+    });
+
+    addOptionBtn.addEventListener('click', () => {
+        const optionsContainer = document.getElementById('optionsContainer');
+        const newInput = document.createElement('input');
+        newInput.type = 'text';
+        newInput.className = 'option-input w-full mt-1 p-2 border rounded';
+        newInput.placeholder = `Option ${optionsContainer.children.length - 1}`;
+        optionsContainer.appendChild(newInput);
+    });
+
+    addQuestionForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const form = e.target;
+        const message = document.getElementById('formMessage');
+        const imageFile = document.getElementById('imageUpload').files[0];
+
+        try {
+            message.textContent = "Uploading...";
+            let imageUrl = null;
+            if (imageFile) {
+                imageUrl = await uploadImageToCloudinary(imageFile);
+            }
+
+            const questionType = form.questionType.value;
+            let newQuestion;
+
+            if (questionType === 'comprehension') {
+                const questionsArray = [];
+                form.querySelectorAll('.question-group').forEach(group => {
+                    const compQuestion = group.querySelector('.comp-question').value;
+                    const compOptions = Array.from(group.querySelectorAll('.comp-option')).map(input => input.value).filter(v => v);
+                    const compCorrectAnswer = group.querySelector('.comp-correct-answer').value;
+
+                    questionsArray.push({
+                        question: compQuestion,
+                        options: compOptions,
+                        correct_answer: compCorrectAnswer,
+                        type: 'multiple-choice',
+                    });
+                });
+                newQuestion = {
+                    topic: form.topic.value,
+                    subject: form.subject.value, // Added subject value
+                    grade: form.grade.value,
+                    passage: form.passage.value,
+                    type: questionType,
+                    location: form.questionLocation.value,
+                    image_url: imageUrl,
+                    image_position: form.imagePosition.value,
+                    sub_questions: questionsArray
+                };
+            } else {
+                const options = questionType === 'multiple-choice' ? Array.from(form.querySelectorAll('.option-input')).map(input => input.value).filter(v => v) : null;
+                const correctAnswer = questionType === 'multiple-choice' ? form.correctAnswer.value : null;
+                const writingType = questionType === 'creative-writing' ? form.writingType.value : null;
+            
+                newQuestion = {
+                    topic: form.topic.value,
+                    subject: form.subject.value, // Added subject value
+                    grade: form.grade.value,
+                    question: form.questionText.value,
+                    type: questionType,
+                    location: form.questionLocation.value,
+                    options: options,
+                    correct_answer: correctAnswer,
+                    image_url: imageUrl,
+                    image_position: form.imagePosition.value,
+                    writing_type: writingType,
+                };
+            }
+
+            await addDoc(collection(db, "admin_questions"), newQuestion);
+            message.textContent = "Question saved successfully!";
+            message.style.color = 'green';
+            form.reset();
+            loadCounters();
+        } catch (error) {
+            console.error("Error adding question:", error);
+            message.textContent = "Error saving question.";
+            message.style.color = 'red';
+        }
+    });
 }
 
 function capitalize(str) {
-  return str.replace(/\b\w/g, l => l.toUpperCase());
+  return str.replace(/\b\w/g, l => l.toUpperCase());
 }
 
 async function loadAndRenderReport(docId) {
