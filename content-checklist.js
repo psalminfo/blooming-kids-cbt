@@ -1,6 +1,6 @@
 import { auth, db } from './firebaseConfig.js';
-import { collection, getDocs, onAuthStateChanged, signOut, doc, updateDoc } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
-import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-auth.js";
+import { collection, getDocs, doc, updateDoc } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
+import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-auth.js";
 
 const ADMIN_EMAIL = 'psalm4all@gmail.com';
 const CLOUDINARY_CLOUD_NAME = 'dy2hxcyaf';
@@ -9,7 +9,6 @@ const CLOUDINARY_UPLOAD_URL = `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOU
 
 
 async function uploadContentToFirebase(questionId, newContent) {
-    // Logic to find the question and update it in Firestore
     const questionRef = doc(db, "admin_questions", questionId);
     await updateDoc(questionRef, newContent);
 }
