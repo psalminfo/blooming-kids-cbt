@@ -31,7 +31,6 @@ function capitalize(str) {
 // ##################################################################
 
 async function renderAdminPanel(container) {
-    // THIS HTML IS THE COMPLETE, ORIGINAL VERSION FROM YOUR FILE
     container.innerHTML = `
         <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
             <div class="bg-blue-100 p-4 rounded-lg text-center shadow-md"><h3 class="font-bold text-blue-800">Total Students</h3><p id="totalStudentsCount" class="text-3xl text-blue-600 font-extrabold">0</p></div>
@@ -43,19 +42,20 @@ async function renderAdminPanel(container) {
                 <h2 class="text-2xl font-bold text-green-700 mb-4">Add New Question</h2>
                 <form id="addQuestionForm">
                     <div class="mb-4"><label for="topic" class="block text-gray-700">Topic</label><input type="text" id="topic" class="w-full mt-1 p-2 border rounded" required></div>
-                  <div class="mb-4">
-    <label for="subject" class="block font-medium text-gray-700">Subject</label>
-    <select id="subject" name="subject" required class="w-full mt-1 p-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500">
-        <option value="" disabled selected>-- Select a Subject --</option>
-        <option value="English">English</option>
-        <option value="Math">Math</option>
-        <optgroup label="Science">
-            <option value="Biology">Biology</option>
-            <option value="Chemistry">Chemistry</option>
-            <option value="Physics">Physics</option>
-        </optgroup>
-    </select>
-</div>                    <div class="mb-4"><label for="grade" class="block text-gray-700">Grade</label><select id="grade" required class="w-full mt-1 p-2 border rounded"><option value="">Select Grade</option><option value="3">3</option><option value="4">4</option><option value="5">5</option><option value="6">6</option><option value="7">7</option><option value="8">8</option></select></div>
+                    <div class="mb-4">
+                        <label for="subject" class="block font-medium text-gray-700">Subject</label>
+                        <select id="subject" name="subject" required class="w-full mt-1 p-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500">
+                            <option value="" disabled selected>-- Select a Subject --</option>
+                            <option value="English">English</option>
+                            <option value="Math">Math</option>
+                            <optgroup label="Science">
+                                <option value="Biology">Biology</option>
+                                <option value="Chemistry">Chemistry</option>
+                                <option value="Physics">Physics</option>
+                            </optgroup>
+                        </select>
+                    </div>
+                    <div class="mb-4"><label for="grade" class="block text-gray-700">Grade</label><select id="grade" required class="w-full mt-1 p-2 border rounded"><option value="">Select Grade</option><option value="3">3</option><option value="4">4</option><option value="5">5</option><option value="6">6</option><option value="7">7</option><option value="8">8</option></select></div>
                     <div class="mb-4"><label for="questionType" class="block text-gray-700">Question Type</label><select id="questionType" class="w-full mt-1 p-2 border rounded"><option value="multiple-choice">Multiple Choice</option><option value="creative-writing">Creative Writing</option><option value="comprehension">Comprehension</option></select></div>
                     <div class="mb-4" id="writingTypeSection" style="display:none;"><label for="writingType" class="block text-gray-700">Writing Type</label><select id="writingType" class="w-full mt-1 p-2 border rounded"><option value="Narrative">Narrative</option><option value="Descriptive">Descriptive</option><option value="Persuasive">Persuasive</option></select></div>
                     <div class="mb-4" id="comprehensionSection" style="display:none;"><label for="passage" class="block text-gray-700">Comprehension Passage</label><textarea id="passage" class="w-full mt-1 p-2 border rounded" rows="4"></textarea><div id="comprehensionQuestions" class="mt-4"><h4 class="font-semibold mb-2">Questions for Passage</h4></div><button type="button" id="addCompQuestionBtn" class="bg-gray-200 px-3 py-1 rounded text-sm mt-2">+ Add Question</button></div>
@@ -80,7 +80,6 @@ async function renderAdminPanel(container) {
 }
 
 function setupDashboardListeners() {
-    // This function sets up all event listeners for the dashboard elements.
     const addQuestionForm = document.getElementById('addQuestionForm');
     const questionTypeDropdown = document.getElementById('questionType');
     const addOptionBtn = document.getElementById('addOptionBtn');
@@ -118,7 +117,6 @@ function setupDashboardListeners() {
         if (e.target.value) loadAndRenderReport(e.target.value);
     });
     
-    // Initial data load for the dashboard
     loadCounters();
     loadStudentDropdown();
 }
@@ -246,91 +244,160 @@ async function loadAndRenderReport(docId) {
     }
 }
 
+
 // ##################################################################
-// # SECTION 2: CONTENT MANAGER PANEL (With File Upload)
+// # SECTION 2: CONTENT MANAGER (AUTOMATIC GITHUB DISCOVERY)
 // ##################################################################
 
 async function renderContentManagerPanel(container) {
     container.innerHTML = `
         <div class="bg-white p-6 rounded-lg shadow-md">
-            <h2 class="text-2xl font-bold text-green-700 mb-4">Content Checklist & Uploader</h2>
-            <div id="content-manager-loader"><p>Loading test data from database...</p></div>
-            <div id="content-manager-main" style="display:none;">
-                <div class="mb-8 p-4 border rounded-md"><h3 class="text-xl font-semibold mb-2">Passage Upload</h3><p class="text-gray-600 mb-4">Select a passage to update. Changes are saved directly.</p><label for="passage-select" class="font-bold">Select Passage:</label><select id="passage-select" class="w-full p-2 border rounded mt-1 mb-2"></select><textarea id="passage-content" placeholder="Passage content..." class="w-full p-2 border rounded h-40"></textarea><button id="update-passage-btn" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 mt-2">Save Passage</button></div>
-                <div class="p-4 border rounded-md"><h3 class="text-xl font-semibold mb-2">Missing Images</h3><p class="text-gray-600 mb-4">Select a question, upload an image, and save.</p><label for="image-select" class="font-bold">Select Question:</label><select id="image-select" class="w-full p-2 border rounded mt-1 mb-2"></select><label for="image-upload-input" class="font-bold mt-2">Upload Image:</label><input type="file" id="image-upload-input" class="w-full mt-1 border p-2 rounded" accept="image/*"><button id="update-image-btn" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 mt-2">Upload & Save Image</button></div>
+            <h2 class="text-2xl font-bold text-green-700 mb-4">Content Manager</h2>
+            
+            <div class="bg-gray-50 p-4 border rounded-lg mb-6">
+                <label for="test-file-select" class="block font-bold text-gray-800">1. Select a Test File to Edit</label>
+                <p class="text-sm text-gray-600 mb-2">The list is automatically populated from your GitHub repository.</p>
+                <div id="file-loader" class="flex space-x-2">
+                    <select id="test-file-select" class="w-full p-2 border rounded">
+                        <option>Loading files from GitHub...</option>
+                    </select>
+                    <button id="load-test-btn" class="bg-green-600 text-white font-bold px-4 py-2 rounded hover:bg-green-700">Load</button>
+                </div>
+                <div id="loader-status" class="mt-2"></div>
+            </div>
+
+            <div id="manager-workspace" style="display:none;">
+                 <h3 class="text-gray-800 font-bold mb-4 text-lg" id="loaded-file-name"></h3>
+                <div class="mb-8 p-4 border rounded-md"><h4 class="text-xl font-semibold mb-2">2. Passage Upload</h4><select id="passage-select" class="w-full p-2 border rounded mt-1 mb-2"></select><textarea id="passage-content" placeholder="Passage content..." class="w-full p-2 border rounded h-40"></textarea><button id="update-passage-btn" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 mt-2">Save Passage</button></div>
+                <div class="p-4 border rounded-md"><h4 class="text-xl font-semibold mb-2">3. Missing Images</h4><select id="image-select" class="w-full p-2 border rounded mt-1 mb-2"></select><label class="font-bold mt-2">Upload Image:</label><input type="file" id="image-upload-input" class="w-full mt-1 border p-2 rounded" accept="image/*"><button id="update-image-btn" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 mt-2">Upload & Save Image</button></div>
                 <p id="status" class="mt-4 font-bold"></p>
             </div>
         </div>
     `;
-    await setupContentManager();
+    setupContentManager();
 }
 
 async function setupContentManager() {
-    const loader = document.getElementById('content-manager-loader');
-    const main = document.getElementById('content-manager-main');
-    const statusDiv = document.getElementById('status');
-    let testsData = [];
+    // I have filled in your GitHub details from the URL you provided.
+    const GITHUB_USER = 'psalminfo';
+    const GITHUB_REPO = 'blooming-kids-cbt';
+    
+    // This will look in the root directory. If your files are in a folder, change it.
+    // For example: `.../contents/my-tests-folder/`
+    const API_URL = `https://api.github.com/repos/${GITHUB_USER}/${GITHUB_REPO}/contents/`;
 
-    try {
-        const querySnapshot = await getDocs(collection(db, "tests"));
-        testsData = querySnapshot.docs.map(doc => ({ docId: doc.id, ...doc.data() }));
-        loader.style.display = 'none';
-        main.style.display = 'block';
-    } catch (error) {
-        loader.innerHTML = `<p class="text-red-500">Error loading test data: ${error.message}</p>`;
-        return;
+    const loaderStatus = document.getElementById('loader-status');
+    const workspace = document.getElementById('manager-workspace');
+    const testFileSelect = document.getElementById('test-file-select');
+    const loadTestBtn = document.getElementById('load-test-btn');
+    
+    let testsData = []; 
+
+    async function discoverFiles() {
+        try {
+            const response = await fetch(API_URL);
+            if (!response.ok) throw new Error(`Cannot access repository. Check username/repo. Status: ${response.status}`);
+            const files = await response.json();
+            
+            testFileSelect.innerHTML = '<option value="">-- Select a Test File --</option>';
+            const jsonFiles = files.filter(file => file.name.endsWith('.json'));
+
+            if (jsonFiles.length === 0) {
+                 testFileSelect.innerHTML = '<option value="">No .json files found in repository.</option>';
+                 return;
+            }
+
+            jsonFiles.forEach(file => {
+                const option = document.createElement('option');
+                option.value = file.download_url;
+                option.textContent = file.name;
+                testFileSelect.appendChild(option);
+            });
+        } catch (error) {
+            console.error('Error discovering files:', error);
+            loaderStatus.innerHTML = `<p class="text-red-500"><strong>Error discovering files:</strong> ${error.message}</p>`;
+        }
     }
 
-    const passageSelect = document.getElementById('passage-select');
-    const passageContent = document.getElementById('passage-content');
-    const updatePassageBtn = document.getElementById('update-passage-btn');
-    const imageSelect = document.getElementById('image-select');
-    const imageUploadInput = document.getElementById('image-upload-input');
-    const updateImageBtn = document.getElementById('update-image-btn');
-
-    function populateDropdowns() {
-        // (Code to populate dropdowns as before)
-    }
-
-    // Event listeners for passage and image selection
-    passageSelect.addEventListener('change', e => { /* ... */ });
-    updatePassageBtn.addEventListener('click', async () => { /* ... */ });
-
-    updateImageBtn.addEventListener('click', async () => {
-        const selectedImage = imageSelect.value;
-        const file = imageUploadInput.files[0];
-        if (!selectedImage || !file) {
-            statusDiv.textContent = 'Please select a question and an image file.';
+    loadTestBtn.addEventListener('click', async () => {
+        const url = testFileSelect.value;
+        if (!url) {
+            loaderStatus.innerHTML = `<p class="text-yellow-600">Please select a file from the dropdown.</p>`;
             return;
         }
 
+        loaderStatus.innerHTML = `<p class="text-blue-600">Fetching test data...</p>`;
+        workspace.style.display = 'none';
+
         try {
-            statusDiv.textContent = 'Uploading image to Cloudinary...';
-            const imageUrl = await uploadImageToCloudinary(file);
-            statusDiv.textContent = 'Image uploaded. Saving URL to database...';
+            const response = await fetch(url);
+            if (!response.ok) throw new Error(`Could not fetch file. Status: ${response.status}`);
+            const jsonData = await response.json();
+            testsData = jsonData.tests;
 
-            const [testIndex, questionIndex] = selectedImage.split('-');
-            const testToUpdate = { ...testsData[testIndex] };
-            testToUpdate.questions[questionIndex].imageUrl = imageUrl;
-            delete testToUpdate.questions[questionIndex].imagePlaceholder;
+            if (!testsData) throw new Error("JSON file does not contain a 'tests' array.");
 
-            const testDocRef = doc(db, "tests", testToUpdate.docId);
-            await updateDoc(testDocRef, { questions: testToUpdate.questions });
-            
-            // Update local data to reflect change
-            testsData[testIndex] = testToUpdate;
-            
-            statusDiv.textContent = `✅ Image saved successfully!`;
-            imageUploadInput.value = ''; // Clear file input
+            loaderStatus.innerHTML = `<p class="text-green-600 font-bold">✅ Successfully loaded!</p>`;
+            document.getElementById('loaded-file-name').textContent = `Editing: ${testFileSelect.options[testFileSelect.selectedIndex].text}`;
+            workspace.style.display = 'block';
             populateDropdowns();
+
         } catch (error) {
-            console.error('Error saving image:', error);
-            statusDiv.textContent = `❌ Error: ${error.message}`;
+            console.error("Error loading test data:", error);
+            loaderStatus.innerHTML = `<p class="text-red-500"><strong>Error:</strong> ${error.message}</p>`;
         }
     });
 
-    populateDropdowns();
+    const passageSelect = document.getElementById('passage-select');
+    const passageContent = document.getElementById('passage-content');
+    const imageSelect = document.getElementById('image-select');
+
+    function populateDropdowns() {
+        passageSelect.innerHTML = '<option value="">-- Select a Passage to edit --</option>';
+        imageSelect.innerHTML = '<option value="">-- Select a Question to add an image --</option>';
+        
+        testsData.forEach((test, testIndex) => {
+             if (test.passages) {
+                test.passages.forEach((passage, passageIndex) => {
+                    const isComplete = passage.content && !passage.content.includes("TO BE UPLOADED");
+                    const option = document.createElement('option');
+                    option.value = `${testIndex}-${passageIndex}`;
+                    option.textContent = `[${test.subject} G${test.grade}] ${passage.title} ${isComplete ? '✓' : '✗'}`;
+                    passageSelect.appendChild(option);
+                });
+            }
+            if (test.questions) {
+                test.questions.forEach((question, questionIndex) => {
+                    if (question.imagePlaceholder && !question.imageUrl) {
+                         const option = document.createElement('option');
+                         option.value = `${testIndex}-${questionIndex}`;
+                         option.textContent = `[${test.subject} G${test.grade}] Q-ID ${question.questionId} ✗`;
+                         imageSelect.appendChild(option);
+                    }
+                });
+            }
+        });
+    }
+
+    passageSelect.addEventListener('change', e => {
+        if (!e.target.value) { passageContent.value = ''; return; }
+        const [testIndex, passageIndex] = e.target.value.split('-');
+        const test = testsData[testIndex];
+        passageContent.value = test.passages[passageIndex].content || '';
+    });
+    
+    // Note: Saving to GitHub requires API authentication and is not included in this version.
+    document.getElementById('update-passage-btn').addEventListener('click', () => { 
+        document.getElementById('status').textContent = 'Saving is not connected for this version.';
+    });
+    document.getElementById('update-image-btn').addEventListener('click', () => { 
+        document.getElementById('status').textContent = 'Saving is not connected for this version.';
+    });
+
+    // Automatically discover files when the panel is rendered
+    discoverFiles();
 }
+
 
 // ##################################################################
 // # SECTION 3: AUTHENTICATION & APP INITIALIZATION
@@ -361,7 +428,3 @@ onAuthStateChanged(auth, async (user) => {
         window.location.href = "admin-auth.html";
     }
 });
-
-
-
-
