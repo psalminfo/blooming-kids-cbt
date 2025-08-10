@@ -14,48 +14,50 @@ export async function loadQuestions(subject, grade) {
     let allQuestions = [];
 
     try {
-        // =================================================================
-        // ### START: UPGRADED OVERRIDE LOGIC ###
-        // =================================================================
-
-        // 1. First, check Firestore for a complete, curated test document.
         const testDocRef = doc(db, "tests", docId);
         const docSnap = await getDoc(testDocRef);
 
-        if (docSnap.exists()) {
-            // If the curated test exists, use its questions and we're done fetching.
-            console.log(`Loading curated test from Firestore: ${docId}`);
-            const testData = docSnap.data().tests || [];
-            allQuestions = testData.flatMap(t => t.questions || []);
-        } else {
-            // 2. If no curated test exists, combine GitHub and admin_questions.
-            console.log(`No curated test found. Combining sources for ${docId}`);
-            
-            // Fetch from GitHub (this is our base)
-            let githubQuestions = [];
-            try {
-                const gitHubRes = await fetch(GITHUB_URL);
-                if (gitHubRes.ok) {
-                    const gitHubJson = await gitHubRes.json();
-                    githubQuestions = gitHubJson.tests.flatMap(t => t.questions || []);
-                    console.log(`Found ${githubQuestions.length} questions on GitHub.`);
-                }
-            } catch (e) {
-                console.warn("Could not fetch or parse GitHub file. It may not exist.");
-            }
+        let rawData;
 
-            // Fetch from Firestore admin_questions collection
+        if (docSnap.exists()) {
+            console.log(`Loading curated test from Firestore: ${docId}`);
+            rawData = docSnap.data();
+        } else {
+            console.log(`No curated test found. Combining sources for ${docId}`);
+            const gitHubRes = await fetch(GITHUB_URL);
+            if (!gitHubRes.ok) {
+                 // If GitHub also fails, we'll try to get individual questions
+                 console.warn("GitHub file not found. Checking admin_questions as a last resort.");
+            } else {
+                rawData = await gitHubRes.json();
+            }
+        }
+        
+        // =================================================================
+        // ### START: NEW LOGIC TO HANDLE BOTH JSON FORMATS ###
+        // =================================================================
+
+        if (rawData && rawData.tests) {
+            // This is the NEW format (e.g., 10-ela.json)
+            console.log("Detected 'tests' format.");
+            allQuestions = rawData.tests.flatMap(t => t.questions || []);
+        } else if (rawData && rawData.questions) {
+            // This is the OLD format (e.g., the 3-math.json you provided)
+            console.log("Detected 'questions' format.");
+            allQuestions = rawData.questions;
+        }
+
+        // Final check: if we still don't have questions, query admin_questions
+        if (allQuestions.length === 0) {
+            console.log("No primary questions found. Querying 'admin_questions'.");
             const q = query(collection(db, "admin_questions"), where("subject", "==", subject), where("grade", "==", grade));
             const firestoreSnapshot = await getDocs(q);
             const firestoreQuestions = firestoreSnapshot.docs.map(doc => doc.data());
-            console.log(`Found ${firestoreQuestions.length} questions in Firestore 'admin_questions'.`);
-
-            // Combine the two sources
-            allQuestions = [...githubQuestions, ...firestoreQuestions];
+            allQuestions = [...allQuestions, ...firestoreQuestions];
         }
 
         // =================================================================
-        // ### END: UPGRADED OVERRIDE LOGIC ###
+        // ### END: NEW LOGIC ###
         // =================================================================
 
         if (!allQuestions || allQuestions.length === 0) {
