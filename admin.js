@@ -246,29 +246,25 @@ async function loadAndRenderReport(docId) {
 
 
 // ##################################################################
-// # SECTION 2: CONTENT MANAGER (FINAL VERSION)
+// # SECTION 2: CONTENT MANAGER (FINAL VERSION WITH BUG FIX)
 // ##################################################################
 
 async function renderContentManagerPanel(container) {
     container.innerHTML = `
         <div class="bg-white p-6 rounded-lg shadow-md">
             <h2 class="text-2xl font-bold text-green-700 mb-4">Content Manager</h2>
-            
             <div class="bg-gray-50 p-4 border rounded-lg mb-6">
                 <label for="test-file-select" class="block font-bold text-gray-800">1. Select a Test File</label>
                 <p class="text-sm text-gray-600 mb-2">Automatically finds test files in your GitHub repository.</p>
                 <div id="file-loader" class="flex space-x-2">
-                    <select id="test-file-select" class="w-full p-2 border rounded">
-                        <option>Loading files from GitHub...</option>
-                    </select>
+                    <select id="test-file-select" class="w-full p-2 border rounded"><option>Loading files...</option></select>
                     <button id="load-test-btn" class="bg-green-600 text-white font-bold px-4 py-2 rounded hover:bg-green-700">Load</button>
                 </div>
                 <div id="loader-status" class="mt-2"></div>
             </div>
-
             <div id="manager-workspace" style="display:none;">
                  <h3 class="text-gray-800 font-bold mb-4 text-lg" id="loaded-file-name"></h3>
-                <div class="mb-8 p-4 border rounded-md"><h4 class="text-xl font-semibold mb-2">2. Edit Passages</h4><select id="passage-select" class="w-full p-2 border rounded mt-1 mb-2"></select><textarea id="passage-content" placeholder="Passage content will appear here..." class="w-full p-2 border rounded h-40"></textarea><button id="update-passage-btn" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 mt-2">Save Passage to Firestore</button></div>
+                <div class="mb-8 p-4 border rounded-md"><h4 class="text-xl font-semibold mb-2">2. Edit Incomplete Passages</h4><select id="passage-select" class="w-full p-2 border rounded mt-1 mb-2"></select><textarea id="passage-content" placeholder="Passage content..." class="w-full p-2 border rounded h-40"></textarea><button id="update-passage-btn" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 mt-2">Save Passage to Firestore</button></div>
                 <div class="p-4 border rounded-md"><h4 class="text-xl font-semibold mb-2">3. Add Missing Images</h4><select id="image-select" class="w-full p-2 border rounded mt-1 mb-2"></select><label class="font-bold mt-2">Upload Image:</label><input type="file" id="image-upload-input" class="w-full mt-1 border p-2 rounded" accept="image/*"><button id="update-image-btn" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 mt-2">Upload & Save Image to Firestore</button></div>
                 <p id="status" class="mt-4 font-bold"></p>
             </div>
@@ -278,12 +274,8 @@ async function renderContentManagerPanel(container) {
 }
 
 async function setupContentManager() {
-    // Your GitHub details are filled in.
     const GITHUB_USER = 'psalminfo';
     const GITHUB_REPO = 'blooming-kids-cbt';
-    
-    // NOTE: This looks in the root directory. If your files are in a folder, e.g., "tests", 
-    // change this to: `.../contents/tests/`
     const API_URL = `https://api.github.com/repos/${GITHUB_USER}/${GITHUB_REPO}/contents/`;
 
     const loaderStatus = document.getElementById('loader-status');
@@ -292,23 +284,20 @@ async function setupContentManager() {
     const loadTestBtn = document.getElementById('load-test-btn');
     const status = document.getElementById('status');
     
-    let loadedTestData = null; // Holds the entire data object for the currently loaded test.
-    let currentTestDocId = null; // The ID for the Firestore document (e.g., "10-ela").
+    let loadedTestData = null;
+    let currentTestDocId = null;
 
     async function discoverFiles() {
         try {
             const response = await fetch(API_URL);
             if (!response.ok) throw new Error(`Cannot access repository. Check username/repo. Status: ${response.status}`);
             const files = await response.json();
-            
             testFileSelect.innerHTML = '<option value="">-- Select a Test File --</option>';
             const jsonFiles = files.filter(file => file.name.endsWith('.json'));
-
             if (jsonFiles.length === 0) {
                  testFileSelect.innerHTML = '<option value="">No .json files found.</option>';
                  return;
             }
-
             jsonFiles.forEach(file => {
                 const option = document.createElement('option');
                 option.value = file.download_url;
@@ -344,13 +333,13 @@ async function setupContentManager() {
                 loaderStatus.innerHTML = `<p class="text-green-600 font-bold">✅ Loaded saved version from Firestore!</p>`;
                 loadedTestData = docSnap.data();
             } else {
-                console.log("No saved version in Firestore. Loading template from GitHub.");
+                console.log("No saved version. Loading template from GitHub.");
                 loaderStatus.innerHTML = `<p class="text-blue-600">Loading original template from GitHub...</p>`;
                 const response = await fetch(url);
                 if (!response.ok) throw new Error(`Could not fetch file. Status: ${response.status}`);
                 loadedTestData = await response.json();
                 
-                // One-time sync to Firestore
+                // First-time sync to Firestore
                 await setDoc(testDocRef, loadedTestData);
                 loaderStatus.innerHTML = `<p class="text-green-600 font-bold">✅ Loaded template from GitHub and synced to Firestore!</p>`;
             }
@@ -375,12 +364,12 @@ async function setupContentManager() {
     const updateImageBtn = document.getElementById('update-image-btn');
 
     function populateDropdowns() {
-        passageSelect.innerHTML = '<option value="">-- Select a Passage to edit --</option>';
-        imageSelect.innerHTML = '<option value="">-- Select a Question for an image --</option>';
+        passageSelect.innerHTML = '<option value="">-- Select an incomplete passage --</option>';
+        imageSelect.innerHTML = '<option value="">-- Select a question needing an image --</option>';
         
         loadedTestData.tests.forEach((test, testIndex) => {
-             // Filter to only show passages that need content
              (test.passages || []).forEach((passage, passageIndex) => {
+                // This filter now correctly checks for the placeholder string.
                 if (passage.content && passage.content.includes("TO BE UPLOADED")) {
                     const option = document.createElement('option');
                     option.value = `${testIndex}-${passageIndex}`;
@@ -388,8 +377,8 @@ async function setupContentManager() {
                     passageSelect.appendChild(option);
                 }
              });
-             // Filter to only show questions that need an image
              (test.questions || []).forEach((question, questionIndex) => {
+                // This filter correctly checks for a placeholder AND the absence of a final URL.
                 if (question.imagePlaceholder && !question.imageUrl) {
                      const option = document.createElement('option');
                      option.value = `${testIndex}-${questionIndex}`;
@@ -417,15 +406,17 @@ async function setupContentManager() {
         status.style.color = 'blue';
 
         const [testIndex, passageIndex] = selected.split('-');
+        // Update the content in the main data object
         loadedTestData.tests[testIndex].passages[passageIndex].content = passageContent.value;
         
         try {
             const testDocRef = doc(db, "tests", currentTestDocId);
-            await updateDoc(testDocRef, { tests: loadedTestData.tests });
+            // Save the entire updated data object back to Firestore
+            await setDoc(testDocRef, loadedTestData);
             status.textContent = `✅ Passage saved successfully!`;
             status.style.color = 'green';
             passageContent.value = '';
-            populateDropdowns(); // Re-populate to remove the completed item
+            populateDropdowns(); // Re-run the filter to remove the completed item
         } catch (error) {
             status.textContent = `❌ Error saving passage: ${error.message}`;
             status.style.color = 'red';
@@ -453,12 +444,12 @@ async function setupContentManager() {
             delete loadedTestData.tests[testIndex].questions[questionIndex].imagePlaceholder;
 
             const testDocRef = doc(db, "tests", currentTestDocId);
-            await updateDoc(testDocRef, { tests: loadedTestData.tests });
+            await setDoc(testDocRef, loadedTestData);
             
             status.textContent = `✅ Image URL saved successfully!`;
             status.style.color = 'green';
             imageUploadInput.value = '';
-            populateDropdowns(); // Re-populate to remove the completed item
+            populateDropdowns(); // Re-run the filter to remove the completed item
         } catch (error) {
             console.error('Error saving image:', error);
             status.textContent = `❌ Error: ${error.message}`;
