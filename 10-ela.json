@@ -14,8 +14,7 @@
         {
           "passageId": "p2",
           "title": "Make the Switch!",
-          "content": "[PASSAGE TEXT TO BE UPLOADED]",
-          "imagePlaceholder": "woman_holding_reusable_bottle.png"
+          "content": "[PASSAGE TEXT TO BE UPLOADED]"
         },
         {
           "passageId": "p3",
@@ -49,14 +48,64 @@
           "passageId": "p8",
           "title": "Where the Wild Things Are",
           "author": "Beth Pratt-Bergstrom",
-          "content": "[PASSAGE TEXT TO BE UPLOADED]",
-          "imagePlaceholder": "mountain_lion_hollywood_sign.png"
+          "content": "[PASSAGE TEXT TO BE UPLOADED]"
         },
         {
           "passageId": "p9",
           "title": "Your Brain on Movies",
           "author": "Aaron Millar",
           "content": "[PASSAGE TEXT TO BE UPLOADED]"
+        }
+      ],
+      "questions": [
+        {
+          "questionId": "eng2_2019_q1",
+          "passageId": "p1",
+          "questionText": "J.T. would like to add the following sentence to the first paragraph (sentences 1-6): 'Students from around the world are also part of musical marching groups.' Where is the most effective place to insert this sentence?",
+          "options": { "A": "After sentence 1", "B": "After sentence 2", "C": "After sentence 4", "D": "After sentence 5" },
+          "correctAnswer": "C"
+        },
+        {
+          "questionId": "eng2_2019_q2",
+          "passageId": "p1",
+          "questionText": "J.T. wants to use a more appropriate transition in sentence 11. Which of the following can best replace Furthermore in this sentence?",
+          "options": { "F": "For example", "G": "In conclusion", "H": "Overall", "J": "Instead" },
+          "correctAnswer": "J"
+        },
+        {
+          "questionId": "eng2_2019_q3",
+          "passageId": "p1",
+          "questionText": "What is the most effective revision to make in sentence 15?",
+          "options": { "A": "A misstep by just one student and a flaw is created that is visible in the perfectly coordinated display.", "B": "A misstep by just one student creates a visible flaw in the perfectly coordinated display.", "C": "A misstep by just one student creates a flaw in the perfectly coordinated display, the flaw is visible.", "D": "A misstep by just one student creates a visible flaw that can be seen in the perfectly coordinated display." },
+          "correctAnswer": "B"
+        },
+        {
+          "questionId": "eng2_2019_q4",
+          "passageId": "p1",
+          "questionText": "J.T. has included an extraneous sentence in his paper. Which of these sentences should be deleted from this paper?",
+          "options": { "F": "Sentence 9", "G": "Sentence 13", "H": "Sentence 18", "J": "Sentence 20" },
+          "correctAnswer": "J"
+        },
+        {
+          "questionId": "eng2_2019_q5",
+          "passageId": "p2",
+          "imagePlaceholder": "woman_holding_reusable_bottle.png",
+          "questionText": "Mimi's essay does not have a strong position statement. Which of the following sentences should replace sentence 6 to serve as an effective position statement?",
+          "options": { "A": "It's foolish to buy several bottles of water each day when there's no good reason for doing this.", "B": "People need to stop doing this now and protest against bottled-water companies.", "C": "These problems can be solved, however, if people choose to drink water from reusable containers instead of plastic bottles.", "D": "The list of problems that people are causing, such as increasing pollution, by buying bottled water is endless." },
+          "correctAnswer": "C"
+        },
+        {
+          "questionId": "eng2_2019_q37",
+          "passageId": "p8",
+          "imagePlaceholder": "mountain_lion_hollywood_sign.png",
+          "questionText": "What is the author's purpose for writing this article?",
+          "options": { "A": "To encourage people to visit national parks", "B": "To advocate for coexistence of humans and wildlife in urban areas", "C": "To explain methods for tracking a cougar through Griffith Park", "D": "To persuade people to convert urban cities back to natural spaces" },
+          "correctAnswer": "B"
+        }
+      ]
+    }
+  ]
+}
         }
       ],
       "questions": [
