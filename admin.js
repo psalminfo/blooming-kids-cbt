@@ -246,7 +246,7 @@ async function loadAndRenderReport(docId) {
 
 
 // ##################################################################
-// # SECTION 2: CONTENT MANAGER (FINAL VERSION WITH IMAGE PREVIEW)
+// # SECTION 2: CONTENT MANAGER (WITH DEBUGGER)
 // ##################################################################
 
 async function renderContentManagerPanel(container) {
@@ -265,19 +265,7 @@ async function renderContentManagerPanel(container) {
             <div id="manager-workspace" style="display:none;">
                  <h3 class="text-gray-800 font-bold mb-4 text-lg" id="loaded-file-name"></h3>
                 <div class="mb-8 p-4 border rounded-md"><h4 class="text-xl font-semibold mb-2">2. Edit Incomplete Passages</h4><select id="passage-select" class="w-full p-2 border rounded mt-1 mb-2"></select><textarea id="passage-content" placeholder="Passage content..." class="w-full p-2 border rounded h-40"></textarea><button id="update-passage-btn" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 mt-2">Save Passage to Firestore</button></div>
-                
-                <div class="p-4 border rounded-md"><h4 class="text-xl font-semibold mb-2">3. Add Missing Images</h4>
-                    <select id="image-select" class="w-full p-2 border rounded mt-1 mb-2"></select>
-                    
-                    <div id="image-preview-container" class="my-2" style="display:none;">
-                        <p class="font-semibold text-sm">Image to be replaced:</p>
-                        <img id="image-preview" src="" class="border rounded max-w-xs mt-1"/>
-                    </div>
-
-                    <label class="font-bold mt-2">Upload New Image:</label>
-                    <input type="file" id="image-upload-input" class="w-full mt-1 border p-2 rounded" accept="image/*">
-                    <button id="update-image-btn" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 mt-2">Upload & Save Image to Firestore</button>
-                </div>
+                <div class="p-4 border rounded-md"><h4 class="text-xl font-semibold mb-2">3. Add Missing Images</h4><select id="image-select" class="w-full p-2 border rounded mt-1 mb-2"></select><label class="font-bold mt-2">Upload Image:</label><input type="file" id="image-upload-input" class="w-full mt-1 border p-2 rounded" accept="image/*"><button id="update-image-btn" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 mt-2">Upload & Save Image to Firestore</button></div>
                 <p id="status" class="mt-4 font-bold"></p>
             </div>
         </div>
@@ -288,7 +276,6 @@ async function renderContentManagerPanel(container) {
 async function setupContentManager() {
     const GITHUB_USER = 'psalminfo';
     const GITHUB_REPO = 'blooming-kids-cbt';
-    const GITHUB_IMAGE_PREVIEW_URL = `https://raw.githubusercontent.com/${GITHUB_USER}/${GITHUB_REPO}/main/images/`;
     const API_URL = `https://api.github.com/repos/${GITHUB_USER}/${GITHUB_REPO}/contents/`;
 
     const loaderStatus = document.getElementById('loader-status');
@@ -358,6 +345,26 @@ async function setupContentManager() {
             
             if (!loadedTestData || !loadedTestData.tests) throw new Error("Invalid test file format.");
             
+            // ### START: DEBUGGING BLOCK ###
+            console.log("--- Starting Debug for Loaded Test ---");
+            console.log("Test data has been loaded. Checking for a specific question with an image placeholder...");
+            const testObject = loadedTestData.tests[0]; // Assuming one test structure per file
+            if (testObject && testObject.questions) {
+                const questionToDebug = testObject.questions.find(q => q.questionId === 'eng2_2019_q5');
+                if (questionToDebug) {
+                    console.log("Found question 'eng2_2019_q5'. Here is the object:", questionToDebug);
+                    if (questionToDebug.imagePlaceholder) {
+                        console.log("✅ SUCCESS: The 'imagePlaceholder' property exists on this object.");
+                    } else {
+                        console.log("❌ CRITICAL ERROR: The 'imagePlaceholder' property is MISSING from this object. The data in Firestore or on GitHub is incorrect.");
+                    }
+                } else {
+                    console.log("Could not find question 'eng2_2019_q5' in the loaded data.");
+                }
+            }
+            console.log("--- End Debug ---");
+            // ### END: DEBUGGING BLOCK ###
+
             document.getElementById('loaded-file-name').textContent = `Editing: ${fileName}`;
             workspace.style.display = 'block';
             populateDropdowns();
@@ -374,14 +381,10 @@ async function setupContentManager() {
     const imageUploadInput = document.getElementById('image-upload-input');
     const updatePassageBtn = document.getElementById('update-passage-btn');
     const updateImageBtn = document.getElementById('update-image-btn');
-    const imagePreviewContainer = document.getElementById('image-preview-container');
-    const imagePreview = document.getElementById('image-preview');
-
 
     function populateDropdowns() {
         passageSelect.innerHTML = '<option value="">-- Select an incomplete passage --</option>';
         imageSelect.innerHTML = '<option value="">-- Select a question needing an image --</option>';
-        imagePreviewContainer.style.display = 'none';
         
         loadedTestData.tests.forEach((test, testIndex) => {
              (test.passages || []).forEach((passage, passageIndex) => {
@@ -407,23 +410,6 @@ async function setupContentManager() {
         if (!e.target.value) { passageContent.value = ''; return; }
         const [testIndex, passageIndex] = e.target.value.split('-');
         passageContent.value = loadedTestData.tests[testIndex].passages[passageIndex].content || '';
-    });
-
-    imageSelect.addEventListener('change', e => {
-        if (!e.target.value) {
-            imagePreviewContainer.style.display = 'none';
-            return;
-        }
-        const [testIndex, questionIndex] = e.target.value.split('-');
-        const question = loadedTestData.tests[testIndex].questions[questionIndex];
-        const imageName = question.imagePlaceholder;
-        
-        if (imageName) {
-            imagePreview.src = GITHUB_IMAGE_PREVIEW_URL + imageName;
-            imagePreviewContainer.style.display = 'block';
-        } else {
-            imagePreviewContainer.style.display = 'none';
-        }
     });
     
     updatePassageBtn.addEventListener('click', async () => {
