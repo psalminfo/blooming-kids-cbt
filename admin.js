@@ -1,5 +1,5 @@
 import { auth, db } from './firebaseConfig.js';
-import { collection, getDocs, doc, addDoc, query, where, getDoc, updateDoc } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
+import { collection, getDocs, doc, addDoc, query, where, getDoc, updateDoc, setDoc } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
 import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-auth.js";
 
 const ADMIN_EMAIL = 'psalm4all@gmail.com';
@@ -246,7 +246,7 @@ async function loadAndRenderReport(docId) {
 
 
 // ##################################################################
-// # SECTION 2: CONTENT MANAGER (AUTOMATIC GITHUB DISCOVERY)
+// # SECTION 2: CONTENT MANAGER (AUTOMATIC GITHUB DISCOVERY & FIRESTORE SAVE)
 // ##################################################################
 
 async function renderContentManagerPanel(container) {
@@ -278,20 +278,22 @@ async function renderContentManagerPanel(container) {
 }
 
 async function setupContentManager() {
-    // I have filled in your GitHub details from the URL you provided.
+    // Your GitHub details are filled in.
     const GITHUB_USER = 'psalminfo';
     const GITHUB_REPO = 'blooming-kids-cbt';
     
-    // This will look in the root directory. If your files are in a folder, change it.
-    // For example: `.../contents/my-tests-folder/`
+    // This looks in the root directory. If your files are in a folder like "tests", 
+    // change this to `.../contents/tests/`
     const API_URL = `https://api.github.com/repos/${GITHUB_USER}/${GITHUB_REPO}/contents/`;
 
     const loaderStatus = document.getElementById('loader-status');
     const workspace = document.getElementById('manager-workspace');
     const testFileSelect = document.getElementById('test-file-select');
     const loadTestBtn = document.getElementById('load-test-btn');
+    const status = document.getElementById('status');
     
     let testsData = []; 
+    let currentTestDocId = null; 
 
     async function discoverFiles() {
         try {
@@ -321,12 +323,16 @@ async function setupContentManager() {
 
     loadTestBtn.addEventListener('click', async () => {
         const url = testFileSelect.value;
+        const fileName = testFileSelect.options[testFileSelect.selectedIndex].text;
+        // Use the filename (without .json) as the unique ID for the Firestore document
+        currentTestDocId = fileName.replace('.json', ''); 
+
         if (!url) {
             loaderStatus.innerHTML = `<p class="text-yellow-600">Please select a file from the dropdown.</p>`;
             return;
         }
 
-        loaderStatus.innerHTML = `<p class="text-blue-600">Fetching test data...</p>`;
+        loaderStatus.innerHTML = `<p class="text-blue-600">Fetching test data from GitHub...</p>`;
         workspace.style.display = 'none';
 
         try {
@@ -337,8 +343,13 @@ async function setupContentManager() {
 
             if (!testsData) throw new Error("JSON file does not contain a 'tests' array.");
 
-            loaderStatus.innerHTML = `<p class="text-green-600 font-bold">✅ Successfully loaded!</p>`;
-            document.getElementById('loaded-file-name').textContent = `Editing: ${testFileSelect.options[testFileSelect.selectedIndex].text}`;
+            // Before saving, we set the entire document in Firestore to ensure it exists.
+            // Using setDoc with { merge: true } acts like an "upsert".
+            const testDocRef = doc(db, "tests", currentTestDocId);
+            await setDoc(testDocRef, { tests: testsData }, { merge: true });
+
+            loaderStatus.innerHTML = `<p class="text-green-600 font-bold">✅ Successfully loaded and synced with Firestore!</p>`;
+            document.getElementById('loaded-file-name').textContent = `Editing: ${fileName}`;
             workspace.style.display = 'block';
             populateDropdowns();
 
@@ -351,11 +362,13 @@ async function setupContentManager() {
     const passageSelect = document.getElementById('passage-select');
     const passageContent = document.getElementById('passage-content');
     const imageSelect = document.getElementById('image-select');
+    const imageUploadInput = document.getElementById('image-upload-input');
+    const updatePassageBtn = document.getElementById('update-passage-btn');
+    const updateImageBtn = document.getElementById('update-image-btn');
 
     function populateDropdowns() {
         passageSelect.innerHTML = '<option value="">-- Select a Passage to edit --</option>';
         imageSelect.innerHTML = '<option value="">-- Select a Question to add an image --</option>';
-        
         testsData.forEach((test, testIndex) => {
              if (test.passages) {
                 test.passages.forEach((passage, passageIndex) => {
@@ -382,19 +395,68 @@ async function setupContentManager() {
     passageSelect.addEventListener('change', e => {
         if (!e.target.value) { passageContent.value = ''; return; }
         const [testIndex, passageIndex] = e.target.value.split('-');
-        const test = testsData[testIndex];
-        passageContent.value = test.passages[passageIndex].content || '';
+        passageContent.value = testsData[testIndex].passages[passageIndex].content || '';
     });
     
-    // Note: Saving to GitHub requires API authentication and is not included in this version.
-    document.getElementById('update-passage-btn').addEventListener('click', () => { 
-        document.getElementById('status').textContent = 'Saving is not connected for this version.';
-    });
-    document.getElementById('update-image-btn').addEventListener('click', () => { 
-        document.getElementById('status').textContent = 'Saving is not connected for this version.';
+    updatePassageBtn.addEventListener('click', async () => {
+        const selected = passageSelect.value;
+        if (!selected) {
+            status.textContent = 'Please select a passage first.';
+            status.style.color = 'orange';
+            return;
+        }
+        status.textContent = 'Saving passage to Firestore...';
+        status.style.color = 'blue';
+
+        const [testIndex, passageIndex] = selected.split('-');
+        testsData[testIndex].passages[passageIndex].content = passageContent.value;
+        
+        try {
+            const testDocRef = doc(db, "tests", currentTestDocId);
+            await updateDoc(testDocRef, { tests: testsData });
+            status.textContent = `✅ Passage saved successfully to Firestore!`;
+            status.style.color = 'green';
+            populateDropdowns();
+        } catch (error) {
+            status.textContent = `❌ Error saving passage: ${error.message}`;
+            status.style.color = 'red';
+            console.error("Firestore update error:", error);
+        }
     });
 
-    // Automatically discover files when the panel is rendered
+    updateImageBtn.addEventListener('click', async () => {
+        const selectedImage = imageSelect.value;
+        const file = imageUploadInput.files[0];
+        if (!selectedImage || !file) {
+            status.textContent = 'Please select a question and an image file.';
+            status.style.color = 'orange';
+            return;
+        }
+
+        try {
+            status.textContent = 'Uploading image to Cloudinary...';
+            status.style.color = 'blue';
+            const imageUrl = await uploadImageToCloudinary(file);
+            
+            status.textContent = 'Image uploaded. Saving URL to Firestore...';
+            const [testIndex, questionIndex] = selectedImage.split('-');
+            testsData[testIndex].questions[questionIndex].imageUrl = imageUrl;
+            delete testsData[testIndex].questions[questionIndex].imagePlaceholder;
+
+            const testDocRef = doc(db, "tests", currentTestDocId);
+            await updateDoc(testDocRef, { tests: testsData });
+            
+            status.textContent = `✅ Image URL saved successfully to Firestore!`;
+            status.style.color = 'green';
+            imageUploadInput.value = '';
+            populateDropdowns();
+        } catch (error) {
+            console.error('Error saving image:', error);
+            status.textContent = `❌ Error: ${error.message}`;
+            status.style.color = 'red';
+        }
+    });
+
     discoverFiles();
 }
 
