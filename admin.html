@@ -1,39 +1,41 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-    <title>Admin Panel - Blooming Kids House</title>
-    <link rel="icon" href="favicon.ico" />
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" />
-    <link rel="stylesheet" href="style.css" />
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.9.2/html2pdf.bundle.min.js"></script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Panel</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
 </head>
-<body class="bg-green-50 min-h-screen">
-    <div class="max-w-7xl mx-auto p-6">
-        <div class="flex justify-between items-center mb-6">
-            <h1 class="text-3xl font-bold text-green-800">Admin Panel</h1>
-            <button id="logoutBtn" class="bg-yellow-400 text-white px-4 py-2 rounded hover:bg-yellow-500">Logout</button>
-        </div>
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
-            <div class="bg-blue-100 p-4 rounded-lg text-center shadow-md">
-                <h3 class="font-bold text-blue-800">Total Students</h3>
-                <p id="totalStudentsCount" class="text-3xl text-blue-600 font-extrabold">0</p>
-            </div>
-            <div class="bg-blue-100 p-4 rounded-lg text-center shadow-md">
-                <h3 class="font-bold text-blue-800">Total Tutors</h3>
-                <p id="totalTutorsCount" class="text-3xl text-blue-600 font-extrabold">0</p>
-            </div>
-            <div class="bg-blue-100 p-4 rounded-lg text-center shadow-md">
-                <h3 class="font-bold text-blue-800">Students Per Tutor</h3>
-                <select id="studentsPerTutorSelect" class="w-full mt-1 p-2 border rounded"></select>
-            </div>
-        </div>
+<body>
 
-        <div id="adminContent">
-            <p class="text-center text-gray-600 mt-12">Checking user permissions...</p>
+    <div id="app-container">
+        <nav id="sidebar" class="sidebar">
+            <div class="sidebar-header">
+                <h3>Menu</h3>
+            </div>
+            <ul class="nav-links">
+                <li><a href="#dashboard" class="nav-link"><i class="fas fa-tachometer-alt"></i> Dashboard</a></li>
+                <li><a href="#checklist" class="nav-link"><i class="fas fa-tasks"></i> Content Checklist</a></li>
+                </ul>
+        </nav>
+
+        <div id="main-content">
+            <header class="app-header">
+                <button id="menu-toggle" class="menu-toggle"><i class="fas fa-bars"></i></button>
+                <h1>Admin Panel</h1>
+            </header>
+            
+            <main id="page-content" class="page-content">
+                </main>
         </div>
     </div>
-    <script type="module" src="admin.js"></script>
+
+    <script src="https://www.gstatic.com/firebasejs/12.0.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/12.0.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore-compat.js"></script>
+    
+    <script type="module" src="js/main.js"></script>
+    
 </body>
 </html>
