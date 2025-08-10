@@ -246,7 +246,7 @@ async function loadAndRenderReport(docId) {
 
 
 // ##################################################################
-// # SECTION 2: CONTENT MANAGER (FINAL VERSION WITH BUG FIX)
+// # SECTION 2: CONTENT MANAGER (FINAL VERSION WITH IMAGE PREVIEW)
 // ##################################################################
 
 async function renderContentManagerPanel(container) {
@@ -288,7 +288,6 @@ async function renderContentManagerPanel(container) {
 async function setupContentManager() {
     const GITHUB_USER = 'psalminfo';
     const GITHUB_REPO = 'blooming-kids-cbt';
-    // This now points to your 'images' folder for the preview
     const GITHUB_IMAGE_PREVIEW_URL = `https://raw.githubusercontent.com/${GITHUB_USER}/${GITHUB_REPO}/main/images/`;
     const API_URL = `https://api.github.com/repos/${GITHUB_USER}/${GITHUB_REPO}/contents/`;
 
@@ -382,7 +381,7 @@ async function setupContentManager() {
     function populateDropdowns() {
         passageSelect.innerHTML = '<option value="">-- Select an incomplete passage --</option>';
         imageSelect.innerHTML = '<option value="">-- Select a question needing an image --</option>';
-        imagePreviewContainer.style.display = 'none'; // Hide preview initially
+        imagePreviewContainer.style.display = 'none';
         
         loadedTestData.tests.forEach((test, testIndex) => {
              (test.passages || []).forEach((passage, passageIndex) => {
@@ -410,7 +409,6 @@ async function setupContentManager() {
         passageContent.value = loadedTestData.tests[testIndex].passages[passageIndex].content || '';
     });
 
-    // --- NEW: Event listener to show image preview ---
     imageSelect.addEventListener('change', e => {
         if (!e.target.value) {
             imagePreviewContainer.style.display = 'none';
