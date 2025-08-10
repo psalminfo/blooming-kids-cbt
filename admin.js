@@ -117,7 +117,9 @@ async function renderAdminPanel() {
                     <div id="optionsContainer" class="mb-4">
                         <h4 class="font-semibold mb-2">Options</h4>
                         <input type="text" class="option-input w-full mt-1 p-2 border rounded" placeholder="Option 1">
-                        <input type="text" class="option-input w-full mt-1 p-2 border rounded" placeholder="Option 2">
+                        <input type="text" class="comp-option w-1/2 p-2 border rounded" placeholder="Option 2">
+                        <input type="text" class="comp-option w-1/2 p-2 border rounded" placeholder="Option 3">
+                        <input type="text" class="comp-option w-1/2 p-2 border rounded" placeholder="Option 4">
                     </div>
                     <button type="button" id="addOptionBtn" class="bg-gray-200 px-3 py-1 rounded text-sm mb-4">+ Add Option</button>
                     <div class="mb-4" id="correctAnswerSection">
