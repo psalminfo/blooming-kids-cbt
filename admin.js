@@ -137,9 +137,16 @@ async function renderAdminPanel() {
                     <p id="formMessage" class="mt-4 text-sm"></p>
                 </form>
             </div>
-
-            <!-- View Single Report -->
-            <div class="bg-white p-6 rounded-lg shadow-md">
+            <!-- Missing Content Checklist -->
+            <div class="bg-white p-6 rounded-lg shadow-md col-span-1">
+                <h2 class="text-2xl font-bold text-green-700 mb-4">Content Checklist</h2>
+                <p class="text-gray-600 mb-2">Questions from your GitHub that need content:</p>
+                <div id="checklistContent" class="space-y-4 text-sm">
+                    <p class="text-gray-500">Loading checklist...</p>
+                </div>
+            </div>
+            <!-- Report Section -->
+            <div class="bg-white p-6 rounded-lg shadow-md col-span-2">
                 <h2 class="text-2xl font-bold text-green-700 mb-4">View Student Reports</h2>
                 <div class="mb-4">
                     <label for="studentDropdown" class="block text-gray-700">Select Student</label>
