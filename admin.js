@@ -30,14 +30,6 @@ async function renderAdminPanel() {
     const adminContent = document.getElementById('adminContent');
     adminContent.innerHTML = `
         <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <!-- Content Checklist and Uploads -->
-            <div class="bg-white p-6 rounded-lg shadow-md">
-                <h2 class="text-2xl font-bold text-green-700 mb-4">Content Checklist</h2>
-                <div id="checklistContent" class="space-y-4 text-sm">
-                    <p class="text-gray-500">Loading checklist...</p>
-                </div>
-            </div>
-
             <!-- Add Question Form -->
             <div class="bg-white p-6 rounded-lg shadow-md">
                 <h2 class="text-2xl font-bold text-green-700 mb-4">Add New Question</h2>
@@ -60,6 +52,15 @@ async function renderAdminPanel() {
                             <option value="10">Grade 10</option>
                             <option value="11">Grade 11</option>
                             <option value="12">Grade 12</option>
+                        </select>
+                    </div>
+                    <div class="mb-4">
+                        <label for="subject" class="block text-gray-700">Subject</label>
+                        <select id="subject" required class="w-full mt-1 p-2 border rounded">
+                            <option value="">Select Subject</option>
+                            <option value="math">Math</option>
+                            <option value="ela">English Language Arts</option>
+                            <option value="science">Science</option>
                         </select>
                     </div>
                     <div class="mb-4">
@@ -137,9 +138,16 @@ async function renderAdminPanel() {
                     <p id="formMessage" class="mt-4 text-sm"></p>
                 </form>
             </div>
-
-            <!-- View Single Report -->
-            <div class="bg-white p-6 rounded-lg shadow-md">
+            <!-- Missing Content Checklist -->
+            <div class="bg-white p-6 rounded-lg shadow-md col-span-1">
+                <h2 class="text-2xl font-bold text-green-700 mb-4">Content Checklist</h2>
+                <p class="text-gray-600 mb-2">Questions from your GitHub that need content:</p>
+                <div id="checklistContent" class="space-y-4 text-sm">
+                    <p class="text-gray-500">Loading checklist...</p>
+                </div>
+            </div>
+            <!-- Report Section -->
+            <div class="bg-white p-6 rounded-lg shadow-md col-span-2">
                 <h2 class="text-2xl font-bold text-green-700 mb-4">View Student Reports</h2>
                 <div class="mb-4">
                     <label for="studentDropdown" class="block text-gray-700">Select Student</label>
@@ -288,7 +296,7 @@ async function renderAdminPanel() {
                 await updateDoc(doc(db, "admin_questions", questionId), updateData);
                 alert("Content uploaded successfully!");
                 loadChecklist(); // Refresh the checklist
-           
+            }
 
         } catch (error) {
             console.error("Error updating content:", error);
@@ -467,4 +475,3 @@ onAuthStateChanged(auth, async (user) => {
         window.location.href = "admin-auth.html";
     }
 });
-
