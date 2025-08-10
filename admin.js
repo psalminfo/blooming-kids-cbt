@@ -117,7 +117,9 @@ async function renderAdminPanel() {
                     <div id="optionsContainer" class="mb-4">
                         <h4 class="font-semibold mb-2">Options</h4>
                         <input type="text" class="option-input w-full mt-1 p-2 border rounded" placeholder="Option 1">
-                        <input type="text" class="option-input w-full mt-1 p-2 border rounded" placeholder="Option 2">
+                        <input type="text" class="comp-option w-1/2 p-2 border rounded" placeholder="Option 2">
+                        <input type="text" class="comp-option w-1/2 p-2 border rounded" placeholder="Option 3">
+                        <input type="text" class="comp-option w-1/2 p-2 border rounded" placeholder="Option 4">
                     </div>
                     <button type="button" id="addOptionBtn" class="bg-gray-200 px-3 py-1 rounded text-sm mb-4">+ Add Option</button>
                     <div class="mb-4" id="correctAnswerSection">
@@ -128,15 +130,10 @@ async function renderAdminPanel() {
                     <p id="formMessage" class="mt-4 text-sm"></p>
                 </form>
             </div>
-
-            <div class="bg-white p-6 rounded-lg shadow-md">
-                <h2 class="text-2xl font-bold text-green-700 mb-4">View Student Reports</h2>
-                <div class="mb-4">
-                    <label for="studentDropdown" class="block text-gray-700">Select Student</label>
-                    <select id="studentDropdown" class="w-full mt-1 p-2 border rounded"></select>
-                </div>
-                <div id="reportContent" class="space-y-4">
-                    <p class="text-gray-500">Please select a student to view their report.</p>
+            <div class="bg-white p-6 rounded-lg shadow-md col-span-1">
+                <h2 class="text-2xl font-bold text-green-700 mb-4">Content Checklist</h2>
+                <div id="checklistContent" class="space-y-4">
+                    <p class="text-gray-500">Loading checklist...</p>
                 </div>
             </div>
         </div>
@@ -185,28 +182,6 @@ async function renderAdminPanel() {
             newInput.className = 'comp-option w-1/2 p-2 border rounded';
             newInput.placeholder = `Option ${optionsGroup.children.length + 1}`;
             optionsGroup.appendChild(newInput);
-        }
-    });
-
-    // Fetch and populate student dropdown
-    const studentDropdown = document.getElementById('studentDropdown');
-    getDocs(collection(db, "student_results")).then(studentReportsSnapshot => {
-        studentDropdown.innerHTML = `<option value="">Select Student</option>`;
-        studentReportsSnapshot.forEach(doc => {
-            const student = doc.data();
-            const option = document.createElement('option');
-            option.value = doc.id;
-            option.textContent = `${student.studentName} (${student.parentEmail})`;
-            studentDropdown.appendChild(option);
-        });
-    });
-
-    studentDropdown.addEventListener('change', async (e) => {
-        const docId = e.target.value;
-        if (docId) {
-            await loadAndRenderReport(docId);
-        } else {
-            document.getElementById('reportContent').innerHTML = `<p class="text-gray-500">Please select a student to view their report.</p>`;
         }
     });
 
