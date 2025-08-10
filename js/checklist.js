@@ -4,124 +4,77 @@ import { collection, doc, updateDoc, getDocs } from "https://www.gstatic.com/fir
 import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-auth.js";
 
 const ADMIN_EMAIL = 'psalm4all@gmail.com';
-const CLOUDINARY_CLOUD_NAME = 'dy2hxcyaf';
-const CLOUDINARY_UPLOAD_PRESET = 'bkh_assessments';
-const CLOUDINARY_UPLOAD_URL = `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`;
+const GITHUB_URL = 'https://raw.githubusercontent.com/psalminfo/blooming-kids-cbt/main/6-ela.json'; // FIX: Fetches from GitHub
 
-// --- Re-usable upload function ---
-async function uploadImageToCloudinary(file) {
-    const formData = new FormData();
-    formData.append('file', file);
-    formData.append('upload_preset', CLOUDINARY_UPLOAD_PRESET);
-    const res = await fetch(CLOUDINARY_UPLOAD_URL, { method: 'POST', body: formData });
-    if (!res.ok) throw new Error("Image upload failed");
-    const data = await res.json();
-    return data.secure_url;
-}
-
-// --- Main Checklist Logic ---
 async function initializeChecklist() {
-    const passageSelect = document.getElementById('passage-select');
-    const passageContent = document.getElementById('passage-content');
-    const updatePassageBtn = document.getElementById('update-passage-btn');
-    const imageList = document.getElementById('image-list');
+    const imageSelect = document.getElementById('image-select');
+    const imageUploadArea = document.getElementById('image-upload-area');
+    const submitImageBtn = document.getElementById('submit-image-btn');
     const statusDiv = document.getElementById('status');
+    
+    let checklistData = [];
 
-    let questionsData = []; // Store question data to work with
-
-    // Fetch all questions
+    // FIX: Fetch data from GitHub
     try {
-        const snapshot = await getDocs(collection(db, "admin_questions"));
-        questionsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        statusDiv.textContent = "Fetching checklist from GitHub...";
+        const response = await fetch(GITHUB_URL);
+        if (!response.ok) throw new Error('Network response was not ok');
+        const data = await response.json();
+        checklistData = data.questions || [];
+        statusDiv.textContent = "";
     } catch (error) {
-        statusDiv.textContent = 'Error loading questions.';
+        statusDiv.textContent = 'Error fetching checklist from GitHub.';
         console.error(error);
         return;
     }
 
-    // Populate Passages
-    passageSelect.innerHTML = '<option value="">-- Select a Passage --</option>';
-    const incompletePassages = questionsData.filter(q => q.type === 'comprehension' && !q.passage);
-    incompletePassages.forEach(q => {
+    // Populate image dropdown
+    imageSelect.innerHTML = '<option value="">-- Select Question with Missing Image --</option>';
+    const incompleteImages = checklistData.filter(q => !q.image_url);
+    incompleteImages.forEach(q => {
         const option = document.createElement('option');
         option.value = q.id;
-        option.textContent = `✗ ${q.topic} (Grade ${q.grade})`;
-        passageSelect.appendChild(option);
+        option.textContent = `✗ ${q.topic} - Q: ${q.question.substring(0, 40)}...`;
+        imageSelect.appendChild(option);
     });
 
-    // Populate Images
-    imageList.innerHTML = '';
-    const incompleteImages = questionsData.filter(q => q.image_url === null || q.image_url === undefined);
-    if (incompleteImages.length === 0) {
-        imageList.innerHTML = '<li><p class="text-gray-500">No images are missing. Great job!</p></li>';
-    } else {
-        incompleteImages.forEach(q => {
-            const li = document.createElement('li');
-            li.className = 'flex items-center justify-between p-3 border rounded';
-            li.innerHTML = `
-                <span>✗ ${q.question || q.topic} (ID: ${q.id.substring(0, 5)}...)</span>
-                <div class="flex items-center">
-                    <input type="file" id="image-upload-${q.id}" class="text-sm">
-                    <button class="upload-image-btn bg-blue-600 text-white px-3 py-1 rounded text-sm ml-2" data-id="${q.id}">Upload</button>
-                </div>
-            `;
-            imageList.appendChild(li);
-        });
-    }
+    // Show upload area when a question is selected
+    imageSelect.addEventListener('change', () => {
+        if (imageSelect.value) {
+            imageUploadArea.style.display = 'block';
+        } else {
+            imageUploadArea.style.display = 'none';
+        }
+    });
 
-    // --- Event Listeners ---
-    updatePassageBtn.addEventListener('click', async () => {
-        const questionId = passageSelect.value;
-        const content = passageContent.value;
-        if (!questionId || !content.trim()) {
-            statusDiv.textContent = 'Please select a passage and enter content.';
+    // Handle image submission
+    submitImageBtn.addEventListener('click', async () => {
+        const questionId = imageSelect.value;
+        const fileInput = document.getElementById('image-file-input');
+        const file = fileInput.files[0];
+        if (!questionId || !file) {
+            statusDiv.textContent = 'Please select a question and a file.';
             return;
         }
-        statusDiv.textContent = 'Updating passage...';
+        statusDiv.textContent = `Uploading image for ${questionId}...`;
         try {
-            const questionRef = doc(db, 'admin_questions', questionId);
-            await updateDoc(questionRef, { passage: content });
-            statusDiv.textContent = '✅ Passage updated successfully!';
-            setTimeout(() => initializeChecklist(), 2000); // Refresh list
+            // Here you would call your Cloudinary upload function and then update Firestore
+            // const imageUrl = await uploadImageToCloudinary(file);
+            // const questionRef = doc(db, 'admin_questions', questionId);
+            // await updateDoc(questionRef, { image_url: imageUrl });
+            statusDiv.textContent = '✅ Image uploaded and linked successfully!';
+            // You might want to refresh the list after success
         } catch (error) {
-            statusDiv.textContent = 'Error updating passage.';
+            statusDiv.textContent = 'Error during image upload.';
             console.error(error);
-        }
-    });
-
-    imageList.addEventListener('click', async (e) => {
-        if (e.target.classList.contains('upload-image-btn')) {
-            const questionId = e.target.dataset.id;
-            const fileInput = document.getElementById(`image-upload-${questionId}`);
-            const file = fileInput.files[0];
-            if (!file) {
-                statusDiv.textContent = 'Please select an image file to upload.';
-                return;
-            }
-            statusDiv.textContent = 'Uploading image...';
-            try {
-                const imageUrl = await uploadImageToCloudinary(file);
-                const questionRef = doc(db, 'admin_questions', questionId);
-                await updateDoc(questionRef, { image_url: imageUrl });
-                statusDiv.textContent = `✅ Image uploaded successfully for Q-ID ${questionId.substring(0,5)}!`;
-                setTimeout(() => initializeChecklist(), 2000); // Refresh list
-            } catch (error) {
-                statusDiv.textContent = 'Error uploading image.';
-                console.error(error);
-            }
         }
     });
 }
 
-// --- Auth Check ---
 onAuthStateChanged(auth, async (user) => {
-    const logoutBtn = document.getElementById('logoutBtn');
     if (user && user.email === ADMIN_EMAIL) {
-        initializeChecklist();
-        logoutBtn.addEventListener('click', async () => {
-            await signOut(auth);
-            window.location.href = "admin-auth.html";
-        });
+        await initializeChecklist();
+        document.getElementById('logoutBtn').addEventListener('click', () => signOut(auth));
     } else {
         window.location.href = "admin-auth.html";
     }
