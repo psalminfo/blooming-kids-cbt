@@ -276,7 +276,7 @@ async function renderContentManagerPanel(container) {
 async function setupContentManager() {
     const GITHUB_USER = 'psalminfo';
     const GITHUB_REPO = 'blooming-kids-cbt';
-    const API_URL = `https://api.github.com/repos/${GITHUB_USER}/${GITHUB_REPO}/contents/`;
+    const API_URL = `https://api.github.com/repos/${GITHUB_USER}/${GITHUB_REPO}/contents/tests/`;
 
     const loaderStatus = document.getElementById('loader-status');
     const workspace = document.getElementById('manager-workspace');
@@ -490,3 +490,4 @@ onAuthStateChanged(auth, async (user) => {
         window.location.href = "admin-auth.html";
     }
 });
+
