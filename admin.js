@@ -137,14 +137,8 @@ async function renderAdminPanel() {
                     <p id="formMessage" class="mt-4 text-sm"></p>
                 </form>
             </div>
-            <div class="bg-white p-6 rounded-lg shadow-md col-span-1">
-                <h2 class="text-2xl font-bold text-green-700 mb-4">Content Checklist</h2>
-                <p class="text-gray-600 mb-2">Questions from your GitHub that need content:</p>
-                <div id="checklistContent" class="space-y-4 text-sm">
-                    <p class="text-gray-500">Loading checklist...</p>
-                </div>
-            </div>
-            <div class="bg-white p-6 rounded-lg shadow-md col-span-2">
+
+            <div class="bg-white p-6 rounded-lg shadow-md">
                 <h2 class="text-2xl font-bold text-green-700 mb-4">View Student Reports</h2>
                 <div class="mb-4">
                     <label for="studentDropdown" class="block text-gray-700">Select Student</label>
@@ -165,43 +159,7 @@ async function renderAdminPanel() {
     const writingTypeSection = document.getElementById('writingTypeSection');
     const comprehensionSection = document.getElementById('comprehensionSection');
     const addCompQuestionBtn = document.getElementById('addCompQuestionBtn');
-    const checklistContent = document.getElementById('checklistContent');
-
-    async function loadChecklist() {
-        checklistContent.innerHTML = `<p class="text-gray-500">Loading checklist...</p>`;
-        const GITHUB_URL = `https://raw.githubusercontent.com/psalminfo/blooming-kids-cbt/main/6-ela.json`;
-        const firestoreSnapshot = await getDocs(collection(db, "admin_questions"));
-        const existingQuestions = firestoreSnapshot.docs.map(doc => doc.data());
-
-        try {
-            const githubRes = await fetch(GITHUB_URL);
-            const githubData = githubRes.ok ? (await githubRes.json()).questions : [];
-
-            let checklistHTML = '';
-            githubData.forEach(q => {
-                const needsImage = q.image_url === null || q.image_url === undefined;
-                const needsPassage = q.passageId !== null && !existingQuestions.some(eq => eq.passageId === q.passageId);
-
-                if (needsImage || needsPassage) {
-                    checklistHTML += `
-                        <div class="p-4 border rounded-lg bg-gray-50">
-                            <p class="font-semibold">${q.questionText || 'Comprehension Passage'}</p>
-                            ${needsImage ? `<p class="text-red-500">❌ Missing Image</p>` : ''}
-                            ${needsPassage ? `<p class="text-red-500">❌ Missing Passage</p>` : ''}
-                            <button class="update-content-btn bg-green-500 text-white px-4 py-2 rounded mt-2" data-question-id="${q.id}">Add Content</button>
-                        </div>
-                    `;
-                }
-            });
-            checklistContent.innerHTML = checklistHTML || `<p class="text-gray-500">No content is missing from your GitHub files.</p>`;
-
-        } catch (error) {
-            console.error("Error loading checklist:", error);
-            checklistContent.innerHTML = `<p class="text-red-500">Failed to load checklist from GitHub.</p>`;
-        }
-    }
-
-
+    
     questionTypeDropdown.addEventListener('change', (e) => {
         const type = e.target.value;
         optionsContainer.style.display = type === 'multiple-choice' ? 'block' : 'none';
