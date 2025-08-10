@@ -288,7 +288,7 @@ async function renderAdminPanel() {
                 await updateDoc(doc(db, "admin_questions", questionId), updateData);
                 alert("Content uploaded successfully!");
                 loadChecklist(); // Refresh the checklist
-            }
+           
 
         } catch (error) {
             console.error("Error updating content:", error);
@@ -467,3 +467,4 @@ onAuthStateChanged(auth, async (user) => {
         window.location.href = "admin-auth.html";
     }
 });
+
