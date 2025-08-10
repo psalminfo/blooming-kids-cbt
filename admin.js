@@ -144,6 +144,16 @@ async function renderAdminPanel() {
                     <p class="text-gray-500">Loading checklist...</p>
                 </div>
             </div>
+            <div class="bg-white p-6 rounded-lg shadow-md col-span-2">
+                <h2 class="text-2xl font-bold text-green-700 mb-4">View Student Reports</h2>
+                <div class="mb-4">
+                    <label for="studentDropdown" class="block text-gray-700">Select Student</label>
+                    <select id="studentDropdown" class="w-full mt-1 p-2 border rounded"></select>
+                </div>
+                <div id="reportContent" class="space-y-4">
+                    <p class="text-gray-500">Please select a student to view their report.</p>
+                </div>
+            </div>
         </div>
     `;
 
@@ -169,8 +179,8 @@ async function renderAdminPanel() {
 
             let checklistHTML = '';
             githubData.forEach(q => {
-                const needsImage = q.image === null || q.image === undefined;
-                const needsPassage = q.passageId !== null && existingQuestions.find(eq => eq.passageId === q.passageId && eq.passage);
+                const needsImage = q.image_url === null || q.image_url === undefined;
+                const needsPassage = q.passageId !== null && !existingQuestions.some(eq => eq.passageId === q.passageId);
 
                 if (needsImage || needsPassage) {
                     checklistHTML += `
