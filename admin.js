@@ -30,6 +30,7 @@ async function renderAdminPanel() {
     const adminContent = document.getElementById('adminContent');
     adminContent.innerHTML = `
         <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <!-- Content Checklist and Uploads -->
             <div class="bg-white p-6 rounded-lg shadow-md">
                 <h2 class="text-2xl font-bold text-green-700 mb-4">Content Checklist</h2>
                 <div id="checklistContent" class="space-y-4 text-sm">
@@ -37,6 +38,7 @@ async function renderAdminPanel() {
                 </div>
             </div>
 
+            <!-- Add Question Form -->
             <div class="bg-white p-6 rounded-lg shadow-md">
                 <h2 class="text-2xl font-bold text-green-700 mb-4">Add New Question</h2>
                 <form id="addQuestionForm">
@@ -124,9 +126,7 @@ async function renderAdminPanel() {
                     <div id="optionsContainer" class="mb-4">
                         <h4 class="font-semibold mb-2">Options</h4>
                         <input type="text" class="option-input w-full mt-1 p-2 border rounded" placeholder="Option 1">
-                        <input type="text" class="comp-option w-1/2 p-2 border rounded" placeholder="Option 2">
-                        <input type="text" class="comp-option w-1/2 p-2 border rounded" placeholder="Option 3">
-                        <input type="text" class="comp-option w-1/2 p-2 border rounded" placeholder="Option 4">
+                        <input type="text" class="option-input w-full mt-1 p-2 border rounded" placeholder="Option 2">
                     </div>
                     <button type="button" id="addOptionBtn" class="bg-gray-200 px-3 py-1 rounded text-sm mb-4">+ Add Option</button>
                     <div class="mb-4" id="correctAnswerSection">
@@ -138,6 +138,7 @@ async function renderAdminPanel() {
                 </form>
             </div>
 
+            <!-- View Single Report -->
             <div class="bg-white p-6 rounded-lg shadow-md">
                 <h2 class="text-2xl font-bold text-green-700 mb-4">View Student Reports</h2>
                 <div class="mb-4">
@@ -159,74 +160,56 @@ async function renderAdminPanel() {
     const writingTypeSection = document.getElementById('writingTypeSection');
     const comprehensionSection = document.getElementById('comprehensionSection');
     const addCompQuestionBtn = document.getElementById('addCompQuestionBtn');
-    
-    questionTypeDropdown.addEventListener('change', (e) => {
-        const type = e.target.value;
-        optionsContainer.style.display = type === 'multiple-choice' ? 'block' : 'none';
-        addOptionBtn.style.display = type === 'multiple-choice' ? 'inline-block' : 'none';
-        correctAnswerSection.style.display = type === 'multiple-choice' ? 'block' : 'none';
-        writingTypeSection.style.display = type === 'creative-writing' ? 'block' : 'none';
-        comprehensionSection.style.display = type === 'comprehension' ? 'block' : 'none';
-    });
+    const checklistContent = document.getElementById('checklistContent');
 
-    addCompQuestionBtn.addEventListener('click', () => {
-        const compQuestionsContainer = document.getElementById('comprehensionQuestions');
-        const questionCount = compQuestionsContainer.querySelectorAll('.question-group').length;
-        const newQuestionGroup = document.createElement('div');
-        newQuestionGroup.className = 'question-group mb-4 p-4 border rounded';
-        newQuestionGroup.innerHTML = `
-            <textarea class="comp-question w-full mt-1 p-2 border rounded" rows="2" placeholder="Question"></textarea>
-            <div class="options-group flex space-x-2 mt-2">
-                <input type="text" class="comp-option w-1/2 p-2 border rounded" placeholder="Option 1">
-                <input type="text" class="comp-option w-1/2 p-2 border rounded" placeholder="Option 2">
-            </div>
-            <input type="text" class="comp-correct-answer w-full mt-2 p-2 border rounded" placeholder="Correct Answer">
-            <button type="button" class="add-comp-option-btn bg-gray-200 px-3 py-1 rounded text-sm mt-2">+ Add Option</button>
-        `;
-        compQuestionsContainer.appendChild(newQuestionGroup);
-    });
+    async function loadChecklist() {
+        checklistContent.innerHTML = `<p class="text-gray-500">Loading checklist...</p>`;
+        const GITHUB_URL = `https://raw.githubusercontent.com/psalminfo/blooming-kids-cbt/main/6-ela.json`;
+        const firestoreSnapshot = await getDocs(collection(db, "admin_questions"));
+        const existingQuestions = firestoreSnapshot.docs.map(doc => ({id: doc.id, ...doc.data()}));
 
-    document.getElementById('comprehensionQuestions').addEventListener('click', (e) => {
-        if (e.target.classList.contains('add-comp-option-btn')) {
-            const optionsGroup = e.target.closest('.question-group').querySelector('.options-group');
-            const newInput = document.createElement('input');
-            newInput.type = 'text';
-            newInput.className = 'comp-option w-1/2 p-2 border rounded';
-            newInput.placeholder = `Option ${optionsGroup.children.length + 1}`;
-            optionsGroup.appendChild(newInput);
+        try {
+            const githubRes = await fetch(GITHUB_URL);
+            const githubData = githubRes.ok ? (await githubRes.json()).questions : [];
+
+            let checklistHTML = '';
+            githubData.forEach(q => {
+                const needsImage = q.image_url === null || q.image_url === undefined;
+                const needsPassage = q.passageId !== null && !existingQuestions.some(eq => eq.passageId === q.passageId && eq.passage);
+
+                if (needsImage || needsPassage) {
+                    checklistHTML += `
+                        <div class="p-4 border rounded-lg bg-gray-50 mb-4">
+                            <h4 class="font-bold text-gray-800">${q.questionText || 'Comprehension Question'} (ID: ${q.id})</h4>
+                            <p class="text-gray-600">${q.topic}</p>
+                            <form class="update-form mt-2 space-y-2" data-question-id="${q.id}">
+                                ${needsImage ? `
+                                    <div class="border p-2 rounded-md bg-white">
+                                        <h5 class="font-semibold text-red-500">❌ Missing Image</h5>
+                                        <label for="imageUpload-${q.id}" class="block text-sm text-gray-700">Upload Image</label>
+                                        <input type="file" id="imageUpload-${q.id}" class="w-full mt-1">
+                                        <button type="submit" class="bg-green-600 text-white px-4 py-2 rounded mt-2 text-sm">Upload Image</button>
+                                    </div>
+                                ` : ''}
+                                ${needsPassage ? `
+                                    <div class="border p-2 rounded-md bg-white">
+                                        <h5 class="font-semibold text-red-500">❌ Missing Passage</h5>
+                                        <label for="passageUpload-${q.id}" class="block text-sm text-gray-700">Paste Passage</label>
+                                        <textarea id="passageUpload-${q.id}" class="w-full mt-1 p-2 border rounded" rows="4"></textarea>
+                                        <button type="submit" class="bg-green-600 text-white px-4 py-2 rounded mt-2 text-sm">Save Passage</button>
+                                    </div>
+                                ` : ''}
+                            </form>
+                        </div>
+                    `;
+                }
+            });
+            checklistContent.innerHTML = checklistHTML || `<p class="text-gray-500">No content is missing from your GitHub files.</p>`;
+        } catch (error) {
+            console.error("Error loading checklist:", error);
+            checklistContent.innerHTML = `<p class="text-red-500">Failed to load checklist from GitHub.</p>`;
         }
-    });
-
-    // Fetch and populate student dropdown
-    const studentDropdown = document.getElementById('studentDropdown');
-    getDocs(collection(db, "student_results")).then(studentReportsSnapshot => {
-        studentDropdown.innerHTML = `<option value="">Select Student</option>`;
-        studentReportsSnapshot.forEach(doc => {
-            const student = doc.data();
-            const option = document.createElement('option');
-            option.value = doc.id;
-            option.textContent = `${student.studentName} (${student.parentEmail})`;
-            studentDropdown.appendChild(option);
-        });
-    });
-
-    studentDropdown.addEventListener('change', async (e) => {
-        const docId = e.target.value;
-        if (docId) {
-            await loadAndRenderReport(docId);
-        } else {
-            document.getElementById('reportContent').innerHTML = `<p class="text-gray-500">Please select a student to view their report.</p>`;
-        }
-    });
-
-    addOptionBtn.addEventListener('click', () => {
-        const optionsContainer = document.getElementById('optionsContainer');
-        const newInput = document.createElement('input');
-        newInput.type = 'text';
-        newInput.className = 'option-input w-full mt-1 p-2 border rounded';
-        newInput.placeholder = `Option ${optionsContainer.children.length - 1}`;
-        optionsContainer.appendChild(newInput);
-    });
+    }
 
     addQuestionForm.addEventListener('submit', async (e) => {
         e.preventDefault();
@@ -297,6 +280,104 @@ async function renderAdminPanel() {
             console.error("Error adding question:", error);
             message.textContent = "Error saving question.";
             message.style.color = 'red';
+        }
+    });
+
+    // Event delegation for dynamically added forms
+    document.getElementById('checklistContent').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const form = e.target;
+        const questionId = form.getAttribute('data-question-id');
+        const imageFile = form.querySelector('input[type="file"]')?.files[0];
+        const passageText = form.querySelector('textarea')?.value.trim();
+
+        try {
+            let updateData = {};
+            if (imageFile) {
+                const imageUrl = await uploadImageToCloudinary(imageFile);
+                updateData.image_url = imageUrl;
+            }
+            if (passageText) {
+                updateData.passage = passageText;
+            }
+
+            if (Object.keys(updateData).length > 0) {
+                await updateDoc(doc(db, "admin_questions", questionId), updateData);
+                alert("Content uploaded successfully!");
+                loadChecklist(); // Refresh the checklist
+            }
+
+        } catch (error) {
+            console.error("Error updating content:", error);
+            alert("Error updating content.");
+        }
+    });
+
+    const studentDropdown = document.getElementById('studentDropdown');
+    getDocs(collection(db, "student_results")).then(studentReportsSnapshot => {
+        studentDropdown.innerHTML = `<option value="">Select Student</option>`;
+        studentReportsSnapshot.forEach(doc => {
+            const student = doc.data();
+            const option = document.createElement('option');
+            option.value = doc.id;
+            option.textContent = `${student.studentName} (${student.parentEmail})`;
+            studentDropdown.appendChild(option);
+        });
+    });
+
+    studentDropdown.addEventListener('change', async (e) => {
+        const docId = e.target.value;
+        if (docId) {
+            await loadAndRenderReport(docId);
+        } else {
+            document.getElementById('reportContent').innerHTML = `<p class="text-gray-500">Please select a student to view their report.</p>`;
+        }
+    });
+
+
+    // Add event listeners for dynamic form elements
+    const questionTypeDropdown = document.getElementById('questionType');
+    const optionsContainer = document.getElementById('optionsContainer');
+    const addOptionBtn = document.getElementById('addOptionBtn');
+    const correctAnswerSection = document.getElementById('correctAnswerSection');
+    const writingTypeSection = document.getElementById('writingTypeSection');
+    const comprehensionSection = document.getElementById('comprehensionSection');
+    const addCompQuestionBtn = document.getElementById('addCompQuestionBtn');
+    
+    questionTypeDropdown.addEventListener('change', (e) => {
+        const type = e.target.value;
+        optionsContainer.style.display = type === 'multiple-choice' ? 'block' : 'none';
+        addOptionBtn.style.display = type === 'multiple-choice' ? 'inline-block' : 'none';
+        correctAnswerSection.style.display = type === 'multiple-choice' ? 'block' : 'none';
+        writingTypeSection.style.display = type === 'creative-writing' ? 'block' : 'none';
+        comprehensionSection.style.display = type === 'comprehension' ? 'block' : 'none';
+    });
+
+    addCompQuestionBtn.addEventListener('click', () => {
+        const compQuestionsContainer = document.getElementById('comprehensionQuestions');
+        const questionCount = compQuestionsContainer.querySelectorAll('.question-group').length;
+        const newQuestionGroup = document.createElement('div');
+        newQuestionGroup.className = 'question-group mb-4 p-4 border rounded';
+        newQuestionGroup.innerHTML = `
+            <textarea class="comp-question w-full mt-1 p-2 border rounded" rows="2" placeholder="Question"></textarea>
+            <div class="options-group flex space-x-2 mt-2">
+                <input type="text" class="comp-option w-1/2 p-2 border rounded" placeholder="Option 1">
+                <input type="text" class="comp-option w-1/2 p-2 border rounded" placeholder="Option 2">
+            </div>
+            <input type="text" class="comp-correct-answer w-full mt-2 p-2 border rounded" placeholder="Correct Answer">
+            <button type="button" class="add-comp-option-btn bg-gray-200 px-3 py-1 rounded text-sm mt-2">+ Add Option</button>
+        `;
+        compQuestionsContainer.appendChild(newQuestionGroup);
+    });
+
+    document.getElementById('comprehensionQuestions').addEventListener('click', (e) => {
+        if (e.target.classList.contains('add-comp-option-btn')) {
+            const optionsGroup = e.target.closest('.question-group').querySelector('.options-group');
+            const newInput = document.createElement('input');
+            newInput.type = 'text';
+            newInput.className = 'comp-option w-1/2 p-2 border rounded';
+            newInput.placeholder = `Option ${optionsGroup.children.length + 1}`;
+            optionsGroup.appendChild(newInput);
         }
     });
 }
