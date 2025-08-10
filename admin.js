@@ -43,7 +43,7 @@ async function renderAdminPanel(container) {
                 <h2 class="text-2xl font-bold text-green-700 mb-4">Add New Question</h2>
                 <form id="addQuestionForm">
                     <div class="mb-4"><label for="topic" class="block text-gray-700">Topic</label><input type="text" id="topic" class="w-full mt-1 p-2 border rounded" required></div>
-                    <div class="mb-4"><label for="subject" class="block text-gray-700">Subject</label><select id="subject" required class="w-full mt-1 p-2 border rounded"><option value="">Select Subject</option><option value="Math">Math</option><option value="English">English</option><option value="Biology">Biology</option>value="Physics">Physics</option><option value="Chemistry">Chemistry</option></select></div>
+                    <div class="mb-4"><label for="subject" class="block text-gray-700">Subject</label><select id="subject" required class="w-full mt-1 p-2 border rounded"><option value="">Select Subject</option><option value="Math">Math</option><option value="English">English</option><option value="Biology">Biology</option><option value="Physics">Physics</option><option value="Chemistry">Chemistry</option></select></div>
                     <div class="mb-4"><label for="grade" class="block text-gray-700">Grade</label><select id="grade" required class="w-full mt-1 p-2 border rounded"><option value="">Select Grade</option><option value="3">3</option><option value="4">4</option><option value="5">5</option><option value="6">6</option><option value="7">7</option><option value="8">8</option></select></div>
                     <div class="mb-4"><label for="questionType" class="block text-gray-700">Question Type</label><select id="questionType" class="w-full mt-1 p-2 border rounded"><option value="multiple-choice">Multiple Choice</option><option value="creative-writing">Creative Writing</option><option value="comprehension">Comprehension</option></select></div>
                     <div class="mb-4" id="writingTypeSection" style="display:none;"><label for="writingType" class="block text-gray-700">Writing Type</label><select id="writingType" class="w-full mt-1 p-2 border rounded"><option value="Narrative">Narrative</option><option value="Descriptive">Descriptive</option><option value="Persuasive">Persuasive</option></select></div>
@@ -350,5 +350,6 @@ onAuthStateChanged(auth, async (user) => {
         window.location.href = "admin-auth.html";
     }
 });
+
 
 
