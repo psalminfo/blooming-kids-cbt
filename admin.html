@@ -1,41 +1,41 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Admin Panel</title>
-    <link rel="stylesheet" href="style.css">
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>Admin Panel - Blooming Kids House</title>
+    <link rel="icon" href="favicon.ico" />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" />
+    <link rel="stylesheet" href="style.css" />
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.9.2/html2pdf.bundle.min.js"></script>
 </head>
-<body>
+<body class="bg-green-50">
 
     <div id="app-container">
         <nav id="sidebar" class="sidebar">
             <div class="sidebar-header">
-                <h3>Menu</h3>
+                <h3>Admin Menu</h3>
             </div>
             <ul class="nav-links">
                 <li><a href="#dashboard" class="nav-link"><i class="fas fa-tachometer-alt"></i> Dashboard</a></li>
                 <li><a href="#checklist" class="nav-link"><i class="fas fa-tasks"></i> Content Checklist</a></li>
-                </ul>
+            </ul>
         </nav>
 
-        <div id="main-content">
+        <div id="main-content-wrapper">
             <header class="app-header">
                 <button id="menu-toggle" class="menu-toggle"><i class="fas fa-bars"></i></button>
-                <h1>Admin Panel</h1>
+                <h1 class="text-3xl font-bold text-white">Admin Panel</h1>
+                <button id="logoutBtn" class="bg-yellow-400 text-white px-4 py-2 rounded hover:bg-yellow-500 ml-auto">Logout</button>
             </header>
             
             <main id="page-content" class="page-content">
                 </main>
         </div>
     </div>
-
-    <script src="https://www.gstatic.com/firebasejs/12.0.0/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/12.0.0/firebase-auth-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore-compat.js"></script>
     
     <script type="module" src="js/main.js"></script>
-    
+
 </body>
 </html>
