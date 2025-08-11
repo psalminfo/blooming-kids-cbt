@@ -96,12 +96,28 @@ function displayQuestions(questions) {
     const container = document.getElementById("question-container");
     container.innerHTML = (questions || []).map((q, i) => `
         <div class="bg-white p-4 border rounded-lg shadow-sm question-block" data-question-id="${q.id}">
+            
+            <!-- START: This is the new code to display images -->
+            ${(q.image_url && q.image_position === 'before') ? `<img src="${q.image_url}" class="mb-2 w-full rounded" alt="Question image"/>` : ''}
+            
             <p class="font-semibold mb-2 question-text">${i + 1}. ${q.question || q.passage || ''}</p>
-            ${(q.options || []).map(opt => `
-                <label class="block ml-4">
-                    <input type="radio" name="q${i}" value="${opt}" class="mr-2"> ${opt}
-                </label>
-            `).join('')}
+
+            ${(q.image_url && q.image_position === 'after') ? `<img src="${q.image_url}" class="mt-2 w-full rounded" alt="Question image"/>` : ''}
+            <!-- END: This is the new code to display images -->
+            
+            ${q.type === 'creative-writing' ? `
+                <textarea id="creativeWriting" class="w-full mt-4 p-2 border rounded" rows="10" placeholder="Write your response here..."></textarea>
+                <div class="mt-2">
+                    <label class="block text-sm text-gray-600">Or upload a file:</label>
+                    <input type="file" id="creativeWritingFile" class="w-full mt-1">
+                </div>
+            ` : `
+                ${(q.options || []).map(opt => `
+                    <label class="block ml-4">
+                        <input type="radio" name="q${i}" value="${opt}" class="mr-2"> ${opt}
+                    </label>
+                `).join('')}
+            `}
         </div>
     `).join('');
 }
