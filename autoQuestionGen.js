@@ -94,16 +94,21 @@ export function getLoadedQuestions() {
 
 function displayQuestions(questions) {
     const container = document.getElementById("question-container");
-    container.innerHTML = (questions || []).map((q, i) => `
+    container.innerHTML = (questions || []).map((q, i) => {
+        // ### START: THIS IS THE FIX ###
+        // This logic now defaults to showing the image 'before' if the position isn't specified.
+        const showImageBefore = q.image_url && q.image_position !== 'after';
+        const showImageAfter = q.image_url && q.image_position === 'after';
+        // ### END: THIS IS THE FIX ###
+
+        return `
         <div class="bg-white p-4 border rounded-lg shadow-sm question-block" data-question-id="${q.id}">
             
-            <!-- START: This is the new code to display images -->
-            ${(q.image_url && q.image_position === 'before') ? `<img src="${q.image_url}" class="mb-2 w-full rounded" alt="Question image"/>` : ''}
+            ${showImageBefore ? `<img src="${q.image_url}" class="mb-2 w-full rounded" alt="Question image"/>` : ''}
             
             <p class="font-semibold mb-2 question-text">${i + 1}. ${q.question || q.passage || ''}</p>
 
-            ${(q.image_url && q.image_position === 'after') ? `<img src="${q.image_url}" class="mt-2 w-full rounded" alt="Question image"/>` : ''}
-            <!-- END: This is the new code to display images -->
+            ${showImageAfter ? `<img src="${q.image_url}" class="mt-2 w-full rounded" alt="Question image"/>` : ''}
             
             ${q.type === 'creative-writing' ? `
                 <textarea id="creativeWriting" class="w-full mt-4 p-2 border rounded" rows="10" placeholder="Write your response here..."></textarea>
@@ -119,5 +124,5 @@ function displayQuestions(questions) {
                 `).join('')}
             `}
         </div>
-    `).join('');
+    `}).join('');
 }
