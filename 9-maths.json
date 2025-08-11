@@ -1,0 +1,153 @@
+{
+  "tests": [
+    {
+      "id": "grade_9_math_combined",
+      "subject": "Math",
+      "grade": "9",
+      "year": "2024",
+      "defaultQuestionType": "multiple-choice",
+      "questions": [
+        {
+          "questionId": "m9_q1",
+          "question": "Below is a sequence of numbers: 0.5, 3, 5.5, 8, ... Which term has a value of 148?",
+          "options": ["59", "60", "61", "62"],
+          "correctAnswer": "60"
+        },
+        {
+          "questionId": "m9_q2",
+          "question": "A train was scheduled to leave at 17:40. It departed 30 minutes late and the journey took 3 hours and 45 minutes. Find the time that it arrived at its destination.",
+          "options": ["21:55", "22:55", "20:55", "21:25"],
+          "correctAnswer": "21:55"
+        },
+        {
+          "questionId": "m9_q3",
+          "imagePlaceholder": "math_q5_shape_perimeter.png",
+          "question": "Write a simplified expression for the perimeter of the shape drawn below.",
+          "options": [
+            "4a + 6b + 10",
+            "2a + 5b + 11",
+            "4a + 5b + 9",
+            "2a + 6b + 9"
+          ],
+          "correctAnswer": "2a + 6b + 9"
+        },
+        {
+          "questionId": "m9_q4",
+          "question": "Calculate the total surface area of a cube whose volume is 27 cubic centimetres.",
+          "options": ["54 cm²", "36 cm²", "27 cm²", "18 cm²"],
+          "correctAnswer": "54 cm²"
+        },
+        {
+          "questionId": "m9_q5",
+          "imagePlaceholder": "math_q14_trapezium.png",
+          "question": "Find the perimeter of the trapezium below.",
+          "options": ["195 cm", "213 cm", "203.5 cm", "243 cm"],
+          "correctAnswer": "213 cm"
+        },
+        {
+          "questionId": "m9_q6",
+          "imagePlaceholder": "math_q17_semicircle.png",
+          "question": "The diagram shows a semicircle of radius 2 cm containing a smaller circle. Calculate the fraction of the semicircle that is shaded.",
+          "options": ["1/2", "1/3", "2/3", "1/4"],
+          "correctAnswer": "1/2"
+        },
+        {
+          "questionId": "m9_q7",
+          "imagePlaceholder": "math_q18_triangle_angles.png",
+          "question": "In the diagram PQ = PR = RS and angle QPR = 40°. Find the size of angle x.",
+          "options": ["105°", "110°", "115°", "120°"],
+          "correctAnswer": "110°"
+        },
+        {
+          "questionId": "m9_q8",
+          "question": "Jo bought a used car for $6000 and paid 15% deposit. How much did he still have to pay?",
+          "options": ["$900", "$5100", "$4500", "$5000"],
+          "correctAnswer": "$5100"
+        },
+        {
+          "questionId": "m9_q9",
+          "question": "What is 8% of $600?",
+          "options": ["$48", "$58", "$480", "$580"],
+          "correctAnswer": "$48"
+        },
+        {
+          "questionId": "m9_q10",
+          "imagePlaceholder": "math_q7_l_shape.png",
+          "question": "The perimeter of the shape is:",
+          "options": ["72cm", "94cm", "47cm", "69cm"],
+          "correctAnswer": "94cm"
+        },
+        {
+          "questionId": "m9_q11",
+          "imagePlaceholder": "math_q8_circle_arc.png",
+          "question": "If the length of the shorter arc AB is 22cm and C is the centre of the circle then the circumference of the circle is:",
+          "options": ["88cm", "176cm", "990cm", "67cm"],
+          "correctAnswer": "176cm"
+        },
+        {
+          "questionId": "m9_q12",
+          "imagePlaceholder": "math_q12_triangle_exterior_angles.png",
+          "question": "Find the value of a°.",
+          "options": ["40", "53", "93", "146"],
+          "correctAnswer": "40"
+        },
+        {
+          "questionId": "m9_q13",
+          "imagePlaceholder": "math_q13_parallel_lines.png",
+          "question": "Find the value of x°.",
+          "options": ["124", "56", "34", "134"],
+          "correctAnswer": "124"
+        },
+        {
+          "questionId": "m9_q14",
+          "imagePlaceholder": "math_q14_histogram.png",
+          "question": "How many students studied for more than 8 hours in the week?",
+          "options": ["22", "29", "42", "50"],
+          "correctAnswer": "22"
+        },
+        {
+          "questionId": "m9_q15",
+          "imagePlaceholder": "math_q17_line_gradient.png",
+          "question": "The gradient of the line is:",
+          "options": ["-2/3", "2/3", "3/2", "-3/2"],
+          "correctAnswer": "-2/3"
+        },
+        {
+          "questionId": "m9_q16",
+          "imagePlaceholder": "math_q22_rectangle_path.png",
+          "question": "The diagram shows a small rectangular field. If Linda runs from A to B to D to C to A, how far does she run?",
+          "options": ["140m", "150m", "160m", "120m"],
+          "correctAnswer": "150m"
+        },
+        {
+          "questionId": "m9_q17",
+          "imagePlaceholder": "math_q24_trapezoid_side.png",
+          "question": "The length of x equals:",
+          "options": ["2√5 cm", "√6 cm", "5√2 cm", "6cm"],
+          "correctAnswer": "2√5 cm"
+        },
+        {
+          "questionId": "m9_q18",
+          "imagePlaceholder": "math_q25_box_diagonal.png",
+          "question": "The rectangular box has dimensions as shown. What is the length AG?",
+          "options": ["2√26", "4√6", "2√3", "√16"],
+          "correctAnswer": "2√26"
+        },
+        {
+          "questionId": "m9_q19",
+          "imagePlaceholder": "math_q27_rectangular_prism.png",
+          "question": "If Density = Mass ÷ Volume, what is the Mass of the solid in the diagram if its Density is 1.2gm/cm³?",
+          "options": ["72gm", "60gm", "50gm", "38.4gm"],
+          "correctAnswer": "72gm"
+        },
+        {
+          "questionId": "m9_q20",
+          "imagePlaceholder": "math_q59_right_triangle.png",
+          "question": "Find the value of x.",
+          "options": ["3", "4", "5", "6"],
+          "correctAnswer": "3"
+        }
+      ]
+    }
+  ]
+}
