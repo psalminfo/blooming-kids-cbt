@@ -1,5 +1,5 @@
 import { db } from './firebaseConfig.js';
-import { doc, getDoc, collection, getDocs, query, where } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
+import { collection, getDocs, query, where, documentId } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
 
 let loadedQuestions = [];
 
@@ -7,28 +7,51 @@ export async function loadQuestions(subject, grade) {
     const container = document.getElementById("question-container");
     container.innerHTML = `<p class="text-gray-500">Please wait, preparing your test...</p>`;
 
+    // This is still needed for the GitHub fallback URL
     const fileName = `${grade}-${subject}`.toLowerCase();
-    const docId = fileName;
     const GITHUB_URL = `https://raw.githubusercontent.com/psalminfo/blooming-kids-cbt/main/${fileName}.json`;
 
     let allQuestions = [];
 
     try {
-        const testDocRef = doc(db, "tests", docId);
-        const docSnap = await getDoc(testDocRef);
-
         let rawData;
+        let docFoundInFirestore = false;
+
+        // --- START: MODIFIED FETCHING LOGIC ---
+        // This new logic performs a "fuzzy search" in Firestore.
+
+        const testsCollectionRef = collection(db, "tests");
         
-        if (docSnap.exists()) {
+        // 1. Create a search prefix, e.g., "9-mat" from "maths"
+        const searchPrefix = `${grade}-${subject.toLowerCase().slice(0, 3)}`;
+
+        // 2. Create a query to find document IDs that start with our prefix.
+        // The '\uf8ff' character is a special trick to create an upper bound for the search.
+        const q = query(
+            testsCollectionRef,
+            where(documentId(), '>=', searchPrefix),
+            where(documentId(), '<', searchPrefix + '\uf8ff')
+        );
+
+        const querySnapshot = await getDocs(q);
+
+        // 3. Check if we found any matching documents.
+        if (!querySnapshot.empty) {
+            // If we found a match (or multiple), we'll use the first one.
+            const docSnap = querySnapshot.docs[0];
             rawData = docSnap.data();
-            console.log(`Loading curated test from Firestore: ${docId}`);
+            docFoundInFirestore = true;
+            console.log(`Loading curated test from Firestore with a fuzzy match: ${docSnap.id}`);
         } else {
+            // 4. If no match is found in Firestore, fall back to GitHub.
+            console.log(`No test found in Firestore with prefix '${searchPrefix}'. Trying GitHub.`);
             const gitHubRes = await fetch(GITHUB_URL);
             if (!gitHubRes.ok) throw new Error("Test file not found in Firestore or on GitHub.");
             rawData = await gitHubRes.json();
-            console.log(`Test not found in Firestore. Loading from GitHub: ${fileName}.json`);
+            console.log(`Loaded test from GitHub: ${fileName}.json`);
         }
-        
+        // --- END: MODIFIED FETCHING LOGIC ---
+
         // --- Logic to handle both JSON formats ---
         let testArray = [];
         if (rawData && rawData.tests) {
@@ -81,11 +104,8 @@ export function getLoadedQuestions() {
 function displayQuestions(questions) {
     const container = document.getElementById("question-container");
     container.innerHTML = (questions || []).map((q, i) => {
-        // ### START: THIS IS THE FIX ###
-        // The property name is now correctly 'imageUrl' (camelCase) to match the data.
         const showImageBefore = q.imageUrl && q.image_position !== 'after';
         const showImageAfter = q.imageUrl && q.image_position === 'after';
-        // ### END: THIS IS THE FIX ###
 
         return `
         <div class="bg-white p-4 border rounded-lg shadow-sm question-block" data-question-id="${q.id}">
