@@ -27,9 +27,8 @@ function capitalize(str) {
 
 
 // ##################################################################
-// # SECTION 1: DASHBOARD PANEL (Fully Restored)
+// # SECTION 1: DASHBOARD PANEL (Unchanged)
 // ##################################################################
-
 async function renderAdminPanel(container) {
     container.innerHTML = `
         <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
@@ -246,7 +245,7 @@ async function loadAndRenderReport(docId) {
 
 
 // ##################################################################
-// # SECTION 2: CONTENT MANAGER (WITH FORCE RELOAD)
+// # SECTION 2: CONTENT MANAGER (FINAL VERSION)
 // ##################################################################
 
 async function renderContentManagerPanel(container) {
@@ -322,198 +321,4 @@ async function setupContentManager() {
         currentTestDocId = fileName.replace('.json', ''); 
         const forceReload = forceReloadCheckbox.checked;
 
-        if (!url) {
-            loaderStatus.innerHTML = `<p class="text-yellow-600">Please select a file.</p>`;
-            return;
-        }
-
-        loaderStatus.innerHTML = `<p class="text-blue-600">Checking for test...</p>`;
-        workspace.style.display = 'none';
-        status.textContent = '';
-
-        try {
-            const testDocRef = doc(db, "tests", currentTestDocId);
-            const docSnap = await getDoc(testDocRef);
-
-            // If the user forces a reload, OR if the document doesn't exist in Firestore, fetch from GitHub.
-            if (forceReload || !docSnap.exists()) {
-                console.log(forceReload ? "Force Reload activated. Fetching from GitHub." : "No saved version. Loading template from GitHub.");
-                loaderStatus.innerHTML = `<p class="text-blue-600">Loading latest version from GitHub...</p>`;
-                
-                const response = await fetch(url);
-                if (!response.ok) throw new Error(`Could not fetch file from GitHub. Status: ${response.status}`);
-                loadedTestData = await response.json();
-                
-                // Overwrite Firestore with the fresh copy from GitHub.
-                await setDoc(testDocRef, loadedTestData);
-                loaderStatus.innerHTML = `<p class="text-green-600 font-bold">✅ Synced latest version from GitHub to Firestore!</p>`;
-            } else {
-                console.log("Loading saved progress from Firestore.");
-                loaderStatus.innerHTML = `<p class="text-green-600 font-bold">✅ Loaded saved version from Firestore!</p>`;
-                loadedTestData = docSnap.data();
-            }
-            
-            if (!loadedTestData || !loadedTestData.tests) throw new Error("Invalid test file format.");
-            
-            document.getElementById('loaded-file-name').textContent = `Editing: ${fileName}`;
-            workspace.style.display = 'block';
-            populateDropdowns();
-
-        } catch (error) {
-            console.error("Error loading test data:", error);
-            loaderStatus.innerHTML = `<p class="text-red-500"><strong>Error:</strong> ${error.message}</p>`;
-        }
-    });
-
-    const passageSelect = document.getElementById('passage-select');
-    const passageContent = document.getElementById('passage-content');
-    const imageSelect = document.getElementById('image-select');
-    const imageUploadInput = document.getElementById('image-upload-input');
-    const updatePassageBtn = document.getElementById('update-passage-btn');
-    const updateImageBtn = document.getElementById('update-image-btn');
-    const imagePreviewContainer = document.getElementById('image-preview-container');
-    const imagePreview = document.getElementById('image-preview');
-
-
-    function populateDropdowns() {
-        passageSelect.innerHTML = '<option value="">-- Select an incomplete passage --</option>';
-        imageSelect.innerHTML = '<option value="">-- Select a question needing an image --</option>';
-        imagePreviewContainer.style.display = 'none';
-        
-        loadedTestData.tests.forEach((test, testIndex) => {
-             (test.passages || []).forEach((passage, passageIndex) => {
-                if (passage.content && passage.content.includes("TO BE UPLOADED")) {
-                    const option = document.createElement('option');
-                    option.value = `${testIndex}-${passageIndex}`;
-                    option.textContent = `[${test.subject} G${test.grade}] ${passage.title}`;
-                    passageSelect.appendChild(option);
-                }
-             });
-             (test.questions || []).forEach((question, questionIndex) => {
-                if (question.imagePlaceholder && !question.imageUrl) {
-                     const option = document.createElement('option');
-                     option.value = `${testIndex}-${questionIndex}`;
-                     option.textContent = `[${test.subject} G${test.grade}] Q-ID ${question.questionId}`;
-                     imageSelect.appendChild(option);
-                }
-             });
-        });
-    }
-
-    passageSelect.addEventListener('change', e => {
-        if (!e.target.value) { passageContent.value = ''; return; }
-        const [testIndex, passageIndex] = e.target.value.split('-');
-        passageContent.value = loadedTestData.tests[testIndex].passages[passageIndex].content || '';
-    });
-
-    imageSelect.addEventListener('change', e => {
-        if (!e.target.value) {
-            imagePreviewContainer.style.display = 'none';
-            return;
-        }
-        const [testIndex, questionIndex] = e.target.value.split('-');
-        const question = loadedTestData.tests[testIndex].questions[questionIndex];
-        const imageName = question.imagePlaceholder;
-        
-        if (imageName) {
-            imagePreview.src = GITHUB_IMAGE_PREVIEW_URL + imageName;
-            imagePreviewContainer.style.display = 'block';
-        } else {
-            imagePreviewContainer.style.display = 'none';
-        }
-    });
-    
-    updatePassageBtn.addEventListener('click', async () => {
-        const selected = passageSelect.value;
-        if (!selected) {
-            status.textContent = 'Please select a passage first.';
-            status.style.color = 'orange';
-            return;
-        }
-        status.textContent = 'Saving passage to Firestore...';
-        status.style.color = 'blue';
-
-        const [testIndex, passageIndex] = selected.split('-');
-        loadedTestData.tests[testIndex].passages[passageIndex].content = passageContent.value;
-        
-        try {
-            const testDocRef = doc(db, "tests", currentTestDocId);
-            await setDoc(testDocRef, loadedTestData);
-            status.textContent = `✅ Passage saved successfully!`;
-            status.style.color = 'green';
-            passageContent.value = '';
-            populateDropdowns();
-        } catch (error) {
-            status.textContent = `❌ Error saving passage: ${error.message}`;
-            status.style.color = 'red';
-            console.error("Firestore update error:", error);
-        }
-    });
-
-    updateImageBtn.addEventListener('click', async () => {
-        const selectedImage = imageSelect.value;
-        const file = imageUploadInput.files[0];
-        if (!selectedImage || !file) {
-            status.textContent = 'Please select a question and an image file.';
-            status.style.color = 'orange';
-            return;
-        }
-
-        try {
-            status.textContent = 'Uploading image...';
-            status.style.color = 'blue';
-            const imageUrl = await uploadImageToCloudinary(file);
-            
-            status.textContent = 'Saving URL to Firestore...';
-            const [testIndex, questionIndex] = selectedImage.split('-');
-            loadedTestData.tests[testIndex].questions[questionIndex].imageUrl = imageUrl;
-            delete loadedTestData.tests[testIndex].questions[questionIndex].imagePlaceholder;
-
-            const testDocRef = doc(db, "tests", currentTestDocId);
-            await setDoc(testDocRef, loadedTestData);
-            
-            status.textContent = `✅ Image URL saved successfully!`;
-            status.style.color = 'green';
-            imageUploadInput.value = '';
-            populateDropdowns();
-        } catch (error) {
-            console.error('Error saving image:', error);
-            status.textContent = `❌ Error: ${error.message}`;
-            status.style.color = 'red';
-        }
-    });
-
-    discoverFiles();
-}
-
-
-// ##################################################################
-// # SECTION 3: AUTHENTICATION & APP INITIALIZATION
-// ##################################################################
-
-function initializeAdminPanel() {
-    const mainContent = document.getElementById('main-content');
-    const navDashboard = document.getElementById('navDashboard');
-    const navContent = document.getElementById('navContent');
-
-    function setActiveNav(activeButton) {
-        navDashboard.classList.remove('active');
-        navContent.classList.remove('active');
-        activeButton.classList.add('active');
-    }
-
-    navDashboard.addEventListener('click', () => { setActiveNav(navDashboard); renderAdminPanel(mainContent); });
-    navContent.addEventListener('click', () => { setActiveNav(navContent); renderContentManagerPanel(mainContent); });
-    
-    renderAdminPanel(mainContent); // Initial render
-}
-
-onAuthStateChanged(auth, async (user) => {
-    if (user && user.email === ADMIN_EMAIL) {
-        document.getElementById('logoutBtn').addEventListener('click', () => signOut(auth));
-        initializeAdminPanel();
-    } else {
-        window.location.href = "admin-auth.html";
-    }
-});
-
+        if (!url
