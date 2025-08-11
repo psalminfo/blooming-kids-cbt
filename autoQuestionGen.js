@@ -96,7 +96,8 @@ function displayQuestions(questions) {
     const container = document.getElementById("question-container");
     container.innerHTML = (questions || []).map((q, i) => {
         // ### START: THIS IS THE FIX ###
-        // This logic now defaults to showing the image 'before' if the position isn't specified.
+        // This logic now correctly displays images based on the image_url.
+        // It defaults to showing the image 'before' if the position isn't specified.
         const showImageBefore = q.image_url && q.image_position !== 'after';
         const showImageAfter = q.image_url && q.image_position === 'after';
         // ### END: THIS IS THE FIX ###
