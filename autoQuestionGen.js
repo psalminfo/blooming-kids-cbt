@@ -95,12 +95,13 @@ export function getLoadedQuestions() {
 function displayQuestions(questions) {
     const container = document.getElementById("question-container");
     container.innerHTML = (questions || []).map((q, i) => {
-        // ### START: THIS IS THE FIX ###
-        // This logic now correctly displays images based on the image_url.
-        // It defaults to showing the image 'before' if the position isn't specified.
+        // ### START: DIAGNOSTIC LOG ###
+        // This will print every question object right before it's displayed.
+        console.log("Displaying question:", q);
+        // ### END: DIAGNOSTIC LOG ###
+
         const showImageBefore = q.image_url && q.image_position !== 'after';
         const showImageAfter = q.image_url && q.image_position === 'after';
-        // ### END: THIS IS THE FIX ###
 
         return `
         <div class="bg-white p-4 border rounded-lg shadow-sm question-block" data-question-id="${q.id}">
