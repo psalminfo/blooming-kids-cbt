@@ -1,0 +1,579 @@
+{
+  "tests": [
+    {
+      "id": "staar_biology_2019",
+      "subject": "Biology",
+      "grade": "9",
+      "year": "2019",
+      "defaultQuestionType": "multiple-choice",
+      "questions": [
+        {
+          "questionId": "bio_2019_q1",
+          "question": "A new predator of rabbits has been introduced within an ecosystem. This new predator runs faster than the native predators of rabbits. Which statement describes what will most likely occur in the rabbit population due to the introduction of the predator?",
+          "options": [
+            "The rabbits will mutate their genes and express genes that increase their speed.",
+            "Slower rabbits will develop stronger legs and pass this trait to their offspring.",
+            "Rabbits will mate and produce offspring with a different species that has faster runners.",
+            "Faster rabbits will survive and reproduce increasing the average speed of the rabbit population."
+          ],
+          "correctAnswer": "Faster rabbits will survive and reproduce increasing the average speed of the rabbit population."
+        },
+        {
+          "questionId": "bio_2019_q2",
+          "question": "Which answer choice best describes a community?",
+          "options": [
+            "Praying mantises caring for their young",
+            "Three-spined sticklebacks living in estuaries",
+            "Different species of lizards occupying the same niche in a desert",
+            "Roosting mother bats recognizing their offspring"
+          ],
+          "correctAnswer": "Different species of lizards occupying the same niche in a desert"
+        },
+        {
+          "questionId": "bio_2019_q3",
+          "question": "Eight components present in nucleic acids are listed in the box. Which components bond with adenine in a section of double-stranded DNA?",
+          "options": [
+            "1, 3, 5, and 6 only",
+            "3 and 5 only",
+            "2 and 4 only",
+            "3, 4, 7, and 8 only"
+          ],
+          "correctAnswer": "3 and 5 only"
+        },
+        {
+          "questionId": "bio_2019_q4",
+          "question": "What would be the most likely effect of a wildfire that burned a large area of a forest?",
+          "options": [
+            "More sugars and starches would be available for animals in the area.",
+            "The availability of fossil fuels for use by industries in the area would be reduced.",
+            "Less carbon dioxide would be removed from the atmosphere in the area by plants.",
+            "An increase in animal respiration would increase the release of carbon dioxide in the area."
+          ],
+          "correctAnswer": "Less carbon dioxide would be removed from the atmosphere in the area by plants."
+        },
+        {
+          "questionId": "bio_2019_q5",
+          "question": "Which four body systems interact to allow a person to sneeze?",
+          "options": [
+            "Muscular, immune, nervous, respiratory",
+            "Nervous, respiratory, circulatory, skeletal",
+            "Respiratory, endocrine, skeletal, circulatory",
+            "Lymphatic, skeletal, respiratory, muscular"
+          ],
+          "correctAnswer": "Muscular, immune, nervous, respiratory"
+        },
+        {
+          "questionId": "bio_2019_q6",
+          "question": "Students use a microscope to look for structures present in four different cells. The students placed an X for each structure that was viewed for each cell on the table shown. Which cell that was viewed is most likely a prokaryote?",
+          "options": [
+            "Cell W",
+            "Cell X",
+            "Cell Y",
+            "Cell Z"
+          ],
+          "correctAnswer": "Cell X"
+        },
+        {
+          "questionId": "bio_2019_q7",
+          "question": "A dichotomous key for identifying fish is shown. Based on this key, which two fish have eyes located on either side of their head and are not spotted?",
+          "options": [
+            "Glassy sweeper and squirrelfish",
+            "Glasseye snapper and spotted eagle ray",
+            "Spotted goatfish and bandtail puffer",
+            "Peacock flounder and glassy sweeper"
+          ],
+          "correctAnswer": "Glassy sweeper and squirrelfish"
+        },
+        {
+          "questionId": "bio_2019_q8",
+          "question": "Students are modeling mRNA during the process of protein synthesis. Which answer choice correctly describes the model of the mRNA strand being transcribed?",
+          "options": [
+            "The mRNA strand is complementary to the DNA template strand; however, uracil instead of adenine is paired with thymine.",
+            "The mRNA strand is complementary to the DNA template strand; however, uracil instead of thymine is paired with adenine.",
+            "The mRNA strand is an exact copy of the DNA template strand; however, uracil instead of adenine is paired with thymine.",
+            "The mRNA strand is an exact copy of the DNA template strand; however, uracil instead of thymine is paired with adenine."
+          ],
+          "correctAnswer": "The mRNA strand is complementary to the DNA template strand; however, uracil instead of thymine is paired with adenine."
+        },
+        {
+          "questionId": "bio_2019_q9",
+          "imagePlaceholder": "human_karyotype.png",
+          "question": "The karyotype for humans is shown. The chemical colchicine is used in the production of karyotypes. Colchicine prevents spindle fibers from forming during the cell cycle. What is a result of preventing spindle fibers from forming?",
+          "options": [
+            "The cell cycle skips G0 phase and repeats G1 phase.",
+            "Mitotic division is skipped, and the cell cycle proceeds to cytokinesis.",
+            "Mitotic division stops in metaphase and cannot proceed to anaphase.",
+            "The cell cycle skips S phase and proceeds to G2 phase."
+          ],
+          "correctAnswer": "Mitotic division stops in metaphase and cannot proceed to anaphase."
+        },
+        {
+          "questionId": "bio_2019_q10",
+          "question": "A team of students encounters an unknown organism in a field while conducting a biodiversity study. Some students think the organism is a plant, while others think it is a fungus. Which question should the students investigate to classify the organism correctly?",
+          "options": [
+            "Is there a cell wall around the cells of the organism?",
+            "Does the organism perform photosynthesis?",
+            "Is there nervous tissue present in the organism?",
+            "Does the organism reproduce sexually?"
+          ],
+          "correctAnswer": "Does the organism perform photosynthesis?"
+        },
+        {
+          "questionId": "bio_2019_q11",
+          "question": "The San Marcos salamander, Eurycea nana, is found only in Spring Lake and a portion of the San Marcos River. Which human activity would most likely decrease the ability of the salamanders to survive?",
+          "options": [
+            "Increasing water consumption that decreases the flow of clean water from the springs that feed the river",
+            "Public transportation that reduces the number of automobiles that contribute to pollution runoff into the river",
+            "Tourism that helps fund the educational programs related to river ecosystem conservation",
+            "The addition of a new food source into the river that limits competition for resources"
+          ],
+          "correctAnswer": "Increasing water consumption that decreases the flow of clean water from the springs that feed the river"
+        },
+        {
+          "questionId": "bio_2019_q12",
+          "imagePlaceholder": "horse_evolution.png",
+          "question": "The diagram shows data on the evolution of horses. The data in the diagram is evidence that —",
+          "options": [
+            "a new species of horse suddenly appeared",
+            "horses slowly developed over time",
+            "horses have similar stages of rapid embryological development",
+            "horses have a common ancestry with other hooved animals"
+          ],
+          "correctAnswer": "horses slowly developed over time"
+        },
+        {
+          "questionId": "bio_2019_q13",
+          "imagePlaceholder": "virus_structure.png",
+          "question": "A student produces a labeled drawing of a virus for a presentation. The student states that the capsid has a function similar to the nuclear membrane found in animal cells. Which of these describes the similar functions of capsids and nuclear membranes?",
+          "options": [
+            "Both transport proteins throughout the structures.",
+            "Both provide energy for activities in the structures.",
+            "Both protect genetic information for the structures.",
+            "Both code for the proteins needed for reproduction of the structures."
+          ],
+          "correctAnswer": "Both protect genetic information for the structures."
+        },
+        {
+          "questionId": "bio_2019_q14",
+          "question": "Enzymes are proteins that have a three-dimensional shape that is specific to a particular substrate. Environmental conditions can change the shape of the protein. What is the most likely result if the shape of the enzyme changes?",
+          "options": [
+            "The substrate will change its shape to match the enzyme.",
+            "The enzyme will no longer be able to catalyze the reaction with the substrate.",
+            "The products made from the enzyme and the substrate will be changed.",
+            "The enzyme will be able to bind to more diverse substrates than before."
+          ],
+          "correctAnswer": "The enzyme will no longer be able to catalyze the reaction with the substrate."
+        },
+        {
+          "questionId": "bio_2019_q15",
+          "imagePlaceholder": "cellular_transport.png",
+          "question": "A type of cellular transport is shown. Which description best identifies this type of cellular transport?",
+          "options": [
+            "Active transport, because energy is being used to move molecules against the concentration gradient",
+            "Facilitated diffusion, because energy is being used to move molecules with the concentration gradient",
+            "Osmosis, because energy is not being used to move molecules with the concentration gradient",
+            "Endocytosis, because energy is not being used to move molecules against the concentration gradient"
+          ],
+          "correctAnswer": "Active transport, because energy is being used to move molecules against the concentration gradient"
+        },
+        {
+          "questionId": "bio_2019_q16",
+          "imagePlaceholder": "aye_aye_lemur.png",
+          "question": "The aye-aye lemur has a specialized middle finger that is long and thin to feed on insect larvae inside trees. Which selective pressure most likely resulted in the development of the aye-aye lemur's special adaptation?",
+          "options": [
+            "Limited availability of water",
+            "Competing for mates",
+            "Large numbers of natural predators",
+            "Food sources that are hard to find"
+          ],
+          "correctAnswer": "Food sources that are hard to find"
+        },
+        {
+          "questionId": "bio_2019_q17",
+          "imagePlaceholder": "punnett_square.png",
+          "question": "Mice have two unlinked allele pairs that affect fur color. The term 'agouti' describes fur with pigmentation that changes in each hair from the shaft to the tip. Mice with the aa allele pair are albino, regardless of the second allele-pair combination. What is the probability of albinism in the offspring of a cross between two mice with AaBb alleles?",
+          "options": [
+            "1/16",
+            "3/16",
+            "4/16",
+            "9/16"
+          ],
+          "correctAnswer": "4/16"
+        },
+        {
+          "questionId": "bio_2019_q18",
+          "question": "Gibberellins are hormones produced in the root tips of plants. The plant uses these hormones to stimulate the growth of shoots. How are gibberellins able to affect other parts of the plant?",
+          "options": [
+            "Gibberellins are absorbed through the stomata and attach to chloroplasts.",
+            "Gibberellins are transported through vascular tissues to other parts of the plant.",
+            "Gibberellins become concentrated within the tissues of the plant during mitosis.",
+            "Gibberellins become modified once they infect healthy cells and are later released to infect other cells."
+          ],
+          "correctAnswer": "Gibberellins are transported through vascular tissues to other parts of the plant."
+        },
+        {
+          "questionId": "bio_2019_q19",
+          "imagePlaceholder": "mitochondrion_process.png",
+          "question": "The diagram shows molecules that a mitochondrion uses and produces during a cellular process. Which other molecule is a product of this process?",
+          "options": [
+            "DNA",
+            "RNA",
+            "C6H12O6",
+            "ATP"
+          ],
+          "correctAnswer": "ATP"
+        },
+        {
+          "questionId": "bio_2019_q20",
+          "imagePlaceholder": "texas_food_web.png",
+          "question": "A partial Texas food web is shown. The populations of which organisms will most likely increase as a result of a disease that suddenly reduced the population of Texas horned lizards?",
+          "options": [
+            "Grasses and ants",
+            "Ants and grasshoppers",
+            "Grasshoppers and Texas cottonmouths",
+            "Texas cottonmouths and red-shouldered hawks"
+          ],
+          "correctAnswer": "Ants and grasshoppers"
+        },
+        {
+          "questionId": "bio_2019_q21",
+          "question": "A biomass pyramid of an ecosystem is shown. Which statement provides the best explanation for the difference in biomass of organisms found at each trophic level?",
+          "options": [
+            "Organisms at higher trophic levels have less energy available to them than organisms at lower trophic levels.",
+            "Organisms at higher trophic levels require smaller habitats than organisms at lower trophic levels.",
+            "Organisms at lower trophic levels provide less energy than organisms at higher trophic levels.",
+            "Organisms at lower trophic levels outcompete organisms at higher trophic levels."
+          ],
+          "correctAnswer": "Organisms at higher trophic levels have less energy available to them than organisms at lower trophic levels."
+        },
+        {
+          "questionId": "bio_2019_q22",
+          "question": "Conservation biologists studying cheetah populations have determined that the lack of genetic diversity among the cheetahs is due to genetic drift. Which statement explains the most likely consequence of having a low genetic diversity on the cheetah population?",
+          "options": [
+            "The chances of a mutation occurring in the cheetah population are decreased, increasing the cheetah survival rate.",
+            "The gene pool remains in equilibrium and future generations of cheetah offspring are stronger and better adapted to their environments.",
+            "The cheetah population becomes less likely to survive an outbreak of a disease or an environmental change, increasing the chance of species extinction.",
+            "Genetic variability is maintained from older cheetah populations that have survived and endured environmental stressors."
+          ],
+          "correctAnswer": "The cheetah population becomes less likely to survive an outbreak of a disease or an environmental change, increasing the chance of species extinction."
+        },
+        {
+          "questionId": "bio_2019_q23",
+          "question": "CRISPR-Cas9 is a genetic modification technique that edits parts of the genome of an organism. Using this technique scientists can add, remove, or modify sections of the DNA sequence. How can scientists use this technique to control gene expression?",
+          "options": [
+            "By activating or deactivating specific genes",
+            "By calculating the number of genes different organisms produce",
+            "By identifying how closely related one individual is to another",
+            "By determining the number of chromosomes in an organism"
+          ],
+          "correctAnswer": "By activating or deactivating specific genes"
+        },
+        {
+          "questionId": "bio_2019_q24",
+          "question": "During secondary succession, which of these best describes why decomposing pioneer plants give way to larger, more complex plants species, such as hardwood trees?",
+          "options": [
+            "Increased amounts of sunlight are able to reach the ground while the pioneer species are decomposing.",
+            "Increased soil temperatures from decomposing pioneer species help tree seeds germinate more quickly.",
+            "Increased amounts of decomposing pioneer species remove nutrients that tree seedlings need to grow and mature.",
+            "Increased amounts of soil from decomposing pioneer species allow plants with more extensive root systems to become established."
+          ],
+          "correctAnswer": "Increased amounts of soil from decomposing pioneer species allow plants with more extensive root systems to become established."
+        },
+        {
+          "questionId": "bio_2019_q25",
+          "imagePlaceholder": "millipede_ant_encounter.png",
+          "question": "The fuzzy millipede, Polyxenus fasciculatus, protects itself against ants by ejecting fibers from a tuft located at the tail end of its body which entangle the ant. Which two systems most directly interact in the fuzzy millipede's defense against ants?",
+          "options": [
+            "Muscular and integumentary",
+            "Immune and muscular",
+            "Integumentary and endocrine",
+            "Endocrine and immune"
+          ],
+          "correctAnswer": "Muscular and integumentary"
+        },
+        {
+          "questionId": "bio_2019_q26",
+          "imagePlaceholder": "pedigree_chart.png",
+          "question": "The inheritance pattern for an autosomal dominant trait is shown in the pedigree. Shaded symbols represent individuals that express the dominant trait. Based on this pedigree, what are the most likely genotypes of individuals I-1 and I-2?",
+          "options": [
+            "I-1: aa, I-2: Aa",
+            "I-1: AA, I-2: Aa",
+            "I-1: Aa, I-2: aa",
+            "I-1: aa, I-2: AA"
+          ],
+          "correctAnswer": "I-1: Aa, I-2: aa"
+        },
+        {
+          "questionId": "bio_2019_q27",
+          "question": "When cells lose their ability to regulate the cell cycle, they can divide at an accelerated rate and form a mass of cells. This mass of cells is referred to as —",
+          "options": [
+            "a tumor",
+            "an embryo",
+            "a gland",
+            "an organ"
+          ],
+          "correctAnswer": "a tumor"
+        },
+        {
+          "questionId": "bio_2019_q28",
+          "question": "The model shows a mutation to a partial sequence of bases in a gene. Which type of mutation does the model demonstrate?",
+          "options": [
+            "Deletion",
+            "Insertion",
+            "Substitution",
+            "Translocation"
+          ],
+          "correctAnswer": "Deletion"
+        },
+        {
+          "questionId": "bio_2019_q29",
+          "question": "Many tree frog populations are threatened due to habitat loss. In an effort to promote conservation, tree frogs may be bred in captivity. A zoo acquired male and female tree frogs from two different populations. In the zoo, the tree frogs were able to successfully mate within their own population, but breeding attempts between the two populations were unsuccessful. Based on this information, which statement correctly describes the relationship between the two populations of tree frogs?",
+          "options": [
+            "They are in the same species but different kingdoms.",
+            "They are in the same class but different phyla.",
+            "They are in the same family but different orders.",
+            "They are in the same genus but different species."
+          ],
+          "correctAnswer": "They are in the same genus but different species."
+        },
+        {
+          "questionId": "bio_2019_q30",
+          "question": "In a study of physical endurance, researchers observed significant increases in the heart rates and breathing rates of participants immediately after they engaged in strenuous exercise. Which statement best explains the increase in the heart rate and the breathing rate during exercise?",
+          "options": [
+            "The water concentration in the blood increases.",
+            "Body cells require increased oxygen as energy is expended.",
+            "Muscle cells increase in temperature and require fluid to reduce the temperature.",
+            "An increase in muscle activity causes increases in glucose levels in red blood cells."
+          ],
+          "correctAnswer": "Body cells require increased oxygen as energy is expended."
+        },
+        {
+          "questionId": "bio_2019_q31",
+          "question": "In 1898 Friedrich Loeffler and Paul Frosch found evidence that the cause of the highly contagious hoof-and-mouth disease in livestock was a microscopic infectious particle. It was discovered that this particle requires a host cell to reproduce. Which pathogen is most likely responsible for causing hoof-and-mouth disease in livestock?",
+          "options": [
+            "A bacterium, because it is contagious",
+            "A fungus, because it infects livestock",
+            "A protist, because it is microscopic",
+            "A virus, because it requires a host cell to reproduce"
+          ],
+          "correctAnswer": "A virus, because it requires a host cell to reproduce"
+        },
+        {
+          "questionId": "bio_2019_q32",
+          "imagePlaceholder": "wasp_life_cycle.png",
+          "question": "The diagrams show a partial food web containing the Glyptapanteles wasp and the life cycle of this wasp. Based on the two diagrams, which list correctly identifies the relationships Glyptapanteles wasp larvae have with other organisms?",
+          "options": [
+            "Competition: stinkbugs, Parasitism: geometrid moths",
+            "Competition: geometrid moths, Commensalism: stinkbugs, Mutualism: guava and eucalyptus trees",
+            "Competition: stinkbugs and geometrid moths, Commensalism: guava and eucalyptus trees",
+            "Parasitism: geometrid moths, Commensalism: stinkbugs, Mutualism: guava and eucalyptus trees"
+          ],
+          "correctAnswer": "Competition: stinkbugs, Parasitism: geometrid moths"
+        },
+        {
+          "questionId": "bio_2019_q33",
+          "question": "Male guppies found in areas without predators are more colorful than the ones found in locations with large predator populations. A population of adult guppies originating from an area with a large number of predators is transferred to a nearby area with few predators. Which of these is most likely to happen over a few generations?",
+          "options": [
+            "The mortality rate of the guppies will increase.",
+            "Offspring will stop competing for resources.",
+            "There will be an increase in mutations in the offspring.",
+            "There will be an increase in the number of colorful guppies."
+          ],
+          "correctAnswer": "There will be an increase in the number of colorful guppies."
+        },
+        {
+          "questionId": "bio_2019_q34",
+          "question": "Grassland ecosystems in Texas have evolved to depend on periodic fires to return nutrients to the soil and encourage plant reproduction. Humans have prevented fires in many of these grassland areas, resulting in plant and animal communities with little diversity. Wildlife biologists often recommend prescribed burns. What natural processes are the biologists attempting to imitate?",
+          "options": [
+            "Biomagnification",
+            "Succession",
+            "Population bottleneck",
+            "Species extinction"
+          ],
+          "correctAnswer": "Succession"
+        },
+        {
+          "questionId": "bio_2019_q35",
+          "question": "A chart of some plant systems and functions is shown. Which system interactions are dependent on the plant's ability to respond to the direction of light?",
+          "options": [
+            "Option 1",
+            "Option 2",
+            "Option 3",
+            "Option 4"
+          ],
+          "correctAnswer": "Option 4"
+        },
+        {
+          "questionId": "bio_2019_q36",
+          "question": "Exposure to the building material asbestos has been linked to certain types of cancers. Asbestos causes mutations in the p53 gene, which controls tumor suppression. Which statement best explains why people with cancer due to asbestos exposure do not pass the mutation on to their offspring?",
+          "options": [
+            "The mutation occurred in gametic cells.",
+            "The mutation occurred in somatic cells.",
+            "The mutation is recessive.",
+            "The mutation is sex-linked."
+          ],
+          "correctAnswer": "The mutation occurred in somatic cells."
+        },
+        {
+          "questionId": "bio_2019_q37",
+          "question": "Which of these components are found in the cells of all living organisms?",
+          "options": [
+            "Estrogen and testosterone",
+            "Hemoglobin and lymphocytes",
+            "Cytosine and guanine",
+            "Cellulose and chlorophyll"
+          ],
+          "correctAnswer": "Cytosine and guanine"
+        },
+        {
+          "questionId": "bio_2019_q38",
+          "imagePlaceholder": "feedback_mechanism.png",
+          "question": "A feedback mechanism in the human body is shown. Based on this diagram, which two systems interact to maintain homeostasis?",
+          "options": [
+            "The nervous and reproductive systems work together to stimulate the production of insulin.",
+            "The circulatory and endocrine systems work together to keep blood sugar levels constant.",
+            "The excretory and nervous systems work together to convert glycogen into glucose.",
+            "The immune and circulatory systems work together to circulate blood through the pancreas."
+          ],
+          "correctAnswer": "The circulatory and endocrine systems work together to keep blood sugar levels constant."
+        },
+        {
+          "questionId": "bio_2019_q39",
+          "question": "Which role of protists has the most positive effect on maintaining the plant population in an ecosystem?",
+          "options": [
+            "Protists are a major food source for animals.",
+            "Protists produce approximately 75 percent of the oxygen on Earth.",
+            "Protists decompose dead materials, returning nutrients to the soil.",
+            "Protists found in the gut of animals assist in digestion."
+          ],
+          "correctAnswer": "Protists decompose dead materials, returning nutrients to the soil."
+        },
+        {
+          "questionId": "bio_2019_q40",
+          "question": "A table of four types of carbohydrates is shown. Which list correctly matches the functions to the types of carbohydrates?",
+          "options": [
+            "Energy: glycogen and starch; Structure: cellulose and chitin",
+            "Energy: cellulose and chitin; Structure: glycogen and starch",
+            "Energy: chitin and glycogen; Structure: cellulose and starch",
+            "Energy: cellulose and starch; Structure: chitin and glycogen"
+          ],
+          "correctAnswer": "Energy: glycogen and starch; Structure: cellulose and chitin"
+        },
+        {
+          "questionId": "bio_2019_q41",
+          "question": "Gametes produced by an organism contain a combination of genes from that organism. In every gamete, this combination is —",
+          "options": [
+            "the same because it is created from the same DNA",
+            "the same because chromosomes are copied prior to meiosis",
+            "different due to DNA replication prior to mitosis",
+            "different due to independent assortment during meiosis"
+          ],
+          "correctAnswer": "different due to independent assortment during meiosis"
+        },
+        {
+          "questionId": "bio_2019_q42",
+          "question": "White-tailed deer are seasonal breeders. What is the most likely explanation for white-tailed deer having a seasonal breeding cycle instead of a monthly breeding cycle like many domesticated animals?",
+          "options": [
+            "Male and female deer come into contact with each other only in the fall.",
+            "Large predators are not found in deer habitats during the spring and summer months.",
+            "Giving birth only in the spring and summer ensures that offspring are born when food is most available.",
+            "Deer give birth in the spring and summer in order to avoid being pregnant during the hot summer months."
+          ],
+          "correctAnswer": "Giving birth only in the spring and summer ensures that offspring are born when food is most available."
+        },
+        {
+          "questionId": "bio_2019_q43",
+          "question": "A segment of a DNA strand is shown: 3' AGGTCAGGT 5'. Which of these is the correct complementary DNA strand for the segment shown?",
+          "options": [
+            "5' AGGTCAGGT 3'",
+            "5' ACCUGAGGU 3'",
+            "5' TGGACTGGA 3'",
+            "5' TCCAGTCCA 3'"
+          ],
+          "correctAnswer": "5' TCCAGTCCA 3'"
+        },
+        {
+          "questionId": "bio_2019_q44",
+          "imagePlaceholder": "ocean_sunfish.png",
+          "question": "The ocean sunfish (Mola mola) will swim to the surface of the water and lie sideways, allowing seabirds to eat the copepods from their skin. Which list describes the types of relationships the sunfish has with other marine organisms?",
+          "options": [
+            "Seabirds: mutualism, Jellyfish: predation, Copepods: parasitism",
+            "Seabirds: parasitism, Jellyfish: commensalism, Copepods: predation",
+            "Seabirds: predation, Jellyfish: mutualism, Copepods: commensalism",
+            "Seabirds: commensalism, Jellyfish: parasitism, Copepods: mutualism"
+          ],
+          "correctAnswer": "Seabirds: mutualism, Jellyfish: predation, Copepods: parasitism"
+        },
+        {
+          "questionId": "bio_2019_q45",
+          "question": "Which statement accurately describes the energy needs for photosynthesis and cellular respiration?",
+          "options": [
+            "Solar energy is needed for cellular respiration but not for photosynthesis.",
+            "Chemical energy in the form of glucose is needed for both cellular respiration and photosynthesis.",
+            "Chemical energy in the form of glucose is needed for photosynthesis, and solar energy is needed for cellular respiration.",
+            "Solar energy is needed for photosynthesis, and chemical energy in the form of glucose is needed for cellular respiration."
+          ],
+          "correctAnswer": "Solar energy is needed for photosynthesis, and chemical energy in the form of glucose is needed for cellular respiration."
+        },
+        {
+          "questionId": "bio_2019_q46",
+          "question": "Which table shows two steps of DNA replication?",
+          "options": [
+            "Step 1: DNA Polymerase matches uracil to thymine and cytosine to guanine. Step 2: Two identical DNA double helixes are produced.",
+            "Step 1: DNA Polymerase matches cytosine to thymine and uracil to guanine. Step 2: Two separate but complementary single DNA strands are produced.",
+            "Step 1: DNA Polymerase matches adenine to thymine and cytosine to guanine. Step 2: Two identical DNA double helixes are produced.",
+            "Step 1: DNA Polymerase matches uracil to thymine and adenine to guanine. Step 2: Two separate but complementary single DNA strands are produced."
+          ],
+          "correctAnswer": "Step 1: DNA Polymerase matches adenine to thymine and cytosine to guanine. Step 2: Two identical DNA double helixes are produced."
+        },
+        {
+          "questionId": "bio_2019_q47",
+          "imagePlaceholder": "cladogram_mammals.png",
+          "question": "This cladogram shows the evolutionary relationships among some mammals based on homologous structures. Which statement is supported by this cladogram?",
+          "options": [
+            "Hippopotamuses are more closely related to cows than to javelinas.",
+            "Toothed whales are more closely related to mouse deer than to hippopotamuses.",
+            "Javelinas and pigs are more closely related than baleen whales and toothed whales.",
+            "Cows and mouse deer are more closely related than javelinas and pigs."
+          ],
+          "correctAnswer": "Hippopotamuses are more closely related to cows than to javelinas."
+        },
+        {
+          "questionId": "bio_2019_q48",
+          "question": "Some species of millipedes will roll into a ball when threatened, while other species of millipedes can secrete noxious chemicals from their bodies. These adaptations allow the millipedes to —",
+          "options": [
+            "survive in different temperatures",
+            "avoid different types of predators",
+            "conserve different amounts of energy",
+            "blend into different types of environments"
+          ],
+          "correctAnswer": "avoid different types of predators"
+        },
+        {
+          "questionId": "bio_2019_q49",
+          "imagePlaceholder": "stem_cell_development.png",
+          "question": "The diagram shows how specialized body cells can develop. Which of the following best explains why cells that contain the same genetic material do not develop into the same types of cells?",
+          "options": [
+            "Because internal or external stimuli can trigger the activation of specific genes in the DNA of cells",
+            "Because random mutations can occur in the DNA of cells during early embryonic development",
+            "Because messenger RNA is converted to transfer RNA when cell differentiation begins",
+            "Because chemical signals that are released during the cell cycle can result in the linking of similar genes"
+          ],
+          "correctAnswer": "Because internal or external stimuli can trigger the activation of specific genes in the DNA of cells"
+        },
+        {
+          "questionId": "bio_2019_q50",
+          "imagePlaceholder": "transmembrane_proteins.png",
+          "question": "Transmembrane proteins span the width of cell membranes. Four types of transmembrane proteins are shown in a section of cell membrane. Although these proteins have different specific functions, they all —",
+          "options": [
+            "stop chemical reactions within the cell",
+            "synthesize molecules that signal other cells",
+            "help the cell interact with its external environment",
+            "remove large waste particles from the cytoplasm of the cell"
+          ],
+          "correctAnswer": "help the cell interact with its external environment"
+        }
+      ]
+    }
+  ]
+}
