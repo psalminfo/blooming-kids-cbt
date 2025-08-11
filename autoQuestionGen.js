@@ -18,33 +18,24 @@ export async function loadQuestions(subject, grade) {
         const docSnap = await getDoc(testDocRef);
 
         let rawData;
-        let dataSource;
-
+        
         if (docSnap.exists()) {
             rawData = docSnap.data();
-            dataSource = "Firestore";
             console.log(`Loading curated test from Firestore: ${docId}`);
         } else {
             const gitHubRes = await fetch(GITHUB_URL);
             if (!gitHubRes.ok) throw new Error("Test file not found in Firestore or on GitHub.");
             rawData = await gitHubRes.json();
-            dataSource = "GitHub";
             console.log(`Test not found in Firestore. Loading from GitHub: ${fileName}.json`);
         }
         
-        console.log("1. Raw data loaded from:", dataSource, rawData);
-
         // --- Logic to handle both JSON formats ---
         let testArray = [];
         if (rawData && rawData.tests) {
-            console.log("2. Detected 'tests' array format.");
             testArray = rawData.tests;
         } else if (rawData && rawData.questions) {
-            console.log("2. Detected 'questions' only format.");
             testArray = [{ subject, grade, questions: rawData.questions }];
         }
-
-        console.log("3. Extracted test array:", testArray);
 
         allQuestions = testArray.flatMap(test => {
             const defaultType = test.defaultQuestionType;
@@ -52,8 +43,6 @@ export async function loadQuestions(subject, grade) {
             return test.questions.map(q => ({ ...q, type: q.type || defaultType }));
         });
         
-        console.log(`4. Total questions processed: ${allQuestions.length}`);
-
         if (allQuestions.length === 0) {
             container.innerHTML = `<p class="text-red-600">❌ No questions found for ${subject.toUpperCase()} Grade ${grade}.</p>`;
             return;
@@ -65,8 +54,6 @@ export async function loadQuestions(subject, grade) {
         const creativeWriting = allQuestions.filter(q => q.type === 'creative-writing');
         const comprehension = allQuestions.filter(q => q.type === 'comprehension');
         
-        console.log(`5. Filtered questions by type: MC=${multipleChoice.length}, CW=${creativeWriting.length}, Comp=${comprehension.length}`);
-
         if (subject.toLowerCase() === 'ela' || subject.toLowerCase() === 'english') {
             if (creativeWriting.length > 0) finalQuestions.push(creativeWriting[0]);
             if (comprehension.length > 0) finalQuestions.push(...comprehension.slice(0, 2));
@@ -78,7 +65,6 @@ export async function loadQuestions(subject, grade) {
             finalQuestions = [...allQuestions].sort(() => 0.5 - Math.random()).slice(0, 30);
         }
 
-        console.log(`6. Final test contains ${finalQuestions.length} questions.`);
         loadedQuestions = finalQuestions.map((q, index) => ({ ...q, id: index }));
         
         displayQuestions(loadedQuestions);
@@ -95,22 +81,20 @@ export function getLoadedQuestions() {
 function displayQuestions(questions) {
     const container = document.getElementById("question-container");
     container.innerHTML = (questions || []).map((q, i) => {
-        // ### START: DIAGNOSTIC LOG ###
-        // This will print every question object right before it's displayed.
-        console.log("Displaying question:", q);
-        // ### END: DIAGNOSTIC LOG ###
-
-        const showImageBefore = q.image_url && q.image_position !== 'after';
-        const showImageAfter = q.image_url && q.image_position === 'after';
+        // ### START: THIS IS THE FIX ###
+        // The property name is now correctly 'imageUrl' (camelCase) to match the data.
+        const showImageBefore = q.imageUrl && q.image_position !== 'after';
+        const showImageAfter = q.imageUrl && q.image_position === 'after';
+        // ### END: THIS IS THE FIX ###
 
         return `
         <div class="bg-white p-4 border rounded-lg shadow-sm question-block" data-question-id="${q.id}">
             
-            ${showImageBefore ? `<img src="${q.image_url}" class="mb-2 w-full rounded" alt="Question image"/>` : ''}
+            ${showImageBefore ? `<img src="${q.imageUrl}" class="mb-2 w-full rounded" alt="Question image"/>` : ''}
             
             <p class="font-semibold mb-2 question-text">${i + 1}. ${q.question || q.passage || ''}</p>
 
-            ${showImageAfter ? `<img src="${q.image_url}" class="mt-2 w-full rounded" alt="Question image"/>` : ''}
+            ${showImageAfter ? `<img src="${q.imageUrl}" class="mt-2 w-full rounded" alt="Question image"/>` : ''}
             
             ${q.type === 'creative-writing' ? `
                 <textarea id="creativeWriting" class="w-full mt-4 p-2 border rounded" rows="10" placeholder="Write your response here..."></textarea>
