@@ -135,7 +135,7 @@
           "type": "multiple-choice",
           "question": "What is the correct way to write sentence 9?",
           "options": ["People feel safe when confiding in their pets; without being judgmental. A pet will often sit compassionately by its owner's side for as long as is needed.", "People feel safe when confiding in their pets, without being judgmental; a pet will often sit compassionately by its owner's side for as long as is needed.", "People feel safe when confiding in their pets. Without being judgmental, a pet will often sit compassionately; by its owner's side, for as long as is needed.", "People feel safe when confiding in their pets; without being judgmental, a pet will often sit compassionately by its owner's side for as long as is needed."],
-          "correctAnswer": "People feel safe when confiding in their pets; without being judgmental, a pet will often sit compassionately by its owner's side for as long as is needed."
+          "correctAnswer": "People feel safe when confiding in their pets. Without being judgmental, a pet will often sit compassionately by its owner's side for as long as is needed."
         },
         {
           "questionId": "eng1_2019_q12",
@@ -143,7 +143,7 @@
           "type": "multiple-choice",
           "question": "What change, if any, needs to be made in sentence 26?",
           "options": ["Change minimal to minamal", "Change are to were", "Delete the comma after appropriate", "No change is necessary."],
-          "correctAnswer": "No change is necessary."
+          "correctAnswer": "Delete the comma after appropriate"
         },
         {
           "questionId": "eng1_2019_q13",
