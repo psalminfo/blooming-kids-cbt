@@ -1,348 +1,244 @@
 {
+  "passages": [
+    {
+      "id": "p1",
+      "content": "PASTE PASSAGE HERE"
+    },
+    {
+      "id": "p2",
+      "content": "PASTE PASSAGE HERE"
+    },
+    {
+      "id": "p3",
+      "content": "PASTE PASSAGE HERE"
+    },
+    {
+      "id": "p4",
+      "content": "PASTE PASSAGE HERE"
+    },
+    {
+      "id": "p5",
+      "content": "PASTE PASSAGE HERE"
+    },
+    {
+      "id": "p6",
+      "content": "PASTE PASSAGE HERE"
+    },
+    {
+      "id": "p7",
+      "content": "PASTE PASSAGE HERE"
+    },
+    {
+      "id": "p8",
+      "content": "PASTE PASSAGE HERE"
+    },
+    {
+      "id": "p9",
+      "content": "PASTE PASSAGE HERE"
+    },
+    {
+      "id": "p10",
+      "content": "PASTE PASSAGE HERE"
+    },
+    {
+      "id": "p11",
+      "content": "PASTE PASSAGE HERE"
+    },
+    {
+      "id": "p12",
+      "content": "PASTE PASSAGE HERE"
+    },
+    {
+      "id": "p13",
+      "content": "PASTE PASSAGE HERE"
+    },
+    {
+      "id": "p14",
+      "content": "PASTE PASSAGE HERE"
+    },
+    {
+      "id": "p15",
+      "content": "PASTE PASSAGE HERE"
+    },
+    {
+      "id": "p16",
+      "content": "PASTE PASSAGE HERE"
+    },
+    {
+      "id": "p17",
+      "content": "PASTE PASSAGE HERE"
+    },
+    {
+      "id": "p18",
+      "content": "PASTE PASSAGE HERE"
+    },
+    {
+      "id": "p19",
+      "content": "PASTE PASSAGE HERE"
+    },
+    {
+      "id": "p20",
+      "content": "PASTE PASSAGE HERE"
+    }
+  ],
   "questions": [
     {
       "type": "creative-writing",
-      "passage": "Some schools require each student to participate in an organized school sport chosen by the student. People at these schools argue that athletics is an important part of the educational experience and that there should be a rule requiring participation. Others argue that students should be free to decide whether or not they wish to participate in organized school sports. Write an essay for a classroom instructor in which you take a position on whether participation in organized school athletics should be required. Be sure to defend your position with logical arguments and appropriate examples."
+      "question": "Some schools require each student to participate in an organized school sport chosen by the student. People at these schools argue that athletics is an important part of the educational experience and that there should be a rule requiring participation. Others argue that students should be free to decide whether or not they wish to participate in organized school sports. Write an essay for a classroom instructor in which you take a position on whether participation in organized school athletics should be required. Be sure to defend your position with logical arguments and appropriate examples."
     },
     {
-      "type": "comprehension",
-      "passage": "PASTE PASSAGE HERE",
-      "questions": [
-        {
-          "question": "The main idea of the paragraph maintains that the memory",
-          "options": [
-            "always operates at peak efficiency.",
-            "breaks down under great strain.",
-            "improves if it is used often.",
-            "becomes unreliable if it tires."
-          ],
-          "answer": "improves if it is used often."
-        },
-        {
-          "question": "The writer believes people remember names best when they",
-          "options": [
-            "meet new people",
-            "are intelligent",
-            "decide to do so",
-            "are interested in people"
-          ],
-          "answer": "decide to do so"
-        }
-      ]
+      "type": "multiple-choice",
+      "passageId": "p1",
+      "question": "The main idea of the paragraph maintains that the memory",
+      "options": ["always operates at peak efficiency.", "breaks down under great strain.", "improves if it is used often.", "becomes unreliable if it tires."],
+      "answer": "improves if it is used often."
     },
     {
-      "type": "comprehension",
-      "passage": "PASTE PASSAGE HERE",
-      "questions": [
-        {
-          "question": "This passage is primarily about",
-          "options": [
-            "unemployment in the 1930s.",
-            "the effect of unemployment on United States families.",
-            "President Franklin D. Roosevelt's presidency.",
-            "President Roosevelt's FERA program."
-          ],
-          "answer": "President Roosevelt's FERA program."
-        }
-      ]
+      "type": "multiple-choice",
+      "passageId": "p2",
+      "question": "This passage is primarily about",
+      "options": ["unemployment in the 1930s.", "the effect of unemployment on United States families.", "President Franklin D. Roosevelt's presidency.", "President Roosevelt's FERA program."],
+      "answer": "President Roosevelt's FERA program."
     },
     {
-      "type": "comprehension",
-      "passage": "PASTE PASSAGE HERE",
-      "questions": [
-        {
-          "question": "From this passage it seems safe to conclude that the English",
-          "options": [
-            "do not know that too much sugar is unhealthy.",
-            "eat desserts at every meal.",
-            "are fonder of sweets than most people.",
-            "have more cavities than any other people."
-          ],
-          "answer": "are fonder of sweets than most people."
-        },
-        {
-          "question": "This passage implies that the writer thinks that 95 pounds of sugar per person per year is",
-          "options": [
-            "a surprisingly large amount",
-            "a surprisingly small amount",
-            "about what one would expect",
-            "an unhealthy amount"
-          ],
-          "answer": "a surprisingly large amount"
-        }
-      ]
+      "type": "multiple-choice",
+      "passageId": "p3",
+      "question": "From this passage it seems safe to conclude that the English",
+      "options": ["do not know that too much sugar is unhealthy.", "eat desserts at every meal.", "are fonder of sweets than most people.", "have more cavities than any other people."],
+      "answer": "are fonder of sweets than most people."
     },
     {
-      "type": "comprehension",
-      "passage": "PASTE PASSAGE HERE",
-      "questions": [
-        {
-          "question": "We can conclude from the information in this passage that",
-          "options": [
-            "women today are highly successful in winning equal rights.",
-            "only pioneer women have been considered equal to men.",
-            "historically, women have only achieved equality through force.",
-            "historically, the principle of equality alone has not been enough to secure women equal rights."
-          ],
-          "answer": "historically, the principle of equality alone has not been enough to secure women equal rights."
-        }
-      ]
+      "type": "multiple-choice",
+      "passageId": "p4",
+      "question": "We can conclude from the information in this passage that",
+      "options": ["women today are highly successful in winning equal rights.", "only pioneer women have been considered equal to men.", "historically, women have only achieved equality through force.", "historically, the principle of equality alone has not been enough to secure women equal rights."],
+      "answer": "historically, the principle of equality alone has not been enough to secure women equal rights."
     },
     {
-      "type": "comprehension",
-      "passage": "PASTE PASSAGE HERE",
-      "questions": [
-        {
-          "question": "Even after the success of baby carriages in England,",
-          "options": [
-            "Charles Burton was a poor man.",
-            "Americans were still reluctant to buy baby carriages.",
-            "Americans purchased thousands of baby carriages.",
-            "the United States bought more carriages than any other country."
-          ],
-          "answer": "Americans were still reluctant to buy baby carriages."
-        }
-      ]
+      "type": "multiple-choice",
+      "passageId": "p5",
+      "question": "Even after the success of baby carriages in England,",
+      "options": ["Charles Burton was a poor man.", "Americans were still reluctant to buy baby carriages.", "Americans purchased thousands of baby carriages.", "the United States bought more carriages than any other country."],
+      "answer": "Americans were still reluctant to buy baby carriages."
     },
     {
-      "type": "comprehension",
-      "passage": "PASTE PASSAGE HERE",
-      "questions": [
-        {
-          "question": "The purpose of the passage is to present",
-          "options": [
-            "a personal observation.",
-            "a solution to a problem.",
-            "actual information.",
-            "opposing scientific theories."
-          ],
-          "answer": "actual information."
-        }
-      ]
+      "type": "multiple-choice",
+      "passageId": "p6",
+      "question": "The purpose of the passage is to present",
+      "options": ["a personal observation.", "a solution to a problem.", "actual information.", "opposing scientific theories."],
+      "answer": "actual information."
     },
     {
-      "type": "comprehension",
-      "passage": "PASTE PASSAGE HERE",
-      "questions": [
-        {
-          "question": "This passage is mainly about",
-          "options": [
-            "how people in different countries save their money",
-            "how people in England made pottery centuries ago",
-            "how a common expression began in a surprising way",
-            "how an unusual custom got started"
-          ],
-          "answer": "how a common expression began in a surprising way"
-        }
-      ]
+      "type": "multiple-choice",
+      "passageId": "p1",
+      "question": "The writer believes people remember names best when they",
+      "options": ["meet new people", "are intelligent", "decide to do so", "are interested in people"],
+      "answer": "decide to do so"
     },
     {
-      "type": "comprehension",
-      "passage": "PASTE PASSAGE HERE",
-      "questions": [
-        {
-          "question": "According to this passage, the wheel is an important invention because",
-          "options": [
-            "it is one of the world's oldest inventions",
-            "it forms the basis of so many later inventions",
-            "it is an invention that can be traced to many cultures",
-            "it is one the world's most famous inventions"
-          ],
-          "answer": "it forms the basis of so many later inventions"
-        }
-      ]
+      "type": "multiple-choice",
+      "passageId": "p7",
+      "question": "This passage is mainly about",
+      "options": ["how people in different countries save their money", "how people in England made pottery centuries ago", "how a common expression began in a surprising way", "how an unusual custom got started"],
+      "answer": "how a common expression began in a surprising way"
     },
     {
-      "type": "comprehension",
-      "passage": "PASTE PASSAGE HERE",
-      "questions": [
-        {
-          "question": "Morse left the art world and helped to invent the telegraph",
-          "options": [
-            "because he was tired of painting",
-            "because he wanted to communicate with people far away",
-            "because of a personal tragedy in his life",
-            "because he was fascinated by science"
-          ],
-          "answer": "because of a personal tragedy in his life"
-        }
-      ]
+      "type": "multiple-choice",
+      "passageId": "p3",
+      "question": "This passage implies that the writer thinks that 95 pounds of sugar per person per year is",
+      "options": ["a surprisingly large amount", "a surprisingly small amount", "about what one would expect", "an unhealthy amount"],
+      "answer": "a surprisingly large amount"
     },
     {
-      "type": "comprehension",
-      "passage": "PASTE PASSAGE HERE",
-      "questions": [
-        {
-          "question": "The author of this passage is praising Leonardo DaVinci for his:",
-          "options": [
-            "artistic talent",
-            "intelligence",
-            "vision",
-            "fame"
-          ],
-          "answer": "vision"
-        }
-      ]
+      "type": "multiple-choice",
+      "passageId": "p8",
+      "question": "According to this passage, the wheel is an important invention because",
+      "options": ["it is one of the world's oldest inventions", "it forms the basis of so many later inventions", "it is an invention that can be traced to many cultures", "it is one the world's most famous inventions"],
+      "answer": "it forms the basis of so many later inventions"
     },
     {
-      "type": "comprehension",
-      "passage": "PASTE PASSAGE HERE",
-      "questions": [
-        {
-          "question": "What does the second sentence do?",
-          "options": [
-            "It restates the idea found in the first.",
-            "It states an effect.",
-            "It gives an example.",
-            "It analyzes the statement made in the first."
-          ],
-          "answer": "It states an effect."
-        }
-      ]
+      "type": "multiple-choice",
+      "passageId": "p9",
+      "question": "Morse left the art world and helped to invent the telegraph",
+      "options": ["because he was tired of painting", "because he wanted to communicate with people far away", "because of a personal tragedy in his life", "because he was fascinated by science"],
+      "answer": "because of a personal tragedy in his life"
     },
     {
-      "type": "comprehension",
-      "passage": "PASTE PASSAGE HERE",
-      "questions": [
-        {
-          "question": "What does the second sentence do?",
-          "options": [
-            "It expands on the first sentence.",
-            "It makes a contrast.",
-            "It proposes a solution.",
-            "It states an effect."
-          ],
-          "answer": "It expands on the first sentence."
-        }
-      ]
+      "type": "multiple-choice",
+      "passageId": "p10",
+      "question": "The author of this passage is praising Leonardo DaVinci for his:",
+      "options": ["artistic talent", "intelligence", "vision", "fame"],
+      "answer": "vision"
     },
     {
-      "type": "comprehension",
-      "passage": "PASTE PASSAGE HERE",
-      "questions": [
-        {
-          "question": "How are the two sentences related?",
-          "options": [
-            "They contradict each other.",
-            "They present problems and solutions.",
-            "They establish a contrast.",
-            "They repeat the same idea."
-          ],
-          "answer": "They repeat the same idea."
-        }
-      ]
+      "type": "multiple-choice",
+      "passageId": "p11",
+      "question": "What does the second sentence do?",
+      "options": ["It restates the idea found in the first.", "It states an effect.", "It gives an example.", "It analyzes the statement made in the first."],
+      "answer": "It states an effect."
     },
     {
-      "type": "comprehension",
-      "passage": "PASTE PASSAGE HERE",
-      "questions": [
-        {
-          "question": "What does the second sentence do?",
-          "options": [
-            "It reinforces what is stated in the first.",
-            "It explains what is stated in the first.",
-            "It expands on the first.",
-            "It draws a conclusion about what is stated in the first."
-          ],
-          "answer": "It reinforces what is stated in the first."
-        }
-      ]
+      "type": "multiple-choice",
+      "passageId": "p12",
+      "question": "What does the second sentence do?",
+      "options": ["It expands on the first sentence.", "It makes a contrast.", "It proposes a solution.", "It states an effect."],
+      "answer": "It expands on the first sentence."
     },
     {
-      "type": "comprehension",
-      "passage": "PASTE PASSAGE HERE",
-      "questions": [
-        {
-          "question": "What does the second sentence do?",
-          "options": [
-            "It makes a contrast.",
-            "It restates an idea found in the first.",
-            "It states an effect.",
-            "It gives an example."
-          ],
-          "answer": "It gives an example."
-        }
-      ]
+      "type": "multiple-choice",
+      "passageId": "p13",
+      "question": "How are the two sentences related?",
+      "options": ["They contradict each other.", "They present problems and solutions.", "They establish a contrast.", "They repeat the same idea."],
+      "answer": "They repeat the same idea."
     },
     {
-      "type": "comprehension",
-      "passage": "PASTE PASSAGE HERE",
-      "questions": [
-        {
-          "question": "What does the second sentence do?",
-          "options": [
-            "It reinforces the first.",
-            "It states an effect.",
-            "It draws a conclusion.",
-            "It provides a contrast."
-          ],
-          "answer": "It reinforces the first."
-        }
-      ]
+      "type": "multiple-choice",
+      "passageId": "p14",
+      "question": "What does the second sentence do?",
+      "options": ["It reinforces what is stated in the first.", "It explains what is stated in the first.", "It expands on the first.", "It draws a conclusion about what is stated in the first."],
+      "answer": "It reinforces what is stated in the first."
     },
     {
-      "type": "comprehension",
-      "passage": "PASTE PASSAGE HERE",
-      "questions": [
-        {
-          "question": "How do the two sentences relate?",
-          "options": [
-            "They express roughly the same idea.",
-            "They contradict each other.",
-            "They present problems and solutions.",
-            "They establish a contrast."
-          ],
-          "answer": "They express roughly the same idea."
-        }
-      ]
+      "type": "multiple-choice",
+      "passageId": "p15",
+      "question": "What does the second sentence do?",
+      "options": ["It makes a contrast.", "It restates an idea found in the first.", "It states an effect.", "It gives an example."],
+      "answer": "It gives an example."
     },
     {
-      "type": "comprehension",
-      "passage": "PASTE PASSAGE HERE",
-      "questions": [
-        {
-          "question": "What does the second sentence do?",
-          "options": [
-            "It reinforces the first.",
-            "It explains what is stated in the first.",
-            "It contradicts the first.",
-            "It analyzes a statement made in the first."
-          ],
-          "answer": "It contradicts the first."
-        }
-      ]
+      "type": "multiple-choice",
+      "passageId": "p16",
+      "question": "What does the second sentence do?",
+      "options": ["It reinforces the first.", "It states an effect.", "It draws a conclusion.", "It provides a contrast."],
+      "answer": "It reinforces the first."
     },
     {
-      "type": "comprehension",
-      "passage": "PASTE PASSAGE HERE",
-      "questions": [
-        {
-          "question": "What does the second sentence do?",
-          "options": [
-            "It expands on the first.",
-            "It states an effect.",
-            "It contrasts with the first.",
-            "It gives an example."
-          ],
-          "answer": "It expands on the first."
-        }
-      ]
+      "type": "multiple-choice",
+      "passageId": "p17",
+      "question": "How do the two sentences relate?",
+      "options": ["They express roughly the same idea.", "They contradict each other.", "They present problems and solutions.", "They establish a contrast."],
+      "answer": "They express roughly the same idea."
     },
     {
-      "type": "comprehension",
-      "passage": "PASTE PASSAGE HERE",
-      "questions": [
-        {
-          "question": "How do the two sentences relate?",
-          "options": [
-            "They establish a contrast.",
-            "They contradict each other.",
-            "They reinforce each other.",
-            "They provide a problem and solution."
-          ],
-          "answer": "They establish a contrast."
-        }
-      ]
+      "type": "multiple-choice",
+      "passageId": "p18",
+      "question": "What does the second sentence do?",
+      "options": ["It reinforces the first.", "It explains what is stated in the first.", "It contradicts the first.", "It analyzes a statement made in the first."],
+      "answer": "It contradicts the first."
+    },
+    {
+      "type": "multiple-choice",
+      "passageId": "p19",
+      "question": "What does the second sentence do?",
+      "options": ["It expands on the first.", "It states an effect.", "It contrasts with the first.", "It gives an example."],
+      "answer": "It expands on the first."
+    },
+    {
+      "type": "multiple-choice",
+      "passageId": "p20",
+      "question": "How do the two sentences relate?",
+      "options": ["They establish a contrast.", "They contradict each other.", "They reinforce each other.", "They provide a problem and solution."],
+      "answer": "They establish a contrast."
     }
   ]
 }
