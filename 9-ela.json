@@ -59,6 +59,13 @@
         }
       ],
       "questions": [
+        {
+          "questionId": "elaap_cw1",
+          "passageId": null,
+          "type": "creative-writing",
+          "writing_type": "Persuasive",
+          "question": "Some schools require each student to participate in an organized school sport chosen by the student. People at these schools argue that athletics is an important part of the educational experience and that there should be a rule requiring participation. Others argue that students should be free to decide whether or not they wish to participate in organized school sports. Write an essay for a classroom instructor in which you take a position on whether participation in organized school athletics should be required. Be sure to defend your position with logical arguments and appropriate examples."
+        },
         { "questionId": "elaap_q1", "passageId": "p1", "question": "The main idea of the paragraph maintains that the memory...", "options": ["always operates at peak efficiency.", "breaks down under great strain.", "improves if it is used often.", "becomes unreliable if it tires."], "correctAnswer": "improves if it is used often." },
         { "questionId": "elaap_q2", "passageId": "p2", "question": "This passage is primarily about...", "options": ["unemployment in the 1930s.", "the effect of unemployment on United States families.", "President Franklin D. Roosevelt's presidency.", "President Roosevelt's FERA program."], "correctAnswer": "President Roosevelt's FERA program." },
         { "questionId": "elaap_q3", "passageId": "p3", "question": "From this passage it seems safe to conclude that the English...", "options": ["do not know that too much sugar is unhealthy.", "eat desserts at every meal.", "are fonder of sweets than most people.", "have more cavities than any other people."], "correctAnswer": "are fonder of sweets than most people." },
