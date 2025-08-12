@@ -2,7 +2,7 @@
   "tests": [
     {
       "id": "staar_english_i_2019",
-      "subject": "English",
+      "subject": "English I",
       "grade": "9",
       "year": "2019",
       "defaultQuestionType": "multiple-choice",
@@ -10,468 +10,733 @@
         {
           "passageId": "p1",
           "title": "The Great Barrier Reef",
-          "content": "[PASSAGE TEXT TO BE UPLOADED]"
+          "content": "[PASSAGE TEXT TO BE UPLOADED: Candice's paper on the Great Barrier Reef, sentences 1-35]"
         },
         {
           "passageId": "p2",
           "title": "The Case for a Mentoring Program",
-          "content": "[PASSAGE TEXT TO BE UPLOADED]"
+          "content": "[PASSAGE TEXT TO BE UPLOADED: Melody's essay on a mentoring program, sentences 1-23]"
         },
         {
           "passageId": "p3",
           "title": "Owner's Best Friend",
-          "content": "[PASSAGE TEXT TO BE UPLOADED]"
+          "content": "[PASSAGE TEXT TO BE UPLOADED: Gabriella's paper on owning a pet, sentences 1-31]"
         },
         {
           "passageId": "p4",
           "title": "Flying to New Heights",
-          "content": "[PASSAGE TEXT TO BE UPLOADED]"
+          "content": "[PASSAGE TEXT TO BE UPLOADED: Gena's essay about Bessie Coleman, sentences 1-30]"
         },
         {
           "passageId": "p5",
           "title": "A Baseball School for Big-League Dreamers",
-          "content": "[PASSAGE TEXT TO BE UPLOADED]"
+          "content": "[PASSAGE TEXT TO BE UPLOADED: Article by Robert Benincasa, paragraphs 1-33]"
         },
         {
           "passageId": "p6",
           "title": "I Believe in the Also-Rans",
-          "content": "[PASSAGE TEXT TO BE UPLOADED]"
+          "content": "[PASSAGE TEXT TO BE UPLOADED: Essay by Clive B., paragraphs 1-9]"
         },
         {
-          "passageId": "p7",
-          "title": "from Antaeus",
-          "content": "[PASSAGE TEXT TO BE UPLOADED]"
+          "passageId": "p7_paired",
+          "title": "Paired Passages: A Baseball School for Big-League Dreamers & I Believe in the Also-Rans",
+          "content": "[This is a paired passage entry. The content is drawn from p5 and p6.]"
         },
         {
           "passageId": "p8",
+          "title": "from Antaeus",
+          "content": "[PASSAGE TEXT TO BE UPLOADED: Excerpt from the story by Borden Deal, paragraphs 1-32]"
+        },
+        {
+          "passageId": "p9",
           "title": "My Desk",
-          "content": "[PASSAGE TEXT TO BE UPLOADED]"
+          "content": "[PASSAGE TEXT TO BE UPLOADED: Poem by Debora Marsh, lines 1-35]"
         }
       ],
       "questions": [
         {
-          "questionId": "eng1_2019_q1",
+          "questionId": "q1",
           "passageId": "p1",
           "type": "multiple-choice",
           "question": "What transition would be the most appropriate to use at the beginning of sentence 6?",
-          "options": ["As a matter of concern", "For further evidence", "To wipe away any doubt", "For this reason among others"],
-          "correctAnswer": "For this reason among others"
+          "options": [
+            "As a matter of concern",
+            "For further evidence",
+            "To wipe away any doubt",
+            "For this reason among others"
+          ],
+          "correctAnswer": "[Correct Answer Here]"
         },
         {
-          "questionId": "eng1_2019_q2",
+          "questionId": "q2",
           "passageId": "p1",
           "type": "multiple-choice",
-          "question": "Which sentence should replace sentence 8 to serve as the thesis statement?",
-          "options": ["There are other barrier reefs in the oceans of the world, but only the Great Barrier Reef is so well known.", "The Great Barrier Reef of Australia is a supreme example of the mysteries of the natural world because of its wide variety of plant and animal life.", "Some scientists believe the Great Barrier Reef first began to grow about 18 million years ago.", "A coral reef like the Great Barrier Reef can grow only in shallow, warm water because it needs light from the sun to survive."],
-          "correctAnswer": "The Great Barrier Reef of Australia is a supreme example of the mysteries of the natural world because of its wide variety of plant and animal life."
+          "question": "Candice needs a more effective thesis statement for her paper. Which sentence should replace sentence 8 to serve as the thesis statement?",
+          "options": [
+            "There are other barrier reefs in the oceans of the world, but only the Great Barrier Reef is so well known.",
+            "The Great Barrier Reef of Australia is a supreme example of the mysteries of the natural world because of its wide variety of plant and animal life.",
+            "Some scientists believe the Great Barrier Reef first began to grow about 18 million years ago.",
+            "A coral reef like the Great Barrier Reef can grow only in shallow, warm water because it needs light from the sun to survive."
+          ],
+          "correctAnswer": "[Correct Answer Here]"
         },
         {
-          "questionId": "eng1_2019_q3",
+          "questionId": "q3",
           "passageId": "p1",
           "type": "multiple-choice",
-          "question": "Which of the following sentences should be inserted before sentence 19 to introduce the ideas in this paragraph?",
-          "options": ["Over time a vast array of creatures has come to inhabit the Great Barrier Reef.", "Marine animal species that are threatened are protected by the Great Barrier Reef Marine Park Authority.", "The biodiversity of the Great Barrier Reef ensures its long-term existence.", "The waters along the Great Barrier Reef provide a habitat for marine animals that researchers study."],
-          "correctAnswer": "Over time a vast array of creatures has come to inhabit the Great Barrier Reef."
+          "question": "Candice needs a topic sentence for the third paragraph (sentences 19-21). Which of the following sentences should be inserted before sentence 19 to introduce the ideas in this paragraph?",
+          "options": [
+            "Over time a vast array of creatures has come to inhabit the Great Barrier Reef.",
+            "Marine animal species that are threatened are protected by the Great Barrier Reef Marine Park Authority.",
+            "The biodiversity of the Great Barrier Reef ensures its long-term existence.",
+            "The waters along the Great Barrier Reef provide a habitat for marine animals that researchers study."
+          ],
+          "correctAnswer": "[Correct Answer Here]"
         },
         {
-          "questionId": "eng1_2019_q4",
+          "questionId": "q4",
           "passageId": "p1",
           "type": "multiple-choice",
           "question": "Candice may have a redundant sentence in the fourth paragraph (sentences 22-26). Which sentence, if any, should be deleted?",
-          "options": ["Sentence 24", "Sentence 25", "Sentence 26", "No sentence should be deleted."],
-          "correctAnswer": "Sentence 26"
+          "options": [
+            "Sentence 24",
+            "Sentence 25",
+            "Sentence 26",
+            "No sentence should be deleted."
+          ],
+          "correctAnswer": "[Correct Answer Here]"
         },
         {
-          "questionId": "eng1_2019_q5",
+          "questionId": "q5",
           "passageId": "p1",
           "type": "multiple-choice",
-          "question": "Which sentence should she use to replace sentence 35?",
-          "options": ["Finally, we must protect the Great Barrier Reef from being destroyed so future generations can enjoy it.", "How much still remains to be discovered about the Great Barrier Reef of Australia is anybody's guess.", "Researchers should explore the oceans further to try to find other natural wonders like the Great Barrier Reef.", "Attracting visitors from around the world, the Great Barrier Reef has a beauty that is perhaps unequaled anywhere on Earth."],
-          "correctAnswer": "Attracting visitors from around the world, the Great Barrier Reef has a beauty that is perhaps unequaled anywhere on Earth."
+          "question": "Candice would like to improve her concluding sentence by summing up the ideas she has presented. Which sentence should she use to replace sentence 35?",
+          "options": [
+            "Finally, we must protect the Great Barrier Reef from being destroyed so future generations can enjoy it.",
+            "How much still remains to be discovered about the Great Barrier Reef of Australia is anybody's guess.",
+            "Researchers should explore the oceans further to try to find other natural wonders like the Great Barrier Reef.",
+            "Attracting visitors from around the world, the Great Barrier Reef has a beauty that is perhaps unequaled anywhere on Earth."
+          ],
+          "correctAnswer": "[Correct Answer Here]"
         },
         {
-          "questionId": "eng1_2019_q6",
+          "questionId": "q6",
           "passageId": "p2",
           "type": "multiple-choice",
-          "question": "What change should she make in sentence 1 to clarify her introductory paragraph?",
-          "options": ["Change They to Teachers and leaders at our school", "Change continually to always", "Change telling us to instructing us", "Change community to surrounding neighborhood"],
-          "correctAnswer": "Change They to Teachers and leaders at our school"
+          "question": "Melody's opening sentence is unclear. What change should she make in sentence 1 to clarify her introductory paragraph?",
+          "options": [
+            "Change They to Teachers and leaders at our school",
+            "Change continually to always",
+            "Change telling us to instructing us",
+            "Change community to surrounding neighborhood"
+          ],
+          "correctAnswer": "[Correct Answer Here]"
         },
         {
-          "questionId": "eng1_2019_q7",
+          "questionId": "q7",
           "passageId": "p2",
           "type": "multiple-choice",
           "question": "What is the most effective way to combine sentences 6 and 7?",
-          "options": ["My own sister is having a hard time in math attending one of the elementary schools that feeds into our high school.", "My own sister attends one of the elementary schools that feeds into our high school although she is having a hard time in math.", "My own sister, who attends one of the elementary schools that feeds into our high school, is having a hard time in math.", "My own sister attends one of the elementary schools that feeds into our high school, she is having a hard time in math."],
-          "correctAnswer": "My own sister, who attends one of the elementary schools that feeds into our high school, is having a hard time in math."
+          "options": [
+            "My own sister is having a hard time in math attending one of the elementary schools that feeds into our high school.",
+            "My own sister attends one of the elementary schools that feeds into our high school although she is having a hard time in math.",
+            "My own sister, who attends one of the elementary schools that feeds into our high school, is having a hard time in math.",
+            "My own sister attends one of the elementary schools that feeds into our high school, she is having a hard time in math."
+          ],
+          "correctAnswer": "[Correct Answer Here]"
         },
         {
-          "questionId": "eng1_2019_q8",
+          "questionId": "q8",
           "passageId": "p2",
           "type": "multiple-choice",
-          "question": "Which of the following could she add before sentence 12 to improve this transition?",
-          "options": ["In researching mentoring programs, I learned of several promising results.", "As I think about a mentoring program, I have many ideas on how it should work.", "If struggling youngsters get the help they need, it could benefit teachers, too.", "Because I believe in the mentoring concept, I'd like to see it at our school."],
-          "correctAnswer": "In researching mentoring programs, I learned of several promising results."
+          "question": "Melody needs a better transition into the third paragraph (sentences 12-17) of her essay. Which of the following could she add before sentence 12 to improve this transition?",
+          "options": [
+            "In researching mentoring programs, I learned of several promising results.",
+            "As I think about a mentoring program, I have many ideas on how it should work.",
+            "If struggling youngsters get the help they need, it could benefit teachers, too.",
+            "Because I believe in the mentoring concept, I'd like to see it at our school."
+          ],
+          "correctAnswer": "[Correct Answer Here]"
         },
         {
-          "questionId": "eng1_2019_q9",
+          "questionId": "q9",
           "passageId": "p2",
           "type": "multiple-choice",
-          "question": "Where is the best place for her to insert this sentence: 'Some students may say that they don't have enough time to participate in a mentoring program because of other activities in which they are involved.'?",
-          "options": ["Before sentence 5", "Before sentence 10", "Before sentence 13", "Before sentence 21"],
-          "correctAnswer": "Before sentence 21"
+          "question": "Melody would like to add the following counterargument to her essay. 'Some students may say that they don't have enough time to participate in a mentoring program because of other activities in which they are involved.' Where is the best place for her to insert this sentence?",
+          "options": [
+            "Before sentence 5",
+            "Before sentence 10",
+            "Before sentence 13",
+            "Before sentence 21"
+          ],
+          "correctAnswer": "[Correct Answer Here]"
         },
         {
-          "questionId": "eng1_2019_q10",
+          "questionId": "q10",
           "passageId": "p3",
           "type": "multiple-choice",
           "question": "What change, if any, needs to be made in sentence 4?",
-          "options": ["Change benefitial to beneficial", "Insert a comma after people", "Change healthier to healthiest", "No change is needed in sentence 4."],
-          "correctAnswer": "Change benefitial to beneficial"
+          "options": [
+            "Change benefitial to beneficial",
+            "Insert a comma after people",
+            "Change healthier to healthiest",
+            "No change is needed in sentence 4."
+          ],
+          "correctAnswer": "[Correct Answer Here]"
         },
         {
-          "questionId": "eng1_2019_q11",
+          "questionId": "q11",
           "passageId": "p3",
           "type": "multiple-choice",
           "question": "What is the correct way to write sentence 9?",
-          "options": ["People feel safe when confiding in their pets; without being judgmental. A pet will often sit compassionately by its owner's side for as long as is needed.", "People feel safe when confiding in their pets, without being judgmental; a pet will often sit compassionately by its owner's side for as long as is needed.", "People feel safe when confiding in their pets. Without being judgmental, a pet will often sit compassionately; by its owner's side, for as long as is needed.", "People feel safe when confiding in their pets; without being judgmental, a pet will often sit compassionately by its owner's side for as long as is needed."],
-          "correctAnswer": "People feel safe when confiding in their pets. Without being judgmental, a pet will often sit compassionately by its owner's side for as long as is needed."
+          "options": [
+            "People feel safe when confiding in their pets; without being judgmental. A pet will often sit compassionately by its owner's side for as long as is needed.",
+            "People feel safe when confiding in their pets, without being judgmental; a pet will often sit compassionately by its owner's side for as long as is needed.",
+            "People feel safe when confiding in their pets. Without being judgmental, a pet will often sit compassionately; by its owner's side, for as long as is needed.",
+            "People feel safe when confiding in their pets; without being judgmental, a pet will often sit compassionately by its owner's side for as long as is needed."
+          ],
+          "correctAnswer": "[Correct Answer Here]"
         },
         {
-          "questionId": "eng1_2019_q12",
+          "questionId": "q12",
           "passageId": "p3",
           "type": "multiple-choice",
           "question": "What change, if any, needs to be made in sentence 26?",
-          "options": ["Change minimal to minamal", "Change are to were", "Delete the comma after appropriate", "No change is necessary."],
-          "correctAnswer": "Delete the comma after appropriate"
+          "options": [
+            "Change minimal to minamal",
+            "Change are to were",
+            "Delete the comma after appropriate",
+            "No change is necessary."
+          ],
+          "correctAnswer": "[Correct Answer Here]"
         },
         {
-          "questionId": "eng1_2019_q13",
+          "questionId": "q13",
           "passageId": "p3",
           "type": "multiple-choice",
           "question": "What change should be made in sentence 30?",
-          "options": ["Change poet to Poet", "Change until to Until", "Change one's to ones'", "Change remains to remained"],
-          "correctAnswer": "Change until to Until"
+          "options": [
+            "Change poet to Poet",
+            "Change until to Until",
+            "Change one's to ones'",
+            "Change remains to remained"
+          ],
+          "correctAnswer": "[Correct Answer Here]"
         },
         {
-          "questionId": "eng1_2019_q14",
+          "questionId": "q14",
           "passageId": "p4",
           "type": "multiple-choice",
           "question": "What is the correct way to write sentence 8?",
-          "options": ["She promised her mother that she would succeed consequently, she walked the four-mile distance daily, between her home and school.", "She promised her mother that she would succeed consequently she walked the four-mile distance daily between her home and school.", "She promised her mother that she would succeed. Consequently, she walked; the four-mile distance daily between her home and school.", "She promised her mother that she would succeed. Consequently, she walked the four-mile distance daily between her home and school."],
-          "correctAnswer": "She promised her mother that she would succeed. Consequently, she walked the four-mile distance daily between her home and school."
+          "options": [
+            "She promised her mother that she would succeed consequently, she walked the four-mile distance daily, between her home and school.",
+            "She promised her mother that she would succeed consequently she walked the four-mile distance daily between her home and school.",
+            "She promised her mother that she would succeed. Consequently, she walked; the four-mile distance daily between her home and school.",
+            "She promised her mother that she would succeed. Consequently, she walked the four-mile distance daily between her home and school."
+          ],
+          "correctAnswer": "[Correct Answer Here]"
         },
         {
-          "questionId": "eng1_2019_q15",
+          "questionId": "q15",
           "passageId": "p4",
           "type": "multiple-choice",
           "question": "What change, if any, needs to be made in sentence 10?",
-          "options": ["Change have run to ran", "Delete the comma after year", "Change was forced to is forced", "Make no change"],
-          "correctAnswer": "Change have run to ran"
+          "options": [
+            "Change have run to ran",
+            "Delete the comma after year",
+            "Change was forced to is forced",
+            "Make no change"
+          ],
+          "correctAnswer": "[Correct Answer Here]"
         },
         {
-          "questionId": "eng1_2019_q16",
+          "questionId": "q16",
           "passageId": "p4",
           "type": "multiple-choice",
           "question": "What change should Gena make in sentence 17?",
-          "options": ["Insert a comma after September", "Change whom to who", "Change proficient to proficiant", "Change came to comes"],
-          "correctAnswer": "Change whom to who"
+          "options": [
+            "Insert a comma after September",
+            "Change whom to who",
+            "Change proficient to proficiant",
+            "Change came to comes"
+          ],
+          "correctAnswer": "[Correct Answer Here]"
         },
         {
-          "questionId": "eng1_2019_q17",
+          "questionId": "q17",
           "passageId": "p4",
           "type": "multiple-choice",
           "question": "What change, if any, needs to be made in sentence 25?",
-          "options": ["Insert a comma after performance", "Change the comma after 1926 to a semicolon", "Change mechanical to machanical", "No change should be made."],
-          "correctAnswer": "No change should be made."
+          "options": [
+            "Insert a comma after performance",
+            "Change the comma after 1926 to a semicolon",
+            "Change mechanical to machanical",
+            "No change should be made."
+          ],
+          "correctAnswer": "[Correct Answer Here]"
         },
         {
-          "questionId": "eng1_2019_q18",
+          "questionId": "q18",
           "passageId": "p4",
           "type": "multiple-choice",
           "question": "How does sentence 28 need to be changed?",
-          "options": ["Change Similar to Similarly", "Change female to females", "Change started to would start", "Insert a comma after Club"],
-          "correctAnswer": "Change Similar to Similarly"
+          "options": [
+            "Change Similar to Similarly",
+            "Change female to females",
+            "Change started to would start",
+            "Insert a comma after Club"
+          ],
+          "correctAnswer": "[Correct Answer Here]"
         },
         {
-          "questionId": "eng1_2019_q19",
+          "questionId": "q19",
           "passageId": "p5",
           "type": "multiple-choice",
-          "question": "Which sentence from 'A Baseball School for Big-League Dreamers' best supports the main idea of the article?",
-          "options": ["Tuition, room and board here for the combined academic and sports program is about $70,000 a year.", "Most players here won't ever put on a big-league uniform, but they come to IMG trying to find and reach their potential.", "He remembers being fascinated by how the players and coaches talked and how fans reacted to the game.", "Ketch doesn't think about the numbers."],
-          "correctAnswer": "Most players here won't ever put on a big-league uniform, but they come to IMG trying to find and reach their potential."
+          "question": "Which sentence from \"A Baseball School for Big-League Dreamers\" best supports the main idea of the article?",
+          "options": [
+            "Tuition, room and board here for the combined academic and sports program is about $70,000 a year.",
+            "Most players here won't ever put on a big-league uniform, but they come to IMG trying to find and reach their potential.",
+            "He remembers being fascinated by how the players and coaches talked and how fans reacted to the game.",
+            "Ketch doesn't think about the numbers."
+          ],
+          "correctAnswer": "[Correct Answer Here]"
         },
         {
-          "questionId": "eng1_2019_q20",
+          "questionId": "q20",
           "passageId": "p5",
           "type": "multiple-choice",
-          "question": "Based on the article, the coaches at IMG can best be described as —",
-          "options": ["concerned about the effectiveness of their coaching ability", "focused on becoming coaches at a professional level", "dismissive of the mistakes students make", "caring about the future success of the students"],
-          "correctAnswer": "caring about the future success of the students"
+          "question": "Based on the article, the coaches at IMG can best be described as",
+          "options": [
+            "concerned about the effectiveness of their coaching ability",
+            "focused on becoming coaches at a professional level",
+            "dismissive of the mistakes students make",
+            "caring about the future success of the students"
+          ],
+          "correctAnswer": "[Correct Answer Here]"
         },
         {
-          "questionId": "eng1_2019_q21",
+          "questionId": "q21",
           "passageId": "p5",
           "type": "multiple-choice",
-          "question": "What evidence does the author present in the article to support the opinion expressed in this quotation: '\"Ketchum Marsh is one of the most successful stories that will come out of IMG,\" Bolek says, focusing not just on baseball, but on life.'?",
-          "options": ["A reference to Marsh's work ethic", "An anecdote about Marsh's time as a batboy", "A description of Marsh's training regimen", "Information about Marsh's future plans"],
-          "correctAnswer": "A reference to Marsh's work ethic"
+          "question": "Read this quotation from paragraph 13. '\"Ketchum Marsh is one of the most successful stories that will come out of IMG,\" Bolek says, focusing not just on baseball, but on life.' What evidence does the author present in the article to support the opinion expressed in this quotation?",
+          "options": [
+            "A reference to Marsh's work ethic",
+            "An anecdote about Marsh's time as a batboy",
+            "A description of Marsh's training regimen",
+            "Information about Marsh's future plans"
+          ],
+          "correctAnswer": "[Correct Answer Here]"
         },
         {
-          "questionId": "eng1_2019_q22",
+          "questionId": "q22",
           "passageId": "p5",
           "type": "multiple-choice",
-          "question": "The author wrote 'A Baseball School for Big-League Dreamers' primarily to —",
-          "options": ["highlight the reasons people pursue a career in sports", "persuade readers to support schools that specialize in training student-athletes", "inform readers about a unique school and the students who attend it", "convince student-athletes to enroll in a specialized school for sports"],
-          "correctAnswer": "inform readers about a unique school and the students who attend it"
+          "question": "The author wrote \"A Baseball School for Big-League Dreamers\" primarily to",
+          "options": [
+            "highlight the reasons people pursue a career in sports",
+            "persuade readers to support schools that specialize in training student-athletes",
+            "inform readers about a unique school and the students who attend it",
+            "convince student-athletes to enroll in a specialized school for sports"
+          ],
+          "correctAnswer": "[Correct Answer Here]"
         },
         {
-          "questionId": "eng1_2019_q23",
+          "questionId": "q23",
           "passageId": "p5",
           "type": "multiple-choice",
-          "question": "Read paragraph 21. What does this sentence suggest: 'Baseball folklore tells us that the scrappiest kid on the sandlot has a shot at going to \"the show.\"'?",
-          "options": ["Baseball players understand their potential at an early age.", "Determination and grit could get a player to the big leagues.", "Legends about baseball frequently inspire players to improve.", "Most major-league players come from humble circumstances."],
-          "correctAnswer": "Determination and grit could get a player to the big leagues."
+          "question": "Read paragraph 21. 'Baseball folklore tells us that the scrappiest kid on the sandlot has a shot at going to \"the show.\"' What does this sentence suggest?",
+          "options": [
+            "Baseball players understand their potential at an early age.",
+            "Determination and grit could get a player to the big leagues.",
+            "Legends about baseball frequently inspire players to improve.",
+            "Most major-league players come from humble circumstances."
+          ],
+          "correctAnswer": "[Correct Answer Here]"
         },
         {
-          "questionId": "eng1_2019_q24",
+          "questionId": "q24",
           "passageId": "p5",
           "type": "multiple-choice",
-          "imagePlaceholder": "baseball_pyramid.png",
+          "imagePlaceholder": "baseball_competition_pyramid.png",
           "question": "What does the graphic best suggest about the different levels of baseball competition?",
-          "options": ["More athletes prefer playing college baseball than minor-league baseball.", "Most Little League baseball players participate in multiple sports when they reach high school.", "Playing Little League baseball is necessary to becoming a major-league player.", "Baseball leagues become more selective as players advance."],
-          "correctAnswer": "Baseball leagues become more selective as players advance."
+          "options": [
+            "More athletes prefer playing college baseball than minor-league baseball.",
+            "Most Little League baseball players participate in multiple sports when they reach high school.",
+            "Playing Little League baseball is necessary to becoming a major-league player.",
+            "Baseball leagues become more selective as players advance."
+          ],
+          "correctAnswer": "[Correct Answer Here]"
         },
         {
-          "questionId": "eng1_2019_q25",
+          "questionId": "q25",
           "passageId": "p5",
           "type": "multiple-choice",
           "question": "What can the reader conclude from the interaction between the pitching coach and Cameron Varga in paragraphs 17 through 20?",
-          "options": ["The pitching coach wants his players to always strive to improve.", "The pitching coach is mainly concerned about winning games quickly.", "Varga is confident in his ability to succeed in Florida.", "Varga's number of pitches will decrease as his speed increases."],
-          "correctAnswer": "The pitching coach wants his players to always strive to improve."
+          "options": [
+            "The pitching coach wants his players to always strive to improve.",
+            "The pitching coach is mainly concerned about winning games quickly.",
+            "Varga is confident in his ability to succeed in Florida.",
+            "Varga's number of pitches will decrease as his speed increases."
+          ],
+          "correctAnswer": "[Correct Answer Here]"
         },
         {
-          "questionId": "eng1_2019_q26",
+          "questionId": "q26",
           "passageId": "p6",
           "type": "multiple-choice",
           "question": "What is the author's purpose for mentioning the children's race through the house?",
-          "options": ["To illustrate that some children value fun above competition", "To emphasize that his child is athletically superior to her friends", "To highlight that children often disregard household rules", "To show that children lack concerns about safety when competing"],
-          "correctAnswer": "To illustrate that some children value fun above competition"
+          "options": [
+            "To illustrate that some children value fun above competition",
+            "To emphasize that his child is athletically superior to her friends",
+            "To highlight that children often disregard household rules",
+            "To show that children lack concerns about safety when competing"
+          ],
+          "correctAnswer": "[Correct Answer Here]"
         },
         {
-          "questionId": "eng1_2019_q27",
+          "questionId": "q27",
           "passageId": "p6",
           "type": "multiple-choice",
           "question": "Based on the information presented in the essay, what is one message the reader can infer?",
-          "options": ["Avoiding competition is better than participating when failure is certain.", "Being rewarded simply for participating belittles the efforts of the winners.", "Persistence ensures that a loser will eventually become a winner.", "Satisfaction comes from being dedicated and doing your best."],
-          "correctAnswer": "Satisfaction comes from being dedicated and doing your best."
+          "options": [
+            "Avoiding competition is better than participating when failure is certain.",
+            "Being rewarded simply for participating belittles the efforts of the winners.",
+            "Persistence ensures that a loser will eventually become a winner.",
+            "Satisfaction comes from being dedicated and doing your best."
+          ],
+          "correctAnswer": "[Correct Answer Here]"
         },
         {
-          "questionId": "eng1_2019_q28",
+          "questionId": "q28",
           "passageId": "p6",
           "type": "multiple-choice",
-          "question": "Which definition best matches the use of the word validated in paragraph 3?",
-          "options": ["Definition 1", "Definition 2", "Definition 3", "Definition 4"],
-          "correctAnswer": "Definition 2"
+          "question": "Read the following dictionary entry. validate \\'va-lə-,dāt\\ v 1. declare or make legal 2. prove or confirm to be true 3. approve an expressed agreement 4. mark with an indication of being official. Which definition best matches the use of the word validated in paragraph 3?",
+          "options": [
+            "Definition 1",
+            "Definition 2",
+            "Definition 3",
+            "Definition 4"
+          ],
+          "correctAnswer": "[Correct Answer Here]"
         },
         {
-          "questionId": "eng1_2019_q29",
+          "questionId": "q29",
           "passageId": "p6",
           "type": "multiple-choice",
-          "question": "The author includes quotations in paragraph 8 primarily to —",
-          "options": ["highlight that Naomi and Kean rarely agree", "emphasize Cyrus's noncompetitive nature", "point out the author's concern for Cyrus", "reveal Naomi's and Kean's athletic abilities"],
-          "correctAnswer": "emphasize Cyrus's noncompetitive nature"
+          "question": "The author includes quotations in paragraph 8 primarily to",
+          "options": [
+            "highlight that Naomi and Kean rarely agree",
+            "emphasize Cyrus's noncompetitive nature",
+            "point out the author's concern for Cyrus",
+            "reveal Naomi's and Kean's athletic abilities"
+          ],
+          "correctAnswer": "[Correct Answer Here]"
         },
         {
-          "questionId": "eng1_2019_q30",
+          "questionId": "q30",
           "passageId": "p6",
           "type": "multiple-choice",
-          "question": "Which quotation best expresses the author's viewpoint about being an 'also-ran'?",
-          "options": ["At school I was fortunate to win enough to balance all the times I lost, and I began to believe in this idea.", "Our family enjoys a large house with a great running track.", "Naomi and Kean have always been fast runners and very evenly matched, too.", "I believe in celebrating those that finish third in a three-horse race."],
-          "correctAnswer": "I believe in celebrating those that finish third in a three-horse race."
+          "question": "Which quotation best expresses the author's viewpoint about being an \"also-ran\"?",
+          "options": [
+            "At school I was fortunate to win enough to balance all the times I lost, and I began to believe in this idea.",
+            "Our family enjoys a large house with a great running track.",
+            "Naomi and Kean have always been fast runners and very evenly matched, too.",
+            "I believe in celebrating those that finish third in a three-horse race."
+          ],
+          "correctAnswer": "[Correct Answer Here]"
         },
         {
-          "questionId": "eng1_2019_q31",
+          "questionId": "q31",
           "passageId": "p6",
           "type": "multiple-choice",
           "question": "What can the reader conclude from paragraph 3?",
-          "options": ["The author's education did not fully prepare him for living in the real world.", "The author was better at sports than at academics while growing up.", "Educational priorities at elite schools differ from those in public schools.", "Students in England are required to attend school through the university level."],
-          "correctAnswer": "The author's education did not fully prepare him for living in the real world."
+          "options": [
+            "The author's education did not fully prepare him for living in the real world.",
+            "The author was better at sports than at academics while growing up.",
+            "Educational priorities at elite schools differ from those in public schools.",
+            "Students in England are required to attend school through the university level."
+          ],
+          "correctAnswer": "[Correct Answer Here]"
         },
         {
-          "questionId": "eng1_2019_q32",
+          "questionId": "q32",
           "passageId": "p6",
           "type": "multiple-choice",
           "question": "What is the main idea of the selection?",
-          "options": ["Children usually develop friendships with others who have similar abilities.", "Parents should encourage their children to be active because fitness is important.", "People should celebrate their best efforts even if they don't always succeed.", "People who consistently win competitions as children have lifelong advantages over those who don't."],
-          "correctAnswer": "People should celebrate their best efforts even if they don't always succeed."
+          "options": [
+            "Children usually develop friendships with others who have similar abilities.",
+            "Parents should encourage their children to be active because fitness is important.",
+            "People should celebrate their best efforts even if they don't always succeed.",
+            "People who consistently win competitions as children have lifelong advantages over those who don't."
+          ],
+          "correctAnswer": "[Correct Answer Here]"
         },
         {
-          "questionId": "eng1_2019_q33",
-          "passageId": ["p5","p6"],
+          "questionId": "q33",
+          "passageId": "p7_paired",
           "type": "multiple-choice",
-          "question": "Both Ketchum Marsh in 'A Baseball School for Big-League Dreamers' and the author of 'I Believe in the Also-Rans' —",
-          "options": ["are frustrated by their limited athletic abilities", "are natives of the same geographic location", "have families that emphasize the importance of athletics", "have attended exclusive schools that focus on achievement"],
-          "correctAnswer": "have attended exclusive schools that focus on achievement"
+          "question": "Both Ketchum Marsh in \"A Baseball School for Big-League Dreamers\" and the author of \"I Believe in the Also-Rans\"",
+          "options": [
+            "are frustrated by their limited athletic abilities",
+            "are natives of the same geographic location",
+            "have families that emphasize the importance of athletics",
+            "have attended exclusive schools that focus on achievement"
+          ],
+          "correctAnswer": "[Correct Answer Here]"
         },
         {
-          "questionId": "eng1_2019_q34",
-          "passageId": ["p5","p6"],
+          "questionId": "q34",
+          "passageId": "p7_paired",
           "type": "multiple-choice",
-          "question": "Which sentence from 'A Baseball School for Big-League Dreamers' contrasts with the attitude expressed in the sentence from 'I Believe in the Also-Rans'?",
-          "options": ["'You kind of just don't want to leave the field at the end of the night,' he says.", "'We are not sending the message that every one of our players are going to wind up playing shortstop for the Mets.'", "Bolek, who has coached in the minors, the majors and college, says his job is not always about baseball.", "And there's something else: Many of the coaches have given years to the game."],
-          "correctAnswer": "'We are not sending the message that every one of our players are going to wind up playing shortstop for the Mets.'"
+          "question": "Read this sentence from paragraph 2 of \"I Believe in the Also-Rans.\" 'As an English teenager I was schooled in an elite school where I was fed the idea that I was better than others and that achievement and winning were all-important.' Which sentence from \"A Baseball School for Big-League Dreamers\" contrasts with the attitude expressed in the sentence from \"I Believe in the Also-Rans\"?",
+          "options": [
+            "\"You kind of just don't want to leave the field at the end of the night,\" he says.",
+            "\"We are not sending the message that every one of our players are going to wind up playing shortstop for the Mets.\"",
+            "Bolek, who has coached in the minors, the majors and college, says his job is not always about baseball.",
+            "And there's something else: Many of the coaches have given years to the game."
+          ],
+          "correctAnswer": "[Correct Answer Here]"
         },
         {
-          "questionId": "eng1_2019_q35",
-          "passageId": ["p5","p6"],
+          "questionId": "q35",
+          "passageId": "p7_paired",
           "type": "multiple-choice",
           "question": "Which sentence correctly describes the organizational pattern used by the authors of the two selections?",
-          "options": ["Both selections provide definitions of key terms to add meaning to the texts.", "Both selections include anecdotes as examples to support their main ideas.", "Both selections use quotations from experts to support the main ideas in the texts.", "Both selections use cause-and-effect to highlight the relationships between key ideas."],
-          "correctAnswer": "Both selections include anecdotes as examples to support their main ideas."
+          "options": [
+            "Both selections provide definitions of key terms to add meaning to the texts.",
+            "Both selections include anecdotes as examples to support their main ideas.",
+            "Both selections use quotations from experts to support the main ideas in the texts.",
+            "Both selections use cause-and-effect to highlight the relationships between key ideas."
+          ],
+          "correctAnswer": "[Correct Answer Here]"
         },
         {
-          "questionId": "eng1_2019_q36",
-          "passageId": ["p5","p6"],
+          "questionId": "q36",
+          "passageId": "p7_paired",
           "type": "multiple-choice",
-          "question": "What do Ketchum Marsh in 'A Baseball School for Big-League Dreamers' and Cyrus in 'I Believe in the Also-Rans' have in common?",
-          "options": ["Neither is a natural-born athlete.", "Both become easily frustrated by failure.", "Neither has supportive adults in his life.", "Both hope to play professional sports."],
-          "correctAnswer": "Neither is a natural-born athlete."
+          "question": "What do Ketchum Marsh in \"A Baseball School for Big-League Dreamers\" and Cyrus in \"I Believe in the Also-Rans\" have in common?",
+          "options": [
+            "Neither is a natural-born athlete.",
+            "Both become easily frustrated by failure.",
+            "Neither has supportive adults in his life.",
+            "Both hope to play professional sports."
+          ],
+          "correctAnswer": "[Correct Answer Here]"
         },
         {
-          "questionId": "eng1_2019_q37",
-          "passageId": ["p5","p6"],
+          "questionId": "q37",
+          "passageId": "p7_paired",
           "type": "multiple-choice",
-          "question": "What is the purpose of paragraph 32 in 'A Baseball School for Big-League Dreamers' and paragraph 3 in 'I Believe in the Also-Rans'?",
-          "options": ["To explain that early disappointment can often lead to long-term failure", "To point out the educational advantages of attending elite schools", "To emphasize that the realities of adult life often differ from early experiences", "To specify the most important qualities needed to become a successful adult"],
-          "correctAnswer": "To emphasize that the realities of adult life often differ from early experiences"
+          "question": "What is the purpose of paragraph 32 in \"A Baseball School for Big-League Dreamers\" and paragraph 3 in \"I Believe in the Also-Rans\"?",
+          "options": [
+            "To explain that early disappointment can often lead to long-term failure",
+            "To point out the educational advantages of attending elite schools",
+            "To emphasize that the realities of adult life often differ from early experiences",
+            "To specify the most important qualities needed to become a successful adult"
+          ],
+          "correctAnswer": "[Correct Answer Here]"
         },
         {
-          "questionId": "eng1_2019_q38",
-          "passageId": "p7",
+          "questionId": "q38",
+          "passageId": "p8",
           "type": "multiple-choice",
           "question": "What does the point of view used in the excerpt help the reader understand?",
-          "options": ["How the adults found the garden", "How T. J.'s reactions differ from the reactions of the other boys", "How long the boys worked on the garden", "How the boys agreed to help T. J. plant the garden"],
-          "correctAnswer": "How T. J.'s reactions differ from the reactions of the other boys"
+          "options": [
+            "How the adults found the garden",
+            "How T. J.'s reactions differ from the reactions of the other boys",
+            "How long the boys worked on the garden",
+            "How the boys agreed to help T. J. plant the garden"
+          ],
+          "correctAnswer": "[Correct Answer Here]"
         },
         {
-          "questionId": "eng1_2019_q39",
-          "passageId": "p7",
+          "questionId": "q39",
+          "passageId": "p8",
           "type": "multiple-choice",
           "question": "How is the first sentence of the excerpt important to the plot?",
-          "options": ["It foreshadows the resolution.", "It introduces the main character.", "It initiates the main conflict.", "It presents an unanswered question."],
-          "correctAnswer": "It initiates the main conflict."
+          "options": [
+            "It foreshadows the resolution.",
+            "It introduces the main character.",
+            "It initiates the main conflict.",
+            "It presents an unanswered question."
+          ],
+          "correctAnswer": "[Correct Answer Here]"
         },
         {
-          "questionId": "eng1_2019_q40",
-          "passageId": "p7",
+          "questionId": "q40",
+          "passageId": "p8",
           "type": "multiple-choice",
           "question": "In paragraph 30, what does the word laboriously mean?",
-          "options": ["At great cost", "For good reason", "Quietly and in secrecy", "Slowly and with difficulty"],
-          "correctAnswer": "Slowly and with difficulty"
+          "options": [
+            "At great cost",
+            "For good reason",
+            "Quietly and in secrecy",
+            "Slowly and with difficulty"
+          ],
+          "correctAnswer": "[Correct Answer Here]"
         },
         {
-          "questionId": "eng1_2019_q41",
-          "passageId": "p7",
+          "questionId": "q41",
+          "passageId": "p8",
           "type": "multiple-choice",
-          "question": "The irony of this quotation is that it calls attention to —",
-          "options": ["the love T. J. has for the outdoors while he is on a man-made structure", "the rooftop being abandoned and the men still caring about its welfare", "the fact that T. J. does not have the right to use the rooftop despite creating the garden", "the effort used to create a garden when it can be easily destroyed"],
-          "correctAnswer": "the fact that T. J. does not have the right to use the rooftop despite creating the garden"
+          "question": "Read this quotation from paragraph 20. '\"It's our earth. It's our land. Can't nobody touch a man's own land.\"' The irony of this quotation is that it calls attention to",
+          "options": [
+            "the love T. J. has for the outdoors while he is on a man-made structure",
+            "the rooftop being abandoned and the men still caring about its welfare",
+            "the fact that T. J. does not have the right to use the rooftop despite creating the garden",
+            "the effort used to create a garden when it can be easily destroyed"
+          ],
+          "correctAnswer": "[Correct Answer Here]"
         },
         {
-          "questionId": "eng1_2019_q42",
-          "passageId": "p7",
+          "questionId": "q42",
+          "passageId": "p8",
           "type": "multiple-choice",
           "question": "What is a central theme of the excerpt?",
-          "options": ["Adults often lose their sense of accomplishment as they age.", "People take pride in their work.", "People rely on authority figures to maintain order.", "It is important to recognize the value of green spaces."],
-          "correctAnswer": "People take pride in their work."
+          "options": [
+            "Adults often lose their sense of accomplishment as they age.",
+            "People take pride in their work.",
+            "People rely on authority figures to maintain order.",
+            "It is important to recognize the value of green spaces."
+          ],
+          "correctAnswer": "[Correct Answer Here]"
         },
         {
-          "questionId": "eng1_2019_q43",
-          "passageId": "p7",
+          "questionId": "q43",
+          "passageId": "p8",
           "type": "multiple-choice",
           "question": "What does T. J.'s climb back up the fire escape in paragraph 28 reveal about him?",
-          "options": ["He has difficulty following rules.", "He enjoys being the leader of a group.", "He behaves in ways that others consider immature.", "He takes action once he makes up his mind."],
-          "correctAnswer": "He takes action once he makes up his mind."
+          "options": [
+            "He has difficulty following rules.",
+            "He enjoys being the leader of a group.",
+            "He behaves in ways that others consider immature.",
+            "He takes action once he makes up his mind."
+          ],
+          "correctAnswer": "[Correct Answer Here]"
         },
         {
-          "questionId": "eng1_2019_q44",
-          "passageId": "p7",
+          "questionId": "q44",
+          "passageId": "p8",
           "type": "multiple-choice",
-          "question": "In paragraph 25, why does Blackie say, 'They own the building'?",
-          "options": ["To help the men by supporting their claim", "To rally the boys to go against what T. J. has planned", "To indicate the limitations of what the men can do", "To convince T. J. that it is pointless to resist"],
-          "correctAnswer": "To convince T. J. that it is pointless to resist"
+          "question": "In paragraph 25, why does Blackie say, \"They own the building\"?",
+          "options": [
+            "To help the men by supporting their claim",
+            "To rally the boys to go against what T. J. has planned",
+            "To indicate the limitations of what the men can do",
+            "To convince T. J. that it is pointless to resist"
+          ],
+          "correctAnswer": "[Correct Answer Here]"
         },
         {
-          "questionId": "eng1_2019_q45",
-          "passageId": "p7",
+          "questionId": "q45",
+          "passageId": "p8",
           "type": "multiple-choice",
           "question": "In paragraph 32, what does the blade of grass represent for T. J.?",
-          "options": ["A final remnant of something precious", "The harvest he anticipated", "The new home he has found", "His friendship with the other boys"],
-          "correctAnswer": "A final remnant of something precious"
+          "options": [
+            "A final remnant of something precious",
+            "The harvest he anticipated",
+            "The new home he has found",
+            "His friendship with the other boys"
+          ],
+          "correctAnswer": "[Correct Answer Here]"
         },
         {
-          "questionId": "eng1_2019_q46",
-          "passageId": "p8",
+          "questionId": "q46",
+          "passageId": "p9",
           "type": "multiple-choice",
-          "question": "In line 16, the word etched most closely means —",
-          "options": ["perfected", "imprinted", "remembered", "tarnished"],
-          "correctAnswer": "imprinted"
+          "question": "Read lines 15 and 16. 'He sanded down the finish, erasing the indentations of the letters and numbers he had etched over time.' In line 16, the word etched most closely means",
+          "options": [
+            "perfected",
+            "imprinted",
+            "remembered",
+            "tarnished"
+          ],
+          "correctAnswer": "[Correct Answer Here]"
         },
         {
-          "questionId": "eng1_2019_q47",
-          "passageId": "p8",
+          "questionId": "q47",
+          "passageId": "p9",
           "type": "multiple-choice",
           "question": "What is a theme of the poem?",
-          "options": ["Children desire what their parents value.", "Cherished objects can create connections between family members.", "What is extraordinary to some may seem ordinary to others.", "Old objects can be made new again by using imagination."],
-          "correctAnswer": "Cherished objects can create connections between family members."
+          "options": [
+            "Children desire what their parents value.",
+            "Cherished objects can create connections between family members.",
+            "What is extraordinary to some may seem ordinary to others.",
+            "Old objects can be made new again by using imagination."
+          ],
+          "correctAnswer": "[Correct Answer Here]"
         },
         {
-          "questionId": "eng1_2019_q48",
-          "passageId": "p8",
+          "questionId": "q48",
+          "passageId": "p9",
           "type": "multiple-choice",
           "question": "What does the desk represent in the poem?",
-          "options": ["The changes in style that happen over time", "The pride that is found in caring for possessions", "The new beginnings that come with each generation", "The different ways creativity can be inspired in individuals"],
-          "correctAnswer": "The new beginnings that come with each generation"
+          "options": [
+            "The changes in style that happen over time",
+            "The pride that is found in caring for possessions",
+            "The new beginnings that come with each generation",
+            "The different ways creativity can be inspired in individuals"
+          ],
+          "correctAnswer": "[Correct Answer Here]"
         },
         {
-          "questionId": "eng1_2019_q49",
-          "passageId": "p8",
+          "questionId": "q49",
+          "passageId": "p9",
           "type": "multiple-choice",
           "question": "Which line from the poem best indicates that the speaker is ready to relinquish ownership of the desk?",
-          "options": ["Older than you by far, it sits in your room (line 28)", "piled high with crayon drawings, coins, trolls, and hot wheels cars. (line 29)", "You're still too young to do algebra homework. (line 30)", "and paint it to match your bright green and lavender dreams. (line 35)"],
-          "correctAnswer": "and paint it to match your bright green and lavender dreams. (line 35)"
+          "options": [
+            "Older than you by far, it sits in your room (line 28)",
+            "piled high with crayon drawings, coins, trolls, and hot wheels cars. (line 29)",
+            "You're still too young to do algebra homework. (line 30)",
+            "and paint it to match your bright green and lavender dreams. (line 35)"
+          ],
+          "correctAnswer": "[Correct Answer Here]"
         },
         {
-          "questionId": "eng1_2019_q50",
-          "passageId": "p8",
+          "questionId": "q50",
+          "passageId": "p9",
           "type": "multiple-choice",
           "question": "What tone is established in lines 22 through 25?",
-          "options": ["Intellectual, because the speaker refers to academic matters", "Playful, because the speaker quickly lists random details", "Nostalgic, because the speaker warmly remembers the past", "Hopeful, because the speaker refers to her childhood dreams"],
-          "correctAnswer": "Nostalgic, because the speaker warmly remembers the past"
+          "options": [
+            "Intellectual, because the speaker refers to academic matters",
+            "Playful, because the speaker quickly lists random details",
+            "Nostalgic, because the speaker warmly remembers the past",
+            "Hopeful, because the speaker refers to her childhood dreams"
+          ],
+          "correctAnswer": "[Correct Answer Here]"
         },
         {
-          "questionId": "eng1_2019_q51",
-          "passageId": "p8",
+          "questionId": "q51",
+          "passageId": "p9",
           "type": "multiple-choice",
           "question": "What do the speaker's comments in lines 31 through 35 suggest?",
-          "options": ["The speaker wants her child to find his or her own identity.", "The speaker wants her child to select a new color for the desk.", "The speaker believes her child deserves a new piece of furniture.", "The speaker believes her child will refuse to accept her offer."],
-          "correctAnswer": "The speaker wants her child to find his or her own identity."
+          "options": [
+            "The speaker wants her child to find his or her own identity.",
+            "The speaker wants her child to select a new color for the desk.",
+            "The speaker believes her child deserves a new piece of furniture.",
+            "The speaker believes her child will refuse to accept her offer."
+          ],
+          "correctAnswer": "[Correct Answer Here]"
         },
         {
-          "questionId": "eng1_2019_q52",
-          "passageId": "p8",
+          "questionId": "q52",
+          "passageId": "p9",
           "type": "multiple-choice",
-          "question": "The repetition in lines 19 through 21 is used to emphasize that the desk —",
-          "options": ["contains messages written long ago", "is worth a great amount of money", "is outdated in its appearance", "creates a timeless bond"],
-          "correctAnswer": "creates a timeless bond"
+          "question": "The repetition in lines 19 through 21 is used to emphasize that the desk",
+          "options": [
+            "contains messages written long ago",
+            "is worth a great amount of money",
+            "is outdated in its appearance",
+            "creates a timeless bond"
+          ],
+          "correctAnswer": "[Correct Answer Here]"
         },
         {
-          "questionId": "eng1_2019_cw1",
+          "questionId": "q_composition_1",
           "passageId": null,
           "type": "creative-writing",
           "writing_type": "Expository",
-          "question": "A Gallup poll found that Americans are 20 percent happier on weekends than on workdays. Although most people must structure their days around school or work, they still prefer their free time. Write an essay explaining the importance of making time for both work and play."
+          "question": "Read the information in the box below.\n\nA Gallup poll found that Americans are 20 percent happier on weekends than on workdays. Americans also ranked working as one of their least pleasurable activities, while socializing after work was one of their most pleasurable activities.\n\nAlthough most people must structure their days around school or work, they still prefer their free time.\n\nThink carefully about this statement.\n\nWrite an essay explaining the importance of making time for both work and play."
         }
       ]
     }
