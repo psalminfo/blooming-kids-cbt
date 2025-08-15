@@ -1,31 +1,86 @@
 import { db } from './firebaseConfig.js';
-import { collection, addDoc, Timestamp } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
+import { collection, addDoc, Timestamp, query, where, getDocs, updateDoc, doc } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
 import { getLoadedQuestions } from './autoQuestionGen.js'; 
 
-export async function submitTestToFirebase(subject, grade, studentName, parentEmail, tutorEmail, studentCountry) {
-    const loadedQuestions = getLoadedQuestions();
-    const answers = [];
-    let creativeWritingContent = null;
-    let creativeWritingFileUrl = null;
-    let totalScoreableQuestions = 0;
+const CLOUDINARY_CLOUD_NAME = 'dy2hxcyaf';
+const CLOUDINARY_UPLOAD_PRESET = 'bkh_assessments';
+const CLOUDINARY_UPLOAD_URL = `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`;
 
+
+async function uploadCreativeWritingFile(file) {
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('upload_preset', CLOUDINARY_UPLOAD_PRESET);
+
+    const res = await fetch(CLOUDINARY_UPLOAD_URL, {
+        method: 'POST',
+        body: formData,
+    });
+
+    if (!res.ok) throw new Error("File upload failed");
+
+    const data = await res.json();
+    return data.secure_url;
+}
+
+
+export async function submitCreativeWritingToFirebase(studentName, parentEmail, tutorEmail) {
+    const loadedQuestions = getLoadedQuestions();
     const creativeWritingQuestion = loadedQuestions.find(q => q.type === 'creative-writing');
     const creativeWritingBlock = creativeWritingQuestion ? document.querySelector(`.question-block[data-question-id="${creativeWritingQuestion.id}"]`) : null;
-    
-    if (creativeWritingBlock) {
-        creativeWritingContent = creativeWritingBlock.querySelector('textarea').value.trim();
-        const creativeWritingFile = creativeWritingBlock.querySelector('input[type="file"]').files[0];
-        
-        if (!creativeWritingContent && !creativeWritingFile) {
-            alert("Please provide a response or upload a file for the creative writing question.");
-            throw new Error("Creative writing submission required.");
-        }
-        if (creativeWritingFile) {
-            // Placeholder for Cloudinary upload logic for creative writing files
-            // You must implement this with your Cloudinary credentials
-            // creativeWritingFileUrl = await uploadCreativeWritingFile(creativeWritingFile);
-        }
+
+    if (!creativeWritingBlock) {
+        throw new Error("No creative writing question found.");
     }
+
+    const creativeWritingContent = creativeWritingBlock.querySelector('textarea').value.trim();
+    const creativeWritingFile = creativeWritingBlock.querySelector('input[type="file"]').files[0];
+    
+    if (!creativeWritingContent && !creativeWritingFile) {
+        throw new Error("Please provide a response or upload a file for the creative writing question.");
+    }
+
+    let creativeWritingFileUrl = null;
+    if (creativeWritingFile) {
+        creativeWritingFileUrl = await uploadCreativeWritingFile(creativeWritingFile);
+    }
+
+    const creativeWritingAnswer = {
+        questionText: creativeWritingQuestion.question,
+        type: 'creative-writing',
+        studentResponse: creativeWritingContent || null,
+        fileUrl: creativeWritingFileUrl || null,
+        tutorGrade: 'Pending'
+    };
+
+    // Find the student's in-progress test document
+    const resultsRef = collection(db, "student_results");
+    const q = query(resultsRef, where("studentName", "==", studentName), where("parentEmail", "==", parentEmail), where("tutorEmail", "==", tutorEmail));
+    const querySnapshot = await getDocs(q);
+
+    if (querySnapshot.empty) {
+        // Create a new document with just the creative writing for now
+        await addDoc(resultsRef, {
+            studentName,
+            parentEmail,
+            tutorEmail,
+            answers: [creativeWritingAnswer],
+            submittedAt: Timestamp.now()
+        });
+    } else {
+        // Update the existing document
+        const docRef = doc(db, "student_results", querySnapshot.docs[0].id);
+        const existingAnswers = querySnapshot.docs[0].data().answers;
+        const combinedAnswers = creativeWritingAnswer ? [creativeWritingAnswer, ...existingAnswers.filter(a => a.type !== 'creative-writing')] : existingAnswers;
+        await updateDoc(docRef, { answers: combinedAnswers });
+    }
+}
+
+
+export async function submitTestToFirebase(subject, grade, studentName, parentEmail, tutorEmail, studentCountry, creativeWritingSubmitted) {
+    const loadedQuestions = getLoadedQuestions();
+    const answers = [];
+    let totalScoreableQuestions = 0;
 
     const questionBlocks = document.querySelectorAll(".question-block");
     for (const block of questionBlocks) {
@@ -33,13 +88,9 @@ export async function submitTestToFirebase(subject, grade, studentName, parentEm
         const originalQuestion = loadedQuestions.find(q => q.id === parseInt(questionId));
 
         if (originalQuestion.type === 'creative-writing') {
-            answers.push({
-                questionText: originalQuestion.question,
-                type: 'creative-writing',
-                studentResponse: creativeWritingContent || null,
-                fileUrl: creativeWritingFileUrl || null,
-                tutorGrade: 'Pending'
-            });
+            if (!creativeWritingSubmitted) {
+                throw new Error("Please submit the creative writing portion first.");
+            }
             continue;
         }
 
@@ -66,22 +117,39 @@ export async function submitTestToFirebase(subject, grade, studentName, parentEm
         });
     }
 
-    const resultData = {
-        subject,
-        grade,
-        studentName,
-        parentEmail,
-        tutorEmail,
-        studentCountry,
-        answers,
-        totalScoreableQuestions,
-        submittedAt: Timestamp.now()
-    };
+    const resultsRef = collection(db, "student_results");
+    const q = query(resultsRef, where("studentName", "==", studentName), where("parentEmail", "==", parentEmail), where("tutorEmail", "==", tutorEmail));
+    const querySnapshot = await getDocs(q);
 
-    try {
-        await addDoc(collection(db, "student_results"), resultData);
-    } catch (err) {
-        console.error("Error submitting test results to Firebase:", err);
-        throw new Error("Failed to submit test results.");
+    const docId = querySnapshot.empty ? null : querySnapshot.docs[0].id;
+    const existingAnswers = querySnapshot.empty ? [] : querySnapshot.docs[0].data().answers;
+    const creativeWritingAnswer = existingAnswers.find(a => a.type === 'creative-writing');
+    const combinedAnswers = creativeWritingAnswer ? [creativeWritingAnswer, ...answers] : answers;
+    
+    if (docId) {
+        const docRef = doc(db, "student_results", docId);
+        await updateDoc(docRef, {
+            subject,
+            grade,
+            studentName,
+            parentEmail,
+            tutorEmail,
+            studentCountry,
+            answers: combinedAnswers,
+            totalScoreableQuestions,
+            submittedAt: Timestamp.now()
+        });
+    } else {
+        await addDoc(resultsRef, {
+            subject,
+            grade,
+            studentName,
+            parentEmail,
+            tutorEmail,
+            studentCountry,
+            answers: combinedAnswers,
+            totalScoreableQuestions,
+            submittedAt: Timestamp.now()
+        });
     }
 }
