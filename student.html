@@ -49,7 +49,6 @@
       await submitTestToFirebase(subject, grade, studentName, parentEmail, tutorEmail, studentCountry);
       document.getElementById("question-container").innerHTML = `<div class="text-center p-6 text-green-700 font-semibold text-xl">✅ Submitted. Redirecting...</div>`;
       
-      // Pass student info back to subject select page
       const params = new URLSearchParams();
       params.append('studentName', studentName);
       params.append('parentEmail', parentEmail);
