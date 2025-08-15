@@ -37,7 +37,7 @@
     const parentEmail = urlParams.get('parentEmail');
     const tutorEmail = urlParams.get('tutorEmail');
     const studentCountry = urlParams.get('country');
-
+    
     if (!subject || !grade || !studentName || !parentEmail || !tutorEmail || !studentCountry) {
       alert("Missing student info. Redirecting...");
       window.location.href = "index.html";
