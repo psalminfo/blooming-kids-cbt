@@ -132,8 +132,8 @@ async function loadReport() {
                 <tbody>${topicsTableRows}</tbody>
               </table>
             ` : `<p class="italic">No topics found for this test.</p>`}
-          
           <h3 class="text-lg font-semibold mt-4 mb-2">Tutor’s Recommendation</h3>
+          <p class="mb-2 italic">Based on this assessment, the tutor recommends dedicated focus on the topics highlighted above. Regular practice will help reinforce understanding and build long-term confidence.</p>
           <p class="mb-2"><strong>Tutor's Report:</strong> ${tutorReport}</p>
           <canvas id="chart-${blockIndex}" class="w-full h-48 mb-4"></canvas>
           <h3 class="text-lg font-semibold mb-1">Director’s Message</h3>
