@@ -58,7 +58,8 @@ export async function submitTestToFirebase(subject, grade, studentName, parentEm
                 type: 'creative-writing',
                 studentResponse: creativeWritingContent || null,
                 fileUrl: creativeWritingFileUrl || null,
-                tutorGrade: 'Pending'
+                tutorGrade: 'Pending',
+                tutorReport: null
             });
             continue;
         }
