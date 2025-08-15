@@ -134,4 +134,73 @@ async function loadReport() {
             ` : `<p class="italic">No topics found for this test.</p>`}
           
           <h3 class="text-lg font-semibold mt-4 mb-2">Creative Writing Report</h3>
-          <p class="mb-2"><strong>Submission:</strong> ${creativeWritingContent}</p
+          <p class="mb-2"><strong>Submission:</strong> ${creativeWritingContent}</p>
+          <p class="mb-2"><strong>Tutor's Report:</strong> ${tutorReport}</p>
+          <canvas id="chart-${blockIndex}" class="w-full h-48 mb-4"></canvas>
+          <h3 class="text-lg font-semibold mb-1">Director’s Message</h3>
+          <p class="italic text-sm">At Blooming Kids House, we are committed to helping every child succeed. We believe that with personalized support from our tutors, ${fullName} will unlock their full potential. Keep up the great work!<br/>– Mrs. Yinka Isikalu, Director</p>
+          <div class="mt-4">
+            <button onclick="downloadSessionReport(${blockIndex}, '${fullName}')" class="btn-yellow px-4 py-2 rounded">Download Session PDF</button>
+          </div>
+        </div>
+      `;
+      
+      reportContent.innerHTML += fullBlock;
+      
+      const ctx = document.getElementById(`chart-${blockIndex}`).getContext('2d');
+      const subjectLabels = results.map(r => r.subject.toUpperCase());
+      const correctScores = results.map(s => s.correct);
+      const incorrectScores = results.map(s => s.total - s.correct);
+
+      new Chart(ctx, {
+          type: 'bar',
+          data: {
+            labels: subjectLabels,
+            datasets: [
+              { label: 'Correct Answers', data: correctScores, backgroundColor: '#4CAF50' },
+              { label: 'Incorrect/Unanswered', data: incorrectScores, backgroundColor: '#FFCD56' }
+            ]
+          },
+          options: {
+            responsive: true,
+            scales: { x: { stacked: true }, y: { stacked: true, beginAtZero: true } },
+            plugins: { title: { display: true, text: 'Score Distribution by Subject' } }
+          }
+        });
+
+      blockIndex++;
+    }
+
+    document.getElementById("inputArea").classList.add("hidden");
+    reportArea.classList.remove("hidden");
+    document.getElementById("logoutArea").style.display = "flex";
+
+  } catch (error) {
+    console.error("Error generating report: ", error);
+    alert("A critical error occurred while generating the report. Please check the console for details.");
+  } finally {
+    loader.classList.add("hidden");
+    generateBtn.disabled = false;
+    generateBtn.textContent = "Generate Report";
+  }
+}
+
+function downloadSessionReport(index, studentName) {
+  const element = document.getElementById(`report-block-${index}`);
+  const safeStudentName = studentName.replace(/ /g, '_');
+  const fileName = `Assessment_Report_${safeStudentName}_Session_${index + 1}.pdf`;
+  
+  const opt = {
+    margin: 0.5,
+    filename: fileName,
+    image: { type: 'jpeg', quality: 0.98 },
+    html2canvas: { scale: 2, useCORS: true },
+    jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' }
+  };
+
+  html2pdf().from(element).set(opt).save();
+}
+
+function logout() {
+  window.location.href = "parent.html";
+}
