@@ -12,6 +12,7 @@ function renderTutorPanel(tutor) {
                 <button id="searchBtn" class="bg-blue-600 text-white px-4 py-2 rounded mt-2 hover:bg-blue-700">Search</button>
             </div>
         </div>
+
         <div id="pendingReportsContainer" class="space-y-4">
             <p class="text-gray-500">Loading pending submissions...</p>
         </div>
@@ -50,19 +51,22 @@ async function loadTutorReports(tutorEmail, parentEmail = null) {
             const creativeWritingAnswer = data.answers.find(a => a.type === 'creative-writing');
             if (creativeWritingAnswer) {
                 const reportCardHTML = `
-                    <div class="border rounded-lg p-4 shadow-sm bg-white">
+                    <div class="border rounded-lg p-4 shadow-sm bg-white mb-4">
                         <p><strong>Student:</strong> ${data.studentName}</p>
                         <p><strong>Email:</strong> ${data.parentEmail}</p>
                         <p><strong>Subject:</strong> ${data.subject}</p>
                         <p><strong>Submitted At:</strong> ${new Date(data.submittedAt.seconds * 1000).toLocaleString()}</p>
                         <div class="mt-4 border-t pt-4">
                             <h4 class="font-semibold">Creative Writing Submission:</h4>
-                            <p class="italic">${creativeWritingAnswer.studentResponse || "No response"}</p>
-                            ${creativeWritingAnswer.fileUrl ? `<a href="${creativeWritingAnswer.fileUrl}" target="_blank" class="text-blue-500 hover:underline">Download File</a>` : ''}
+                            ${creativeWritingAnswer.fileUrl ? 
+                                creativeWritingAnswer.fileUrl.match(/\.(jpeg|jpg|gif|png)$/i) ? 
+                                    `<img src="${creativeWritingAnswer.fileUrl}" class="w-full h-auto object-cover mt-2 rounded" alt="Student Submission" />` :
+                                    `<a href="${creativeWritingAnswer.fileUrl}" target="_blank" class="text-blue-500 hover:underline">Download File</a>`
+                                : creativeWritingAnswer.studentResponse ? `<p class="italic">${creativeWritingAnswer.studentResponse}</p>` : "No response"}
                             <p class="mt-2"><strong>Status:</strong> ${creativeWritingAnswer.tutorGrade || 'Pending'}</p>
                             ${creativeWritingAnswer.tutorGrade === 'Pending' ? `
-                                <textarea class="creative-writing-report w-full mt-2 p-2 border rounded" rows="3" placeholder="Write your report here..."></textarea>
-                                <button class="submit-creative-writing-report-btn bg-green-600 text-white px-4 py-2 rounded mt-2" data-doc-id="${doc.id}">Submit Report</button>
+                                <textarea class="tutor-report w-full mt-2 p-2 border rounded" rows="3" placeholder="Write your report here..."></textarea>
+                                <button class="submit-report-btn bg-green-600 text-white px-4 py-2 rounded mt-2" data-doc-id="${doc.id}">Submit Report</button>
                             ` : `
                                 <p class="mt-2"><strong>Tutor's Report:</strong> ${creativeWritingAnswer.tutorReport || 'N/A'}</p>
                             `}
@@ -80,10 +84,10 @@ async function loadTutorReports(tutorEmail, parentEmail = null) {
         pendingReportsContainer.innerHTML = pendingHTML || `<p class="text-gray-500">No pending submissions found.</p>`;
         if(gradedReportsContainer) gradedReportsContainer.innerHTML = gradedHTML || `<p class="text-gray-500">No graded submissions found.</p>`;
 
-        document.querySelectorAll('.submit-creative-writing-report-btn').forEach(button => {
+        document.querySelectorAll('.submit-report-btn').forEach(button => {
             button.addEventListener('click', async (e) => {
                 const docId = e.target.getAttribute('data-doc-id');
-                const reportTextarea = e.target.closest('.border').querySelector('.creative-writing-report');
+                const reportTextarea = e.target.closest('.border').querySelector('.tutor-report');
                 const tutorReport = reportTextarea.value.trim();
 
                 if (tutorReport) {
@@ -100,6 +104,7 @@ async function loadTutorReports(tutorEmail, parentEmail = null) {
                 }
             });
         });
+
     } catch (error) {
         console.error("Error loading tutor reports:", error);
         pendingReportsContainer.innerHTML = `<p class="text-red-500">Failed to load reports.</p>`;
