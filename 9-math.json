@@ -411,4 +411,50 @@
         {
           "questionId": "m9p_q55",
           "question": "Find the points of intersection of the graphs of y = x² and y = 3x - 2.",
-          "options": ["
+          "options": ["(1,1)(1,4)", "(2,4)(1,1)", "(1,-1)(2,4)", "(-2,4)(1,1)", "None of these"],
+          "correctAnswer": "(2,4)(1,1)",
+          "topic": "Simultaneous Equations"
+        },
+        {
+          "questionId": "m9p_q56",
+          "question": "Which shop gave the worst value for money?",
+          "imageUrl": "https://res.cloudinary.com/dy2hxcyaf/image/upload/v1754925559/maths_56_aw3ut6.jpg",
+          "options": ["Shop z", "Shop y", "Shop x", "Shop w", "Shop v"],
+          "correctAnswer": "Shop v",
+          "topic": "Data Analysis"
+        },
+        {
+          "questionId": "m9p_q57",
+          "question": "Which two shops charged the same price per kilogram?",
+          "imageUrl": "https://res.cloudinary.com/dy2hxcyaf/image/upload/v1754925592/maths_56_qak0i7.jpg",
+          "options": ["Shops z & x", "Shops z & v", "Shops y & z", "Shops v & w", "Shops x & y"],
+          "correctAnswer": "Shops x & y",
+          "topic": "Data Analysis"
+        },
+        {
+          "questionId": "m9p_q58",
+          "question": "At which shop would you get three times the amount of sugar for the same price as shop z?",
+          "imageUrl": "https://res.cloudinary.com/dy2hxcyaf/image/upload/v1754925615/maths_56_cc5q1h.jpg",
+          "options": ["Shop v", "Shop x", "Shop w", "Shop y", "None of these"],
+          "correctAnswer": "Shop w",
+          "topic": "Data Analysis"
+        },
+        {
+          "questionId": "m9p_q59",
+          "question": "Find the value of x.",
+          "imageUrl": "https://res.cloudinary.com/dy2hxcyaf/image/upload/v1754925626/maths_59_yj1g3z.jpg",
+          "options": ["4", "5", "6", "3", "None of these"],
+          "correctAnswer": "3",
+          "topic": "Pythagorean Theorem"
+        },
+        {
+          "questionId": "m9p_q60",
+          "question": "Factorise ab + b² - ac - bc",
+          "options": ["(b-c)(a-c)", "(b+a)(b+c)", "(b-c)(a+b)", "(b+c)(a-b)", "(b-c)(a+c)"],
+          "correctAnswer": "(b-c)(a+b)",
+          "topic": "Factorising"
+        }
+      ]
+    }
+  ]
+}
