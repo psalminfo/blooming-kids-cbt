@@ -13,12 +13,17 @@ document.getElementById("studentLoginForm").addEventListener("submit", function 
     return;
   }
 
-  const params = new URLSearchParams();
-  params.append('studentName', studentName);
-  params.append('parentEmail', parentEmail);
-  params.append('grade', grade);
-  params.append('tutorEmail', tutorEmail);
-  params.append('country', studentCountry);
+  // --- THIS IS THE FIX ---
+  // We now save all the student's details to the browser's local storage.
+  // The test page (student.js) will be able to read this information.
+  localStorage.setItem("studentName", studentName);
+  localStorage.setItem("studentEmail", parentEmail); // This was the missing 'parentEmail'
+  localStorage.setItem("grade", grade);
+  localStorage.setItem("tutorEmail", tutorEmail);
+  localStorage.setItem("studentCountry", studentCountry);
+  // --- END OF FIX ---
 
-  window.location.href = `subject-select.html?${params.toString()}`;
+
+  // We no longer need to pass the info in the URL, so we can redirect directly.
+  window.location.href = `subject-select.html`;
 });
