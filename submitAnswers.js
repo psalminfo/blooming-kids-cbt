@@ -56,6 +56,12 @@ export async function submitTestToFirebase(subject, grade, studentName, parentEm
         const questionId = block.getAttribute('data-question-id');
         const originalQuestion = loadedQuestions.find(q => q.id === parseInt(questionId));
 
+        // =================================================================
+        // ===== THIS IS THE DIAGNOSTIC LINE I HAVE ADDED FOR YOU ==========
+        // =================================================================
+        console.log("Final Check - Question Data:", originalQuestion);
+        // =================================================================
+
         if (!originalQuestion) continue;
 
         if (originalQuestion.type === 'creative-writing') {
