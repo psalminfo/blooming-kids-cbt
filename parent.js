@@ -15,17 +15,25 @@ function capitalize(str) {
     return str.replace(/\b\w/g, l => l.toUpperCase());
 }
 
+// =================================================================
+// ===== NEW TEMPLATE-BASED RECOMMENDATION FUNCTION ================
+// =================================================================
 /**
- * Generates a personalized tutor recommendation. It first tries to use AI,
- * but if that fails, it falls back to a high-quality, template-based message.
+ * Generates a unique, personalized recommendation based on test performance
+ * without needing an external AI call.
+ * @param {string} studentName The name of the student.
+ * @param {string} tutorName The name of the tutor.
+ * @param {Array} results The student's test results.
+ * @returns {string} A personalized recommendation string.
  */
-async function generateTutorRecommendation(studentName, tutorName, results) {
-    // 1. Analyze performance to find strengths and weaknesses for both methods.
+function generateTemplatedRecommendation(studentName, tutorName, results) {
+    // 1. Analyze performance to find strengths and weaknesses.
     const strengths = [];
     const weaknesses = [];
     results.forEach(res => {
         const percentage = res.total > 0 ? (res.correct / res.total) * 100 : 0;
-        const topicList = res.topics.length > 0 ? res.topics : [res.subject]; // Use subject as fallback topic
+        // Use the subject as a fallback if no specific topics are listed
+        const topicList = res.topics.length > 0 ? res.topics : [res.subject];
         if (percentage >= 70) {
             strengths.push(...topicList);
         } else {
@@ -36,48 +44,29 @@ async function generateTutorRecommendation(studentName, tutorName, results) {
     const uniqueStrengths = [...new Set(strengths)];
     const uniqueWeaknesses = [...new Set(weaknesses)];
 
-    // 2. Try to generate the recommendation using the AI.
-    try {
-        let prompt = `Write a warm, encouraging, and professional tutor's recommendation for a student named ${studentName}. The brand is "Blooming Kids House". The tutor's name is ${tutorName}.
-        The tone should be positive and supportive, aimed at a parent.
-        The recommendation must be unique and based on these specific test results:
-        - The student showed strong skills in these topics: ${uniqueStrengths.join(', ') || 'various areas'}. Praise them for this.
-        - The student could use some more practice in these topics: ${uniqueWeaknesses.join(', ')}. Frame this as an opportunity for growth.
-        Conclude by confidently stating that with personalized support from their tutor, ${tutorName}, at Blooming Kids House, ${studentName} will be able to master these skills and unlock their full potential. The message should be about 3-4 sentences long.`;
-
-        let chatHistory = [{ role: "user", parts: [{ text: prompt }] }];
-        const payload = { contents: chatHistory };
-        const apiKey = ""; // This is handled by the execution environment
-        const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${apiKey}`;
-        
-        const response = await fetch(apiUrl, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload)
-        });
-
-        if (!response.ok) {
-            throw new Error(`API call failed with status: ${response.status}`); // This will trigger the catch block
-        }
-
-        const result = await response.json();
-        if (result.candidates && result.candidates.length > 0) {
-            return result.candidates[0].content.parts[0].text; // Success! Return the AI message.
-        } else {
-            throw new Error("No content from AI."); // Trigger the catch block
-        }
-    } catch (error) {
-        // --- THIS IS THE FALLBACK SYSTEM ---
-        // If the 'try' block fails for any reason (like a 403 error), this code will run instead.
-        console.error("AI recommendation failed, generating template-based fallback:", error);
-
-        const strengthsText = uniqueStrengths.length > 0 ? `showing strong skills in areas like ${uniqueStrengths.join(', ')}` : "doing great work";
-        const weaknessesText = uniqueWeaknesses.length > 0 ? `we'll focus on practicing ${uniqueWeaknesses.join(', ')}` : "we'll continue to build on their skills";
-
-        // This creates a personalized, human-sounding message without the AI.
-        return `It's clear that ${studentName} is ${strengthsText}. To take their learning to the next level, ${weaknessesText}. With dedicated support from their tutor, ${tutorName}, at Blooming Kids House, we're confident they will master these topics and continue to excel.`;
+    // 2. Build the personalized message from template parts.
+    let praiseClause = "";
+    if (uniqueStrengths.length > 0) {
+        praiseClause = `It's clear that ${studentName} is showing strong skills in areas like ${uniqueStrengths.join(', ')}. `;
+    } else {
+        praiseClause = `${studentName} has put in a great effort on this assessment. `;
     }
+
+    let improvementClause = "";
+    if (uniqueWeaknesses.length > 0) {
+        improvementClause = `To take their learning to the next level, we'll focus on practicing ${uniqueWeaknesses.join(', ')}. `;
+    } else {
+        improvementClause = "We'll continue to build on these fantastic results. ";
+    }
+
+    const closingStatement = `With dedicated support from their tutor, ${tutorName}, at Blooming Kids House, we're confident they will master these topics and continue to excel.`;
+
+    // 3. Combine the parts into a final, unique recommendation.
+    return praiseClause + improvementClause + closingStatement;
 }
+// =================================================================
+// ===== END OF NEW FUNCTION =======================================
+// =================================================================
 
 
 async function loadReport() {
@@ -159,9 +148,10 @@ async function loadReport() {
 
             const tableRows = results.map(res => `<tr><td class="border px-2 py-1">${res.subject.toUpperCase()}</td><td class="border px-2 py-1 text-center">${res.correct} / ${res.total}</td></tr>`).join("");
             const topicsTableRows = results.map(res => `<tr><td class="border px-2 py-1 font-semibold">${res.subject.toUpperCase()}</td><td class="border px-2 py-1">${res.topics.join(', ') || 'N/A'}</td></tr>`).join("");
-            
-            let tutorReport = "Generating personalized recommendation...";
-            
+
+            // --- THIS IS THE CHANGE: We now call the new template function ---
+            const tutorReport = generateTemplatedRecommendation(fullName, tutorName, results);
+
             const fullBlock = `
               <div class="border rounded-lg shadow mb-8 p-4 bg-white" id="report-block-${blockIndex}">
                 <h2 class="text-xl font-bold mb-2">Student Name: ${fullName}</h2>
@@ -181,23 +171,16 @@ async function loadReport() {
                   <tbody>${topicsTableRows}</tbody>
                 </table>
                 <h3 class="text-lg font-semibold mt-4 mb-2">Tutor’s Recommendation</h3>
-                <p class="mb-2" id="tutor-report-${blockIndex}"><strong>Tutor's Report:</strong> ${tutorReport}</p>
+                <p class="mb-2"><strong>Tutor's Report:</strong> ${tutorReport}</p>
                 <canvas id="chart-${blockIndex}" class="w-full h-48 mb-4"></canvas>
                 <h3 class="text-lg font-semibold mb-1">Director’s Message</h3>
                 <p class="italic text-sm">At Blooming Kids House, we are committed to helping every child succeed. We believe that with personalized support from our tutors, ${fullName} will unlock their full potential. Keep up the great work!<br/>– Mrs. Yinka Isikalu, Director</p>
                 <div class="mt-4"><button onclick="downloadSessionReport(${blockIndex}, '${fullName}')" class="btn-yellow px-4 py-2 rounded">Download Session PDF</button></div>
               </div>
             `;
-            
+
             reportContent.innerHTML += fullBlock;
 
-            generateTutorRecommendation(fullName, tutorName, results).then(recommendation => {
-                const reportElement = document.getElementById(`tutor-report-${blockIndex}`);
-                if (reportElement) {
-                    reportElement.innerHTML = `<strong>Tutor's Report:</strong> ${recommendation}`;
-                }
-            });
-            
             const ctx = document.getElementById(`chart-${blockIndex}`).getContext('2d');
             const subjectLabels = results.map(r => r.subject.toUpperCase());
             const correctScores = results.map(s => s.correct);
@@ -245,4 +228,5 @@ function logout() {
     window.location.href = "parent.html";
 }
 
+// Attach the loadReport function to the button
 document.getElementById("generateBtn").addEventListener("click", loadReport);
