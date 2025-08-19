@@ -1,95 +1,94 @@
 <!DOCTYPE html>
-
 <html lang="en">
-
 <head>
-
-  <meta charset="UTF-8" />
-
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-
-  <title>Student Login - Blooming Kids House</title>
-
-  <link rel="icon" href="favicon.ico" />
-
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" />
-
-  <link rel="stylesheet" href="style.css" />
-
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>Student Login - Blooming Kids House</title>
+    <link rel="icon" href="favicon.ico" />
+    <!-- Tailwind CSS for styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts for better typography -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        /* Custom styles to apply the new font and a subtle background pattern */
+        body {
+            font-family: 'Poppins', sans-serif;
+            background-color: #f0fdf4; /* A very light green background */
+            background-image:
+                radial-gradient(circle at 1px 1px, #a7f3d0 1px, transparent 0);
+            background-size: 20px 20px;
+        }
+        /* Custom focus styles for better accessibility */
+        .form-input:focus {
+            border-color: #10b981; /* Emerald-500 */
+            box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.2);
+            outline: none;
+        }
+        /* Style for the main heading */
+        .brand-heading {
+            font-weight: 800; /* Extra Bold */
+        }
+    </style>
 </head>
+<body class="min-h-screen flex items-center justify-center p-4">
 
-<body class="bg-green-50 min-h-screen flex items-center justify-center">
+    <!-- Main Login Card -->
+    <div class="bg-white p-8 md:p-10 rounded-2xl shadow-2xl w-full max-w-md transform transition-all hover:scale-105 duration-300">
 
-  <div class="bg-white p-8 rounded-xl shadow-xl w-full max-w-md">
+        <!-- Your Logo Here -->
+        <div class="text-center mb-6">
+            <!-- This now points to the logo you uploaded -->
+            <img src="http://googleusercontent.com/file_content/96" alt="Blooming Kids House Logo" class="mx-auto h-20 w-auto">
+        </div>
 
-    <h1 class="text-4xl font-extrabold text-green-900 text-center mb-8">BLOOMING KIDS HOUSE TEST</h1>
+        <!-- Updated Original Headings -->
+        <h1 class="text-3xl brand-heading text-green-900 text-center mb-6">BLOOMING KIDS HOUSE</h1>
+        <h2 class="text-2xl font-bold text-green-800 text-center mb-8">Student Login</h2>
 
-    <h2 class="text-2xl font-bold text-green-800 text-center mb-6">Student Login</h2>
+        <form id="studentLoginForm" class="space-y-5">
+            <!-- Input fields with better styling -->
+            <input type="text" id="studentName" placeholder="Full Name" required class="w-full px-4 py-3 border border-gray-200 rounded-lg form-input transition-colors duration-300 focus:border-green-500" />
+            <input type="email" id="parentEmail" placeholder="Parent's Email" required class="w-full px-4 py-3 border border-gray-200 rounded-lg form-input transition-colors duration-300 focus:border-green-500" />
+            <select id="grade" required class="w-full px-4 py-3 border border-gray-200 rounded-lg form-input transition-colors duration-300 focus:border-green-500">
+                <option value="">Select Grade</option>
+                <option value="3">Grade 3</option>
+                <option value="4">Grade 4</option>
+                <option value="5">Grade 5</option>
+                <option value="6">Grade 6</option>
+                <option value="7">Grade 7</option>
+                <option value="8">Grade 8</option>
+                <option value="9">Grade 9</option>
+                <option value="10">Grade 10</option>
+                <option value="11">Grade 11</option>
+                <option value="12">Grade 12</option>
+            </select>
+            <input type="email" id="tutorEmail" placeholder="Tutor's Email" required class="w-full px-4 py-3 border border-gray-200 rounded-lg form-input transition-colors duration-300 focus:border-green-500" />
+            <select id="country" required class="w-full px-4 py-3 border border-gray-200 rounded-lg form-input transition-colors duration-300 focus:border-green-500">
+                <option value="">Select Country</option>
+                <option value="USA">USA</option>
+                <option value="UK">UK</option>
+                <option value="Canada">Canada</option>
+                <option value="Africa">Africa</option>
+                <option value="Switzerland">Switzerland</option>
+                <option value="Germany">Germany</option>
+            </select>
+            <input type="text" id="accessCode" placeholder="Access Code (e.g., bkh2025)" required class="w-full px-4 py-3 border border-gray-200 rounded-lg form-input transition-colors duration-300 focus:border-green-500" />
+            
+            <!-- Enhanced Login Button -->
+            <button type="submit" class="w-full py-3 font-semibold text-white bg-green-600 rounded-lg hover:bg-green-700 focus:outline-none focus:ring-4 focus:ring-green-300 transition-all duration-300 transform hover:scale-105">
+                Login
+            </button>
+        </form>
 
-    <form id="studentLoginForm" class="space-y-4">
+        <!-- Footer -->
+        <p class="text-xs text-center mt-8 text-gray-500">
+            POWERED BY <span class="font-bold text-yellow-500">POG</span>
+        </p>
+    </div>
 
-      <input type="text" id="studentName" placeholder="Full Name" required class="w-full px-4 py-2 border rounded" />
-
-      <input type="email" id="parentEmail" placeholder="Parent Email" required class="w-full px-4 py-2 border rounded" />
-
-      <select id="grade" required class="w-full px-4 py-2 border rounded">
-
-        <option value="">Select Grade</option>
-
-        <option value="3">Grade 3</option>
-
-        <option value="4">Grade 4</option>
-
-        <option value="5">Grade 5</option>
-
-        <option value="6">Grade 6</option>
-
-        <option value="7">Grade 7</option>
-
-        <option value="8">Grade 8</option>
-
-        <option value="9">Grade 9</option>
-
-        <option value="10">Grade 10</option>
-
-        <option value="11">Grade 11</option>
-
-        <option value="12">Grade 12</option>
-
-      </select>
-
-      <input type="email" id="tutorEmail" placeholder="Tutor's Email" required class="w-full px-4 py-2 border rounded" />
-
-      <select id="country" required class="w-full px-4 py-2 border rounded">
-
-        <option value="">Select Country</option>
-
-        <option value="USA">USA</option>
-
-        <option value="UK">UK</option>
-
-        <option value="Canada">Canada</option>
-
-        <option value="Africa">Africa</option>
-
-        <option value="Switzerland">Switzerland</option>
-
-        <option value="Germany">Germany</option>
-
-      </select>
-
-      <input type="text" id="accessCode" placeholder="Access Code (bkh2025)" required class="w-full px-4 py-2 border rounded" />
-
-      <button type="submit" class="bg-green-600 text-white w-full py-2 rounded hover:bg-green-700">Login</button>
-
-    </form>
-
-    <p class="text-xs text-center mt-4 text-gray-600">POWERED BY <span style="color:#FFEB3B">POG</span></p>
-
-  </div>
-
-  <script type="module" src="student-login.js"></script>
-
+    <!-- The login logic remains the same -->
+    <script type="module" src="student-login.js"></script>
 </body>
-
 </html>
