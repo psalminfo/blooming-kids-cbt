@@ -5,12 +5,15 @@ document.addEventListener("DOMContentLoaded", async () => {
     const urlParams = new URLSearchParams(window.location.search);
     const subject = urlParams.get("subject")?.toLowerCase();
 
-    // Read student info from localStorage
+    // --- THIS IS THE FIX: Read ALL student info from localStorage ---
     const studentName = localStorage.getItem("studentName");
     const parentEmail = localStorage.getItem("studentEmail");
     const grade = localStorage.getItem("grade");
+    const tutorEmail = localStorage.getItem("tutorEmail"); // Added this line
+    const studentCountry = localStorage.getItem("studentCountry"); // Added this line
 
-    if (!studentName || !parentEmail || !grade || !subject) {
+    // Updated the check to include the new fields
+    if (!studentName || !parentEmail || !grade || !subject || !tutorEmail || !studentCountry) {
         alert("Missing student info. Please log in again.");
         window.location.href = "index.html";
         return;
@@ -98,11 +101,14 @@ document.addEventListener("DOMContentLoaded", async () => {
         const score = resultsPayload.filter(r => r.studentAnswer === r.correctAnswer).length;
 
         try {
+            // --- THIS IS THE FIX: Add the missing fields to the data sent to Firestore ---
             await addDoc(collection(db, "student_results"), {
                 studentName,
                 parentEmail,
                 grade,
                 subject,
+                tutorEmail, // Added this line
+                studentCountry, // Added this line
                 answers: resultsPayload,
                 score: score,
                 totalScoreableQuestions: questions.length,
