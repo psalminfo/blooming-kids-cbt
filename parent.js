@@ -16,36 +16,35 @@ function capitalize(str) {
 }
 
 /**
- * Generates a personalized tutor recommendation using AI.
- * @param {string} studentName The name of the student.
- * @param {string} tutorName The name of the tutor.
- * @param {Array} results The student's test results.
- * @returns {Promise<string>} A promise that resolves with the AI-generated text.
+ * Generates a personalized tutor recommendation. It first tries to use AI,
+ * but if that fails, it falls back to a high-quality, template-based message.
  */
 async function generateTutorRecommendation(studentName, tutorName, results) {
+    // 1. Analyze performance to find strengths and weaknesses for both methods.
     const strengths = [];
     const weaknesses = [];
-
     results.forEach(res => {
         const percentage = res.total > 0 ? (res.correct / res.total) * 100 : 0;
+        const topicList = res.topics.length > 0 ? res.topics : [res.subject]; // Use subject as fallback topic
         if (percentage >= 70) {
-            strengths.push(...res.topics);
+            strengths.push(...topicList);
         } else {
-            weaknesses.push(...res.topics);
+            weaknesses.push(...topicList);
         }
     });
 
     const uniqueStrengths = [...new Set(strengths)];
     const uniqueWeaknesses = [...new Set(weaknesses)];
 
-    let prompt = `Write a warm, encouraging, and professional tutor's recommendation for a student named ${studentName}. The brand is "Blooming Kids House". The tutor's name is ${tutorName}.
-    The tone should be positive and supportive, aimed at a parent.
-    The recommendation must be unique and based on these specific test results:
-    - The student showed strong skills in these topics: ${uniqueStrengths.join(', ') || 'various areas'}. Praise them for this.
-    - The student could use some more practice in these topics: ${uniqueWeaknesses.join(', ')}. Frame this as an opportunity for growth.
-    Conclude by confidently stating that with personalized support from their tutor, ${tutorName}, at Blooming Kids House, ${studentName} will be able to master these skills and unlock their full potential. The message should be about 3-4 sentences long.`;
-
+    // 2. Try to generate the recommendation using the AI.
     try {
+        let prompt = `Write a warm, encouraging, and professional tutor's recommendation for a student named ${studentName}. The brand is "Blooming Kids House". The tutor's name is ${tutorName}.
+        The tone should be positive and supportive, aimed at a parent.
+        The recommendation must be unique and based on these specific test results:
+        - The student showed strong skills in these topics: ${uniqueStrengths.join(', ') || 'various areas'}. Praise them for this.
+        - The student could use some more practice in these topics: ${uniqueWeaknesses.join(', ')}. Frame this as an opportunity for growth.
+        Conclude by confidently stating that with personalized support from their tutor, ${tutorName}, at Blooming Kids House, ${studentName} will be able to master these skills and unlock their full potential. The message should be about 3-4 sentences long.`;
+
         let chatHistory = [{ role: "user", parts: [{ text: prompt }] }];
         const payload = { contents: chatHistory };
         const apiKey = ""; // This is handled by the execution environment
@@ -58,19 +57,25 @@ async function generateTutorRecommendation(studentName, tutorName, results) {
         });
 
         if (!response.ok) {
-            // This is where the 403 error is caught
-            throw new Error(`API call failed with status: ${response.status}`);
+            throw new Error(`API call failed with status: ${response.status}`); // This will trigger the catch block
         }
 
         const result = await response.json();
         if (result.candidates && result.candidates.length > 0) {
-            return result.candidates[0].content.parts[0].text;
+            return result.candidates[0].content.parts[0].text; // Success! Return the AI message.
         } else {
-            return "Could not generate a recommendation at this time.";
+            throw new Error("No content from AI."); // Trigger the catch block
         }
     } catch (error) {
-        console.error("Error generating AI recommendation:", error);
-        return "We are currently unable to generate a personalized recommendation due to a technical issue. Your tutor will provide feedback shortly.";
+        // --- THIS IS THE FALLBACK SYSTEM ---
+        // If the 'try' block fails for any reason (like a 403 error), this code will run instead.
+        console.error("AI recommendation failed, generating template-based fallback:", error);
+
+        const strengthsText = uniqueStrengths.length > 0 ? `showing strong skills in areas like ${uniqueStrengths.join(', ')}` : "doing great work";
+        const weaknessesText = uniqueWeaknesses.length > 0 ? `we'll focus on practicing ${uniqueWeaknesses.join(', ')}` : "we'll continue to build on their skills";
+
+        // This creates a personalized, human-sounding message without the AI.
+        return `It's clear that ${studentName} is ${strengthsText}. To take their learning to the next level, ${weaknessesText}. With dedicated support from their tutor, ${tutorName}, at Blooming Kids House, we're confident they will master these topics and continue to excel.`;
     }
 }
 
@@ -179,7 +184,6 @@ async function loadReport() {
                 <p class="mb-2" id="tutor-report-${blockIndex}"><strong>Tutor's Report:</strong> ${tutorReport}</p>
                 <canvas id="chart-${blockIndex}" class="w-full h-48 mb-4"></canvas>
                 <h3 class="text-lg font-semibold mb-1">Director’s Message</h3>
-                <!-- THIS IS THE RESTORED DIRECTOR'S MESSAGE -->
                 <p class="italic text-sm">At Blooming Kids House, we are committed to helping every child succeed. We believe that with personalized support from our tutors, ${fullName} will unlock their full potential. Keep up the great work!<br/>– Mrs. Yinka Isikalu, Director</p>
                 <div class="mt-4"><button onclick="downloadSessionReport(${blockIndex}, '${fullName}')" class="btn-yellow px-4 py-2 rounded">Download Session PDF</button></div>
               </div>
