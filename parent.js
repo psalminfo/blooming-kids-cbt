@@ -15,9 +15,6 @@ function capitalize(str) {
     return str.replace(/\b\w/g, l => l.toUpperCase());
 }
 
-// =================================================================
-// ===== NEW AI FUNCTION ===========================================
-// =================================================================
 /**
  * Generates a personalized tutor recommendation using AI.
  * @param {string} studentName The name of the student.
@@ -26,7 +23,6 @@ function capitalize(str) {
  * @returns {Promise<string>} A promise that resolves with the AI-generated text.
  */
 async function generateTutorRecommendation(studentName, tutorName, results) {
-    // 1. Analyze the student's performance to find strengths and weaknesses.
     const strengths = [];
     const weaknesses = [];
 
@@ -39,26 +35,20 @@ async function generateTutorRecommendation(studentName, tutorName, results) {
         }
     });
 
-    // Create unique lists of topics
     const uniqueStrengths = [...new Set(strengths)];
     const uniqueWeaknesses = [...new Set(weaknesses)];
 
-    // 2. Create a detailed, unique prompt for the AI.
     let prompt = `Write a warm, encouraging, and professional tutor's recommendation for a student named ${studentName}. The brand is "Blooming Kids House". The tutor's name is ${tutorName}.
-
     The tone should be positive and supportive, aimed at a parent.
-
     The recommendation must be unique and based on these specific test results:
     - The student showed strong skills in these topics: ${uniqueStrengths.join(', ') || 'various areas'}. Praise them for this.
     - The student could use some more practice in these topics: ${uniqueWeaknesses.join(', ')}. Frame this as an opportunity for growth.
-
     Conclude by confidently stating that with personalized support from their tutor, ${tutorName}, at Blooming Kids House, ${studentName} will be able to master these skills and unlock their full potential. The message should be about 3-4 sentences long.`;
 
-    // 3. Call the AI to generate the text.
     try {
         let chatHistory = [{ role: "user", parts: [{ text: prompt }] }];
         const payload = { contents: chatHistory };
-        const apiKey = ""; // This will be handled by the environment
+        const apiKey = ""; // This is handled by the execution environment
         const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${apiKey}`;
         
         const response = await fetch(apiUrl, {
@@ -68,6 +58,7 @@ async function generateTutorRecommendation(studentName, tutorName, results) {
         });
 
         if (!response.ok) {
+            // This is where the 403 error is caught
             throw new Error(`API call failed with status: ${response.status}`);
         }
 
@@ -79,12 +70,9 @@ async function generateTutorRecommendation(studentName, tutorName, results) {
         }
     } catch (error) {
         console.error("Error generating AI recommendation:", error);
-        return "We are currently unable to generate a personalized recommendation. Your tutor will provide feedback shortly.";
+        return "We are currently unable to generate a personalized recommendation due to a technical issue. Your tutor will provide feedback shortly.";
     }
 }
-// =================================================================
-// ===== END OF NEW AI FUNCTION ====================================
-// =================================================================
 
 
 async function loadReport() {
@@ -120,7 +108,6 @@ async function loadReport() {
 
         if (studentResults.length === 0) {
             alert("No records found. Please check the name and email.");
-            // Reset button state
             loader.classList.add("hidden");
             generateBtn.disabled = false;
             generateBtn.textContent = "Generate Report";
@@ -149,13 +136,9 @@ async function loadReport() {
 
             let tutorName = 'N/A';
             if (tutorEmail && tutorEmail !== 'N/A') {
-                try {
-                    const tutorDoc = await db.collection("tutors").doc(tutorEmail).get();
-                    if (tutorDoc.exists) {
-                        tutorName = tutorDoc.data().name;
-                    }
-                } catch (e) {
-                    console.error("Could not fetch tutor document:", e);
+                const tutorDoc = await db.collection("tutors").doc(tutorEmail).get();
+                if (tutorDoc.exists) {
+                    tutorName = tutorDoc.data().name;
                 }
             }
 
@@ -171,10 +154,9 @@ async function loadReport() {
 
             const tableRows = results.map(res => `<tr><td class="border px-2 py-1">${res.subject.toUpperCase()}</td><td class="border px-2 py-1 text-center">${res.correct} / ${res.total}</td></tr>`).join("");
             const topicsTableRows = results.map(res => `<tr><td class="border px-2 py-1 font-semibold">${res.subject.toUpperCase()}</td><td class="border px-2 py-1">${res.topics.join(', ') || 'N/A'}</td></tr>`).join("");
-
-            // --- THIS IS THE CHANGE: We now call the AI function ---
-            // We show a placeholder while the AI is working.
+            
             let tutorReport = "Generating personalized recommendation...";
+            
             const fullBlock = `
               <div class="border rounded-lg shadow mb-8 p-4 bg-white" id="report-block-${blockIndex}">
                 <h2 class="text-xl font-bold mb-2">Student Name: ${fullName}</h2>
@@ -197,14 +179,14 @@ async function loadReport() {
                 <p class="mb-2" id="tutor-report-${blockIndex}"><strong>Tutor's Report:</strong> ${tutorReport}</p>
                 <canvas id="chart-${blockIndex}" class="w-full h-48 mb-4"></canvas>
                 <h3 class="text-lg font-semibold mb-1">Director’s Message</h3>
-                <p class="italic text-sm">At Blooming Kids House, we are committed to helping every child succeed...<br/>– Mrs. Yinka Isikalu, Director</p>
+                <!-- THIS IS THE RESTORED DIRECTOR'S MESSAGE -->
+                <p class="italic text-sm">At Blooming Kids House, we are committed to helping every child succeed. We believe that with personalized support from our tutors, ${fullName} will unlock their full potential. Keep up the great work!<br/>– Mrs. Yinka Isikalu, Director</p>
                 <div class="mt-4"><button onclick="downloadSessionReport(${blockIndex}, '${fullName}')" class="btn-yellow px-4 py-2 rounded">Download Session PDF</button></div>
               </div>
             `;
             
             reportContent.innerHTML += fullBlock;
 
-            // Generate the recommendation and update the placeholder
             generateTutorRecommendation(fullName, tutorName, results).then(recommendation => {
                 const reportElement = document.getElementById(`tutor-report-${blockIndex}`);
                 if (reportElement) {
@@ -212,7 +194,6 @@ async function loadReport() {
                 }
             });
             
-            // Render the chart
             const ctx = document.getElementById(`chart-${blockIndex}`).getContext('2d');
             const subjectLabels = results.map(r => r.subject.toUpperCase());
             const correctScores = results.map(s => s.correct);
@@ -260,5 +241,4 @@ function logout() {
     window.location.href = "parent.html";
 }
 
-// Attach the loadReport function to the button
 document.getElementById("generateBtn").addEventListener("click", loadReport);
