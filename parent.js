@@ -15,9 +15,6 @@ function capitalize(str) {
     return str.replace(/\b\w/g, l => l.toUpperCase());
 }
 
-// =================================================================
-// ===== NEW, MORE SOPHISTICATED RECOMMENDATION FUNCTION ===========
-// =================================================================
 /**
  * Generates a unique, personalized recommendation using a smart template.
  * It summarizes performance instead of just listing topics.
@@ -42,7 +39,6 @@ function generateTemplatedRecommendation(studentName, tutorName, results) {
     const uniqueStrengths = [...new Set(strengths)];
     const uniqueWeaknesses = [...new Set(weaknesses)];
 
-    // --- Build the message with more natural language ---
     let praiseClause = "";
     if (uniqueStrengths.length > 2) {
         praiseClause = `It was great to see ${studentName} demonstrate a solid understanding of several key concepts, particularly in areas like ${uniqueStrengths[0]} and ${uniqueStrengths[1]}. `;
@@ -65,9 +61,6 @@ function generateTemplatedRecommendation(studentName, tutorName, results) {
 
     return praiseClause + improvementClause + closingStatement;
 }
-// =================================================================
-// ===== END OF NEW FUNCTION =======================================
-// =================================================================
 
 
 async function loadReport() {
@@ -150,8 +143,12 @@ async function loadReport() {
             const tableRows = results.map(res => `<tr><td class="border px-2 py-1">${res.subject.toUpperCase()}</td><td class="border px-2 py-1 text-center">${res.correct} / ${res.total}</td></tr>`).join("");
             const topicsTableRows = results.map(res => `<tr><td class="border px-2 py-1 font-semibold">${res.subject.toUpperCase()}</td><td class="border px-2 py-1">${res.topics.join(', ') || 'N/A'}</td></tr>`).join("");
 
-            // --- THIS IS THE CHANGE: We now call the new template function ---
-            const tutorReport = generateTemplatedRecommendation(fullName, tutorName, results);
+            // --- THIS IS THE FIX ---
+            // 1. Get the automated recommendation
+            const recommendation = generateTemplatedRecommendation(fullName, tutorName, results);
+            // 2. Get the manual report from the creative writing section
+            const creativeWritingAnswer = session[0].answers.find(a => a.type === 'creative-writing');
+            const tutorReport = creativeWritingAnswer?.tutorReport || 'Pending review.';
 
             const fullBlock = `
               <div class="border rounded-lg shadow mb-8 p-4 bg-white" id="report-block-${blockIndex}">
@@ -171,8 +168,14 @@ async function loadReport() {
                   <thead class="bg-gray-100"><tr><th class="border px-2 py-1 text-left">Subject</th><th class="border px-2 py-1 text-left">Topics Covered</th></tr></thead>
                   <tbody>${topicsTableRows}</tbody>
                 </table>
+                
+                <!-- 3. Display the recommendation and report in the correct sections -->
                 <h3 class="text-lg font-semibold mt-4 mb-2">Tutor’s Recommendation</h3>
+                <p class="mb-2">${recommendation}</p>
+
+                <h3 class="text-lg font-semibold mt-4 mb-2">Creative Writing Feedback</h3>
                 <p class="mb-2"><strong>Tutor's Report:</strong> ${tutorReport}</p>
+
                 <canvas id="chart-${blockIndex}" class="w-full h-48 mb-4"></canvas>
                 <h3 class="text-lg font-semibold mb-1">Director’s Message</h3>
                 <p class="italic text-sm">At Blooming Kids House, we are committed to helping every child succeed. We believe that with personalized support from our tutors, ${fullName} will unlock their full potential. Keep up the great work!<br/>– Mrs. Yinka Isikalu, Director</p>
@@ -229,5 +232,4 @@ function logout() {
     window.location.href = "parent.html";
 }
 
-// Attach the loadReport function to the button
 document.getElementById("generateBtn").addEventListener("click", loadReport);
