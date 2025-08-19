@@ -1,10 +1,8 @@
 import { db } from './firebaseConfig.js';
 import { collection, addDoc, Timestamp } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
-// You need to import getLoadedQuestions from the file that has it.
-// I'm assuming it's in 'autoQuestionGen.js' based on our conversation.
+// Make sure this path is correct for your project structure
 import { getLoadedQuestions } from './autoQuestionGen.js';
 
-// This can be replaced with Firebase Storage in the future for better integration.
 const CLOUDINARY_CLOUD_NAME = 'dy2hxcyaf';
 const CLOUDINARY_UPLOAD_PRESET = 'bkh_assessments';
 const CLOUDINARY_UPLOAD_URL = `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`;
@@ -28,21 +26,15 @@ async function uploadCreativeWritingFile(file) {
     return data.secure_url;
 }
 
-/**
- * Gathers test answers from the page, calculates the score, and submits the results to Firestore.
- * This is the primary function for handling test submissions.
- */
+
 export async function submitTestToFirebase(subject, grade, studentName, parentEmail, tutorEmail, studentCountry) {
     const loadedQuestions = getLoadedQuestions();
     const answers = [];
     let creativeWritingContent = null;
     let creativeWritingFileUrl = null;
-
-    // Initialize variables for scoring
     let score = 0;
     let totalScoreableQuestions = 0;
 
-    // --- Creative Writing Section Handling ---
     const creativeWritingQuestion = loadedQuestions.find(q => q.type === 'creative-writing');
     const creativeWritingBlock = creativeWritingQuestion ? document.querySelector(`.question-block[data-question-id="${creativeWritingQuestion.id}"]`) : null;
 
@@ -59,7 +51,6 @@ export async function submitTestToFirebase(subject, grade, studentName, parentEm
         }
     }
 
-    // --- Process All Question Blocks ---
     const questionBlocks = document.querySelectorAll(".question-block");
     for (const block of questionBlocks) {
         const questionId = block.getAttribute('data-question-id');
@@ -79,7 +70,6 @@ export async function submitTestToFirebase(subject, grade, studentName, parentEm
             continue;
         }
 
-        // --- Handle Scoreable Questions ---
         totalScoreableQuestions++;
         const selectedOption = block.querySelector("input[type='radio']:checked");
 
@@ -90,13 +80,13 @@ export async function submitTestToFirebase(subject, grade, studentName, parentEm
 
         const studentAnswer = selectedOption.value;
 
-        // --- THE FIX: Check for both naming conventions to prevent null values ---
-        const correctAnswer = originalQuestion.correct_answer || originalQuestion.correctAnswer || null;
+        // --- THIS IS THE CRITICAL FIX ---
+        // It now correctly reads all properties from your updated JSON file.
+        const correctAnswer = originalQuestion.correctAnswer || null;
         const topic = originalQuestion.topic || null;
-        const imageUrl = originalQuestion.image_url || originalQuestion.imageUrl || null;
-        const imagePosition = originalQuestion.image_position || originalQuestion.imagePosition || null;
+        const imageUrl = originalQuestion.imageUrl || null;
+        const imagePosition = originalQuestion.imagePosition || null;
 
-        // Compare answers and increment score if correct
         if (studentAnswer === correctAnswer) {
             score++;
         }
@@ -104,14 +94,13 @@ export async function submitTestToFirebase(subject, grade, studentName, parentEm
         answers.push({
             questionText: originalQuestion.question || null,
             studentAnswer: studentAnswer,
-            correctAnswer: correctAnswer,
+            correctAnswer: correctAnswer, // This will now be saved correctly
             topic: topic,
             imageUrl: imageUrl,
             imagePosition: imagePosition
         });
     }
 
-    // --- Final Data Object for Firestore ---
     const resultData = {
         subject,
         grade,
@@ -126,8 +115,8 @@ export async function submitTestToFirebase(subject, grade, studentName, parentEm
     };
 
     try {
-        const docRef = await addDoc(collection(db, "student_results"), resultData);
-        console.log("Test results submitted successfully with Document ID: ", docRef.id);
+        await addDoc(collection(db, "student_results"), resultData);
+        console.log("Test results submitted successfully.");
     } catch (err) {
         console.error("Error submitting test results to Firebase:", err);
         throw new Error("Failed to submit test results.");
