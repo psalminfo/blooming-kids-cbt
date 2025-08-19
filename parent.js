@@ -16,27 +16,25 @@ function capitalize(str) {
 }
 
 // =================================================================
-// ===== NEW TEMPLATE-BASED RECOMMENDATION FUNCTION ================
+// ===== NEW, MORE SOPHISTICATED RECOMMENDATION FUNCTION ===========
 // =================================================================
 /**
- * Generates a unique, personalized recommendation based on test performance
- * without needing an external AI call.
+ * Generates a unique, personalized recommendation using a smart template.
+ * It summarizes performance instead of just listing topics.
  * @param {string} studentName The name of the student.
  * @param {string} tutorName The name of the tutor.
  * @param {Array} results The student's test results.
  * @returns {string} A personalized recommendation string.
  */
 function generateTemplatedRecommendation(studentName, tutorName, results) {
-    // 1. Analyze performance to find strengths and weaknesses.
     const strengths = [];
     const weaknesses = [];
     results.forEach(res => {
         const percentage = res.total > 0 ? (res.correct / res.total) * 100 : 0;
-        // Use the subject as a fallback if no specific topics are listed
         const topicList = res.topics.length > 0 ? res.topics : [res.subject];
-        if (percentage >= 70) {
+        if (percentage >= 75) {
             strengths.push(...topicList);
-        } else {
+        } else if (percentage < 50) {
             weaknesses.push(...topicList);
         }
     });
@@ -44,24 +42,27 @@ function generateTemplatedRecommendation(studentName, tutorName, results) {
     const uniqueStrengths = [...new Set(strengths)];
     const uniqueWeaknesses = [...new Set(weaknesses)];
 
-    // 2. Build the personalized message from template parts.
+    // --- Build the message with more natural language ---
     let praiseClause = "";
-    if (uniqueStrengths.length > 0) {
-        praiseClause = `It's clear that ${studentName} is showing strong skills in areas like ${uniqueStrengths.join(', ')}. `;
+    if (uniqueStrengths.length > 2) {
+        praiseClause = `It was great to see ${studentName} demonstrate a solid understanding of several key concepts, particularly in areas like ${uniqueStrengths[0]} and ${uniqueStrengths[1]}. `;
+    } else if (uniqueStrengths.length > 0) {
+        praiseClause = `${studentName} showed strong potential, especially in the topic of ${uniqueStrengths.join(', ')}. `;
     } else {
-        praiseClause = `${studentName} has put in a great effort on this assessment. `;
+        praiseClause = `${studentName} has put in a commendable effort on this initial assessment. `;
     }
 
     let improvementClause = "";
-    if (uniqueWeaknesses.length > 0) {
-        improvementClause = `To take their learning to the next level, we'll focus on practicing ${uniqueWeaknesses.join(', ')}. `;
+    if (uniqueWeaknesses.length > 2) {
+        improvementClause = `Our next step will be to focus on building more confidence in a few areas, such as ${uniqueWeaknesses[0]} and ${uniqueWeaknesses[1]}. `;
+    } else if (uniqueWeaknesses.length > 0) {
+        improvementClause = `To continue this positive progress, our focus will be on the topic of ${uniqueWeaknesses.join(', ')}. `;
     } else {
-        improvementClause = "We'll continue to build on these fantastic results. ";
+        improvementClause = "We will continue to build on these fantastic results and explore more advanced topics. ";
     }
 
-    const closingStatement = `With dedicated support from their tutor, ${tutorName}, at Blooming Kids House, we're confident they will master these topics and continue to excel.`;
+    const closingStatement = `With personalized support from their tutor, ${tutorName}, at Blooming Kids House, we are very confident that ${studentName} will master these skills and unlock their full potential.`;
 
-    // 3. Combine the parts into a final, unique recommendation.
     return praiseClause + improvementClause + closingStatement;
 }
 // =================================================================
