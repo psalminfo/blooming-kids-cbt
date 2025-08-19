@@ -13,15 +13,13 @@ document.getElementById("studentLoginForm").addEventListener("submit", function 
     return;
   }
 
-  // --- THIS IS THE FIX ---
-  // We now save all the student's details to the browser's local storage.
+  // Save all details to the browser's local storage
   localStorage.setItem("studentName", studentName);
   localStorage.setItem("studentEmail", parentEmail);
   localStorage.setItem("grade", grade);
   localStorage.setItem("tutorEmail", tutorEmail);
   localStorage.setItem("studentCountry", studentCountry);
-  // --- END OF FIX ---
 
-  // Redirect to the subject selection page.
+  // Redirect to the subject selection page
   window.location.href = `subject-select.html`;
 });
