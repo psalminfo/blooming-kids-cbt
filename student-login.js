@@ -4,8 +4,8 @@ document.getElementById("studentLoginForm").addEventListener("submit", function 
   const studentName = document.getElementById("studentName").value;
   const parentEmail = document.getElementById("parentEmail").value;
   const grade = document.getElementById("grade").value;
-  const tutorEmail = document.getElementById("tutorEmail").value;
-  const studentCountry = document.getElementById("country").value;
+  const tutorName = document.getElementById("tutorName").value;
+  const location = document.getElementById("location").value;
   const accessCode = document.getElementById("accessCode").value;
 
   if (accessCode !== "bkh2025") {
@@ -13,17 +13,15 @@ document.getElementById("studentLoginForm").addEventListener("submit", function 
     return;
   }
 
-  // --- THIS IS THE FIX ---
-  // We now save all the student's details to the browser's local storage.
-  // The test page (student.js) will be able to read this information.
-  localStorage.setItem("studentName", studentName);
-  localStorage.setItem("studentEmail", parentEmail); // This was the missing 'parentEmail'
-  localStorage.setItem("grade", grade);
-  localStorage.setItem("tutorEmail", tutorEmail);
-  localStorage.setItem("studentCountry", studentCountry);
-  // --- END OF FIX ---
+  const studentData = {
+    studentName,
+    parentEmail,
+    grade,
+    tutorName,
+    location
+  };
 
+  localStorage.setItem("studentData", JSON.stringify(studentData));
 
-  // We no longer need to pass the info in the URL, so we can redirect directly.
-  window.location.href = `subject-select.html`;
+  window.location.href = "subject-select.html";
 });
