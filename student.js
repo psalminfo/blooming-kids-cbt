@@ -14,10 +14,10 @@ document.addEventListener("DOMContentLoaded", async () => {
         return;
     }
 
-    // Use the correct GitHub URL from your other files
     const gradeNumber = grade.match(/\d+/)[0];
     const fileName = `${gradeNumber}-${subject}`;
-    const GITHUB_URL = `https://raw.githubusercontent.com/psalminfo/blooming-kids-cbt/main/${fileName}.json`;
+    // Add a cache-busting parameter to the URL to prevent browser caching issues
+    const GITHUB_URL = `https://raw.githubusercontent.com/psalminfo/blooming-kids-cbt/main/${fileName}.json?t=${new Date().getTime()}`;
 
     let questions = [];
 
@@ -26,7 +26,6 @@ document.addEventListener("DOMContentLoaded", async () => {
         if (!res.ok) throw new Error(`File not found: ${GITHUB_URL}`);
         const data = await res.json();
 
-        // The JSON structure has a top-level 'tests' array, then 'questions'
         const testData = data.tests[0];
         questions = testData.questions.sort(() => 0.5 - Math.random()).slice(0, 30);
 
@@ -71,35 +70,43 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
 
     async function submitTest() {
-        // --- NEW FEATURE: VALIDATE ALL QUESTIONS ARE ANSWERED ---
+        // --- THIS IS THE FINAL DIAGNOSTIC STEP ---
+        // This will print the exact question data your browser is using to the console.
+        console.log("Checking the 'questions' array at the moment of submission:", questions);
+
         const allQuestionBlocks = document.querySelectorAll('.question-block');
+        // Reset styles for all blocks first
+        allQuestionBlocks.forEach(block => {
+            block.style.border = "1px solid #e2e8f0"; // Reset to default border
+        });
+
         for (let i = 0; i < questions.length; i++) {
             const selectedInput = document.querySelector(`input[name="q${i}"]:checked`);
             if (!selectedInput) {
-                alert(`You have not answered question #${i + 1}. Please answer all questions before submitting.`);
+                const unansweredBlock = allQuestionBlocks[i];
                 // Scroll the unanswered question into view
-                allQuestionBlocks[i].scrollIntoView({ behavior: 'smooth', block: 'center' });
+                unansweredBlock.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                // Highlight the unanswered question with a red border
+                unansweredBlock.style.border = "2px solid red";
+                // We removed the blocking alert() so the scroll and style changes can happen.
                 return; // Stop the submission process
             }
         }
 
-        // --- BUG FIX: CORRECTLY READ THE 'correctAnswer' PROPERTY ---
         const resultsPayload = questions.map((q, i) => {
             const selectedInput = document.querySelector(`input[name="q${i}"]:checked`);
             return {
                 questionText: q.question,
-                topic: q.topic || "N/A", // Add topic, default to "N/A" if missing
+                topic: q.topic || "N/A",
                 studentAnswer: selectedInput ? selectedInput.value : "No answer",
-                correctAnswer: q.correctAnswer || q.correct_answer || "N/A", // This is the fix
+                correctAnswer: q.correctAnswer || q.correct_answer || "N/A",
                 imageUrl: q.imageUrl || null
             };
         });
         
-        // Calculate score
         const score = resultsPayload.filter(r => r.studentAnswer === r.correctAnswer).length;
 
         try {
-            // Save the complete payload to Firebase
             await addDoc(collection(db, "student_results"), {
                 studentName,
                 parentEmail,
