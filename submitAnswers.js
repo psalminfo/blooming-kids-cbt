@@ -1,6 +1,6 @@
 import { db } from './firebaseConfig.js';
 import { collection, addDoc, Timestamp } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
-// Make sure this path is correct for your project structure
+// Ensure this path points to your question loading file
 import { getLoadedQuestions } from './autoQuestionGen.js';
 
 const CLOUDINARY_CLOUD_NAME = 'dy2hxcyaf';
@@ -80,9 +80,9 @@ export async function submitTestToFirebase(subject, grade, studentName, parentEm
 
         const studentAnswer = selectedOption.value;
 
-        // --- THIS IS THE CRITICAL FIX ---
-        // It now correctly reads all properties from your updated JSON file.
-        const correctAnswer = originalQuestion.correctAnswer || null;
+        // --- THIS IS THE CORRECTED LOGIC ---
+        // It robustly finds the correct answer and topic from the loaded question data.
+        const correctAnswer = originalQuestion.correctAnswer || originalQuestion.correct_answer || null;
         const topic = originalQuestion.topic || null;
         const imageUrl = originalQuestion.imageUrl || null;
         const imagePosition = originalQuestion.imagePosition || null;
