@@ -1,45 +1,49 @@
 import { db, collection, addDoc, serverTimestamp } from "./firebaseConfig.js";
 
 document.addEventListener("DOMContentLoaded", async () => {
-  const urlParams = new URLSearchParams(window.location.search);
-  const subject = urlParams.get("subject")?.toLowerCase();
+    const urlParams = new URLSearchParams(window.location.search);
+    const subject = urlParams.get("subject")?.toLowerCase();
 
-  const studentName = localStorage.getItem("studentName");
-  const parentEmail = localStorage.getItem("studentEmail");
-  const grade = localStorage.getItem("grade");
+    const studentName = localStorage.getItem("studentName");
+    const parentEmail = localStorage.getItem("studentEmail");
+    const grade = localStorage.getItem("grade");
 
-  if (!studentName || !parentEmail || !grade || !subject) {
-    alert("Missing student info. Please log in again.");
-    window.location.href = "index.html";
-    return;
-  }
+    if (!studentName || !parentEmail || !grade || !subject) {
+        alert("Missing student info. Please log in again.");
+        window.location.href = "index.html";
+        return;
+    }
 
-  const gradeNumber = grade.match(/\d+/)[0];
-  const file = `${gradeNumber}-${subject}.json`;
-  
-  let questions = [];
+    // Use the correct GitHub URL from your other files
+    const gradeNumber = grade.match(/\d+/)[0];
+    const fileName = `${gradeNumber}-${subject}`;
+    const GITHUB_URL = `https://raw.githubusercontent.com/psalminfo/blooming-kids-cbt/main/${fileName}.json`;
 
-  try {
-    const res = await fetch(file);
-    if (!res.ok) throw new Error(`File not found: ${file}`);
-    const data = await res.json();
-    
-    // Randomize the questions and take the first 30
-    questions = data.questions.sort(() => 0.5 - Math.random()).slice(0, 30);
-    
-    renderQuestions(questions);
-    startTimer(30);
-  } catch (err) {
-    console.error("Question fetch error:", err);
-    alert(`Could not load questions for ${subject}.`);
-  }
+    let questions = [];
 
-  function renderQuestions(qs) {
-    const container = document.getElementById("questionContainer");
-    if (!container) return;
-    container.innerHTML = qs.map((q, i) => `
-      <div class="bg-white p-4 rounded shadow mb-4">
+    try {
+        const res = await fetch(GITHUB_URL);
+        if (!res.ok) throw new Error(`File not found: ${GITHUB_URL}`);
+        const data = await res.json();
+
+        // The JSON structure has a top-level 'tests' array, then 'questions'
+        const testData = data.tests[0];
+        questions = testData.questions.sort(() => 0.5 - Math.random()).slice(0, 30);
+
+        renderQuestions(questions);
+        startTimer(30);
+    } catch (err) {
+        console.error("Question fetch error:", err);
+        alert(`Could not load questions for ${subject}. Please check the subject name and try again.`);
+    }
+
+    function renderQuestions(qs) {
+        const container = document.getElementById("questionContainer");
+        if (!container) return;
+        container.innerHTML = qs.map((q, i) => `
+      <div class="bg-white p-4 rounded shadow mb-4 question-block">
         <p class="font-semibold mb-2">${i + 1}. ${q.question}</p>
+        ${q.imageUrl ? `<img src="${q.imageUrl}" alt="Question Image" class="my-2 max-w-full h-auto rounded">` : ''}
         <div class="options-container">
         ${q.options.map(opt => `
           <label class="block cursor-pointer p-2 rounded hover:bg-gray-100">
@@ -48,58 +52,76 @@ document.addEventListener("DOMContentLoaded", async () => {
         </div>
       </div>
     `).join("");
-  }
-
-  function startTimer(mins) {
-    let time = mins * 60;
-    const timerEl = document.getElementById("timer");
-    if (!timerEl) return;
-    const interval = setInterval(() => {
-      const m = String(Math.floor(time / 60)).padStart(2, "0");
-      const s = String(time % 60).padStart(2, "0");
-      timerEl.textContent = `Time Left: ${m}:${s}`;
-      if (--time < 0) {
-        clearInterval(interval);
-        alert("Time is up! Submitting your answers.");
-        submitTest();
-      }
-    }, 1000);
-  }
-
-  async function submitTest() {
-    // Create a rich array of result objects
-    const resultsPayload = questions.map((q, i) => {
-      const selectedInput = document.querySelector(`input[name="q${i}"]:checked`);
-      return {
-        questionText: q.question,
-        topic: q.topic,
-        studentAnswer: selectedInput ? selectedInput.value : "No answer",
-        correctAnswer: q.correct_answer
-      };
-    });
-
-    try {
-      // Save the new, self-contained payload to Firebase
-      await addDoc(collection(db, "student_results"), {
-        studentName,
-        parentEmail,
-        grade,
-        subject,
-        answers: resultsPayload, // This now contains everything needed for grading
-        submittedAt: serverTimestamp()
-      });
-      
-      alert("Test submitted successfully!");
-      window.location.href = "subject-select.html";
-
-    } catch (err) {
-      console.error("Submit error:", err);
-      alert("Failed to submit your test. Please try again.");
     }
-  }
 
-  const submitButton = document.getElementById("submitBtn");
-  if (submitButton) {
-    submitButton.addEventListener("click", submitTest);
-  }
+    function startTimer(mins) {
+        let time = mins * 60;
+        const timerEl = document.getElementById("timer");
+        if (!timerEl) return;
+        const interval = setInterval(() => {
+            const m = String(Math.floor(time / 60)).padStart(2, "0");
+            const s = String(time % 60).padStart(2, "0");
+            timerEl.textContent = `Time Left: ${m}:${s}`;
+            if (--time < 0) {
+                clearInterval(interval);
+                alert("Time is up! Submitting your answers.");
+                submitTest();
+            }
+        }, 1000);
+    }
+
+    async function submitTest() {
+        // --- NEW FEATURE: VALIDATE ALL QUESTIONS ARE ANSWERED ---
+        const allQuestionBlocks = document.querySelectorAll('.question-block');
+        for (let i = 0; i < questions.length; i++) {
+            const selectedInput = document.querySelector(`input[name="q${i}"]:checked`);
+            if (!selectedInput) {
+                alert(`You have not answered question #${i + 1}. Please answer all questions before submitting.`);
+                // Scroll the unanswered question into view
+                allQuestionBlocks[i].scrollIntoView({ behavior: 'smooth', block: 'center' });
+                return; // Stop the submission process
+            }
+        }
+
+        // --- BUG FIX: CORRECTLY READ THE 'correctAnswer' PROPERTY ---
+        const resultsPayload = questions.map((q, i) => {
+            const selectedInput = document.querySelector(`input[name="q${i}"]:checked`);
+            return {
+                questionText: q.question,
+                topic: q.topic || "N/A", // Add topic, default to "N/A" if missing
+                studentAnswer: selectedInput ? selectedInput.value : "No answer",
+                correctAnswer: q.correctAnswer || q.correct_answer || "N/A", // This is the fix
+                imageUrl: q.imageUrl || null
+            };
+        });
+        
+        // Calculate score
+        const score = resultsPayload.filter(r => r.studentAnswer === r.correctAnswer).length;
+
+        try {
+            // Save the complete payload to Firebase
+            await addDoc(collection(db, "student_results"), {
+                studentName,
+                parentEmail,
+                grade,
+                subject,
+                answers: resultsPayload,
+                score: score,
+                totalScoreableQuestions: questions.length,
+                submittedAt: serverTimestamp()
+            });
+
+            alert("Test submitted successfully!");
+            window.location.href = "subject-select.html";
+
+        } catch (err) {
+            console.error("Submit error:", err);
+            alert("Failed to submit your test. Please try again.");
+        }
+    }
+
+    const submitButton = document.getElementById("submitBtn");
+    if (submitButton) {
+        submitButton.addEventListener("click", submitTest);
+    }
 });
