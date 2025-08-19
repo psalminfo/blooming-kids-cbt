@@ -1,4 +1,6 @@
-import { db, collection, addDoc, serverTimestamp } from "./firebaseConfig.js";
+// --- THIS IS THE FIX: We now import functions directly from Firebase ---
+import { db } from "./firebaseConfig.js";
+import { collection, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
 
 document.addEventListener("DOMContentLoaded", async () => {
     const urlParams = new URLSearchParams(window.location.search);
@@ -16,7 +18,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     const gradeNumber = grade.match(/\d+/)[0];
     const fileName = `${gradeNumber}-${subject}`;
-    // Add a cache-busting parameter to the URL to prevent browser caching issues
+    // Add a cache-busting parameter to the URL to force the browser to get the latest version
     const GITHUB_URL = `https://raw.githubusercontent.com/psalminfo/blooming-kids-cbt/main/${fileName}.json?t=${new Date().getTime()}`;
 
     let questions = [];
@@ -70,10 +72,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
 
     async function submitTest() {
-        // --- THIS IS THE FINAL DIAGNOSTIC STEP ---
-        // This will print the exact question data your browser is using to the console.
-        console.log("Checking the 'questions' array at the moment of submission:", questions);
-
         const allQuestionBlocks = document.querySelectorAll('.question-block');
         // Reset styles for all blocks first
         allQuestionBlocks.forEach(block => {
@@ -84,11 +82,8 @@ document.addEventListener("DOMContentLoaded", async () => {
             const selectedInput = document.querySelector(`input[name="q${i}"]:checked`);
             if (!selectedInput) {
                 const unansweredBlock = allQuestionBlocks[i];
-                // Scroll the unanswered question into view
                 unansweredBlock.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                // Highlight the unanswered question with a red border
                 unansweredBlock.style.border = "2px solid red";
-                // We removed the blocking alert() so the scroll and style changes can happen.
                 return; // Stop the submission process
             }
         }
