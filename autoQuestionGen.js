@@ -13,23 +13,17 @@ export async function loadQuestions(subject, grade) {
     let allQuestions = [];
 
     try {
-        // --- START: NEW MULTI-SOURCE FETCHING LOGIC ---
-
-        // 1. First, try to find a curated test in the 'tests' collection.
         const testsCollectionRef = collection(db, "tests");
         const searchTerm = `${grade}-${subject.toLowerCase()}`;
         const curatedTestQuery = query(testsCollectionRef, where("searchId", "==", searchTerm));
         const curatedTestSnapshot = await getDocs(curatedTestQuery);
 
         if (!curatedTestSnapshot.empty) {
-            // A. If a curated test is found, use its questions.
             const docSnap = curatedTestSnapshot.docs[0];
             const rawData = docSnap.data();
             allQuestions = rawData.questions || [];
             console.log(`Loading curated test from Firestore: ${docSnap.id}`);
         } else {
-            // B. If no curated test is found, gather questions from 'admin questions'.
-            console.log(`No curated test found for '${searchTerm}'. Checking 'admin questions'.`);
             const adminQuestionsRef = collection(db, "admin questions");
             const adminQuery = query(
                 adminQuestionsRef,
@@ -39,17 +33,14 @@ export async function loadQuestions(subject, grade) {
             const adminSnapshot = await getDocs(adminQuery);
 
             if (!adminSnapshot.empty) {
-                adminSnapshot.forEach(doc => {
-                    allQuestions.push(doc.data());
-                });
+                adminSnapshot.forEach(doc => allQuestions.push(doc.data()));
                 console.log(`Loaded ${allQuestions.length} questions from 'admin questions'.`);
             } else {
-                // C. If 'admin questions' is also empty, fall back to GitHub.
-                console.log(`No questions found in 'admin questions'. Trying GitHub.`);
+                console.log(`No questions found in Firestore. Trying GitHub.`);
                 const gitHubRes = await fetch(GITHUB_URL);
                 if (!gitHubRes.ok) throw new Error("Test file not found in any source.");
                 const rawData = await gitHubRes.json();
-                // Handle both possible JSON structures from GitHub
+                
                 if (rawData && rawData.tests) {
                     allQuestions = rawData.tests[0]?.questions || [];
                 } else if (rawData && rawData.questions) {
@@ -58,14 +49,12 @@ export async function loadQuestions(subject, grade) {
                 console.log(`Loaded test from GitHub: ${fileName}.json`);
             }
         }
-        // --- END: NEW MULTI-SOURCE FETCHING LOGIC ---
         
         if (allQuestions.length === 0) {
             container.innerHTML = `<p class="text-red-600">❌ No questions found for ${subject.toUpperCase()} Grade ${grade}.</p>`;
             return;
         }
 
-        // --- Test-building logic ---
         let finalQuestions = [];
         const multipleChoice = allQuestions.filter(q => q.type === 'multiple-choice' || !q.type);
         const creativeWriting = allQuestions.filter(q => q.type === 'creative-writing');
