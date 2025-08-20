@@ -21,7 +21,8 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     const gradeNumber = grade.match(/\d+/)[0];
     const fileName = `${gradeNumber}-${subject}`;
-  
+    const GITHUB_URL = `https://raw.githubusercontent.com/psalminfo/blooming-kids-cbt/main/${fileName}.json?t=${new Date().getTime()}`;
+
     let questions = [];
 
     try {
@@ -128,4 +129,3 @@ document.addEventListener("DOMContentLoaded", async () => {
         submitButton.addEventListener("click", submitTest);
     }
 });
-
