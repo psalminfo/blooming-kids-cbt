@@ -4,14 +4,11 @@ import { collection, getDocs, query, where } from "https://www.gstatic.com/fireb
 let loadedQuestions = [];
 
 export async function loadQuestions(subject, grade) {
-    // --- THIS IS THE FIX: Changed "question-container" to "questionContainer" ---
     const container = document.getElementById("questionContainer");
     if (!container) {
         console.error("Fatal Error: The element with ID 'questionContainer' was not found in the HTML.");
         return;
     }
-    // --- END OF FIX ---
-
     container.innerHTML = `<p class="text-gray-500">Please wait, preparing your personalized test...</p>`;
 
     const fileName = `${grade}-${subject}`.toLowerCase();
