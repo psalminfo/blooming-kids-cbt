@@ -1,59 +1,89 @@
-<!-- student.html -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Student Test - Blooming Kids House</title>
-  <link rel="icon" href="favicon.ico" />
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" />
-  <link rel="stylesheet" href="style.css" />
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Student Test - Blooming Kids House</title>
+  <link rel="icon" href="favicon.ico" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" />
+  <link rel="stylesheet" href="style.css" />
 </head>
 <body class="bg-green-50 min-h-screen">
-  <div class="max-w-4xl mx-auto p-6">
-    <div class="flex justify-between items-center mb-4">
-      <h1 class="text-xl font-bold text-green-800">Blooming Kids House Test</h1>
-      <button onclick="logout()" class="bg-yellow-400 text-white px-4 py-2 rounded hover:bg-yellow-500">Logout</button>
-    </div>
+  <div class="max-w-4xl mx-auto p-6">
+    <div class="flex justify-between items-center mb-4">
+      <h1 class="text-xl font-bold text-green-800">Blooming Kids House Test</h1>
+      <button onclick="logout()" class="bg-yellow-400 text-white px-4 py-2 rounded hover:bg-yellow-500">Logout</button>
+    </div>
 
-    <div id="question-container" class="space-y-4">
-      <p class="text-gray-600">Loading questions...</p>
-    </div>
+    <div id="question-container" class="space-y-4">
+      <p class="text-gray-600">Loading questions...</p>
+    </div>
 
-    <div class="mt-6 flex justify-between">
-      <button onclick="submitAnswers()" class="bg-green-600 text-white px-6 py-2 rounded hover:bg-green-700">Submit Test</button>
-    </div>
+    <div class="mt-6 flex justify-between">
+      <button onclick="submitAnswers()" class="bg-green-600 text-white px-6 py-2 rounded hover:bg-green-700">Submit Test</button>
+    </div>
 
-    <p class="text-xs text-center mt-8 text-gray-600">POWERED BY <span style="color:#FFEB3B">POG</span></p>
-  </div>
+    <p class="text-xs text-center mt-8 text-gray-600">POWERED BY <span style="color:#FFEB3B">POG</span></p>
+  </div>
 
-  <script type="module">
-    import { logout } from './utils.js';
-    import { loadQuestions } from './autoQuestionGen.js';
-    import { submitTestToFirebase } from './generateReport.js';
+  <script type="module">
+    import { logout } from './utils.js';
+    import { loadQuestions } from './autoQuestionGen.js';
+    import { submitTestToFirebase } from './generateReport.js';
 
-    const urlParams = new URLSearchParams(window.location.search);
-    const subject = urlParams.get('subject');
-    const grade = urlParams.get('grade');
-    const studentName = urlParams.get('studentName');
-    const parentEmail = urlParams.get('parentEmail');
-    const tutorName = urlParams.get('tutorName');
-    const location = urlParams.get('location');
+    const urlParams = new URLSearchParams(window.location.search);
+    const subject = urlParams.get('subject');
+    const grade = urlParams.get('grade');
+    const studentName = urlParams.get('studentName');
+    const parentEmail = urlParams.get('parentEmail');
+    const tutorName = urlParams.get('tutorName');
+    const location = urlParams.get('location');
 
-    if (!subject || !grade) {
-      alert("Missing subject or grade. Redirecting...");
-      window.location.href = "index.html";
-    } else {
-      loadQuestions(subject, grade, studentName, parentEmail, tutorName, location);
-    }
+    if (!subject || !grade) {
+      alert("Missing subject or grade. Redirecting...");
+      window.location.href = "index.html";
+    } else {
+      loadQuestions(subject, grade, studentName, parentEmail, tutorName, location);
+    }
 
-    window.submitAnswers = async function () {
-      await submitTestToFirebase(subject, grade, studentName, parentEmail, tutorName, location);
-      document.getElementById("question-container").innerHTML = `<div class="text-center p-6 text-green-700 font-semibold text-xl">✅ Submitted. Redirecting...</div>`;
-      setTimeout(() => window.location.href = "subject-select.html", 1500);
-    }
+    // THIS IS THE ONLY UPDATED SECTION
+    window.submitAnswers = async function () {
+      // Get all the question blocks on the page
+      const allQuestionBlocks = document.querySelectorAll('.question-block');
 
-    window.logout = logout;
-  </script>
+      // Reset the border style on all questions
+      allQuestionBlocks.forEach(block => {
+        block.style.border = ""; // Reset to default
+      });
+
+      // Loop through each question to find an unanswered one
+      for (let i = 0; i < allQuestionBlocks.length; i++) {
+        const isAnswered = document.querySelector(`input[name="q${i}"]:checked`);
+        
+        // If a question is not answered:
+        if (!isAnswered) {
+          alert("Please answer all questions. We'll take you to the first one you missed.");
+          
+          const unansweredBlock = allQuestionBlocks[i];
+          
+          // Scroll the unanswered question into view
+          unansweredBlock.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          
+          // Highlight it with a red border
+          unansweredBlock.style.border = "2px solid red";
+          
+          // Stop the function here
+          return; 
+        }
+      }
+
+      // If the loop completes, proceed with the original submission logic
+      await submitTestToFirebase(subject, grade, studentName, parentEmail, tutorName, location);
+      document.getElementById("question-container").innerHTML = `<div class="text-center p-6 text-green-700 font-semibold text-xl">✅ Submitted. Redirecting...</div>`;
+      setTimeout(() => window.location.href = "subject-select.html", 1500);
+    }
+
+    window.logout = logout;
+  </script>
 </body>
 </html>
