@@ -1,45 +1,56 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Select Subject - Blooming Kids House</title>
-  <link rel="icon" href="favicon.ico" />
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" />
-  <link rel="stylesheet" href="style.css" />
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Select Subject - Blooming Kids House</title>
+  <link rel="icon" href="favicon.ico" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" />
+  <link rel="stylesheet" href="style.css" />
 </head>
 <body class="bg-green-50 min-h-screen flex items-center justify-center">
 
-  <div class="bg-white p-8 rounded-xl shadow-xl w-full max-w-md text-center">
-    <h2 class="text-2xl font-bold text-green-800 mb-4">Select a Subject</h2>
-    <div id="subjectButtons" class="space-y-4">
-      <button onclick="goToSubject('math')" class="bg-green-600 text-white w-full py-2 rounded hover:bg-green-700">Math</button>
-      <button onclick="goToSubject('ela')" class="bg-green-600 text-white w-full py-2 rounded hover:bg-green-700">English Language Arts</button>
-      <button onclick="goToSubject('biology')" class="bg-green-600 text-white w-full py-2 rounded hover:bg-green-700">Biology</button>
-       <button onclick="goToSubject('physics')" class="bg-green-600 text-white w-full py-2 rounded hover:bg-green-700">Physics</button>
-       <button onclick="goToSubject('chemistry')" class="bg-green-600 text-white w-full py-2 rounded hover:bg-green-700">Chemistry</button>
-    </div>
-    <p class="text-xs text-center mt-6 text-gray-600">POWERED BY <span style="color:#FFEB3B">POG</span></p>
-  </div>
+  <div class="bg-white p-8 rounded-xl shadow-xl w-full max-w-md text-center">
+    <h2 class="text-2xl font-bold text-green-800 mb-4">Select a Subject</h2>
+    <div id="subjectButtons" class="space-y-4">
+      <button onclick="goToSubject('math')" class="bg-green-600 text-white w-full py-2 rounded hover:bg-green-700">Math</button>
+      <button onclick="goToSubject('ela')" class="bg-green-600 text-white w-full py-2 rounded hover:bg-green-700">English Language Arts</button>
+      <button onclick="goToSubject('biology')" class="bg-green-600 text-white w-full py-2 rounded hover:bg-green-700">Biology</button>
+      <button onclick="goToSubject('physics')" class="bg-green-600 text-white w-full py-2 rounded hover:bg-green-700">Physics</button>
+      <button onclick="goToSubject('chemistry')" class="bg-green-600 text-white w-full py-2 rounded hover:bg-green-700">Chemistry</button>
+    </div>
+    <p class="text-xs text-center mt-6 text-gray-600">POWERED BY <span style="color:#FFEB3B">POG</span></p>
+  </div>
 
-  <script>
-    // This script now correctly reads from localStorage
-    const studentName = localStorage.getItem('studentName');
-    const parentEmail = localStorage.getItem('studentEmail');
-    const grade = localStorage.getItem('grade');
+  <script>
+    // This script reads student info from the browser's local storage.
+    const studentName = localStorage.getItem('studentName');
+    const parentEmail = localStorage.getItem('studentEmail');
+    const grade = localStorage.getItem('grade');
 
-    if (!studentName || !parentEmail || !grade) {
-      alert("Missing student info. Please log in again.");
-      window.location.href = "index.html";
-    }
+    // It checks if the student is properly logged in. If not, it redirects.
+    if (!studentName || !parentEmail || !grade) {
+      alert("Missing student info. Please log in again.");
+      window.location.href = "index.html";
+    }
 
-    function goToSubject(subject) {
-      // It only needs to pass the subject in the URL now
-      window.location.href = `student.html?subject=${subject}`;
-    }
-  </script>
+    /**
+     * UPDATED FUNCTION
+     * This now sends ALL the required student data in the URL to the next page.
+     */
+    function goToSubject(subject) {
+      // Create a URL query string with all the student data.
+      const params = new URLSearchParams({
+        subject: subject,
+        studentName: studentName,
+        parentEmail: parentEmail,
+        grade: grade
+      });
+
+      // Redirect to the test page with the complete URL.
+      window.location.href = `student.html?${params.toString()}`;
+    }
+  </script>
 
 </body>
 </html>
-
-
