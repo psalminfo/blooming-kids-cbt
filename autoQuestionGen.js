@@ -110,11 +110,13 @@ function displayQuestions(questions) {
                     <input type="file" id="creativeWritingFile" class="w-full mt-1">
                 </div>
             ` : `
-                ${(q.options || []).map(opt => `
+            <div class="mt-2">
+                ${(q.options || []).map((opt, index) => `
                     <label class="flex items-center ml-4 p-2 rounded hover:bg-gray-100 cursor-pointer">
-                        <input type="radio" name="q${i}" value="${opt}" class="mr-2"> ${opt}
+                        <input type="radio" name="q${i}" value="${opt}" class="mr-2"> ${String.fromCharCode(65 + index)}. ${opt}
                     </label>
                 `).join('')}
+            </div>
             `}
         </div>
     `}).join('');
