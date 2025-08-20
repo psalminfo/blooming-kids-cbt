@@ -110,15 +110,13 @@ function displayQuestions(questions) {
                     <input type="file" id="creativeWritingFile" class="w-full mt-1">
                 </div>
             ` : `
-              <div class="mt-2">
+              <div class="mt-2">
                     ${(q.options || []).map((opt, index) => `
-                        {/* CHANGE 1: Removed the alphabetical label */}
-                        {/* CHANGE 2: Removed horizontal padding (p-2 -> py-2) to fix left alignment */}
-                        <label class="flex items-center py-2 rounded hover:bg-gray-100 cursor-pointer">
-                            <input type="radio" name="q${i}" value="${opt}" class="mr-2"> ${opt}
+                        <label class="flex items-center p-2 rounded hover:bg-gray-100 cursor-pointer">
+                            <input type="radio" name="q${i}" value="${opt}" class="mr-2"> ${String.fromCharCode(65 + index)}. ${opt}
                         </label>
                     `).join('')}
-              </div>
+              </div>
             `}
         </div>
     `}).join('');
