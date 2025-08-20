@@ -1,61 +1,28 @@
 import { db } from "./firebaseConfig.js";
 import { collection, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
+// --- THIS IS THE CHANGE: We now import the functions from our dedicated file ---
+import { loadQuestions, getLoadedQuestions } from "./autoQuestionGen.js";
 
-document.addEventListener("DOMContentLoaded", async () => {
+document.addEventListener("DOMContentLoaded", () => {
     const urlParams = new URLSearchParams(window.location.search);
     const subject = urlParams.get("subject")?.toLowerCase();
 
-    // --- THIS IS THE FIX: Read ALL student info from localStorage ---
     const studentName = localStorage.getItem("studentName");
     const parentEmail = localStorage.getItem("studentEmail");
     const grade = localStorage.getItem("grade");
-    const tutorEmail = localStorage.getItem("tutorEmail"); // Added this line
-    const studentCountry = localStorage.getItem("studentCountry"); // Added this line
+    const tutorEmail = localStorage.getItem("tutorEmail");
+    const studentCountry = localStorage.getItem("studentCountry");
 
-    // Updated the check to include the new fields
-    if (!studentName || !parentEmail || !grade || !subject || !tutorEmail || !studentCountry) {
+    if (!studentName || !parentEmail || !grade || !subject) {
         alert("Missing student info. Please log in again.");
         window.location.href = "index.html";
         return;
     }
 
-    const gradeNumber = grade.match(/\d+/)[0];
-    const fileName = `${gradeNumber}-${subject}`;
-    const GITHUB_URL = `https://raw.githubusercontent.com/psalminfo/blooming-kids-cbt/main/${fileName}.json?t=${new Date().getTime()}`;
-
-    let questions = [];
-
-    try {
-        const res = await fetch(GITHUB_URL);
-        if (!res.ok) throw new Error(`File not found: ${GITHUB_URL}`);
-        const data = await res.json();
-
-        const testData = data.tests[0];
-        questions = testData.questions.sort(() => 0.5 - Math.random()).slice(0, 30);
-
-        renderQuestions(questions);
-        startTimer(30);
-    } catch (err) {
-        console.error("Question fetch error:", err);
-        alert(`Could not load questions for ${subject}.`);
-    }
-
-    function renderQuestions(qs) {
-        const container = document.getElementById("questionContainer");
-        if (!container) return;
-        container.innerHTML = qs.map((q, i) => `
-      <div class="bg-white p-4 rounded shadow mb-4 question-block">
-        <p class="font-semibold mb-2">${i + 1}. ${q.question}</p>
-        ${q.imageUrl ? `<img src="${q.imageUrl}" alt="Question Image" class="my-2 max-w-full h-auto rounded">` : ''}
-        <div class="options-container">
-        ${q.options.map(opt => `
-          <label class="block cursor-pointer p-2 rounded hover:bg-gray-100">
-            <input type="radio" name="q${i}" value="${opt}" class="mr-2" />${opt}
-          </label>`).join("")}
-        </div>
-      </div>
-    `).join("");
-    }
+    // --- The complex loading logic is gone. We just call the function. ---
+    loadQuestions(subject, grade);
+    
+    startTimer(30);
 
     function startTimer(mins) {
         let time = mins * 60;
@@ -74,6 +41,8 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
 
     async function submitTest() {
+        // We now get the questions from our dedicated module
+        const questions = getLoadedQuestions();
         const allQuestionBlocks = document.querySelectorAll('.question-block');
         allQuestionBlocks.forEach(block => block.style.border = "1px solid #e2e8f0");
 
@@ -101,14 +70,13 @@ document.addEventListener("DOMContentLoaded", async () => {
         const score = resultsPayload.filter(r => r.studentAnswer === r.correctAnswer).length;
 
         try {
-            // --- THIS IS THE FIX: Add the missing fields to the data sent to Firestore ---
             await addDoc(collection(db, "student_results"), {
                 studentName,
                 parentEmail,
                 grade,
                 subject,
-                tutorEmail, // Added this line
-                studentCountry, // Added this line
+                tutorEmail,
+                studentCountry,
                 answers: resultsPayload,
                 score: score,
                 totalScoreableQuestions: questions.length,
