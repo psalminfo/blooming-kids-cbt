@@ -85,8 +85,6 @@ export async function loadQuestions(subject, grade) {
         loadedQuestions = finalQuestions.map((q, index) => ({ ...q, id: index }));
         
         displayQuestions(loadedQuestions);
-         console.log("Data received by displayQuestions:", questions); // Add this line
-    const container = document.getElementById("question-container");
     } catch (err) {
         console.error("Failed to load questions:", err);
         container.innerHTML = `<p class="text-red-600">❌ An error occurred while loading the test. ${err.message}</p>`;
@@ -128,4 +126,3 @@ function displayQuestions(questions) {
         </div>
     `}).join('');
 }
-
