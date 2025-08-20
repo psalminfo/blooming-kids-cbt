@@ -1,6 +1,6 @@
 import { db } from "./firebaseConfig.js";
 import { collection, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
-// --- THIS IS THE CHANGE: We now import the functions from our dedicated file ---
+// --- THIS IS THE FIX: We now import the functions from our dedicated file ---
 import { loadQuestions, getLoadedQuestions } from "./autoQuestionGen.js";
 
 document.addEventListener("DOMContentLoaded", () => {
