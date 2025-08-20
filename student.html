@@ -1,109 +1,133 @@
 <!DOCTYPE html>
+
 <html lang="en">
+
 <head>
+
   <meta charset="UTF-8" />
+
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+
   <title>Student Test - Blooming Kids House</title>
+
   <link rel="icon" href="favicon.ico" />
+
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" />
+
   <link rel="stylesheet" href="style.css" />
+
 </head>
+
 <body class="bg-green-50 min-h-screen">
+
   <div class="max-w-4xl mx-auto p-6">
+
     <div class="flex justify-between items-center mb-4">
+
       <h1 class="text-xl font-bold text-green-800">Blooming Kids House Test</h1>
+
       <button onclick="logout()" class="bg-yellow-400 text-white px-4 py-2 rounded hover:bg-yellow-500">Logout</button>
+
     </div>
+
+
 
     <div id="question-container" class="space-y-4">
+
       <p class="text-gray-600">Loading questions...</p>
+
     </div>
 
-    <div id="elaSubmissionButtons" class="hidden mt-6 flex justify-between">
-      <button onclick="submitCreativeWriting()" class="bg-blue-600 text-white px-6 py-2 rounded hover:bg-blue-700">Submit Writing Only</button>
-      <button onclick="submitRemainingAnswers()" class="bg-green-600 text-white px-6 py-2 rounded hover:bg-green-700">Submit Remaining</button>
-    </div>
 
-    <div id="otherSubmissionButton" class="mt-6 flex justify-between">
+
+    <div class="mt-6 flex justify-between">
+
       <button onclick="submitAnswers()" class="bg-green-600 text-white px-6 py-2 rounded hover:bg-green-700">Submit Test</button>
+
     </div>
+
+
 
     <p class="text-xs text-center mt-8 text-gray-600">POWERED BY <span style="color:#FFEB3B">POG</span></p>
+
   </div>
 
+
+
   <script type="module">
+
     import { loadQuestions } from './autoQuestionGen.js';
-    import { submitTestToFirebase, submitCreativeWritingToFirebase } from './generateReport.js';
+
+    import { submitTestToFirebase } from './generateReport.js';
+
+
 
     const urlParams = new URLSearchParams(window.location.search);
+
     const subject = urlParams.get('subject');
+
     const grade = urlParams.get('grade');
+
     const studentName = urlParams.get('studentName');
+
     const parentEmail = urlParams.get('parentEmail');
+
     const tutorEmail = urlParams.get('tutorEmail');
+
     const studentCountry = urlParams.get('country');
-    let creativeWritingSubmitted = false;
+
+    
 
     if (!subject || !grade || !studentName || !parentEmail || !tutorEmail || !studentCountry) {
+
       alert("Missing student info. Redirecting...");
+
       window.location.href = "index.html";
+
     } else {
+
       loadQuestions(subject, grade, studentCountry);
+
     }
 
-    if (subject === 'ela') {
-      document.getElementById('elaSubmissionButtons').classList.remove('hidden');
-      document.getElementById('otherSubmissionButton').classList.add('hidden');
-    } else {
-      document.getElementById('elaSubmissionButtons').classList.add('hidden');
-      document.getElementById('otherSubmissionButton').classList.remove('hidden');
-    }
+
 
     window.submitAnswers = async function () {
-      await submitTestToFirebase(subject, grade, studentName, parentEmail, tutorEmail, studentCountry, creativeWritingSubmitted);
+
+      await submitTestToFirebase(subject, grade, studentName, parentEmail, tutorEmail, studentCountry);
+
       document.getElementById("question-container").innerHTML = `<div class="text-center p-6 text-green-700 font-semibold text-xl">✅ Submitted. Redirecting...</div>`;
-      
+
+      
+
       const params = new URLSearchParams();
+
       params.append('studentName', studentName);
+
       params.append('parentEmail', parentEmail);
+
       params.append('grade', grade);
+
       params.append('tutorEmail', tutorEmail);
+
       params.append('country', studentCountry);
-      
+
+      
+
       setTimeout(() => window.location.href = `subject-select.html?${params.toString()}`, 1500);
+
     }
 
-    window.submitCreativeWriting = async function () {
-      try {
-        await submitCreativeWritingToFirebase(studentName, parentEmail, tutorEmail);
-        alert("Creative writing submitted! You can now continue with the rest of the test.");
-        creativeWritingSubmitted = true;
-        document.getElementById('elaSubmissionButtons').classList.add('hidden');
-        document.getElementById('otherSubmissionButton').classList.remove('hidden');
-      } catch (error) {
-        alert(error.message);
-      }
-    }
 
-    window.submitRemainingAnswers = async function () {
-      if (!creativeWritingSubmitted) {
-        alert("Please submit the creative writing first.");
-        return;
-      }
-      await submitTestToFirebase(subject, grade, studentName, parentEmail, tutorEmail, studentCountry, creativeWritingSubmitted);
-      document.getElementById("question-container").innerHTML = `<div class="text-center p-6 text-green-700 font-semibold text-xl">✅ Submitted. Redirecting...</div>`;
-      const params = new URLSearchParams();
-      params.append('studentName', studentName);
-      params.append('parentEmail', parentEmail);
-      params.append('grade', grade);
-      params.append('tutorEmail', tutorEmail);
-      params.append('country', studentCountry);
-      setTimeout(() => window.location.href = `subject-select.html?${params.toString()}`, 1500);
-    }
 
     window.logout = () => {
+
       window.location.href = 'index.html';
+
     };
+
   </script>
+
 </body>
+
 </html>
