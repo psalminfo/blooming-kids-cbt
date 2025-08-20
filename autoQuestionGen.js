@@ -1,72 +1,84 @@
 import { db } from './firebaseConfig.js';
-import { collection, getDocs, query, where, documentId } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
+import { collection, getDocs, query, where } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
 
 let loadedQuestions = [];
 
-export async function loadQuestions(subject, grade, studentCountry) {
+export async function loadQuestions(subject, grade) {
     const container = document.getElementById("question-container");
+    container.innerHTML = `<p class="text-gray-500">Please wait, preparing your test...</p>`;
+
     const fileName = `${grade}-${subject}`.toLowerCase();
     const GITHUB_URL = `https://raw.githubusercontent.com/psalminfo/blooming-kids-cbt/main/${fileName}.json`;
 
-    container.innerHTML = `<p class="text-gray-500">Please wait, loading questions...</p>`;
+    let allQuestions = [];
 
     try {
-        let allQuestions = [];
-        let firestoreQuestions = [];
+        let rawData;
         
-        // Fetch questions from the "admin_questions" collection
-        const adminQuestionsSnapshot = await getDocs(collection(db, "admin_questions"));
-        firestoreQuestions = adminQuestionsSnapshot.docs.map(doc => doc.data());
-        
-        // Fetch from the "tests" collection in Firestore (primary source)
+        // --- START: CORRECTED FETCHING LOGIC ---
+        // This new logic searches for an exact match on a dedicated 'searchId' field.
+
         const testsCollectionRef = collection(db, "tests");
-        const searchPrefix = `${grade}-${subject.toLowerCase().slice(0, 3)}`;
+        
+        // 1. Create the exact search term, e.g., "9-math".
+        const searchTerm = `${grade}-${subject.toLowerCase()}`;
+
+        // 2. Create a query to find documents where the 'searchId' field is an exact match.
+        // This is the correct and efficient way to query Firestore.
         const q = query(
             testsCollectionRef,
-            where(documentId(), '>=', searchPrefix),
-            where(documentId(), '<', searchPrefix + '\uf8ff')
+            where("searchId", "==", searchTerm)
         );
-        const testsSnapshot = await getDocs(q);
 
-        if (!testsSnapshot.empty) {
-            allQuestions = testsSnapshot.docs.flatMap(docSnap => docSnap.data().questions || []);
-            allQuestions.push(...firestoreQuestions);
-            console.log(`Loaded ${allQuestions.length} questions from Firestore 'tests' collection and 'admin_questions'.`);
+        const querySnapshot = await getDocs(q);
+
+        // 3. Check if we found a matching document.
+        if (!querySnapshot.empty) {
+            const docSnap = querySnapshot.docs[0];
+            rawData = docSnap.data();
+            console.log(`Loading curated test from Firestore: ${docSnap.id}`);
         } else {
-            // Fallback to GitHub if no test is found in Firestore 'tests'
-            console.log(`No test found in Firestore 'tests' collection. Trying GitHub and 'admin_questions'.`);
+            // 4. If no match is found in Firestore, fall back to GitHub.
+            console.log(`No test found in Firestore for '${searchTerm}'. Trying GitHub.`);
             const gitHubRes = await fetch(GITHUB_URL);
-            const gitHubData = gitHubRes.ok ? (await gitHubRes.json()).questions : [];
-            allQuestions = [...(gitHubData || []), ...firestoreQuestions];
+            if (!gitHubRes.ok) throw new Error("Test file not found in Firestore or on GitHub.");
+            rawData = await gitHubRes.json();
+            console.log(`Loaded test from GitHub: ${fileName}.json`);
+        }
+        // --- END: CORRECTED FETCHING LOGIC ---
+
+        // --- Logic to handle both JSON formats ---
+        let testArray = [];
+        if (rawData && rawData.tests) {
+            testArray = rawData.tests;
+        } else if (rawData && rawData.questions) {
+            testArray = [{ subject, grade, questions: rawData.questions }];
         }
 
+        allQuestions = testArray.flatMap(test => {
+            const defaultType = test.defaultQuestionType;
+            if (!test.questions) return [];
+            return test.questions.map(q => ({ ...q, type: q.type || defaultType }));
+        });
+        
         if (allQuestions.length === 0) {
             container.innerHTML = `<p class="text-red-600">❌ No questions found for ${subject.toUpperCase()} Grade ${grade}.</p>`;
             return;
         }
 
-        let countrySpecificQuestions = allQuestions.filter(q => q.location === studentCountry);
-
-        if (countrySpecificQuestions.length < 30) {
-            allQuestions = [...countrySpecificQuestions, ...allQuestions.filter(q => q.location !== studentCountry)];
-        } else {
-            allQuestions = countrySpecificQuestions;
-        }
-
+        // --- Test-building logic ---
         let finalQuestions = [];
         const multipleChoice = allQuestions.filter(q => q.type === 'multiple-choice');
         const creativeWriting = allQuestions.filter(q => q.type === 'creative-writing');
         const comprehension = allQuestions.filter(q => q.type === 'comprehension');
         
-        if (subject === 'ela') {
-            if (creativeWriting.length > 0) {
-                finalQuestions.push(creativeWriting[0]);
-            }
-            if (comprehension.length > 0) {
-                finalQuestions.push(...comprehension.slice(0, 2));
-            }
+        if (subject.toLowerCase() === 'ela' || subject.toLowerCase() === 'english') {
+            if (creativeWriting.length > 0) finalQuestions.push(creativeWriting[0]);
+            if (comprehension.length > 0) finalQuestions.push(...comprehension.slice(0, 2));
+            
+            const remainingNeeded = 30 - finalQuestions.length;
             const remainingQuestions = [...multipleChoice].sort(() => 0.5 - Math.random());
-            finalQuestions.push(...remainingQuestions.slice(0, 30 - finalQuestions.length));
+            finalQuestions.push(...remainingQuestions.slice(0, remainingNeeded));
         } else {
             finalQuestions = [...allQuestions].sort(() => 0.5 - Math.random()).slice(0, 30);
         }
@@ -76,7 +88,7 @@ export async function loadQuestions(subject, grade, studentCountry) {
         displayQuestions(loadedQuestions);
     } catch (err) {
         console.error("Failed to load questions:", err);
-        container.innerHTML = `<p class="text-red-600">❌ An error occurred while loading questions.</p>`;
+        container.innerHTML = `<p class="text-red-600">❌ An error occurred while loading the test. ${err.message}</p>`;
     }
 }
 
@@ -86,11 +98,19 @@ export function getLoadedQuestions() {
 
 function displayQuestions(questions) {
     const container = document.getElementById("question-container");
-    container.innerHTML = (questions || []).map((q, i) => `
+    container.innerHTML = (questions || []).map((q, i) => {
+        const showImageBefore = q.imageUrl && q.image_position !== 'after';
+        const showImageAfter = q.imageUrl && q.image_position === 'after';
+
+        return `
         <div class="bg-white p-4 border rounded-lg shadow-sm question-block" data-question-id="${q.id}">
-            ${(q.image_url && q.image_position === 'before') ? `<img src="${q.image_url}" class="mb-2 w-full rounded" />` : ''}
+            
+            ${showImageBefore ? `<img src="${q.imageUrl}" class="mb-2 w-full rounded" alt="Question image"/>` : ''}
+            
             <p class="font-semibold mb-2 question-text">${i + 1}. ${q.question || q.passage || ''}</p>
-            ${(q.image_url && q.image_position === 'after') ? `<img src="${q.image_url}" class="mt-2 w-full rounded" />` : ''}
+
+            ${showImageAfter ? `<img src="${q.imageUrl}" class="mt-2 w-full rounded" alt="Question image"/>` : ''}
+            
             ${q.type === 'creative-writing' ? `
                 <textarea id="creativeWriting" class="w-full mt-4 p-2 border rounded" rows="10" placeholder="Write your response here..."></textarea>
                 <div class="mt-2">
@@ -105,5 +125,5 @@ function displayQuestions(questions) {
                 `).join('')}
             `}
         </div>
-    `).join('');
+    `}).join('');
 }
