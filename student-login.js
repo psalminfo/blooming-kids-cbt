@@ -4,8 +4,8 @@ document.getElementById("studentLoginForm").addEventListener("submit", function 
   const studentName = document.getElementById("studentName").value;
   const parentEmail = document.getElementById("parentEmail").value;
   const grade = document.getElementById("grade").value;
-  const tutorName = document.getElementById("tutorName").value;
-  const location = document.getElementById("location").value;
+  const tutorEmail = document.getElementById("tutorEmail").value;
+  const studentCountry = document.getElementById("country").value;
   const accessCode = document.getElementById("accessCode").value;
 
   if (accessCode !== "bkh2025") {
@@ -13,15 +13,15 @@ document.getElementById("studentLoginForm").addEventListener("submit", function 
     return;
   }
 
-  const studentData = {
-    studentName,
-    parentEmail,
-    grade,
-    tutorName,
-    location
-  };
+  // --- THIS IS THE FIX ---
+  // We now save all the student's details to the browser's local storage.
+  localStorage.setItem("studentName", studentName);
+  localStorage.setItem("studentEmail", parentEmail);
+  localStorage.setItem("grade", grade);
+  localStorage.setItem("tutorEmail", tutorEmail);
+  localStorage.setItem("studentCountry", studentCountry);
+  // --- END OF FIX ---
 
-  localStorage.setItem("studentData", JSON.stringify(studentData));
-
-  window.location.href = "subject-select.html";
+  // Redirect to the subject selection page.
+  window.location.href = `subject-select.html`;
 });
