@@ -1,3 +1,4 @@
+<!-- student.html -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -12,37 +13,47 @@
   <div class="max-w-4xl mx-auto p-6">
     <div class="flex justify-between items-center mb-4">
       <h1 class="text-xl font-bold text-green-800">Blooming Kids House Test</h1>
-      <!-- This timer element will now work because student.js is being loaded -->
-      <div id="timer" class="text-lg font-semibold text-red-600">Time Left: --:--</div>
       <button onclick="logout()" class="bg-yellow-400 text-white px-4 py-2 rounded hover:bg-yellow-500">Logout</button>
     </div>
 
-    <div id="questionContainer" class="space-y-4">
+    <div id="question-container" class="space-y-4">
       <p class="text-gray-600">Loading questions...</p>
     </div>
 
     <div class="mt-6 flex justify-between">
-      <!-- The button now has an ID so student.js can find it -->
-      <button id="submitBtn" class="bg-green-600 text-white px-6 py-2 rounded hover:bg-green-700">Submit Test</button>
+      <button onclick="submitAnswers()" class="bg-green-600 text-white px-6 py-2 rounded hover:bg-green-700">Submit Test</button>
     </div>
 
     <p class="text-xs text-center mt-8 text-gray-600">POWERED BY <span style="color:#FFEB3B">POG</span></p>
   </div>
 
-  <!-- This script now correctly loads your student.js file, which contains all the logic -->
-  <script type="module" src="student.js"></script>
+  <script type="module">
+    import { logout } from './utils.js';
+    import { loadQuestions } from './autoQuestionGen.js';
+    import { submitTestToFirebase } from './generateReport.js';
 
-  <script>
-    // The logout function can remain here
-    function logout() {
-      // Clear local storage to ensure a clean logout
-      localStorage.removeItem("studentName");
-      localStorage.removeItem("studentEmail");
-      localStorage.removeItem("grade");
-      localStorage.removeItem("tutorEmail");
-      localStorage.removeItem("studentCountry");
-      window.location.href = 'index.html';
-    };
+    const urlParams = new URLSearchParams(window.location.search);
+    const subject = urlParams.get('subject');
+    const grade = urlParams.get('grade');
+    const studentName = urlParams.get('studentName');
+    const parentEmail = urlParams.get('parentEmail');
+    const tutorName = urlParams.get('tutorName');
+    const location = urlParams.get('location');
+
+    if (!subject || !grade) {
+      alert("Missing subject or grade. Redirecting...");
+      window.location.href = "index.html";
+    } else {
+      loadQuestions(subject, grade, studentName, parentEmail, tutorName, location);
+    }
+
+    window.submitAnswers = async function () {
+      await submitTestToFirebase(subject, grade, studentName, parentEmail, tutorName, location);
+      document.getElementById("question-container").innerHTML = `<div class="text-center p-6 text-green-700 font-semibold text-xl">✅ Submitted. Redirecting...</div>`;
+      setTimeout(() => window.location.href = "subject-select.html", 1500);
+    }
+
+    window.logout = logout;
   </script>
 </body>
 </html>
