@@ -1,61 +1,139 @@
 import { db } from "./firebaseConfig.js";
-import { collection, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
+import { collection, addDoc, serverTimestamp, getDocs, query, where } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
 
-document.addEventListener("DOMContentLoaded", async () => {
+// This variable will hold the questions for the current test.
+let currentTestQuestions = [];
+
+/**
+ * This is the main function that loads questions from multiple sources.
+ * It prioritizes Firestore and uses GitHub as a fallback.
+ */
+async function loadQuestions(subject, grade) {
+    const container = document.getElementById("questionContainer");
+    container.innerHTML = `<p class="text-gray-500">Please wait, preparing your personalized test...</p>`;
+
+    const fileName = `${grade}-${subject}`.toLowerCase();
+    const GITHUB_URL = `https://raw.githubusercontent.com/psalminfo/blooming-kids-cbt/main/${fileName}.json`;
+
+    let allQuestions = [];
+
+    try {
+        // 1. First, try to find a curated test in the 'tests' collection.
+        const testsCollectionRef = collection(db, "tests");
+        const curatedTestQuery = query(
+            testsCollectionRef,
+            where("grade", "==", String(grade)),
+            where("subject", "==", subject)
+        );
+        const curatedTestSnapshot = await getDocs(curatedTestQuery);
+
+        if (!curatedTestSnapshot.empty) {
+            const docSnap = curatedTestSnapshot.docs[0];
+            allQuestions = docSnap.data().questions || [];
+            console.log(`SUCCESS: Loading curated test from Firestore: ${docSnap.id}`);
+        } else {
+            // 2. If no curated test is found, gather questions from 'admin_questions'.
+            console.log(`INFO: No curated test found. Checking 'admin_questions' collection.`);
+            const adminQuestionsRef = collection(db, "admin_questions");
+            const adminQuery = query(
+                adminQuestionsRef,
+                where("grade", "==", String(grade)),
+                where("subject", "==", subject.toLowerCase())
+            );
+            const adminSnapshot = await getDocs(adminQuery);
+
+            if (!adminSnapshot.empty) {
+                adminSnapshot.forEach(doc => allQuestions.push(doc.data()));
+                console.log(`SUCCESS: Loaded ${allQuestions.length} questions from 'admin_questions'.`);
+            } else {
+                // 3. If still no questions, fall back to GitHub.
+                console.log(`INFO: No questions found in Firestore. Trying GitHub as a fallback.`);
+                const gitHubRes = await fetch(GITHUB_URL);
+                if (!gitHubRes.ok) throw new Error("Test file not found in any source.");
+                const rawData = await gitHubRes.json();
+                
+                if (rawData && rawData.tests) {
+                    allQuestions = rawData.tests[0]?.questions || [];
+                } else if (rawData && rawData.questions) {
+                    allQuestions = rawData.questions;
+                }
+                console.log(`SUCCESS: Loaded test from GitHub: ${fileName}.json`);
+            }
+        }
+        
+        if (allQuestions.length === 0) {
+            container.innerHTML = `<p class="text-red-600">❌ No questions found for ${subject.toUpperCase()} Grade ${grade}.</p>`;
+            return;
+        }
+
+        // Build the final test with the correct mix of questions.
+        let finalQuestions = [];
+        const multipleChoice = allQuestions.filter(q => q.type === 'multiple-choice' || !q.type);
+        const creativeWriting = allQuestions.filter(q => q.type === 'creative-writing');
+        const comprehension = allQuestions.filter(q => q.type === 'comprehension');
+        
+        if (subject.toLowerCase() === 'ela' || subject.toLowerCase() === 'english') {
+            if (creativeWriting.length > 0) finalQuestions.push(creativeWriting[0]);
+            if (comprehension.length > 0) finalQuestions.push(...comprehension.slice(0, 2));
+            
+            const remainingNeeded = 30 - finalQuestions.length;
+            const remainingQuestions = [...multipleChoice].sort(() => 0.5 - Math.random());
+            finalQuestions.push(...remainingQuestions.slice(0, remainingNeeded));
+        } else {
+            finalQuestions = [...allQuestions].sort(() => 0.5 - Math.random()).slice(0, 30);
+        }
+
+        // Save the final questions to our global variable and display them.
+        currentTestQuestions = finalQuestions.map((q, index) => ({ ...q, id: index }));
+        displayQuestions(currentTestQuestions);
+
+    } catch (err) {
+        console.error("Failed to load questions:", err);
+        container.innerHTML = `<p class="text-red-600">❌ An error occurred while loading the test. ${err.message}</p>`;
+    }
+}
+
+/**
+ * Renders the questions to the page.
+ */
+function displayQuestions(questions) {
+    const container = document.getElementById("questionContainer");
+    container.innerHTML = (questions || []).map((q, i) => {
+        const showImage = q.imageUrl;
+        return `
+        <div class="bg-white p-4 border rounded-lg shadow-sm question-block" data-question-id="${q.id}">
+            ${showImage ? `<img src="${q.imageUrl}" class="mb-2 w-full rounded" alt="Question image"/>` : ''}
+            <p class="font-semibold mb-2 question-text">${i + 1}. ${q.question || q.passage || ''}</p>
+            ${(q.options || []).map(opt => `
+                <label class="block ml-4">
+                    <input type="radio" name="q${i}" value="${opt}" class="mr-2"> ${opt}
+                </label>
+            `).join('')}
+        </div>
+    `}).join('');
+}
+
+
+document.addEventListener("DOMContentLoaded", () => {
     const urlParams = new URLSearchParams(window.location.search);
     const subject = urlParams.get("subject")?.toLowerCase();
 
-    // --- THIS IS THE FIX: Read ALL student info from localStorage ---
     const studentName = localStorage.getItem("studentName");
     const parentEmail = localStorage.getItem("studentEmail");
     const grade = localStorage.getItem("grade");
-    const tutorEmail = localStorage.getItem("tutorEmail"); // Added this line
-    const studentCountry = localStorage.getItem("studentCountry"); // Added this line
+    const tutorEmail = localStorage.getItem("tutorEmail");
+    const studentCountry = localStorage.getItem("studentCountry");
 
-    // Updated the check to include the new fields
-    if (!studentName || !parentEmail || !grade || !subject || !tutorEmail || !studentCountry) {
+    if (!studentName || !parentEmail || !grade || !subject) {
         alert("Missing student info. Please log in again.");
         window.location.href = "index.html";
         return;
     }
 
-    const gradeNumber = grade.match(/\d+/)[0];
-    const fileName = `${gradeNumber}-${subject}`;
-    const GITHUB_URL = `https://raw.githubusercontent.com/psalminfo/blooming-kids-cbt/main/${fileName}.json?t=${new Date().getTime()}`;
-
-    let questions = [];
-
-    try {
-        const res = await fetch(GITHUB_URL);
-        if (!res.ok) throw new Error(`File not found: ${GITHUB_URL}`);
-        const data = await res.json();
-
-        const testData = data.tests[0];
-        questions = testData.questions.sort(() => 0.5 - Math.random()).slice(0, 30);
-
-        renderQuestions(questions);
-        startTimer(30);
-    } catch (err) {
-        console.error("Question fetch error:", err);
-        alert(`Could not load questions for ${subject}.`);
-    }
-
-    function renderQuestions(qs) {
-        const container = document.getElementById("questionContainer");
-        if (!container) return;
-        container.innerHTML = qs.map((q, i) => `
-      <div class="bg-white p-4 rounded shadow mb-4 question-block">
-        <p class="font-semibold mb-2">${i + 1}. ${q.question}</p>
-        ${q.imageUrl ? `<img src="${q.imageUrl}" alt="Question Image" class="my-2 max-w-full h-auto rounded">` : ''}
-        <div class="options-container">
-        ${q.options.map(opt => `
-          <label class="block cursor-pointer p-2 rounded hover:bg-gray-100">
-            <input type="radio" name="q${i}" value="${opt}" class="mr-2" />${opt}
-          </label>`).join("")}
-        </div>
-      </div>
-    `).join("");
-    }
+    // Call the main function to load questions.
+    loadQuestions(subject, grade);
+    
+    startTimer(30);
 
     function startTimer(mins) {
         let time = mins * 60;
@@ -74,6 +152,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
 
     async function submitTest() {
+        const questions = currentTestQuestions; // Use the globally stored questions
         const allQuestionBlocks = document.querySelectorAll('.question-block');
         allQuestionBlocks.forEach(block => block.style.border = "1px solid #e2e8f0");
 
@@ -101,14 +180,13 @@ document.addEventListener("DOMContentLoaded", async () => {
         const score = resultsPayload.filter(r => r.studentAnswer === r.correctAnswer).length;
 
         try {
-            // --- THIS IS THE FIX: Add the missing fields to the data sent to Firestore ---
             await addDoc(collection(db, "student_results"), {
                 studentName,
                 parentEmail,
                 grade,
                 subject,
-                tutorEmail, // Added this line
-                studentCountry, // Added this line
+                tutorEmail,
+                studentCountry,
                 answers: resultsPayload,
                 score: score,
                 totalScoreableQuestions: questions.length,
