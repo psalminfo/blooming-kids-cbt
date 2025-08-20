@@ -36,40 +36,49 @@
     const grade = urlParams.get('grade');
     const studentName = urlParams.get('studentName');
     const parentEmail = urlParams.get('parentEmail');
-    
-    // --- THIS IS THE FIX ---
-    // Using the correct names to get data from the URL
-    const tutorEmail = urlParams.get('tutorEmail');
-    const studentCountry = urlParams.get('country');
+    const tutorName = urlParams.get('tutorName');
+    const location = urlParams.get('location');
 
-    // FIX: This now validates all parameters correctly
-    if (!subject || !grade || !studentName || !parentEmail || !tutorEmail || !studentCountry) {
-      alert("Missing student info. Redirecting...");
+    if (!subject || !grade) {
+      alert("Missing subject or grade. Redirecting...");
       window.location.href = "index.html";
     } else {
-      // FIX: Calling loadQuestions with the correct number of arguments
-      loadQuestions(subject, grade);
+      loadQuestions(subject, grade, studentName, parentEmail, tutorName, location);
     }
 
+    // THIS IS THE ONLY UPDATED SECTION
     window.submitAnswers = async function () {
-      const allQuestionBlocks = document.querySelectorAll('.question-block');
-      allQuestionBlocks.forEach(block => {
-        block.style.border = "";
-      });
+      // Get all the question blocks on the page
+      const allQuestionBlocks = document.querySelectorAll('.question-block');
 
-      for (let i = 0; i < allQuestionBlocks.length; i++) {
-        const isAnswered = document.querySelector(`input[name="q${i}"]:checked`);
-        if (!isAnswered) {
-          alert("Please answer all questions. We'll take you to the first one you missed.");
-          const unansweredBlock = allQuestionBlocks[i];
-          unansweredBlock.scrollIntoView({ behavior: 'smooth', block: 'center' });
-          unansweredBlock.style.border = "2px solid red";
-          return; 
-        }
-      }
+      // Reset the border style on all questions
+      allQuestionBlocks.forEach(block => {
+        block.style.border = ""; // Reset to default
+      });
 
-      // FIX: Passing the correct variables to the submission function
-      await submitTestToFirebase(subject, grade, studentName, parentEmail, tutorEmail, studentCountry);
+      // Loop through each question to find an unanswered one
+      for (let i = 0; i < allQuestionBlocks.length; i++) {
+        const isAnswered = document.querySelector(`input[name="q${i}"]:checked`);
+        
+        // If a question is not answered:
+        if (!isAnswered) {
+          alert("Please answer all questions. We'll take you to the first one you missed.");
+          
+          const unansweredBlock = allQuestionBlocks[i];
+          
+          // Scroll the unanswered question into view
+          unansweredBlock.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          
+          // Highlight it with a red border
+          unansweredBlock.style.border = "2px solid red";
+          
+          // Stop the function here
+          return; 
+        }
+      }
+
+      // If the loop completes, proceed with the original submission logic
+      await submitTestToFirebase(subject, grade, studentName, parentEmail, tutorName, location);
       document.getElementById("question-container").innerHTML = `<div class="text-center p-6 text-green-700 font-semibold text-xl">✅ Submitted. Redirecting...</div>`;
       setTimeout(() => window.location.href = "subject-select.html", 1500);
     }
