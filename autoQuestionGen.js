@@ -18,16 +18,13 @@ export async function loadQuestions(subject, grade) {
 
     try {
         // --- START: CORRECTED FETCHING LOGIC ---
-        // This new logic searches for an exact match on the 'grade' and 'subject' fields.
-
         const testsCollectionRef = collection(db, "tests");
         
-        // 1. Create a query to find documents where the fields are an exact match.
-        // This is the correct way to query your existing data structure.
+        // 1. This query now correctly searches for the 'grade' and 'subject' fields.
         const curatedTestQuery = query(
             testsCollectionRef,
             where("grade", "==", String(grade)),
-            where("subject", "==", subject) // Assuming subject is stored with initial caps, e.g., "Math"
+            where("subject", "==", subject) // Assumes subject is stored with initial caps, e.g., "Math"
         );
         const curatedTestSnapshot = await getDocs(curatedTestQuery);
 
@@ -35,11 +32,10 @@ export async function loadQuestions(subject, grade) {
             const docSnap = curatedTestSnapshot.docs[0];
             const rawData = docSnap.data();
             allQuestions = rawData.questions || [];
-            console.log(`Loading curated test from Firestore: ${docSnap.id}`);
+            console.log(`SUCCESS: Loading curated test from Firestore: ${docSnap.id}`);
         } else {
-            // B. If no curated test is found, gather questions from 'admin_questions'.
-            console.log(`No curated test found. Checking 'admin_questions' collection.`);
-            // Corrected collection name from "admin questions" to "admin_questions"
+            console.log(`INFO: No curated test found. Checking 'admin_questions' collection.`);
+            // 2. This now uses the correct collection name "admin_questions".
             const adminQuestionsRef = collection(db, "admin_questions"); 
             const adminQuery = query(
                 adminQuestionsRef,
@@ -50,10 +46,9 @@ export async function loadQuestions(subject, grade) {
 
             if (!adminSnapshot.empty) {
                 adminSnapshot.forEach(doc => allQuestions.push(doc.data()));
-                console.log(`Loaded ${allQuestions.length} questions from 'admin_questions'.`);
+                console.log(`SUCCESS: Loaded ${allQuestions.length} questions from 'admin_questions'.`);
             } else {
-                // C. If 'admin_questions' is also empty, fall back to GitHub.
-                console.log(`No questions found in Firestore. Trying GitHub.`);
+                console.log(`INFO: No questions found in Firestore. Trying GitHub as a fallback.`);
                 const gitHubRes = await fetch(GITHUB_URL);
                 if (!gitHubRes.ok) throw new Error("Test file not found in any source.");
                 const rawData = await gitHubRes.json();
@@ -63,7 +58,7 @@ export async function loadQuestions(subject, grade) {
                 } else if (rawData && rawData.questions) {
                     allQuestions = rawData.questions;
                 }
-                console.log(`Loaded test from GitHub: ${fileName}.json`);
+                console.log(`SUCCESS: Loaded test from GitHub: ${fileName}.json`);
             }
         }
         // --- END: CORRECTED FETCHING LOGIC ---
