@@ -1,9 +1,6 @@
-import { db } from './firebaseConfig.js';
-import { collection, getDocs } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
-
 let loadedQuestions = [];
 
-export async function loadQuestions(subject, grade, studentCountry) {
+export async function loadQuestions(subject, grade) {
     const container = document.getElementById("question-container");
     const fileName = `${grade}-${subject}`.toLowerCase();
     const GITHUB_URL = `https://raw.githubusercontent.com/psalminfo/blooming-kids-cbt/main/${fileName}.json`;
@@ -11,49 +8,18 @@ export async function loadQuestions(subject, grade, studentCountry) {
     container.innerHTML = `<p class="text-gray-500">Please wait, loading questions...</p>`;
 
     try {
-        const gitHubRes = await fetch(GITHUB_URL);
-        const gitHubData = gitHubRes.ok ? (await gitHubRes.json()).questions : [];
-
-        const firestoreSnapshot = await getDocs(collection(db, "admin_questions"));
-        const combinedQuestions = [...(gitHubData || []), ...(firestoreSnapshot.docs.map(doc => ({id: doc.id, ...doc.data()})) || [])];
-
-        if (combinedQuestions.length === 0) {
-            container.innerHTML = `<p class="text-red-600">❌ No questions found for ${subject.toUpperCase()} Grade ${grade}.</p>`;
-            return;
-        }
-
-        let countrySpecificQuestions = combinedQuestions.filter(q => q.location === studentCountry);
-
-        if (countrySpecificQuestions.length < 30) {
-            combinedQuestions = [...countrySpecificQuestions, ...combinedQuestions.filter(q => q.location !== studentCountry)];
-        } else {
-            combinedQuestions = countrySpecificQuestions;
-        }
-
-        let finalQuestions = [];
-        const multipleChoice = combinedQuestions.filter(q => q.type === 'multiple-choice');
-        const creativeWriting = combinedQuestions.filter(q => q.type === 'creative-writing');
-        const comprehension = combinedQuestions.filter(q => q.type === 'comprehension');
+        const res = await fetch(GITHUB_URL);
+        if (!res.ok) throw new Error("Question file not found");
+        const data = await res.json();
         
-        if (subject === 'ela') {
-            if (creativeWriting.length > 0) {
-                finalQuestions.push(creativeWriting[0]);
-            }
-            if (comprehension.length > 0) {
-                finalQuestions.push(...comprehension.slice(0, 2));
-            }
-            const remainingQuestions = [...multipleChoice].sort(() => 0.5 - Math.random());
-            finalQuestions.push(...remainingQuestions.slice(0, 30 - finalQuestions.length));
-        } else {
-            finalQuestions = [...combinedQuestions].sort(() => 0.5 - Math.random()).slice(0, 30);
-        }
-
-        loadedQuestions = finalQuestions.map((q, index) => ({ ...q, id: q.id, index: index }));
+        // Add a unique ID to each question and shuffle them
+        const questionsWithIds = data.questions.map((q, index) => ({ ...q, id: index }));
+        loadedQuestions = questionsWithIds.sort(() => 0.5 - Math.random()).slice(0, 30);
         
         displayQuestions(loadedQuestions);
     } catch (err) {
-        console.error("Failed to load questions:", err);
-        container.innerHTML = `<p class="text-red-600">❌ An error occurred while loading questions.</p>`;
+        console.error("GitHub load failed:", err);
+        container.innerHTML = `<p class="text-red-600">❌ No questions found for ${subject.toUpperCase()} Grade ${grade}.</p>`;
     }
 }
 
@@ -63,33 +29,20 @@ export function getLoadedQuestions() {
 
 function displayQuestions(questions) {
     const container = document.getElementById("question-container");
-    container.innerHTML = (questions || []).map((q, i) => {
-        let passageHtml = '';
-        if (q.type === 'comprehension' && q.passage) {
-            passageHtml = `<div class="p-4 bg-gray-100 rounded-lg mb-4">${q.passage}</div>`;
-        }
-        
-        const imageHtml = q.image_url ? `<img src="${q.image_url}" class="mb-2 w-full rounded" />` : '';
-        const position = q.image_position === 'before' ? `${imageHtml}${passageHtml}` : `${passageHtml}${imageHtml}`;
 
-        return `
-            <div class="bg-white p-4 border rounded-lg shadow-sm question-block" data-question-id="${q.id}">
-                ${position}
-                <p class="font-semibold mb-2 question-text">${i + 1}. ${q.question}</p>
-                ${q.type === 'creative-writing' ? `
-                    <textarea id="creativeWriting" class="w-full mt-4 p-2 border rounded" rows="10" placeholder="Write your response here..."></textarea>
-                    <div class="mt-2">
-                        <label class="block text-sm text-gray-600">Or upload a file:</label>
-                        <input type="file" id="creativeWritingFile" class="w-full mt-1">
-                    </div>
-                ` : `
-                    ${(q.options || []).map(opt => `
-                        <label class="block ml-4">
-                            <input type="radio" name="q${i}" value="${opt}" class="mr-2"> ${opt}
-                        </label>
-                    `).join('')}
-                `}
-            </div>
-        `;
-    }).join('');
+    if (!questions || questions.length === 0) {
+        container.innerHTML = `<p class="text-red-600">❌ This subject has no questions yet.</p>`;
+        return;
+    }
+
+    container.innerHTML = questions.map((q, i) => `
+        <div class="bg-white p-4 border rounded-lg shadow-sm question-block" data-question-id="${q.id}">
+            <p class="font-semibold mb-2 question-text">${i + 1}. ${q.question}</p>
+            ${q.options.map(opt => `
+                <label class="block ml-4">
+                    <input type="radio" name="q${i}" value="${opt}" class="mr-2"> ${opt}
+                </label>
+            `).join('')}
+        </div>
+    `).join('');
 }
