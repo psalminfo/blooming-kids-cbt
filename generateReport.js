@@ -99,7 +99,7 @@ export async function submitTestToFirebase(subject, grade, studentName, parentEm
         }
 
         const studentAnswer = selectedOption.value;
-        const correctAnswer = originalQuestion.correct_answer || null;
+        const correctAnswer = originalQuestion.correctAnswer || null;
 
         // --- NEW: Compare answers and increment score if correct ---
         if (studentAnswer === correctAnswer) {
@@ -139,3 +139,4 @@ export async function submitTestToFirebase(subject, grade, studentName, parentEm
         throw new Error("Failed to submit test results.");
     }
 }
+
