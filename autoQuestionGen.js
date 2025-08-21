@@ -1,6 +1,5 @@
 import { db } from './firebaseConfig.js';
 import { collection, getDocs, query, where, documentId, doc, setDoc } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
-import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-storage.js";
 
 let loadedQuestions = [];
 
@@ -82,10 +81,13 @@ export async function loadQuestions(subject, grade) {
 }
 
 /**
- * Handles the submission of the creative writing question.
- * It uploads the file to Firebase Storage and saves the file URL and text to Firestore.
+ * Handles the submission of the creative writing question using Cloudinary.
+ * It uploads the file to Cloudinary and saves the file URL and text to Firestore.
  */
 window.submitCreativeWriting = async function(questionId) {
+    const CLOUDINARY_URL = 'https://api.cloudinary.com/v1_1/dy2hxcyaf/upload';
+    const CLOUDINARY_UPLOAD_PRESET = 'bkh_assessments';
+    
     const studentId = "currentStudentId"; // Replace with actual student ID from your authentication system
     const questionTextarea = document.getElementById(`creative-writing-text-${questionId}`);
     const fileInput = document.getElementById(`creative-writing-file-${questionId}`);
@@ -106,11 +108,22 @@ window.submitCreativeWriting = async function(questionId) {
     try {
         let fileUrl = null;
         if (file) {
-            const storage = getStorage();
-            const storageRef = ref(storage, `student_answers/creative_writing/${studentId}/${Date.now()}-${file.name}`);
-            const snapshot = await uploadBytes(storageRef, file);
-            fileUrl = await getDownloadURL(snapshot.ref);
-            console.log("File uploaded successfully:", fileUrl);
+            const formData = new FormData();
+            formData.append('file', file);
+            formData.append('upload_preset', CLOUDINARY_UPLOAD_PRESET);
+            
+            const response = await fetch(CLOUDINARY_URL, {
+                method: 'POST',
+                body: formData
+            });
+
+            const result = await response.json();
+            if (result.secure_url) {
+                fileUrl = result.secure_url;
+                console.log("File uploaded to Cloudinary successfully:", fileUrl);
+            } else {
+                throw new Error("Cloudinary upload failed.");
+            }
         }
 
         // Prepare the data to be saved to Firestore
