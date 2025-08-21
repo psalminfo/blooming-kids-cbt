@@ -29,7 +29,7 @@
 
   <script type="module">
     import { logout } from './utils.js';
-    import { loadQuestions } from './autoQuestionGen.js';
+    import { loadQuestions } from './autoQuestionGen.js?version=2';
     import { submitTestToFirebase } from './generateReport.js';
 
     const urlParams = new URLSearchParams(window.location.search);
@@ -57,3 +57,4 @@
   </script>
 </body>
 </html>
+
