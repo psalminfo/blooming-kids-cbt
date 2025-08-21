@@ -104,7 +104,8 @@ async function loadReport() {
 
         const grouped = {};
         studentResults.forEach((result) => {
-            const sessionKey = Math.floor(result.timestamp / 3600);
+            // FIX: Group by date instead of by hour (86400 seconds in a day)
+            const sessionKey = Math.floor(result.timestamp / 86400); 
             if (!grouped[sessionKey]) grouped[sessionKey] = [];
             grouped[sessionKey].push(result);
         });
@@ -143,44 +144,40 @@ async function loadReport() {
             const tableRows = results.map(res => `<tr><td class="border px-2 py-1">${res.subject.toUpperCase()}</td><td class="border px-2 py-1 text-center">${res.correct} / ${res.total}</td></tr>`).join("");
             const topicsTableRows = results.map(res => `<tr><td class="border px-2 py-1 font-semibold">${res.subject.toUpperCase()}</td><td class="border px-2 py-1">${res.topics.join(', ') || 'N/A'}</td></tr>`).join("");
 
-            // --- THIS IS THE FIX ---
-            // 1. Get the automated recommendation
             const recommendation = generateTemplatedRecommendation(fullName, tutorName, results);
-            // 2. Get the manual report from the creative writing section
             const creativeWritingAnswer = session[0].answers.find(a => a.type === 'creative-writing');
             const tutorReport = creativeWritingAnswer?.tutorReport || 'Pending review.';
 
             const fullBlock = `
-              <div class="border rounded-lg shadow mb-8 p-4 bg-white" id="report-block-${blockIndex}">
-                <h2 class="text-xl font-bold mb-2">Student Name: ${fullName}</h2>
-                <p><strong>Parent Email:</strong> ${parentEmail}</p>
-                <p><strong>Grade:</strong> ${session[0].grade}</p>
-                <p><strong>Tutor:</strong> ${tutorName || 'N/A'}</p>
-                <p><strong>Location:</strong> ${studentCountry || 'N/A'}</p>
-                <p><strong>Session Date:</strong> ${formattedDate}</p>
-                <h3 class="text-lg font-semibold mt-4 mb-2">Performance Summary</h3>
-                <table class="w-full text-sm mb-4 border border-collapse">
-                  <thead class="bg-gray-100"><tr><th class="border px-2 py-1 text-left">Subject</th><th class="border px-2 py-1 text-center">Score</th></tr></thead>
-                  <tbody>${tableRows}</tbody>
-                </table>
-                <h3 class="text-lg font-semibold mt-4 mb-2">Knowledge & Skill Analysis</h3>
-                <table class="w-full text-sm mb-4 border border-collapse">
-                  <thead class="bg-gray-100"><tr><th class="border px-2 py-1 text-left">Subject</th><th class="border px-2 py-1 text-left">Topics Covered</th></tr></thead>
-                  <tbody>${topicsTableRows}</tbody>
-                </table>
-                
-                <!-- 3. Display the recommendation and report in the correct, separate sections -->
-                <h3 class="text-lg font-semibold mt-4 mb-2">Tutor’s Recommendation</h3>
-                <p class="mb-2">${recommendation}</p>
+                <div class="border rounded-lg shadow mb-8 p-4 bg-white" id="report-block-${blockIndex}">
+                    <h2 class="text-xl font-bold mb-2">Student Name: ${fullName}</h2>
+                    <p><strong>Parent Email:</strong> ${parentEmail}</p>
+                    <p><strong>Grade:</strong> ${session[0].grade}</p>
+                    <p><strong>Tutor:</strong> ${tutorName || 'N/A'}</p>
+                    <p><strong>Location:</strong> ${studentCountry || 'N/A'}</p>
+                    <p><strong>Session Date:</strong> ${formattedDate}</p>
+                    <h3 class="text-lg font-semibold mt-4 mb-2">Performance Summary</h3>
+                    <table class="w-full text-sm mb-4 border border-collapse">
+                        <thead class="bg-gray-100"><tr><th class="border px-2 py-1 text-left">Subject</th><th class="border px-2 py-1 text-center">Score</th></tr></thead>
+                        <tbody>${tableRows}</tbody>
+                    </table>
+                    <h3 class="text-lg font-semibold mt-4 mb-2">Knowledge & Skill Analysis</h3>
+                    <table class="w-full text-sm mb-4 border border-collapse">
+                        <thead class="bg-gray-100"><tr><th class="border px-2 py-1 text-left">Subject</th><th class="border px-2 py-1 text-left">Topics Covered</th></tr></thead>
+                        <tbody>${topicsTableRows}</tbody>
+                    </table>
+                    
+                    <h3 class="text-lg font-semibold mt-4 mb-2">Tutor’s Recommendation</h3>
+                    <p class="mb-2">${recommendation}</p>
 
-                <h3 class="text-lg font-semibold mt-4 mb-2">Creative Writing Feedback</h3>
-                <p class="mb-2"><strong>Tutor's Report:</strong> ${tutorReport}</p>
+                    <h3 class="text-lg font-semibold mt-4 mb-2">Creative Writing Feedback</h3>
+                    <p class="mb-2"><strong>Tutor's Report:</strong> ${tutorReport}</p>
 
-                <canvas id="chart-${blockIndex}" class="w-full h-48 mb-4"></canvas>
-                <h3 class="text-lg font-semibold mb-1">Director’s Message</h3>
-                <p class="italic text-sm">At Blooming Kids House, we are committed to helping every child succeed. We believe that with personalized support from our tutors, ${fullName} will unlock their full potential. Keep up the great work!<br/>– Mrs. Yinka Isikalu, Director</p>
-                <div class="mt-4"><button onclick="downloadSessionReport(${blockIndex}, '${fullName}')" class="btn-yellow px-4 py-2 rounded">Download Session PDF</button></div>
-              </div>
+                    <canvas id="chart-${blockIndex}" class="w-full h-48 mb-4"></canvas>
+                    <h3 class="text-lg font-semibold mb-1">Director’s Message</h3>
+                    <p class="italic text-sm">At Blooming Kids House, we are committed to helping every child succeed. We believe that with personalized support from our tutors, ${fullName} will unlock their full potential. Keep up the great work!<br/>– Mrs. Yinka Isikalu, Director</p>
+                    <div class="mt-4"><button onclick="downloadSessionReport(${blockIndex}, '${fullName}')" class="btn-yellow px-4 py-2 rounded">Download Session PDF</button></div>
+                </div>
             `;
 
             reportContent.innerHTML += fullBlock;
