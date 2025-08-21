@@ -20,15 +20,17 @@ export async function submitTestToFirebase(subject, grade, studentName, parentEm
     // Filter out the creative writing question from the list of questions to be scored
     const scoreableQuestions = loadedQuestions.filter(q => q.type !== 'creative-writing');
 
-    // **NEW VALIDATION LOGIC**
-    // Iterate only over the questions that are scoreable (i.e., multiple-choice) to check for answers
-    for (const originalQuestion of scoreableQuestions) {
-        const questionBlock = document.querySelector(`.question-block[data-question-id="${originalQuestion.id}"]`);
-        if (questionBlock) {
-            const selectedOption = questionBlock.querySelector("input[type='radio']:checked");
-            if (!selectedOption) {
-                alert("Please answer all multiple-choice questions before submitting.");
-                throw new Error("All multiple-choice questions must be answered.");
+    // **UPDATED VALIDATION LOGIC**
+    // This validation check is now skipped for the 'ela' subject
+    if (subject.toLowerCase() !== 'ela') {
+        for (const originalQuestion of scoreableQuestions) {
+            const questionBlock = document.querySelector(`.question-block[data-question-id="${originalQuestion.id}"]`);
+            if (questionBlock) {
+                const selectedOption = questionBlock.querySelector("input[type='radio']:checked");
+                if (!selectedOption) {
+                    alert("Please answer all multiple-choice questions before submitting.");
+                    throw new Error("All multiple-choice questions must be answered.");
+                }
             }
         }
     }
