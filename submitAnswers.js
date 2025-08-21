@@ -1,34 +1,43 @@
 import { db } from './firebaseConfig.js';
-import { collection, addDoc, Timestamp, getDoc, doc } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
-// Ensure this path points to your question loading file, likely 'autoQuestionGen.js'
+import { collection, addDoc, Timestamp } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
 import { getLoadedQuestions } from './autoQuestionGen.js';
 
-// No longer needed, as autoQuestionGen.js handles this upload directly
-// const CLOUDINARY_CLOUD_NAME = 'dy2hxcyaf';
-// const CLOUDINARY_UPLOAD_PRESET = 'bkh_assessments';
-// const CLOUDINARY_UPLOAD_URL = `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`;
-// async function uploadCreativeWritingFile(file) { ... }
+const CLOUDINARY_CLOUD_NAME = 'dy2hxcyaf';
+const CLOUDINARY_UPLOAD_PRESET = 'bkh_assessments';
+const CLOUDINARY_UPLOAD_URL = `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`;
+
+/**
+ * Handles the upload of a creative writing file to Cloudinary.
+ * @param {File} file The file to be uploaded.
+ * @returns {Promise<string>} The URL of the uploaded file.
+ */
+async function uploadCreativeWritingFile(file) {
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('upload_preset', CLOUDINARY_UPLOAD_PRESET);
+
+    const res = await fetch(CLOUDINARY_UPLOAD_URL, {
+        method: 'POST',
+        body: formData,
+    });
+
+    if (!res.ok) {
+        console.error("File upload failed with status:", res.status);
+        throw new Error("File upload failed");
+    }
+
+    const data = await res.json();
+    return data.secure_url;
+}
 
 
 export async function submitTestToFirebase(subject, grade, studentName, parentEmail, tutorEmail, studentCountry) {
-    // FIX: Get creative writing document ID and check its existence directly
-    let creativeWritingSubmitted = false;
-    const creativeWritingQuestionId = "0"; // Assuming CW is always at index 0
-    const creativeWritingDocId = `${parentEmail}-${creativeWritingQuestionId}`;
-    try {
-        const docRef = doc(db, "tutor_submissions", creativeWritingDocId);
-        const docSnap = await getDoc(docRef);
-        if (docSnap.exists()) {
-            creativeWritingSubmitted = true;
-        }
-    } catch (error) {
-        console.error("Error checking for creative writing submission:", error);
-    }
-
     const loadedQuestions = getLoadedQuestions();
     const answers = [];
     let score = 0;
     let totalScoreableQuestions = 0;
+    let creativeWritingSubmitted = false;
+    let multipleChoiceComplete = true;
 
     const questionBlocks = document.querySelectorAll(".question-block");
     for (const block of questionBlocks) {
@@ -38,42 +47,69 @@ export async function submitTestToFirebase(subject, grade, studentName, parentEm
         if (!originalQuestion) continue;
 
         const isCreativeWriting = originalQuestion.type === 'creative-writing';
+
         if (isCreativeWriting) {
-            // If creative writing has been submitted, skip it. Otherwise, alert.
-            if (!creativeWritingSubmitted) {
-                alert("Please submit your creative writing first.");
-                throw new Error("Creative writing submission required.");
+            const textAnswer = block.querySelector('textarea').value.trim();
+            const file = block.querySelector('input[type="file"]').files[0];
+            let fileUrl = null;
+
+            if (textAnswer || file) {
+                if (file) {
+                    try {
+                        fileUrl = await uploadCreativeWritingFile(file);
+                    } catch (error) {
+                        alert("Failed to upload creative writing file. Please try again.");
+                        return; // Stop submission on file upload failure
+                    }
+                }
+                
+                answers.push({
+                    questionText: originalQuestion.question || null,
+                    type: 'creative-writing',
+                    studentResponse: textAnswer || null,
+                    fileUrl: fileUrl || null,
+                    tutorReport: null,
+                    status: 'pending_review'
+                });
+                creativeWritingSubmitted = true;
             }
-            continue;
+        } else {
+            totalScoreableQuestions++;
+            const selectedOption = block.querySelector("input[type='radio']:checked");
+
+            if (!selectedOption) {
+                multipleChoiceComplete = false;
+            } else {
+                const studentAnswer = selectedOption.value;
+                const correctAnswer = originalQuestion.correctAnswer || originalQuestion.correct_answer || null;
+                const topic = originalQuestion.topic || null;
+                const imageUrl = originalQuestion.imageUrl || null;
+                const imagePosition = originalQuestion.imagePosition || null;
+
+                if (studentAnswer === correctAnswer) {
+                    score++;
+                }
+
+                answers.push({
+                    questionText: originalQuestion.question || null,
+                    studentAnswer: studentAnswer,
+                    correctAnswer: correctAnswer,
+                    topic: topic,
+                    imageUrl: imageUrl,
+                    imagePosition: imagePosition
+                });
+            }
         }
+    }
 
-        totalScoreableQuestions++;
-        const selectedOption = block.querySelector("input[type='radio']:checked");
-
-        if (!selectedOption) {
-            alert("Please answer all multiple-choice questions before submitting.");
-            throw new Error("All multiple-choice questions must be answered.");
-        }
-
-        const studentAnswer = selectedOption.value;
-
-        const correctAnswer = originalQuestion.correctAnswer || originalQuestion.correct_answer || null;
-        const topic = originalQuestion.topic || null;
-        const imageUrl = originalQuestion.imageUrl || null;
-        const imagePosition = originalQuestion.imagePosition || null;
-
-        if (studentAnswer === correctAnswer) {
-            score++;
-        }
-
-        answers.push({
-            questionText: originalQuestion.question || null,
-            studentAnswer: studentAnswer,
-            correctAnswer: correctAnswer,
-            topic: topic,
-            imageUrl: imageUrl,
-            imagePosition: imagePosition
-        });
+    // Perform final validation check before submitting
+    if (!multipleChoiceComplete) {
+        alert("Please answer all multiple-choice questions before submitting.");
+        return;
+    }
+    if (loadedQuestions.some(q => q.type === 'creative-writing') && !creativeWritingSubmitted) {
+        alert("Please provide a response or upload a file for the creative writing question.");
+        return;
     }
 
     const resultData = {
@@ -83,7 +119,7 @@ export async function submitTestToFirebase(subject, grade, studentName, parentEm
         parentEmail,
         tutorEmail,
         studentCountry,
-        answers,
+        answers, // This now contains all answers in one array
         score: score,
         totalScoreableQuestions: totalScoreableQuestions,
         submittedAt: Timestamp.now()
@@ -91,9 +127,9 @@ export async function submitTestToFirebase(subject, grade, studentName, parentEm
 
     try {
         await addDoc(collection(db, "student_results"), resultData);
-        console.log("Test results submitted successfully.");
+        alert("Test results submitted successfully!");
     } catch (err) {
         console.error("Error submitting test results to Firebase:", err);
-        throw new Error("Failed to submit test results.");
+        alert("Failed to submit test results. Please try again.");
     }
 }
