@@ -36,48 +36,51 @@ async function loadTutorReports(tutorEmail, parentEmail = null) {
     pendingReportsContainer.innerHTML = `<p class="text-gray-500">Loading pending submissions...</p>`;
     if(gradedReportsContainer) gradedReportsContainer.innerHTML = `<p class="text-gray-500">Loading graded submissions...</p>`;
 
-    let resultsQuery = query(collection(db, "student_results"), where("tutorEmail", "==", tutorEmail));
-    if (parentEmail) {
-        resultsQuery = query(resultsQuery, where("parentEmail", "==", parentEmail));
-    }
-    
+    // FIX: Changed the collection to "tutor_submissions"
+    let submissionsQuery = query(collection(db, "tutor_submissions"));
+    // Note: If you add the studentId to the tutor_submissions document, you can filter by tutorEmail
+    // submissionsQuery = query(submissionsQuery, where("tutorEmail", "==", tutorEmail));
+
     try {
-        const querySnapshot = await getDocs(resultsQuery);
+        const querySnapshot = await getDocs(submissionsQuery);
         let pendingHTML = '';
         let gradedHTML = '';
 
         querySnapshot.forEach(doc => {
             const data = doc.data();
-            const creativeWritingAnswer = data.answers.find(a => a.type === 'creative-writing');
-            if (creativeWritingAnswer) {
-                const reportCardHTML = `
-                    <div class="border rounded-lg p-4 shadow-sm bg-white mb-4">
-                        <p><strong>Student:</strong> ${data.studentName}</p>
-                        <p><strong>Email:</strong> ${data.parentEmail}</p>
-                        <p><strong>Subject:</strong> ${data.subject}</p>
-                        <p><strong>Submitted At:</strong> ${new Date(data.submittedAt.seconds * 1000).toLocaleString()}</p>
-                        <div class="mt-4 border-t pt-4">
-                            <h4 class="font-semibold">Creative Writing Submission:</h4>
-                            ${creativeWritingAnswer.fileUrl ? 
-                                creativeWritingAnswer.fileUrl.match(/\.(jpeg|jpg|gif|png)$/i) ? 
-                                    `<img src="${creativeWritingAnswer.fileUrl}" class="w-full h-auto object-cover mt-2 rounded" alt="Student Submission" />` :
-                                    `<a href="${creativeWritingAnswer.fileUrl}" target="_blank" class="text-blue-500 hover:underline">Download File</a>`
-                                : creativeWritingAnswer.studentResponse ? `<p class="italic">${creativeWritingAnswer.studentResponse}</p>` : "No response"}
-                            <p class="mt-2"><strong>Status:</strong> ${creativeWritingAnswer.tutorGrade || 'Pending'}</p>
-                            ${creativeWritingAnswer.tutorGrade === 'Pending' ? `
-                                <textarea class="tutor-report w-full mt-2 p-2 border rounded" rows="3" placeholder="Write your report here..."></textarea>
-                                <button class="submit-report-btn bg-green-600 text-white px-4 py-2 rounded mt-2" data-doc-id="${doc.id}">Submit Report</button>
-                            ` : `
-                                <p class="mt-2"><strong>Tutor's Report:</strong> ${creativeWritingAnswer.tutorReport || 'N/A'}</p>
-                            `}
-                        </div>
+            
+            // FIX: The data is now the creative writing answer itself
+            const creativeWritingAnswer = data;
+            
+            // Only render submissions for the current tutor (if applicable)
+            // You will need to add a "tutorEmail" field to the tutor_submissions document
+            // if (creativeWritingAnswer.tutorEmail !== tutorEmail) return;
+
+            const reportCardHTML = `
+                <div class="border rounded-lg p-4 shadow-sm bg-white mb-4">
+                    <p><strong>Student:</strong> ${creativeWritingAnswer.studentId}</p>
+                    <p><strong>Submitted At:</strong> ${new Date(creativeWritingAnswer.submittedAt.seconds * 1000).toLocaleString()}</p>
+                    <div class="mt-4 border-t pt-4">
+                        <h4 class="font-semibold">Creative Writing Submission:</h4>
+                        ${creativeWritingAnswer.fileUrl ? 
+                            creativeWritingAnswer.fileUrl.match(/\.(jpeg|jpg|gif|png|webp)$/i) ? 
+                                `<img src="${creativeWritingAnswer.fileUrl}" class="w-full h-auto object-cover mt-2 rounded" alt="Student Submission" />` :
+                                `<a href="${creativeWritingAnswer.fileUrl}" target="_blank" class="text-blue-500 hover:underline">Download File</a>`
+                            : creativeWritingAnswer.textAnswer ? `<p class="italic">${creativeWritingAnswer.textAnswer}</p>` : "No response"}
+                        <p class="mt-2"><strong>Status:</strong> ${creativeWritingAnswer.tutorGrade || 'Pending'}</p>
+                        ${creativeWritingAnswer.tutorGrade === 'Pending' ? `
+                            <textarea class="tutor-report w-full mt-2 p-2 border rounded" rows="3" placeholder="Write your report here..."></textarea>
+                            <button class="submit-report-btn bg-green-600 text-white px-4 py-2 rounded mt-2" data-doc-id="${doc.id}">Submit Report</button>
+                        ` : `
+                            <p class="mt-2"><strong>Tutor's Report:</strong> ${creativeWritingAnswer.tutorReport || 'N/A'}</p>
+                        `}
                     </div>
-                `;
-                if (creativeWritingAnswer.tutorGrade === 'Pending') {
-                    pendingHTML += reportCardHTML;
-                } else {
-                    gradedHTML += reportCardHTML;
-                }
+                </div>
+            `;
+            if (creativeWritingAnswer.tutorGrade === 'Pending') {
+                pendingHTML += reportCardHTML;
+            } else {
+                gradedHTML += reportCardHTML;
             }
         });
 
@@ -91,15 +94,8 @@ async function loadTutorReports(tutorEmail, parentEmail = null) {
                 const tutorReport = reportTextarea.value.trim();
 
                 if (tutorReport) {
-                    const docRef = doc(db, "student_results", docId);
-                    const docSnap = await getDoc(docRef);
-                    const docData = docSnap.data();
-
-                    const updatedAnswers = docData.answers.map(a => 
-                        a.type === 'creative-writing' ? { ...a, tutorReport: tutorReport, tutorGrade: 'Graded' } : a
-                    );
-
-                    await updateDoc(docRef, { answers: updatedAnswers });
+                    const docRef = doc(db, "tutor_submissions", docId);
+                    await updateDoc(docRef, { tutorReport: tutorReport, tutorGrade: 'Graded' });
                     loadTutorReports(tutorEmail, parentEmail); // Refresh the list
                 }
             });
