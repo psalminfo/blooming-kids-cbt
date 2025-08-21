@@ -16,20 +16,17 @@ export async function submitTestToFirebase(subject, grade, studentName, parentEm
     let score = 0;
     let totalScoreableQuestions = 0;
 
-    // FIX: Removed redundant creative writing validation and submission logic.
-    // The creative writing question is handled by a separate function and does not need to be processed here.
-
+    // FIX: Filter out the creative writing question from the list of questions to be scored.
+    const scoreableQuestions = loadedQuestions.filter(q => q.type !== 'creative-writing');
+    
+    // Check if a parent email search is being used and filter the query
     const questionBlocks = document.querySelectorAll(".question-block");
     for (const block of questionBlocks) {
         const questionId = block.getAttribute('data-question-id');
-        const originalQuestion = loadedQuestions.find(q => q.id === parseInt(questionId));
+        const originalQuestion = scoreableQuestions.find(q => q.id === parseInt(questionId));
 
-        if (!originalQuestion) continue;
-
-        // The core change. We check for the 'data-is-creative-writing' attribute
-        // and completely skip this question block in the main loop.
-        const isCreativeWriting = block.getAttribute('data-is-creative-writing') === 'true';
-        if (isCreativeWriting) {
+        // Skip the creative writing question block entirely
+        if (!originalQuestion) {
             continue;
         }
 
