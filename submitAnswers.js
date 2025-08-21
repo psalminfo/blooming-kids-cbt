@@ -26,7 +26,7 @@ export async function submitTestToFirebase(subject, grade, studentName, parentEm
 
         if (!originalQuestion) continue;
 
-        // FIX: The core change. We check for the 'data-is-creative-writing' attribute
+        // The core change. We check for the 'data-is-creative-writing' attribute
         // and completely skip this question block in the main loop.
         const isCreativeWriting = block.getAttribute('data-is-creative-writing') === 'true';
         if (isCreativeWriting) {
