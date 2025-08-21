@@ -88,7 +88,13 @@ window.submitCreativeWriting = async function(questionId) {
     const CLOUDINARY_URL = 'https://api.cloudinary.com/v1_1/dy2hxcyaf/upload';
     const CLOUDINARY_UPLOAD_PRESET = 'bkh_assessments';
     
-    const studentId = "currentStudentId"; // Replace with actual student ID from your authentication system
+    // Get student details from URL parameters
+    const params = new URLSearchParams(window.location.search);
+    const studentName = params.get('studentName') || 'unknown';
+    const parentEmail = params.get('parentEmail') || 'unknown';
+    const tutorEmail = params.get('tutorEmail') || 'unknown';
+    const grade = params.get('grade') || 'unknown';
+
     const questionTextarea = document.getElementById(`creative-writing-text-${questionId}`);
     const fileInput = document.getElementById(`creative-writing-file-${questionId}`);
     const submitBtn = document.getElementById(`submit-cw-btn-${questionId}`);
@@ -132,12 +138,15 @@ window.submitCreativeWriting = async function(questionId) {
             textAnswer: textAnswer,
             fileUrl: fileUrl,
             submittedAt: new Date(),
-            studentId: studentId,
+            studentName: studentName,
+            parentEmail: parentEmail,
+            tutorEmail: tutorEmail,
+            grade: grade,
             status: "pending_review"
         };
 
         // Save the data to the tutor_submissions collection
-        const docRef = doc(db, "tutor_submissions", `${studentId}-${questionId}`);
+        const docRef = doc(db, "tutor_submissions", `${parentEmail}-${questionId}`);
         await setDoc(docRef, submittedData);
         
         alert("Creative writing submitted successfully!");
