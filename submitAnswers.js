@@ -1,5 +1,6 @@
 import { db } from './firebaseConfig.js';
-import { collection, addDoc, Timestamp, getDocs, query, where } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
+import { collection, addDoc, Timestamp, getDoc, doc } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
+// Ensure this path points to your question loading file, likely 'autoQuestionGen.js'
 import { getLoadedQuestions } from './autoQuestionGen.js';
 
 // No longer needed, as autoQuestionGen.js handles this upload directly
@@ -8,18 +9,16 @@ import { getLoadedQuestions } from './autoQuestionGen.js';
 // const CLOUDINARY_UPLOAD_URL = `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`;
 // async function uploadCreativeWritingFile(file) { ... }
 
+
 export async function submitTestToFirebase(subject, grade, studentName, parentEmail, tutorEmail, studentCountry) {
-    // FIX: Check Firestore for a creative writing submission first
+    // FIX: Get creative writing document ID and check its existence directly
     let creativeWritingSubmitted = false;
+    const creativeWritingQuestionId = "0"; // Assuming CW is always at index 0
+    const creativeWritingDocId = `${parentEmail}-${creativeWritingQuestionId}`;
     try {
-        const creativeWritingQuery = query(
-            collection(db, "tutor_submissions"),
-            where("parentEmail", "==", parentEmail),
-            where("studentName", "==", studentName),
-            where("questionId", "==", "0") // Assuming the creative writing question always has ID "0"
-        );
-        const querySnapshot = await getDocs(creativeWritingQuery);
-        if (!querySnapshot.empty) {
+        const docRef = doc(db, "tutor_submissions", creativeWritingDocId);
+        const docSnap = await getDoc(docRef);
+        if (docSnap.exists()) {
             creativeWritingSubmitted = true;
         }
     } catch (error) {
@@ -40,7 +39,7 @@ export async function submitTestToFirebase(subject, grade, studentName, parentEm
 
         const isCreativeWriting = originalQuestion.type === 'creative-writing';
         if (isCreativeWriting) {
-            // FIX: If creative writing has been submitted, skip it. Otherwise, alert.
+            // If creative writing has been submitted, skip it. Otherwise, alert.
             if (!creativeWritingSubmitted) {
                 alert("Please submit your creative writing first.");
                 throw new Error("Creative writing submission required.");
