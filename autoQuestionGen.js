@@ -5,18 +5,21 @@ let loadedQuestions = [];
 
 /**
  * The entry point to load and display questions for a test.
- * It now handles a special "creative-writing" question type, ensuring it is always the first question.
  * @param {string} subject The subject of the test (e.g., 'ela').
  * @param {string} grade The grade level of the test (e.g., 'grade4').
+ * @param {string} state The current state of the test ('creative-writing' or 'mcq').
  */
-export async function loadQuestions(subject, grade) {
+export async function loadQuestions(subject, grade, state = 'creative-writing') {
     const container = document.getElementById("question-container");
+    const submitBtnContainer = document.getElementById("submit-button-container");
     container.innerHTML = `<p class="text-gray-500">Please wait, preparing your test...</p>`;
+    submitBtnContainer.style.display = 'none';
 
     const fileName = `${grade}-${subject}`.toLowerCase();
     const GITHUB_URL = `https://raw.githubusercontent.com/psalminfo/blooming-kids-cbt/main/${fileName}.json`;
 
     let allQuestions = [];
+    let creativeWritingQuestion = null;
 
     try {
         let rawData;
@@ -32,13 +35,10 @@ export async function loadQuestions(subject, grade) {
         if (!querySnapshot.empty) {
             const docSnap = querySnapshot.docs[0];
             rawData = docSnap.data();
-            console.log(`Loading curated test from Firestore: ${docSnap.id}`);
         } else {
-            console.log(`No test found in Firestore. Trying GitHub.`);
             const gitHubRes = await fetch(GITHUB_URL);
             if (!gitHubRes.ok) throw new Error("Test file not found.");
             rawData = await gitHubRes.json();
-            console.log(`Loaded test from GitHub.`);
         }
 
         let testArray = [];
@@ -47,48 +47,34 @@ export async function loadQuestions(subject, grade) {
         } else if (rawData && rawData.questions) {
             testArray = [{ questions: rawData.questions }];
         }
-
         allQuestions = testArray.flatMap(test => test.questions || []);
-        
+
         if (allQuestions.length === 0) {
             container.innerHTML = `<p class="text-red-600">❌ No questions found.</p>`;
             return;
         }
 
-        // Find the creative writing question and remove it from the main array
-        let creativeWritingQuestion = null;
-        const filteredQuestions = allQuestions.filter(q => {
-            if (q.type === 'creative-writing' && creativeWritingQuestion === null) {
-                creativeWritingQuestion = q;
-                return false; // Don't include it in the filtered list
+        if (subject.toLowerCase() === 'ela' && state === 'creative-writing') {
+            creativeWritingQuestion = allQuestions.find(q => q.type === 'creative-writing');
+            if (!creativeWritingQuestion) {
+                container.innerHTML = `<p class="text-red-600">❌ Creative writing question not found. Redirecting...</p>`;
+                window.location.href = window.location.href.split('&state=')[0] + '&state=mcq';
+                return;
             }
-            return true;
-        });
-
-        // Shuffle the remaining questions
-        const shuffledQuestions = filteredQuestions.sort(() => 0.5 - Math.random()).slice(0, 30);
-        
-        // Add the creative writing question to the beginning if it was found
-        const finalQuestions = creativeWritingQuestion ? [creativeWritingQuestion, ...shuffledQuestions] : shuffledQuestions;
-        
-        loadedQuestions = finalQuestions.map((q, index) => ({ ...q, id: index }));
-        
-        displayQuestions(loadedQuestions);
+            loadedQuestions = [{ ...creativeWritingQuestion, id: 0 }];
+            displayQuestions(loadedQuestions, true);
+        } else {
+            const filteredQuestions = allQuestions.filter(q => q.type !== 'creative-writing');
+            const shuffledQuestions = filteredQuestions.sort(() => 0.5 - Math.random()).slice(0, 30);
+            loadedQuestions = shuffledQuestions.map((q, index) => ({ ...q, id: index }));
+            displayQuestions(loadedQuestions, false);
+            submitBtnContainer.style.display = 'block';
+        }
     } catch (err) {
         console.error("Failed to load questions:", err);
         container.innerHTML = `<p class="text-red-600">❌ An error occurred: ${err.message}</p>`;
     }
 }
-
-/**
- * Handles the submission of the creative writing question using Cloudinary.
- * NOTE: This function is no longer called by a dedicated button.
- * It remains here as an example of what was moved to submitTestToFirebase.js
- */
-window.submitCreativeWriting = async function(questionId) {
-    console.warn("This function is now deprecated and should not be used. The logic has been moved to submitTestToFirebase.");
-}
-
 
 export function getLoadedQuestions() {
     return loadedQuestions;
@@ -96,35 +82,42 @@ export function getLoadedQuestions() {
 
 /**
  * Renders the questions to the DOM.
- * This function now contains a conditional block to handle different question types.
  * @param {Array} questions The array of questions to display.
+ * @param {boolean} isCreativeWritingOnly A flag to render only the CW question with a special button.
  */
-function displayQuestions(questions) {
+function displayQuestions(questions, isCreativeWritingOnly) {
     const container = document.getElementById("question-container");
-    let mcqIndex = 0; // Initialize a separate counter for multiple-choice questions
     container.innerHTML = (questions || []).map((q, i) => {
         const showImageBefore = q.imageUrl && q.image_position !== 'after';
         const showImageAfter = q.imageUrl && q.image_position === 'after';
 
-        // Check if it's the creative writing question
-        if (q.type === 'creative-writing') {
+        if (isCreativeWritingOnly) {
+            const params = new URLSearchParams(window.location.search);
+            const studentName = params.get('studentName');
+            const parentEmail = params.get('parentEmail');
+            const tutorEmail = params.get('tutorEmail');
+            const grade = params.get('grade');
+            
             return `
-                <div class="bg-white p-4 border rounded-lg shadow-sm question-block" data-question-id="${q.id}" data-is-creative-writing="true">
+                <div class="bg-white p-4 border rounded-lg shadow-sm question-block" data-question-id="${q.id}">
                     <h2 class="font-semibold text-lg mb-2">Creative Writing</h2>
                     <p class="font-semibold mb-2 question-text">${q.question || ''}</p>
                     
                     <textarea id="creative-writing-text-${q.id}" class="w-full h-40 p-2 border rounded-lg mb-2" placeholder="Write your answer here..."></textarea>
                     
                     <div class="mb-2">
-                        <label class="block mb-1 text-sm font-medium text-gray-700">Or Upload a File (e.g., photo of your writing)</label>
+                        <label class="block mb-1 text-sm font-medium text-gray-700">Or Upload a File</label>
                         <input type="file" id="creative-writing-file-${q.id}" class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-violet-50 file:text-violet-700 hover:file:bg-violet-100"/>
                     </div>
+                    
+                    <button onclick="window.continueToMCQ(${q.id}, '${studentName}', '${parentEmail}', '${tutorEmail}', '${grade}')" class="bg-blue-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors duration-200 mt-4">
+                        Continue to Multiple-Choice
+                    </button>
                 </div>
             `;
         }
         
-        // This is the original logic for multiple-choice questions
-        mcqIndex++; // Increment the counter only for multiple-choice questions
+        let mcqIndex = i + 1;
         return `
             <div class="bg-white p-4 border rounded-lg shadow-sm question-block" data-question-id="${q.id}">
                 ${showImageBefore ? `<img src="${q.imageUrl}" class="mb-2 w-full rounded" alt="Question image"/>` : ''}
@@ -141,3 +134,67 @@ function displayQuestions(questions) {
         `;
     }).join('');
 }
+
+// NEW: Continue to MCQ handler
+window.continueToMCQ = async (questionId, studentName, parentEmail, tutorEmail, grade) => {
+    const CLOUDINARY_URL = 'https://api.cloudinary.com/v1_1/dy2hxcyaf/upload';
+    const CLOUDINARY_UPLOAD_PRESET = 'bkh_assessments';
+    
+    const questionTextarea = document.getElementById(`creative-writing-text-${questionId}`);
+    const fileInput = document.getElementById(`creative-writing-file-${questionId}`);
+    
+    const textAnswer = questionTextarea.value.trim();
+    const file = fileInput.files[0];
+
+    const continueBtn = document.querySelector('button[onclick*="continueToMCQ"]');
+    if (continueBtn) {
+        continueBtn.textContent = "Submitting...";
+        continueBtn.disabled = true;
+    }
+    
+    try {
+        let fileUrl = null;
+        if (file) {
+            const formData = new FormData();
+            formData.append('file', file);
+            formData.append('upload_preset', CLOUDINARY_UPLOAD_PRESET);
+            const response = await fetch(CLOUDINARY_URL, { method: 'POST', body: formData });
+            const result = await response.json();
+            if (result.secure_url) {
+                fileUrl = result.secure_url;
+            } else {
+                throw new Error("Cloudinary upload failed.");
+            }
+        }
+        
+        if (textAnswer || file) {
+            const submittedData = {
+                questionId: questionId,
+                textAnswer: textAnswer,
+                fileUrl: fileUrl,
+                submittedAt: new Date(),
+                studentName: studentName,
+                parentEmail: parentEmail,
+                tutorEmail: tutorEmail,
+                grade: grade,
+                status: "pending_review"
+            };
+            const docRef = doc(db, "tutor_submissions", `${parentEmail}-${questionId}`);
+            await setDoc(docRef, submittedData);
+        }
+        
+        alert("Creative writing submitted successfully! Moving to multiple-choice questions.");
+        
+        const params = new URLSearchParams(window.location.search);
+        params.set('state', 'mcq');
+        window.location.search = params.toString();
+
+    } catch (error) {
+        console.error("Error submitting creative writing:", error);
+        alert("An error occurred. Please try again.");
+        if (continueBtn) {
+            continueBtn.textContent = "Continue to Multiple-Choice";
+            continueBtn.disabled = false;
+        }
+    }
+};
