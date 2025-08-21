@@ -4,6 +4,12 @@ import { collection, getDocs, query, where, documentId } from "https://www.gstat
 let loadedQuestions = [];
 
 export async function loadQuestions(subject, grade) {
+    // --- THIS IS THE TEST ---
+    // If you see this alert on your live site, the correct file is loading.
+    // If you DO NOT see this alert, the wrong file is being used.
+    alert("This is the NEW, CORRECT autoQuestionGen.js file!");
+    // -------------------------
+
     const container = document.getElementById("question-container");
     container.innerHTML = `<p class="text-gray-500">Please wait, preparing your test...</p>`;
 
@@ -45,7 +51,7 @@ export async function loadQuestions(subject, grade) {
         allQuestions = testArray.flatMap(test => test.questions || []);
         
         if (allQuestions.length === 0) {
-            container.innerHTML = `<p class="text-red-600">❌ No questions found.</p>`;
+      .innerHTML = `<p class="text-red-600">❌ No questions found.</p>`;
             return;
         }
 
