@@ -85,11 +85,12 @@ export async function loadQuestions(subject, grade) {
  * Handles the submission of the creative writing question.
  * It uploads the file to Firebase Storage and saves the file URL and text to Firestore.
  */
-async function submitCreativeWriting(questionId) {
+window.submitCreativeWriting = async function(questionId) {
     const studentId = "currentStudentId"; // Replace with actual student ID from your authentication system
     const questionTextarea = document.getElementById(`creative-writing-text-${questionId}`);
     const fileInput = document.getElementById(`creative-writing-file-${questionId}`);
     const submitBtn = document.getElementById(`submit-cw-btn-${questionId}`);
+    const questionBlock = document.querySelector(`[data-question-id="${questionId}"]`);
     
     const textAnswer = questionTextarea.value.trim();
     const file = fileInput.files[0];
@@ -132,6 +133,9 @@ async function submitCreativeWriting(questionId) {
         questionTextarea.disabled = true;
         fileInput.disabled = true;
 
+        // Add a class to the question block to mark it as answered
+        questionBlock.classList.add("answered");
+
     } catch (error) {
         console.error("Error submitting creative writing:", error);
         alert("An error occurred during submission. Please try again.");
@@ -159,7 +163,7 @@ function displayQuestions(questions) {
         // Check if it's the creative writing question
         if (q.type === 'creative-writing') {
             return `
-                <div class="bg-white p-4 border rounded-lg shadow-sm question-block" data-question-id="${q.id}">
+                <div class="bg-white p-4 border rounded-lg shadow-sm question-block" data-question-id="${q.id}" data-is-creative-writing="true">
                     <h2 class="font-semibold text-lg mb-2">Creative Writing</h2>
                     <p class="font-semibold mb-2 question-text">${i + 1}. ${q.question || ''}</p>
                     <textarea id="creative-writing-text-${q.id}" class="w-full h-40 p-2 border rounded-lg mb-2" placeholder="Write your answer here..."></textarea>
