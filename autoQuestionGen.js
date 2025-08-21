@@ -71,14 +71,14 @@ function displayQuestions(questions) {
         const showImageAfter = q.imageUrl && q.image_position === 'after';
 
         return `
-        <div class="bg-white p-4 border rounded-lg shadow-sm question-block" data-question-id="${q.id}">
+        <div class="bg-white p-2 border rounded-lg shadow-sm question-block" data-question-id="${q.id}">
             ${showImageBefore ? `<img src="${q.imageUrl}" class="mb-2 w-full rounded" alt="Question image"/>` : ''}
             <p class="font-semibold mb-2 question-text">${i + 1}. ${q.question || q.passage || ''}</p>
             ${showImageAfter ? `<img src="${q.imageUrl}" class="mt-2 w-full rounded" alt="Question image"/>` : ''}
             <div class="mt-2">
                 ${(q.options || []).map(opt => `
                     <label class="flex items-center py-2 rounded hover:bg-gray-100 cursor-pointer">
-                        <input type="radio" name="q${i}" value="${opt}" class="mr-2"> ${opt}
+                        <input type="radio" name="q${i}" value="${opt}" class="mr-1"> ${opt}
                     </label>
                 `).join('')}
             </div>
