@@ -126,7 +126,7 @@ window.submitCreativeWriting = async function(questionId) {
             }
         }
 
-        // Prepare the data to be saved to Firestore
+        // Prepare the data to be saved to a dedicated collection for tutors to review
         const submittedData = {
             questionId: questionId,
             textAnswer: textAnswer,
@@ -136,7 +136,7 @@ window.submitCreativeWriting = async function(questionId) {
             status: "pending_review"
         };
 
-        // Save the data to a dedicated collection for tutors to review
+        // Save the data to the tutor_submissions collection
         const docRef = doc(db, "tutor_submissions", `${studentId}-${questionId}`);
         await setDoc(docRef, submittedData);
         
