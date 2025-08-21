@@ -28,7 +28,7 @@
 
     <script type="module">
         import { loadQuestions } from './js/autoQuestionGen.js';
-        import { submitTestToFirebase } from './js/submitTestToFirebase.js';
+        import { submitTestToFirebase } from './js/submitAnswers.js';
 
         const urlParams = new URLSearchParams(window.location.search);
         const subject = urlParams.get('subject');
@@ -59,3 +59,4 @@
     </script>
 </body>
 </html>
+
