@@ -19,8 +19,21 @@ export async function submitTestToFirebase(subject, grade, studentName, parentEm
 
     // Filter out the creative writing question from the list of questions to be scored
     const scoreableQuestions = loadedQuestions.filter(q => q.type !== 'creative-writing');
-    
-    // Get all question blocks from the DOM
+
+    // **NEW VALIDATION LOGIC**
+    // Iterate only over the questions that are scoreable (i.e., multiple-choice) to check for answers
+    for (const originalQuestion of scoreableQuestions) {
+        const questionBlock = document.querySelector(`.question-block[data-question-id="${originalQuestion.id}"]`);
+        if (questionBlock) {
+            const selectedOption = questionBlock.querySelector("input[type='radio']:checked");
+            if (!selectedOption) {
+                alert("Please answer all multiple-choice questions before submitting.");
+                throw new Error("All multiple-choice questions must be answered.");
+            }
+        }
+    }
+
+    // Now, iterate through the DOM to score the answers. This part remains similar.
     const questionBlocks = document.querySelectorAll(".question-block");
     
     for (const block of questionBlocks) {
@@ -34,11 +47,6 @@ export async function submitTestToFirebase(subject, grade, studentName, parentEm
 
         totalScoreableQuestions++;
         const selectedOption = block.querySelector("input[type='radio']:checked");
-
-        if (!selectedOption) {
-            alert("Please answer all multiple-choice questions before submitting.");
-            throw new Error("All multiple-choice questions must be answered.");
-        }
 
         const studentAnswer = selectedOption.value;
         const correctAnswer = originalQuestion.correctAnswer || originalQuestion.correct_answer || null;
