@@ -9,11 +9,13 @@ let loadedQuestions = [];
  * @param {string} grade The grade level of the test (e.g., 'grade4').
  * @param {string} state The current state of the test ('creative-writing' or 'mcq').
  */
-export async function loadQuestions(subject, grade, state = 'creative-writing') {
+export async function loadQuestions(subject, grade, state) {
     const container = document.getElementById("question-container");
     const submitBtnContainer = document.getElementById("submit-button-container");
     container.innerHTML = `<p class="text-gray-500">Please wait, preparing your test...</p>`;
-    submitBtnContainer.style.display = 'none';
+    if (submitBtnContainer) {
+        submitBtnContainer.style.display = 'none';
+    }
 
     const fileName = `${grade}-${subject}`.toLowerCase();
     const GITHUB_URL = `https://raw.githubusercontent.com/psalminfo/blooming-kids-cbt/main/${fileName}.json`;
@@ -68,7 +70,9 @@ export async function loadQuestions(subject, grade, state = 'creative-writing') 
             const shuffledQuestions = filteredQuestions.sort(() => 0.5 - Math.random()).slice(0, 30);
             loadedQuestions = shuffledQuestions.map((q, index) => ({ ...q, id: index }));
             displayQuestions(loadedQuestions, false);
-            submitBtnContainer.style.display = 'block';
+            if (submitBtnContainer) {
+                submitBtnContainer.style.display = 'block';
+            }
         }
     } catch (err) {
         console.error("Failed to load questions:", err);
