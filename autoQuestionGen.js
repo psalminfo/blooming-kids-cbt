@@ -76,7 +76,7 @@ function displayQuestions(questions) {
             ${showImageAfter ? `<img src="${q.imageUrl}" class="mt-2 w-full rounded" alt="Question image"/>` : ''}
             <div class="mt-2">
                 ${(q.options || []).map(opt => `
-                    <!-- THIS IS THE FIX: No margin, no letters, just clean alignment -->
+                    <!-- This is the final corrected version for alignment -->
                     <label class="flex items-center py-2 rounded hover:bg-gray-100 cursor-pointer">
                         <input type="radio" name="q${i}" value="${opt}" class="mr-2"> ${opt}
                     </label>
