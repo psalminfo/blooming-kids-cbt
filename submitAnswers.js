@@ -3,7 +3,7 @@ import { collection, addDoc, Timestamp } from "https://www.gstatic.com/firebasej
 import { getLoadedQuestions } from './autoQuestionGen.js';
 
 /**
- * Submits the multiple-choice test results to Firebase, ignoring creative writing.
+ * Submits the multiple-choice test results to Firebase.
  * @param {string} subject The test subject.
  * @param {string} grade The student's grade.
  * @param {string} studentName The student's name.
@@ -17,50 +17,36 @@ export async function submitTestToFirebase(subject, grade, studentName, parentEm
     let score = 0;
     let totalScoreableQuestions = 0;
 
-    // Filter out the creative writing question from the list of questions to be scored
-    const scoreableQuestions = loadedQuestions.filter(q => q.type !== 'creative-writing');
-
-    // **UPDATED VALIDATION LOGIC**
-    // This validation check is now skipped for the 'ela' subject
-    if (subject.toLowerCase() !== 'ela') {
-        for (const originalQuestion of scoreableQuestions) {
-            const questionBlock = document.querySelector(`.question-block[data-question-id="${originalQuestion.id}"]`);
-            if (questionBlock) {
-                const selectedOption = questionBlock.querySelector("input[type='radio']:checked");
-                if (!selectedOption) {
-                    alert("Please answer all multiple-choice questions before submitting.");
-                    throw new Error("All multiple-choice questions must be answered.");
-                }
+    // Validation to ensure all questions are answered
+    for (let i = 0; i < loadedQuestions.length; i++) {
+        const questionBlock = document.querySelector(`.question-block[data-question-id="${loadedQuestions[i].id}"]`);
+        if (questionBlock) {
+            const selectedOption = questionBlock.querySelector("input[type='radio']:checked");
+            if (!selectedOption) {
+                alert("Please answer all multiple-choice questions before submitting.");
+                // We'll take the user to the first unanswered question
+                questionBlock.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                questionBlock.style.border = "2px solid red";
+                throw new Error("All multiple-choice questions must be answered.");
             }
         }
     }
 
-    // Now, iterate through the DOM to score the answers. This part remains similar.
+    // Process all multiple-choice questions
     const questionBlocks = document.querySelectorAll(".question-block");
-    
     for (const block of questionBlocks) {
         const questionId = block.getAttribute('data-question-id');
-        const originalQuestion = scoreableQuestions.find(q => q.id === parseInt(questionId));
+        const originalQuestion = loadedQuestions.find(q => q.id === parseInt(questionId));
 
-        // Skip the creative writing question block entirely
         if (!originalQuestion) {
             continue;
         }
 
         totalScoreableQuestions++;
         const selectedOption = block.querySelector("input[type='radio']:checked");
-        
-        // This check is now redundant since it's handled above, but we'll keep it for safety.
-        if (!selectedOption) {
-            continue;
-        }
-
         const studentAnswer = selectedOption.value;
         const correctAnswer = originalQuestion.correctAnswer || originalQuestion.correct_answer || null;
-        const topic = originalQuestion.topic || null;
-        const imageUrl = originalQuestion.imageUrl || null;
-        const imagePosition = originalQuestion.imagePosition || null;
-
+        
         if (studentAnswer === correctAnswer) {
             score++;
         }
@@ -69,9 +55,9 @@ export async function submitTestToFirebase(subject, grade, studentName, parentEm
             questionText: originalQuestion.question || null,
             studentAnswer: studentAnswer,
             correctAnswer: correctAnswer,
-            topic: topic,
-            imageUrl: imageUrl,
-            imagePosition: imagePosition
+            topic: originalQuestion.topic || null,
+            imageUrl: originalQuestion.imageUrl || null,
+            imagePosition: originalQuestion.imagePosition || null
         });
     }
 
