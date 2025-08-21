@@ -1,31 +1,31 @@
 /* style.css */
 body {
-    overflow-x: hidden;
+    overflow-x: hidden;
 }
 
 #app-container {
-    display: flex;
+    display: flex;
 }
 
 /* Sidebar Navigation */
 .sidebar {
-    width: 250px;
-    background: #2c3e50;
-    color: #ecf0f1;
-    height: 100vh;
-    position: fixed;
-    top: 0;
-    left: -250px; /* Initially hidden */
-    transition: left 0.3s ease-in-out;
-    z-index: 1000;
+    width: 250px;
+    background: #2c3e50;
+    color: #ecf0f1;
+    height: 100vh;
+    position: fixed;
+    top: 0;
+    left: -250px; /* Initially hidden */
+    transition: left 0.3s ease-in-out;
+    z-index: 1000;
 }
 .sidebar.active {
-    left: 0;
+    left: 0;
 }
 .sidebar-header {
-    padding: 20px;
-    background: #1a252f;
-    text-align: center;
+    padding: 20px;
+    background: #1a252f;
+    text-align: center;
 }
 .sidebar-header h3 { margin: 0; color: #fff; }
 .nav-links { list-style: none; padding: 0; margin: 0; }
@@ -35,27 +35,33 @@ body {
 
 /* Main Content Area */
 #main-content-wrapper {
-    flex-grow: 1;
-    width: 100%;
-    transition: margin-left 0.3s ease-in-out;
+    flex-grow: 1;
+    width: 100%;
+    transition: margin-left 0.3s ease-in-out;
 }
 #main-content-wrapper.sidebar-active {
-    margin-left: 250px;
+    margin-left: 250px;
 }
 .app-header {
-    background: #2c3e50;
-    padding: 1rem 1.5rem;
-    display: flex;
-    align-items: center;
+    background: #2c3e50;
+    padding: 1rem 1.5rem;
+    display: flex;
+    align-items: center;
 }
 .menu-toggle {
-    background: none;
-    border: none;
-    color: white;
-    font-size: 24px;
-    cursor: pointer;
-    margin-right: 20px;
+    background: none;
+    border: none;
+    color: white;
+    font-size: 24px;
+    cursor: pointer;
+    margin-right: 20px;
 }
 .page-content {
-    padding: 1.5rem;
+    padding: 1.5rem;
+}
+
+/* --- THIS IS THE NEW CODE TO FIX THE ALIGNMENT --- */
+.question-block .mt-2 label {
+    margin-left: 0 !important;
+    padding-left: 0 !important;
 }
