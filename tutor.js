@@ -37,9 +37,12 @@ async function loadTutorReports(tutorEmail, parentEmail = null) {
     if(gradedReportsContainer) gradedReportsContainer.innerHTML = `<p class="text-gray-500">Loading graded submissions...</p>`;
 
     // FIX: Changed the collection to "tutor_submissions"
-    let submissionsQuery = query(collection(db, "tutor_submissions"));
-    // Note: If you add the studentId to the tutor_submissions document, you can filter by tutorEmail
-    // submissionsQuery = query(submissionsQuery, where("tutorEmail", "==", tutorEmail));
+    let submissionsQuery = query(collection(db, "tutor_submissions"), where("tutorEmail", "==", tutorEmail));
+    
+    // Check if a parent email search is being used and filter the query
+    if (parentEmail) {
+        submissionsQuery = query(submissionsQuery, where("parentEmail", "==", parentEmail));
+    }
 
     try {
         const querySnapshot = await getDocs(submissionsQuery);
@@ -47,18 +50,14 @@ async function loadTutorReports(tutorEmail, parentEmail = null) {
         let gradedHTML = '';
 
         querySnapshot.forEach(doc => {
-            const data = doc.data();
+            const creativeWritingAnswer = doc.data();
             
-            // FIX: The data is now the creative writing answer itself
-            const creativeWritingAnswer = data;
-            
-            // Only render submissions for the current tutor (if applicable)
-            // You will need to add a "tutorEmail" field to the tutor_submissions document
-            // if (creativeWritingAnswer.tutorEmail !== tutorEmail) return;
-
             const reportCardHTML = `
                 <div class="border rounded-lg p-4 shadow-sm bg-white mb-4">
-                    <p><strong>Student:</strong> ${creativeWritingAnswer.studentId}</p>
+                    <p><strong>Student:</strong> ${creativeWritingAnswer.studentName}</p>
+                    <p><strong>Parent Email:</strong> ${creativeWritingAnswer.parentEmail}</p>
+                    <p><strong>Grade:</strong> ${creativeWritingAnswer.grade}</p>
+                    <p><strong>Tutor Email:</strong> ${creativeWritingAnswer.tutorEmail}</p>
                     <p><strong>Submitted At:</strong> ${new Date(creativeWritingAnswer.submittedAt.seconds * 1000).toLocaleString()}</p>
                     <div class="mt-4 border-t pt-4">
                         <h4 class="font-semibold">Creative Writing Submission:</h4>
@@ -67,8 +66,8 @@ async function loadTutorReports(tutorEmail, parentEmail = null) {
                                 `<img src="${creativeWritingAnswer.fileUrl}" class="w-full h-auto object-cover mt-2 rounded" alt="Student Submission" />` :
                                 `<a href="${creativeWritingAnswer.fileUrl}" target="_blank" class="text-blue-500 hover:underline">Download File</a>`
                             : creativeWritingAnswer.textAnswer ? `<p class="italic">${creativeWritingAnswer.textAnswer}</p>` : "No response"}
-                        <p class="mt-2"><strong>Status:</strong> ${creativeWritingAnswer.tutorGrade || 'Pending'}</p>
-                        ${creativeWritingAnswer.tutorGrade === 'Pending' ? `
+                        <p class="mt-2"><strong>Status:</strong> ${creativeWritingAnswer.status || 'Pending'}</p>
+                        ${creativeWritingAnswer.status === 'pending_review' ? `
                             <textarea class="tutor-report w-full mt-2 p-2 border rounded" rows="3" placeholder="Write your report here..."></textarea>
                             <button class="submit-report-btn bg-green-600 text-white px-4 py-2 rounded mt-2" data-doc-id="${doc.id}">Submit Report</button>
                         ` : `
@@ -77,7 +76,7 @@ async function loadTutorReports(tutorEmail, parentEmail = null) {
                     </div>
                 </div>
             `;
-            if (creativeWritingAnswer.tutorGrade === 'Pending') {
+            if (creativeWritingAnswer.status === 'pending_review') {
                 pendingHTML += reportCardHTML;
             } else {
                 gradedHTML += reportCardHTML;
@@ -95,7 +94,7 @@ async function loadTutorReports(tutorEmail, parentEmail = null) {
 
                 if (tutorReport) {
                     const docRef = doc(db, "tutor_submissions", docId);
-                    await updateDoc(docRef, { tutorReport: tutorReport, tutorGrade: 'Graded' });
+                    await updateDoc(docRef, { tutorReport: tutorReport, status: 'Graded' });
                     loadTutorReports(tutorEmail, parentEmail); // Refresh the list
                 }
             });
