@@ -49,6 +49,11 @@ export async function submitTestToFirebase(subject, grade, studentName, parentEm
 
         totalScoreableQuestions++;
         const selectedOption = block.querySelector("input[type='radio']:checked");
+        
+        // This check is now redundant since it's handled above, but we'll keep it for safety.
+        if (!selectedOption) {
+            continue;
+        }
 
         const studentAnswer = selectedOption.value;
         const correctAnswer = originalQuestion.correctAnswer || originalQuestion.correct_answer || null;
