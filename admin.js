@@ -29,7 +29,7 @@ function capitalize(str) {
 
 
 // ##################################################################
-// # SECTION 1: DASHBOARD PANEL (Restored to Original)
+// # SECTION 1: DASHBOARD PANEL (Fully Restored)
 // ##################################################################
 
 async function renderAdminPanel(container) {
@@ -114,11 +114,12 @@ function setupDashboardListeners() {
         newQ.innerHTML = `<textarea class="comp-question w-full mt-1 p-2 border rounded" rows="2" placeholder="Question"></textarea><div class="flex space-x-2 mt-2"><input type="text" class="comp-option w-1/2 p-2 border rounded" placeholder="Option 1"><input type="text" class="comp-option w-1/2 p-2 border rounded" placeholder="Option 2"></div><input type="text" class="comp-correct-answer w-full mt-2 p-2 border rounded" placeholder="Correct Answer">`;
         container.appendChild(newQ);
     });
-
+    
     studentDropdown.addEventListener('change', (e) => {
         if (e.target.value) loadAndRenderReport(e.target.value);
     });
-
+    
+    loadCounters();
     loadStudentDropdown();
 }
 
@@ -166,7 +167,7 @@ async function handleAddQuestionSubmit(e) {
                 newQuestion.correct_answer = form.correctAnswer.value;
             }
         }
-
+        
         await addDoc(collection(db, "admin_questions"), newQuestion);
         message.textContent = "Question saved successfully!";
         message.style.color = 'green';
@@ -175,6 +176,25 @@ async function handleAddQuestionSubmit(e) {
         console.error("Error adding question:", error);
         message.textContent = `Error: ${error.message}`;
         message.style.color = 'red';
+    }
+}
+
+async function loadCounters() {
+    const [studentsSnapshot, tutorsSnapshot] = await Promise.all([
+        getDocs(collection(db, "student_results")),
+        getDocs(collection(db, "tutors"))
+    ]);
+    document.getElementById('totalStudentsCount').textContent = studentsSnapshot.docs.length;
+    document.getElementById('totalTutorsCount').textContent = tutorsSnapshot.docs.length;
+    const studentsPerTutorSelect = document.getElementById('studentsPerTutorSelect');
+    studentsPerTutorSelect.innerHTML = `<option value="">Students Per Tutor</option>`;
+    for (const tutorDoc of tutorsSnapshot.docs) {
+        const tutor = tutorDoc.data();
+        const studentsQuery = query(collection(db, "student_results"), where("tutorEmail", "==", tutor.email));
+        const studentsUnderTutor = await getDocs(studentsQuery);
+        const option = document.createElement('option');
+        option.textContent = `${tutor.name} (${studentsUnderTutor.docs.length} students)`;
+        studentsPerTutorSelect.appendChild(option);
     }
 }
 
@@ -198,12 +218,12 @@ async function loadAndRenderReport(docId) {
         const reportDocSnap = await getDoc(doc(db, "student_results", docId));
         if (!reportDocSnap.exists()) throw new Error("Report not found");
         const data = reportDocSnap.data();
-
+        
         const tutorName = data.tutorEmail ? (await getDoc(doc(db, "tutors", data.tutorEmail))).data()?.name || 'N/A' : 'N/A';
         const creativeWritingAnswer = data.answers.find(a => a.type === 'creative-writing');
         const tutorReport = creativeWritingAnswer?.tutorReport || 'No report available.';
         const score = data.answers.filter(a => a.type !== 'creative-writing' && String(a.studentAnswer).toLowerCase() === String(a.correctAnswer).toLowerCase()).length;
-
+        
         reportContent.innerHTML = `
             <div class="border rounded-lg shadow p-4 bg-white" id="report-block">
                 <h3 class="text-xl font-bold mb-2">${capitalize(data.studentName)}</h3>
@@ -225,7 +245,6 @@ async function loadAndRenderReport(docId) {
         reportContent.innerHTML = `<p class="text-red-500">Failed to load report. ${error.message}</p>`;
     }
 }
-
 
 // ##################################################################
 // # SECTION 2: CONTENT MANAGER (FINAL VERSION)
@@ -727,4 +746,5 @@ onAuthStateChanged(auth, async (user) => {
     } else {
         window.location.href = "admin-auth.html";
     }
+
 });
