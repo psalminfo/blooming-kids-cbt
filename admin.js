@@ -1,5 +1,5 @@
 import { auth, db } from './firebaseConfig.js';
-import { collection, getDocs, doc, addDoc, query, where, getDoc, updateDoc, setDoc } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
+import { collection, getDocs, doc, addDoc, query, where, getDoc, updateDoc, setDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
 import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-auth.js";
 
 const ADMIN_EMAIL = 'psalm4all@gmail.com';
@@ -188,7 +188,7 @@ async function loadCounters() {
     studentsPerTutorSelect.innerHTML = `<option value="">Students Per Tutor</option>`;
     for (const tutorDoc of tutorsSnapshot.docs) {
         const tutor = tutorDoc.data();
-        const studentsQuery = query(collection(db, "student_results"), where("tutorEmail", "==", tutor.email));
+        const studentsQuery = query(collection(db, "students"), where("tutorEmail", "==", tutor.email));
         const studentsUnderTutor = await getDocs(studentsQuery);
         const option = document.createElement('option');
         option.textContent = `${tutor.name} (${studentsUnderTutor.docs.length} students)`;
@@ -487,22 +487,160 @@ async function setupContentManager() {
 
 
 // ##################################################################
-// # SECTION 3: AUTHENTICATION & APP INITIALIZATION
+// # SECTION 3: TUTOR MANAGEMENT (NEW)
+// ##################################################################
+async function renderTutorManagementPanel(container) {
+    container.innerHTML = `
+        <div class="bg-white p-6 rounded-lg shadow-md mb-6">
+            <h2 class="text-2xl font-bold text-green-700 mb-4">Tutor & Student Management</h2>
+            <div class="flex items-center space-x-4 mb-4">
+                <label class="flex items-center">
+                    <span class="text-gray-700 font-semibold">Report Submission Status:</span>
+                    <label for="report-toggle" class="relative inline-flex items-center cursor-pointer ml-4">
+                        <input type="checkbox" id="report-toggle" class="sr-only peer">
+                        <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                        <span id="report-status-label" class="ml-3 text-sm font-medium text-gray-900">Disabled</span>
+                    </label>
+                </label>
+            </div>
+            <div class="mb-4">
+                <h3 class="font-bold text-lg mb-2">Import Students (Google Sheet)</h3>
+                <input type="file" id="importStudentsFile" class="w-full mt-1 p-2 border rounded" accept=".xlsx, .xls">
+                <button id="importStudentsBtn" class="bg-blue-600 text-white px-4 py-2 rounded mt-2 hover:bg-blue-700">Import</button>
+                <p id="import-status" class="mt-2 text-sm"></p>
+            </div>
+        </div>
+        
+        <div class="bg-white p-6 rounded-lg shadow-md">
+            <h3 class="text-2xl font-bold text-green-700 mb-4">Manage Tutors</h3>
+            <div id="tutor-list" class="space-y-6">
+                <p>Loading tutors...</p>
+            </div>
+        </div>
+    `;
+    setupTutorManagementListeners();
+}
+
+async function setupTutorManagementListeners() {
+    const reportToggle = document.getElementById('report-toggle');
+    const reportStatusLabel = document.getElementById('report-status-label');
+    const tutorListContainer = document.getElementById('tutor-list');
+    
+    // Load and set the initial toggle state from Firestore
+    const settingsDocRef = doc(db, "settings", "report_submission");
+    const settingsSnap = await getDoc(settingsDocRef);
+    if (settingsSnap.exists()) {
+        const isEnabled = settingsSnap.data().enabled;
+        reportToggle.checked = isEnabled;
+        reportStatusLabel.textContent = isEnabled ? 'Enabled' : 'Disabled';
+    } else {
+        await setDoc(settingsDocRef, { enabled: false });
+    }
+
+    // Toggle listener
+    reportToggle.addEventListener('change', async (e) => {
+        const isChecked = e.target.checked;
+        reportStatusLabel.textContent = isChecked ? 'Enabled' : 'Disabled';
+        await updateDoc(settingsDocRef, { enabled: isChecked });
+    });
+
+    // Load and render all tutors and their assigned students
+    async function loadTutorsAndStudents() {
+        tutorListContainer.innerHTML = `<p class="text-gray-500">Loading tutors...</p>`;
+        const tutorsSnapshot = await getDocs(collection(db, "tutors"));
+        let tutorsHTML = '';
+
+        for (const tutorDoc of tutorsSnapshot.docs) {
+            const tutor = tutorDoc.data();
+            const studentsQuery = query(collection(db, "students"), where("tutorEmail", "==", tutor.email));
+            const studentsSnapshot = await getDocs(studentsQuery);
+            const studentCount = studentsSnapshot.docs.length;
+            
+            let studentsListHTML = studentsSnapshot.docs.map(studentDoc => {
+                const student = studentDoc.data();
+                return `<li class="flex justify-between items-center bg-gray-50 p-2 rounded-md">
+                            <span>${student.studentName} (${student.subjects.join(', ')})</span>
+                            <button class="remove-student-btn text-red-500 hover:text-red-700" data-student-id="${studentDoc.id}">Remove</button>
+                        </li>`;
+            }).join('');
+
+            tutorsHTML += `
+                <div class="border p-4 rounded-lg shadow-sm">
+                    <h4 class="font-bold text-xl mb-2">${tutor.name} (${studentCount} students)</h4>
+                    <ul class="space-y-2 mb-4">${studentsListHTML}</ul>
+                    <div class="add-student-form">
+                        <input type="text" class="new-student-name w-full mt-1 p-2 border rounded" placeholder="Student Name">
+                        <input type="text" class="new-student-grade w-full mt-1 p-2 border rounded" placeholder="Grade">
+                        <input type="text" class="new-student-subject w-full mt-1 p-2 border rounded" placeholder="Subject (comma-separated)">
+                        <input type="text" class="new-student-days w-full mt-1 p-2 border rounded" placeholder="Days of Class">
+                        <button class="add-student-btn bg-green-600 text-white px-4 py-2 rounded mt-2 hover:bg-green-700" data-tutor-email="${tutor.email}">Add Student</button>
+                    </div>
+                </div>
+            `;
+        }
+        tutorListContainer.innerHTML = tutorsHTML || `<p class="text-gray-500">No tutors found.</p>`;
+
+        // Add event listeners for new buttons
+        document.querySelectorAll('.add-student-btn').forEach(button => {
+            button.addEventListener('click', async (e) => {
+                const tutorEmail = e.target.getAttribute('data-tutor-email');
+                const formContainer = e.target.closest('.add-student-form');
+                const studentName = formContainer.querySelector('.new-student-name').value;
+                const studentGrade = formContainer.querySelector('.new-student-grade').value;
+                const subjects = formContainer.querySelector('.new-student-subject').value.split(',').map(s => s.trim());
+                const days = formContainer.querySelector('.new-student-days').value;
+                
+                if (studentName && studentGrade && subjects.length && days) {
+                    await addDoc(collection(db, "students"), {
+                        studentName, grade: studentGrade, subjects, days, tutorEmail
+                    });
+                    loadTutorsAndStudents(); // Refresh the list
+                }
+            });
+        });
+
+        document.querySelectorAll('.remove-student-btn').forEach(button => {
+            button.addEventListener('click', async (e) => {
+                const studentId = e.target.getAttribute('data-student-id');
+                if (confirm('Are you sure you want to remove this student?')) {
+                    await deleteDoc(doc(db, "students", studentId));
+                    loadTutorsAndStudents(); // Refresh the list
+                }
+            });
+        });
+    }
+
+    loadTutorsAndStudents();
+
+    // Placeholder for Google Sheets Import logic
+    document.getElementById('importStudentsBtn').addEventListener('click', () => {
+        const importStatus = document.getElementById('import-status');
+        importStatus.textContent = "Google Sheets import requires a Firebase Cloud Function. This is a placeholder.";
+        importStatus.style.color = 'orange';
+    });
+}
+
+
+// ##################################################################
+// # SECTION 4: AUTHENTICATION & APP INITIALIZATION
 // ##################################################################
 
 function initializeAdminPanel() {
     const mainContent = document.getElementById('main-content');
     const navDashboard = document.getElementById('navDashboard');
     const navContent = document.getElementById('navContent');
+    const navTutorManagement = document.getElementById('navTutorManagement');
 
     function setActiveNav(activeButton) {
         navDashboard.classList.remove('active');
         navContent.classList.remove('active');
+        navTutorManagement.classList.remove('active');
         activeButton.classList.add('active');
     }
 
     navDashboard.addEventListener('click', () => { setActiveNav(navDashboard); renderAdminPanel(mainContent); });
     navContent.addEventListener('click', () => { setActiveNav(navContent); renderContentManagerPanel(mainContent); });
+    navTutorManagement.addEventListener('click', () => { setActiveNav(navTutorManagement); renderTutorManagementPanel(mainContent); });
     
     renderAdminPanel(mainContent); // Initial render
 }
