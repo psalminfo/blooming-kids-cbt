@@ -975,17 +975,3 @@ onAuthStateChanged(auth, async (user) => {
     }
 });
 ```
-
-***
-
-### What's Next? Testing and Finalizing
-
-The system is now deployed and ready for a test run. The final step is to test it from your perspective as the Director.
-
-**Your next action:**
-1.  In your admin portal, go to the "Tutor Management" tab and make sure the "Report Submission Status" toggle is turned on.
-2.  Log in to your tutor portal. The "Submit Report" button should be visible.
-3.  Submit a report for a student. The Cloud Function should run, and you should receive an email with the report.
-4.  Check your Google Sheet to confirm that a new row with the pay advice details has been added.
-
-Please let me know the outcome of your tests, and we can make any final adjustments if need
