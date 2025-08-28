@@ -4,7 +4,7 @@ import { onAuthStateChanged, signOut, onIdTokenChanged } from "https://www.gstat
 import { onSnapshot } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
 
 const ADMIN_EMAIL = 'psalm4all@gmail.com';
-let activeTutorId = null; // Store the ID of the currently selected tutor
+let activeTutorId = null;
 
 // --- Cloudinary Configuration ---
 const CLOUDINARY_CLOUD_NAME = 'dy2hxcyaf';
@@ -29,16 +29,11 @@ function capitalize(str) {
 
 
 // ##################################################################
-// # SECTION 1: DASHBOARD PANEL (Fully Restored)
+// # SECTION 1: DASHBOARD PANEL (Restored to Original)
 // ##################################################################
 
 async function renderAdminPanel(container) {
     container.innerHTML = `
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
-            <div class="bg-blue-100 p-4 rounded-lg text-center shadow-md"><h3 class="font-bold text-blue-800">Total Students</h3><p id="totalStudentsCount" class="text-3xl text-blue-600 font-extrabold">0</p></div>
-            <div class="bg-blue-100 p-4 rounded-lg text-center shadow-md"><h3 class="font-bold text-blue-800">Total Tutors</h3><p id="totalTutorsCount" class="text-3xl text-blue-600 font-extrabold">0</p></div>
-            <div class="bg-blue-100 p-4 rounded-lg text-center shadow-md"><h3 class="font-bold text-blue-800">Students Per Tutor</h3><select id="studentsPerTutorSelect" class="w-full mt-1 p-2 border rounded"></select></div>
-        </div>
         <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div class="bg-white p-6 rounded-lg shadow-md">
                 <h2 class="text-2xl font-bold text-green-700 mb-4">Add New Question</h2>
@@ -114,12 +109,11 @@ function setupDashboardListeners() {
         newQ.innerHTML = `<textarea class="comp-question w-full mt-1 p-2 border rounded" rows="2" placeholder="Question"></textarea><div class="flex space-x-2 mt-2"><input type="text" class="comp-option w-1/2 p-2 border rounded" placeholder="Option 1"><input type="text" class="comp-option w-1/2 p-2 border rounded" placeholder="Option 2"></div><input type="text" class="comp-correct-answer w-full mt-2 p-2 border rounded" placeholder="Correct Answer">`;
         container.appendChild(newQ);
     });
-    
+
     studentDropdown.addEventListener('change', (e) => {
         if (e.target.value) loadAndRenderReport(e.target.value);
     });
-    
-    loadCounters();
+
     loadStudentDropdown();
 }
 
@@ -167,7 +161,7 @@ async function handleAddQuestionSubmit(e) {
                 newQuestion.correct_answer = form.correctAnswer.value;
             }
         }
-        
+
         await addDoc(collection(db, "admin_questions"), newQuestion);
         message.textContent = "Question saved successfully!";
         message.style.color = 'green';
@@ -176,25 +170,6 @@ async function handleAddQuestionSubmit(e) {
         console.error("Error adding question:", error);
         message.textContent = `Error: ${error.message}`;
         message.style.color = 'red';
-    }
-}
-
-async function loadCounters() {
-    const [studentsSnapshot, tutorsSnapshot] = await Promise.all([
-        getDocs(collection(db, "students")),
-        getDocs(collection(db, "tutors"))
-    ]);
-    document.getElementById('totalStudentsCount').textContent = studentsSnapshot.docs.length;
-    document.getElementById('totalTutorsCount').textContent = tutorsSnapshot.docs.length;
-    const studentsPerTutorSelect = document.getElementById('studentsPerTutorSelect');
-    studentsPerTutorSelect.innerHTML = `<option value="">Students Per Tutor</option>`;
-    for (const tutorDoc of tutorsSnapshot.docs) {
-        const tutor = tutorDoc.data();
-        const studentsQuery = query(collection(db, "students"), where("tutorEmail", "==", tutor.email));
-        const studentsUnderTutor = await getDocs(studentsQuery);
-        const option = document.createElement('option');
-        option.textContent = `${tutor.name} (${studentsUnderTutor.docs.length} students)`;
-        studentsPerTutorSelect.appendChild(option);
     }
 }
 
@@ -218,12 +193,12 @@ async function loadAndRenderReport(docId) {
         const reportDocSnap = await getDoc(doc(db, "student_results", docId));
         if (!reportDocSnap.exists()) throw new Error("Report not found");
         const data = reportDocSnap.data();
-        
+
         const tutorName = data.tutorEmail ? (await getDoc(doc(db, "tutors", data.tutorEmail))).data()?.name || 'N/A' : 'N/A';
         const creativeWritingAnswer = data.answers.find(a => a.type === 'creative-writing');
         const tutorReport = creativeWritingAnswer?.tutorReport || 'No report available.';
         const score = data.answers.filter(a => a.type !== 'creative-writing' && String(a.studentAnswer).toLowerCase() === String(a.correctAnswer).toLowerCase()).length;
-        
+
         reportContent.innerHTML = `
             <div class="border rounded-lg shadow p-4 bg-white" id="report-block">
                 <h3 class="text-xl font-bold mb-2">${capitalize(data.studentName)}</h3>
@@ -291,7 +266,7 @@ async function setupContentManager() {
     const loadTestBtn = document.getElementById('load-test-btn');
     const forceReloadCheckbox = document.getElementById('force-reload-checkbox');
     const status = document.getElementById('status');
-    
+
     let loadedTestData = null;
     let currentTestDocId = null;
 
@@ -321,7 +296,7 @@ async function setupContentManager() {
     loadTestBtn.addEventListener('click', async () => {
         const url = testFileSelect.value;
         const fileName = testFileSelect.options[testFileSelect.selectedIndex].text;
-        currentTestDocId = fileName.replace('.json', ''); 
+        currentTestDocId = fileName.replace('.json', '');
         const forceReload = forceReloadCheckbox.checked;
 
         if (!url) {
@@ -345,17 +320,17 @@ async function setupContentManager() {
                 const logMessage = forceReload ? "Force Reload activated. Fetching from GitHub." : "No saved version. Loading template from GitHub.";
                 console.log(logMessage);
                 loaderStatus.innerHTML = `<p class="text-blue-600">Loading latest version from GitHub...</p>`;
-                
+
                 const response = await fetch(url);
                 if (!response.ok) throw new Error(`Could not fetch file from GitHub. Status: ${response.status}`);
                 loadedTestData = await response.json();
-                
+
                 await setDoc(testDocRef, loadedTestData);
                 loaderStatus.innerHTML = `<p class="text-green-600 font-bold">✅ Synced latest version from GitHub to Firestore!</p>`;
             }
-            
+
             if (!loadedTestData || !loadedTestData.tests) throw new Error("Invalid test file format.");
-            
+
             document.getElementById('loaded-file-name').textContent = `Editing: ${fileName}`;
             workspace.style.display = 'block';
             populateDropdowns();
@@ -380,7 +355,7 @@ async function setupContentManager() {
         passageSelect.innerHTML = '<option value="">-- Select an incomplete passage --</option>';
         imageSelect.innerHTML = '<option value="">-- Select a question needing an image --</option>';
         imagePreviewContainer.style.display = 'none';
-        
+
         loadedTestData.tests.forEach((test, testIndex) => {
              (test.passages || []).forEach((passage, passageIndex) => {
                 if (passage.content && passage.content.includes("TO BE UPLOADED")) {
@@ -415,7 +390,7 @@ async function setupContentManager() {
         const [testIndex, questionIndex] = e.target.value.split('-');
         const question = loadedTestData.tests[testIndex].questions[questionIndex];
         const imageName = question.imagePlaceholder;
-        
+
         if (imageName) {
             imagePreview.src = GITHUB_IMAGE_PREVIEW_URL + imageName;
             imagePreviewContainer.style.display = 'block';
@@ -423,7 +398,7 @@ async function setupContentManager() {
             imagePreviewContainer.style.display = 'none';
         }
     });
-    
+
     updatePassageBtn.addEventListener('click', async () => {
         const selected = passageSelect.value;
         if (!selected) {
@@ -436,7 +411,7 @@ async function setupContentManager() {
 
         const [testIndex, passageIndex] = selected.split('-');
         loadedTestData.tests[testIndex].passages[passageIndex].content = passageContent.value;
-        
+
         try {
             const testDocRef = doc(db, "tests", currentTestDocId);
             await setDoc(testDocRef, loadedTestData);
@@ -464,7 +439,7 @@ async function setupContentManager() {
             status.textContent = 'Uploading image...';
             status.style.color = 'blue';
             const imageUrl = await uploadImageToCloudinary(file);
-            
+
             status.textContent = 'Saving URL to Firestore...';
             const [testIndex, questionIndex] = selectedImage.split('-');
             loadedTestData.tests[testIndex].questions[questionIndex].imageUrl = imageUrl;
@@ -472,7 +447,7 @@ async function setupContentManager() {
 
             const testDocRef = doc(db, "tests", currentTestDocId);
             await setDoc(testDocRef, loadedTestData);
-            
+
             status.textContent = `✅ Image URL saved successfully!`;
             status.style.color = 'green';
             imageUploadInput.value = '';
@@ -495,6 +470,10 @@ async function renderTutorManagementPanel(container) {
     container.innerHTML = `
         <div class="bg-white p-6 rounded-lg shadow-md mb-6">
             <h2 class="text-2xl font-bold text-green-700 mb-4">Tutor & Student Management</h2>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                <div class="bg-blue-100 p-4 rounded-lg text-center shadow-md"><h3 class="font-bold text-blue-800">Total Students</h3><p id="totalStudentsCount" class="text-3xl text-blue-600 font-extrabold">0</p></div>
+                <div class="bg-blue-100 p-4 rounded-lg text-center shadow-md"><h3 class="font-bold text-blue-800">Total Tutors</h3><p id="totalTutorsCount" class="text-3xl text-blue-600 font-extrabold">0</p></div>
+            </div>
             <div class="flex items-center justify-between space-x-4 mb-4">
                 <label class="flex items-center">
                     <span class="text-gray-700 font-semibold">Report Submission Status:</span>
@@ -520,7 +499,7 @@ async function renderTutorManagementPanel(container) {
                 <p id="import-status" class="mt-2 text-sm"></p>
             </div>
         </div>
-        
+
         <div class="bg-white p-6 rounded-lg shadow-md">
             <h3 class="text-2xl font-bold text-green-700 mb-4">Manage Tutors</h3>
             <div class="mb-4">
@@ -543,7 +522,9 @@ async function setupTutorManagementListeners() {
     const saveEmailsBtn = document.getElementById('save-emails-btn');
     const reportEmailInput = document.getElementById('report-email');
     const payEmailInput = document.getElementById('pay-email');
-    
+    const totalTutorsCount = document.getElementById('totalTutorsCount');
+    const totalStudentsCount = document.getElementById('totalStudentsCount');
+
     // Listen to the settings document for real-time updates
     const settingsDocRef = doc(db, "settings", "report_submission");
     onSnapshot(settingsDocRef, (docSnap) => {
@@ -554,7 +535,7 @@ async function setupTutorManagementListeners() {
             reportStatusLabel.textContent = isEnabled ? 'Enabled' : 'Disabled';
             reportStatusLabel.classList.toggle('text-green-600', isEnabled);
             reportStatusLabel.classList.toggle('text-gray-500', !isEnabled);
-            
+
             reportEmailInput.value = data.reportEmails ? data.reportEmails.join(', ') : '';
             payEmailInput.value = data.payEmails ? data.payEmails.join(', ') : '';
         } else {
@@ -574,6 +555,19 @@ async function setupTutorManagementListeners() {
         await updateDoc(settingsDocRef, { reportEmails, payEmails });
         alert('Emails saved successfully!');
     });
+
+    // Listen to the tutors collection for real-time updates to counts
+    onSnapshot(collection(db, "tutors"), (querySnapshot) => {
+        const totalTutors = querySnapshot.docs.length;
+        totalTutorsCount.textContent = totalTutors;
+    });
+
+    // Listen to the students collection for real-time updates to counts
+    onSnapshot(collection(db, "students"), (querySnapshot) => {
+        const totalStudents = querySnapshot.docs.length;
+        totalStudentsCount.textContent = totalStudents;
+    });
+
 
     // Load tutors into the dropdown
     const tutorsSnapshot = await getDocs(collection(db, "tutors"));
