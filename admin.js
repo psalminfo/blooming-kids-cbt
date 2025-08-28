@@ -749,35 +749,3 @@ onAuthStateChanged(auth, async (user) => {
     }
 });
 
-// ##################################################################
-// # SECTION 4: AUTHENTICATION & APP INITIALIZATION
-// ##################################################################
-
-function initializeAdminPanel() {
-    const mainContent = document.getElementById('main-content');
-    const navDashboard = document.getElementById('navDashboard');
-    const navContent = document.getElementById('navContent');
-    const navTutorManagement = document.getElementById('navTutorManagement');
-
-    function setActiveNav(activeButton) {
-        navDashboard.classList.remove('active');
-        navContent.classList.remove('active');
-        navTutorManagement.classList.remove('active');
-        activeButton.classList.add('active');
-    }
-
-    navDashboard.addEventListener('click', () => { setActiveNav(navDashboard); renderAdminPanel(mainContent); });
-    navContent.addEventListener('click', () => { setActiveNav(navContent); renderContentManagerPanel(mainContent); });
-    navTutorManagement.addEventListener('click', () => { setActiveNav(navTutorManagement); renderTutorManagementPanel(mainContent); });
-    
-    renderAdminPanel(mainContent); // Initial render
-}
-
-onAuthStateChanged(auth, async (user) => {
-    if (user && user.email === ADMIN_EMAIL) {
-        document.getElementById('logoutBtn').addEventListener('click', () => signOut(auth));
-        initializeAdminPanel();
-    } else {
-        window.location.href = "admin-auth.html";
-    }
-});
