@@ -1,8 +1,10 @@
 import { auth, db } from './firebaseConfig.js';
 import { collection, getDocs, doc, addDoc, query, where, getDoc, updateDoc, setDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
-import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-auth.js";
+import { onAuthStateChanged, signOut, onIdTokenChanged } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-auth.js";
+import { onSnapshot } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
 
 const ADMIN_EMAIL = 'psalm4all@gmail.com';
+let activeTutorId = null; // Store the ID of the currently selected tutor
 
 // --- Cloudinary Configuration ---
 const CLOUDINARY_CLOUD_NAME = 'dy2hxcyaf';
@@ -179,7 +181,7 @@ async function handleAddQuestionSubmit(e) {
 
 async function loadCounters() {
     const [studentsSnapshot, tutorsSnapshot] = await Promise.all([
-        getDocs(collection(db, "student_results")),
+        getDocs(collection(db, "students")),
         getDocs(collection(db, "tutors"))
     ]);
     document.getElementById('totalStudentsCount').textContent = studentsSnapshot.docs.length;
@@ -493,7 +495,7 @@ async function renderTutorManagementPanel(container) {
     container.innerHTML = `
         <div class="bg-white p-6 rounded-lg shadow-md mb-6">
             <h2 class="text-2xl font-bold text-green-700 mb-4">Tutor & Student Management</h2>
-            <div class="flex items-center space-x-4 mb-4">
+            <div class="flex items-center justify-between space-x-4 mb-4">
                 <label class="flex items-center">
                     <span class="text-gray-700 font-semibold">Report Submission Status:</span>
                     <label for="report-toggle" class="relative inline-flex items-center cursor-pointer ml-4">
@@ -502,6 +504,14 @@ async function renderTutorManagementPanel(container) {
                         <span id="report-status-label" class="ml-3 text-sm font-medium text-gray-500">Disabled</span>
                     </label>
                 </label>
+            </div>
+             <div class="mb-4">
+                <h3 class="font-bold text-lg mb-2">Configure Emails</h3>
+                <label for="report-email" class="block text-gray-700">Report Recipient Emails (comma-separated)</label>
+                <input type="text" id="report-email" class="w-full mt-1 p-2 border rounded" placeholder="e.g., admin@example.com, accounting@example.com">
+                 <label for="pay-email" class="block text-gray-700 mt-4">Pay Advice Recipient Emails (comma-separated)</label>
+                <input type="text" id="pay-email" class="w-full mt-1 p-2 border rounded" placeholder="e.g., admin@example.com, hr@example.com">
+                <button id="save-emails-btn" class="bg-green-600 text-white px-4 py-2 rounded mt-2 hover:bg-green-700">Save Emails</button>
             </div>
             <div class="mb-4">
                 <h3 class="font-bold text-lg mb-2">Import Students (Google Sheet)</h3>
@@ -530,27 +540,39 @@ async function setupTutorManagementListeners() {
     const reportStatusLabel = document.getElementById('report-status-label');
     const tutorSelect = document.getElementById('tutor-select');
     const selectedTutorDetails = document.getElementById('selected-tutor-details');
+    const saveEmailsBtn = document.getElementById('save-emails-btn');
+    const reportEmailInput = document.getElementById('report-email');
+    const payEmailInput = document.getElementById('pay-email');
     
-    // Load and set the initial toggle state from Firestore
+    // Listen to the settings document for real-time updates
     const settingsDocRef = doc(db, "settings", "report_submission");
-    const settingsSnap = await getDoc(settingsDocRef);
-    if (settingsSnap.exists()) {
-        const isEnabled = settingsSnap.data().enabled;
-        reportToggle.checked = isEnabled;
-        reportStatusLabel.textContent = isEnabled ? 'Enabled' : 'Disabled';
-        reportStatusLabel.classList.toggle('text-green-600', isEnabled);
-        reportStatusLabel.classList.toggle('text-gray-500', !isEnabled);
-    } else {
-        await setDoc(settingsDocRef, { enabled: false });
-    }
+    onSnapshot(settingsDocRef, (docSnap) => {
+        if (docSnap.exists()) {
+            const data = docSnap.data();
+            const isEnabled = data.enabled;
+            reportToggle.checked = isEnabled;
+            reportStatusLabel.textContent = isEnabled ? 'Enabled' : 'Disabled';
+            reportStatusLabel.classList.toggle('text-green-600', isEnabled);
+            reportStatusLabel.classList.toggle('text-gray-500', !isEnabled);
+            
+            reportEmailInput.value = data.reportEmails ? data.reportEmails.join(', ') : '';
+            payEmailInput.value = data.payEmails ? data.payEmails.join(', ') : '';
+        } else {
+            setDoc(settingsDocRef, { enabled: false, reportEmails: [], payEmails: [] });
+        }
+    });
 
     // Toggle listener
     reportToggle.addEventListener('change', async (e) => {
-        const isChecked = e.target.checked;
-        reportStatusLabel.textContent = isChecked ? 'Enabled' : 'Disabled';
-        reportStatusLabel.classList.toggle('text-green-600', isChecked);
-        reportStatusLabel.classList.toggle('text-gray-500', !isChecked);
-        await updateDoc(settingsDocRef, { enabled: isChecked });
+        await updateDoc(settingsDocRef, { enabled: e.target.checked });
+    });
+
+    // Save Emails Listener
+    saveEmailsBtn.addEventListener('click', async () => {
+        const reportEmails = reportEmailInput.value.split(',').map(email => email.trim()).filter(email => email);
+        const payEmails = payEmailInput.value.split(',').map(email => email.trim()).filter(email => email);
+        await updateDoc(settingsDocRef, { reportEmails, payEmails });
+        alert('Emails saved successfully!');
     });
 
     // Load tutors into the dropdown
@@ -567,18 +589,22 @@ async function setupTutorManagementListeners() {
     });
 
     tutorSelect.addEventListener('change', async (e) => {
-        const tutorId = e.target.value;
-        if (!tutorId) {
+        activeTutorId = e.target.value;
+        if (!activeTutorId) {
             selectedTutorDetails.innerHTML = `<p class="text-gray-500">Please select a tutor to view details.</p>`;
             return;
         }
-        const tutor = tutorsData[tutorId];
+        await renderSelectedTutorDetails(activeTutorId, tutorsData);
+    });
+
+    async function renderSelectedTutorDetails(tutorId, allTutorsData) {
+        const tutor = allTutorsData[tutorId];
         const studentsQuery = query(collection(db, "students"), where("tutorEmail", "==", tutor.email));
         const studentsSnapshot = await getDocs(studentsQuery);
         const studentsListHTML = studentsSnapshot.docs.map(studentDoc => {
             const student = studentDoc.data();
             return `<li class="flex justify-between items-center bg-gray-50 p-2 rounded-md">
-                        <span>${student.studentName} (${student.subjects.join(', ')})</span>
+                        <span>${student.studentName} (${student.subjects.join(', ')}) - Fee: $${student.studentFee}</span>
                         <div class="flex space-x-2">
                              <button class="remove-student-btn text-red-500 hover:text-red-700" data-student-id="${studentDoc.id}">Remove</button>
                         </div>
@@ -609,12 +635,9 @@ async function setupTutorManagementListeners() {
                 </div>
             </div>
         `;
-        // Add event listeners for new buttons
         document.getElementById('management-staff-toggle').addEventListener('change', async (e) => {
             const tutorDocRef = doc(db, "tutors", tutorId);
             await updateDoc(tutorDocRef, { isManagementStaff: e.target.checked });
-            // Re-render the panel to show updated state if needed
-            tutorSelect.dispatchEvent(new Event('change'));
         });
         document.querySelectorAll('.add-student-btn').forEach(button => {
             button.addEventListener('click', async (e) => {
@@ -629,7 +652,7 @@ async function setupTutorManagementListeners() {
                     await addDoc(collection(db, "students"), {
                         studentName, grade: studentGrade, subjects, days, tutorEmail, studentFee
                     });
-                    tutorSelect.dispatchEvent(new Event('change'));
+                    await renderSelectedTutorDetails(tutorId, allTutorsData);
                 } else {
                     alert('Please fill in all student details correctly.');
                 }
@@ -640,12 +663,31 @@ async function setupTutorManagementListeners() {
                 const studentId = e.target.getAttribute('data-student-id');
                 if (confirm('Are you sure you want to remove this student?')) {
                     await deleteDoc(doc(db, "students", studentId));
-                    tutorSelect.dispatchEvent(new Event('change'));
+                    await renderSelectedTutorDetails(tutorId, allTutorsData);
                 }
             });
         });
+    }
+
+    onSnapshot(collection(db, "tutors"), async (querySnapshot) => {
+        const tutorsData = {};
+        tutorSelect.innerHTML = `<option value="">-- Select a Tutor --</option>`;
+        querySnapshot.forEach(doc => {
+            const tutor = doc.data();
+            tutorsData[doc.id] = tutor;
+            const option = document.createElement('option');
+            option.value = doc.id;
+            option.textContent = tutor.name;
+            tutorSelect.appendChild(option);
+        });
+        if (activeTutorId && tutorsData[activeTutorId]) {
+            tutorSelect.value = activeTutorId;
+            await renderSelectedTutorDetails(activeTutorId, tutorsData);
+        } else {
+            selectedTutorDetails.innerHTML = `<p class="text-gray-500">Please select a tutor to view details.</p>`;
+        }
     });
-    
+
     // Placeholder for Google Sheets Import logic
     document.getElementById('importStudentsBtn').addEventListener('click', () => {
         const importStatus = document.getElementById('import-status');

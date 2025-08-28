@@ -1,8 +1,25 @@
 import { auth, db } from './firebaseConfig.js';
 import { collection, getDocs, doc, updateDoc, getDoc, where, query } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
-import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-auth.js";
-// Re-importing from a known working path for consistency
-import { getStorage, ref, uploadBytesResumable, getDownloadURL } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-storage.js";
+import { onAuthStateChanged, signOut, onIdTokenChanged } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-auth.js";
+import { onSnapshot } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
+import { httpsCallable } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-functions.js";
+
+// --- Global state to hold report submission status ---
+let isSubmissionEnabled = false;
+
+// Listen for changes to the admin setting in real-time
+const settingsDocRef = doc(db, "settings", "report_submission");
+onSnapshot(settingsDocRef, (docSnap) => {
+    if (docSnap.exists()) {
+        isSubmissionEnabled = docSnap.data().enabled;
+        // Re-render the student database if the page is currently active
+        const mainContent = document.getElementById('mainContent');
+        if (mainContent.querySelector('#student-list-view')) {
+             renderStudentDatabase(mainContent, window.tutorData);
+        }
+    }
+});
+
 
 // --- Utility Functions ---
 function renderTutorDashboard(container, tutor) {
@@ -32,9 +49,6 @@ function renderTutorDashboard(container, tutor) {
 async function loadTutorReports(tutorEmail, parentEmail = null) {
     const pendingReportsContainer = document.getElementById('pendingReportsContainer');
     const gradedReportsContainer = document.getElementById('gradedReportsContainer');
-    const settingsDocRef = doc(db, "settings", "report_submission");
-    const settingsSnap = await getDoc(settingsDocRef);
-    const submissionEnabled = settingsSnap.exists() && settingsSnap.data().enabled;
     
     pendingReportsContainer.innerHTML = `<p class="text-gray-500">Loading pending submissions...</p>`;
     if(gradedReportsContainer) gradedReportsContainer.innerHTML = `<p class="text-gray-500">Loading graded submissions...</p>`;
@@ -61,7 +75,7 @@ async function loadTutorReports(tutorEmail, parentEmail = null) {
                         <h4 class="font-semibold">Creative Writing Submission:</h4>
                         ${data.fileUrl ? `<a href="${data.fileUrl}" target="_blank" class="text-blue-500 hover:underline">Download File</a>` : `<p class="italic">${data.textAnswer || "No response"}</p>`}
                         <p class="mt-2"><strong>Status:</strong> ${data.status || 'Pending'}</p>
-                        ${(data.status === 'pending_review' && submissionEnabled) ? `
+                        ${(data.status === 'pending_review' && isSubmissionEnabled) ? `
                             <textarea class="tutor-report w-full mt-2 p-2 border rounded" rows="3" placeholder="Write your report here..."></textarea>
                             <button class="submit-report-btn bg-green-600 text-white px-4 py-2 rounded mt-2" data-doc-id="${doc.id}">Submit Report</button>
                         ` : `
@@ -101,8 +115,8 @@ async function loadTutorReports(tutorEmail, parentEmail = null) {
 
 // NEW: Student Database View
 async function renderStudentDatabase(container, tutor) {
-    container.innerHTML = `<div id="student-list" class="bg-white p-6 rounded-lg shadow-md">Loading student data...</div>`;
-    const studentListContainer = document.getElementById('student-list');
+    container.innerHTML = `<div id="student-list-view" class="bg-white p-6 rounded-lg shadow-md">Loading student data...</div>`;
+    const studentListContainer = document.getElementById('student-list-view');
     try {
         const studentQuery = query(collection(db, "students"), where("tutorEmail", "==", tutor.email));
         const studentsSnapshot = await getDocs(studentQuery);
@@ -110,14 +124,48 @@ async function renderStudentDatabase(container, tutor) {
             studentListContainer.innerHTML = `<p class="text-gray-500">You are not assigned to any students yet.</p>`;
             return;
         }
+
         let studentsHTML = `<h2 class="text-2xl font-bold text-green-700 mb-4">My Students</h2>`;
-        studentsHTML += `<div class="overflow-x-auto"><table class="min-w-full divide-y divide-gray-200"><thead><tr><th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Student Name</th><th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Grade</th><th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Subject(s)</th><th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Days of Class</th></tr></thead><tbody class="bg-white divide-y divide-gray-200">`;
+        studentsHTML += `<p class="text-sm text-gray-600 mb-4">Report submission is currently <strong class="${isSubmissionEnabled ? 'text-green-600' : 'text-red-500'}">${isSubmissionEnabled ? 'Enabled' : 'Disabled'}</strong> by the admin.</p>`;
+        
+        studentsHTML += `<div class="overflow-x-auto"><table class="min-w-full divide-y divide-gray-200"><thead><tr><th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Student Name</th><th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Grade</th><th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Subject(s)</th><th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Days of Class</th><th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th></tr></thead><tbody class="bg-white divide-y divide-gray-200">`;
+        
         studentsSnapshot.forEach(doc => {
             const student = doc.data();
-            studentsHTML += `<tr><td class="px-6 py-4 whitespace-nowrap">${student.studentName}</td><td class="px-6 py-4 whitespace-nowrap">${student.grade}</td><td class="px-6 py-4 whitespace-nowrap">${student.subjects.join(', ')}</td><td class="px-6 py-4 whitespace-nowrap">${student.days}</td></tr>`;
+            studentsHTML += `<tr><td class="px-6 py-4 whitespace-nowrap">${student.studentName}</td><td class="px-6 py-4 whitespace-nowrap">${student.grade}</td><td class="px-6 py-4 whitespace-nowrap">${student.subjects.join(', ')}</td><td class="px-6 py-4 whitespace-nowrap">${student.days}</td><td class="px-6 py-4 whitespace-nowrap">`;
+            if (isSubmissionEnabled) {
+                studentsHTML += `<button class="submit-report-btn bg-green-600 text-white px-3 py-1 rounded" data-student-id="${doc.id}">Submit Report</button>`;
+            } else {
+                studentsHTML += `<span class="text-gray-400">Not Enabled</span>`;
+            }
+            studentsHTML += `</td></tr>`;
         });
+        
         studentsHTML += `</tbody></table></div>`;
         studentListContainer.innerHTML = studentsHTML;
+        
+        document.querySelectorAll('.submit-report-btn').forEach(button => {
+            button.addEventListener('click', async (e) => {
+                const studentId = e.target.getAttribute('data-student-id');
+                const studentDoc = await getDoc(doc(db, "students", studentId));
+                const studentData = studentDoc.data();
+                
+                const reportText = prompt(`Enter report for ${studentData.studentName}:`);
+                
+                if (reportText) {
+                    const processSubmission = httpsCallable(functions, 'processTutorSubmission');
+                    try {
+                        const result = await processSubmission({
+                            studentReports: [{ studentId, reportText, studentFee: studentData.studentFee }]
+                        });
+                        alert(result.data.message);
+                    } catch (error) {
+                        alert(`Error submitting report: ${error.message}`);
+                    }
+                }
+            });
+        });
+
     } catch (error) {
         console.error("Error loading students:", error);
         studentListContainer.innerHTML = `<p class="text-red-500">Failed to load student data.</p>`;
