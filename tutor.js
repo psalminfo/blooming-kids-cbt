@@ -1,6 +1,8 @@
 import { auth, db } from './firebaseConfig.js';
 import { collection, getDocs, doc, updateDoc, getDoc, where, query } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
 import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-auth.js";
+// Re-importing from a known working path for consistency
+import { getStorage, ref, uploadBytesResumable, getDownloadURL } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-storage.js";
 
 // --- Utility Functions ---
 function renderTutorDashboard(container, tutor) {
@@ -26,9 +28,13 @@ function renderTutorDashboard(container, tutor) {
     loadTutorReports(tutor.email);
 }
 
+// Updated to check report submission status
 async function loadTutorReports(tutorEmail, parentEmail = null) {
     const pendingReportsContainer = document.getElementById('pendingReportsContainer');
     const gradedReportsContainer = document.getElementById('gradedReportsContainer');
+    const settingsDocRef = doc(db, "settings", "report_submission");
+    const settingsSnap = await getDoc(settingsDocRef);
+    const submissionEnabled = settingsSnap.exists() && settingsSnap.data().enabled;
     
     pendingReportsContainer.innerHTML = `<p class="text-gray-500">Loading pending submissions...</p>`;
     if(gradedReportsContainer) gradedReportsContainer.innerHTML = `<p class="text-gray-500">Loading graded submissions...</p>`;
@@ -55,10 +61,11 @@ async function loadTutorReports(tutorEmail, parentEmail = null) {
                         <h4 class="font-semibold">Creative Writing Submission:</h4>
                         ${data.fileUrl ? `<a href="${data.fileUrl}" target="_blank" class="text-blue-500 hover:underline">Download File</a>` : `<p class="italic">${data.textAnswer || "No response"}</p>`}
                         <p class="mt-2"><strong>Status:</strong> ${data.status || 'Pending'}</p>
-                        ${data.status === 'pending_review' ? `
+                        ${(data.status === 'pending_review' && submissionEnabled) ? `
                             <textarea class="tutor-report w-full mt-2 p-2 border rounded" rows="3" placeholder="Write your report here..."></textarea>
                             <button class="submit-report-btn bg-green-600 text-white px-4 py-2 rounded mt-2" data-doc-id="${doc.id}">Submit Report</button>
                         ` : `
+                            <p class="mt-2 text-red-500">Submissions are currently disabled by the admin.</p>
                             <p class="mt-2"><strong>Tutor's Report:</strong> ${data.tutorReport || 'N/A'}</p>
                         `}
                     </div>
@@ -97,7 +104,6 @@ async function renderStudentDatabase(container, tutor) {
     container.innerHTML = `<div id="student-list" class="bg-white p-6 rounded-lg shadow-md">Loading student data...</div>`;
     const studentListContainer = document.getElementById('student-list');
     try {
-        // Assume a new "students" collection that links students to tutors by email
         const studentQuery = query(collection(db, "students"), where("tutorEmail", "==", tutor.email));
         const studentsSnapshot = await getDocs(studentQuery);
         if (studentsSnapshot.empty) {
@@ -134,7 +140,6 @@ function initializeTutorPanel() {
     navDashboard.addEventListener('click', () => { setActiveNav(navDashboard); renderTutorDashboard(mainContent, window.tutorData); });
     navStudentDatabase.addEventListener('click', () => { setActiveNav(navStudentDatabase); renderStudentDatabase(mainContent, window.tutorData); });
     
-    // Initial render
     renderTutorDashboard(mainContent, window.tutorData);
 }
 
