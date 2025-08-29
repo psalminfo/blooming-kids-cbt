@@ -333,4 +333,3 @@ onAuthStateChanged(auth, async (user) => {
         window.location.href = "tutor-auth.html";
     }
 });
-
