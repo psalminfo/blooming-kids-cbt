@@ -3,6 +3,7 @@ import { collection, getDocs, doc, addDoc, query, where, getDoc, updateDoc, setD
 import { onAuthStateChanged, signOut, onIdTokenChanged } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-auth.js";
 import { onSnapshot } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
 import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-storage.js";
+import { getFunctions, httpsCallable } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-functions.js";
 
 const ADMIN_EMAIL = 'psalm4all@gmail.com';
 let activeTutorId = null;
@@ -28,9 +29,24 @@ function capitalize(str) {
     return str.replace(/\b\w/g, l => l.toUpperCase());
 }
 
+// Function to convert data to CSV format
+function convertToCSV(data) {
+    const header = ['Tutor Name', 'Student Name', 'Subjects', 'Days', 'Fee', 'Total Fee', 'Date'];
+    const rows = data.map(item => [
+        item.tutorName,
+        item.studentName,
+        item.subjects.join(', '),
+        item.days,
+        item.studentFee,
+        item.totalFee,
+        item.date,
+    ]);
+    const csv = [header.join(','), ...rows.map(row => row.join(','))].join('\n');
+    return csv;
+}
 
 // ##################################################################
-// # SECTION 1: DASHBOARD PANEL (Fully Restored)
+// # SECTION 1: DASHBOARD PANEL
 // ##################################################################
 
 async function renderAdminPanel(container) {
@@ -115,11 +131,11 @@ function setupDashboardListeners() {
         newQ.innerHTML = `<textarea class="comp-question w-full mt-1 p-2 border rounded" rows="2" placeholder="Question"></textarea><div class="flex space-x-2 mt-2"><input type="text" class="comp-option w-1/2 p-2 border rounded" placeholder="Option 1"><input type="text" class="comp-option w-1/2 p-2 border rounded" placeholder="Option 2"></div><input type="text" class="comp-correct-answer w-full mt-2 p-2 border rounded" placeholder="Correct Answer">`;
         container.appendChild(newQ);
     });
-    
+
     studentDropdown.addEventListener('change', (e) => {
         if (e.target.value) loadAndRenderReport(e.target.value);
     });
-    
+
     loadCounters();
     loadStudentDropdown();
 }
@@ -168,7 +184,7 @@ async function handleAddQuestionSubmit(e) {
                 newQuestion.correct_answer = form.correctAnswer.value;
             }
         }
-        
+
         await addDoc(collection(db, "admin_questions"), newQuestion);
         message.textContent = "Question saved successfully!";
         message.style.color = 'green';
@@ -219,12 +235,12 @@ async function loadAndRenderReport(docId) {
         const reportDocSnap = await getDoc(doc(db, "student_results", docId));
         if (!reportDocSnap.exists()) throw new Error("Report not found");
         const data = reportDocSnap.data();
-        
+
         const tutorName = data.tutorEmail ? (await getDoc(doc(db, "tutors", data.tutorEmail))).data()?.name || 'N/A' : 'N/A';
         const creativeWritingAnswer = data.answers.find(a => a.type === 'creative-writing');
         const tutorReport = creativeWritingAnswer?.tutorReport || 'No report available.';
         const score = data.answers.filter(a => a.type !== 'creative-writing' && String(a.studentAnswer).toLowerCase() === String(a.correctAnswer).toLowerCase()).length;
-        
+
         reportContent.innerHTML = `
             <div class="border rounded-lg shadow p-4 bg-white" id="report-block">
                 <h3 class="text-xl font-bold mb-2">${capitalize(data.studentName)}</h3>
@@ -313,439 +329,154 @@ async function setupContentManager() {
                 testFileSelect.appendChild(option);
             });
         } catch (error) {
-            console.error('Error discovering files:', error);
-            loaderStatus.innerHTML = `<p class="text-red-500"><strong>Error discovering files:</strong> ${error.message}</p>`;
+            loaderStatus.textContent = `Error: ${error.message}`;
+            loaderStatus.style.color = 'red';
         }
     }
-
-    loadTestBtn.addEventListener('click', async () => {
-        const url = testFileSelect.value;
-        const fileName = testFileSelect.options[testFileSelect.selectedIndex].text;
-        currentTestDocId = fileName.replace('.json', '');
-        const forceReload = forceReloadCheckbox.checked;
-
-        if (!url) {
-            loaderStatus.innerHTML = `<p class="text-yellow-600">Please select a file.</p>`;
-            return;
-        }
-
-        loaderStatus.innerHTML = `<p class="text-blue-600">Checking for test...</p>`;
-        workspace.style.display = 'none';
-        status.textContent = '';
-
-        try {
-            const testDocRef = doc(db, "tests", currentTestDocId);
-            const docSnap = await getDoc(testDocRef);
-
-            if (!forceReload && docSnap.exists()) {
-                console.log("Loading saved progress from Firestore.");
-                loaderStatus.innerHTML = `<p class="text-green-600 font-bold">✅ Loaded saved version from Firestore!</p>`;
-                loadedTestData = docSnap.data();
-            } else {
-                const logMessage = forceReload ? "Force Reload activated. Fetching from GitHub." : "No saved version. Loading template from GitHub.";
-                console.log(logMessage);
-                loaderStatus.innerHTML = `<p class="text-blue-600">Loading latest version from GitHub...</p>`;
-
-                const response = await fetch(url);
-                if (!response.ok) throw new Error(`Could not fetch file from GitHub. Status: ${response.status}`);
-                loadedTestData = await response.json();
-
-                await setDoc(testDocRef, loadedTestData);
-                loaderStatus.innerHTML = `<p class="text-green-600 font-bold">✅ Synced latest version from GitHub to Firestore!</p>`;
-            }
-
-            if (!loadedTestData || !loadedTestData.tests) throw new Error("Invalid test file format.");
-
-            document.getElementById('loaded-file-name').textContent = `Editing: ${fileName}`;
-            workspace.style.display = 'block';
-            populateDropdowns();
-
-        } catch (error) {
-            console.error("Error loading test data:", error);
-            loaderStatus.innerHTML = `<p class="text-red-500"><strong>Error:</strong> ${error.message}</p>`;
-        }
-    });
-
-    const passageSelect = document.getElementById('passage-select');
-    const passageContent = document.getElementById('passage-content');
-    const imageSelect = document.getElementById('image-select');
-    const imageUploadInput = document.getElementById('image-upload-input');
-    const updatePassageBtn = document.getElementById('update-passage-btn');
-    const updateImageBtn = document.getElementById('update-image-btn');
-    const imagePreviewContainer = document.getElementById('image-preview-container');
-    const imagePreview = document.getElementById('image-preview');
-
-
-    function populateDropdowns() {
-        passageSelect.innerHTML = '<option value="">-- Select an incomplete passage --</option>';
-        imageSelect.innerHTML = '<option value="">-- Select a question needing an image --</option>';
-        imagePreviewContainer.style.display = 'none';
-
-        loadedTestData.tests.forEach((test, testIndex) => {
-             (test.passages || []).forEach((passage, passageIndex) => {
-                if (passage.content && passage.content.includes("TO BE UPLOADED")) {
-                    const option = document.createElement('option');
-                    option.value = `${testIndex}-${passageIndex}`;
-                    option.textContent = `[${test.subject} G${test.grade}] ${passage.title}`;
-                    passageSelect.appendChild(option);
-                }
-             });
-             (test.questions || []).forEach((question, questionIndex) => {
-                if (question.imagePlaceholder && !question.imageUrl) {
-                     const option = document.createElement('option');
-                     option.value = `${testIndex}-${questionIndex}`;
-                     option.textContent = `[${test.subject} G${test.grade}] Q-ID ${question.questionId}`;
-                     imageSelect.appendChild(option);
-                }
-             });
-        });
-    }
-
-    passageSelect.addEventListener('change', e => {
-        if (!e.target.value) { passageContent.value = ''; return; }
-        const [testIndex, passageIndex] = e.target.value.split('-');
-        passageContent.value = loadedTestData.tests[testIndex].passages[passageIndex].content || '';
-    });
-
-    imageSelect.addEventListener('change', e => {
-        if (!e.target.value) {
-            imagePreviewContainer.style.display = 'none';
-            return;
-        }
-        const [testIndex, questionIndex] = e.target.value.split('-');
-        const question = loadedTestData.tests[testIndex].questions[questionIndex];
-        const imageName = question.imagePlaceholder;
-
-        if (imageName) {
-            imagePreview.src = GITHUB_IMAGE_PREVIEW_URL + imageName;
-            imagePreviewContainer.style.display = 'block';
-        } else {
-            imagePreviewContainer.style.display = 'none';
-        }
-    });
-
-    updatePassageBtn.addEventListener('click', async () => {
-        const selected = passageSelect.value;
-        if (!selected) {
-            status.textContent = 'Please select a passage first.';
-            status.style.color = 'orange';
-            return;
-        }
-        status.textContent = 'Saving passage to Firestore...';
-        status.style.color = 'blue';
-
-        const [testIndex, passageIndex] = selected.split('-');
-        loadedTestData.tests[testIndex].passages[passageIndex].content = passageContent.value;
-
-        try {
-            const testDocRef = doc(db, "tests", currentTestDocId);
-            await setDoc(testDocRef, loadedTestData);
-            status.textContent = `✅ Passage saved successfully!`;
-            status.style.color = 'green';
-            passageContent.value = '';
-            populateDropdowns();
-        } catch (error) {
-            status.textContent = `❌ Error saving passage: ${error.message}`;
-            status.style.color = 'red';
-            console.error("Firestore update error:", error);
-        }
-    });
-
-    updateImageBtn.addEventListener('click', async () => {
-        const selectedImage = imageSelect.value;
-        const file = imageUploadInput.files[0];
-        if (!selectedImage || !file) {
-            status.textContent = 'Please select a question and an image file.';
-            status.style.color = 'orange';
-            return;
-        }
-
-        try {
-            status.textContent = 'Uploading image...';
-            status.style.color = 'blue';
-            const imageUrl = await uploadImageToCloudinary(file);
-
-            status.textContent = 'Saving URL to Firestore...';
-            const [testIndex, questionIndex] = selectedImage.split('-');
-            loadedTestData.tests[testIndex].questions[questionIndex].imageUrl = imageUrl;
-            delete loadedTestData.tests[testIndex].questions[questionIndex].imagePlaceholder;
-
-            const testDocRef = doc(db, "tests", currentTestDocId);
-            await setDoc(testDocRef, loadedTestData);
-
-            status.textContent = `✅ Image URL saved successfully!`;
-            status.style.color = 'green';
-            imageUploadInput.value = '';
-            populateDropdowns();
-        } catch (error) {
-            console.error('Error saving image:', error);
-            status.textContent = `❌ Error: ${error.message}`;
-            status.style.color = 'red';
-        }
-    });
-
-    discoverFiles();
 }
 
+// ##################################################################
+// # SECTION 3: PAY ADVICE PANEL (NEW)
+// ##################################################################
 
-// ##################################################################
-// # SECTION 3: TUTOR MANAGEMENT (NEW)
-// ##################################################################
-async function renderTutorManagementPanel(container) {
+async function renderPayAdvicePanel(container) {
     container.innerHTML = `
-        <div class="bg-white p-6 rounded-lg shadow-md mb-6">
-            <h2 class="text-2xl font-bold text-green-700 mb-4">Tutor & Student Management</h2>
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-                <div class="bg-blue-100 p-4 rounded-lg text-center shadow-md"><h3 class="font-bold text-blue-800">Total Students</h3><p id="totalStudentsCount" class="text-3xl text-blue-600 font-extrabold">0</p></div>
-                <div class="bg-blue-100 p-4 rounded-lg text-center shadow-md"><h3 class="font-bold text-blue-800">Total Tutors</h3><p id="totalTutorsCount" class="text-3xl text-blue-600 font-extrabold">0</p></div>
-            </div>
-            <div class="flex items-center justify-between space-x-4 mb-4">
-                <label class="flex items-center">
-                    <span class="text-gray-700 font-semibold">Report Submission Status:</span>
-                    <label for="report-toggle" class="relative inline-flex items-center cursor-pointer ml-4">
-                        <input type="checkbox" id="report-toggle" class="sr-only peer">
-                        <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
-                        <span id="report-status-label" class="ml-3 text-sm font-medium text-gray-500">Disabled</span>
-                    </label>
-                </label>
-            </div>
-             <div class="mb-4">
-                <h3 class="font-bold text-lg mb-2">Configure Emails</h3>
-                <label for="report-email" class="block text-gray-700">Report Recipient Emails (comma-separated)</label>
-                <input type="text" id="report-email" class="w-full mt-1 p-2 border rounded" placeholder="e.g., admin@example.com, accounting@example.com">
-                 <label for="pay-email" class="block text-gray-700 mt-4">Pay Advice Recipient Emails (comma-separated)</label>
-                <input type="text" id="pay-email" class="w-full mt-1 p-2 border rounded" placeholder="e.g., admin@example.com, hr@example.com">
-                <button id="save-emails-btn" class="bg-green-600 text-white px-4 py-2 rounded mt-2 hover:bg-green-700">Save Emails</button>
-            </div>
-            <div class="mb-4">
-                <h3 class="font-bold text-lg mb-2">Import Students (Google Sheet)</h3>
-                <input type="file" id="importStudentsFile" class="w-full mt-1 p-2 border rounded" accept=".xlsx, .xls">
-                <button id="importStudentsBtn" class="bg-blue-600 text-white px-4 py-2 rounded mt-2 hover:bg-blue-700">Import</button>
-                <p id="import-status" class="mt-2 text-sm"></p>
-            </div>
-        </div>
-
         <div class="bg-white p-6 rounded-lg shadow-md">
-            <h3 class="text-2xl font-bold text-green-700 mb-4">Manage Tutors</h3>
-            <div class="mb-4">
-                <label for="tutor-select" class="block font-semibold">Select Tutor:</label>
-                <select id="tutor-select" class="w-full p-2 border rounded mt-1"></select>
+            <h2 class="text-2xl font-bold text-green-700 mb-4">Pay Advice</h2>
+            <div class="flex justify-between items-center mb-4">
+                <input type="text" id="pay-advice-search" class="w-1/2 p-2 border rounded" placeholder="Search by tutor or student name...">
+                <button id="download-pay-advice-btn" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Download CSV</button>
             </div>
-            <div id="selected-tutor-details" class="mt-4">
-                <p class="text-gray-500">Please select a tutor to view details.</p>
+            <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead>
+                        <tr>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tutor Name</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Student Name</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Subject(s)</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Days</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Individual Fee</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total Fee</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
+                        </tr>
+                    </thead>
+                    <tbody id="pay-advice-table-body" class="bg-white divide-y divide-gray-200">
+                        </tbody>
+                </table>
             </div>
+            <p id="pay-advice-status" class="mt-4 text-center text-gray-500">Loading pay advice data...</p>
         </div>
     `;
-    setupTutorManagementListeners();
+    setupPayAdviceListeners();
+    await loadPayAdviceData();
 }
 
-async function setupTutorManagementListeners() {
-    const reportToggle = document.getElementById('report-toggle');
-    const reportStatusLabel = document.getElementById('report-status-label');
-    const tutorSelect = document.getElementById('tutor-select');
-    const selectedTutorDetails = document.getElementById('selected-tutor-details');
-    const saveEmailsBtn = document.getElementById('save-emails-btn');
-    const reportEmailInput = document.getElementById('report-email');
-    const payEmailInput = document.getElementById('pay-email');
-    const totalTutorsCount = document.getElementById('totalTutorsCount');
-    const totalStudentsCount = document.getElementById('totalStudentsCount');
-
-    // Listen to the settings document for real-time updates
-    const settingsDocRef = doc(db, "settings", "report_submission");
-    onSnapshot(settingsDocRef, (docSnap) => {
-        if (docSnap.exists()) {
-            const data = docSnap.data();
-            const isEnabled = data.enabled;
-            reportToggle.checked = isEnabled;
-            reportStatusLabel.textContent = isEnabled ? 'Enabled' : 'Disabled';
-            reportStatusLabel.classList.toggle('text-green-600', isEnabled);
-            reportStatusLabel.classList.toggle('text-gray-500', !isEnabled);
-
-            reportEmailInput.value = data.reportEmails ? data.reportEmails.join(', ') : '';
-            payEmailInput.value = data.payEmails ? data.payEmails.join(', ') : '';
-        } else {
-            setDoc(settingsDocRef, { enabled: false, reportEmails: [], payEmails: [] });
-        }
+async function setupPayAdviceListeners() {
+    document.getElementById('pay-advice-search').addEventListener('input', (e) => {
+        const query = e.target.value.toLowerCase();
+        const rows = document.querySelectorAll('#pay-advice-table-body tr');
+        rows.forEach(row => {
+            const rowText = row.textContent.toLowerCase();
+            row.style.display = rowText.includes(query) ? '' : 'none';
+        });
     });
-
-    // Toggle listener
-    reportToggle.addEventListener('change', async (e) => {
-        await updateDoc(settingsDocRef, { enabled: e.target.checked });
+    document.getElementById('download-pay-advice-btn').addEventListener('click', () => {
+        downloadPayAdviceAsCSV();
     });
+}
 
-    // Save Emails Listener
-    saveEmailsBtn.addEventListener('click', async () => {
-        const reportEmails = reportEmailInput.value.split(',').map(email => email.trim()).filter(email => email);
-        const payEmails = payEmailInput.value.split(',').map(email => email.trim()).filter(email => email);
-        await updateDoc(settingsDocRef, { reportEmails, payEmails });
-        alert('Emails saved successfully!');
-    });
+let payAdviceDataCache = []; // Cache to hold data for search and download
 
-    // Listen to the tutors collection for real-time updates to counts
-    onSnapshot(collection(db, "tutors"), (querySnapshot) => {
-        const totalTutors = querySnapshot.docs.length;
-        totalTutorsCount.textContent = totalTutors;
-    });
+async function loadPayAdviceData() {
+    const tableBody = document.getElementById('pay-advice-table-body');
+    const statusText = document.getElementById('pay-advice-status');
+    statusText.textContent = "Loading pay advice data...";
+    tableBody.innerHTML = '';
+    payAdviceDataCache = [];
 
-    // Listen to the students collection for real-time updates to counts
-    onSnapshot(collection(db, "students"), (querySnapshot) => {
-        const totalStudents = querySnapshot.docs.length;
-        totalStudentsCount.textContent = totalStudents;
-    });
-
-
-    // Load tutors into the dropdown
-    const tutorsSnapshot = await getDocs(collection(db, "tutors"));
-    tutorSelect.innerHTML = `<option value="">-- Select a Tutor --</option>`;
-    const tutorsData = {};
-    tutorsSnapshot.forEach(doc => {
-        const tutor = doc.data();
-        tutorsData[doc.id] = tutor;
-        const option = document.createElement('option');
-        option.value = doc.id;
-        option.textContent = tutor.name;
-        tutorSelect.appendChild(option);
-    });
-
-    tutorSelect.addEventListener('change', async (e) => {
-        activeTutorId = e.target.value;
-        if (!activeTutorId) {
-            selectedTutorDetails.innerHTML = `<p class="text-gray-500">Please select a tutor to view details.</p>`;
+    try {
+        const payAdviceSnapshot = await getDocs(collection(db, "pay_advice"));
+        if (payAdviceSnapshot.empty) {
+            statusText.textContent = "No pay advice records found.";
             return;
         }
-        await renderSelectedTutorDetails(activeTutorId, tutorsData);
-    });
 
-    async function renderSelectedTutorDetails(tutorId, allTutorsData) {
-        const tutor = allTutorsData[tutorId];
-        const studentsQuery = query(collection(db, "students"), where("tutorEmail", "==", tutor.email));
-        const studentsSnapshot = await getDocs(studentsQuery);
-        const studentsListHTML = studentsSnapshot.docs.map(studentDoc => {
-            const student = studentDoc.data();
-            return `<li class="flex justify-between items-center bg-gray-50 p-2 rounded-md">
-                        <span>${student.studentName} (${student.subjects.join(', ')}) - Fee: $${student.studentFee}</span>
-                        <div class="flex space-x-2">
-                             <button class="remove-student-btn text-red-500 hover:text-red-700" data-student-id="${studentDoc.id}">Remove</button>
-                        </div>
-                    </li>`;
-        }).join('');
-
-        selectedTutorDetails.innerHTML = `
-            <div class="p-4 border rounded-lg shadow-sm">
-                <div class="flex items-center justify-between mb-4">
-                    <h4 class="font-bold text-xl">${tutor.name} (${studentsSnapshot.docs.length} students)</h4>
-                    <label class="flex items-center space-x-2">
-                        <span>Management Staff:</span>
-                        <input type="checkbox" id="management-staff-toggle" data-tutor-id="${tutorId}" class="h-5 w-5 rounded text-blue-600 focus:ring-blue-500" ${tutor.isManagementStaff ? 'checked' : ''}>
-                    </label>
-                </div>
-                <div class="mb-4">
-                     <p><strong>Students:</strong></p>
-                     <ul class="space-y-2 mt-2">${studentsListHTML || '<p class="text-gray-500">No students assigned.</p>'}</ul>
-                </div>
-                <div class="add-student-form border-t pt-4">
-                    <h5 class="font-semibold text-gray-700 mb-2">Add New Student:</h5>
-                    <input type="text" class="new-student-name w-full mt-1 p-2 border rounded" placeholder="Student Name">
-                    <input type="text" class="new-student-grade w-full mt-1 p-2 border rounded" placeholder="Grade">
-                    <input type="text" class="new-student-subject w-full mt-1 p-2 border rounded" placeholder="Subject(s) (e.g., Math, English)">
-                    <input type="text" class="new-student-days w-full mt-1 p-2 border rounded" placeholder="Days of Class (e.g., M-W-F)">
-                    <input type="number" class="new-student-fee w-full mt-1 p-2 border rounded" placeholder="Student Fee">
-                    <button class="add-student-btn bg-green-600 text-white px-4 py-2 rounded mt-2 hover:bg-green-700" data-tutor-email="${tutor.email}">Add Student</button>
-                </div>
-            </div>
-        `;
-        document.getElementById('management-staff-toggle').addEventListener('change', async (e) => {
-            const tutorDocRef = doc(db, "tutors", tutorId);
-            await updateDoc(tutorDocRef, { isManagementStaff: e.target.checked });
+        payAdviceSnapshot.forEach(doc => {
+            const data = doc.data();
+            payAdviceDataCache.push(data);
+            const row = `
+                <tr>
+                    <td class="px-6 py-4 whitespace-nowrap">${data.tutorName}</td>
+                    <td class="px-6 py-4 whitespace-nowrap">${data.studentName}</td>
+                    <td class="px-6 py-4 whitespace-nowrap">${data.subjects.join(', ')}</td>
+                    <td class="px-6 py-4 whitespace-nowrap">${data.days}</td>
+                    <td class="px-6 py-4 whitespace-nowrap">${data.studentFee}</td>
+                    <td class="px-6 py-4 whitespace-nowrap">${data.totalFee}</td>
+                    <td class="px-6 py-4 whitespace-nowrap">${new Date(data.date.seconds * 1000).toLocaleDateString()}</td>
+                </tr>
+            `;
+            tableBody.innerHTML += row;
         });
-        document.querySelectorAll('.add-student-btn').forEach(button => {
-            button.addEventListener('click', async (e) => {
-                const tutorEmail = e.target.getAttribute('data-tutor-email');
-                const formContainer = e.target.closest('.add-student-form');
-                const studentName = formContainer.querySelector('.new-student-name').value;
-                const studentGrade = formContainer.querySelector('.new-student-grade').value;
-                const subjects = formContainer.querySelector('.new-student-subject').value.split(',').map(s => s.trim());
-                const days = formContainer.querySelector('.new-student-days').value;
-                const studentFee = parseFloat(formContainer.querySelector('.new-student-fee').value);
-                if (studentName && studentGrade && subjects.length && days && !isNaN(studentFee)) {
-                    await addDoc(collection(db, "students"), {
-                        studentName, grade: studentGrade, subjects, days, tutorEmail, studentFee
-                    });
-                    await renderSelectedTutorDetails(tutorId, allTutorsData);
-                } else {
-                    alert('Please fill in all student details correctly.');
-                }
-            });
-        });
-        document.querySelectorAll('.remove-student-btn').forEach(button => {
-            button.addEventListener('click', async (e) => {
-                const studentId = e.target.getAttribute('data-student-id');
-                if (confirm('Are you sure you want to remove this student?')) {
-                    await deleteDoc(doc(db, "students", studentId));
-                    await renderSelectedTutorDetails(tutorId, allTutorsData);
-                }
-            });
-        });
+        statusText.textContent = "";
+    } catch (error) {
+        console.error("Error loading pay advice data:", error);
+        statusText.textContent = "Failed to load pay advice data.";
+        statusText.style.color = 'red';
     }
-
-    onSnapshot(collection(db, "tutors"), async (querySnapshot) => {
-        const tutorsData = {};
-        tutorSelect.innerHTML = `<option value="">-- Select a Tutor --</option>`;
-        querySnapshot.forEach(doc => {
-            const tutor = doc.data();
-            tutorsData[doc.id] = tutor;
-            const option = document.createElement('option');
-            option.value = doc.id;
-            option.textContent = tutor.name;
-            tutorSelect.appendChild(option);
-        });
-        if (activeTutorId && tutorsData[activeTutorId]) {
-            tutorSelect.value = activeTutorId;
-            await renderSelectedTutorDetails(activeTutorId, tutorsData);
-        } else {
-            selectedTutorDetails.innerHTML = `<p class="text-gray-500">Please select a tutor to view details.</p>`;
-        }
-    });
-
-    // Placeholder for Google Sheets Import logic
-    document.getElementById('importStudentsBtn').addEventListener('click', () => {
-        const importStatus = document.getElementById('import-status');
-        importStatus.textContent = "Google Sheets import requires a Firebase Cloud Function. This is a placeholder.";
-        importStatus.style.color = 'orange';
-    });
 }
 
-
-// ##################################################################
-// # SECTION 4: AUTHENTICATION & APP INITIALIZATION
-// ##################################################################
-
-function initializeAdminPanel() {
-    const mainContent = document.getElementById('main-content');
-    const navDashboard = document.getElementById('navDashboard');
-    const navContent = document.getElementById('navContent');
-    const navTutorManagement = document.getElementById('navTutorManagement');
-
-    function setActiveNav(activeButton) {
-        navDashboard.classList.remove('active');
-        navContent.classList.remove('active');
-        navTutorManagement.classList.remove('active');
-        activeButton.classList.add('active');
-    }
-
-    navDashboard.addEventListener('click', () => { setActiveNav(navDashboard); renderAdminPanel(mainContent); });
-    navContent.addEventListener('click', () => { setActiveNav(navContent); renderContentManagerPanel(mainContent); });
-    navTutorManagement.addEventListener('click', () => { setActiveNav(navTutorManagement); renderTutorManagementPanel(mainContent); });
-    
-    renderAdminPanel(mainContent); // Initial render
+function downloadPayAdviceAsCSV() {
+    const csvContent = convertToCSV(payAdviceDataCache);
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', 'pay_advice_report.csv');
+    link.style.display = 'none';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
 }
+
+// ##################################################################
+// # MAIN APP INITIALIZATION
+// ##################################################################
 
 onAuthStateChanged(auth, async (user) => {
+    const mainContent = document.getElementById('main-content');
+    const logoutBtn = document.getElementById('logoutBtn');
     if (user && user.email === ADMIN_EMAIL) {
-        document.getElementById('logoutBtn').addEventListener('click', () => signOut(auth));
-        initializeAdminPanel();
+        // Hide initial text
+        mainContent.innerHTML = '';
+        const navDashboard = document.getElementById('navDashboard');
+        const navContent = document.getElementById('navContent');
+        const navTutorManagement = document.getElementById('navTutorManagement');
+        const navPayAdvice = document.getElementById('navPayAdvice');
+
+        function setActiveNav(activeButton) {
+            navDashboard.classList.remove('active');
+            navContent.classList.remove('active');
+            navTutorManagement.classList.remove('active');
+            navPayAdvice.classList.remove('active');
+            activeButton.classList.add('active');
+        }
+
+        // Event Listeners for navigation
+        navDashboard.addEventListener('click', () => { setActiveNav(navDashboard); renderAdminPanel(mainContent); });
+        navContent.addEventListener('click', () => { setActiveNav(navContent); renderContentManagerPanel(mainContent); });
+        navTutorManagement.addEventListener('click', () => { setActiveNav(navTutorManagement); renderTutorManagementPanel(mainContent); });
+        navPayAdvice.addEventListener('click', () => { setActiveNav(navPayAdvice); renderPayAdvicePanel(mainContent); });
+
+        // Initial view
+        renderAdminPanel(mainContent);
+
+        logoutBtn.addEventListener('click', async () => {
+            await signOut(auth);
+            window.location.href = "admin-auth.html";
+        });
+
     } else {
-        window.location.href = "admin-auth.html";
+        mainContent.innerHTML = `<p class="text-center mt-12 text-red-600">You do not have permission to view this page.</p>`;
+        logoutBtn.classList.add('hidden');
     }
 });
-

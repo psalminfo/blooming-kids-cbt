@@ -152,19 +152,71 @@ async function renderStudentDatabase(container, tutor) {
                 const studentDoc = await getDoc(doc(db, "students", studentId));
                 const studentData = studentDoc.data();
                 
-                const reportText = prompt(`Enter report for ${studentData.studentName}:`);
-                
-                if (reportText) {
+                // Show a structured report form instead of a simple prompt
+                const reportFormHTML = `
+                    <h3 class="text-xl font-bold mb-4">Submit Report for ${studentData.studentName}</h3>
+                    <div class="mb-4">
+                        <label class="block text-gray-700 font-semibold">Introduction</label>
+                        <textarea id="report-intro" class="w-full mt-1 p-2 border rounded" rows="2" placeholder="e.g., This is a comprehensive report on BRYAN’s progress..."></textarea>
+                    </div>
+                    <div class="mb-4">
+                        <label class="block text-gray-700 font-semibold">Topics & Remarks</label>
+                        <p class="text-sm text-gray-500">Enter topics and remarks, separated by a comma (e.g., 'Multiplication: Great job, he is catching up').</p>
+                        <textarea id="report-topics" class="w-full mt-1 p-2 border rounded" rows="3" placeholder="e.g., Math: Multiplication, Remark: Bryan is doing well..."></textarea>
+                    </div>
+                    <div class="mb-4">
+                        <label class="block text-gray-700 font-semibold">Progress & Achievements</label>
+                        <textarea id="report-progress" class="w-full mt-1 p-2 border rounded" rows="2" placeholder="e.g., We will surely have some good reports soon..."></textarea>
+                    </div>
+                    <div class="mb-4">
+                        <label class="block text-gray-700 font-semibold">Strengths & Weaknesses</label>
+                        <textarea id="report-sw" class="w-full mt-1 p-2 border rounded" rows="2" placeholder="e.g., Strengths: Good attitude. Weaknesses: Needs to focus more."></textarea>
+                    </div>
+                    <div class="mb-4">
+                        <label class="block text-gray-700 font-semibold">Recommendations</label>
+                        <textarea id="report-recs" class="w-full mt-1 p-2 border rounded" rows="2" placeholder="e.g., I would like to ask for him to be allowed to focus while in class, less distractions."></textarea>
+                    </div>
+                    <div class="mb-4">
+                        <label class="block text-gray-700 font-semibold">General Comments</label>
+                        <textarea id="report-general" class="w-full mt-1 p-2 border rounded" rows="2" placeholder="e.g., Bryan is always smiling; he is always happy..."></textarea>
+                    </div>
+                    <button id="submit-structured-report-btn" class="bg-green-600 text-white px-6 py-2 rounded hover:bg-green-700">Submit Report</button>
+                    <button id="cancel-report-btn" class="bg-gray-400 text-white px-6 py-2 rounded hover:bg-gray-500 ml-2">Cancel</button>
+                `;
+
+                // Display the form in a modal or a dedicated section
+                const reportModal = document.createElement('div');
+                reportModal.className = 'fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex items-center justify-center';
+                reportModal.innerHTML = `<div class="relative bg-white p-8 rounded-lg shadow-xl max-w-lg mx-auto">${reportFormHTML}</div>`;
+                document.body.appendChild(reportModal);
+
+                document.getElementById('cancel-report-btn').addEventListener('click', () => {
+                    reportModal.remove();
+                });
+
+                document.getElementById('submit-structured-report-btn').addEventListener('click', async () => {
+                    const reportData = {
+                        introduction: document.getElementById('report-intro').value,
+                        topics: document.getElementById('report-topics').value,
+                        progress: document.getElementById('report-progress').value,
+                        strengthsWeaknesses: document.getElementById('report-sw').value,
+                        recommendations: document.getElementById('report-recs').value,
+                        generalComments: document.getElementById('report-general').value
+                    };
+
                     const processSubmission = httpsCallable(functions, 'processTutorSubmission');
                     try {
                         const result = await processSubmission({
-                            studentReports: [{ studentId, reportText, studentFee: studentData.studentFee }]
+                            studentId: studentId,
+                            reportData: reportData
                         });
                         alert(result.data.message);
+                        reportModal.remove();
+                        renderStudentDatabase(container, tutor); // Refresh the list
                     } catch (error) {
                         alert(`Error submitting report: ${error.message}`);
                     }
-                }
+                });
             });
         });
 
