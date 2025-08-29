@@ -168,17 +168,15 @@ async function renderStudentDatabase(container, tutor) {
         const isStudentOnBreak = student.summerBreak;
         studentsHTML += `<tr><td class="px-6 py-4 whitespace-nowrap">${student.studentName}</td><td class="px-6 py-4 whitespace-nowrap">${student.grade}</td><td class="px-6 py-4 whitespace-nowrap">${student.subjects.join(', ')}</td><td class="px-6 py-4 whitespace-nowrap">${student.days}</td><td class="px-6 py-4 whitespace-nowrap space-x-2">`;
         
-        // Corrected syntax for button display
+        // This is the corrected conditional logic
         if (isSummerBreakEnabled && !isStudentOnBreak) {
              studentsHTML += `<button class="summer-break-btn bg-yellow-600 text-white px-3 py-1 rounded" data-student-id="${doc.id}">Summer Break</button>`;
         } else if (isStudentOnBreak) {
             studentsHTML += `<span class="text-gray-400">On Break</span>`;
-        }
-
-        if (isSubmissionEnabled && !isStudentOnBreak) {
+        } else if (isSubmissionEnabled && !isStudentOnBreak) {
             studentsHTML += `<button class="submit-report-btn bg-green-600 text-white px-3 py-1 rounded" data-student-id="${doc.id}">Submit Report</button>`;
         } else {
-             studentsHTML += `<span class="text-gray-400">Not Enabled</span>`;
+            studentsHTML += `<span class="text-gray-400">Not Enabled</span>`;
         }
         
         studentsHTML += `</td></tr>`;
