@@ -3,6 +3,7 @@ import { collection, getDocs, doc, addDoc, query, where, getDoc, updateDoc, setD
 import { onAuthStateChanged, signOut, onIdTokenChanged } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-auth.js";
 import { onSnapshot } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
 import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-storage.js";
+import { getFunctions, httpsCallable } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-functions.js";
 
 const ADMIN_EMAIL = 'psalm4all@gmail.com';
 let activeTutorId = null;
@@ -30,15 +31,15 @@ function capitalize(str) {
 
 // Function to convert data to CSV format
 function convertToCSV(data) {
-    const header = ['Tutor Name', 'Student Name', 'Subjects', 'Days', 'Fee', 'Total Fee', 'Date'];
+    const header = ['Tutor Name', 'Student Name', 'Grade', 'Days', 'Individual Fee', 'Total Fee', 'Date'];
     const rows = data.map(item => [
         item.tutorName,
         item.studentName,
-        item.subjects.join(', '),
+        item.grade,
         item.days,
         item.studentFee,
         item.totalFee,
-        item.date,
+        new Date(item.date.seconds * 1000).toLocaleDateString(),
     ]);
     const csv = [header.join(','), ...rows.map(row => row.join(','))].join('\n');
     return csv;
@@ -326,7 +327,13 @@ async function setupContentManager() {
                 option.value = file.download_url;
                 option.textContent = file.name;
                 testFileSelect.appendChild(option);
-            }
+            });
+        } catch (error) {
+            loaderStatus.textContent = `Error: ${error.message}`;
+            loaderStatus.style.color = 'red';
+        }
+    }
+}
 // ##################################################################
 // # SECTION 3: TUTOR MANAGEMENT (NEW)
 // ##################################################################
@@ -535,7 +542,7 @@ async function setupTutorManagementListeners() {
                         ${gradeOptions}
                     </select>
                     <input type="text" class="new-student-subject w-full mt-1 p-2 border rounded" placeholder="Subject(s) (e.g., Math, English)">
-                     <select class="new-student-days w-full mt-1 p-2 border rounded">
+                    <select class="new-student-days w-full mt-1 p-2 border rounded">
                         <option value="">Select Days</option>
                         ${dayOptions}
                     </select>
@@ -979,6 +986,4 @@ onAuthStateChanged(auth, async (user) => {
         mainContent.innerHTML = `<p class="text-center mt-12 text-red-600">You do not have permission to view this page.</p>`;
         logoutBtn.classList.add('hidden');
     }
-
 });
-
