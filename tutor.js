@@ -291,7 +291,7 @@ async function renderStudentDatabase(container, tutor) {
                 }
             });
         });
-    }
+    
     
 // --- Main App Initialization ---
 function initializeTutorPanel() {
@@ -333,3 +333,4 @@ onAuthStateChanged(auth, async (user) => {
         window.location.href = "tutor-auth.html";
     }
 });
+
