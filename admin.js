@@ -1,12 +1,8 @@
 import { auth, db } from './firebaseConfig.js';
 import { collection, getDocs, doc, addDoc, query, where, getDoc, updateDoc, setDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
-import { onAuthStateChanged, signOut, onIdTokenChanged } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-auth.js";
-import { onSnapshot } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
-import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-storage.js";
-import { getFunctions, httpsCallable } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-functions.js";
+import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-auth.js";
 
 const ADMIN_EMAIL = 'psalm4all@gmail.com';
-let activeTutorId = null;
 
 // --- Cloudinary Configuration ---
 const CLOUDINARY_CLOUD_NAME = 'dy2hxcyaf';
@@ -29,24 +25,9 @@ function capitalize(str) {
     return str.replace(/\b\w/g, l => l.toUpperCase());
 }
 
-// Function to convert data to CSV format
-function convertToCSV(data) {
-    const header = ['Tutor Name', 'Student Name', 'Subjects', 'Days', 'Fee', 'Total Fee', 'Date'];
-    const rows = data.map(item => [
-        item.tutorName,
-        item.studentName,
-        item.subjects.join(', '),
-        item.days,
-        item.studentFee,
-        item.totalFee,
-        item.date,
-    ]);
-    const csv = [header.join(','), ...rows.map(row => row.join(','))].join('\n');
-    return csv;
-}
 
 // ##################################################################
-// # SECTION 1: DASHBOARD PANEL
+// # SECTION 1: DASHBOARD PANEL (Fully Restored)
 // ##################################################################
 
 async function renderAdminPanel(container) {
@@ -131,11 +112,11 @@ function setupDashboardListeners() {
         newQ.innerHTML = `<textarea class="comp-question w-full mt-1 p-2 border rounded" rows="2" placeholder="Question"></textarea><div class="flex space-x-2 mt-2"><input type="text" class="comp-option w-1/2 p-2 border rounded" placeholder="Option 1"><input type="text" class="comp-option w-1/2 p-2 border rounded" placeholder="Option 2"></div><input type="text" class="comp-correct-answer w-full mt-2 p-2 border rounded" placeholder="Correct Answer">`;
         container.appendChild(newQ);
     });
-
+    
     studentDropdown.addEventListener('change', (e) => {
         if (e.target.value) loadAndRenderReport(e.target.value);
     });
-
+    
     loadCounters();
     loadStudentDropdown();
 }
@@ -184,7 +165,7 @@ async function handleAddQuestionSubmit(e) {
                 newQuestion.correct_answer = form.correctAnswer.value;
             }
         }
-
+        
         await addDoc(collection(db, "admin_questions"), newQuestion);
         message.textContent = "Question saved successfully!";
         message.style.color = 'green';
@@ -207,7 +188,7 @@ async function loadCounters() {
     studentsPerTutorSelect.innerHTML = `<option value="">Students Per Tutor</option>`;
     for (const tutorDoc of tutorsSnapshot.docs) {
         const tutor = tutorDoc.data();
-        const studentsQuery = query(collection(db, "student_results"), where("tutorEmail", "==", tutor.email));
+        const studentsQuery = query(collection(db, "students"), where("tutorEmail", "==", tutor.email));
         const studentsUnderTutor = await getDocs(studentsQuery);
         const option = document.createElement('option');
         option.textContent = `${tutor.name} (${studentsUnderTutor.docs.length} students)`;
@@ -235,12 +216,12 @@ async function loadAndRenderReport(docId) {
         const reportDocSnap = await getDoc(doc(db, "student_results", docId));
         if (!reportDocSnap.exists()) throw new Error("Report not found");
         const data = reportDocSnap.data();
-
+        
         const tutorName = data.tutorEmail ? (await getDoc(doc(db, "tutors", data.tutorEmail))).data()?.name || 'N/A' : 'N/A';
         const creativeWritingAnswer = data.answers.find(a => a.type === 'creative-writing');
         const tutorReport = creativeWritingAnswer?.tutorReport || 'No report available.';
         const score = data.answers.filter(a => a.type !== 'creative-writing' && String(a.studentAnswer).toLowerCase() === String(a.correctAnswer).toLowerCase()).length;
-
+        
         reportContent.innerHTML = `
             <div class="border rounded-lg shadow p-4 bg-white" id="report-block">
                 <h3 class="text-xl font-bold mb-2">${capitalize(data.studentName)}</h3>
@@ -262,6 +243,7 @@ async function loadAndRenderReport(docId) {
         reportContent.innerHTML = `<p class="text-red-500">Failed to load report. ${error.message}</p>`;
     }
 }
+
 
 // ##################################################################
 // # SECTION 2: CONTENT MANAGER (FINAL VERSION)
@@ -307,7 +289,7 @@ async function setupContentManager() {
     const loadTestBtn = document.getElementById('load-test-btn');
     const forceReloadCheckbox = document.getElementById('force-reload-checkbox');
     const status = document.getElementById('status');
-
+    
     let loadedTestData = null;
     let currentTestDocId = null;
 
@@ -329,10 +311,178 @@ async function setupContentManager() {
                 testFileSelect.appendChild(option);
             });
         } catch (error) {
-            loaderStatus.textContent = `Error: ${error.message}`;
-            loaderStatus.style.color = 'red';
+            console.error('Error discovering files:', error);
+            loaderStatus.innerHTML = `<p class="text-red-500"><strong>Error discovering files:</strong> ${error.message}</p>`;
         }
     }
+
+    loadTestBtn.addEventListener('click', async () => {
+        const url = testFileSelect.value;
+        const fileName = testFileSelect.options[testFileSelect.selectedIndex].text;
+        currentTestDocId = fileName.replace('.json', ''); 
+        const forceReload = forceReloadCheckbox.checked;
+
+        if (!url) {
+            loaderStatus.innerHTML = `<p class="text-yellow-600">Please select a file.</p>`;
+            return;
+        }
+
+        loaderStatus.innerHTML = `<p class="text-blue-600">Checking for test...</p>`;
+        workspace.style.display = 'none';
+        status.textContent = '';
+
+        try {
+            const testDocRef = doc(db, "tests", currentTestDocId);
+            const docSnap = await getDoc(testDocRef);
+
+            if (!forceReload && docSnap.exists()) {
+                console.log("Loading saved progress from Firestore.");
+                loaderStatus.innerHTML = `<p class="text-green-600 font-bold">✅ Loaded saved version from Firestore!</p>`;
+                loadedTestData = docSnap.data();
+            } else {
+                const logMessage = forceReload ? "Force Reload activated. Fetching from GitHub." : "No saved version. Loading template from GitHub.";
+                console.log(logMessage);
+                loaderStatus.innerHTML = `<p class="text-blue-600">Loading latest version from GitHub...</p>`;
+                
+                const response = await fetch(url);
+                if (!response.ok) throw new Error(`Could not fetch file from GitHub. Status: ${response.status}`);
+                loadedTestData = await response.json();
+                
+                await setDoc(testDocRef, loadedTestData);
+                loaderStatus.innerHTML = `<p class="text-green-600 font-bold">✅ Synced latest version from GitHub to Firestore!</p>`;
+            }
+            
+            if (!loadedTestData || !loadedTestData.tests) throw new Error("Invalid test file format.");
+            
+            document.getElementById('loaded-file-name').textContent = `Editing: ${fileName}`;
+            workspace.style.display = 'block';
+            populateDropdowns();
+
+        } catch (error) {
+            console.error("Error loading test data:", error);
+            loaderStatus.innerHTML = `<p class="text-red-500"><strong>Error:</strong> ${error.message}</p>`;
+        }
+    });
+
+    const passageSelect = document.getElementById('passage-select');
+    const passageContent = document.getElementById('passage-content');
+    const imageSelect = document.getElementById('image-select');
+    const imageUploadInput = document.getElementById('image-upload-input');
+    const updatePassageBtn = document.getElementById('update-passage-btn');
+    const updateImageBtn = document.getElementById('update-image-btn');
+    const imagePreviewContainer = document.getElementById('image-preview-container');
+    const imagePreview = document.getElementById('image-preview');
+
+
+    function populateDropdowns() {
+        passageSelect.innerHTML = '<option value="">-- Select an incomplete passage --</option>';
+        imageSelect.innerHTML = '<option value="">-- Select a question needing an image --</option>';
+        imagePreviewContainer.style.display = 'none';
+        
+        loadedTestData.tests.forEach((test, testIndex) => {
+             (test.passages || []).forEach((passage, passageIndex) => {
+                if (passage.content && passage.content.includes("TO BE UPLOADED")) {
+                    const option = document.createElement('option');
+                    option.value = `${testIndex}-${passageIndex}`;
+                    option.textContent = `[${test.subject} G${test.grade}] ${passage.title}`;
+                    passageSelect.appendChild(option);
+                }
+             });
+             (test.questions || []).forEach((question, questionIndex) => {
+                if (question.imagePlaceholder && !question.imageUrl) {
+                     const option = document.createElement('option');
+                     option.value = `${testIndex}-${questionIndex}`;
+                     option.textContent = `[${test.subject} G${test.grade}] Q-ID ${question.questionId}`;
+                     imageSelect.appendChild(option);
+                }
+             });
+        });
+    }
+
+    passageSelect.addEventListener('change', e => {
+        if (!e.target.value) { passageContent.value = ''; return; }
+        const [testIndex, passageIndex] = e.target.value.split('-');
+        passageContent.value = loadedTestData.tests[testIndex].passages[passageIndex].content || '';
+    });
+
+    imageSelect.addEventListener('change', e => {
+        if (!e.target.value) {
+            imagePreviewContainer.style.display = 'none';
+            return;
+        }
+        const [testIndex, questionIndex] = e.target.value.split('-');
+        const question = loadedTestData.tests[testIndex].questions[questionIndex];
+        const imageName = question.imagePlaceholder;
+        
+        if (imageName) {
+            imagePreview.src = GITHUB_IMAGE_PREVIEW_URL + imageName;
+            imagePreviewContainer.style.display = 'block';
+        } else {
+            imagePreviewContainer.style.display = 'none';
+        }
+    });
+    
+    updatePassageBtn.addEventListener('click', async () => {
+        const selected = passageSelect.value;
+        if (!selected) {
+            status.textContent = 'Please select a passage first.';
+            status.style.color = 'orange';
+            return;
+        }
+        status.textContent = 'Saving passage to Firestore...';
+        status.style.color = 'blue';
+
+        const [testIndex, passageIndex] = selected.split('-');
+        loadedTestData.tests[testIndex].passages[passageIndex].content = passageContent.value;
+        
+        try {
+            const testDocRef = doc(db, "tests", currentTestDocId);
+            await setDoc(testDocRef, loadedTestData);
+            status.textContent = `✅ Passage saved successfully!`;
+            status.style.color = 'green';
+            passageContent.value = '';
+            populateDropdowns();
+        } catch (error) {
+            status.textContent = `❌ Error saving passage: ${error.message}`;
+            status.style.color = 'red';
+            console.error("Firestore update error:", error);
+        }
+    });
+
+    updateImageBtn.addEventListener('click', async () => {
+        const selectedImage = imageSelect.value;
+        const file = imageUploadInput.files[0];
+        if (!selectedImage || !file) {
+            status.textContent = 'Please select a question and an image file.';
+            status.style.color = 'orange';
+            return;
+        }
+
+        try {
+            status.textContent = 'Uploading image...';
+            status.style.color = 'blue';
+            const imageUrl = await uploadImageToCloudinary(file);
+            
+            status.textContent = 'Saving URL to Firestore...';
+            const [testIndex, questionIndex] = selectedImage.split('-');
+            loadedTestData.tests[testIndex].questions[questionIndex].imageUrl = imageUrl;
+            delete loadedTestData.tests[testIndex].questions[questionIndex].imagePlaceholder;
+
+            const testDocRef = doc(db, "tests", currentTestDocId);
+            await setDoc(testDocRef, loadedTestData);
+            
+            status.textContent = `✅ Image URL saved successfully!`;
+            status.style.color = 'green';
+            imageUploadInput.value = '';
+            populateDropdowns();
+        } catch (error) {
+            console.error('Error saving image:', error);
+            status.textContent = `❌ Error: ${error.message}`;
+            status.style.color = 'red';
+        }
+    });
+
+    discoverFiles();
 }
 // ##################################################################
 // # SECTION 3: TUTOR MANAGEMENT (NEW)
@@ -986,4 +1136,5 @@ onAuthStateChanged(auth, async (user) => {
         mainContent.innerHTML = `<p class="text-center mt-12 text-red-600">You do not have permission to view this page.</p>`;
         logoutBtn.classList.add('hidden');
     }
+
 });
