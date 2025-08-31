@@ -337,6 +337,8 @@ async function setupContentManager() {
 // ##################################################################
 // # SECTION 3: TUTOR MANAGEMENT (NEW)
 // ##################################################################
+let activeTutorId = null;
+
 async function renderTutorManagementPanel(container) {
     container.innerHTML = `
         <div class="bg-white p-6 rounded-lg shadow-md mb-6">
@@ -354,7 +356,7 @@ async function renderTutorManagementPanel(container) {
                         <span id="report-status-label" class="ml-3 text-sm font-medium text-gray-500">Disabled</span>
                     </label>
                 </label>
-                 <label class="flex items-center">
+                   <label class="flex items-center">
                     <span class="text-gray-700 font-semibold">Allow Tutors to Add Students:</span>
                     <label for="tutor-add-toggle" class="relative inline-flex items-center cursor-pointer ml-4">
                         <input type="checkbox" id="tutor-add-toggle" class="sr-only peer">
@@ -362,7 +364,7 @@ async function renderTutorManagementPanel(container) {
                         <span id="tutor-add-status-label" class="ml-3 text-sm font-medium text-gray-500">Disabled</span>
                     </label>
                 </label>
-                <label class="flex items-center">
+                   <label class="flex items-center">
                     <span class="text-gray-700 font-semibold">Enable Summer Break:</span>
                     <label for="summer-break-toggle" class="relative inline-flex items-center cursor-pointer ml-4">
                         <input type="checkbox" id="summer-break-toggle" class="sr-only peer">
@@ -531,8 +533,8 @@ async function setupTutorManagementListeners() {
                     </label>
                 </div>
                 <div class="mb-4">
-                     <p><strong>Students:</strong></p>
-                     <ul class="space-y-2 mt-2">${studentsListHTML || '<p class="text-gray-500">No students assigned.</p>'}</ul>
+                      <p><strong>Students:</strong></p>
+                    <ul class="space-y-2 mt-2">${studentsListHTML || '<p class="text-gray-500">No students assigned.</p>'}</ul>
                 </div>
                 <div class="add-student-form border-t pt-4">
                     <h5 class="font-semibold text-gray-700 mb-2">Add New Student:</h5>
@@ -987,4 +989,5 @@ onAuthStateChanged(auth, async (user) => {
         if (logoutBtn) logoutBtn.classList.add('hidden');
     }
 });
+
 
