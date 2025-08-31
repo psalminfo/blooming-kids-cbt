@@ -987,3 +987,4 @@ onAuthStateChanged(auth, async (user) => {
         if (logoutBtn) logoutBtn.classList.add('hidden');
     }
 });
+
