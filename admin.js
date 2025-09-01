@@ -129,9 +129,248 @@ async function loadAndRenderReport(docId) {
     }
 }
 
+// ##################################################################
+// # SECTION 2: CONTENT MANAGER (FINAL VERSION)
+// ##################################################################
+
+async function renderContentManagerPanel(container) {
+    container.innerHTML = `
+        <div class="bg-white p-6 rounded-lg shadow-md">
+            <h2 class="text-2xl font-bold text-green-700 mb-4">Content Manager</h2>
+            <div class="bg-gray-50 p-4 border rounded-lg mb-6">
+                <label for="test-file-select" class="block font-bold text-gray-800">1. Select a Test File</label>
+                <p class="text-sm text-gray-600 mb-2">Automatically finds test files in your GitHub repository.</p>
+                <div id="file-loader" class="flex items-center space-x-2">
+                    <select id="test-file-select" class="w-full p-2 border rounded"><option>Loading files...</option></select>
+                    <button id="load-test-btn" class="bg-green-600 text-white font-bold px-4 py-2 rounded hover:bg-green-700">Load</button>
+                </div>
+                <div class="mt-2">
+                    <input type="checkbox" id="force-reload-checkbox" class="mr-2">
+                    <label for="force-reload-checkbox" class="text-sm text-gray-700">Reload from GitHub (overwrites saved progress)</label>
+                </div>
+                <div id="loader-status" class="mt-2"></div>
+            </div>
+            <div id="manager-workspace" style="display:none;">
+                 <h3 class="text-gray-800 font-bold mb-4 text-lg" id="loaded-file-name"></h3>
+                <div class="mb-8 p-4 border rounded-md"><h4 class="text-xl font-semibold mb-2">2. Edit Incomplete Passages</h4><select id="passage-select" class="w-full p-2 border rounded mt-1 mb-2"></select><textarea id="passage-content" placeholder="Passage content..." class="w-full p-2 border rounded h-40"></textarea><button id="update-passage-btn" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 mt-2">Save Passage to Firestore</button></div>
+                <div class="p-4 border rounded-md"><h4 class="text-xl font-semibold mb-2">3. Add Missing Images</h4><select id="image-select" class="w-full p-2 border rounded mt-1 mb-2"></select><div id="image-preview-container" class="my-2" style="display:none;"><p class="font-semibold text-sm">Image to be replaced:</p><img id="image-preview" src="" class="border rounded max-w-xs mt-1"/></div><label class="font-bold mt-2">Upload New Image:</label><input type="file" id="image-upload-input" class="w-full mt-1 border p-2 rounded" accept="image/*"><button id="update-image-btn" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 mt-2">Upload & Save Image to Firestore</button></div>
+                <p id="status" class="mt-4 font-bold"></p>
+            </div>
+        </div>
+    `;
+    setupContentManager();
+}
+
+async function setupContentManager() {
+    const GITHUB_USER = 'psalminfo';
+    const GITHUB_REPO = 'blooming-kids-cbt';
+    const GITHUB_IMAGE_PREVIEW_URL = `https://raw.githubusercontent.com/${GITHUB_USER}/${GITHUB_REPO}/main/images/`;
+    const API_URL = `https://api.github.com/repos/${GITHUB_USER}/${GITHUB_REPO}/contents/`;
+
+    const loaderStatus = document.getElementById('loader-status');
+    const workspace = document.getElementById('manager-workspace');
+    const testFileSelect = document.getElementById('test-file-select');
+    const loadTestBtn = document.getElementById('load-test-btn');
+    const forceReloadCheckbox = document.getElementById('force-reload-checkbox');
+    const status = document.getElementById('status');
+    
+    let loadedTestData = null;
+    let currentTestDocId = null;
+
+    async function discoverFiles() {
+        try {
+            const response = await fetch(API_URL);
+            if (!response.ok) throw new Error(`Cannot access repository. Check username/repo. Status: ${response.status}`);
+            const files = await response.json();
+            testFileSelect.innerHTML = '<option value="">-- Select a Test File --</option>';
+            const jsonFiles = files.filter(file => file.name.endsWith('.json'));
+            if (jsonFiles.length === 0) {
+                 testFileSelect.innerHTML = '<option value="">No .json files found.</option>';
+                 return;
+            }
+            jsonFiles.forEach(file => {
+                const option = document.createElement('option');
+                option.value = file.download_url;
+                option.textContent = file.name;
+                testFileSelect.appendChild(option);
+            });
+        } catch (error) {
+            console.error('Error discovering files:', error);
+            loaderStatus.innerHTML = `<p class="text-red-500"><strong>Error discovering files:</strong> ${error.message}</p>`;
+        }
+    }
+
+    loadTestBtn.addEventListener('click', async () => {
+        const url = testFileSelect.value;
+        const fileName = testFileSelect.options[testFileSelect.selectedIndex].text;
+        currentTestDocId = fileName.replace('.json', ''); 
+        const forceReload = forceReloadCheckbox.checked;
+
+        if (!url) {
+            loaderStatus.innerHTML = `<p class="text-yellow-600">Please select a file.</p>`;
+            return;
+        }
+
+        loaderStatus.innerHTML = `<p class="text-blue-600">Checking for test...</p>`;
+        workspace.style.display = 'none';
+        status.textContent = '';
+
+        try {
+            const testDocRef = doc(db, "tests", currentTestDocId);
+            const docSnap = await getDoc(testDocRef);
+
+            if (!forceReload && docSnap.exists()) {
+                console.log("Loading saved progress from Firestore.");
+                loaderStatus.innerHTML = `<p class="text-green-600 font-bold">✅ Loaded saved version from Firestore!</p>`;
+                loadedTestData = docSnap.data();
+            } else {
+                const logMessage = forceReload ? "Force Reload activated. Fetching from GitHub." : "No saved version. Loading template from GitHub.";
+                console.log(logMessage);
+                loaderStatus.innerHTML = `<p class="text-blue-600">Loading latest version from GitHub...</p>`;
+                
+                const response = await fetch(url);
+                if (!response.ok) throw new Error(`Could not fetch file from GitHub. Status: ${response.status}`);
+                loadedTestData = await response.json();
+                
+                await setDoc(testDocRef, loadedTestData);
+                loaderStatus.innerHTML = `<p class="text-green-600 font-bold">✅ Synced latest version from GitHub to Firestore!</p>`;
+            }
+            
+            if (!loadedTestData || !loadedTestData.tests) throw new Error("Invalid test file format.");
+            
+            document.getElementById('loaded-file-name').textContent = `Editing: ${fileName}`;
+            workspace.style.display = 'block';
+            populateDropdowns();
+
+        } catch (error) {
+            console.error("Error loading test data:", error);
+            loaderStatus.innerHTML = `<p class="text-red-500"><strong>Error:</strong> ${error.message}</p>`;
+        }
+    });
+
+    const passageSelect = document.getElementById('passage-select');
+    const passageContent = document.getElementById('passage-content');
+    const imageSelect = document.getElementById('image-select');
+    const imageUploadInput = document.getElementById('image-upload-input');
+    const updatePassageBtn = document.getElementById('update-passage-btn');
+    const updateImageBtn = document.getElementById('update-image-btn');
+    const imagePreviewContainer = document.getElementById('image-preview-container');
+    const imagePreview = document.getElementById('image-preview');
+
+
+    function populateDropdowns() {
+        passageSelect.innerHTML = '<option value="">-- Select an incomplete passage --</option>';
+        imageSelect.innerHTML = '<option value="">-- Select a question needing an image --</option>';
+        imagePreviewContainer.style.display = 'none';
+        
+        loadedTestData.tests.forEach((test, testIndex) => {
+             (test.passages || []).forEach((passage, passageIndex) => {
+                if (passage.content && passage.content.includes("TO BE UPLOADED")) {
+                    const option = document.createElement('option');
+                    option.value = `${testIndex}-${passageIndex}`;
+                    option.textContent = `[${test.subject} G${test.grade}] ${passage.title}`;
+                    passageSelect.appendChild(option);
+                }
+             });
+             (test.questions || []).forEach((question, questionIndex) => {
+                if (question.imagePlaceholder && !question.imageUrl) {
+                     const option = document.createElement('option');
+                     option.value = `${testIndex}-${questionIndex}`;
+                     option.textContent = `[${test.subject} G${test.grade}] Q-ID ${question.questionId}`;
+                     imageSelect.appendChild(option);
+                }
+             });
+        });
+    }
+
+    passageSelect.addEventListener('change', e => {
+        if (!e.target.value) { passageContent.value = ''; return; }
+        const [testIndex, passageIndex] = e.target.value.split('-');
+        passageContent.value = loadedTestData.tests[testIndex].passages[passageIndex].content || '';
+    });
+
+    imageSelect.addEventListener('change', e => {
+        if (!e.target.value) {
+            imagePreviewContainer.style.display = 'none';
+            return;
+        }
+        const [testIndex, questionIndex] = e.target.value.split('-');
+        const question = loadedTestData.tests[testIndex].questions[questionIndex];
+        const imageName = question.imagePlaceholder;
+        
+        if (imageName) {
+            imagePreview.src = GITHUB_IMAGE_PREVIEW_URL + imageName;
+            imagePreviewContainer.style.display = 'block';
+        } else {
+            imagePreviewContainer.style.display = 'none';
+        }
+    });
+    
+    updatePassageBtn.addEventListener('click', async () => {
+        const selected = passageSelect.value;
+        if (!selected) {
+            status.textContent = 'Please select a passage first.';
+            status.style.color = 'orange';
+            return;
+        }
+        status.textContent = 'Saving passage to Firestore...';
+        status.style.color = 'blue';
+
+        const [testIndex, passageIndex] = selected.split('-');
+        loadedTestData.tests[testIndex].passages[passageIndex].content = passageContent.value;
+        
+        try {
+            const testDocRef = doc(db, "tests", currentTestDocId);
+            await setDoc(testDocRef, loadedTestData);
+            status.textContent = `✅ Passage saved successfully!`;
+            status.style.color = 'green';
+            passageContent.value = '';
+            populateDropdowns();
+        } catch (error) {
+            status.textContent = `❌ Error saving passage: ${error.message}`;
+            status.style.color = 'red';
+            console.error("Firestore update error:", error);
+        }
+    });
+
+    updateImageBtn.addEventListener('click', async () => {
+        const selectedImage = imageSelect.value;
+        const file = imageUploadInput.files[0];
+        if (!selectedImage || !file) {
+            status.textContent = 'Please select a question and an image file.';
+            status.style.color = 'orange';
+            return;
+        }
+
+        try {
+            status.textContent = 'Uploading image...';
+            status.style.color = 'blue';
+            const imageUrl = await uploadImageToCloudinary(file);
+            
+            status.textContent = 'Saving URL to Firestore...';
+            const [testIndex, questionIndex] = selectedImage.split('-');
+            loadedTestData.tests[testIndex].questions[questionIndex].imageUrl = imageUrl;
+            delete loadedTestData.tests[testIndex].questions[questionIndex].imagePlaceholder;
+
+            const testDocRef = doc(db, "tests", currentTestDocId);
+            await setDoc(testDocRef, loadedTestData);
+            
+            status.textContent = `✅ Image URL saved successfully!`;
+            status.style.color = 'green';
+            imageUploadInput.value = '';
+            populateDropdowns();
+        } catch (error) {
+            console.error('Error saving image:', error);
+            status.textContent = `❌ Error: ${error.message}`;
+            status.style.color = 'red';
+        }
+    });
+
+    discoverFiles();
+}
 
 // ##################################################################
-// # SECTION 2: TUTOR MANAGEMENT
+// # SECTION 3: TUTOR MANAGEMENT
 // ##################################################################
 async function renderTutorManagementPanel(container) {
     container.innerHTML = `
@@ -269,7 +508,7 @@ async function renderSelectedTutorDetails(tutorId) {
 
 
 // ##################################################################
-// # SECTION 3: TUTOR REPORTS PANEL
+// # SECTION 4: TUTOR REPORTS PANEL
 // ##################################################################
 
 async function renderTutorReportsPanel(container) {
@@ -336,7 +575,7 @@ async function downloadAdminReport(reportId) {
 
 
 // ##################################################################
-// # SECTION 4: PAY ADVICE PANEL (NEW & FUNCTIONAL)
+// # SECTION 5: PAY ADVICE PANEL (NEW & FUNCTIONAL)
 // ##################################################################
 
 async function renderPayAdvicePanel(container) {
@@ -410,7 +649,7 @@ async function loadPayAdviceData() {
 
 
 // ##################################################################
-// # SECTION 5: SUMMER BREAK PANEL
+// # SECTION 6: SUMMER BREAK PANEL
 // ##################################################################
 async function renderSummerBreakPanel(container) {
      container.innerHTML = `
@@ -480,3 +719,4 @@ onAuthStateChanged(auth, async (user) => {
         logoutBtn.classList.add('hidden');
     }
 });
+
