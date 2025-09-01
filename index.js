@@ -1,53 +1,102 @@
-// At the top of your functions/index.js file
+/**
+ * =================================================================
+ * Firebase Cloud Function for Tutor Report Submission
+ * =================================================================
+ *
+ * This file contains the backend logic for processing student reports
+ * submitted by tutors.
+ *
+ * Key Features:
+ * - Handles Cross-Origin Resource Sharing (CORS) to allow requests
+ * from your Netlify frontend.
+ * - Validates incoming requests to ensure they are secure.
+ * - Fetches student data from Firestore.
+ * - Saves the complete, structured report to the 'tutor_submissions'
+ * collection.
+ * - Provides clear success or error feedback to the frontend.
+ *
+ */
+
+// Import required Firebase and Node.js modules.
 const functions = require("firebase-functions");
 const admin = require("firebase-admin");
-const cors = require("cors")({ origin: true }); // Initialize cors
+const cors = require("cors")({ origin: true }); // This is the crucial part for CORS.
 
+// Initialize the Firebase Admin SDK to interact with Firebase services.
 admin.initializeApp();
 const db = admin.firestore();
 
-// Your updated function
+/**
+ * @name processTutorSubmission
+ * @description An HTTP-triggered Cloud Function that receives report data,
+ * validates it, and saves it to Firestore.
+ * @triggers HTTP Request
+ */
 exports.processTutorSubmission = functions.https.onRequest((req, res) => {
-    // Wrap your function logic in the cors middleware
+    // 1. Wrap the entire function in the 'cors' middleware.
+    // This automatically handles the browser's preflight (OPTIONS) request
+    // and adds the required 'Access-Control-Allow-Origin' header to the response.
     cors(req, res, async () => {
-        // Check for POST request. The preflight is an OPTIONS request.
+
+        // 2. Security Check: Ensure the request is a POST request.
+        // We only want to allow data to be sent to this function, not retrieved.
         if (req.method !== 'POST') {
-            return res.status(405).send('Method Not Allowed');
+            return res.status(405).json({
+                data: { message: "Method Not Allowed. Please use POST." }
+            });
         }
 
         try {
+            // 3. Extract the data payload from the request body.
+            // The Firebase client SDK automatically wraps it in a 'data' object.
             const { studentId, reportData, submissionId } = req.body.data;
 
-            // --- Your existing logic here ---
-            // Example: Get student data
+            // 4. Input Validation: Check if all required data is present.
+            if (!studentId || !reportData || !submissionId) {
+                console.error("Validation failed: Missing data in payload.", req.body.data);
+                return res.status(400).json({
+                    data: { message: "Bad Request: Missing required fields (studentId, reportData, or submissionId)." }
+                });
+            }
+
+            // 5. Fetch the corresponding student document from Firestore.
             const studentRef = db.collection("students").doc(studentId);
             const studentSnap = await studentRef.get();
+
             if (!studentSnap.exists) {
-                throw new functions.https.HttpsError('not-found', 'Student not found.');
+                console.error(`Student with ID [${studentId}] not found.`);
+                return res.status(404).json({
+                    data: { message: `Student with ID [${studentId}] was not found.` }
+                });
             }
             const studentData = studentSnap.data();
 
-            // Create the submission document
+            // 6. Create the new submission document in the 'tutor_submissions' collection.
             const submissionRef = db.collection("tutor_submissions").doc(submissionId);
             await submissionRef.set({
                 studentId: studentId,
                 studentName: studentData.studentName,
-                parentEmail: studentData.parentEmail || '', // Make sure student has parentEmail
+                parentEmail: studentData.parentEmail || '', // Fallback to empty string if missing
                 grade: studentData.grade,
                 tutorEmail: studentData.tutorEmail,
-                tutorReport: reportData, // The structured report object
-                status: 'Graded', // Or whatever status you prefer
-                submittedAt: admin.firestore.FieldValue.serverTimestamp()
+                tutorReport: reportData, // Embed the entire structured report object
+                status: 'Graded',
+                submittedAt: admin.firestore.FieldValue.serverTimestamp() // Use the server's time
             });
-            // --- End of your logic ---
 
-            // Send a success response
-            res.status(200).send({ data: { message: "Report submitted successfully!" } });
+            // 7. Send a successful response back to the client.
+            console.log(`Successfully created report [${submissionId}] for student [${studentId}].`);
+            res.status(200).json({
+                data: { message: "Report has been submitted successfully!" }
+            });
 
         } catch (error) {
-            console.error("Error processing submission:", error);
-            // Send an error response
-            res.status(500).send({ data: { message: `Error submitting report: ${error.message}` } });
+            // 8. Catch any unexpected errors, log them for debugging, and send a generic error message.
+            console.error("CRITICAL ERROR in processTutorSubmission:", error);
+            res.status(500).json({
+                data: { message: "An internal server error occurred. Please try again later." }
+            });
         }
     });
 });
+
