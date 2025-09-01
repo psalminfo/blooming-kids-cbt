@@ -162,15 +162,20 @@ async function renderStudentDatabase(container, tutor) {
         
         // Corrected syntax for button display
         if (isSummerBreakEnabled && !isStudentOnBreak) {
-             studentsHTML += `<button class="summer-break-btn bg-yellow-600 text-white px-3 py-1 rounded" data-student-id="${doc.id}">Summer Break</button>`;
+            studentsHTML += `<button class="summer-break-btn bg-yellow-600 text-white px-3 py-1 rounded" data-student-id="${doc.id}">Summer Break</button>`;
         } else if (isStudentOnBreak) {
             studentsHTML += `<span class="text-gray-400">On Break</span>`;
         }
 
+        // Add a space between buttons if both are present
+        if ((isSummerBreakEnabled && !isStudentOnBreak) && (isSubmissionEnabled && !isStudentOnBreak)) {
+            studentsHTML += `<span class="mr-2"></span>`;
+        }
+
         if (isSubmissionEnabled && !isStudentOnBreak) {
             studentsHTML += `<button class="submit-report-btn bg-green-600 text-white px-3 py-1 rounded" data-student-id="${doc.id}">Submit Report</button>`;
-        } else {
-             studentsHTML += `<span class="text-gray-400">Not Enabled</span>`;
+        } else if (!isSummerBreakEnabled || !isStudentOnBreak) {
+            studentsHTML += `<span class="text-gray-400">Not Enabled</span>`;
         }
         
         studentsHTML += `</td></tr>`;
@@ -182,21 +187,21 @@ async function renderStudentDatabase(container, tutor) {
     document.querySelectorAll('.summer-break-btn').forEach(button => {
         button.addEventListener('click', async (e) => {
             const studentId = e.target.getAttribute('data-student-id');
-             if (confirm("Are you sure you want to mark this student as on summer break?")) {
+            if (confirm("Are you sure you want to mark this student as on summer break?")) {
                 await updateDoc(doc(db, "students", studentId), { summerBreak: true });
                 renderStudentDatabase(container, tutor);
             }
         });
     });
 
-     if (isTutorAddEnabled) {
-         document.getElementById('add-student-btn').addEventListener('click', async () => {
+    if (isTutorAddEnabled) {
+        document.getElementById('add-student-btn').addEventListener('click', async () => {
             const studentName = document.getElementById('new-student-name').value;
             const studentGrade = document.getElementById('new-student-grade').value;
             const subjects = document.getElementById('new-student-subject').value.split(',').map(s => s.trim());
             const days = document.getElementById('new-student-days').value;
             const studentFee = parseFloat(document.getElementById('new-student-fee').value);
-             if (studentName && studentGrade && subjects.length && days && !isNaN(studentFee)) {
+            if (studentName && studentGrade && subjects.length && days && !isNaN(studentFee)) {
                 await addDoc(collection(db, "students"), {
                     studentName, grade: studentGrade, subjects, days, tutorEmail: tutor.email, studentFee, summerBreak: false
                 });
@@ -212,7 +217,7 @@ async function renderStudentDatabase(container, tutor) {
         });
     }
 
-     document.querySelectorAll('.submit-report-btn').forEach(button => {
+    document.querySelectorAll('.submit-report-btn').forEach(button => {
         button.addEventListener('click', async (e) => {
             const studentId = e.target.getAttribute('data-student-id');
             const studentDoc = await getDoc(doc(db, "students", studentId));
@@ -347,4 +352,3 @@ onAuthStateChanged(auth, async (user) => {
         window.location.href = "tutor-auth.html";
     }
 });
-}
