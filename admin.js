@@ -616,143 +616,127 @@ async function setupTutorManagementListeners() {
 // # SECTION 4: PAY ADVICE PANEL (NEW)
 // ##################################################################
 
-async function renderPayAdvicePanel(container) {
-    container.innerHTML = `
-        <div class="bg-white p-6 rounded-lg shadow-md">
-            <h2 class="text-2xl font-bold text-green-700 mb-4">Pay Advice</h2>
-            <div class="flex justify-between items-center mb-4">
-                <input type="text" id="pay-advice-search" class="w-1/2 p-2 border rounded" placeholder="Search by tutor or student name...">
-                <button id="download-pay-advice-btn" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Download CSV</button>
-            </div>
-             <div class="mb-4">
-                <label for="pay-advice-date" class="block text-gray-700">Filter by Date:</label>
-                <input type="date" id="pay-advice-date" class="mt-1 p-2 border rounded">
-                <button id="delete-pay-advice-btn" class="bg-red-600 text-white px-4 py-2 rounded mt-2 hover:bg-red-700">Delete Records for Date</button>
-            </div>
-            <div class="overflow-x-auto">
-                <table class="min-w-full divide-y divide-gray-200">
-                    <thead>
-                        <tr>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tutor Name</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Student Name</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Grade</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Days</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Individual Fee</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total Fee</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
-                        </tr>
-                    </thead>
-                    <tbody id="pay-advice-table-body" class="bg-white divide-y divide-gray-200">
-                        </tbody>
-                </table>
-            </div>
-            <p id="pay-advice-status" class="mt-4 text-center text-gray-500">Loading pay advice data...</p>
-        </div>
-    `;
-    setupPayAdviceListeners();
-    await loadPayAdviceData();
-}
-
-async function setupPayAdviceListeners() {
-    const payAdviceDateInput = document.getElementById('pay-advice-date');
-    const deletePayAdviceBtn = document.getElementById('delete-pay-advice-btn');
-    
-    document.getElementById('pay-advice-search').addEventListener('input', (e) => {
-        const query = e.target.value.toLowerCase();
-        const rows = document.querySelectorAll('#pay-advice-table-body tr');
-        rows.forEach(row => {
-            const rowText = row.textContent.toLowerCase();
-            row.style.display = rowText.includes(query) ? '' : 'none';
-        });
-    });
-    
-    document.getElementById('download-pay-advice-btn').addEventListener('click', () => {
-        downloadPayAdviceAsCSV();
-    });
-
-    payAdviceDateInput.addEventListener('change', async (e) => {
-        await loadPayAdviceData(e.target.value);
-    });
-
-    deletePayAdviceBtn.addEventListener('click', async () => {
-        const dateToDelete = payAdviceDateInput.value;
-        if (!dateToDelete) {
-            alert("Please select a date to delete.");
-            return;
-        }
-
-        if (confirm(`Are you sure you want to delete all pay advice records for ${dateToDelete}? This action cannot be undone.`)) {
-            const deleteRecords = httpsCallable(getFunctions(), 'deletePayAdviceRecords');
-            try {
-                const result = await deleteRecords({ date: dateToDelete });
-                alert(result.data.message);
-                await loadPayAdviceData();
-            } catch (error) {
-                alert(`Error deleting records: ${error.message}`);
-            }
-        }
-    });
-}
-
-let payAdviceDataCache = []; // Cache to hold data for search and download
-
-async function loadPayAdviceData(filterDate = null) {
-    const tableBody = document.getElementById('pay-advice-table-body');
-    const statusText = document.getElementById('pay-advice-status');
-    statusText.textContent = "Loading pay advice data...";
-    tableBody.innerHTML = '';
-    payAdviceDataCache = [];
+// ####################################################################
+// ### This function now correctly loads individual student reports ###
+// ####################################################################
+async function loadTutorReportsForAdmin() {
+    const reportsListContainer = document.getElementById('tutor-reports-list');
+    const tutorReportsCountEl = document.getElementById('tutorReportsCount');
+    const totalReportsCountEl = document.getElementById('totalReportsCount');
+    reportsListContainer.innerHTML = `<p class="text-gray-500 text-center">Loading reports...</p>`;
 
     try {
-        let payAdviceQuery = collection(db, "pay_advice");
-        if (filterDate) {
-            const start = new Date(filterDate);
-            const end = new Date(filterDate);
-            end.setDate(end.getDate() + 1);
-            payAdviceQuery = query(payAdviceQuery, where("date", ">=", start), where("date", "<", end));
-        }
+        const reportsQuery = query(collection(db, "tutor_submissions"), orderBy("submittedAt", "desc"));
+        const reportsSnapshot = await getDocs(reportsQuery);
+        
+        const tutorsWithReports = new Set();
+        reportsSnapshot.forEach(doc => {
+            tutorsWithReports.add(doc.data().tutorEmail);
+        });
 
-        const payAdviceSnapshot = await getDocs(payAdviceQuery);
-        if (payAdviceSnapshot.empty) {
-            statusText.textContent = "No pay advice records found.";
+        tutorReportsCountEl.textContent = tutorsWithReports.size;
+        totalReportsCountEl.textContent = reportsSnapshot.docs.length;
+
+        if (reportsSnapshot.empty) {
+            reportsListContainer.innerHTML = `<p class="text-gray-500 text-center">No reports have been submitted yet.</p>`;
             return;
         }
 
-        payAdviceSnapshot.forEach(doc => {
+        let reportsHTML = '';
+        reportsSnapshot.forEach(doc => {
             const data = doc.data();
-            payAdviceDataCache.push(data);
-            const row = `
-                <tr>
-                    <td class="px-6 py-4 whitespace-nowrap">${data.tutorName}</td>
-                    <td class="px-6 py-4 whitespace-nowrap">${data.studentName}</td>
-                    <td class="px-6 py-4 whitespace-nowrap">${data.grade}</td>
-                    <td class="px-6 py-4 whitespace-nowrap">${data.days}</td>
-                    <td class="px-6 py-4 whitespace-nowrap">${data.studentFee}</td>
-                    <td class="px-6 py-4 whitespace-nowrap">${data.totalFee}</td>
-                    <td class="px-6 py-4 whitespace-nowrap">${new Date(data.date.seconds * 1000).toLocaleDateString()}</td>
-                </tr>
+            reportsHTML += `
+                <div class="border rounded-lg p-4 shadow-sm bg-white flex justify-between items-center">
+                    <div>
+                        <p><strong>Tutor:</strong> ${data.tutorName || data.tutorEmail}</p>
+                        <p><strong>Student:</strong> ${data.studentName}</p>
+                        <p><strong>Date:</strong> ${new Date(data.submittedAt.seconds * 1000).toLocaleDateString()}</p>
+                    </div>
+                    <button class="download-report-btn bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700" data-report-id="${doc.id}">Download PDF</button>
+                </div>
             `;
-            tableBody.innerHTML += row;
         });
-        statusText.textContent = "";
+        reportsListContainer.innerHTML = reportsHTML;
+
+        document.querySelectorAll('.download-report-btn').forEach(button => {
+            button.addEventListener('click', async (e) => {
+                const reportId = e.target.getAttribute('data-report-id');
+                await downloadAdminReport(reportId);
+            });
+        });
+
     } catch (error) {
-        console.error("Error loading pay advice data:", error);
-        statusText.textContent = "Failed to load pay advice data.";
-        statusText.style.color = 'red';
+        console.error("Error loading tutor reports:", error);
+        reportsListContainer.innerHTML = `<p class="text-red-500 text-center">Failed to load reports.</p>`;
     }
 }
 
-function downloadPayAdviceAsCSV() {
-    const csvContent = convertToCSV(payAdviceDataCache);
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.setAttribute('href', url);
-    link.setAttribute('download', 'pay_advice_report.csv');
-    link.style.display = 'none';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+
+// ######################################################################
+// ### This function now correctly downloads one report per student ###
+// ######################################################################
+async function downloadAdminReport(reportId) {
+    try {
+        const reportDoc = await getDoc(doc(db, "tutor_submissions", reportId));
+        if (!reportDoc.exists()) {
+            alert("Report not found!");
+            return;
+        }
+        const reportData = reportDoc.data();
+        
+        // **IMPORTANT**: Replace this with your actual logo URL
+        const logoUrl = "https://your-project-id.appspot.com/logo.png";
+        
+        // KEY CHANGE: We access fields like `reportData.introduction` directly, NOT `reportData.tutorReport.introduction`
+        const reportTemplate = `
+            <div style="font-family: Arial, sans-serif; padding: 2rem; max-width: 800px; margin: auto;">
+                <div style="text-align: center; margin-bottom: 2rem;">
+                    <img src="${logoUrl}" alt="Logo" style="height: 60px; margin-bottom: 1rem;">
+                    <h1 style="font-size: 1.5rem; font-weight: bold; color: #166534;">MONTHLY LEARNING REPORT</h1>
+                    <p style="color: #4b5563;">Date: ${new Date(reportData.submittedAt.seconds * 1000).toLocaleDateString()}</p>
+                </div>
+                <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 1rem; color: #1f2937; margin-bottom: 2rem;">
+                    <p><strong>Student's Name:</strong> ${reportData.studentName}</p>
+                    <p><strong>Grade:</strong> ${reportData.grade}</p>
+                    <p><strong>Tutor's Name:</strong> ${reportData.tutorName}</p>
+                </div>
+                <div style="border-top: 1px solid #d1d5db; padding-top: 1rem;">
+                    <h2 style="font-size: 1.25rem; font-weight: bold; color: #16a34a; margin-bottom: 0.5rem;">INTRODUCTION</h2>
+                    <p style="color: #374151; line-height: 1.6; white-space: pre-wrap;">${reportData.introduction || 'N/A'}</p>
+                </div>
+                <div style="border-top: 1px solid #d1d5db; padding-top: 1rem; margin-top: 1rem;">
+                    <h2 style="font-size: 1.25rem; font-weight: bold; color: #16a34a; margin-bottom: 0.5rem;">TOPICS & REMARKS</h2>
+                    <p style="color: #374151; line-height: 1.6; white-space: pre-wrap;">${reportData.topics || 'N/A'}</p>
+                </div>
+                <div style="border-top: 1px solid #d1d5db; padding-top: 1rem; margin-top: 1rem;">
+                    <h2 style="font-size: 1.25rem; font-weight: bold; color: #16a34a; margin-bottom: 0.5rem;">PROGRESS AND ACHIEVEMENTS</h2>
+                    <p style="color: #374151; line-height: 1.6; white-space: pre-wrap;">${reportData.progress || 'N/A'}</p>
+                </div>
+                <div style="border-top: 1px solid #d1d5db; padding-top: 1rem; margin-top: 1rem;">
+                    <h2 style="font-size: 1.25rem; font-weight: bold; color: #16a34a; margin-bottom: 0.5rem;">STRENGTHS AND WEAKNESSES</h2>
+                    <p style="color: #374151; line-height: 1.6; white-space: pre-wrap;">${reportData.strengthsWeaknesses || 'N/A'}</p>
+                </div>
+                 <div style="border-top: 1px solid #d1d5db; padding-top: 1rem; margin-top: 1rem;">
+                    <h2 style="font-size: 1.25rem; font-weight: bold; color: #16a34a; margin-bottom: 0.5rem;">RECOMMENDATIONS</h2>
+                    <p style="color: #374151; line-height: 1.6; white-space: pre-wrap;">${reportData.recommendations || 'N/A'}</p>
+                </div>
+                <div style="border-top: 1px solid #d1d5db; padding-top: 1rem; margin-top: 1rem;">
+                    <h2 style="font-size: 1.25rem; font-weight: bold; color: #16a34a; margin-bottom: 0.5rem;">GENERAL TUTOR'S COMMENTS</h2>
+                    <p style="color: #374151; line-height: 1.6; white-space: pre-wrap;">${reportData.generalComments || 'N/A'}</p>
+                </div>
+                <div style="margin-top: 3rem; text-align: right; color: #374151;">
+                    <p>Best regards,</p>
+                    <p style="font-weight: bold; margin-top: 0.25rem;">${reportData.tutorName}</p>
+                </div>
+            </div>
+        `;
+        const element = document.createElement('div');
+        element.innerHTML = reportTemplate;
+        html2pdf().from(element).save(`${reportData.studentName}_report.pdf`);
+    } catch (error) {
+        console.error("Error generating report PDF:", error);
+        alert(`Failed to download report. Error: ${error.message}`);
+    }
 }
 
 // ##################################################################
@@ -986,4 +970,5 @@ onAuthStateChanged(auth, async (user) => {
         mainContent.innerHTML = `<p class="text-center mt-12 text-red-600">You do not have permission to view this page.</p>`;
         logoutBtn.classList.add('hidden');
     }
+
 });
