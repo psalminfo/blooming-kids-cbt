@@ -873,7 +873,7 @@ async function downloadAdminReport(reportId, returnBlob = false) {
         }
 
         // Get your logo URL from GitHub (see instructions)
-        const logoUrl = "https://raw.githubusercontent.com/YOUR_USERNAME/YOUR_REPO/main/logo.png";
+        const logoUrl = "https://github.com/psalminfo/blooming-kids-cbt/blob/main/logo.png.png";
         
         const reportTemplate = `
             <div style="font-family: Arial, sans-serif; padding: 2rem; max-width: 800px; margin: auto;">
@@ -1103,5 +1103,6 @@ onAuthStateChanged(auth, async (user) => {
         logoutBtn.classList.add('hidden');
     }
 });
+
 
 
