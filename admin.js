@@ -755,6 +755,7 @@ async function renderTutorReportsPanel(container) {
     await loadTutorReportsForAdmin();
 }
 
+// ### NEW ### This function now groups reports by tutor with dropdowns and a "Download All" button.
 async function loadTutorReportsForAdmin() {
     const reportsListContainer = document.getElementById('tutor-reports-list');
     onSnapshot(query(collection(db, "tutor_submissions"), orderBy("submittedAt", "desc")), (snapshot) => {
@@ -769,44 +770,121 @@ async function loadTutorReportsForAdmin() {
             return;
         }
 
-        const uniqueTutors = new Set();
-        snapshot.forEach(doc => uniqueTutors.add(doc.data().tutorEmail));
-        tutorCountEl.textContent = uniqueTutors.size;
+        const reportsByTutor = {};
+        snapshot.forEach(doc => {
+            const report = { id: doc.id, ...doc.data() };
+            const tutorEmail = report.tutorEmail;
+            if (!reportsByTutor[tutorEmail]) {
+                reportsByTutor[tutorEmail] = {
+                    name: report.tutorName || tutorEmail,
+                    reports: []
+                };
+            }
+            reportsByTutor[tutorEmail].reports.push(report);
+        });
+
+        tutorCountEl.textContent = Object.keys(reportsByTutor).length;
         reportCountEl.textContent = snapshot.size;
 
-        reportsListContainer.innerHTML = snapshot.docs.map(doc => {
-            const data = doc.data();
-            return `<div class="border rounded-lg p-4 shadow-sm bg-white flex justify-between items-center">
-                        <div>
-                            <p><strong>Tutor:</strong> ${data.tutorName || data.tutorEmail}</p>
-                            <p><strong>Student:</strong> ${data.studentName}</p>
-                            <p><strong>Date:</strong> ${new Date(data.submittedAt.seconds * 1000).toLocaleDateString()}</p>
+        reportsListContainer.innerHTML = Object.values(reportsByTutor).map(tutorData => {
+            const reportLinks = tutorData.reports.map(report => `
+                <li class="flex justify-between items-center p-2 bg-gray-50 rounded-md">
+                    <span>${report.studentName} - ${new Date(report.submittedAt.seconds * 1000).toLocaleDateString()}</span>
+                    <button class="download-single-report-btn bg-blue-500 text-white px-3 py-1 text-sm rounded hover:bg-blue-600" data-report-id="${report.id}">Download PDF</button>
+                </li>
+            `).join('');
+
+            return `
+                <div class="border rounded-lg shadow-sm">
+                    <details>
+                        <summary class="p-4 cursor-pointer flex justify-between items-center font-semibold text-lg">
+                            <div>
+                                ${tutorData.name} 
+                                <span class="ml-2 text-sm font-normal text-gray-500">(${tutorData.reports.length} reports)</span>
+                            </div>
+                            <button class="download-all-btn bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700" data-tutor-email="${tutorData.reports[0].tutorEmail}">Download All as ZIP</button>
+                        </summary>
+                        <div class="p-4 border-t">
+                            <ul class="space-y-2">${reportLinks}</ul>
                         </div>
-                        <button class="download-report-btn bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700" data-report-id="${doc.id}">Download PDF</button>
-                    </div>`;
+                    </details>
+                </div>
+            `;
         }).join('');
 
-        reportsListContainer.querySelectorAll('.download-report-btn').forEach(button => {
-            button.addEventListener('click', (e) => downloadAdminReport(e.target.dataset.reportId));
+        reportsListContainer.querySelectorAll('.download-single-report-btn').forEach(button => {
+            button.addEventListener('click', (e) => {
+                e.stopPropagation(); // Prevent the dropdown from closing
+                downloadAdminReport(e.target.dataset.reportId);
+            });
+        });
+
+        reportsListContainer.querySelectorAll('.download-all-btn').forEach(button => {
+            button.addEventListener('click', async (e) => {
+                e.stopPropagation();
+                const tutorEmail = e.target.dataset.tutorEmail;
+                const reportsToDownload = reportsByTutor[tutorEmail].reports;
+                
+                button.textContent = 'Zipping...';
+                button.disabled = true;
+
+                try {
+                    const zip = new JSZip();
+                    for (const report of reportsToDownload) {
+                        // The 'true' argument tells the function to return the PDF data instead of saving it
+                        const pdfBlob = await downloadAdminReport(report.id, true); 
+                        if (pdfBlob) {
+                            const fileName = `${report.studentName}_${new Date(report.submittedAt.seconds * 1000).toLocaleDateString().replace(/\//g, '-')}.pdf`;
+                            zip.file(fileName, pdfBlob);
+                        }
+                    }
+
+                    const content = await zip.generateAsync({ type: "blob" });
+                    saveAs(content, `${reportsByTutor[tutorEmail].name}_Reports.zip`);
+
+                } catch (error) {
+                    console.error("Error creating ZIP file:", error);
+                    alert("An error occurred while creating the ZIP file.");
+                } finally {
+                    button.textContent = 'Download All as ZIP';
+                    button.disabled = false;
+                }
+            });
         });
     });
 }
 
-async function downloadAdminReport(reportId) {
+// ### UPDATED ### Now includes Parent Name, new heading, and logo.
+async function downloadAdminReport(reportId, returnBlob = false) {
     try {
         const reportDoc = await getDoc(doc(db, "tutor_submissions", reportId));
-        if (!reportDoc.exists()) return alert("Report not found!");
+        if (!reportDoc.exists()) throw new Error("Report not found!");
+        
         const reportData = reportDoc.data();
-        const logoUrl = "PASTE_YOUR_LOGO_URL_HERE"; // IMPORTANT: See instructions
+        
+        // This is where the parent's email is retrieved
+        let parentEmail = 'N/A';
+        if (reportData.studentId) {
+            const studentDoc = await getDoc(doc(db, "students", reportData.studentId));
+            if (studentDoc.exists()) {
+                parentEmail = studentDoc.data().parentEmail || 'N/A';
+            }
+        }
+
+        // Get your logo URL from GitHub (see instructions)
+        const logoUrl = "https://raw.githubusercontent.com/YOUR_USERNAME/YOUR_REPO/main/logo.png";
+        
         const reportTemplate = `
             <div style="font-family: Arial, sans-serif; padding: 2rem; max-width: 800px; margin: auto;">
                 <div style="text-align: center; margin-bottom: 2rem;">
                     <img src="${logoUrl}" alt="Company Logo" style="height: 80px; margin-bottom: 1rem;">
-                    <h1 style="font-size: 1.5rem; font-weight: bold; color: #166534;">MONTHLY LEARNING REPORT</h1>
+                    <h3 style="font-size: 1.8rem; font-weight: bold; color: #15803d; margin: 0;">Blooming Kids House</h3>
+                    <h1 style="font-size: 1.2rem; font-weight: bold; color: #166534; margin-top: 0.5rem;">MONTHLY LEARNING REPORT</h1>
                     <p style="color: #4b5563;">Date: ${new Date(reportData.submittedAt.seconds * 1000).toLocaleDateString()}</p>
                 </div>
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 2rem;">
                     <p><strong>Student's Name:</strong> ${reportData.studentName}</p>
+                    <p><strong>Parent's Email:</strong> ${parentEmail}</p>
                     <p><strong>Grade:</strong> ${reportData.grade}</p>
                     <p><strong>Tutor's Name:</strong> ${reportData.tutorName}</p>
                 </div>
@@ -816,10 +894,27 @@ async function downloadAdminReport(reportId) {
                 }).map(([title, content]) => `<div style="border-top: 1px solid #d1d5db; padding-top: 1rem; margin-top: 1rem;"><h2 style="font-size: 1.25rem; font-weight: bold; color: #16a34a;">${title}</h2><p style="line-height: 1.6; white-space: pre-wrap;">${content || 'N/A'}</p></div>`).join('')}
                 <div style="margin-top: 3rem; text-align: right;"><p>Best regards,</p><p style="font-weight: bold;">${reportData.tutorName}</p></div>
             </div>`;
-        html2pdf().from(reportTemplate).save(`${reportData.studentName}_report.pdf`);
+        
+        const opt = {
+            margin:       0.5,
+            filename:     `${reportData.studentName}_report.pdf`,
+            image:        { type: 'jpeg', quality: 0.98 },
+            html2canvas:  { scale: 2 },
+            jsPDF:        { unit: 'in', format: 'letter', orientation: 'portrait' }
+        };
+
+        // If the function is asked to return the data (for zipping), it returns a blob.
+        if (returnBlob) {
+            return await html2pdf().from(reportTemplate).set(opt).outputPdf('blob');
+        } else {
+            // Otherwise, it saves the file directly.
+            html2pdf().from(reportTemplate).set(opt).save();
+        }
+
     } catch (error) {
         console.error("Error generating PDF:", error);
         alert(`Failed to download report: ${error.message}`);
+        return null; // Return null on error
     }
 }
 
@@ -1007,3 +1102,4 @@ onAuthStateChanged(auth, async (user) => {
         logoutBtn.classList.add('hidden');
     }
 });
+
