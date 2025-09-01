@@ -142,6 +142,7 @@ async function renderStudentDatabase(container, tutor) {
             studentsHTML += `
                 <div class="bg-gray-100 p-4 rounded-lg shadow-inner mb-4">
                     <h3 class="font-bold text-lg mb-2">Add a New Student</h3>
+                    <input type="text" id="new-student-name" class="w-full mt-1 p-2 border rounded" placeholder="Parent Name">
                     <input type="text" id="new-student-name" class="w-full mt-1 p-2 border rounded" placeholder="Student Name">
                     <select id="new-student-grade" class="w-full mt-1 p-2 border rounded">
                         <option value="">Select Grade</option>
@@ -415,3 +416,4 @@ onAuthStateChanged(auth, async (user) => {
         window.location.href = "tutor-auth.html";
     }
 });
+
