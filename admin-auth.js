@@ -1,5 +1,6 @@
 import { auth, db } from './firebaseConfig.js';
-import { signInWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-auth.js";
+// ### UPDATED ### to include the necessary persistence functions
+import { signInWithEmailAndPassword, setPersistence, browserLocalPersistence } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-auth.js";
 import { doc, getDoc } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
 
 const ADMIN_EMAIL = 'psalm4all@gmail.com';
@@ -10,6 +11,9 @@ document.getElementById('adminLoginForm').addEventListener('submit', async (e) =
     const password = document.getElementById('adminPassword').value;
     
     try {
+        // ### ADDED ### This line tells Firebase to keep the user logged in
+        await setPersistence(auth, browserLocalPersistence);
+
         const userCredential = await signInWithEmailAndPassword(auth, email, password);
         const user = userCredential.user;
 
