@@ -3,6 +3,10 @@ import { collection, getDocs, doc, getDoc, where, query, orderBy } from "https:/
 import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-auth.js";
 import { onSnapshot } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
 
+function capitalize(str) {
+    if (!str) return '';
+    return str.replace(/\b\w/g, l => l.toUpperCase());
+}
 // This is the updated onAuthStateChanged function for MANAGEMENT.JS
 
 onAuthStateChanged(auth, async (user) => {
@@ -67,3 +71,4 @@ onAuthStateChanged(auth, async (user) => {
     }
 
 });
+
