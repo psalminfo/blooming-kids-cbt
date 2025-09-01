@@ -335,557 +335,299 @@ async function setupContentManager() {
     }
 }
 // ##################################################################
-
 // # SECTION 3: TUTOR MANAGEMENT (NEW)
-
 // ##################################################################
-
 async function renderTutorManagementPanel(container) {
+    container.innerHTML = `
+        <div class="bg-white p-6 rounded-lg shadow-md mb-6">
+            <h2 class="text-2xl font-bold text-green-700 mb-4">Tutor & Student Management</h2>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                <div class="bg-blue-100 p-4 rounded-lg text-center shadow-md"><h3 class="font-bold text-blue-800">Total Students</h3><p id="totalStudentsCount" class="text-3xl text-blue-600 font-extrabold">0</p></div>
+                <div class="bg-blue-100 p-4 rounded-lg text-center shadow-md"><h3 class="font-bold text-blue-800">Total Tutors</h3><p id="totalTutorsCount" class="text-3xl text-blue-600 font-extrabold">0</p></div>
+            </div>
+            <div class="mb-4">
+                <label class="flex items-center">
+                    <span class="text-gray-700 font-semibold">Allow Tutors to Add Students:</span>
+                    <label for="tutor-add-toggle" class="relative inline-flex items-center cursor-pointer ml-4">
+                        <input type="checkbox" id="tutor-add-toggle" class="sr-only peer">
+                        <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                        <span id="tutor-add-status-label" class="ml-3 text-sm font-medium text-gray-500">Disabled</span>
+                    </label>
+                </label>
+            </div>
+            <div class="mb-4">
+                <h3 class="font-bold text-lg mb-2">Configure Emails</h3>
+                <label for="report-email" class="block text-gray-700">Report Recipient Emails (comma-separated)</label>
+                <input type="text" id="report-email" class="w-full mt-1 p-2 border rounded" placeholder="e.g., admin@example.com, accounting@example.com">
+                <label for="pay-email" class="block text-gray-700 mt-4">Pay Advice Recipient Emails (comma-separated)</label>
+                <input type="text" id="pay-email" class="w-full mt-1 p-2 border rounded" placeholder="e.g., admin@example.com, hr@example.com">
+                <button id="save-emails-btn" class="bg-green-600 text-white px-4 py-2 rounded mt-2 hover:bg-green-700">Save Emails</button>
+            </div>
+            <div class="mb-4">
+                <h3 class="font-bold text-lg mb-2">Import Students (Google Sheet)</h3>
+                <input type="file" id="importStudentsFile" class="w-full mt-1 p-2 border rounded" accept=".xlsx, .xls">
+                <button id="importStudentsBtn" class="bg-blue-600 text-white px-4 py-2 rounded mt-2 hover:bg-blue-700">Import</button>
+                <p id="import-status" class="mt-2 text-sm"></p>
+            </div>
+        </div>
 
-    container.innerHTML = `
-
-        <div class="bg-white p-6 rounded-lg shadow-md mb-6">
-
-            <h2 class="text-2xl font-bold text-green-700 mb-4">Tutor & Student Management</h2>
-
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-
-                <div class="bg-blue-100 p-4 rounded-lg text-center shadow-md"><h3 class="font-bold text-blue-800">Total Students</h3><p id="totalStudentsCount" class="text-3xl text-blue-600 font-extrabold">0</p></div>
-
-                <div class="bg-blue-100 p-4 rounded-lg text-center shadow-md"><h3 class="font-bold text-blue-800">Total Tutors</h3><p id="totalTutorsCount" class="text-3xl text-blue-600 font-extrabold">0</p></div>
-
-            </div>
-
-            <div class="flex items-center justify-between space-x-4 mb-4">
-
-                <label class="flex items-center">
-
-                    <span class="text-gray-700 font-semibold">Report Submission Status:</span>
-
-                    <label for="report-toggle" class="relative inline-flex items-center cursor-pointer ml-4">
-
-                        <input type="checkbox" id="report-toggle" class="sr-only peer">
-
-                        <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
-
-                        <span id="report-status-label" class="ml-3 text-sm font-medium text-gray-500">Disabled</span>
-
-                    </label>
-
-                </label>
-
-                 <label class="flex items-center">
-
-                    <span class="text-gray-700 font-semibold">Allow Tutors to Add Students:</span>
-
-                    <label for="tutor-add-toggle" class="relative inline-flex items-center cursor-pointer ml-4">
-
-                        <input type="checkbox" id="tutor-add-toggle" class="sr-only peer">
-
-                        <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
-
-                        <span id="tutor-add-status-label" class="ml-3 text-sm font-medium text-gray-500">Disabled</span>
-
-                    </label>
-
-                </label>
-
-                <label class="flex items-center">
-
-                    <span class="text-gray-700 font-semibold">Enable Summer Break:</span>
-
-                    <label for="summer-break-toggle" class="relative inline-flex items-center cursor-pointer ml-4">
-
-                        <input type="checkbox" id="summer-break-toggle" class="sr-only peer">
-
-                        <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
-
-                        <span id="summer-break-status-label" class="ml-3 text-sm font-medium text-gray-500">Disabled</span>
-
-                    </label>
-
-                </label>
-
-            </div>
-
-             <div class="mb-4">
-
-                <h3 class="font-bold text-lg mb-2">Configure Emails</h3>
-
-                <label for="report-email" class="block text-gray-700">Report Recipient Emails (comma-separated)</label>
-
-                <input type="text" id="report-email" class="w-full mt-1 p-2 border rounded" placeholder="e.g., admin@example.com, accounting@example.com">
-
-                 <label for="pay-email" class="block text-gray-700 mt-4">Pay Advice Recipient Emails (comma-separated)</label>
-
-                <input type="text" id="pay-email" class="w-full mt-1 p-2 border rounded" placeholder="e.g., admin@example.com, hr@example.com">
-
-                <button id="save-emails-btn" class="bg-green-600 text-white px-4 py-2 rounded mt-2 hover:bg-green-700">Save Emails</button>
-
-            </div>
-
-            <div class="mb-4">
-
-                <h3 class="font-bold text-lg mb-2">Import Students (Google Sheet)</h3>
-
-                <input type="file" id="importStudentsFile" class="w-full mt-1 p-2 border rounded" accept=".xlsx, .xls">
-
-                <button id="importStudentsBtn" class="bg-blue-600 text-white px-4 py-2 rounded mt-2 hover:bg-blue-700">Import</button>
-
-                <p id="import-status" class="mt-2 text-sm"></p>
-
-            </div>
-
-        </div>
-
-
-
-        <div class="bg-white p-6 rounded-lg shadow-md">
-
-            <h3 class="text-2xl font-bold text-green-700 mb-4">Manage Tutors</h3>
-
-            <div class="mb-4">
-
-                <label for="tutor-select" class="block font-semibold">Select Tutor:</label>
-
-                <select id="tutor-select" class="w-full p-2 border rounded mt-1"></select>
-
-            </div>
-
-            <div id="selected-tutor-details" class="mt-4">
-
-                <p class="text-gray-500">Please select a tutor to view details.</p>
-
-            </div>
-
-        </div>
-
-    `;
-
-    setupTutorManagementListeners();
-
+        <div class="bg-white p-6 rounded-lg shadow-md">
+            <h3 class="text-2xl font-bold text-green-700 mb-4">Manage Tutors</h3>
+            <div class="mb-4">
+                <label for="tutor-select" class="block font-semibold">Select Tutor:</label>
+                <select id="tutor-select" class="w-full p-2 border rounded mt-1"></select>
+            </div>
+            <div id="selected-tutor-details" class="mt-4">
+                <p class="text-gray-500">Please select a tutor to view details.</p>
+            </div>
+        </div>
+    `;
+    setupTutorManagementListeners();
 }
 
-
-
 async function setupTutorManagementListeners() {
-
-    const reportToggle = document.getElementById('report-toggle');
-
-    const reportStatusLabel = document.getElementById('report-status-label');
-
-    const tutorAddToggle = document.getElementById('tutor-add-toggle');
-
-    const tutorAddStatusLabel = document.getElementById('tutor-add-status-label');
-
-    const summerBreakToggle = document.getElementById('summer-break-toggle');
-
-    const summerBreakStatusLabel = document.getElementById('summer-break-status-label');
-
-    const tutorSelect = document.getElementById('tutor-select');
-
-    const selectedTutorDetails = document.getElementById('selected-tutor-details');
-
-    const saveEmailsBtn = document.getElementById('save-emails-btn');
-
-    const reportEmailInput = document.getElementById('report-email');
-
-    const payEmailInput = document.getElementById('pay-email');
-
-    const totalTutorsCount = document.getElementById('totalTutorsCount');
-
-    const totalStudentsCount = document.getElementById('totalStudentsCount');
-
-
-
-    // Listen to the settings document for real-time updates
-
-    const settingsDocRef = doc(db, "settings", "global_settings");
-
-    onSnapshot(settingsDocRef, (docSnap) => {
-
-        if (docSnap.exists()) {
-
-            const data = docSnap.data();
-
-            
-
-            // Report Submission Toggle
-
-            const isReportEnabled = data.isReportEnabled;
-
-            reportToggle.checked = isReportEnabled;
-
-            reportStatusLabel.textContent = isReportEnabled ? 'Enabled' : 'Disabled';
-
-            reportStatusLabel.classList.toggle('text-green-600', isReportEnabled);
-
-            reportStatusLabel.classList.toggle('text-gray-500', !isReportEnabled);
-
-
-
-            // Tutor Add Student Toggle
-
-            const isTutorAddEnabled = data.isTutorAddEnabled;
-
-            tutorAddToggle.checked = isTutorAddEnabled;
-
-            tutorAddStatusLabel.textContent = isTutorAddEnabled ? 'Enabled' : 'Disabled';
-
-            tutorAddStatusLabel.classList.toggle('text-green-600', isTutorAddEnabled);
-
-            tutorAddStatusLabel.classList.toggle('text-gray-500', !isTutorAddEnabled);
-
-
-
-            // Summer Break Toggle
-
-            const isSummerBreakEnabled = data.isSummerBreakEnabled;
-
-            summerBreakToggle.checked = isSummerBreakEnabled;
-
-            summerBreakStatusLabel.textContent = isSummerBreakEnabled ? 'Enabled' : 'Disabled';
-
-            summerBreakStatusLabel.classList.toggle('text-green-600', isSummerBreakEnabled);
-
-            summerBreakStatusLabel.classList.toggle('text-gray-500', !isSummerBreakEnabled);
-
-
-
-            reportEmailInput.value = data.reportEmails ? data.reportEmails.join(', ') : '';
-
-            payEmailInput.value = data.payEmails ? data.payEmails.join(', ') : '';
-
-        } else {
-
-            setDoc(settingsDocRef, { isReportEnabled: false, isTutorAddEnabled: false, isSummerBreakEnabled: false, reportEmails: [], payEmails: [] });
-
-        }
-
-    });
-
-
-
-    // Toggle Listeners
-
-    reportToggle.addEventListener('change', async (e) => {
-
-        await updateDoc(settingsDocRef, { isReportEnabled: e.target.checked });
-
-    });
-
-     tutorAddToggle.addEventListener('change', async (e) => {
-
-        await updateDoc(settingsDocRef, { isTutorAddEnabled: e.target.checked });
-
-    });
-
-     summerBreakToggle.addEventListener('change', async (e) => {
-
-        await updateDoc(settingsDocRef, { isSummerBreakEnabled: e.target.checked });
-
-    });
-
-
-
-    // Save Emails Listener
-
-    saveEmailsBtn.addEventListener('click', async () => {
-
-        const reportEmails = reportEmailInput.value.split(',').map(email => email.trim()).filter(email => email);
-
-        const payEmails = payEmailInput.value.split(',').map(email => email.trim()).filter(email => email);
-
-        await updateDoc(settingsDocRef, { reportEmails, payEmails });
-
-        alert('Emails saved successfully!');
-
-    });
-
-
-
-    // Listen to the tutors collection for real-time updates to counts
-
-    onSnapshot(collection(db, "tutors"), (querySnapshot) => {
-
-        const totalTutors = querySnapshot.docs.length;
-
-        totalTutorsCount.textContent = totalTutors;
-
-    });
-
-
-
-    // Listen to the students collection for real-time updates to counts
-
-    onSnapshot(collection(db, "students"), (querySnapshot) => {
-
-        const totalStudents = querySnapshot.docs.length;
-
-        totalStudentsCount.textContent = totalStudents;
-
-    });
-
-
-
-
-
-    // Load tutors into the dropdown
-
-    const tutorsSnapshot = await getDocs(collection(db, "tutors"));
-
-    tutorSelect.innerHTML = `<option value="">-- Select a Tutor --</option>`;
-
-    const tutorsData = {};
-
-    tutorsSnapshot.forEach(doc => {
-
-        const tutor = doc.data();
-
-        tutorsData[doc.id] = tutor;
-
-        const option = document.createElement('option');
-
-        option.value = doc.id;
-
-        option.textContent = tutor.name;
-
-        tutorSelect.appendChild(option);
-
-    });
-
-
-
-    tutorSelect.addEventListener('change', async (e) => {
-
-        activeTutorId = e.target.value;
-
-        if (!activeTutorId) {
-
-            selectedTutorDetails.innerHTML = `<p class="text-gray-500">Please select a tutor to view details.</p>`;
-
-            return;
-
-        }
-
-        await renderSelectedTutorDetails(activeTutorId, tutorsData);
-
-    });
-
-
-
-    async function renderSelectedTutorDetails(tutorId, allTutorsData) {
-
-        const tutor = allTutorsData[tutorId];
-
-        const studentsQuery = query(collection(db, "students"), where("tutorEmail", "==", tutor.email));
-
-        const studentsSnapshot = await getDocs(studentsQuery);
-
-        const studentsListHTML = studentsSnapshot.docs.map(studentDoc => {
-
-            const student = studentDoc.data();
-
-            return `<li class="flex justify-between items-center bg-gray-50 p-2 rounded-md">
-
-                        <span>${student.studentName} (${student.subjects.join(', ')}) - Fee: $${student.studentFee}</span>
-
-                        <div class="flex space-x-2">
-
-                             <button class="remove-student-btn text-red-500 hover:text-red-700" data-student-id="${studentDoc.id}">Remove</button>
-
-                        </div>
-
-                    </li>`;
-
-        }).join('');
-
-
-
-        const gradeOptions = Array.from({length: 12}, (_, i) => `<option value="${i + 1}">${i + 1}</option>`).join('');
-
-        const dayOptions = Array.from({length: 7}, (_, i) => `<option value="${i + 1}">${i + 1}</option>`).join('');
-
-        
-
-        selectedTutorDetails.innerHTML = `
-
-            <div class="p-4 border rounded-lg shadow-sm">
-
-                <div class="flex items-center justify-between mb-4">
-
-                    <h4 class="font-bold text-xl">${tutor.name} (${studentsSnapshot.docs.length} students)</h4>
-
-                    <label class="flex items-center space-x-2">
-
-                        <span>Management Staff:</span>
-
-                        <input type="checkbox" id="management-staff-toggle" data-tutor-id="${tutorId}" class="h-5 w-5 rounded text-blue-600 focus:ring-blue-500" ${tutor.isManagementStaff ? 'checked' : ''}>
-
-                    </label>
-
-                </div>
-
-                <div class="mb-4">
-
-                     <p><strong>Students:</strong></p>
-
-                     <ul class="space-y-2 mt-2">${studentsListHTML || '<p class="text-gray-500">No students assigned.</p>'}</ul>
-
-                </div>
-
-                <div class="add-student-form border-t pt-4">
-
-                    <h5 class="font-semibold text-gray-700 mb-2">Add New Student:</h5>
-
-                    <input type="text" class="new-student-name w-full mt-1 p-2 border rounded" placeholder="Student Name">
-
-                    <select class="new-student-grade w-full mt-1 p-2 border rounded">
-
-                        <option value="">Select Grade</option>
-
-                        ${gradeOptions}
-
-                    </select>
-
-                    <input type="text" class="new-student-subject w-full mt-1 p-2 border rounded" placeholder="Subject(s) (e.g., Math, English)">
-
-                    <select class="new-student-days w-full mt-1 p-2 border rounded">
-
-                        <option value="">Select Days</option>
-
-                        ${dayOptions}
-
-                    </select>
-
-                    <input type="number" class="new-student-fee w-full mt-1 p-2 border rounded" placeholder="Student Fee">
-
-                    <button class="add-student-btn bg-green-600 text-white px-4 py-2 rounded mt-2 hover:bg-green-700" data-tutor-email="${tutor.email}">Add Student</button>
-
-                </div>
-
-            </div>
-
-        `;
-
-        document.getElementById('management-staff-toggle').addEventListener('change', async (e) => {
-
-            const tutorDocRef = doc(db, "tutors", tutorId);
-
-            await updateDoc(tutorDocRef, { isManagementStaff: e.target.checked });
-
-        });
-
-        document.querySelectorAll('.add-student-btn').forEach(button => {
-
-            button.addEventListener('click', async (e) => {
-
-                const tutorEmail = e.target.getAttribute('data-tutor-email');
-
-                const formContainer = e.target.closest('.add-student-form');
-
-                const studentName = formContainer.querySelector('.new-student-name').value;
-
-                const studentGrade = formContainer.querySelector('.new-student-grade').value;
-
-                const subjects = formContainer.querySelector('.new-student-subject').value.split(',').map(s => s.trim());
-
-                const days = formContainer.querySelector('.new-student-days').value;
-
-                const studentFee = parseFloat(formContainer.querySelector('.new-student-fee').value);
-
-                if (studentName && studentGrade && subjects.length && days && !isNaN(studentFee)) {
-
-                    await addDoc(collection(db, "students"), {
-
-                        studentName, grade: studentGrade, subjects, days, tutorEmail, studentFee
-
-                    });
-
-                    await renderSelectedTutorDetails(tutorId, allTutorsData);
-
-                } else {
-
-                    alert('Please fill in all student details correctly.');
-
-                }
-
-            });
-
-        });
-
-        document.querySelectorAll('.remove-student-btn').forEach(button => {
-
-            button.addEventListener('click', async (e) => {
-
-                const studentId = e.target.getAttribute('data-student-id');
-
-                if (confirm('Are you sure you want to remove this student?')) {
-
-                    await deleteDoc(doc(db, "students", studentId));
-
-                    await renderSelectedTutorDetails(tutorId, allTutorsData);
-
-                }
-
-            });
-
-        });
-
-    }
-
-
-
-    onSnapshot(collection(db, "tutors"), async (querySnapshot) => {
-
-        const tutorsData = {};
-
-        tutorSelect.innerHTML = `<option value="">-- Select a Tutor --</option>`;
-
-        querySnapshot.forEach(doc => {
-
-            const tutor = doc.data();
-
-            tutorsData[doc.id] = tutor;
-
-            const option = document.createElement('option');
-
-            option.value = doc.id;
-
-            option.textContent = tutor.name;
-
-            tutorSelect.appendChild(option);
-
-        });
-
-        if (activeTutorId && tutorsData[activeTutorId]) {
-
-            tutorSelect.value = activeTutorId;
-
-            await renderSelectedTutorDetails(activeTutorId, tutorsData);
-
-        } else {
-
-            selectedTutorDetails.innerHTML = `<p class="text-gray-500">Please select a tutor to view details.</p>`;
-
-        }
-
-    });
-
-
-
-    // Placeholder for Google Sheets Import logic
-
-    document.getElementById('importStudentsBtn').addEventListener('click', () => {
-
-        const importStatus = document.getElementById('import-status');
-
-        importStatus.textContent = "Google Sheets import requires a Firebase Cloud Function. This is a placeholder.";
-
-        importStatus.style.color = 'orange';
-
-    });
-
+    const tutorAddToggle = document.getElementById('tutor-add-toggle');
+    const tutorAddStatusLabel = document.getElementById('tutor-add-status-label');
+    const tutorSelect = document.getElementById('tutor-select');
+    const selectedTutorDetails = document.getElementById('selected-tutor-details');
+    const saveEmailsBtn = document.getElementById('save-emails-btn');
+    const reportEmailInput = document.getElementById('report-email');
+    const payEmailInput = document.getElementById('pay-email');
+    const totalTutorsCount = document.getElementById('totalTutorsCount');
+    const totalStudentsCount = document.getElementById('totalStudentsCount');
+
+    // Listen to the settings document for real-time updates
+    const settingsDocRef = doc(db, "settings", "global_settings");
+    onSnapshot(settingsDocRef, (docSnap) => {
+        if (docSnap.exists()) {
+            const data = docSnap.data();
+
+            // Tutor Add Student Toggle
+            const isTutorAddEnabled = data.isTutorAddEnabled;
+            tutorAddToggle.checked = isTutorAddEnabled;
+            tutorAddStatusLabel.textContent = isTutorAddEnabled ? 'Enabled' : 'Disabled';
+            tutorAddStatusLabel.classList.toggle('text-green-600', isTutorAddEnabled);
+            tutorAddStatusLabel.classList.toggle('text-gray-500', !isTutorAddEnabled);
+
+            reportEmailInput.value = data.reportEmails ? data.reportEmails.join(', ') : '';
+            payEmailInput.value = data.payEmails ? data.payEmails.join(', ') : '';
+        } else {
+            setDoc(settingsDocRef, { isTutorAddEnabled: false, reportEmails: [], payEmails: [] });
+        }
+    });
+
+    // Toggle Listeners
+    tutorAddToggle.addEventListener('change', async (e) => {
+        await updateDoc(settingsDocRef, { isTutorAddEnabled: e.target.checked });
+    });
+
+    // Save Emails Listener
+    saveEmailsBtn.addEventListener('click', async () => {
+        const reportEmails = reportEmailInput.value.split(',').map(email => email.trim()).filter(email => email);
+        const payEmails = payEmailInput.value.split(',').map(email => email.trim()).filter(email => email);
+        await updateDoc(settingsDocRef, { reportEmails, payEmails });
+        alert('Emails saved successfully!');
+    });
+
+    // Listen to the tutors collection for real-time updates to counts
+    onSnapshot(collection(db, "tutors"), (querySnapshot) => {
+        const totalTutors = querySnapshot.docs.length;
+        totalTutorsCount.textContent = totalTutors;
+    });
+
+    // Listen to the students collection for real-time updates to counts
+    onSnapshot(collection(db, "students"), (querySnapshot) => {
+        const totalStudents = querySnapshot.docs.length;
+        totalStudentsCount.textContent = totalStudents;
+    });
+
+
+    // Load tutors into the dropdown
+    const tutorsSnapshot = await getDocs(collection(db, "tutors"));
+    tutorSelect.innerHTML = `<option value="">-- Select a Tutor --</option>`;
+    const tutorsData = {};
+    tutorsSnapshot.forEach(doc => {
+        const tutor = doc.data();
+        tutorsData[doc.id] = tutor;
+        const option = document.createElement('option');
+        option.value = doc.id;
+        option.textContent = tutor.name;
+        tutorSelect.appendChild(option);
+    });
+
+    tutorSelect.addEventListener('change', async (e) => {
+        activeTutorId = e.target.value;
+        if (!activeTutorId) {
+            selectedTutorDetails.innerHTML = `<p class="text-gray-500">Please select a tutor to view details.</p>`;
+            return;
+        }
+        await renderSelectedTutorDetails(activeTutorId, tutorsData);
+    });
+
+    async function renderSelectedTutorDetails(tutorId, allTutorsData) {
+        const tutor = allTutorsData[tutorId];
+        const studentsQuery = query(collection(db, "students"), where("tutorEmail", "==", tutor.email));
+        const studentsSnapshot = await getDocs(studentsQuery);
+        const studentsListHTML = studentsSnapshot.docs.map(studentDoc => {
+            const student = studentDoc.data();
+            return `<li class="flex justify-between items-center bg-gray-50 p-2 rounded-md">
+                        <span>${student.studentName} (${student.subjects.join(', ')}) - Fee: $${student.studentFee}</span>
+                        <div class="flex space-x-2">
+                             <button class="remove-student-btn text-red-500 hover:text-red-700" data-student-id="${studentDoc.id}">Remove</button>
+                        </div>
+                    </li>`;
+        }).join('');
+
+        const gradeOptions = Array.from({length: 12}, (_, i) => `<option value="${i + 1}">${i + 1}</option>`).join('');
+        const dayOptions = Array.from({length: 7}, (_, i) => `<option value="${i + 1}">${i + 1}</option>`).join('');
+        
+        selectedTutorDetails.innerHTML = `
+            <div class="p-4 border rounded-lg shadow-sm">
+                <div class="flex items-center justify-between mb-4">
+                    <h4 class="font-bold text-xl">${tutor.name} (${studentsSnapshot.docs.length} students)</h4>
+                    <button id="remove-tutor-btn" class="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600">Remove Tutor</button>
+                </div>
+                <div class="mb-4">
+                    <p><strong>Students:</strong></p>
+                    <ul class="space-y-2 mt-2">${studentsListHTML || '<p class="text-gray-500">No students assigned.</p>'}</ul>
+                </div>
+                <div class="mb-4">
+                    <h5 class="font-semibold text-gray-700 mb-2">Tutor Actions:</h5>
+                    <div class="flex items-center space-x-6">
+                        <label class="flex items-center">
+                            <span>Report Submission:</span>
+                            <label for="report-toggle" class="relative inline-flex items-center cursor-pointer ml-4">
+                                <input type="checkbox" id="report-toggle" class="sr-only peer" ${tutor.isReportEnabled ? 'checked' : ''}>
+                                <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                                <span id="report-status-label" class="ml-3 text-sm font-medium ${tutor.isReportEnabled ? 'text-green-600' : 'text-gray-500'}">${tutor.isReportEnabled ? 'Enabled' : 'Disabled'}</span>
+                            </label>
+                        </label>
+                        <label class="flex items-center">
+                            <span>Summer Break:</span>
+                            <label for="summer-break-toggle" class="relative inline-flex items-center cursor-pointer ml-4">
+                                <input type="checkbox" id="summer-break-toggle" class="sr-only peer" ${tutor.isSummerBreakEnabled ? 'checked' : ''}>
+                                <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                                <span id="summer-break-status-label" class="ml-3 text-sm font-medium ${tutor.isSummerBreakEnabled ? 'text-green-600' : 'text-gray-500'}">${tutor.isSummerBreakEnabled ? 'Enabled' : 'Disabled'}</span>
+                            </label>
+                        </label>
+                    </div>
+                </div>
+                <div class="add-student-form border-t pt-4">
+                    <h5 class="font-semibold text-gray-700 mb-2">Add New Student:</h5>
+                    <input type="text" class="new-student-name w-full mt-1 p-2 border rounded" placeholder="Student Name">
+                    <select class="new-student-grade w-full mt-1 p-2 border rounded">
+                        <option value="">Select Grade</option>
+                        ${gradeOptions}
+                    </select>
+                    <input type="text" class="new-student-subject w-full mt-1 p-2 border rounded" placeholder="Subject(s) (e.g., Math, English)">
+                    <select class="new-student-days w-full mt-1 p-2 border rounded">
+                        <option value="">Select Days</option>
+                        ${dayOptions}
+                    </select>
+                    <input type="number" class="new-student-fee w-full mt-1 p-2 border rounded" placeholder="Student Fee">
+                    <button class="add-student-btn bg-green-600 text-white px-4 py-2 rounded mt-2 hover:bg-green-700" data-tutor-email="${tutor.email}">Add Student</button>
+                </div>
+            </div>
+        `;
+
+        // Add event listeners for the new per-tutor toggles
+        const reportToggle = document.getElementById('report-toggle');
+        const reportStatusLabel = document.getElementById('report-status-label');
+        const summerBreakToggle = document.getElementById('summer-break-toggle');
+        const summerBreakStatusLabel = document.getElementById('summer-break-status-label');
+
+        reportToggle.addEventListener('change', async (e) => {
+            const tutorDocRef = doc(db, "tutors", tutorId);
+            await updateDoc(tutorDocRef, { isReportEnabled: e.target.checked });
+            reportStatusLabel.textContent = e.target.checked ? 'Enabled' : 'Disabled';
+            reportStatusLabel.classList.toggle('text-green-600', e.target.checked);
+            reportStatusLabel.classList.toggle('text-gray-500', !e.target.checked);
+        });
+
+        summerBreakToggle.addEventListener('change', async (e) => {
+            const tutorDocRef = doc(db, "tutors", tutorId);
+            await updateDoc(tutorDocRef, { isSummerBreakEnabled: e.target.checked });
+            summerBreakStatusLabel.textContent = e.target.checked ? 'Enabled' : 'Disabled';
+            summerBreakStatusLabel.classList.toggle('text-green-600', e.target.checked);
+            summerBreakStatusLabel.classList.toggle('text-gray-500', !e.target.checked);
+        });
+
+        // Add event listener for the new "Remove Tutor" button
+        document.getElementById('remove-tutor-btn').addEventListener('click', async () => {
+            if (confirm('Are you sure you want to remove this tutor and ALL of their students? This action cannot be undone.')) {
+                // Delete all students associated with the tutor first
+                const studentsToDeleteQuery = query(collection(db, "students"), where("tutorEmail", "==", tutor.email));
+                const studentsToDeleteSnapshot = await getDocs(studentsToDeleteQuery);
+                const deletePromises = studentsToDeleteSnapshot.docs.map(studentDoc => deleteDoc(doc(db, "students", studentDoc.id)));
+                await Promise.all(deletePromises);
+
+                // Then, delete the tutor
+                await deleteDoc(doc(db, "tutors", tutorId));
+                
+                // Clear the selected tutor details pane
+                selectedTutorDetails.innerHTML = `<p class="text-gray-500">Tutor and their students have been removed.</p>`;
+                // Reset the select dropdown to its default state
+                tutorSelect.value = "";
+            }
+        });
+
+        // Add student and remove student listeners (unchanged from original code)
+        document.querySelectorAll('.add-student-btn').forEach(button => {
+            button.addEventListener('click', async (e) => {
+                const tutorEmail = e.target.getAttribute('data-tutor-email');
+                const formContainer = e.target.closest('.add-student-form');
+                const studentName = formContainer.querySelector('.new-student-name').value;
+                const studentGrade = formContainer.querySelector('.new-student-grade').value;
+                const subjects = formContainer.querySelector('.new-student-subject').value.split(',').map(s => s.trim());
+                const days = formContainer.querySelector('.new-student-days').value;
+                const studentFee = parseFloat(formContainer.querySelector('.new-student-fee').value);
+                if (studentName && studentGrade && subjects.length && days && !isNaN(studentFee)) {
+                    await addDoc(collection(db, "students"), {
+                        studentName, grade: studentGrade, subjects, days, tutorEmail, studentFee
+                    });
+                    await renderSelectedTutorDetails(tutorId, allTutorsData);
+                } else {
+                    alert('Please fill in all student details correctly.');
+                }
+            });
+        });
+
+        document.querySelectorAll('.remove-student-btn').forEach(button => {
+            button.addEventListener('click', async (e) => {
+                const studentId = e.target.getAttribute('data-student-id');
+                if (confirm('Are you sure you want to remove this student?')) {
+                    await deleteDoc(doc(db, "students", studentId));
+                    await renderSelectedTutorDetails(tutorId, allTutorsData);
+                }
+            });
+        });
+    }
+
+    onSnapshot(collection(db, "tutors"), async (querySnapshot) => {
+        const tutorsData = {};
+        tutorSelect.innerHTML = `<option value="">-- Select a Tutor --</option>`;
+        querySnapshot.forEach(doc => {
+            const tutor = doc.data();
+            tutorsData[doc.id] = tutor;
+            const option = document.createElement('option');
+            option.value = doc.id;
+            option.textContent = tutor.name;
+            tutorSelect.appendChild(option);
+        });
+        if (activeTutorId && tutorsData[activeTutorId]) {
+            tutorSelect.value = activeTutorId;
+            await renderSelectedTutorDetails(activeTutorId, tutorsData);
+        } else {
+            selectedTutorDetails.innerHTML = `<p class="text-gray-500">Please select a tutor to view details.</p>`;
+        }
+    });
+
+    // Placeholder for Google Sheets Import logic
+    document.getElementById('importStudentsBtn').addEventListener('click', () => {
+        const importStatus = document.getElementById('import-status');
+        importStatus.textContent = "Google Sheets import requires a Firebase Cloud Function. This is a placeholder.";
+        importStatus.style.color = 'orange';
+    });
 } 
 
 // ##################################################################
@@ -1263,6 +1005,7 @@ onAuthStateChanged(auth, async (user) => {
         if (logoutBtn) logoutBtn.classList.add('hidden');
     }
 });
+
 
 
 
