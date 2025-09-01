@@ -1059,6 +1059,62 @@ async function renderSummerBreakPanel(container) {
     });
 }
 
+// ##################################################################
+// # SECTION 7: RENDER STAFF PANEL
+// ##################################################################
+
+async function renderStaffPanel(container) {
+    container.innerHTML = `
+        <div class="bg-white p-6 rounded-lg shadow-md">
+            <h2 class="text-2xl font-bold text-green-700 mb-4">Staff Management</h2>
+            <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-50"><tr>
+                        <th class="px-6 py-3 text-left text-xs font-medium uppercase">Name</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium uppercase">Email</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium uppercase">Role</th>
+                    </tr></thead>
+                    <tbody id="staff-table-body" class="bg-white divide-y divide-gray-200">
+                        <tr><td colspan="3" class="text-center py-10">Loading staff...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    `;
+
+    const tableBody = document.getElementById('staff-table-body');
+    onSnapshot(collection(db, "staff"), (snapshot) => {
+        tableBody.innerHTML = snapshot.docs.map(doc => {
+            const staff = doc.data();
+            const roles = ['pending', 'tutor', 'manager', 'director', 'admin'];
+            const optionsHTML = roles.map(role => 
+                `<option value="${role}" ${staff.role === role ? 'selected' : ''}>${capitalize(role)}</option>`
+            ).join('');
+
+            return `
+                <tr>
+                    <td class="px-6 py-4 font-medium">${staff.name}</td>
+                    <td class="px-6 py-4">${staff.email}</td>
+                    <td class="px-6 py-4">
+                        <select data-id="${doc.id}" class="role-select p-2 border rounded">
+                            ${optionsHTML}
+                        </select>
+                    </td>
+                </tr>
+            `;
+        }).join('');
+
+        // Add event listeners to the role dropdowns
+        document.querySelectorAll('.role-select').forEach(select => {
+            select.addEventListener('change', async (e) => {
+                const newRole = e.target.value;
+                const docId = e.target.dataset.id;
+                await updateDoc(doc(db, "staff", docId), { role: newRole });
+                alert('Role updated successfully!');
+            });
+        });
+    });
+}
 
 // ##################################################################
 // # MAIN APP INITIALIZATION (Updated)
@@ -1104,6 +1160,21 @@ onAuthStateChanged(auth, async (user) => {
     }
 });
 
+onAuthStateChanged(auth, async (user) => {
+    // ...
+    if (user && user.email === ADMIN_EMAIL) {
+        // ...
+        const navItems = {
+            navDashboard: renderAdminPanel,
+            navContent: renderContentManagerPanel,
+            navStaff: renderStaffPanel, // ### ADD THIS LINE ###
+            navTutorManagement: renderTutorManagementPanel,
+            // ... rest of the items
+        };
+        // ...
+    }
+    // ...
+});
 
 
 
