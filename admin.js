@@ -1060,7 +1060,7 @@ async function renderSummerBreakPanel(container) {
 }
 
 // ##################################################################
-// # SECTION 7: RENDER STAFF PANEL
+// # SECTION 7: RENDER STAFF PANEL (This is the new section)
 // ##################################################################
 
 async function renderStaffPanel(container) {
@@ -1084,6 +1084,10 @@ async function renderStaffPanel(container) {
 
     const tableBody = document.getElementById('staff-table-body');
     onSnapshot(collection(db, "staff"), (snapshot) => {
+        if (snapshot.empty) {
+            tableBody.innerHTML = `<tr><td colspan="3" class="text-center py-10">No staff have signed up yet.</td></tr>`;
+            return;
+        }
         tableBody.innerHTML = snapshot.docs.map(doc => {
             const staff = doc.data();
             const roles = ['pending', 'tutor', 'manager', 'director', 'admin'];
@@ -1096,7 +1100,7 @@ async function renderStaffPanel(container) {
                     <td class="px-6 py-4 font-medium">${staff.name}</td>
                     <td class="px-6 py-4">${staff.email}</td>
                     <td class="px-6 py-4">
-                        <select data-id="${doc.id}" class="role-select p-2 border rounded">
+                        <select data-email="${staff.email}" class="role-select p-2 border rounded bg-white">
                             ${optionsHTML}
                         </select>
                     </td>
@@ -1108,13 +1112,71 @@ async function renderStaffPanel(container) {
         document.querySelectorAll('.role-select').forEach(select => {
             select.addEventListener('change', async (e) => {
                 const newRole = e.target.value;
-                const docId = e.target.dataset.id;
-                await updateDoc(doc(db, "staff", docId), { role: newRole });
-                alert('Role updated successfully!');
+                const docId = e.target.dataset.email; // Use email as the document ID
+                try {
+                    await updateDoc(doc(db, "staff", docId), { role: newRole });
+                    alert('Role updated successfully!');
+                } catch (error) {
+                    console.error("Error updating role: ", error);
+                    alert("Failed to update role. Please check the console for errors.");
+                }
             });
         });
     });
 }
+
+
+// ##################################################################
+// # MAIN APP INITIALIZATION (FIXED & MERGED)
+// ##################################################################
+
+onAuthStateChanged(auth, async (user) => {
+    const mainContent = document.getElementById('main-content');
+    const logoutBtn = document.getElementById('logoutBtn');
+    if (user && user.email === ADMIN_EMAIL) {
+        mainContent.innerHTML = '';
+        
+        // This object maps the button ID to the function that renders its content.
+        const navItems = {
+            navDashboard: renderAdminPanel,
+            navContent: renderContentManagerPanel,
+            navStaff: renderStaffPanel, // This line correctly adds the new panel
+            navTutorManagement: renderTutorManagementPanel,
+            navPayAdvice: renderPayAdvicePanel,
+            navTutorReports: renderTutorReportsPanel,
+            navSummerBreak: renderSummerBreakPanel
+        };
+
+        const setActiveNav = (activeId) => {
+            Object.keys(navItems).forEach(id => {
+                const navElement = document.getElementById(id);
+                if (navElement) {
+                     navElement.classList.toggle('active', id === activeId);
+                }
+            });
+        };
+
+        Object.entries(navItems).forEach(([id, renderFn]) => {
+            const navElement = document.getElementById(id);
+            if (navElement) {
+                navElement.addEventListener('click', () => {
+                    setActiveNav(id);
+                    renderFn(mainContent);
+                });
+            }
+        });
+
+        // Initial Load on page open
+        setActiveNav('navDashboard');
+        renderAdminPanel(mainContent);
+
+        logoutBtn.addEventListener('click', () => signOut(auth).then(() => window.location.href = "admin-auth.html"));
+
+    } else {
+        mainContent.innerHTML = `<p class="text-center mt-12 text-red-600">You do not have permission to view this page.</p>`;
+        logoutBtn.classList.add('hidden');
+    }
+});
 
 // ##################################################################
 // # MAIN APP INITIALIZATION (Updated)
@@ -1175,6 +1237,7 @@ onAuthStateChanged(auth, async (user) => {
     }
     // ...
 });
+
 
 
 
