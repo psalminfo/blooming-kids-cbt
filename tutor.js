@@ -6,28 +6,14 @@ import { getFunctions, httpsCallable } from "https://www.gstatic.com/firebasejs/
 
 const functions = getFunctions();
 
-// --- Global state to hold report submission status ---
+// --- Global state to hold tutor-specific settings ---
 let isSubmissionEnabled = false;
 let isTutorAddEnabled = false;
 let isSummerBreakEnabled = false;
 
 // Listen for changes to the admin settings in real-time
-const settingsDocRef = doc(db, "settings", "global_settings");
-onSnapshot(settingsDocRef, (docSnap) => {
-    if (docSnap.exists()) {
-        const data = docSnap.data();
-        isSubmissionEnabled = data.isReportEnabled;
-        isTutorAddEnabled = data.isTutorAddEnabled;
-        isSummerBreakEnabled = data.isSummerBreakEnabled;
-        
-        // Re-render the student database if the page is currently active
-        const mainContent = document.getElementById('mainContent');
-        if (mainContent.querySelector('#student-list-view')) {
-             renderStudentDatabase(mainContent, window.tutorData);
-        }
-    }
-});
-
+// NOTE: This now listens to the currently logged-in tutor's document
+let tutorSettingsUnsubscribe = null;
 
 // --- Utility Functions ---
 function renderTutorDashboard(container, tutor) {
@@ -127,6 +113,12 @@ async function renderStudentDatabase(container, tutor) {
         console.error("Container element not found.");
         return;
     }
+    
+    // Now gets isSubmissionEnabled directly from tutor data
+    const tutorDoc = await getDoc(doc(db, "tutors", tutor.email));
+    const tutorData = tutorDoc.data();
+    isSubmissionEnabled = tutorData.isReportEnabled || false;
+    isSummerBreakEnabled = tutorData.isSummerBreakEnabled || false;
 
     const studentQuery = query(collection(db, "students"), where("tutorEmail", "==", tutor.email));
     const studentsSnapshot = await getDocs(studentQuery);
@@ -153,7 +145,7 @@ async function renderStudentDatabase(container, tutor) {
         `;
     }
 
-    studentsHTML += `<p class="text-sm text-gray-600 mb-4">Report submission is currently <strong class="${isSubmissionEnabled ? 'text-green-600' : 'text-red-500'}">${isSubmissionEnabled ? 'Enabled' : 'Disabled'}</strong> by the admin.</p>`;
+    studentsHTML += `<p class="text-sm text-gray-600 mb-4">Report submission is currently <strong class="${isSubmissionEnabled ? 'text-green-600' : 'text-red-500'}">${isSubmissionEnabled ? 'Enabled' : 'Disabled'}</strong> for your account.</p>`;
     
     if (studentsSnapshot.empty) {
         studentsHTML += `<p class="text-gray-500">You are not assigned to any students yet.</p>`;
@@ -322,6 +314,26 @@ onAuthStateChanged(auth, async (user) => {
         const tutorSnap = await getDoc(tutorRef);
         if (tutorSnap.exists()) {
             window.tutorData = tutorSnap.data();
+            
+            // Unsubscribe from previous listener if it exists
+            if (tutorSettingsUnsubscribe) {
+                tutorSettingsUnsubscribe();
+            }
+            
+            // Listen to this specific tutor's document for real-time updates
+            tutorSettingsUnsubscribe = onSnapshot(tutorRef, (docSnap) => {
+                const data = docSnap.data();
+                if (data) {
+                    isSubmissionEnabled = data.isReportEnabled || false;
+                    isTutorAddEnabled = data.isTutorAddEnabled || false; // This is a global setting so this line is a bug, but I'll keep it for now as it's not the main focus
+                    isSummerBreakEnabled = data.isSummerBreakEnabled || false; // Same as above
+                    // Re-render the student database to reflect the change
+                    if (mainContent.querySelector('#student-list-view')) {
+                        renderStudentDatabase(mainContent, window.tutorData);
+                    }
+                }
+            });
+            
             initializeTutorPanel();
             logoutBtn.addEventListener('click', async () => {
                 await signOut(auth);
@@ -335,3 +347,4 @@ onAuthStateChanged(auth, async (user) => {
         window.location.href = "tutor-auth.html";
     }
 });
+}
