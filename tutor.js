@@ -6,14 +6,28 @@ import { getFunctions, httpsCallable } from "https://www.gstatic.com/firebasejs/
 
 const functions = getFunctions();
 
-// --- Global state to hold tutor-specific settings ---
+// --- Global state to hold report submission status ---
 let isSubmissionEnabled = false;
 let isTutorAddEnabled = false;
 let isSummerBreakEnabled = false;
 
 // Listen for changes to the admin settings in real-time
-// NOTE: This now listens to the currently logged-in tutor's document
-let tutorSettingsUnsubscribe = null;
+const settingsDocRef = doc(db, "settings", "global_settings");
+onSnapshot(settingsDocRef, (docSnap) => {
+    if (docSnap.exists()) {
+        const data = docSnap.data();
+        isSubmissionEnabled = data.isReportEnabled;
+        isTutorAddEnabled = data.isTutorAddEnabled;
+        isSummerBreakEnabled = data.isSummerBreakEnabled;
+        
+        // Re-render the student database if the page is currently active
+        const mainContent = document.getElementById('mainContent');
+        if (mainContent.querySelector('#student-list-view')) {
+             renderStudentDatabase(mainContent, window.tutorData);
+        }
+    }
+});
+
 
 // --- Utility Functions ---
 function renderTutorDashboard(container, tutor) {
@@ -113,12 +127,6 @@ async function renderStudentDatabase(container, tutor) {
         console.error("Container element not found.");
         return;
     }
-    
-    // Now gets isSubmissionEnabled directly from tutor data
-    const tutorDoc = await getDoc(doc(db, "tutors", tutor.email));
-    const tutorData = tutorDoc.data();
-    isSubmissionEnabled = tutorData.isReportEnabled || false;
-    isSummerBreakEnabled = tutorData.isSummerBreakEnabled || false;
 
     const studentQuery = query(collection(db, "students"), where("tutorEmail", "==", tutor.email));
     const studentsSnapshot = await getDocs(studentQuery);
@@ -145,7 +153,7 @@ async function renderStudentDatabase(container, tutor) {
         `;
     }
 
-    studentsHTML += `<p class="text-sm text-gray-600 mb-4">Report submission is currently <strong class="${isSubmissionEnabled ? 'text-green-600' : 'text-red-500'}">${isSubmissionEnabled ? 'Enabled' : 'Disabled'}</strong> for your account.</p>`;
+    studentsHTML += `<p class="text-sm text-gray-600 mb-4">Report submission is currently <strong class="${isSubmissionEnabled ? 'text-green-600' : 'text-red-500'}">${isSubmissionEnabled ? 'Enabled' : 'Disabled'}</strong> by the admin.</p>`;
     
     if (studentsSnapshot.empty) {
         studentsHTML += `<p class="text-gray-500">You are not assigned to any students yet.</p>`;
@@ -162,20 +170,15 @@ async function renderStudentDatabase(container, tutor) {
         
         // Corrected syntax for button display
         if (isSummerBreakEnabled && !isStudentOnBreak) {
-            studentsHTML += `<button class="summer-break-btn bg-yellow-600 text-white px-3 py-1 rounded" data-student-id="${doc.id}">Summer Break</button>`;
+             studentsHTML += `<button class="summer-break-btn bg-yellow-600 text-white px-3 py-1 rounded" data-student-id="${doc.id}">Summer Break</button>`;
         } else if (isStudentOnBreak) {
             studentsHTML += `<span class="text-gray-400">On Break</span>`;
         }
 
-        // Add a space between buttons if both are present
-        if ((isSummerBreakEnabled && !isStudentOnBreak) && (isSubmissionEnabled && !isStudentOnBreak)) {
-            studentsHTML += `<span class="mr-2"></span>`;
-        }
-
         if (isSubmissionEnabled && !isStudentOnBreak) {
             studentsHTML += `<button class="submit-report-btn bg-green-600 text-white px-3 py-1 rounded" data-student-id="${doc.id}">Submit Report</button>`;
-        } else if (!isSummerBreakEnabled || !isStudentOnBreak) {
-            studentsHTML += `<span class="text-gray-400">Not Enabled</span>`;
+        } else {
+             studentsHTML += `<span class="text-gray-400">Not Enabled</span>`;
         }
         
         studentsHTML += `</td></tr>`;
@@ -187,21 +190,21 @@ async function renderStudentDatabase(container, tutor) {
     document.querySelectorAll('.summer-break-btn').forEach(button => {
         button.addEventListener('click', async (e) => {
             const studentId = e.target.getAttribute('data-student-id');
-            if (confirm("Are you sure you want to mark this student as on summer break?")) {
+             if (confirm("Are you sure you want to mark this student as on summer break?")) {
                 await updateDoc(doc(db, "students", studentId), { summerBreak: true });
                 renderStudentDatabase(container, tutor);
             }
         });
     });
 
-    if (isTutorAddEnabled) {
-        document.getElementById('add-student-btn').addEventListener('click', async () => {
+     if (isTutorAddEnabled) {
+         document.getElementById('add-student-btn').addEventListener('click', async () => {
             const studentName = document.getElementById('new-student-name').value;
             const studentGrade = document.getElementById('new-student-grade').value;
             const subjects = document.getElementById('new-student-subject').value.split(',').map(s => s.trim());
             const days = document.getElementById('new-student-days').value;
             const studentFee = parseFloat(document.getElementById('new-student-fee').value);
-            if (studentName && studentGrade && subjects.length && days && !isNaN(studentFee)) {
+             if (studentName && studentGrade && subjects.length && days && !isNaN(studentFee)) {
                 await addDoc(collection(db, "students"), {
                     studentName, grade: studentGrade, subjects, days, tutorEmail: tutor.email, studentFee, summerBreak: false
                 });
@@ -217,7 +220,7 @@ async function renderStudentDatabase(container, tutor) {
         });
     }
 
-    document.querySelectorAll('.submit-report-btn').forEach(button => {
+     document.querySelectorAll('.submit-report-btn').forEach(button => {
         button.addEventListener('click', async (e) => {
             const studentId = e.target.getAttribute('data-student-id');
             const studentDoc = await getDoc(doc(db, "students", studentId));
@@ -319,26 +322,6 @@ onAuthStateChanged(auth, async (user) => {
         const tutorSnap = await getDoc(tutorRef);
         if (tutorSnap.exists()) {
             window.tutorData = tutorSnap.data();
-            
-            // Unsubscribe from previous listener if it exists
-            if (tutorSettingsUnsubscribe) {
-                tutorSettingsUnsubscribe();
-            }
-            
-            // Listen to this specific tutor's document for real-time updates
-            tutorSettingsUnsubscribe = onSnapshot(tutorRef, (docSnap) => {
-                const data = docSnap.data();
-                if (data) {
-                    isSubmissionEnabled = data.isReportEnabled || false;
-                    isTutorAddEnabled = data.isTutorAddEnabled || false; // This is a global setting so this line is a bug, but I'll keep it for now as it's not the main focus
-                    isSummerBreakEnabled = data.isSummerBreakEnabled || false; // Same as above
-                    // Re-render the student database to reflect the change
-                    if (mainContent.querySelector('#student-list-view')) {
-                        renderStudentDatabase(mainContent, window.tutorData);
-                    }
-                }
-            });
-            
             initializeTutorPanel();
             logoutBtn.addEventListener('click', async () => {
                 await signOut(auth);
