@@ -1062,7 +1062,6 @@ async function renderSummerBreakPanel(container) {
 // ##################################################################
 // # SECTION 7: RENDER STAFF PANEL (This is the new section)
 // ##################################################################
-
 async function renderStaffPanel(container) {
     container.innerHTML = `
         <div class="bg-white p-6 rounded-lg shadow-md">
@@ -1073,10 +1072,9 @@ async function renderStaffPanel(container) {
                         <th class="px-6 py-3 text-left text-xs font-medium uppercase">Name</th>
                         <th class="px-6 py-3 text-left text-xs font-medium uppercase">Email</th>
                         <th class="px-6 py-3 text-left text-xs font-medium uppercase">Role</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium uppercase">Actions</th>
                     </tr></thead>
-                    <tbody id="staff-table-body" class="bg-white divide-y divide-gray-200">
-                        <tr><td colspan="3" class="text-center py-10">Loading staff...</td></tr>
-                    </tbody>
+                    <tbody id="staff-table-body" class="bg-white divide-y divide-gray-200"></tbody>
                 </table>
             </div>
         </div>
@@ -1084,44 +1082,92 @@ async function renderStaffPanel(container) {
 
     const tableBody = document.getElementById('staff-table-body');
     onSnapshot(collection(db, "staff"), (snapshot) => {
-        if (snapshot.empty) {
-            tableBody.innerHTML = `<tr><td colspan="3" class="text-center py-10">No staff have signed up yet.</td></tr>`;
-            return;
-        }
         tableBody.innerHTML = snapshot.docs.map(doc => {
             const staff = doc.data();
-            const roles = ['pending', 'tutor', 'manager', 'director', 'admin'];
-            const optionsHTML = roles.map(role => 
-                `<option value="${role}" ${staff.role === role ? 'selected' : ''}>${capitalize(role)}</option>`
-            ).join('');
-
             return `
                 <tr>
                     <td class="px-6 py-4 font-medium">${staff.name}</td>
                     <td class="px-6 py-4">${staff.email}</td>
+                    <td class="px-6 py-4">${capitalize(staff.role)}</td>
                     <td class="px-6 py-4">
-                        <select data-email="${staff.email}" class="role-select p-2 border rounded bg-white">
-                            ${optionsHTML}
-                        </select>
+                        <button data-id="${doc.id}" class="manage-permissions-btn bg-blue-600 text-white px-3 py-1 rounded text-sm hover:bg-blue-700">Manage Permissions</button>
                     </td>
                 </tr>
             `;
         }).join('');
 
-        // Add event listeners to the role dropdowns
-        document.querySelectorAll('.role-select').forEach(select => {
-            select.addEventListener('change', async (e) => {
-                const newRole = e.target.value;
-                const docId = e.target.dataset.email; // Use email as the document ID
-                try {
-                    await updateDoc(doc(db, "staff", docId), { role: newRole });
-                    alert('Role updated successfully!');
-                } catch (error) {
-                    console.error("Error updating role: ", error);
-                    alert("Failed to update role. Please check the console for errors.");
-                }
-            });
+        document.querySelectorAll('.manage-permissions-btn').forEach(button => {
+            button.addEventListener('click', (e) => openPermissionsModal(e.target.dataset.id));
         });
+    });
+}
+
+async function openPermissionsModal(staffId) {
+    const staffDoc = await getDoc(doc(db, "staff", staffId));
+    if (!staffDoc.exists()) return alert("Staff member not found.");
+
+    const staffData = staffDoc.data();
+    const permissions = staffData.permissions || { tabs: {}, actions: {} }; // Default if none exist
+
+    const modalHTML = `
+        <div id="permissions-modal" class="fixed inset-0 bg-gray-600 bg-opacity-75 flex items-center justify-center z-50">
+            <div class="bg-white rounded-lg shadow-xl p-8 max-w-lg w-full">
+                <h3 class="text-2xl font-bold mb-4">Permissions for ${staffData.name}</h3>
+                
+                <div class="space-y-4">
+                    <div>
+                        <label for="role-select" class="block font-semibold">Role:</label>
+                        <select id="role-select" class="w-full p-2 border rounded mt-1">
+                            ${['pending', 'tutor', 'manager', 'director', 'admin'].map(role => `<option value="${role}" ${staffData.role === role ? 'selected' : ''}>${capitalize(role)}</option>`).join('')}
+                        </select>
+                    </div>
+
+                    <div class="border-t pt-4">
+                        <h4 class="font-semibold mb-2">Tab Visibility:</h4>
+                        <div class="grid grid-cols-2 gap-2">
+                            <label class="flex items-center"><input type="checkbox" id="p-viewTutorManagement" class="mr-2" ${permissions.tabs?.viewTutorManagement ? 'checked' : ''}>Tutor List</label>
+                            <label class="flex items-center"><input type="checkbox" id="p-viewPayAdvice" class="mr-2" ${permissions.tabs?.viewPayAdvice ? 'checked' : ''}>Pay Advice</label>
+                            <label class="flex items-center"><input type="checkbox" id="p-viewTutorReports" class="mr-2" ${permissions.tabs?.viewTutorReports ? 'checked' : ''}>Tutor Reports</label>
+                            <label class="flex items-center"><input type="checkbox" id="p-viewSummerBreak" class="mr-2" ${permissions.tabs?.viewSummerBreak ? 'checked' : ''}>Summer Break</label>
+                        </div>
+                    </div>
+
+                    <div class="border-t pt-4">
+                        <h4 class="font-semibold mb-2">Specific Actions:</h4>
+                        <label class="flex items-center"><input type="checkbox" id="p-canDownloadReports" class="mr-2" ${permissions.actions?.canDownloadReports ? 'checked' : ''}>Can Download Reports</label>
+                        <label class="flex items-center"><input type="checkbox" id="p-canExportPayAdvice" class="mr-2" ${permissions.actions?.canExportPayAdvice ? 'checked' : ''}>Can Export Pay Advice</label>
+                    </div>
+                </div>
+
+                <div class="flex justify-end space-x-4 mt-6">
+                    <button id="cancel-permissions" class="bg-gray-300 px-4 py-2 rounded">Cancel</button>
+                    <button id="save-permissions" class="bg-green-600 text-white px-4 py-2 rounded">Save Changes</button>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    document.body.insertAdjacentHTML('beforeend', modalHTML);
+
+    document.getElementById('cancel-permissions').addEventListener('click', () => document.getElementById('permissions-modal').remove());
+    document.getElementById('save-permissions').addEventListener('click', async () => {
+        const newRole = document.getElementById('role-select').value;
+        const newPermissions = {
+            tabs: {
+                viewTutorManagement: document.getElementById('p-viewTutorManagement').checked,
+                viewPayAdvice: document.getElementById('p-viewPayAdvice').checked,
+                viewTutorReports: document.getElementById('p-viewTutorReports').checked,
+                viewSummerBreak: document.getElementById('p-viewSummerBreak').checked,
+            },
+            actions: {
+                canDownloadReports: document.getElementById('p-canDownloadReports').checked,
+                canExportPayAdvice: document.getElementById('p-canExportPayAdvice').checked,
+            }
+        };
+
+        await updateDoc(doc(db, "staff", staffId), { role: newRole, permissions: newPermissions });
+        alert("Permissions updated successfully!");
+        document.getElementById('permissions-modal').remove();
     });
 }
 
@@ -1237,6 +1283,7 @@ onAuthStateChanged(auth, async (user) => {
     }
     // ...
 });
+
 
 
 
