@@ -8,7 +8,6 @@ function capitalize(str) {
     return str.replace(/\b\w/g, l => l.toUpperCase());
 }
 
-// ### NEW ### Utility function for CSV conversion
 function convertPayAdviceToCSV(data) {
     const header = ['Tutor Name', 'Student Count', 'Total Student Fees (₦)', 'Management Fee (₦)', 'Total Pay (₦)'];
     const rows = data.map(item => [
@@ -25,6 +24,7 @@ function convertPayAdviceToCSV(data) {
 // # PANEL RENDERING FUNCTIONS
 // ##################################
 
+// ### UPDATED as requested ### to group students by tutor
 async function renderManagementTutorView(container) {
     container.innerHTML = `
         <div class="bg-white p-6 rounded-lg shadow-md">
@@ -35,17 +35,8 @@ async function renderManagementTutorView(container) {
                     <div class="bg-green-100 p-3 rounded-lg text-center shadow"><h4 class="font-bold text-green-800 text-sm">Total Students</h4><p id="student-count-badge" class="text-2xl font-extrabold">0</p></div>
                 </div>
             </div>
-            <div class="overflow-x-auto">
-                <table class="min-w-full divide-y divide-gray-200">
-                    <thead class="bg-gray-50"><tr>
-                        <th class="px-6 py-3 text-left text-xs font-medium uppercase">Student Name</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium uppercase">Grade</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium uppercase">Days/Week</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium uppercase">Parent's Email</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium uppercase">Assigned Tutor</th>
-                    </tr></thead>
-                    <tbody id="directory-table-body" class="bg-white divide-y divide-gray-200"></tbody>
-                </table>
+            <div id="directory-list" class="space-y-4">
+                <p class="text-center text-gray-500 py-10">Loading directory...</p>
             </div>
         </div>
     `;
@@ -58,21 +49,53 @@ async function renderManagementTutorView(container) {
     document.getElementById('tutor-count-badge').textContent = tutorsSnapshot.size;
     document.getElementById('student-count-badge').textContent = studentsSnapshot.size;
 
-    const tutorsMap = new Map(tutorsSnapshot.docs.map(doc => [doc.data().email, doc.data().name]));
-    const tableBody = document.getElementById('directory-table-body');
-    
-    const studentsData = studentsSnapshot.docs.map(doc => doc.data());
-    studentsData.sort((a, b) => a.studentName.localeCompare(b.studentName)); 
-    
-    tableBody.innerHTML = studentsData.map(student => `
-        <tr>
-            <td class="px-6 py-4 font-medium">${student.studentName}</td>
-            <td class="px-6 py-4">${student.grade}</td>
-            <td class="px-6 py-4">${student.days}</td>
-            <td class="px-6 py-4">${student.parentEmail || 'N/A'}</td>
-            <td class="px-6 py-4">${tutorsMap.get(student.tutorEmail) || 'Unassigned'}</td>
-        </tr>
-    `).join('');
+    const studentsByTutor = {};
+    studentsSnapshot.forEach(doc => {
+        const student = doc.data();
+        if (!studentsByTutor[student.tutorEmail]) {
+            studentsByTutor[student.tutorEmail] = [];
+        }
+        studentsByTutor[student.tutorEmail].push(student);
+    });
+
+    const directoryList = document.getElementById('directory-list');
+    directoryList.innerHTML = tutorsSnapshot.docs.map(tutorDoc => {
+        const tutor = tutorDoc.data();
+        const assignedStudents = studentsByTutor[tutor.email] || [];
+        
+        const studentsTableRows = assignedStudents
+            .sort((a, b) => a.studentName.localeCompare(b.studentName))
+            .map(student => `
+                <tr class="hover:bg-gray-50">
+                    <td class="px-4 py-2 font-medium">${student.studentName}</td>
+                    <td class="px-4 py-2">${student.grade}</td>
+                    <td class="px-4 py-2">${student.days}</td>
+                    <td class="px-4 py-2">${student.parentEmail || 'N/A'}</td>
+                </tr>
+            `).join('');
+
+        return `
+            <div class="border rounded-lg shadow-sm">
+                <details>
+                    <summary class="p-4 cursor-pointer flex justify-between items-center font-semibold text-lg">
+                        ${tutor.name}
+                        <span class="ml-2 text-sm font-normal text-gray-500">(${assignedStudents.length} students)</span>
+                    </summary>
+                    <div class="border-t p-2">
+                        <table class="min-w-full text-sm">
+                            <thead class="bg-gray-50 text-left"><tr>
+                                <th class="px-4 py-2 font-medium">Student Name</th>
+                                <th class="px-4 py-2 font-medium">Grade</th>
+                                <th class="px-4 py-2 font-medium">Days/Week</th>
+                                <th class="px-4 py-2 font-medium">Parent's Email</th>
+                            </tr></thead>
+                            <tbody class="bg-white divide-y divide-gray-200">${studentsTableRows}</tbody>
+                        </table>
+                    </div>
+                </details>
+            </div>
+        `;
+    }).join('');
 }
 
 async function renderPayAdvicePanel(container) {
@@ -197,7 +220,7 @@ async function loadTutorReportsForManagement() {
         snapshot.forEach(doc => {
             const report = { id: doc.id, ...doc.data() };
             if (!reportsByTutor[report.tutorEmail]) {
-                reportsByTutor[report.tutorEmail] = { name: report.tutorName, reports: [] };
+                reportsByTutor[report.tutorEmail] = { name: report.tutorName || report.tutorEmail, reports: [] };
             }
             reportsByTutor[report.tutorEmail].reports.push(report);
         });
@@ -215,16 +238,25 @@ async function loadTutorReportsForManagement() {
             return `<details class="border rounded-lg"><summary class="p-4 cursor-pointer font-semibold">${tutorData.name} (${tutorData.reports.length} reports)</summary><div class="p-4 border-t"><ul class="space-y-2">${reportLinks}</ul></div></details>`;
         }).join('');
 
-        document.querySelectorAll('.download-report-btn, .view-report-btn').forEach(button => {
+        document.querySelectorAll('.download-report-btn').forEach(button => {
             button.addEventListener('click', (e) => {
                 e.stopPropagation();
-                viewReportInNewTab(e.target.dataset.reportId);
+                // This should call your PDF generation library, e.g., html2pdf
+                // For simplicity, we'll use the view function, but you'd call a download one.
+                viewReportInNewTab(e.target.dataset.reportId, true); // true = download
+            });
+        });
+
+        document.querySelectorAll('.view-report-btn').forEach(button => {
+            button.addEventListener('click', (e) => {
+                e.stopPropagation();
+                viewReportInNewTab(e.target.dataset.reportId, false); // false = view
             });
         });
     });
 }
 
-async function viewReportInNewTab(reportId) {
+async function viewReportInNewTab(reportId, shouldDownload = false) {
     try {
         const reportDoc = await getDoc(doc(db, "tutor_submissions", reportId));
         if (!reportDoc.exists()) throw new Error("Report not found!");
@@ -236,11 +268,15 @@ async function viewReportInNewTab(reportId) {
         }
 
         const logoUrl = "https://raw.githubusercontent.com/psalminfo/blooming-kids-cbt/main/logo.png";
-        const reportTemplate = `<html><head><title>${reportData.studentName} Report</title></head><body><div style="font-family: Arial, sans-serif; padding: 2rem; max-width: 800px; margin: auto;"><div style="text-align: center; margin-bottom: 2rem;"><img src="${logoUrl}" alt="Company Logo" style="height: 80px;"><h3 style="font-size: 1.8rem; font-weight: bold; color: #15803d; margin: 0;">Blooming Kids House</h3><h1 style="font-size: 1.2rem; font-weight: bold; color: #166534;">MONTHLY LEARNING REPORT</h1><p>Date: ${new Date(reportData.submittedAt.seconds * 1000).toLocaleDateString()}</p></div><div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 2rem;"><p><strong>Student's Name:</strong> ${reportData.studentName}</p><p><strong>Parent's Email:</strong> ${parentEmail}</p><p><strong>Grade:</strong> ${reportData.grade}</p><p><strong>Tutor's Name:</strong> ${reportData.tutorName}</p></div>${Object.entries({"INTRODUCTION": reportData.introduction, "TOPICS & REMARKS": reportData.topics, "PROGRESS & ACHIEVEMENTS": reportData.progress, "STRENGTHS AND WEAKNESSES": reportData.strengthsWeaknesses, "RECOMMENDATIONS": reportData.recommendations, "GENERAL TUTOR'S COMMENTS": reportData.generalComments}).map(([title, content]) => `<div style="border-top: 1px solid #d1d5db; padding-top: 1rem; margin-top: 1rem;"><h2 style="font-size: 1.25rem; font-weight: bold; color: #16a34a;">${title}</h2><p style="line-height: 1.6; white-space: pre-wrap;">${content || 'N/A'}</p></div>`).join('')}<div style="margin-top: 3rem; text-align: right;"><p>Best regards,</p><p style="font-weight: bold;">${reportData.tutorName}</p></div></div></body></html>`;
+        const reportTemplate = `<div style="font-family: Arial, sans-serif; padding: 2rem; max-width: 800px; margin: auto;"><div style="text-align: center; margin-bottom: 2rem;"><img src="${logoUrl}" alt="Company Logo" style="height: 80px;"><h3 style="font-size: 1.8rem; font-weight: bold; color: #15803d; margin: 0;">Blooming Kids House</h3><h1 style="font-size: 1.2rem; font-weight: bold; color: #166534;">MONTHLY LEARNING REPORT</h1><p>Date: ${new Date(reportData.submittedAt.seconds * 1000).toLocaleDateString()}</p></div><div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 2rem;"><p><strong>Student's Name:</strong> ${reportData.studentName}</p><p><strong>Parent's Email:</strong> ${parentEmail}</p><p><strong>Grade:</strong> ${reportData.grade}</p><p><strong>Tutor's Name:</strong> ${reportData.tutorName}</p></div>${Object.entries({"INTRODUCTION": reportData.introduction, "TOPICS & REMARKS": reportData.topics, "PROGRESS & ACHIEVEMENTS": reportData.progress, "STRENGTHS AND WEAKNESSES": reportData.strengthsWeaknesses, "RECOMMENDATIONS": reportData.recommendations, "GENERAL TUTOR'S COMMENTS": reportData.generalComments}).map(([title, content]) => `<div style="border-top: 1px solid #d1d5db; padding-top: 1rem; margin-top: 1rem;"><h2 style="font-size: 1.25rem; font-weight: bold; color: #16a34a;">${title}</h2><p style="line-height: 1.6; white-space: pre-wrap;">${content || 'N/A'}</p></div>`).join('')}<div style="margin-top: 3rem; text-align: right;"><p>Best regards,</p><p style="font-weight: bold;">${reportData.tutorName}</p></div></div>`;
 
-        const newWindow = window.open();
-        newWindow.document.write(reportTemplate);
-        newWindow.document.close();
+        if (shouldDownload) {
+             html2pdf().from(reportTemplate).save(`${reportData.studentName}_report.pdf`);
+        } else {
+            const newWindow = window.open();
+            newWindow.document.write(`<html><head><title>${reportData.studentName} Report</title></head><body>${reportTemplate}</body></html>`);
+            newWindow.document.close();
+        }
     } catch (error) {
         alert(`Error: ${error.message}`);
     }
@@ -266,6 +302,7 @@ async function renderSummerBreakPanel(container) {
         }).join('');
     });
 }
+
 
 // ##################################
 // # AUTHENTICATION & INITIALIZATION
