@@ -1,5 +1,5 @@
 import { auth, db } from './firebaseConfig.js';
-import { collection, getDocs, doc, updateDoc, getDoc, where, query, addDoc } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
+import { collection, getDocs, doc, updateDoc, getDoc, where, query } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
 import { onAuthStateChanged, signOut, onIdTokenChanged } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-auth.js";
 import { onSnapshot } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
 import { getFunctions, httpsCallable } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-functions.js";
@@ -8,21 +8,15 @@ const functions = getFunctions();
 
 // --- Global state to hold report submission status ---
 let isSubmissionEnabled = false;
-let isTutorAddEnabled = false;
-let isSummerBreakEnabled = false;
 
-// Listen for changes to the admin settings in real-time
-const settingsDocRef = doc(db, "settings", "global_settings");
+// Listen for changes to the admin setting in real-time
+const settingsDocRef = doc(db, "settings", "report_submission");
 onSnapshot(settingsDocRef, (docSnap) => {
     if (docSnap.exists()) {
-        const data = docSnap.data();
-        isSubmissionEnabled = data.isReportEnabled;
-        isTutorAddEnabled = data.isTutorAddEnabled;
-        isSummerBreakEnabled = data.isSummerBreakEnabled;
-        
+        isSubmissionEnabled = docSnap.data().enabled;
         // Re-render the student database if the page is currently active
         const mainContent = document.getElementById('mainContent');
-        if (mainContent && mainContent.querySelector('#student-list-view')) {
+        if (mainContent.querySelector('#student-list-view')) {
              renderStudentDatabase(mainContent, window.tutorData);
         }
     }
@@ -31,7 +25,6 @@ onSnapshot(settingsDocRef, (docSnap) => {
 
 // --- Utility Functions ---
 function renderTutorDashboard(container, tutor) {
-    if (!container) return;
     container.innerHTML = `
         <div class="bg-white p-6 rounded-lg shadow-md mb-6">
             <h2 class="text-2xl font-bold text-green-700 mb-4">Welcome, ${tutor.name}</h2>
@@ -59,7 +52,7 @@ async function loadTutorReports(tutorEmail, parentEmail = null) {
     const pendingReportsContainer = document.getElementById('pendingReportsContainer');
     const gradedReportsContainer = document.getElementById('gradedReportsContainer');
     
-    if (pendingReportsContainer) pendingReportsContainer.innerHTML = `<p class="text-gray-500">Loading pending submissions...</p>`;
+    pendingReportsContainer.innerHTML = `<p class="text-gray-500">Loading pending submissions...</p>`;
     if(gradedReportsContainer) gradedReportsContainer.innerHTML = `<p class="text-gray-500">Loading graded submissions...</p>`;
     
     let submissionsQuery = query(collection(db, "tutor_submissions"), where("tutorEmail", "==", tutorEmail));
@@ -100,7 +93,7 @@ async function loadTutorReports(tutorEmail, parentEmail = null) {
                 gradedHTML += reportCardHTML;
             }
         });
-        if (pendingReportsContainer) pendingReportsContainer.innerHTML = pendingHTML || `<p class="text-gray-500">No pending submissions found.</p>`;
+        pendingReportsContainer.innerHTML = pendingHTML || `<p class="text-gray-500">No pending submissions found.</p>`;
         if(gradedReportsContainer) gradedReportsContainer.innerHTML = gradedHTML || `<p class="text-gray-500">No graded submissions found.</p>`;
         
         document.querySelectorAll('.submit-report-btn').forEach(button => {
@@ -117,128 +110,49 @@ async function loadTutorReports(tutorEmail, parentEmail = null) {
         });
     } catch (error) {
         console.error("Error loading tutor reports:", error);
-        if (pendingReportsContainer) pendingReportsContainer.innerHTML = `<p class="text-red-500">Failed to load reports.</p>`;
+        pendingReportsContainer.innerHTML = `<p class="text-red-500">Failed to load reports.</p>`;
         if(gradedReportsContainer) gradedReportsContainer.innerHTML = `<p class="text-red-500">Failed to load reports.</p>`;
     }
 }
 
 // NEW: Student Database View
 async function renderStudentDatabase(container, tutor) {
-    if (!container) {
-        console.error("Container element not found.");
-        return;
-    }
-    
-    // Set up the base HTML first
     container.innerHTML = `<div id="student-list-view" class="bg-white p-6 rounded-lg shadow-md">Loading student data...</div>`;
     const studentListContainer = document.getElementById('student-list-view');
-    
     try {
         const studentQuery = query(collection(db, "students"), where("tutorEmail", "==", tutor.email));
         const studentsSnapshot = await getDocs(studentQuery);
-        let studentsHTML = `<h2 class="text-2xl font-bold text-green-700 mb-4">My Students</h2>`;
-
-        if (isTutorAddEnabled) {
-            studentsHTML += `
-                <div class="bg-gray-100 p-4 rounded-lg shadow-inner mb-4">
-                    <h3 class="font-bold text-lg mb-2">Add a New Student</h3>
-                    <input type="text" id="new-student-name" class="w-full mt-1 p-2 border rounded" placeholder="Student Name">
-                    <select id="new-student-grade" class="w-full mt-1 p-2 border rounded">
-                        <option value="">Select Grade</option>
-                        ${Array.from({length: 12}, (_, i) => `<option value="${i + 1}">${i + 1}</option>`).join('')}
-                    </select>
-                    <input type="text" id="new-student-subject" class="w-full mt-1 p-2 border rounded" placeholder="Subject(s) (e.g., Math, English)">
-                    <select id="new-student-days" class="w-full mt-1 p-2 border rounded">
-                        <option value="">Select Days</option>
-                        ${Array.from({length: 7}, (_, i) => `<option value="${i + 1}">${i + 1}</option>`).join('')}
-                    </select>
-                    <input type="number" id="new-student-fee" class="w-full mt-1 p-2 border rounded" placeholder="Student Fee">
-                    <button id="add-student-btn" class="bg-blue-600 text-white px-4 py-2 rounded mt-2 hover:bg-blue-700">Add Student</button>
-                </div>
-            `;
-        }
-
-        studentsHTML += `<p class="text-sm text-gray-600 mb-4">Report submission is currently <strong class="${isSubmissionEnabled ? 'text-green-600' : 'text-red-500'}">${isSubmissionEnabled ? 'Enabled' : 'Disabled'}</strong> by the admin.</p>`;
-        
         if (studentsSnapshot.empty) {
-            studentsHTML += `<p class="text-gray-500">You are not assigned to any students yet.</p>`;
-            studentListContainer.innerHTML = studentsHTML;
+            studentListContainer.innerHTML = `<p class="text-gray-500">You are not assigned to any students yet.</p>`;
             return;
         }
 
+        let studentsHTML = `<h2 class="text-2xl font-bold text-green-700 mb-4">My Students</h2>`;
+        studentsHTML += `<p class="text-sm text-gray-600 mb-4">Report submission is currently <strong class="${isSubmissionEnabled ? 'text-green-600' : 'text-red-500'}">${isSubmissionEnabled ? 'Enabled' : 'Disabled'}</strong> by the admin.</p>`;
+        
         studentsHTML += `<div class="overflow-x-auto"><table class="min-w-full divide-y divide-gray-200"><thead><tr><th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Student Name</th><th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Grade</th><th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Subject(s)</th><th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Days of Class</th><th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th></tr></thead><tbody class="bg-white divide-y divide-gray-200">`;
         
         studentsSnapshot.forEach(doc => {
             const student = doc.data();
-            const isStudentOnBreak = student.summerBreak;
-            
-            studentsHTML += `<tr><td class="px-6 py-4 whitespace-nowrap">${student.studentName}</td><td class="px-6 py-4 whitespace-nowrap">${student.grade}</td><td class="px-6 py-4 whitespace-nowrap">${student.subjects.join(', ')}</td><td class="px-6 py-4 whitespace-nowrap">${student.days}</td><td class="px-6 py-4 whitespace-nowrap space-x-2">`;
-            
-            // Corrected conditional logic to prevent the SyntaxError
-            if (isSummerBreakEnabled && !isStudentOnBreak) {
-                studentsHTML += `<button class="summer-break-btn bg-yellow-600 text-white px-3 py-1 rounded" data-student-id="${doc.id}">Summer Break</button>`;
-            } else if (isStudentOnBreak) {
-                studentsHTML += `<span class="text-gray-400">On Break</span>`;
-            } else if (isSubmissionEnabled) {
+            studentsHTML += `<tr><td class="px-6 py-4 whitespace-nowrap">${student.studentName}</td><td class="px-6 py-4 whitespace-nowrap">${student.grade}</td><td class="px-6 py-4 whitespace-nowrap">${student.subjects.join(', ')}</td><td class="px-6 py-4 whitespace-nowrap">${student.days}</td><td class="px-6 py-4 whitespace-nowrap">`;
+            if (isSubmissionEnabled) {
                 studentsHTML += `<button class="submit-report-btn bg-green-600 text-white px-3 py-1 rounded" data-student-id="${doc.id}">Submit Report</button>`;
             } else {
                 studentsHTML += `<span class="text-gray-400">Not Enabled</span>`;
             }
-
             studentsHTML += `</td></tr>`;
         });
         
         studentsHTML += `</tbody></table></div>`;
         studentListContainer.innerHTML = studentsHTML;
-
-        // Event listeners are attached here, after the HTML is rendered
-        document.querySelectorAll('.summer-break-btn').forEach(button => {
-            button.addEventListener('click', async (e) => {
-                const studentId = e.target.getAttribute('data-student-id');
-                if (confirm("Are you sure you want to mark this student as on summer break?")) {
-                    await updateDoc(doc(db, "students", studentId), { summerBreak: true });
-                    renderStudentDatabase(container, tutor);
-                }
-            });
-        });
-
-        if (isTutorAddEnabled) {
-            const newStudentName = document.getElementById('new-student-name');
-            const newStudentGrade = document.getElementById('new-student-grade');
-            const newStudentSubject = document.getElementById('new-student-subject');
-            const newStudentDays = document.getElementById('new-student-days');
-            const newStudentFee = document.getElementById('new-student-fee');
-            
-            document.getElementById('add-student-btn').addEventListener('click', async () => {
-                if (newStudentName.value && newStudentGrade.value && newStudentSubject.value && newStudentDays.value && !isNaN(parseFloat(newStudentFee.value))) {
-                    await addDoc(collection(db, "students"), {
-                        studentName: newStudentName.value,
-                        grade: newStudentGrade.value,
-                        subjects: newStudentSubject.value.split(',').map(s => s.trim()),
-                        days: newStudentDays.value,
-                        tutorEmail: tutor.email,
-                        studentFee: parseFloat(newStudentFee.value),
-                        summerBreak: false
-                    });
-                    newStudentName.value = '';
-                    newStudentGrade.value = '';
-                    newStudentSubject.value = '';
-                    newStudentDays.value = '';
-                    newStudentFee.value = '';
-                    renderStudentDatabase(container, tutor);
-                } else {
-                    alert('Please fill in all student details correctly.');
-                }
-            });
-        }
-
+        
         document.querySelectorAll('.submit-report-btn').forEach(button => {
             button.addEventListener('click', async (e) => {
                 const studentId = e.target.getAttribute('data-student-id');
                 const studentDoc = await getDoc(doc(db, "students", studentId));
                 const studentData = studentDoc.data();
                 
-                // Show a structured report form
+                // Show a structured report form instead of a simple prompt
                 const reportFormHTML = `
                     <h3 class="text-xl font-bold mb-4">Submit Report for ${studentData.studentName}</h3>
                     <div class="mb-4">
@@ -247,6 +161,7 @@ async function renderStudentDatabase(container, tutor) {
                     </div>
                     <div class="mb-4">
                         <label class="block text-gray-700 font-semibold">Topics & Remarks</label>
+                        <p class="text-sm text-gray-500">Enter topics and remarks, separated by a comma (e.g., 'Multiplication: Great job, he is catching up').</p>
                         <textarea id="report-topics" class="w-full mt-1 p-2 border rounded" rows="3" placeholder="e.g., Math: Multiplication, Remark: Bryan is doing well..."></textarea>
                     </div>
                     <div class="mb-4">
@@ -268,6 +183,8 @@ async function renderStudentDatabase(container, tutor) {
                     <button id="submit-structured-report-btn" class="bg-green-600 text-white px-6 py-2 rounded hover:bg-green-700">Submit Report</button>
                     <button id="cancel-report-btn" class="bg-gray-400 text-white px-6 py-2 rounded hover:bg-gray-500 ml-2">Cancel</button>
                 `;
+
+                // Display the form in a modal or a dedicated section
                 const reportModal = document.createElement('div');
                 reportModal.className = 'fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex items-center justify-center';
                 reportModal.innerHTML = `<div class="relative bg-white p-8 rounded-lg shadow-xl max-w-lg mx-auto">${reportFormHTML}</div>`;
@@ -286,7 +203,7 @@ async function renderStudentDatabase(container, tutor) {
                         recommendations: document.getElementById('report-recs').value,
                         generalComments: document.getElementById('report-general').value
                     };
-                    
+
                     const processSubmission = httpsCallable(functions, 'processTutorSubmission');
                     try {
                         const result = await processSubmission({
@@ -295,7 +212,7 @@ async function renderStudentDatabase(container, tutor) {
                         });
                         alert(result.data.message);
                         reportModal.remove();
-                        renderStudentDatabase(container, tutor);
+                        renderStudentDatabase(container, tutor); // Refresh the list
                     } catch (error) {
                         alert(`Error submitting report: ${error.message}`);
                     }
@@ -308,7 +225,8 @@ async function renderStudentDatabase(container, tutor) {
         studentListContainer.innerHTML = `<p class="text-red-500">Failed to load student data.</p>`;
     }
 }
-    
+
+
 // --- Main App Initialization ---
 function initializeTutorPanel() {
     const mainContent = document.getElementById('mainContent');
@@ -342,8 +260,8 @@ onAuthStateChanged(auth, async (user) => {
                 window.location.href = "tutor-auth.html";
             });
         } else {
-            if (mainContent) mainContent.innerHTML = `<p class="text-center mt-12 text-red-600">Your account is not registered as a tutor.</p>`;
-            if (logoutBtn) logoutBtn.classList.add('hidden');
+            mainContent.innerHTML = `<p class="text-center mt-12 text-red-600">Your account is not registered as a tutor.</p>`;
+            logoutBtn.classList.add('hidden');
         }
     } else {
         window.location.href = "tutor-auth.html";
