@@ -1,5 +1,5 @@
 import { auth, db } from './firebaseConfig.js';
-import { collection, getDocs, doc, updateDoc, getDoc, where, query, addDoc, setDoc } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
+import { collection, getDocs, doc, updateDoc, getDoc, where, query, addDoc, setDoc, writeBatch } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
 import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-auth.js";
 import { onSnapshot } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
 
@@ -26,121 +26,67 @@ onSnapshot(settingsDocRef, (docSnap) => {
 });
 
 
+// ### NEW ### Management Fee Module for designated staff
+async function renderManagementFeeModule(container, tutorData) {
+    // Only show this module if the tutor is marked as management staff
+    if (!tutorData.isManagementStaff) {
+        container.innerHTML = ''; // Clear the container if they are not staff
+        return;
+    }
+
+    container.innerHTML = `
+        <div class="bg-blue-50 p-4 rounded-lg shadow-md mt-6 border border-blue-200">
+            <h3 class="text-lg font-bold text-blue-800 mb-2">Management Fee</h3>
+            <p class="text-sm text-gray-600 mb-2">As you are part of the management staff, please set your monthly management fee.</p>
+            <div class="flex items-center space-x-2">
+                <label for="management-fee-input" class="font-semibold">Fee (₦):</label>
+                <input type="number" id="management-fee-input" class="p-2 border rounded w-full" value="${tutorData.managementFee || 0}">
+                <button id="save-tutor-fee-btn" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Save Fee</button>
+            </div>
+        </div>
+    `;
+
+    document.getElementById('save-tutor-fee-btn').addEventListener('click', async () => {
+        const newFee = parseFloat(document.getElementById('management-fee-input').value);
+        if (!isNaN(newFee) && newFee >= 0) {
+            const tutorRef = doc(db, "tutors", auth.currentUser.email);
+            await updateDoc(tutorRef, { managementFee: newFee });
+            alert('Management fee updated successfully!');
+        } else {
+            alert('Please enter a valid, non-negative number for the fee.');
+        }
+    });
+}
+
+
 // --- Utility Functions ---
 function renderTutorDashboard(container, tutor) {
     container.innerHTML = `
         <div class="bg-white p-6 rounded-lg shadow-md mb-6">
             <h2 class="text-2xl font-bold text-green-700 mb-4">Welcome, ${tutor.name}</h2>
-            <div class="mb-4">
-                <input type="email" id="searchEmail" class="w-full mt-1 p-2 border rounded" placeholder="Search by parent email...">
-                <button id="searchBtn" class="bg-blue-600 text-white px-4 py-2 rounded mt-2 hover:bg-blue-700">Search</button>
-            </div>
-        </div>
-        <div id="pendingReportsContainer" class="space-y-4">
-            <p class="text-gray-500">Loading pending submissions...</p>
-        </div>
-        <div id="gradedReportsContainer" class="space-y-4 hidden">
-            <p class="text-gray-500">Loading graded submissions...</p>
+            <div id="management-module"></div>
         </div>
     `;
-    document.getElementById('searchBtn').addEventListener('click', async () => {
-        const email = document.getElementById('searchEmail').value.trim();
-        await loadTutorReports(tutor.email, email || null);
-    });
-    loadTutorReports(tutor.email);
+    // The management module is called from onAuthStateChanged after tutor data is loaded
 }
 
-// This function loads the old individual submissions, which you might still want for historical data.
-async function loadTutorReports(tutorEmail, parentEmail = null) {
-    const pendingReportsContainer = document.getElementById('pendingReportsContainer');
-    const gradedReportsContainer = document.getElementById('gradedReportsContainer');
-
-    pendingReportsContainer.innerHTML = `<p class="text-gray-500">Loading pending submissions...</p>`;
-    if (gradedReportsContainer) gradedReportsContainer.innerHTML = `<p class="text-gray-500">Loading graded submissions...</p>`;
-
-    let submissionsQuery = query(collection(db, "tutor_submissions"), where("tutorEmail", "==", tutorEmail));
-    if (parentEmail) {
-        submissionsQuery = query(submissionsQuery, where("parentEmail", "==", parentEmail));
-    }
-
-    try {
-        const querySnapshot = await getDocs(submissionsQuery);
-        let pendingHTML = '';
-        let gradedHTML = '';
-
-        querySnapshot.forEach(doc => {
-            const data = doc.data();
-            const reportCardHTML = `
-                <div class="border rounded-lg p-4 shadow-sm bg-white mb-4">
-                    <p><strong>Student:</strong> ${data.studentName}</p>
-                    <p><strong>Parent Email:</strong> ${data.parentEmail}</p>
-                    <p><strong>Grade:</strong> ${data.grade}</p>
-                    <p><strong>Submitted At:</strong> ${new Date(data.submittedAt.seconds * 1000).toLocaleString()}</p>
-                    <div class="mt-4 border-t pt-4">
-                        <h4 class="font-semibold">Creative Writing Submission:</h4>
-                        ${data.fileUrl ? `<a href="${data.fileUrl}" target="_blank" class="text-blue-500 hover:underline">Download File</a>` : `<p class="italic">${data.textAnswer || "No response"}</p>`}
-                        <p class="mt-2"><strong>Status:</strong> ${data.status || 'Pending'}</p>
-                        ${(data.status === 'pending_review') ? `
-                            <textarea class="tutor-report w-full mt-2 p-2 border rounded" rows="3" placeholder="Write your report here..."></textarea>
-                            <button class="submit-report-btn bg-green-600 text-white px-4 py-2 rounded mt-2" data-doc-id="${doc.id}">Submit Report</button>
-                        ` : `
-                            <p class="mt-2"><strong>Tutor's Report:</strong> ${data.tutorReport || 'N/A'}</p>
-                        `}
-                    </div>
-                </div>
-            `;
-            if (data.status === 'pending_review') {
-                pendingHTML += reportCardHTML;
-            } else {
-                gradedHTML += reportCardHTML;
-            }
-        });
-        pendingReportsContainer.innerHTML = pendingHTML || `<p class="text-gray-500">No pending submissions found.</p>`;
-        if (gradedReportsContainer) gradedReportsContainer.innerHTML = gradedHTML || `<p class="text-gray-500">No graded submissions found.</p>`;
-
-        document.querySelectorAll('.submit-report-btn').forEach(button => {
-            button.addEventListener('click', async (e) => {
-                const docId = e.target.getAttribute('data-doc-id');
-                const reportTextarea = e.target.closest('.border').querySelector('.tutor-report');
-                const tutorReport = reportTextarea.value.trim();
-                if (tutorReport) {
-                    const docRef = doc(db, "tutor_submissions", docId);
-                    await updateDoc(docRef, { tutorReport: tutorReport, status: 'Graded' });
-                    loadTutorReports(tutorEmail, parentEmail); // Refresh the list
-                }
-            });
-        });
-    } catch (error) {
-        console.error("Error loading tutor reports:", error);
-        pendingReportsContainer.innerHTML = `<p class="text-red-500">Failed to load reports.</p>`;
-        if (gradedReportsContainer) gradedReportsContainer.innerHTML = `<p class="text-red-500">Failed to load reports.</p>`;
-    }
-}
-
-
-// --- REVISED STUDENT DATABASE FUNCTION ---
+// --- STUDENT DATABASE FUNCTION ---
 async function renderStudentDatabase(container, tutor) {
     if (!container) {
         console.error("Container element not found.");
         return;
     }
 
-    // --- State for multi-student report drafts ---
     let savedReports = {};
 
-    // Fetch the students assigned to this tutor
-    const studentQuery = query(collection(db, "students"), where("tutorEmail", "==", tutor.email));
-    const studentsSnapshot = await getDocs(studentQuery);
-    const students = studentsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-    const studentsCount = students.length;
+    onSnapshot(query(collection(db, "students"), where("tutorEmail", "==", tutor.email)), (studentsSnapshot) => {
+        const students = studentsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        const studentsCount = students.length;
 
-    // --- Main UI Rendering Logic ---
-    function renderUI() {
         let studentsHTML = `<h2 class="text-2xl font-bold text-green-700 mb-4">My Students (${studentsCount})</h2>`;
-
-        // Display the "Add Student" form if enabled by admin
+        
         if (isTutorAddEnabled) {
-            studentsHTML += `
+             studentsHTML += `
                 <div class="bg-gray-100 p-4 rounded-lg shadow-inner mb-4">
                     <h3 class="font-bold text-lg mb-2">Add a New Student</h3>
                     <input type="text" id="new-student-name" class="w-full mt-1 p-2 border rounded" placeholder="Student Name">
@@ -153,12 +99,11 @@ async function renderStudentDatabase(container, tutor) {
                         <option value="">Select Days</option>
                         ${Array.from({ length: 7 }, (_, i) => `<option value="${i + 1}">${i + 1}</option>`).join('')}
                     </select>
-                    <input type="number" id="new-student-fee" class="w-full mt-1 p-2 border rounded" placeholder="Student Fee">
+                    <input type="number" id="new-student-fee" class="w-full mt-1 p-2 border rounded" placeholder="Student Fee (₦)">
                     <button id="add-student-btn" class="bg-blue-600 text-white px-4 py-2 rounded mt-2 hover:bg-blue-700">Add Student</button>
                 </div>`;
         }
         
-        // Display submission status
         studentsHTML += `<p class="text-sm text-gray-600 mb-4">Report submission is currently <strong class="${isSubmissionEnabled ? 'text-green-600' : 'text-red-500'}">${isSubmissionEnabled ? 'Enabled' : 'Disabled'}</strong> by the admin.</p>`;
 
         if (studentsCount === 0) {
@@ -167,230 +112,146 @@ async function renderStudentDatabase(container, tutor) {
             studentsHTML += `
                 <div class="overflow-x-auto">
                     <table class="min-w-full divide-y divide-gray-200">
-                        <thead>
-                            <tr>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Student Name</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
-                            </tr>
-                        </thead>
+                        <thead><tr>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Student Name</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
+                        </tr></thead>
                         <tbody class="bg-white divide-y divide-gray-200">`;
-
             students.forEach(student => {
                 const isStudentOnBreak = student.summerBreak;
                 const isReportSaved = savedReports[student.id];
-
                 studentsHTML += `
                     <tr>
                         <td class="px-6 py-4 whitespace-nowrap">${student.studentName} (Grade ${student.grade})</td>
-                        <td class="px-6 py-4 whitespace-nowrap">
-                            <span class="status-indicator ${isReportSaved ? 'text-green-600 font-semibold' : 'text-gray-500'}">
-                                ${isReportSaved ? 'Report Saved' : 'Pending Report'}
-                            </span>
-                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap"><span class="status-indicator ${isReportSaved ? 'text-green-600 font-semibold' : 'text-gray-500'}">${isReportSaved ? 'Report Saved' : 'Pending Report'}</span></td>
                         <td class="px-6 py-4 whitespace-nowrap space-x-2">`;
-
                 if (isSummerBreakEnabled && !isStudentOnBreak) {
                     studentsHTML += `<button class="summer-break-btn bg-yellow-600 text-white px-3 py-1 rounded" data-student-id="${student.id}">Summer Break</button>`;
                 } else if (isStudentOnBreak) {
                     studentsHTML += `<span class="text-gray-400">On Break</span>`;
                 }
-
                 if (isSubmissionEnabled && !isStudentOnBreak) {
-                    // This is the core logic change
-                    if (studentsCount === 1) {
-                        studentsHTML += `<button class="submit-single-report-btn bg-green-600 text-white px-3 py-1 rounded" data-student-id="${student.id}">Submit Report</button>`;
-                    } else {
-                         studentsHTML += `<button class="enter-report-btn bg-blue-600 text-white px-3 py-1 rounded" data-student-id="${student.id}">${isReportSaved ? 'Edit Report' : 'Enter Report'}</button>`;
-                    }
+                    studentsHTML += `<button class="enter-report-btn bg-blue-600 text-white px-3 py-1 rounded" data-student-id="${student.id}">${isReportSaved ? 'Edit Report' : 'Enter Report'}</button>`;
                 } else if (!isStudentOnBreak) {
                     studentsHTML += `<span class="text-gray-400">Submission Disabled</span>`;
                 }
-                
                 studentsHTML += `</td></tr>`;
             });
-
             studentsHTML += `</tbody></table></div>`;
 
-            // Add the main "Submit All" button ONLY for multiple students
-            if (studentsCount > 1 && isSubmissionEnabled) {
-                const allReportsSaved = Object.keys(savedReports).length === students.filter(s => !s.summerBreak).length;
+            if (isSubmissionEnabled && students.some(s => !s.summerBreak)) {
+                const activeStudentsCount = students.filter(s => !s.summerBreak).length;
+                const allReportsSaved = Object.keys(savedReports).length === activeStudentsCount;
                 studentsHTML += `
                     <div class="mt-6 text-right">
                         <button id="submit-all-reports-btn" class="bg-green-700 text-white px-6 py-3 rounded-lg font-bold ${!allReportsSaved ? 'opacity-50 cursor-not-allowed' : 'hover:bg-green-800'}" ${!allReportsSaved ? 'disabled' : ''}>
-                            Submit All ${studentsCount} Reports
+                            Submit All ${activeStudentsCount} Reports
                         </button>
                     </div>`;
             }
         }
         container.innerHTML = `<div id="student-list-view" class="bg-white p-6 rounded-lg shadow-md">${studentsHTML}</div>`;
-        attachEventListeners();
-    }
+        attachEventListeners(students);
+    });
 
-    // --- Modal Logic ---
     function showReportModal(student) {
-        // Use existing saved data if available, otherwise empty strings
         const existingReport = savedReports[student.id] || {};
         const reportFormHTML = `
             <h3 class="text-xl font-bold mb-4">Monthly Report for ${student.studentName}</h3>
-            <div class="space-y-4">
-                <div>
-                    <label class="block text-gray-700 font-semibold">Introduction</label>
-                    <textarea id="report-intro" class="w-full mt-1 p-2 border rounded" rows="2" placeholder="e.g., This is a comprehensive report on...">${existingReport.introduction || ''}</textarea>
-                </div>
-                <div>
-                    <label class="block text-gray-700 font-semibold">Topics & Remarks</label>
-                    <textarea id="report-topics" class="w-full mt-1 p-2 border rounded" rows="3" placeholder="e.g., Math: Multiplication, Remark: Excellent progress...">${existingReport.topics || ''}</textarea>
-                </div>
-                <div>
-                    <label class="block text-gray-700 font-semibold">Progress & Achievements</label>
-                    <textarea id="report-progress" class="w-full mt-1 p-2 border rounded" rows="2">${existingReport.progress || ''}</textarea>
-                </div>
-                <div>
-                    <label class="block text-gray-700 font-semibold">Strengths & Weaknesses</label>
-                    <textarea id="report-sw" class="w-full mt-1 p-2 border rounded" rows="2">${existingReport.strengthsWeaknesses || ''}</textarea>
-                </div>
-                <div>
-                    <label class="block text-gray-700 font-semibold">Recommendations</label>
-                    <textarea id="report-recs" class="w-full mt-1 p-2 border rounded" rows="2">${existingReport.recommendations || ''}</textarea>
-                </div>
-                <div>
-                    <label class="block text-gray-700 font-semibold">General Comments</label>
-                    <textarea id="report-general" class="w-full mt-1 p-2 border rounded" rows="2">${existingReport.generalComments || ''}</textarea>
-                </div>
-                <div class="flex justify-end space-x-2">
-                    <button id="cancel-report-btn" class="bg-gray-400 text-white px-6 py-2 rounded hover:bg-gray-500">Cancel</button>
-                    <button id="modal-action-btn" class="bg-green-600 text-white px-6 py-2 rounded hover:bg-green-700">
-                        ${studentsCount === 1 ? 'Submit Report' : 'Save Report'}
-                    </button>
-                </div>
-            </div>`;
-
+            <div class="space-y-4">${['Introduction', 'Topics & Remarks', 'Progress & Achievements', 'Strengths & Weaknesses', 'Recommendations', 'General Comments'].map(label => {
+                const id = `report-${label.split(' ')[0].toLowerCase()}`;
+                const key = `${label.split(' ')[0].toLowerCase()}${label.includes('Weaknesses') ? 'Weaknesses' : ''}`;
+                return `<div><label class="block text-gray-700 font-semibold">${label}</label><textarea id="${id}" class="w-full mt-1 p-2 border rounded" rows="2">${existingReport[key] || ''}</textarea></div>`;
+            }).join('')}</div>
+            <div class="flex justify-end space-x-2 mt-4"><button id="cancel-report-btn" class="bg-gray-400 text-white px-6 py-2 rounded">Cancel</button><button id="modal-action-btn" class="bg-green-600 text-white px-6 py-2 rounded">Save Report</button></div>`;
+        
         const reportModal = document.createElement('div');
         reportModal.className = 'fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex items-center justify-center z-50';
         reportModal.innerHTML = `<div class="relative bg-white p-8 rounded-lg shadow-xl w-full max-w-2xl mx-auto">${reportFormHTML}</div>`;
         document.body.appendChild(reportModal);
 
         document.getElementById('cancel-report-btn').addEventListener('click', () => reportModal.remove());
-        
-        document.getElementById('modal-action-btn').addEventListener('click', async () => {
-            const reportData = {
-                studentId: student.id,
-                studentName: student.studentName,
-                grade: student.grade,
-                introduction: document.getElementById('report-intro').value,
+        document.getElementById('modal-action-btn').addEventListener('click', () => {
+            savedReports[student.id] = {
+                studentId: student.id, studentName: student.studentName, grade: student.grade,
+                introduction: document.getElementById('report-introduction').value,
                 topics: document.getElementById('report-topics').value,
                 progress: document.getElementById('report-progress').value,
-                strengthsWeaknesses: document.getElementById('report-sw').value,
-                recommendations: document.getElementById('report-recs').value,
+                strengthsWeaknesses: document.getElementById('report-strengths').value,
+                recommendations: document.getElementById('report-recommendations').value,
                 generalComments: document.getElementById('report-general').value
             };
-
-            // If only one student, submit directly. Otherwise, just save to local state.
-            if (studentsCount === 1) {
-                await submitAllReports([reportData]);
-            } else {
-                savedReports[student.id] = reportData;
-                alert(`${student.studentName}'s report has been saved. Please continue with other students.`);
-                renderUI(); // Re-render the main UI to update status
-            }
+            alert(`${student.studentName}'s report has been saved.`);
             reportModal.remove();
         });
     }
 
-    // --- Data Submission Logic ---
-    async function submitAllReports(reportsArray) {
-        if (reportsArray.length === 0) {
-            alert("No reports to submit.");
-            return;
-        }
-
-        const date = new Date();
-        const monthId = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
-        const docId = `${tutor.email}_${monthId}`;
-        const reportDocRef = doc(db, "monthly_tutor_reports", docId);
-        
-        try {
-            // Using setDoc with a custom ID prevents duplicate reports for the same month
-            await setDoc(reportDocRef, {
-                tutorEmail: tutor.email,
-                tutorName: tutor.name,
-                submissionMonth: monthId,
-                submittedAt: new Date(),
-                studentReports: reportsArray,
-                status: "submitted" // You can use this for admin tracking
-            });
-
-            alert("Successfully submitted all reports for the month!");
-            savedReports = {}; // Clear the saved reports
-            renderUI(); // Re-render to show completion
-        } catch (error) {
-            console.error("Error submitting monthly report:", error);
-            alert(`Error: ${error.message}`);
-        }
-    }
-
-    // --- Event Listeners ---
-    function attachEventListeners() {
-        // Listener for adding a new student
+    function attachEventListeners(students) {
         if (isTutorAddEnabled) {
             document.getElementById('add-student-btn')?.addEventListener('click', async () => {
-                const studentName = document.getElementById('new-student-name').value;
-                const studentGrade = document.getElementById('new-student-grade').value;
-                const subjects = document.getElementById('new-student-subject').value.split(',').map(s => s.trim());
-                const days = document.getElementById('new-student-days').value;
-                const studentFee = parseFloat(document.getElementById('new-student-fee').value);
-                if (studentName && studentGrade && subjects.length && days && !isNaN(studentFee)) {
-                    await addDoc(collection(db, "students"), {
-                        studentName, grade: studentGrade, subjects, days, tutorEmail: tutor.email, studentFee, summerBreak: false
-                    });
-                    // Refresh the entire view after adding a student
-                    renderStudentDatabase(container, tutor);
+                const studentData = {
+                    studentName: document.getElementById('new-student-name').value,
+                    grade: document.getElementById('new-student-grade').value,
+                    subjects: document.getElementById('new-student-subject').value.split(',').map(s => s.trim()),
+                    days: document.getElementById('new-student-days').value,
+                    studentFee: parseFloat(document.getElementById('new-student-fee').value),
+                    tutorEmail: tutor.email, summerBreak: false
+                };
+                if (studentData.studentName && studentData.grade && !isNaN(studentData.studentFee)) {
+                    await addDoc(collection(db, "students"), studentData);
                 } else {
-                    alert('Please fill in all student details correctly.');
+                    alert('Please fill in all details correctly.');
                 }
             });
         }
         
-        // Listener for single student submission button
-        document.querySelector('.submit-single-report-btn')?.addEventListener('click', (e) => {
-            const studentId = e.target.getAttribute('data-student-id');
-            const student = students.find(s => s.id === studentId);
-            showReportModal(student);
-        });
-
-        // Listener for multi-student "Enter Report" buttons
         document.querySelectorAll('.enter-report-btn').forEach(button => {
-            button.addEventListener('click', (e) => {
-                const studentId = e.target.getAttribute('data-student-id');
-                const student = students.find(s => s.id === studentId);
-                showReportModal(student);
-            });
+            button.addEventListener('click', (e) => showReportModal(students.find(s => s.id === e.target.dataset.studentId)));
         });
 
-        // Listener for the final "Submit All Reports" button
         document.getElementById('submit-all-reports-btn')?.addEventListener('click', async () => {
-            if (confirm("Are you sure you want to submit all reports for the month? This action cannot be undone.")) {
-                const reportsArray = Object.values(savedReports);
-                await submitAllReports(reportsArray);
+            if (confirm("Are you sure you want to submit all reports?")) {
+                await submitAllReports(Object.values(savedReports), tutor);
             }
         });
         
-        // Listeners for summer break buttons
-         document.querySelectorAll('.summer-break-btn').forEach(button => {
+        document.querySelectorAll('.summer-break-btn').forEach(button => {
             button.addEventListener('click', async (e) => {
-                const studentId = e.target.getAttribute('data-student-id');
-                if (confirm("Are you sure you want to mark this student as on summer break?")) {
-                    await updateDoc(doc(db, "students", studentId), { summerBreak: true });
-                    renderStudentDatabase(container, tutor); // Re-render after update
+                if (confirm("Mark student as on summer break?")) {
+                    await updateDoc(doc(db, "students", e.target.dataset.studentId), { summerBreak: true });
                 }
             });
         });
     }
-
-    // --- Initial Render ---
-    renderUI();
 }
+
+// ### FIXED ### This function now saves one document per student report.
+async function submitAllReports(reportsArray, tutor) {
+    if (reportsArray.length === 0) return alert("No reports saved to submit.");
+
+    const batch = writeBatch(db);
+    reportsArray.forEach(report => {
+        const newReportRef = doc(collection(db, "tutor_submissions"));
+        batch.set(newReportRef, {
+            ...report,
+            tutorEmail: tutor.email,
+            tutorName: tutor.name,
+            submittedAt: new Date(),
+            status: "submitted"
+        });
+    });
+
+    try {
+        await batch.commit();
+        alert(`Successfully submitted ${reportsArray.length} report(s)!`);
+        // We don't need to clear savedReports because the view will re-render
+    } catch (error) {
+        console.error("Error submitting reports:", error);
+        alert(`Error: ${error.message}`);
+    }
+}
+
 
 // --- Main App Initialization ---
 function initializeTutorPanel() {
@@ -399,13 +260,23 @@ function initializeTutorPanel() {
     const navStudentDatabase = document.getElementById('navStudentDatabase');
 
     function setActiveNav(activeButton) {
-        navDashboard.classList.remove('active');
-        navStudentDatabase.classList.remove('active');
+        [navDashboard, navStudentDatabase].forEach(nav => nav.classList.remove('active'));
         activeButton.classList.add('active');
     }
 
-    navDashboard.addEventListener('click', () => { setActiveNav(navDashboard); renderTutorDashboard(mainContent, window.tutorData); });
-    navStudentDatabase.addEventListener('click', () => { setActiveNav(navStudentDatabase); renderStudentDatabase(mainContent, window.tutorData); });
+    navDashboard.addEventListener('click', () => {
+        setActiveNav(navDashboard);
+        renderTutorDashboard(mainContent, window.tutorData);
+        // ### NEW ### Call management module render here
+        const managementContainer = document.getElementById('management-module');
+        if (managementContainer) {
+            renderManagementFeeModule(managementContainer, window.tutorData);
+        }
+    });
+    navStudentDatabase.addEventListener('click', () => {
+        setActiveNav(navStudentDatabase);
+        renderStudentDatabase(mainContent, window.tutorData);
+    });
 
     // Default to the student database view
     setActiveNav(navStudentDatabase);
@@ -422,10 +293,7 @@ onAuthStateChanged(auth, async (user) => {
         if (tutorSnap.exists()) {
             window.tutorData = tutorSnap.data();
             initializeTutorPanel();
-            logoutBtn.addEventListener('click', async () => {
-                await signOut(auth);
-                window.location.href = "tutor-auth.html";
-            });
+            logoutBtn.addEventListener('click', () => signOut(auth).then(() => window.location.href = "tutor-auth.html"));
         } else {
             mainContent.innerHTML = `<p class="text-center mt-12 text-red-600">Your account is not registered as a tutor.</p>`;
             logoutBtn.classList.add('hidden');
