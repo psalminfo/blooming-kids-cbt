@@ -1062,10 +1062,9 @@ async function renderSummerBreakPanel(container) {
 // ##################################################################
 // # SECTION 7: RENDER STAFF PANEL (This is the new section)
 // ##################################################################
+// In your ADMIN.JS file, replace the existing renderStaffPanel with this new version.
+
 async function renderStaffPanel(container) {
-    // ### NEW ###
-    // This is the master template for all role-based permissions.
-    // You can easily change what each role can do by editing this object.
     const ROLE_PERMISSIONS = {
         pending: {
             tabs: { viewTutorManagement: false, viewPayAdvice: false, viewTutorReports: false, viewSummerBreak: false },
@@ -1083,7 +1082,7 @@ async function renderStaffPanel(container) {
             tabs: { viewTutorManagement: true, viewPayAdvice: true, viewTutorReports: true, viewSummerBreak: true },
             actions: { canDownloadReports: true, canExportPayAdvice: true }
         },
-        admin: {
+        admin: { // Admin role has all permissions by default
             tabs: { viewTutorManagement: true, viewPayAdvice: true, viewTutorReports: true, viewSummerBreak: true },
             actions: { canDownloadReports: true, canExportPayAdvice: true }
         }
@@ -1092,17 +1091,16 @@ async function renderStaffPanel(container) {
     container.innerHTML = `
         <div class="bg-white p-6 rounded-lg shadow-md">
             <h2 class="text-2xl font-bold text-green-700 mb-4">Staff Management</h2>
-            <p class="text-sm text-gray-600 mb-4">New staff who sign up via the management portal will appear here with a "Pending" role. Assign them a role to grant them access.</p>
+            <p class="text-sm text-gray-600 mb-4">Assign a role to apply default permissions, then click "Manage Permissions" to customize.</p>
             <div class="overflow-x-auto">
                 <table class="min-w-full divide-y divide-gray-200">
                     <thead class="bg-gray-50"><tr>
                         <th class="px-6 py-3 text-left text-xs font-medium uppercase">Name</th>
                         <th class="px-6 py-3 text-left text-xs font-medium uppercase">Email</th>
                         <th class="px-6 py-3 text-left text-xs font-medium uppercase">Assign Role</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium uppercase">Actions</th>
                     </tr></thead>
-                    <tbody id="staff-table-body" class="bg-white divide-y divide-gray-200">
-                        <tr><td colspan="3" class="text-center py-10">Loading staff...</td></tr>
-                    </tbody>
+                    <tbody id="staff-table-body" class="bg-white divide-y divide-gray-200"></tbody>
                 </table>
             </div>
         </div>
@@ -1125,38 +1123,100 @@ async function renderStaffPanel(container) {
                             ${optionsHTML}
                         </select>
                     </td>
+                    <td class="px-6 py-4">
+                        <button data-id="${doc.id}" class="manage-permissions-btn bg-blue-600 text-white px-3 py-1 rounded text-sm hover:bg-blue-700">Manage Permissions</button>
+                    </td>
                 </tr>
             `;
         }).join('');
 
-        // Add event listeners to the role dropdowns
         document.querySelectorAll('.role-select').forEach(select => {
             select.addEventListener('change', async (e) => {
                 const newRole = e.target.value;
                 const staffEmail = e.target.dataset.email;
-                
-                // ### NEW ### Get the permission template for the selected role
                 const permissionsTemplate = ROLE_PERMISSIONS[newRole];
 
-                if (confirm(`Are you sure you want to change this user's role to "${capitalize(newRole)}"? This will apply default permissions for that role.`)) {
-                    try {
-                        // Update both the role AND the entire permissions object at once
-                        await updateDoc(doc(db, "staff", staffEmail), { 
-                            role: newRole,
-                            permissions: permissionsTemplate 
-                        });
-                        alert('Role and permissions updated successfully!');
-                    } catch (error) {
-                        console.error("Error updating role:", error);
-                        alert("Failed to update role. Please check the console.");
-                    }
+                if (confirm(`Change role to "${capitalize(newRole)}"? This will apply default permissions.`)) {
+                    await updateDoc(doc(db, "staff", staffEmail), { 
+                        role: newRole,
+                        permissions: permissionsTemplate 
+                    });
+                    alert('Role and default permissions updated!');
                 } else {
-                    // If the admin cancels, revert the dropdown to the original value
                     const originalRole = snapshot.docs.find(d => d.id === staffEmail).data().role;
                     e.target.value = originalRole;
                 }
             });
         });
+
+        document.querySelectorAll('.manage-permissions-btn').forEach(button => {
+            button.addEventListener('click', (e) => openPermissionsModal(e.target.dataset.id));
+        });
+    });
+}
+
+// ### NEW HELPER FUNCTION ### This creates the permissions pop-up.
+async function openPermissionsModal(staffId) {
+    const staffDoc = await getDoc(doc(db, "staff", staffId));
+    if (!staffDoc.exists()) return alert("Staff member not found.");
+
+    const staffData = staffDoc.data();
+    const permissions = staffData.permissions || { tabs: {}, actions: {} };
+
+    const modalHTML = `
+        <div id="permissions-modal" class="fixed inset-0 bg-gray-600 bg-opacity-75 flex items-center justify-center z-50">
+            <div class="bg-white rounded-lg shadow-xl p-8 max-w-lg w-full">
+                <h3 class="text-2xl font-bold mb-4">Edit Permissions for ${staffData.name}</h3>
+                <p class="text-sm text-gray-500 mb-4">Current Role: <span class="font-semibold">${capitalize(staffData.role)}</span></p>
+                
+                <div class="space-y-4">
+                    <div class="border-t pt-4">
+                        <h4 class="font-semibold mb-2">Tab Visibility:</h4>
+                        <div class="grid grid-cols-2 gap-2">
+                            <label class="flex items-center"><input type="checkbox" id="p-viewTutorManagement" class="mr-2" ${permissions.tabs?.viewTutorManagement ? 'checked' : ''}> Tutor List</label>
+                            <label class="flex items-center"><input type="checkbox" id="p-viewPayAdvice" class="mr-2" ${permissions.tabs?.viewPayAdvice ? 'checked' : ''}> Pay Advice</label>
+                            <label class="flex items-center"><input type="checkbox" id="p-viewTutorReports" class="mr-2" ${permissions.tabs?.viewTutorReports ? 'checked' : ''}> Tutor Reports</label>
+                            <label class="flex items-center"><input type="checkbox" id="p-viewSummerBreak" class="mr-2" ${permissions.tabs?.viewSummerBreak ? 'checked' : ''}> Summer Break</label>
+                        </div>
+                    </div>
+
+                    <div class="border-t pt-4">
+                        <h4 class="font-semibold mb-2">Specific Actions:</h4>
+                        <label class="flex items-center"><input type="checkbox" id="p-canDownloadReports" class="mr-2" ${permissions.actions?.canDownloadReports ? 'checked' : ''}> Can Download Reports</label>
+                        <label class="flex items-center"><input type="checkbox" id="p-canExportPayAdvice" class="mr-2" ${permissions.actions?.canExportPayAdvice ? 'checked' : ''}> Can Export Pay Advice</label>
+                    </div>
+                </div>
+
+                <div class="flex justify-end space-x-4 mt-6">
+                    <button id="cancel-permissions" class="bg-gray-300 px-4 py-2 rounded">Cancel</button>
+                    <button id="save-permissions" class="bg-green-600 text-white px-4 py-2 rounded">Save Changes</button>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    document.body.insertAdjacentHTML('beforeend', modalHTML);
+
+    const closeModal = () => document.getElementById('permissions-modal').remove();
+
+    document.getElementById('cancel-permissions').addEventListener('click', closeModal);
+    document.getElementById('save-permissions').addEventListener('click', async () => {
+        const newPermissions = {
+            tabs: {
+                viewTutorManagement: document.getElementById('p-viewTutorManagement').checked,
+                viewPayAdvice: document.getElementById('p-viewPayAdvice').checked,
+                viewTutorReports: document.getElementById('p-viewTutorReports').checked,
+                viewSummerBreak: document.getElementById('p-viewSummerBreak').checked,
+            },
+            actions: {
+                canDownloadReports: document.getElementById('p-canDownloadReports').checked,
+                canExportPayAdvice: document.getElementById('p-canExportPayAdvice').checked,
+            }
+        };
+
+        await updateDoc(doc(db, "staff", staffId), { permissions: newPermissions });
+        alert("Custom permissions saved successfully!");
+        closeModal();
     });
 }
 
@@ -1272,6 +1332,7 @@ onAuthStateChanged(auth, async (user) => {
     }
     // ...
 });
+
 
 
 
