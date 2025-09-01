@@ -277,19 +277,50 @@ async function renderStudentDatabase(container, tutor) {
                 // Add a unique ID for the submission
                 const submissionId = doc(collection(db, "tutor_submissions")).id;
 
-                const processSubmission = httpsCallable(functions, 'processTutorSubmission');
+                // ===================================================================
+                // === THIS IS THE ONLY SECTION THAT HAS BEEN CHANGED ===
+                // ===================================================================
+
+                // The URL of your deployed cloud function
+                const functionUrl = 'https://us-central1-bloomingkidsassessment.cloudfunctions.net/processTutorSubmission';
+
                 try {
-                    const result = await processSubmission({
-                        studentId: studentId,
-                        reportData: reportData,
-                        submissionId: submissionId
+                    const response = await fetch(functionUrl, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        // The payload must be stringified and wrapped in a 'data' object
+                        body: JSON.stringify({
+                            data: {
+                                studentId: studentId,
+                                reportData: reportData,
+                                submissionId: submissionId
+                            }
+                        })
                     });
+
+                    // Get the JSON response from the server
+                    const result = await response.json(); 
+
+                    if (!response.ok) {
+                        // Handle server-side errors (like 404, 500, etc.)
+                        // The error message comes from our backend function's response
+                        throw new Error(result.data.message || 'The server returned an error.');
+                    }
+                    
+                    // If the submission was successful, show the success message
                     alert(result.data.message);
                     reportModal.remove();
                     renderStudentDatabase(container, tutor);
+
                 } catch (error) {
+                    // This will catch both network errors and the server errors we threw
                     alert(`Error submitting report: ${error.message}`);
                 }
+                // ===================================================================
+                // === END OF CHANGED SECTION ===
+                // ===================================================================
             });
         });
     });
