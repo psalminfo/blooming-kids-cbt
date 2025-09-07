@@ -1,0 +1,183 @@
+/* admin.css — Premium glow/glass redesign, no Tailwind */
+
+/* 1) Reset + base */
+* { box-sizing: border-box; }
+html, body { height: 100%; }
+body {
+  margin: 0;
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
+  color: #e8f1ff;
+  background: linear-gradient(120deg, #0b132b, #1c2541, #0b132b);
+  background-size: 400% 400%;
+  animation: aurora 18s ease infinite;
+  -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale;
+}
+@keyframes aurora {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+:focus-visible {
+  outline: 3px solid rgba(56,189,248,0.6);
+  outline-offset: 2px;
+}
+
+/* 2) Shell layout */
+.app-shell {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: clamp(16px, 2vw, 24px);
+  display: grid;
+  grid-template-rows: auto auto 1fr;
+  gap: 16px;
+}
+
+/* 3) Header */
+.app-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 18px;
+  background: rgba(12, 19, 40, 0.55);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 14px;
+  box-shadow: 0 8px 28px rgba(0,0,0,0.35), inset 0 0 0 1px rgba(255,255,255,0.04);
+  position: sticky;
+  top: 12px;
+  z-index: 50;
+}
+.brand {
+  margin: 0;
+  font-size: clamp(20px, 2.6vw, 28px);
+  letter-spacing: 0.4px;
+  font-weight: 800;
+  color: #ffffff;
+  text-shadow: 0 0 10px rgba(99,102,241,0.35);
+}
+
+/* 4) Navigation */
+.app-nav {
+  display: flex; flex-wrap: wrap; gap: 8px;
+  padding: 10px;
+  background: rgba(12, 19, 40, 0.45);
+  border: 1px solid rgba(255,255,255,0.06);
+  border-radius: 14px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.25);
+}
+.nav-btn {
+  appearance: none;
+  border: none;
+  background: transparent;
+  color: #cfe8ff;
+  padding: 10px 14px;
+  border-radius: 10px;
+  cursor: pointer;
+  position: relative;
+  transition: color .2s ease, transform .12s ease, background .2s ease, box-shadow .25s ease;
+}
+.nav-btn:hover { color: #ffffff; background: rgba(255,255,255,0.06); transform: translateY(-1px); }
+.nav-btn.active {
+  color: #ffffff;
+  background: linear-gradient(90deg, rgba(99,102,241,0.18), rgba(56,189,248,0.18));
+  box-shadow: 0 0 18px rgba(99,102,241,0.25);
+}
+.nav-btn.active::after {
+  content: "";
+  position: absolute; left: 12px; right: 12px; bottom: 6px;
+  height: 3px; border-radius: 2px;
+  background: linear-gradient(90deg, #8b5cf6, #60a5fa);
+  box-shadow: 0 0 12px rgba(96,165,250,0.6);
+}
+
+/* 5) Main content */
+.app-main {
+  min-height: 60vh;
+  padding: 12px;
+}
+.card {
+  background: rgba(13, 20, 44, 0.55);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 16px;
+  padding: clamp(16px, 2vw, 24px);
+  box-shadow: 0 10px 36px rgba(0,0,0,0.35), 0 0 28px rgba(56,189,248,0.12);
+  transition: transform .15s ease, box-shadow .25s ease, border-color .2s ease;
+}
+.card:hover { transform: translateY(-2px); box-shadow: 0 14px 44px rgba(0,0,0,0.4), 0 0 36px rgba(56,189,248,0.16); }
+.center { display: grid; place-items: center; min-height: 40vh; }
+.muted { color: #bcd1ea; }
+
+/* 6) Buttons */
+.btn {
+  appearance: none; border: none; cursor: pointer;
+  font-weight: 700; letter-spacing: .2px;
+  padding: 10px 16px; border-radius: 12px;
+  color: #ffffff;
+  background: linear-gradient(90deg, #2563eb, #1d4ed8);
+  box-shadow: 0 8px 20px rgba(37,99,235,0.35);
+  transition: transform .12s ease, box-shadow .25s ease, filter .2s ease;
+}
+.btn:hover { transform: translateY(-1px); box-shadow: 0 12px 26px rgba(96,165,250,0.45); filter: brightness(1.06); }
+.btn:active { transform: translateY(1px); }
+.btn:focus-visible { outline: 3px solid rgba(56,189,248,0.6); outline-offset: 2px; }
+.btn-warning {
+  background: linear-gradient(90deg, #f59e0b, #ea580c);
+  box-shadow: 0 8px 20px rgba(234, 88, 12, 0.35);
+}
+
+/* 7) Forms */
+label { display: inline-block; margin-bottom: 6px; color: #e3ecfb; font-weight: 600; }
+input[type="text"], input[type="date"], input[type="number"], input[type="email"], select, textarea {
+  width: 100%; color: #eaf3ff;
+  background: rgba(11, 18, 38, 0.7);
+  border: 1px solid rgba(255,255,255,0.14);
+  border-radius: 12px;
+  padding: 10px 12px;
+  transition: border-color .2s ease, box-shadow .2s ease, background .2s ease;
+}
+input::placeholder, textarea::placeholder { color: #9fb5d3; }
+input:focus, select:focus, textarea:focus {
+  border-color: rgba(56,189,248,0.6);
+  box-shadow: 0 0 0 4px rgba(56,189,248,0.18);
+  background: rgba(14, 22, 46, 0.85);
+}
+
+/* 8) Tables */
+.table {
+  width: 100%; border-collapse: collapse;
+  background: rgba(13, 20, 44, 0.55);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 14px; overflow: hidden;
+}
+.table th, .table td { padding: 12px; border-bottom: 1px solid rgba(255,255,255,0.08); text-align: left; }
+.table thead th { background: rgba(23, 34, 66, 0.65); color: #dfeafe; font-weight: 800; letter-spacing: .3px; }
+.table tbody tr:hover { background: rgba(56,189,248,0.08); }
+
+/* 9) Utility layout */
+.grid { display: grid; gap: 16px; }
+.cols-2 { grid-template-columns: repeat(2, minmax(0,1fr)); }
+.cols-3 { grid-template-columns: repeat(3, minmax(0,1fr)); }
+@media (max-width: 900px) {
+  .cols-2, .cols-3 { grid-template-columns: 1fr; }
+}
+
+/* 10) Toasts (hook for your JS if needed) */
+.toast {
+  position: fixed; right: 18px; bottom: 18px;
+  z-index: 1000;
+}
+.toast .card { padding: 10px 14px; }
+
+/* 11) Modal overlay (hook for your JS if needed) */
+.modal {
+  position: fixed; inset: 0;
+  display: grid; place-items: center;
+  background: rgba(0,0,0,0.55);
+  z-index: 1100;
+}
+.modal .card { width: min(560px, 92vw); }
+
+/* 12) Small interactive polish */
+a { color: #9fd0ff; text-decoration: none; transition: color .2s ease, text-shadow .2s ease; }
+a:hover { color: #cfe8ff; text-shadow: 0 0 8px rgba(159,208,255,0.6); }

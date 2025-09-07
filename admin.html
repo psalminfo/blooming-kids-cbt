@@ -1,91 +1,39 @@
 <!DOCTYPE html>
-
 <html lang="en">
-
 <head>
-
-    <meta charset="UTF-8" />
-
-    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-
-    <title>Admin Panel - Blooming Kids House</title>
-
-    <link rel="icon" href="favicon.ico" />
-
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" />
-
-    <style>
-
-        .nav-btn {
-
-            padding: 8px 16px;
-
-            border-bottom: 2px solid transparent;
-
-            transition: all 0.3s ease;
-
-        }
-
-        .nav-btn.active {
-
-            border-bottom-color: #2563eb; /* blue-600 */
-
-            color: #2563eb;
-
-        }
-
-    </style>
-
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.9.2/html2pdf.bundle.min.js"></script>
-
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
-
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
-
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>Admin Panel - Blooming Kids House</title>
+  <link rel="icon" href="favicon.ico" />
+  <link rel="stylesheet" href="admin.css" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.9.2/html2pdf.bundle.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
 </head>
+<body>
+  <div class="app-shell">
+    <header class="app-header">
+      <h1 class="brand">Admin Panel</h1>
+      <button id="logoutBtn" class="btn btn-warning">Logout</button>
+    </header>
 
-<body class="bg-green-50 min-h-screen">
+    <nav class="app-nav" role="tablist" aria-label="Admin navigation">
+      <button id="navDashboard" class="nav-btn active" role="tab" aria-selected="true">Dashboard</button>
+      <button id="navContent" class="nav-btn" role="tab">Content Manager</button>
+      <button id="navTutorManagement" class="nav-btn" role="tab">Tutor Management</button>
+      <button id="navPayAdvice" class="nav-btn" role="tab">Pay Advice</button>
+      <button id="navTutorReports" class="nav-btn" role="tab">Tutor Reports</button>
+      <button id="navSummerBreak" class="nav-btn" role="tab">Summer Break</button>
+      <button id="navStaff" class="nav-btn" role="tab">Staff</button>
+    </nav>
 
-    <div class="max-w-7xl mx-auto p-6">
+    <main id="main-content" class="app-main">
+      <div class="card center">
+        <p class="muted">Checking user permissions...</p>
+      </div>
+    </main>
+  </div>
 
-        <div class="flex justify-between items-center mb-6">
-
-            <h1 class="text-3xl font-bold text-green-800">Admin Panel</h1>
-
-            <button id="logoutBtn" class="bg-yellow-400 text-white px-4 py-2 rounded hover:bg-yellow-500">Logout</button>
-
-        </div>
-
-
-
-        <nav class="flex space-x-4 mb-6 border-b">
-
-            <button id="navDashboard" class="nav-btn text-lg font-semibold active">Dashboard</button>
-
-            <button id="navContent" class="nav-btn text-lg font-semibold text-gray-500 hover:text-blue-600">Content Manager</button>
-
-            <button id="navTutorManagement" class="nav-btn text-lg font-semibold text-gray-500 hover:text-blue-600">Tutor Management</button>
-
-            <button id="navPayAdvice" class="nav-btn text-lg font-semibold text-gray-500 hover:text-blue-600">Pay Advice</button>
-
-            <button id="navTutorReports" class="nav-btn text-lg font-semibold text-gray-500 hover:text-blue-600">Tutor Reports</button>
-
-            <button id="navSummerBreak" class="nav-btn text-lg font-semibold text-gray-500 hover:text-blue-600">Summer Break</button>
-
-            <button id="navStaff" class="nav-btn text-lg font-semibold text-gray-500 hover:text-blue-600">Staff</button>
-
-        </nav>
-
-        <div id="main-content">
-
-             <p class="text-center text-gray-600 mt-12">Checking user permissions...</p>
-
-        </div>
-
-    </div>
-
-    <script type="module" src="admin.js"></script>
-
+  <script type="module" src="admin.js"></script>
 </body>
-
 </html>
