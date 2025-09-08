@@ -1,43 +1,69 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-    <title>Management Portal - Blooming Kids House</title>
-    <link rel="icon" href="favicon.ico" />
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" />
-    <style>
-        .nav-btn {
-            padding: 8px 16px;
-            border-bottom: 2px solid transparent;
-            transition: all 0.3s ease;
-        }
-        .nav-btn.active { 
-            border-bottom-color: #166534; /* dark-green */
-            color: #166534; 
-        }
-    </style>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Management Portal - Blooming Kids House</title>
+  <link rel="icon" href="favicon.ico" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" />
+  <style>
+    body {
+      background: linear-gradient(120deg, #f0fdf4, #ecfdf5, #f0fdf4);
+      background-size: 400% 400%;
+      animation: gradientShift 18s ease infinite;
+    }
+    @keyframes gradientShift {
+      0% { background-position: 0% 50%; }
+      50% { background-position: 100% 50%; }
+      100% { background-position: 0% 50%; }
+    }
+
+    .nav-card {
+      @apply bg-white text-green-800 font-semibold text-lg rounded-lg shadow-md px-6 py-4 transition transform;
+    }
+    .nav-card:hover {
+      @apply shadow-xl scale-105;
+      box-shadow: 0 0 12px rgba(22, 101, 52, 0.3);
+    }
+    .nav-card.active {
+      @apply bg-green-100 border border-green-600;
+      box-shadow: 0 0 16px rgba(22, 101, 52, 0.4);
+    }
+
+    .btn-logout {
+      @apply bg-yellow-400 text-white font-semibold px-4 py-2 rounded-lg shadow-md transition;
+    }
+    .btn-logout:hover {
+      @apply bg-yellow-500 shadow-lg;
+    }
+  </style>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 </head>
-<body class="bg-gray-50 min-h-screen">
-    <div class="max-w-7xl mx-auto p-6">
-        <div class="flex justify-between items-center mb-6">
-            <div>
-                <h1 id="welcome-message" class="text-3xl font-bold text-green-800">Welcome</h1>
-                <p id="user-role" class="text-md text-gray-600 font-semibold"></p>
-            </div>
-            <button id="logoutBtn" class="bg-yellow-400 text-white px-4 py-2 rounded hover:bg-yellow-500">Logout</button>
-        </div>
-        <nav class="flex space-x-4 mb-6 border-b">
-            <button id="navTutorManagement" class="nav-btn text-lg font-semibold active">Tutor & Student List</button>
-            <button id="navPayAdvice" class="nav-btn text-lg font-semibold text-gray-500 hover:text-green-700">Pay Advice</button>
-            <button id="navTutorReports" class="nav-btn text-lg font-semibold text-gray-500 hover:text-green-700">Tutor Reports</button>
-            <button id="navSummerBreak" class="nav-btn text-lg font-semibold text-gray-500 hover:text-green-700">Summer Break</button>
-        </nav>
-        <div id="main-content">
-             <p class="text-center text-gray-600 mt-12">Checking user permissions...</p>
-        </div>
+<body class="min-h-screen">
+  <div class="max-w-7xl mx-auto p-6">
+    <!-- Header -->
+    <div class="flex justify-between items-center mb-6">
+      <div>
+        <h1 id="welcome-message" class="text-3xl font-bold text-green-800">Welcome</h1>
+        <p id="user-role" class="text-md text-gray-600 font-semibold">Management Role</p>
+      </div>
+      <button id="logoutBtn" class="btn-logout">Logout</button>
     </div>
-    <script type="module" src="management.js"></script>
+
+    <!-- Zoom-style Navigation Cards -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6 mb-6">
+      <button id="navTutorManagement" class="nav-card active">Tutor & Student List</button>
+      <button id="navPayAdvice" class="nav-card">Pay Advice</button>
+      <button id="navTutorReports" class="nav-card">Tutor Reports</button>
+      <button id="navSummerBreak" class="nav-card">Summer Break</button>
+    </div>
+
+    <!-- Main Content -->
+    <div id="main-content" class="bg-white rounded-xl shadow p-6">
+      <p class="text-center text-gray-600 mt-12">Checking user permissions...</p>
+    </div>
+  </div>
+
+  <script type="module" src="management.js"></script>
 </body>
 </html>
