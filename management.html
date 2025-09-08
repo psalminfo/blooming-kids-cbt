@@ -1,152 +1,43 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Management Portal - Blooming Kids House</title>
-  <link rel="icon" href="favicon.ico" />
-  <style>
-    /* === Base & Theme === */
-    body {
-      margin: 0;
-      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-      background: linear-gradient(120deg, #0f172a, #166534, #1e3a8a);
-      background-size: 400% 400%;
-      animation: aurora 18s ease infinite;
-      color: #f1f5f9;
-      min-height: 100vh;
-    }
-    @keyframes aurora {
-      0% { background-position: 0% 50%; }
-      50% { background-position: 100% 50%; }
-      100% { background-position: 0% 50%; }
-    }
-
-    .container {
-      max-width: 1200px;
-      margin: 0 auto;
-      padding: 32px;
-      text-align: center;
-    }
-
-    /* === Header === */
-    .header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 40px;
-    }
-
-    .header h1 {
-      font-size: 2.5rem;
-      font-weight: bold;
-      color: #ffffff;
-      margin: 0;
-      text-shadow: 0 0 10px rgba(22, 101, 52, 0.5);
-    }
-
-    .header p {
-      font-size: 1rem;
-      color: #d1d5db;
-      font-weight: 600;
-      margin-top: 4px;
-    }
-
-    .btn-logout {
-      background: linear-gradient(90deg, #facc15, #fbbf24);
-      color: white;
-      font-weight: bold;
-      padding: 10px 16px;
-      border: none;
-      border-radius: 12px;
-      cursor: pointer;
-      box-shadow: 0 4px 12px rgba(251, 191, 36, 0.3);
-      transition: transform 0.2s ease, box-shadow 0.3s ease;
-    }
-
-    .btn-logout:hover {
-      background: #f59e0b;
-      transform: translateY(-1px);
-      box-shadow: 0 6px 16px rgba(251, 191, 36, 0.4);
-    }
-
-    /* === Zoom-style Cards === */
-    .card-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-      gap: 24px;
-      margin-bottom: 40px;
-    }
-
-    .card {
-      background: rgba(255, 255, 255, 0.05);
-      border: 1px solid rgba(255, 255, 255, 0.1);
-      border-radius: 16px;
-      padding: 24px;
-      font-size: 1.1rem;
-      font-weight: 600;
-      color: #ffffff;
-      cursor: pointer;
-      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
-      transition: transform 0.2s ease, box-shadow 0.3s ease;
-    }
-
-    .card:hover {
-      transform: translateY(-4px);
-      box-shadow: 0 12px 32px rgba(0, 0, 0, 0.3), 0 0 12px rgba(96, 165, 250, 0.3);
-    }
-
-    .card.active {
-      background: #166534;
-      box-shadow: 0 0 20px rgba(22, 101, 52, 0.6);
-    }
-
-    /* === Main Content === */
-    #main-content {
-      background: rgba(255, 255, 255, 0.05);
-      border-radius: 16px;
-      padding: 32px;
-      box-shadow: 0 6px 20px rgba(0, 0, 0, 0.1);
-    }
-
-    .main-message {
-      color: #d1d5db;
-      font-size: 1rem;
-      margin-top: 24px;
-    }
-
-    @media (max-width: 768px) {
-      .header {
-        flex-direction: column;
-        align-items: flex-start;
-        gap: 12px;
-      }
-    }
-  </style>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>Management Portal - Blooming Kids House</title>
+    <link rel="icon" href="favicon.ico" />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" />
+    <style>
+        .nav-btn {
+            padding: 8px 16px;
+            border-bottom: 2px solid transparent;
+            transition: all 0.3s ease;
+        }
+        .nav-btn.active { 
+            border-bottom-color: #166534; /* dark-green */
+            color: #166534; 
+        }
+    </style>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 </head>
-<body>
-  <div class="container">
-    <div class="header">
-      <div>
-        <h1 id="welcome-message">Welcome</h1>
-        <p id="user-role">Management Role</p>
-      </div>
-      <button id="logoutBtn" class="btn-logout">Logout</button>
+<body class="bg-gray-50 min-h-screen">
+    <div class="max-w-7xl mx-auto p-6">
+        <div class="flex justify-between items-center mb-6">
+            <div>
+                <h1 id="welcome-message" class="text-3xl font-bold text-green-800">Welcome</h1>
+                <p id="user-role" class="text-md text-gray-600 font-semibold"></p>
+            </div>
+            <button id="logoutBtn" class="bg-yellow-400 text-white px-4 py-2 rounded hover:bg-yellow-500">Logout</button>
+        </div>
+        <nav class="flex space-x-4 mb-6 border-b">
+            <button id="navTutorManagement" class="nav-btn text-lg font-semibold active">Tutor & Student List</button>
+            <button id="navPayAdvice" class="nav-btn text-lg font-semibold text-gray-500 hover:text-green-700">Pay Advice</button>
+            <button id="navTutorReports" class="nav-btn text-lg font-semibold text-gray-500 hover:text-green-700">Tutor Reports</button>
+            <button id="navSummerBreak" class="nav-btn text-lg font-semibold text-gray-500 hover:text-green-700">Summer Break</button>
+        </nav>
+        <div id="main-content">
+             <p class="text-center text-gray-600 mt-12">Checking user permissions...</p>
+        </div>
     </div>
-
-    <div class="card-grid">
-      <div id="navTutorManagement" class="card active">Tutor & Student List</div>
-      <div id="navPayAdvice" class="card">Pay Advice</div>
-      <div id="navTutorReports" class="card">Tutor Reports</div>
-      <div id="navSummerBreak" class="card">Summer Break</div>
-    </div>
-
-    <div id="main-content">
-      <p class="main-message">Checking user permissions...</p>
-    </div>
-  </div>
-
-  <script type="module" src="management.js"></script>
+    <script type="module" src="management.js"></script>
 </body>
 </html>
