@@ -43,7 +43,7 @@ async function renderManagementTutorView(container) {
                 .sort((a, b) => a.studentName.localeCompare(b.studentName))
                 .map(student => `
                     <tr class="hover:bg-gray-50">
-                        <td class="px-4 py-2 font-medium">${student.studentName || 'N/A'}</td>
+                        <td class="px-4 py-2 font-medium">${student.parentName || 'N/A'}</td>
                         <td class="px-4 py-2">${student.parentPhone || 'N/A'}</td>
                     </tr>
                 `).join('');
@@ -58,7 +58,7 @@ async function renderManagementTutorView(container) {
                         <div class="border-t p-2">
                             <table class="min-w-full text-sm">
                                 <thead class="bg-gray-50 text-left"><tr>
-                                    <th class="px-4 py-2 font-medium">Student's Name</th>
+                                    <th class="px-4 py-2 font-medium">Parent's Name</th>
                                     <th class="px-4 py-2 font-medium">Parent's Phone NO</th>
                                 </tr></thead>
                                 <tbody class="bg-white divide-y divide-gray-200">${studentsTableRows}</tbody>
