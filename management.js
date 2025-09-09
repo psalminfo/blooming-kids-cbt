@@ -31,8 +31,8 @@ async function renderManagementTutorView(container) {
             <div class="flex justify-between items-center mb-4">
                  <h2 class="text-2xl font-bold text-green-700">Tutor & Student Directory</h2>
                  <div class="flex space-x-4">
-                    <div class="bg-blue-100 p-3 rounded-lg text-center shadow"><h4 class="font-bold text-blue-800 text-sm">Total Tutors</h4><p id="tutor-count-badge" class="text-2xl font-extrabold">0</p></div>
-                    <div class="bg-green-100 p-3 rounded-lg text-center shadow"><h4 class="font-bold text-green-800 text-sm">Total Students</h4><p id="student-count-badge" class="text-2xl font-extrabold">0</p></div>
+                    <div class="bg-green-100 p-3 rounded-lg text-center shadow"><h4 class="font-bold text-green-800 text-sm">Total Tutors</h4><p id="tutor-count-badge" class="text-2xl font-extrabold">0</p></div>
+                    <div class="bg-yellow-100 p-3 rounded-lg text-center shadow"><h4 class="font-bold text-yellow-800 text-sm">Total Students</h4><p id="student-count-badge" class="text-2xl font-extrabold">0</p></div>
                 </div>
             </div>
             <div id="directory-list" class="space-y-4">
@@ -103,7 +103,7 @@ async function renderPayAdvicePanel(container) {
     container.innerHTML = `
         <div class="bg-white p-6 rounded-lg shadow-md">
             <h2 class="text-2xl font-bold text-green-700 mb-4">Tutor Pay Advice</h2>
-            <div class="bg-gray-100 p-4 rounded-lg mb-6 grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+            <div class="bg-green-50 p-4 rounded-lg mb-6 grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
                 <div>
                     <label for="start-date" class="block text-sm font-medium">Start Date</label>
                     <input type="date" id="start-date" class="mt-1 block w-full p-2 border rounded-md">
@@ -113,8 +113,8 @@ async function renderPayAdvicePanel(container) {
                     <input type="date" id="end-date" class="mt-1 block w-full p-2 border rounded-md">
                 </div>
                 <div class="flex items-center space-x-4 col-span-2">
-                     <div class="bg-blue-100 p-3 rounded-lg text-center shadow w-full"><h4 class="font-bold text-blue-800 text-sm">Active Tutors</h4><p id="pay-tutor-count" class="text-2xl font-extrabold">0</p></div>
-                    <div class="bg-green-100 p-3 rounded-lg text-center shadow w-full"><h4 class="font-bold text-green-800 text-sm">Total Students</h4><p id="pay-student-count" class="text-2xl font-extrabold">0</p></div>
+                     <div class="bg-green-100 p-3 rounded-lg text-center shadow w-full"><h4 class="font-bold text-green-800 text-sm">Active Tutors</h4><p id="pay-tutor-count" class="text-2xl font-extrabold">0</p></div>
+                    <div class="bg-yellow-100 p-3 rounded-lg text-center shadow w-full"><h4 class="font-bold text-yellow-800 text-sm">Total Students</h4><p id="pay-student-count" class="text-2xl font-extrabold">0</p></div>
                     ${canExport ? `<button id="export-pay-csv-btn" class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 h-full">Export CSV</button>` : ''}
                 </div>
             </div>
@@ -230,7 +230,7 @@ async function loadTutorReportsForManagement() {
         reportsListContainer.innerHTML = Object.values(reportsByTutor).map(tutorData => {
             const reportLinks = tutorData.reports.map(report => {
                 const buttonHTML = canDownload
-                    ? `<button class="download-report-btn bg-blue-500 text-white px-3 py-1 text-sm rounded" data-report-id="${report.id}">Download</button>`
+                    ? `<button class="download-report-btn bg-green-500 text-white px-3 py-1 text-sm rounded" data-report-id="${report.id}">Download</button>`
                     : `<button class="view-report-btn bg-gray-500 text-white px-3 py-1 text-sm rounded" data-report-id="${report.id}">View</button>`;
                 return `<li class="flex justify-between items-center p-2 bg-gray-50 rounded">${report.studentName}<span>${buttonHTML}</span></li>`;
             }).join('');
