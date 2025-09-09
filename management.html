@@ -4,66 +4,380 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Management Portal - Blooming Kids House</title>
-  <link rel="icon" href="favicon.ico" />
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🌼</text></svg>" />
   <style>
+    /* === Base & Theme === */
     body {
-      background: linear-gradient(120deg, #f0fdf4, #ecfdf5, #f0fdf4);
+      margin: 0;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: linear-gradient(120deg, #0f172a, #166534, #1e3a8a);
       background-size: 400% 400%;
-      animation: gradientShift 18s ease infinite;
+      animation: aurora 18s ease infinite;
+      color: #f1f5f9;
+      min-height: 100vh;
     }
-    @keyframes gradientShift {
+    @keyframes aurora {
       0% { background-position: 0% 50%; }
       50% { background-position: 100% 50%; }
       100% { background-position: 0% 50%; }
     }
 
-    .nav-card {
-      @apply bg-white text-green-800 font-semibold text-lg rounded-lg shadow-md px-6 py-4 transition transform;
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 32px;
+      text-align: center;
     }
-    .nav-card:hover {
-      @apply shadow-xl scale-105;
-      box-shadow: 0 0 12px rgba(22, 101, 52, 0.3);
+
+    /* === Header === */
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 40px;
     }
-    .nav-card.active {
-      @apply bg-green-100 border border-green-600;
-      box-shadow: 0 0 16px rgba(22, 101, 52, 0.4);
+
+    .header h1 {
+      font-size: 2.5rem;
+      font-weight: bold;
+      color: #ffffff;
+      margin: 0;
+      text-shadow: 0 0 10px rgba(22, 101, 52, 0.5);
+    }
+
+    .header p {
+      font-size: 1rem;
+      color: #d1d5db;
+      font-weight: 600;
+      margin-top: 4px;
     }
 
     .btn-logout {
-      @apply bg-yellow-400 text-white font-semibold px-4 py-2 rounded-lg shadow-md transition;
+      background: linear-gradient(90deg, #facc15, #fbbf24);
+      color: white;
+      font-weight: bold;
+      padding: 10px 16px;
+      border: none;
+      border-radius: 12px;
+      cursor: pointer;
+      box-shadow: 0 4px 12px rgba(251, 191, 36, 0.3);
+      transition: transform 0.2s ease, box-shadow 0.3s ease;
     }
+
     .btn-logout:hover {
-      @apply bg-yellow-500 shadow-lg;
+      background: #f59e0b;
+      transform: translateY(-1px);
+      box-shadow: 0 6px 16px rgba(251, 191, 36, 0.4);
+    }
+
+    /* === Zoom-style Cards === */
+    .card-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 24px;
+      margin-bottom: 40px;
+    }
+
+    .card {
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 16px;
+      padding: 24px;
+      font-size: 1.1rem;
+      font-weight: 600;
+      color: #ffffff;
+      cursor: pointer;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+      transition: transform 0.2s ease, box-shadow 0.3s ease;
+    }
+
+    .card:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 12px 32px rgba(0, 0, 0, 0.3), 0 0 12px rgba(96, 165, 250, 0.3);
+    }
+
+    .card.active {
+      background: #166534;
+      box-shadow: 0 0 20px rgba(22, 101, 52, 0.6);
+    }
+
+    /* === Main Content === */
+    #main-content {
+      background: rgba(255, 255, 255, 0.05);
+      border-radius: 16px;
+      padding: 32px;
+      box-shadow: 0 6px 20px rgba(0, 0, 0, 0.1);
+      min-height: 300px;
+      text-align: left;
+    }
+
+    .content-section {
+      display: none;
+    }
+    
+    .content-section.active {
+      display: block;
+      animation: fadeIn 0.5s ease;
+    }
+    
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+
+    .main-message {
+      color: #d1d5db;
+      font-size: 1rem;
+      margin-top: 24px;
+    }
+    
+    /* Table Styles */
+    .data-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 20px;
+    }
+    
+    .data-table th, .data-table td {
+      padding: 12px 15px;
+      text-align: left;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    }
+    
+    .data-table th {
+      background-color: rgba(22, 101, 52, 0.3);
+      color: #facc15;
+    }
+    
+    .data-table tr:hover {
+      background-color: rgba(255, 255, 255, 0.05);
+    }
+    
+    /* Responsive Design */
+    @media (max-width: 768px) {
+      .header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 12px;
+      }
+      
+      .card-grid {
+        grid-template-columns: 1fr;
+      }
+      
+      .container {
+        padding: 16px;
+      }
     }
   </style>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 </head>
-<body class="min-h-screen">
-  <div class="max-w-7xl mx-auto p-6">
-    <!-- Header -->
-    <div class="flex justify-between items-center mb-6">
+<body>
+  <div class="container">
+    <div class="header">
       <div>
-        <h1 id="welcome-message" class="text-3xl font-bold text-green-800">Welcome</h1>
-        <p id="user-role" class="text-md text-gray-600 font-semibold">Management Role</p>
+        <h1 id="welcome-message">Welcome, Administrator</h1>
+        <p id="user-role">Management Portal - Blooming Kids House</p>
       </div>
       <button id="logoutBtn" class="btn-logout">Logout</button>
     </div>
 
-    <!-- Zoom-style Navigation Cards -->
-    <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6 mb-6">
-      <button id="navTutorManagement" class="nav-card active">Tutor & Student List</button>
-      <button id="navPayAdvice" class="nav-card">Pay Advice</button>
-      <button id="navTutorReports" class="nav-card">Tutor Reports</button>
-      <button id="navSummerBreak" class="nav-card">Summer Break</button>
+    <div class="card-grid">
+      <div id="navTutorManagement" class="card active">Tutor & Student List</div>
+      <div id="navPayAdvice" class="card">Pay Advice</div>
+      <div id="navTutorReports" class="card">Tutor Reports</div>
+      <div id="navSummerBreak" class="card">Summer Break</div>
     </div>
 
-    <!-- Main Content -->
-    <div id="main-content" class="bg-white rounded-xl shadow p-6">
-      <p class="text-center text-gray-600 mt-12">Checking user permissions...</p>
+    <div id="main-content">
+      <!-- Tutor Management Section -->
+      <div id="tutorManagement" class="content-section active">
+        <h2>Tutor & Student List</h2>
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Tutor Name</th>
+              <th>Students</th>
+              <th>Subject</th>
+              <th>Schedule</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Sarah Johnson</td>
+              <td>Emma, Noah, Olivia</td>
+              <td>Mathematics</td>
+              <td>Mon/Wed 4-6pm</td>
+            </tr>
+            <tr>
+              <td>Michael Chen</td>
+              <td>Liam, Ava, Mason</td>
+              <td>Science</td>
+              <td>Tue/Thu 5-7pm</td>
+            </tr>
+            <tr>
+              <td>Jessica Williams</td>
+              <td>Sophia, William, Isabella</td>
+              <td>English</td>
+              <td>Mon/Fri 3-5pm</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      
+      <!-- Pay Advice Section -->
+      <div id="payAdvice" class="content-section">
+        <h2>Pay Advice</h2>
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Tutor Name</th>
+              <th>Period</th>
+              <th>Hours</th>
+              <th>Amount</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Sarah Johnson</td>
+              <td>Sept 1-15, 2023</td>
+              <td>24</td>
+              <td>$960.00</td>
+              <td>Paid</td>
+            </tr>
+            <tr>
+              <td>Michael Chen</td>
+              <td>Sept 1-15, 2023</td>
+              <td>20</td>
+              <td>$800.00</td>
+              <td>Paid</td>
+            </tr>
+            <tr>
+              <td>Jessica Williams</td>
+              <td>Sept 1-15, 2023</td>
+              <td>22</td>
+              <td>$880.00</td>
+              <td>Pending</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      
+      <!-- Tutor Reports Section -->
+      <div id="tutorReports" class="content-section">
+        <h2>Tutor Reports</h2>
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Report Name</th>
+              <th>Tutor</th>
+              <th>Period</th>
+              <th>Status</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Progress Report - Mathematics</td>
+              <td>Sarah Johnson</td>
+              <td>September 2023</td>
+              <td>Completed</td>
+              <td><button class="btn-logout" style="padding: 5px 10px;">View</button></td>
+            </tr>
+            <tr>
+              <td>Progress Report - Science</td>
+              <td>Michael Chen</td>
+              <td>September 2023</td>
+              <td>In Progress</td>
+              <td><button class="btn-logout" style="padding: 5px 10px;">View</button></td>
+            </tr>
+            <tr>
+              <td>Progress Report - English</td>
+              <td>Jessica Williams</td>
+              <td>September 2023</td>
+              <td>Not Started</td>
+              <td><button class="btn-logout" style="padding: 5px 10px;">View</button></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      
+      <!-- Summer Break Section -->
+      <div id="summerBreak" class="content-section">
+        <h2>Summer Break Schedule</h2>
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Program</th>
+              <th>Age Group</th>
+              <th>Dates</th>
+              <th>Time</th>
+              <th>Enrollment</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Summer Math Camp</td>
+              <td>8-10 years</td>
+              <td>Jun 5 - Jun 16</td>
+              <td>9am-12pm</td>
+              <td>12/15</td>
+            </tr>
+            <tr>
+              <td>Science Explorers</td>
+              <td>10-12 years</td>
+              <td>Jun 19 - Jun 30</td>
+              <td>1pm-4pm</td>
+              <td>8/15</td>
+            </tr>
+            <tr>
+              <td>Creative Writing</td>
+              <td>9-11 years</td>
+              <td>Jul 10 - Jul 21</td>
+              <td>10am-1pm</td>
+              <td>10/12</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
     </div>
   </div>
 
-  <script type="module" src="management.js"></script>
+  <script>
+    document.addEventListener('DOMContentLoaded', function() {
+      // Navigation functionality
+      const navItems = document.querySelectorAll('.card');
+      const contentSections = document.querySelectorAll('.content-section');
+      
+      // Set initial active state
+      setActiveSection('tutorManagement');
+      
+      // Add click events to navigation cards
+      navItems.forEach(item => {
+        item.addEventListener('click', function() {
+          const targetId = this.id.replace('nav', '').toLowerCase();
+          setActiveSection(targetId);
+          
+          // Update active nav item
+          navItems.forEach(nav => nav.classList.remove('active'));
+          this.classList.add('active');
+        });
+      });
+      
+      // Function to set active section
+      function setActiveSection(sectionId) {
+        contentSections.forEach(section => {
+          section.classList.remove('active');
+        });
+        document.getElementById(sectionId).classList.add('active');
+      }
+      
+      // Logout button functionality
+      document.getElementById('logoutBtn').addEventListener('click', function() {
+        alert('Logout successful! Redirecting to login page.');
+        // In a real application, this would redirect to the login page
+      });
+    });
+  </script>
 </body>
 </html>
