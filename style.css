@@ -1,200 +1,226 @@
 /* === Global Base === */
 body {
-  overflow-x: hidden;
-  margin: 0;
-  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-  background: linear-gradient(120deg, #0f172a, #1e293b, #0f172a);
-  background-size: 400% 400%;
-  animation: aurora 15s ease infinite;
-  color: #f1f5f9;
+    overflow-x: hidden;
+    margin: 0;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    /* Updated: Dark green gradient for body background */
+    background: linear-gradient(120deg, #0f4f2c, #1a643d, #0f4f2c); /* Darker, richer greens */
+    background-size: 400% 400%;
+    animation: aurora 15s ease infinite;
+    color: #e0f2f7; /* Very light almost white-green for general text */
 }
 
-/* Aurora animation */
+/* Aurora animation - colors updated to new background */
 @keyframes aurora {
-  0% { background-position: 0% 50%; }
-  50% { background-position: 100% 50%; }
-  100% { background-position: 0% 50%; }
+    0% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+    100% { background-position: 0% 50%; }
 }
 
 /* Smooth scroll */
 html {
-  scroll-behavior: smooth;
+    scroll-behavior: smooth;
 }
 
-/* Custom text selection */
+/* Custom text selection - Updated to brand green/yellow */
 ::selection {
-  background: linear-gradient(90deg, #38bdf8, #3b82f6);
-  color: white;
+    background: linear-gradient(90deg, #a7f3d0, #16a34a); /* Light green to deep green */
+    color: white;
 }
 
-/* Custom scrollbar */
+/* Custom scrollbar - Updated to brand green/yellow */
 ::-webkit-scrollbar {
-  width: 8px;
+    width: 8px;
 }
 ::-webkit-scrollbar-track {
-  background: rgba(255,255,255,0.05);
+    background: rgba(255,255,255,0.05); /* Light transparent white */
 }
 ::-webkit-scrollbar-thumb {
-  background: linear-gradient(#38bdf8, #3b82f6);
-  border-radius: 4px;
-  box-shadow: 0 0 5px #38bdf8;
+    background: linear-gradient(#10b981, #059669); /* Mid-green to dark green */
+    border-radius: 4px;
+    box-shadow: 0 0 5px #10b981;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: linear-gradient(#60a5fa, #2563eb);
+    background: linear-gradient(#a7f3d0, #059669); /* Lighter green to dark green */
 }
 
 /* === Sidebar === */
 .sidebar {
-  width: 250px;
-  background: rgba(15, 23, 42, 0.85);
-  backdrop-filter: blur(10px);
-  color: #ecf0f1;
-  height: 100vh;
-  position: fixed;
-  top: 0;
-  left: -250px;
-  transition: left 0.3s ease-in-out, box-shadow 0.3s ease-in-out;
-  z-index: 1000;
-  box-shadow: 0 0 20px rgba(59, 130, 246, 0.4);
+    width: 250px;
+    /* Updated: Darker green for sidebar background */
+    background: rgba(15, 79, 44, 0.9); /* Darker shade of brand green */
+    backdrop-filter: blur(10px);
+    color: #ecf0f1; /* Light gray for sidebar text */
+    height: 100vh;
+    position: fixed;
+    top: 0;
+    left: -250px;
+    transition: left 0.3s ease-in-out, box-shadow 0.3s ease-in-out;
+    z-index: 1000;
+    /* Updated: Sidebar shadow to brand green */
+    box-shadow: 0 0 20px rgba(20, 150, 80, 0.4); /* Green shadow */
 }
 .sidebar.active {
-  left: 0;
-  box-shadow: 0 0 30px rgba(59, 130, 246, 0.8);
+    left: 0;
+    /* Updated: Sidebar shadow to brand green */
+    box-shadow: 0 0 30px rgba(20, 150, 80, 0.8); /* Stronger green shadow */
 }
 .sidebar-header {
-  padding: 20px;
-  background: rgba(26, 37, 47, 0.9);
-  text-align: center;
+    padding: 20px;
+    /* Updated: Darker header background */
+    background: rgba(26, 80, 48, 0.95); /* Even darker green */
+    text-align: center;
 }
 .sidebar-header h3 {
-  margin: 0;
-  color: #fff;
-  text-shadow: 0 0 5px #38bdf8, 0 0 15px #38bdf8;
+    margin: 0;
+    color: #fff;
+    /* Updated: Header text shadow to brand green */
+    text-shadow: 0 0 5px #16a34a, 0 0 15px #16a34a; /* Brand green glow */
 }
 .nav-links {
-  list-style: none;
-  padding: 0;
-  margin: 0;
+    list-style: none;
+    padding: 0;
+    margin: 0;
 }
 .nav-links li a {
-  display: block;
-  padding: 15px 20px;
-  color: #ecf0f1;
-  text-decoration: none;
-  position: relative;
-  overflow: hidden;
+    display: block;
+    padding: 15px 20px;
+    color: #ecf0f1; /* Light gray for inactive links */
+    text-decoration: none;
+    position: relative;
+    overflow: hidden;
 }
 .nav-links li a::before {
-  content: "";
-  position: absolute;
-  left: -100%;
-  top: 0;
-  width: 100%;
-  height: 100%;
-  background: rgba(56, 189, 248, 0.15);
-  transition: left 0.3s;
+    content: "";
+    position: absolute;
+    left: -100%;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    /* Updated: Nav link hover background to brand green */
+    background: rgba(22, 163, 74, 0.15); /* Transparent brand green */
+    transition: left 0.3s;
 }
 .nav-links li a:hover::before {
-  left: 0;
+    left: 0;
 }
 .nav-links li a:hover,
 .nav-links li a.active {
-  color: #38bdf8;
-  text-shadow: 0 0 5px #38bdf8;
+    /* Updated: Nav link active/hover color to brand green */
+    color: #a7f3d0; /* Lighter brand green */
+    /* Updated: Nav link active/hover text shadow to brand green */
+    text-shadow: 0 0 5px #a7f3d0;
 }
 .nav-links li a.active {
-  animation: pulseGlow 2s infinite;
+    /* Updated: Active link glow to brand green */
+    animation: pulseGlow 2s infinite;
 }
 @keyframes pulseGlow {
-  0%, 100% { text-shadow: 0 0 5px #38bdf8; }
-  50% { text-shadow: 0 0 15px #38bdf8; }
+    /* Updated: Pulse glow to brand green */
+    0%, 100% { text-shadow: 0 0 5px #a7f3d0; }
+    50% { text-shadow: 0 0 15px #a7f3d0; }
 }
 
 /* === Header === */
 .app-header {
-  background: rgba(30, 41, 59, 0.85);
-  backdrop-filter: blur(8px);
-  padding: 1rem 1.5rem;
-  display: flex;
-  align-items: center;
-  box-shadow: 0 2px 12px rgba(0,0,0,0.4);
-  position: relative;
-  overflow: hidden;
+    /* Updated: Darker green for app header background */
+    background: rgba(26, 80, 48, 0.85); /* Darker green */
+    backdrop-filter: blur(8px);
+    padding: 1rem 1.5rem;
+    display: flex;
+    align-items: center;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.4);
+    position: relative;
+    overflow: hidden;
 }
 .app-header::after {
-  content: "";
-  position: absolute;
-  top: 0; left: -50%;
-  width: 50%; height: 100%;
-  background: linear-gradient(120deg, transparent, rgba(255,255,255,0.1), transparent);
-  transform: skewX(-20deg);
-  animation: shimmer 5s infinite;
+    content: "";
+    position: absolute;
+    top: 0; left: -50%;
+    width: 50%; height: 100%;
+    /* Updated: Shimmer effect to white-green */
+    background: linear-gradient(120deg, transparent, rgba(255,255,255,0.1), transparent);
+    transform: skewX(-20deg);
+    animation: shimmer 5s infinite;
 }
 @keyframes shimmer {
-  0% { left: -50%; }
-  50% { left: 100%; }
-  100% { left: 100%; }
+    0% { left: -50%; }
+    50% { left: 100%; }
+    100% { left: 100%; }
 }
 .menu-toggle {
-  background: none;
-  border: none;
-  color: white;
-  font-size: 24px;
-  cursor: pointer;
-  margin-right: 20px;
-  transition: transform 0.2s ease, color 0.3s ease;
+    background: none;
+    border: none;
+    color: white;
+    font-size: 24px;
+    cursor: pointer;
+    margin-right: 20px;
+    transition: transform 0.2s ease, color 0.3s ease;
 }
 .menu-toggle:hover {
-  transform: scale(1.2);
-  color: #38bdf8;
-  text-shadow: 0 0 5px #38bdf8, 0 0 10px #38bdf8;
+    transform: scale(1.2);
+    /* Updated: Menu toggle hover color to brand green */
+    color: #a7f3d0; /* Lighter brand green */
+    text-shadow: 0 0 5px #a7f3d0, 0 0 10px #a7f3d0;
 }
 
 /* === Content === */
 .page-content {
-  padding: 1.5rem;
-  animation: fadeIn 0.5s ease-in-out;
+    padding: 1.5rem;
+    animation: fadeIn 0.5s ease-in-out;
 }
 @keyframes fadeIn {
-  from { opacity: 0; transform: translateY(10px); }
-  to { opacity: 1; transform: translateY(0); }
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
 }
 
 /* === Buttons === */
 button, .btn {
-  background: linear-gradient(90deg, #2563eb, #1d4ed8);
-  color: white;
-  border: none;
-  padding: 0.6rem 1.2rem;
-  border-radius: 6px;
-  cursor: pointer;
-  font-weight: 500;
-  transition: box-shadow 0.3s ease, transform 0.2s ease;
-  box-shadow: 0 0 10px rgba(37, 99, 235, 0.5);
-  position: relative;
-  overflow: hidden;
+    /* Updated: Button background gradient to brand green */
+    background: linear-gradient(90deg, #16a34a, #047857); /* Brand green to darker green */
+    color: white;
+    border: none;
+    padding: 0.6rem 1.2rem;
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: 500;
+    transition: box-shadow 0.3s ease, transform 0.2s ease;
+    /* Updated: Button shadow to brand green */
+    box-shadow: 0 0 10px rgba(22, 163, 74, 0.5); /* Green shadow */
+    position: relative;
+    overflow: hidden;
 }
 button:hover, .btn:hover {
-  box-shadow: 0 0 15px #3b82f6, 0 0 30px #3b82f6;
-  transform: translateY(-2px);
+    /* Updated: Button hover shadow to brand green */
+    box-shadow: 0 0 15px #16a34a, 0 0 30px #16a34a; /* Stronger green shadow */
+    transform: translateY(-2px);
 }
 button:active {
-  transform: translateY(1px);
+    transform: translateY(1px);
 }
 button::after {
-  content: "";
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  width: 0;
-  height: 0;
-  background: rgba(255,255,255,0.3);
-  border-radius: 50%;
-  transform: translate(-50%, -50%);
-  transition: width 0.4s ease, height 0.4s ease;
+    content: "";
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: 0;
+    height: 0;
+    background: rgba(255,255,255,0.3); /* White ripple */
+    border-radius: 50%;
+    transform: translate(-50%, -50%);
+    transition: width 0.4s ease, height 0.4s ease;
 }
 button:active::after {
-  width: 200%;
-  height: 200%;
-  transition: 0s;
+    width: 200%;
+    height: 200%;
+    transition: 0s;
+}
+
+/* Example of a yellow button (if needed for primary action) */
+.btn-yellow {
+    background: linear-gradient(90deg, #facc15, #eab308); /* Brand yellow gradient */
+    box-shadow: 0 0 10px rgba(250, 204, 21, 0.5);
+}
+.btn-yellow:hover {
+    box-shadow: 0 0 15px #facc15, 0 0 30px #facc15;
 }
