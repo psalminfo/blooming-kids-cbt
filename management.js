@@ -1,5 +1,5 @@
 import { auth, db } from './firebaseConfig.js';
-import { collection, getDocs, doc, getDoc, where, query, Timestamp } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
+import { collection, getDocs, doc, getDoc, where, query, orderBy, Timestamp } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
 import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-auth.js";
 import { onSnapshot } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
 
@@ -44,61 +44,84 @@ function convertPayAdviceToCSV(data) {
 // # PANEL RENDERING FUNCTIONS
 // ##################################
 
+// ### UPDATED as requested ### to group students by tutor
 async function renderManagementTutorView(container) {
     container.innerHTML = `
-        <div class="bg-white p-6 rounded-lg shadow-lg">
-            <h2 class="text-2xl font-bold mb-4 text-green-700">Tutor & Student List</h2>
-            <div id="tutor-list-container" class="space-y-4">
-                <p class="text-center text-gray-500">Loading tutors and students...</p>
+        <div class="bg-white p-6 rounded-lg shadow-md">
+            <div class="flex justify-between items-center mb-4">
+                 <h2 class="text-2xl font-bold text-green-700">Tutor & Student Directory</h2>
+                 <div class="flex space-x-4">
+                     <div class="bg-blue-100 p-3 rounded-lg text-center shadow"><h4 class="font-bold text-blue-800 text-sm">Total Tutors</h4><p id="tutor-count-badge" class="text-2xl font-extrabold">0</p></div>
+                     <div class="bg-green-100 p-3 rounded-lg text-center shadow"><h4 class="font-bold text-green-800 text-sm">Total Students</h4><p id="student-count-badge" class="text-2xl font-extrabold">0</p></div>
+                 </div>
+            </div>
+            <div id="directory-list" class="space-y-4">
+                <p class="text-center text-gray-500 py-10">Loading directory...</p>
             </div>
         </div>
     `;
 
-    const tutorListContainer = document.getElementById('tutor-list-container');
     showLoadingOverlay();
 
     try {
-        const tutorsQuery = query(collection(db, `artifacts/${__app_id}/public/data/tutors`));
-        onSnapshot(tutorsQuery, async (tutorSnapshot) => {
-            if (tutorSnapshot.empty) {
-                tutorListContainer.innerHTML = `<p class="text-center text-gray-500">No tutors found.</p>`;
-                hideLoadingOverlay();
-                return;
+        const tutorsQuery = query(collection(db, `artifacts/${__app_id}/public/data/tutors`), orderBy("name"));
+        const studentsQuery = query(collection(db, `artifacts/${__app_id}/public/data/students`));
+
+        const [tutorsSnapshot, studentsSnapshot] = await Promise.all([
+            getDocs(tutorsQuery),
+            getDocs(studentsQuery)
+        ]);
+
+        document.getElementById('tutor-count-badge').textContent = tutorsSnapshot.size;
+        document.getElementById('student-count-badge').textContent = studentsSnapshot.size;
+
+        const studentsByTutor = {};
+        studentsSnapshot.forEach(doc => {
+            const student = doc.data();
+            if (!studentsByTutor[student.tutorId]) { // Using tutorId to match tutor UID
+                studentsByTutor[student.tutorId] = [];
             }
-
-            const tutorDataPromises = tutorSnapshot.docs.map(async docSnapshot => {
-                const tutor = { id: docSnapshot.id, ...docSnapshot.data() };
-                const studentsQuery = query(collection(db, `artifacts/${__app_id}/public/data/students`), where('tutorId', '==', tutor.id));
-                const studentsSnapshot = await getDocs(studentsQuery);
-                const students = studentsSnapshot.docs.map(studentDoc => ({ id: studentDoc.id, ...studentDoc.data() }));
-                return { ...tutor, students };
-            });
-
-            const tutorsWithStudents = await Promise.all(tutorDataPromises);
-            tutorListContainer.innerHTML = '';
-            tutorsWithStudents.forEach(tutor => {
-                const tutorDiv = document.createElement('div');
-                tutorDiv.className = 'border p-4 rounded-lg shadow-sm';
-                tutorDiv.innerHTML = `
-                    <h3 class="text-xl font-semibold text-green-600">${capitalize(tutor.name)}</h3>
-                    <p class="text-gray-500">Email: ${tutor.email}</p>
-                    <div class="mt-2 pl-4 border-l-2 border-gray-200">
-                        <h4 class="font-medium text-gray-600">Students:</h4>
-                        ${tutor.students.length > 0
-                            ? `<ul class="list-disc list-inside space-y-1 mt-1 text-gray-700">
-                                ${tutor.students.map(s => `<li>${capitalize(s.name)} (Class: ${s.className || 'N/A'})</li>`).join('')}
-                               </ul>`
-                            : `<p class="text-gray-500 text-sm italic">No students assigned.</p>`
-                        }
-                    </div>
-                `;
-                tutorListContainer.appendChild(tutorDiv);
-            });
-            hideLoadingOverlay();
+            studentsByTutor[student.tutorId].push(student);
         });
+
+        const directoryList = document.getElementById('directory-list');
+        directoryList.innerHTML = tutorsSnapshot.docs.map(tutorDoc => {
+            const tutor = tutorDoc.data();
+            const assignedStudents = studentsByTutor[tutorDoc.id] || [];
+            
+            const studentsTableRows = assignedStudents
+                .sort((a, b) => a.name.localeCompare(b.name))
+                .map(student => `
+                    <tr class="hover:bg-gray-50">
+                        <td class="px-4 py-2 font-medium">${student.name}</td>
+                        <td class="px-4 py-2">${student.className || 'N/A'}</td>
+                    </tr>
+                `).join('');
+
+            return `
+                <div class="border rounded-lg shadow-sm">
+                    <details>
+                        <summary class="p-4 cursor-pointer flex justify-between items-center font-semibold text-lg">
+                            ${tutor.name}
+                            <span class="ml-2 text-sm font-normal text-gray-500">(${assignedStudents.length} students)</span>
+                        </summary>
+                        <div class="border-t p-2">
+                            <table class="min-w-full text-sm">
+                                <thead class="bg-gray-50 text-left"><tr>
+                                    <th class="px-4 py-2 font-medium">Student Name</th>
+                                    <th class="px-4 py-2 font-medium">Class</th>
+                                </tr></thead>
+                                <tbody class="bg-white divide-y divide-gray-200">${studentsTableRows}</tbody>
+                            </table>
+                        </div>
+                    </details>
+                </div>
+            `;
+        }).join('');
     } catch (error) {
         console.error("Error fetching tutor and student data:", error);
-        tutorListContainer.innerHTML = `<p class="text-center text-red-500">Error loading data. Please try again later.</p>`;
+        directoryList.innerHTML = `<p class="text-center text-red-500">Error loading data. Please try again later.</p>`;
+    } finally {
         hideLoadingOverlay();
     }
 }
@@ -134,8 +157,8 @@ async function renderManagementPayAdvice(container) {
                 const checkinsSnapshot = await getDocs(studentCheckinsQuery);
 
                 const studentCount = checkinsSnapshot.docs.length;
-                const totalStudentFees = studentCount * 1000; // Assuming ₦1000 per student
-                const managementFee = totalStudentFees * 0.1; // 10% management fee
+                const totalStudentFees = studentCount * 1000;
+                const managementFee = totalStudentFees * 0.1;
                 const totalPay = totalStudentFees - managementFee;
 
                 return {
@@ -231,42 +254,6 @@ async function renderManagementPayAdvice(container) {
     } catch (error) {
         console.error("Error fetching pay advice data:", error);
         payAdviceContainer.innerHTML = `<p class="text-center text-red-500">Error loading data. Please try again later.</p>`;
-        hideLoadingOverlay();
-    }
-}
-
-async function downloadTutorDataAsZip(tutorId, tutorName) {
-    showLoadingOverlay();
-    try {
-        const checkinsQuery = query(collection(db, `artifacts/${__app_id}/public/data/studentCheckIns`), where('tutorId', '==', tutorId));
-        const checkinsSnapshot = await getDocs(checkinsQuery);
-        const checkinData = checkinsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-
-        if (checkinData.length === 0) {
-            showMessageBox('No Data Found', `No check-in records were found for ${tutorName}.`);
-            return;
-        }
-
-        const zip = new JSZip();
-        checkinData.forEach(checkin => {
-            const fileName = `checkin_${checkin.id}.json`;
-            const fileContent = JSON.stringify(checkin, null, 2);
-            zip.file(fileName, fileContent);
-        });
-
-        const zipBlob = await zip.generateAsync({ type: "blob" });
-        const link = document.createElement('a');
-        link.href = URL.createObjectURL(zipBlob);
-        link.download = `${tutorName.toLowerCase().replace(/\s/g, '_')}_data.zip`;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-
-        showMessageBox('Download Complete', `All check-in data for ${tutorName} has been downloaded in a ZIP file.`);
-    } catch (error) {
-        console.error("Error creating or downloading zip file:", error);
-        showMessageBox('Download Failed', 'An error occurred while creating the ZIP file. Please check the console for details.');
-    } finally {
         hideLoadingOverlay();
     }
 }
@@ -403,29 +390,25 @@ async function renderManagementStudentRecords(container) {
 document.addEventListener('DOMContentLoaded', () => {
     const mainContent = document.getElementById('mainContent');
     const logoutBtn = document.getElementById('logoutBtn');
-    const navTutorManagement = document.getElementById('navTutorManagement');
-    const navPayAdvice = document.getElementById('navPayAdvice');
-    const navTutorReports = document.getElementById('navTutorReports');
-    const navStudentRecords = document.getElementById('navStudentRecords');
-
+    
     // Make sure we have the app_id
     const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
     
     // Set up navigation
     const navItems = [
-        { id: 'navTutorManagement', fn: renderManagementTutorView, role: 'admin' },
-        { id: 'navPayAdvice', fn: renderManagementPayAdvice, role: 'admin' },
-        { id: 'navTutorReports', fn: renderManagementTutorReports, role: 'admin' },
-        { id: 'navStudentRecords', fn: renderManagementStudentRecords, role: 'admin' }
+        { id: 'navTutorManagement', fn: renderManagementTutorView, perm: 'viewTutorManagement', title: 'Tutor & Student List' },
+        { id: 'navPayAdvice', fn: renderManagementPayAdvice, perm: 'viewPayAdvice', title: 'Pay Advice' },
+        { id: 'navTutorReports', fn: renderManagementTutorReports, perm: 'viewTutorReports', title: 'Tutor Reports' },
+        { id: 'navStudentRecords', fn: renderManagementStudentRecords, perm: 'viewStudentRecords', title: 'Student Records' },
     ];
 
     onAuthStateChanged(auth, async (user) => {
         if (user) {
             // Log the user's UID and the path the app is looking for.
             console.log("Logged-in user UID:", user.uid);
-            console.log("Expected staff document path:", `artifacts/${appId}/public/data/staff/${user.uid}`);
+            console.log("Expected staff document path:", `artifacts/${appId}/public/data/staff/${user.email}`);
             
-            const userDoc = await getDoc(doc(db, `artifacts/${appId}/public/data/staff`, user.uid));
+            const userDoc = await getDoc(doc(db, `artifacts/${appId}/public/data/staff`, user.email));
             if (userDoc.exists()) {
                 const staffData = userDoc.data();
                 
@@ -437,7 +420,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 let firstVisibleTab = null;
                 navItems.forEach(item => {
                     const button = document.getElementById(item.id);
-                    if (staffData.role === item.role) {
+                    if (staffData.permissions?.tabs?.[item.perm]) {
                         button.style.display = 'block';
                         if (!firstVisibleTab) {
                             firstVisibleTab = item.id;
@@ -464,7 +447,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 console.log("Document does not exist for the logged-in user.");
                 document.getElementById('welcome-message').textContent = `Hello, ${user.email}`;
                 document.getElementById('user-role').textContent = 'Status: Not Registered';
-                mainContent.innerHTML = `<p class="text-center mt-12 text-red-600 font-semibold">Your account is not registered in the staff directory. Ensure your staff profile exists in Firestore and its Document ID matches your User UID.</p>`;
+                mainContent.innerHTML = `<p class="text-center mt-12 text-red-600 font-semibold">Your account is not registered in the staff directory. Ensure your staff profile exists in Firestore and its Document ID matches your User Email.</p>`;
                 logoutBtn.addEventListener('click', () => signOut(auth).then(() => window.location.href = "management-auth.html"));
             }
         } else {
