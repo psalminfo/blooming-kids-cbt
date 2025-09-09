@@ -9,30 +9,29 @@
     /* === Base Reset & Theme === */
     body {
       margin: 0;
-      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-      background-color: #ffffff; /* WHITE BACKGROUND AS REQUESTED */
-      color: #1f2937;
+      font-family: 'Segoe UI', system-ui, -apple-system, BlinkMacSystemFont, Roboto, sans-serif;
+      background-color: #ffffff; /* Pure white, like Zoom */
+      color: #1f2937; /* Default dark text */
     }
     .container {
       max-width: 1200px;
       margin: 0 auto;
-      padding: 32px;
-      text-align: center;
+      padding: 32px 24px;
     }
 
-    /* === Header === */
+    /* === Header === (Clean, like Zoom) */
     .header {
       display: flex;
       justify-content: space-between;
       align-items: center;
       margin-bottom: 40px;
-      background: #f9fafb;
-      padding: 24px;
-      border-radius: 16px;
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+      background: #f9fafb; /* Light gray background */
+      padding: 20px 24px;
+      border-radius: 12px;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
     }
     .header h1 {
-      font-size: 2.2rem;
+      font-size: 2rem;
       font-weight: 700;
       color: #166534;
       margin: 0;
@@ -44,14 +43,14 @@
       margin-top: 4px;
     }
 
-    /* === Logout Button === */
+    /* === Logout Button === (Kept vibrant for contrast) */
     .btn-logout {
       background: linear-gradient(90deg, #facc15, #fbbf24);
       color: white;
       font-weight: bold;
       padding: 10px 16px;
       border: none;
-      border-radius: 12px;
+      border-radius: 10px;
       cursor: pointer;
       box-shadow: 0 4px 12px rgba(251, 191, 36, 0.3);
       transition: transform 0.2s ease, box-shadow 0.3s ease;
@@ -62,51 +61,52 @@
       box-shadow: 0 6px 16px rgba(251, 191, 36, 0.4);
     }
 
-    /* === Zoom-style Cards (Navigation Tabs) === */
+    /* === ZOOM HOMEPAGE STYLE CARD GRID === */
     .card-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
       gap: 24px;
       margin-bottom: 40px;
     }
     .card {
       background: #ffffff;
-      border: 1px solid #e5e7eb;
-      border-radius: 16px;
+      border: 1px solid #e5e7eb; /* Subtle border, like Zoom */
+      border-radius: 12px;
       padding: 24px;
-      font-size: 1.1rem;
+      font-size: 1.125rem; /* 18px, like Zoom cards */
       font-weight: 600;
       color: #1f2937;
       cursor: pointer;
-      box-shadow: 0 6px 16px rgba(0, 0, 0, 0.08);
-      transition: transform 0.2s ease, box-shadow 0.3s ease, border-color 0.3s ease;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06); /* Soft shadow, like Zoom */
+      transition: all 0.3s ease;
+      text-align: center;
     }
     .card:hover {
-      transform: translateY(-4px);
-      box-shadow: 0 10px 24px rgba(0, 0, 0, 0.12), 0 0 8px rgba(22, 101, 52, 0.15);
-      border-color: #166534;
+      transform: translateY(-2px);
+      box-shadow: 0 6px 16px rgba(0, 0, 0, 0.1);
+      border-color: #d1d5db;
     }
     .card.active {
-      background: #ecfdf5;
+      background: #ecfdf5; /* Light green highlight */
       border-color: #166534;
-      box-shadow: 0 0 20px rgba(22, 101, 52, 0.2);
+      box-shadow: 0 4px 12px rgba(22, 101, 52, 0.15);
       color: #166534;
     }
 
-    /* === Main Content === */
+    /* === Main Content === (Default styling for dynamic content) */
     #main-content {
       background: #ffffff;
-      border: 1px solid #e5e7eb;
-      border-radius: 16px;
       padding: 32px;
-      box-shadow: 0 6px 20px rgba(0, 0, 0, 0.05);
-      text-align: left; /* Reset to default alignment for tables/counters */
+      border-radius: 12px;
+      border: 1px solid #e5e7eb;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+      min-height: 300px;
     }
     .main-message {
+      text-align: center;
       color: #6b7280;
       font-size: 1rem;
-      margin-top: 24px;
-      text-align: center;
+      margin-top: 48px;
     }
 
     /* Responsive */
@@ -133,7 +133,7 @@
       <button id="logoutBtn" class="btn-logout">Logout</button>
     </div>
 
-    <!-- Zoom-style Cards as Navigation -->
+    <!-- Zoom-Style Navigation Cards -->
     <div class="card-grid">
       <div id="navTutorManagement" class="card active">Tutor & Student List</div>
       <div id="navPayAdvice" class="card">Pay Advice</div>
