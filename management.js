@@ -1,7 +1,10 @@
 import { auth, db } from './firebaseConfig.js';
-import { collection, getDocs, doc, getDoc, where, query, orderBy, Timestamp } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
+import { collection, getDocs, doc, getDoc, where, query, orderBy, Timestamp, updateDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
 import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-auth.js";
-import { onSnapshot } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
+import JSZip from "https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js";
+import { saveAs } from "https://cdn.jsdelivr.net/npm/file-saver@2.0.5/dist/FileSaver.min.js";
+import html2pdf from "https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js";
+
 
 function capitalize(str) {
     if (!str) return '';
@@ -24,15 +27,14 @@ function convertPayAdviceToCSV(data) {
 // # PANEL RENDERING FUNCTIONS
 // ##################################
 
-// ### UPDATED as requested ### to group students by tutor
 async function renderManagementTutorView(container) {
     container.innerHTML = `
-        <div class="bg-white p-6 rounded-lg shadow-md">
-            <div class="flex justify-between items-center mb-4">
-                 <h2 class="text-2xl font-bold text-green-700">Tutor & Student Directory</h2>
-                 <div class="flex space-x-4">
-                    <div class="bg-green-100 p-3 rounded-lg text-center shadow"><h4 class="font-bold text-green-800 text-sm">Total Tutors</h4><p id="tutor-count-badge" class="text-2xl font-extrabold">0</p></div>
-                    <div class="bg-yellow-100 p-3 rounded-lg text-center shadow"><h4 class="font-bold text-yellow-800 text-sm">Total Students</h4><p id="student-count-badge" class="text-2xl font-extrabold">0</p></div>
+        <div class="panel">
+            <div class="flex flex-col sm:flex-row justify-between items-center mb-4">
+                 <h2 class="text-3xl font-bold text-green-700">Tutor & Student Directory</h2>
+                 <div class="flex flex-col sm:flex-row space-y-4 sm:space-y-0 sm:space-x-4 mt-4 sm:mt-0">
+                    <div class="count-badge"><h4 class="font-bold text-green-800 text-base">Total Tutors</h4><p id="tutor-count-badge" class="text-3xl font-extrabold">0</p></div>
+                    <div class="count-badge"><h4 class="font-bold text-yellow-800 text-base">Total Students</h4><p id="student-count-badge" class="text-3xl font-extrabold">0</p></div>
                 </div>
             </div>
             <div id="directory-list" class="space-y-4">
@@ -67,22 +69,22 @@ async function renderManagementTutorView(container) {
             .sort((a, b) => a.studentName.localeCompare(b.studentName))
             .map(student => `
                 <tr class="hover:bg-gray-50">
-                    <td class="px-4 py-2 font-medium">${student.studentName}</td>
-                    <td class="px-4 py-2">${student.grade}</td>
-                    <td class="px-4 py-2">${student.days}</td>
-                    <td class="px-4 py-2">${student.parentEmail || 'N/A'}</td>
+                    <td class="px-4 py-2 text-base font-medium">${student.studentName}</td>
+                    <td class="px-4 py-2 text-base">${student.grade}</td>
+                    <td class="px-4 py-2 text-base">${student.days}</td>
+                    <td class="px-4 py-2 text-base">${student.parentEmail || 'N/A'}</td>
                 </tr>
             `).join('');
 
         return `
             <div class="border rounded-lg shadow-sm">
                 <details>
-                    <summary class="p-4 cursor-pointer flex justify-between items-center font-semibold text-lg">
+                    <summary class="p-4 cursor-pointer flex justify-between items-center font-bold text-xl">
                         ${tutor.name}
-                        <span class="ml-2 text-sm font-normal text-gray-500">(${assignedStudents.length} students)</span>
+                        <span class="ml-2 text-base font-normal text-gray-500">(${assignedStudents.length} students)</span>
                     </summary>
                     <div class="border-t p-2">
-                        <table class="min-w-full text-sm">
+                        <table class="min-w-full text-base">
                             <thead class="bg-gray-50 text-left"><tr>
                                 <th class="px-4 py-2 font-medium">Student Name</th>
                                 <th class="px-4 py-2 font-medium">Grade</th>
@@ -101,26 +103,26 @@ async function renderManagementTutorView(container) {
 async function renderPayAdvicePanel(container) {
     const canExport = window.userData.permissions?.actions?.canExportPayAdvice === true;
     container.innerHTML = `
-        <div class="bg-white p-6 rounded-lg shadow-md">
-            <h2 class="text-2xl font-bold text-green-700 mb-4">Tutor Pay Advice</h2>
+        <div class="panel">
+            <h2 class="text-3xl font-bold text-green-700 mb-4">Tutor Pay Advice</h2>
             <div class="bg-green-50 p-4 rounded-lg mb-6 grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
                 <div>
-                    <label for="start-date" class="block text-sm font-medium">Start Date</label>
-                    <input type="date" id="start-date" class="mt-1 block w-full p-2 border rounded-md">
+                    <label for="start-date" class="block text-base font-medium">Start Date</label>
+                    <input type="date" id="start-date" class="mt-1 block w-full p-2 border rounded-md text-base">
                 </div>
                 <div>
-                    <label for="end-date" class="block text-sm font-medium">End Date</label>
-                    <input type="date" id="end-date" class="mt-1 block w-full p-2 border rounded-md">
+                    <label for="end-date" class="block text-base font-medium">End Date</label>
+                    <input type="date" id="end-date" class="mt-1 block w-full p-2 border rounded-md text-base">
                 </div>
                 <div class="flex items-center space-x-4 col-span-2">
-                     <div class="bg-green-100 p-3 rounded-lg text-center shadow w-full"><h4 class="font-bold text-green-800 text-sm">Active Tutors</h4><p id="pay-tutor-count" class="text-2xl font-extrabold">0</p></div>
-                    <div class="bg-yellow-100 p-3 rounded-lg text-center shadow w-full"><h4 class="font-bold text-yellow-800 text-sm">Total Students</h4><p id="pay-student-count" class="text-2xl font-extrabold">0</p></div>
-                    ${canExport ? `<button id="export-pay-csv-btn" class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 h-full">Export CSV</button>` : ''}
+                     <div class="count-badge w-full"><h4 class="font-bold text-green-800 text-base">Active Tutors</h4><p id="pay-tutor-count" class="text-3xl font-extrabold">0</p></div>
+                    <div class="count-badge w-full"><h4 class="font-bold text-yellow-800 text-base">Total Students</h4><p id="pay-student-count" class="text-3xl font-extrabold">0</p></div>
+                    ${canExport ? `<button id="export-pay-csv-btn" class="bg-green-600 text-white px-4 py-2 rounded-full hover:bg-green-700 h-full shadow text-base">Export CSV</button>` : ''}
                 </div>
             </div>
             <div class="overflow-x-auto">
                 <table class="min-w-full divide-y divide-gray-200">
-                    <thead class="bg-gray-50"><tr><th class="px-6 py-3 text-left text-xs font-medium uppercase">Tutor</th><th class="px-6 py-3 text-left text-xs font-medium uppercase">Students</th><th class="px-6 py-3 text-left text-xs font-medium uppercase">Student Fees</th><th class="px-6 py-3 text-left text-xs font-medium uppercase">Mgmt. Fee</th><th class="px-6 py-3 text-left text-xs font-medium uppercase">Total Pay</th></tr></thead>
+                    <thead class="bg-gray-50"><tr><th class="px-6 py-3 text-left text-base font-medium uppercase">Tutor</th><th class="px-6 py-3 text-left text-base font-medium uppercase">Students</th><th class="px-6 py-3 text-left text-base font-medium uppercase">Student Fees</th><th class="px-6 py-3 text-left text-base font-medium uppercase">Mgmt. Fee</th><th class="px-6 py-3 text-left text-base font-medium uppercase">Total Pay</th></tr></thead>
                     <tbody id="pay-advice-table-body" class="divide-y"><tr><td colspan="5" class="text-center py-4">Select a date range.</td></tr></tbody>
                 </table>
             </div>
@@ -183,7 +185,7 @@ async function loadPayAdviceData(startDate, endDate) {
 
     document.getElementById('pay-tutor-count').textContent = payData.length;
     document.getElementById('pay-student-count').textContent = totalStudentCount;
-    tableBody.innerHTML = payData.map(d => `<tr><td class="px-6 py-4">${d.tutorName}</td><td class="px-6 py-4">${d.studentCount}</td><td class="px-6 py-4">₦${d.totalStudentFees.toFixed(2)}</td><td class="px-6 py-4">₦${d.managementFee.toFixed(2)}</td><td class="px-6 py-4 font-bold">₦${d.totalPay.toFixed(2)}</td></tr>`).join('');
+    tableBody.innerHTML = payData.map(d => `<tr><td class="px-6 py-4 text-base">${d.tutorName}</td><td class="px-6 py-4 text-base">${d.studentCount}</td><td class="px-6 py-4 text-base">₦${d.totalStudentFees.toFixed(2)}</td><td class="px-6 py-4 text-base">₦${d.managementFee.toFixed(2)}</td><td class="px-6 py-4 font-bold text-base">₦${d.totalPay.toFixed(2)}</td></tr>`).join('');
     
     const exportBtn = document.getElementById('export-pay-csv-btn');
     if (exportBtn) {
@@ -198,94 +200,187 @@ async function loadPayAdviceData(startDate, endDate) {
     }
 }
 
+// ##################################################################
+// # SECTION 4: TUTOR REPORTS PANEL (Upgraded)
+// ##################################################################
+
 async function renderTutorReportsPanel(container) {
     container.innerHTML = `
         <div class="bg-white p-6 rounded-lg shadow-md mb-6">
-            <h2 class="text-2xl font-bold text-green-700 mb-4">Tutor Reports</h2>
-            <div id="tutor-reports-list" class="space-y-4"><p class="text-center">Loading reports...</p></div>
+            <div class="flex justify-between items-start mb-4">
+                 <h2 class="text-2xl font-bold text-green-700">Tutor Reports</h2>
+                 <div class="flex space-x-4">
+                    <div class="bg-blue-100 p-3 rounded-lg text-center shadow"><h4 class="font-bold text-blue-800 text-sm">Tutors Submitted</h4><p id="report-tutor-count" class="text-2xl text-blue-600 font-extrabold">0</p></div>
+                    <div class="bg-green-100 p-3 rounded-lg text-center shadow"><h4 class="font-bold text-green-800 text-sm">Total Reports</h4><p id="report-count" class="text-2xl text-green-600 font-extrabold">0</p></div>
+                </div>
+            </div>
+            <div id="tutor-reports-list" class="space-y-4"><p class="text-gray-500 text-center">Loading reports...</p></div>
         </div>
     `;
-    loadTutorReportsForManagement();
+    await loadTutorReportsForAdmin();
 }
 
-async function loadTutorReportsForManagement() {
+async function loadTutorReportsForAdmin() {
     const reportsListContainer = document.getElementById('tutor-reports-list');
     onSnapshot(query(collection(db, "tutor_submissions"), orderBy("submittedAt", "desc")), (snapshot) => {
+        const tutorCountEl = document.getElementById('report-tutor-count');
+        const reportCountEl = document.getElementById('report-count');
+        if (!tutorCountEl || !reportCountEl) return;
+
         if (snapshot.empty) {
-            reportsListContainer.innerHTML = `<p class="text-center text-gray-500">No reports submitted yet.</p>`;
+            reportsListContainer.innerHTML = `<p class="text-gray-500 text-center">No reports have been submitted yet.</p>`;
+            tutorCountEl.textContent = 0;
+            reportCountEl.textContent = 0;
             return;
         }
 
         const reportsByTutor = {};
         snapshot.forEach(doc => {
             const report = { id: doc.id, ...doc.data() };
-            if (!reportsByTutor[report.tutorEmail]) {
-                reportsByTutor[report.tutorEmail] = { name: report.tutorName || report.tutorEmail, reports: [] };
+            const tutorEmail = report.tutorEmail;
+            if (!reportsByTutor[tutorEmail]) {
+                reportsByTutor[tutorEmail] = {
+                    name: report.tutorName || tutorEmail,
+                    reports: []
+                };
             }
-            reportsByTutor[report.tutorEmail].reports.push(report);
+            reportsByTutor[tutorEmail].reports.push(report);
         });
 
-        const canDownload = window.userData.permissions?.actions?.canDownloadReports === true;
+        tutorCountEl.textContent = Object.keys(reportsByTutor).length;
+        reportCountEl.textContent = snapshot.size;
 
         reportsListContainer.innerHTML = Object.values(reportsByTutor).map(tutorData => {
-            const reportLinks = tutorData.reports.map(report => {
-                const buttonHTML = canDownload
-                    ? `<button class="download-report-btn bg-green-500 text-white px-3 py-1 text-sm rounded" data-report-id="${report.id}">Download</button>`
-                    : `<button class="view-report-btn bg-gray-500 text-white px-3 py-1 text-sm rounded" data-report-id="${report.id}">View</button>`;
-                return `<li class="flex justify-between items-center p-2 bg-gray-50 rounded">${report.studentName}<span>${buttonHTML}</span></li>`;
-            }).join('');
+            const reportLinks = tutorData.reports.map(report => `
+                <li class="flex justify-between items-center p-2 bg-gray-50 rounded-md">
+                    <span>${report.studentName} - ${new Date(report.submittedAt.seconds * 1000).toLocaleDateString()}</span>
+                    <button class="download-single-report-btn bg-blue-500 text-white px-3 py-1 text-sm rounded hover:bg-blue-600" data-report-id="${report.id}">Download PDF</button>
+                </li>
+            `).join('');
 
-            return `<details class="border rounded-lg"><summary class="p-4 cursor-pointer font-semibold">${tutorData.name} (${tutorData.reports.length} reports)</summary><div class="p-4 border-t"><ul class="space-y-2">${reportLinks}</ul></div></details>`;
+            return `
+                <div class="border rounded-lg shadow-sm">
+                    <details>
+                        <summary class="p-4 cursor-pointer flex justify-between items-center font-semibold text-lg">
+                            <div>
+                                ${tutorData.name} 
+                                <span class="ml-2 text-sm font-normal text-gray-500">(${tutorData.reports.length} reports)</span>
+                            </div>
+                            <button class="download-all-btn bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700" data-tutor-email="${tutorData.reports[0].tutorEmail}">Download All as ZIP</button>
+                        </summary>
+                        <div class="p-4 border-t">
+                            <ul class="space-y-2">${reportLinks}</ul>
+                        </div>
+                    </details>
+                </div>
+            `;
         }).join('');
 
-        document.querySelectorAll('.download-report-btn').forEach(button => {
+        reportsListContainer.querySelectorAll('.download-single-report-btn').forEach(button => {
             button.addEventListener('click', (e) => {
-                e.stopPropagation();
-                // This should call your PDF generation library, e.g., html2pdf
-                // For simplicity, we'll use the view function, but you'd call a download one.
-                viewReportInNewTab(e.target.dataset.reportId, true); // true = download
+                e.stopPropagation(); // Prevent the dropdown from closing
+                downloadAdminReport(e.target.dataset.reportId);
             });
         });
 
-        document.querySelectorAll('.view-report-btn').forEach(button => {
-            button.addEventListener('click', (e) => {
+        reportsListContainer.querySelectorAll('.download-all-btn').forEach(button => {
+            button.addEventListener('click', async (e) => {
                 e.stopPropagation();
-                viewReportInNewTab(e.target.dataset.reportId, false); // false = view
+                const tutorEmail = e.target.dataset.tutorEmail;
+                const reportsToDownload = reportsByTutor[tutorEmail].reports;
+                
+                button.textContent = 'Zipping...';
+                button.disabled = true;
+
+                try {
+                    const zip = new JSZip();
+                    for (const report of reportsToDownload) {
+                        const pdfBlob = await downloadAdminReport(report.id, true);
+                        if (pdfBlob) {
+                            const fileName = `${report.studentName}_${new Date(report.submittedAt.seconds * 1000).toLocaleDateString().replace(/\//g, '-')}.pdf`;
+                            zip.file(fileName, pdfBlob);
+                        }
+                    }
+
+                    const content = await zip.generateAsync({ type: "blob" });
+                    saveAs(content, `${reportsByTutor[tutorEmail].name.replace(/\s+/g, '_')}_Reports.zip`);
+
+                } catch (error) {
+                    console.error("Error creating ZIP file:", error);
+                    alert("An error occurred while creating the ZIP file.");
+                } finally {
+                    button.textContent = 'Download All as ZIP';
+                    button.disabled = false;
+                }
             });
         });
     });
 }
 
-async function viewReportInNewTab(reportId, shouldDownload = false) {
+async function downloadAdminReport(reportId, returnBlob = false) {
     try {
         const reportDoc = await getDoc(doc(db, "tutor_submissions", reportId));
         if (!reportDoc.exists()) throw new Error("Report not found!");
+        
         const reportData = reportDoc.data();
+        
+        // This is where the parent's email is retrieved
         let parentEmail = 'N/A';
         if (reportData.studentId) {
             const studentDoc = await getDoc(doc(db, "students", reportData.studentId));
-            if (studentDoc.exists()) parentEmail = studentDoc.data().parentEmail || 'N/A';
+            if (studentDoc.exists()) {
+                parentEmail = studentDoc.data().parentEmail || 'N/A';
+            }
         }
 
         const logoUrl = "https://raw.githubusercontent.com/psalminfo/blooming-kids-cbt/main/logo.png";
-        const reportTemplate = `<div style="font-family: Arial, sans-serif; padding: 2rem; max-width: 800px; margin: auto;"><div style="text-align: center; margin-bottom: 2rem;"><img src="${logoUrl}" alt="Company Logo" style="height: 80px;"><h3 style="font-size: 1.8rem; font-weight: bold; color: #15803d; margin: 0;">Blooming Kids House</h3><h1 style="font-size: 1.2rem; font-weight: bold; color: #166534;">MONTHLY LEARNING REPORT</h1><p>Date: ${new Date(reportData.submittedAt.seconds * 1000).toLocaleDateString()}</p></div><div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 2rem;"><p><strong>Student's Name:</strong> ${reportData.studentName}</p><p><strong>Parent's Email:</strong> ${parentEmail}</p><p><strong>Grade:</strong> ${reportData.grade}</p><p><strong>Tutor's Name:</strong> ${reportData.tutorName}</p></div>${Object.entries({"INTRODUCTION": reportData.introduction, "TOPICS & REMARKS": reportData.topics, "PROGRESS & ACHIEVEMENTS": reportData.progress, "STRENGTHS AND WEAKNESSES": reportData.strengthsWeaknesses, "RECOMMENDATIONS": reportData.recommendations, "GENERAL TUTOR'S COMMENTS": reportData.generalComments}).map(([title, content]) => `<div style="border-top: 1px solid #d1d5db; padding-top: 1rem; margin-top: 1rem;"><h2 style="font-size: 1.25rem; font-weight: bold; color: #16a34a;">${title}</h2><p style="line-height: 1.6; white-space: pre-wrap;">${content || 'N/A'}</p></div>`).join('')}<div style="margin-top: 3rem; text-align: right;"><p>Best regards,</p><p style="font-weight: bold;">${reportData.tutorName}</p></div></div>`;
+        
+        const reportTemplate = `
+            <div style="font-family: Arial, sans-serif; padding: 2rem; max-width: 800px; margin: auto;">
+                <div style="text-align: center; margin-bottom: 2rem;">
+                    <img src="${logoUrl}" alt="Company Logo" style="height: 80px; margin-bottom: 1rem;">
+                    <h3 style="font-size: 1.8rem; font-weight: bold; color: #15803d; margin: 0;">Blooming Kids House</h3>
+                    <h1 style="font-size: 1.2rem; font-weight: bold; color: #166534; margin-top: 0.5rem;">MONTHLY LEARNING REPORT</h1>
+                    <p style="color: #4b5563;">Date: ${new Date(reportData.submittedAt.seconds * 1000).toLocaleDateString()}</p>
+                </div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 2rem;">
+                    <p><strong>Student's Name:</strong> ${reportData.studentName}</p>
+                    <p><strong>Parent's Email:</strong> ${parentEmail}</p>
+                    <p><strong>Grade:</strong> ${reportData.grade}</p>
+                    <p><strong>Tutor's Name:</strong> ${reportData.tutorName}</p>
+                </div>
+                ${Object.entries({
+                    "INTRODUCTION": reportData.introduction, "TOPICS & REMARKS": reportData.topics, "PROGRESS AND ACHIEVEMENTS": reportData.progress,
+                    "STRENGTHS AND WEAKNESSES": reportData.strengthsWeaknesses, "RECOMMENDATIONS": reportData.recommendations, "GENERAL TUTOR'S COMMENTS": reportData.generalComments
+                }).map(([title, content]) => `<div style="border-top: 1px solid #d1d5db; padding-top: 1rem; margin-top: 1rem;"><h2 style="font-size: 1.25rem; font-weight: bold; color: #16a34a;">${title}</h2><p style="line-height: 1.6; white-space: pre-wrap;">${content || 'N/A'}</p></div>`).join('')}
+                <div style="margin-top: 3rem; text-align: right;"><p>Best regards,</p><p style="font-weight: bold;">${reportData.tutorName}</p></div>
+            </div>`;
+        
+        const opt = {
+            margin:       0.5,
+            filename:     `${reportData.studentName}_report.pdf`,
+            image:        { type: 'jpeg', quality: 0.98 },
+            html2canvas:  { scale: 2 },
+            jsPDF:        { unit: 'in', format: 'letter', orientation: 'portrait' }
+        };
 
-        if (shouldDownload) {
-             html2pdf().from(reportTemplate).save(`${reportData.studentName}_report.pdf`);
+        if (returnBlob) {
+            return await html2pdf().from(reportTemplate).set(opt).outputPdf('blob');
         } else {
-            const newWindow = window.open();
-            newWindow.document.write(`<html><head><title>${reportData.studentName} Report</title></head><body>${reportTemplate}</body></html>`);
-            newWindow.document.close();
+            html2pdf().from(reportTemplate).set(opt).save();
         }
+
     } catch (error) {
-        alert(`Error: ${error.message}`);
+        console.error("Error generating PDF:", error);
+        alert(`Failed to download report: ${error.message}`);
+        return null;
     }
 }
 
 async function renderSummerBreakPanel(container) {
     container.innerHTML = `
-        <div class="bg-white p-6 rounded-lg shadow-md">
-            <h2 class="text-2xl font-bold text-green-700 mb-4">Students on Summer Break</h2>
+        <div class="panel">
+            <h2 class="text-3xl font-bold text-green-700 mb-4">Students on Summer Break</h2>
             <div id="break-students-list" class="space-y-4"><p class="text-center">Loading...</p></div>
         </div>
     `;
@@ -293,16 +388,28 @@ async function renderSummerBreakPanel(container) {
         const listContainer = document.getElementById('break-students-list');
         if (!listContainer) return;
         if (snapshot.empty) {
-            listContainer.innerHTML = `<p class="text-center text-gray-500">No students are on break.</p>`;
+            listContainer.innerHTML = `<p class="text-center text-gray-500 text-base">No students are on break.</p>`;
             return;
         }
         listContainer.innerHTML = snapshot.docs.map(doc => {
             const student = doc.data();
-            return `<div class="border p-4 rounded-lg flex justify-between items-center bg-gray-50"><div><p><strong>Student:</strong> ${student.studentName}</p><p><strong>Tutor:</strong> ${student.tutorEmail}</p></div><span class="text-yellow-600 font-semibold px-3 py-1 bg-yellow-100 rounded-full text-sm">On Break</span></div>`;
+            return `<div class="border p-4 rounded-lg flex justify-between items-center bg-gray-50"><div><p class="text-lg font-semibold"><strong>Student:</strong> ${student.studentName}</p><p class="text-lg"><strong>Tutor:</strong> ${student.tutorEmail}</p></div><button class="end-break-btn bg-red-500 text-white px-4 py-2 rounded-full shadow hover:bg-red-600" data-student-id="${doc.id}">End Break</button></div>`;
         }).join('');
+
+        document.querySelectorAll('.end-break-btn').forEach(button => {
+            button.addEventListener('click', async (e) => {
+                const studentId = e.target.dataset.studentId;
+                try {
+                    await updateDoc(doc(db, "students", studentId), {
+                        summerBreak: false
+                    });
+                } catch (error) {
+                    alert(`Error ending break: ${error.message}`);
+                }
+            });
+        });
     });
 }
-
 
 // ##################################
 // # AUTHENTICATION & INITIALIZATION
@@ -330,11 +437,6 @@ onAuthStateChanged(auth, async (user) => {
                 };
 
                 const navContainer = document.querySelector('nav');
-                const originalNavButtons = {};
-                navContainer.querySelectorAll('.nav-btn').forEach(btn => {
-                    originalNavButtons[btn.id] = btn.textContent;
-                });
-
                 navContainer.innerHTML = '';
                 let firstVisibleTab = null;
 
@@ -343,12 +445,14 @@ onAuthStateChanged(auth, async (user) => {
                         if (!firstVisibleTab) firstVisibleTab = id;
                         const button = document.createElement('button');
                         button.id = id;
-                        button.className = 'nav-btn text-lg font-semibold text-gray-500 hover:text-green-700';
-                        button.textContent = originalNavButtons[id];
+                        button.className = 'nav-btn text-lg font-bold text-gray-500 hover:text-white';
+                        button.textContent = document.querySelector(`[id="${id}"]`)?.textContent || (id === 'navTutorManagement' ? 'Tutor & Student List' : id === 'navPayAdvice' ? 'Pay Advice' : id === 'navTutorReports' ? 'Tutor Reports' : id === 'navSummerBreak' ? 'Summer Break' : '');
                         navContainer.appendChild(button);
                         
                         button.addEventListener('click', () => {
-                            document.querySelectorAll('.nav-btn').forEach(btn => btn.classList.remove('active'));
+                            document.querySelectorAll('.nav-btn').forEach(btn => {
+                                btn.classList.remove('active');
+                            });
                             button.classList.add('active');
                             item.fn(mainContent);
                         });
@@ -356,7 +460,11 @@ onAuthStateChanged(auth, async (user) => {
                 });
 
                 if (firstVisibleTab) {
-                    document.getElementById(firstVisibleTab).click();
+                    const firstTabButton = document.getElementById(firstVisibleTab);
+                    if (firstTabButton) {
+                        firstTabButton.classList.add('active');
+                        allNavItems[firstVisibleTab].fn(mainContent);
+                    }
                 } else {
                     mainContent.innerHTML = `<p class="text-center">You have no permissions assigned.</p>`;
                 }
