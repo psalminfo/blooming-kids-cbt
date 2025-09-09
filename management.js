@@ -90,7 +90,8 @@ async function renderManagementTutorView(container) {
                                     <th class="px-4 py-2 font-medium">Student Name</th>
                                     <th class="px-4 py-2 font-medium">Grade</th>
                                     <th class="px-4 py-2 font-medium">Days/Week</th>
-                                    <th class="px-4 py-2 font-medium">Parent's Email</th>
+                                    <th class="px-4 py-2 font-medium">Parent's Name</th>
+                                    <th class="px-4 py-2 font-medium">Parent's Phone NO</th>
                                 </tr></thead>
                                 <tbody class="bg-white divide-y divide-gray-200">${studentsTableRows}</tbody>
                             </table>
@@ -523,3 +524,4 @@ onAuthStateChanged(auth, async (user) => {
         window.location.href = "management-auth.html";
     }
 });
+
