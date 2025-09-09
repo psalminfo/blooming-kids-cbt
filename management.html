@@ -5,24 +5,115 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
     <title>Management Portal - Blooming Kids House</title>
     <link rel="icon" href="favicon.ico" />
-    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
-    <style id="new-styles"></style>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- JSZip for report zipping -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <style>
+        /* Core Colors */
+        :root {
+            --primary-green: #15803d;
+            --secondary-green: #166534;
+            --light-green: #dcfce7;
+            --accent-yellow: #fde047;
+            --hover-green: #16a34a;
+        }
+
+        /* Wavy Background Style */
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: radial-gradient(circle at 50% 120%, rgba(240, 253, 244, 0.7) 10%, rgba(220, 252, 231, 0.8) 30%, rgba(255, 255, 255, 0.9) 60%);
+            background-size: 200% 200%;
+            animation: waveAnimation 15s ease-in-out infinite;
+            color: #1f2937;
+            overflow-x: hidden;
+        }
+
+        @keyframes waveAnimation {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+
+        /* Cards and Panels */
+        .card {
+            background: rgba(255, 255, 255, 0.7);
+            backdrop-filter: blur(8px);
+            border: 1px solid rgba(220, 252, 231, 0.6);
+            border-radius: 14px;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.1), inset 0 0 0 1px rgba(255,255,255,0.2);
+            transition: transform 0.2s ease, box-shadow 0.3s ease;
+        }
+
+        .card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 12px 30px rgba(0,0,0,0.2), 0 0 18px rgba(21,128,61,0.15);
+            border-color: rgba(21,128,61,0.3);
+        }
+
+        /* Buttons */
+        .btn-primary {
+            background: linear-gradient(90deg, var(--primary-green), var(--secondary-green));
+            color: white;
+            border: none;
+            padding: 0.65rem 1.2rem;
+            border-radius: 10px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: box-shadow 0.3s ease, transform 0.2s ease;
+            box-shadow: 0 0 12px rgba(21, 128, 61, 0.45);
+            position: relative;
+            overflow: hidden;
+        }
+        .btn-primary:hover {
+            box-shadow: 0 0 18px var(--hover-green), 0 0 36px var(--hover-green);
+            transform: translateY(-2px);
+        }
+        .btn-primary:active { transform: translateY(1px); }
+        .btn-primary::after {
+            content: "";
+            position: absolute; left: 50%; top: 50%; width: 0; height: 0;
+            background: rgba(255, 255, 255, 0.25);
+            border-radius: 50%; transform: translate(-50%, -50%);
+            transition: width 0.4s ease, height 0.4s ease;
+        }
+        .btn-primary:active::after { width: 220%; height: 220%; transition: 0s; }
+
+        /* Nav buttons */
+        .nav-btn {
+            padding: 10px 20px;
+            border-bottom: 2px solid transparent;
+            transition: all 0.3s ease;
+            border-radius: 8px; /* Added to "encase" */
+            font-size: 1.125rem; /* Increased font size */
+            font-weight: 700; /* Bolder font */
+        }
+        .nav-btn:hover {
+            background-color: rgba(220, 252, 231, 0.5); /* Subtle hover effect */
+        }
+        .nav-btn.active {
+            border-bottom-color: var(--secondary-green) !important;
+            color: var(--secondary-green) !important;
+            background-color: rgba(220, 252, 231, 0.8) !important;
+            box-shadow: 0 4px 12px rgba(22, 101, 52, 0.2);
+        }
+    </style>
 </head>
-<body class="bg-white min-h-screen">
+<body class="min-h-screen">
     <div class="max-w-7xl mx-auto p-6">
         <div class="flex justify-between items-center mb-6">
             <div>
                 <h1 id="welcome-message" class="text-3xl font-bold text-green-800">Welcome</h1>
                 <p id="user-role" class="text-md text-gray-600 font-semibold"></p>
             </div>
-            <button id="logoutBtn" class="bg-yellow-400 text-white px-4 py-2 rounded hover:bg-yellow-500">Logout</button>
+            <button id="logoutBtn" class="btn-primary">Logout</button>
         </div>
         <nav class="flex space-x-4 mb-6 border-b border-gray-200">
-            <button id="navTutorManagement" class="nav-btn text-lg font-semibold active">Tutor & Student List</button>
-            <button id="navPayAdvice" class="nav-btn text-lg font-semibold text-gray-500 hover:text-green-700">Pay Advice</button>
-            <button id="navTutorReports" class="nav-btn text-lg font-semibold text-gray-500 hover:text-green-700">Tutor Reports</button>
-            <button id="navSummerBreak" class="nav-btn text-lg font-semibold text-gray-500 hover:text-green-700">Summer Break</button>
+            <button id="navTutorManagement" class="nav-btn active text-green-700">Tutor & Student List</button>
+            <button id="navPayAdvice" class="nav-btn text-gray-500 hover:text-green-700">Pay Advice</button>
+            <button id="navTutorReports" class="nav-btn text-gray-500 hover:text-green-700">Tutor Reports</button>
+            <button id="navSummerBreak" class="nav-btn text-gray-500 hover:text-green-700">Summer Break</button>
         </nav>
         <div id="main-content">
              <p class="text-center text-gray-600 mt-12">Checking user permissions...</p>
