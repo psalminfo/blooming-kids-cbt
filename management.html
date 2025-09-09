@@ -1,150 +1,47 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Management Portal - Blooming Kids House</title>
-  <link rel="icon" href="favicon.ico" />
-  <style>
-    /* === Base Reset & Theme === */
-    body {
-      margin: 0;
-      font-family: 'Segoe UI', system-ui, -apple-system, BlinkMacSystemFont, Roboto, sans-serif;
-      background-color: #ffffff; /* Pure white, like Zoom */
-      color: #1f2937; /* Default dark text */
-    }
-    .container {
-      max-width: 1200px;
-      margin: 0 auto;
-      padding: 32px 24px;
-    }
-
-    /* === Header === (Clean, like Zoom) */
-    .header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 40px;
-      background: #f9fafb; /* Light gray background */
-      padding: 20px 24px;
-      border-radius: 12px;
-      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
-    }
-    .header h1 {
-      font-size: 2rem;
-      font-weight: 700;
-      color: #166534;
-      margin: 0;
-    }
-    .header p {
-      font-size: 1rem;
-      color: #4b5563;
-      font-weight: 600;
-      margin-top: 4px;
-    }
-
-    /* === Logout Button === (Kept vibrant for contrast) */
-    .btn-logout {
-      background: linear-gradient(90deg, #facc15, #fbbf24);
-      color: white;
-      font-weight: bold;
-      padding: 10px 16px;
-      border: none;
-      border-radius: 10px;
-      cursor: pointer;
-      box-shadow: 0 4px 12px rgba(251, 191, 36, 0.3);
-      transition: transform 0.2s ease, box-shadow 0.3s ease;
-    }
-    .btn-logout:hover {
-      background: #f59e0b;
-      transform: translateY(-1px);
-      box-shadow: 0 6px 16px rgba(251, 191, 36, 0.4);
-    }
-
-    /* === ZOOM HOMEPAGE STYLE CARD GRID === */
-    .card-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-      gap: 24px;
-      margin-bottom: 40px;
-    }
-    .card {
-      background: #ffffff;
-      border: 1px solid #e5e7eb; /* Subtle border, like Zoom */
-      border-radius: 12px;
-      padding: 24px;
-      font-size: 1.125rem; /* 18px, like Zoom cards */
-      font-weight: 600;
-      color: #1f2937;
-      cursor: pointer;
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06); /* Soft shadow, like Zoom */
-      transition: all 0.3s ease;
-      text-align: center;
-    }
-    .card:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 6px 16px rgba(0, 0, 0, 0.1);
-      border-color: #d1d5db;
-    }
-    .card.active {
-      background: #ecfdf5; /* Light green highlight */
-      border-color: #166534;
-      box-shadow: 0 4px 12px rgba(22, 101, 52, 0.15);
-      color: #166534;
-    }
-
-    /* === Main Content === (Default styling for dynamic content) */
-    #main-content {
-      background: #ffffff;
-      padding: 32px;
-      border-radius: 12px;
-      border: 1px solid #e5e7eb;
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
-      min-height: 300px;
-    }
-    .main-message {
-      text-align: center;
-      color: #6b7280;
-      font-size: 1rem;
-      margin-top: 48px;
-    }
-
-    /* Responsive */
-    @media (max-width: 768px) {
-      .header {
-        flex-direction: column;
-        align-items: flex-start;
-        gap: 12px;
-      }
-      .card-grid {
-        grid-template-columns: 1fr;
-      }
-    }
-  </style>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Management Portal - Blooming Kids House</title>
+  <link rel="icon" href="favicon.ico" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet" />
+  <style>
+    /* New CSS styles will go here */
+  </style>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 </head>
-<body>
-  <div class="container">
-    <div class="header">
-      <div>
-        <h1 id="welcome-message">Welcome</h1>
-        <p id="user-role"></p>
-      </div>
-      <button id="logoutBtn" class="btn-logout">Logout</button>
-    </div>
+<body id="aurora-bg">
+  <div class="container">
+    <div class="header">
+      <div>
+        <h1 class="welcome-heading">Welcome</h1>
+        <p class="user-role-text">Management Role</p>
+      </div>
+      <button id="logoutBtn" class="logout-btn">Logout</button>
+    </div>
 
-    <!-- Zoom-Style Navigation Cards -->
-    <div class="card-grid">
-      <div id="navTutorManagement" class="card active">Tutor & Student List</div>
-      <div id="navPayAdvice" class="card">Pay Advice</div>
-      <div id="navTutorReports" class="card">Tutor Reports</div>
-      <div id="navSummerBreak" class="card">Summer Break</div>
-    </div>
+    <nav class="nav-cards">
+      <div id="navTutorManagement" class="nav-card active">
+        <h3>Tutor & Student List</h3>
+      </div>
+      <div id="navPayAdvice" class="nav-card">
+        <h3>Pay Advice</h3>
+      </div>
+      <div id="navTutorReports" class="nav-card">
+        <h3>Tutor Reports</h3>
+      </div>
+      <div id="navSummerBreak" class="nav-card">
+        <h3>Summer Break</h3>
+      </div>
+    </nav>
 
-    <div id="main-content">
-      <p class="main-message">Checking user permissions...</p>
-    </div>
-  </div>
-  <script type="module" src="management.js"></script>
+    <div id="main-content" class="content-box">
+      <p class="main-message">Checking user permissions...</p>
+    </div>
+  </div>
+  <script type="module" src="management.js"></script>
 </body>
 </html>
