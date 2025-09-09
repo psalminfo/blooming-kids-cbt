@@ -5,93 +5,301 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
     <title>Management Portal - Blooming Kids House</title>
     <link rel="icon" href="favicon.ico" />
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" />
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
     <style>
-        .nav-btn {
-            padding: 8px 16px;
-            border-bottom: 2px solid transparent;
-            transition: all 0.3s ease;
+        /* === Background & Base Styles === */
+        body {
+            overflow-x: hidden;
+            margin: 0;
+            font-family: 'Inter', sans-serif;
+            background: linear-gradient(120deg, #0f172a, #1e293b, #0f172a);
+            background-size: 400% 400%;
+            animation: aurora 15s ease infinite;
+            color: #f1f5f9;
         }
-        .nav-btn.active { 
-            border-bottom-color: #166534; /* dark-green */
-            color: #166534; 
+        @keyframes aurora {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
         }
+        ::selection {
+            background: linear-gradient(90deg, #38bdf8, #3b82f6);
+            color: white;
+        }
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: rgba(255,255,255,0.05); }
+        ::-webkit-scrollbar-thumb {
+            background: linear-gradient(#10b981, #16a34a);
+            border-radius: 4px;
+            box-shadow: 0 0 5px #10b981;
+        }
+        ::-webkit-scrollbar-thumb:hover { background: linear-gradient(#34d399, #059669); }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 24px;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            gap: 24px;
+        }
+
+        /* === Header Section === */
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 16px 24px;
+            background: rgba(30, 41, 59, 0.85);
+            backdrop-filter: blur(8px);
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+        }
+
+        .welcome-message {
+            font-size: 2rem;
+            font-weight: 700;
+            color: #10b981;
+            text-shadow: 0 0 10px rgba(16, 185, 129, 0.5);
+        }
+
+        .user-role-text {
+            font-size: 1rem;
+            color: #9ca3af;
+            font-weight: 600;
+        }
+
+        .logout-btn {
+            background: linear-gradient(45deg, #facc15, #f97316);
+            color: #1f2937;
+            font-weight: 700;
+            padding: 10px 16px;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            box-shadow: 0 0 15px rgba(252, 211, 77, 0.5);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+
+        .logout-btn:hover {
+            transform: translateY(-3px) scale(1.05);
+            box-shadow: 0 0 20px rgba(252, 211, 77, 0.8);
+        }
+
+        /* === Navigation Cards (Zoom-style) === */
+        .nav-cards {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 24px;
+        }
+
+        .nav-card {
+            background: rgba(17,24,39,0.6);
+            backdrop-filter: blur(6px);
+            border: 1px solid rgba(255,255,255,0.06);
+            border-radius: 14px;
+            padding: 2rem;
+            text-align: center;
+            cursor: pointer;
+            transition: transform 0.3s ease, box-shadow 0.3s ease, border-color 0.3s ease;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.25), inset 0 0 0 1px rgba(255,255,255,0.04);
+        }
+
+        .nav-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 12px 30px rgba(0,0,0,0.35), 0 0 24px rgba(16, 185, 129, 0.25);
+            border-color: rgba(16, 185, 129, 0.5);
+        }
+
+        .nav-card h3 {
+            font-size: 1.5rem;
+            font-weight: 600;
+            color: #f1f5f9;
+            margin: 0;
+        }
+
+        /* === Main Content Area === */
+        .content-card {
+            background: rgba(17,24,39,0.6);
+            backdrop-filter: blur(6px);
+            padding: 32px;
+            border-radius: 12px;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.25), inset 0 0 0 1px rgba(255,255,255,0.04);
+            min-height: 400px;
+            display: grid;
+            place-items: center;
+        }
+
+        .main-message {
+            text-align: center;
+            color: #9ca3af;
+            font-size: 1.5rem;
+            font-weight: 500;
+        }
+
+        /* === Tutor Reports Specific Styles === */
+        #tutor-list h3 {
+            font-size: 1.25rem;
+            margin-bottom: 0.5rem;
+        }
+        .tutor-item {
+            cursor: pointer;
+            padding: 1rem;
+            border-radius: 8px;
+            transition: background 0.2s ease, transform 0.2s ease;
+        }
+        .tutor-item:hover {
+            background: rgba(255, 255, 255, 0.05);
+            transform: translateX(5px);
+        }
+        .tutor-reports-section {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        @media (max-width: 768px) {
+            .header {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 12px;
+            }
+        }
+        .hidden { display: none; }
     </style>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.7.1/jszip.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
 </head>
-<body class="bg-gray-50 min-h-screen">
-    <div class="max-w-7xl mx-auto p-6">
-        <div class="flex justify-between items-center mb-6">
+<body>
+    <div class="container">
+        <div class="header">
             <div>
-                <h1 id="welcome-message" class="text-3xl font-bold text-green-800">Welcome</h1>
-                <p id="user-role" class="text-md text-gray-600 font-semibold"></p>
+                <h1 id="welcome-message" class="welcome-message">Welcome</h1>
+                <p id="user-role" class="user-role-text">Management Role</p>
             </div>
-            <button id="logoutBtn" class="bg-yellow-400 text-white px-4 py-2 rounded hover:bg-yellow-500">Logout</button>
+            <button id="logoutBtn" class="logout-btn">Logout</button>
         </div>
-        <nav class="flex space-x-4 mb-6 border-b">
-            <button id="navTutorManagement" class="nav-btn text-lg font-semibold active">Tutor & Student List</button>
-            <button id="navPayAdvice" class="nav-btn text-lg font-semibold text-gray-500 hover:text-green-700">Pay Advice</button>
-            <button id="navTutorReports" class="nav-btn text-lg font-semibold text-gray-500 hover:text-green-700">Tutor Reports</button>
-            <button id="navSummerBreak" class="nav-btn text-lg font-semibold text-gray-500 hover:text-green-700">Summer Break</button>
-        </nav>
-        <div id="main-content">
-             <div id="tutor-reports-content" class="p-4 hidden">
-                <div class="flex justify-between items-center mb-4">
-                    <h2 class="text-2xl font-bold">Tutor Reports</h2>
-                    <button id="downloadAllBtn" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Download All Reports</button>
-                </div>
-                <p class="text-gray-600">Click the button above to download all reports for this tutor as a zipped folder.</p>
-            </div>
 
-            <p id="main-message" class="text-center text-gray-600 mt-12">Checking user permissions...</p>
+        <nav id="nav-cards" class="nav-cards">
+            <div id="navTutorManagement" class="nav-card">
+                <h3>Tutor & Student List</h3>
+            </div>
+            <div id="navPayAdvice" class="nav-card">
+                <h3>Pay Advice</h3>
+            </div>
+            <div id="navTutorReports" class="nav-card">
+                <h3>Tutor Reports</h3>
+            </div>
+            <div id="navSummerBreak" class="nav-card">
+                <h3>Summer Break</h3>
+            </div>
+        </nav>
+
+        <div id="main-content" class="content-card hidden">
+            <p id="default-message" class="main-message">Checking user permissions...</p>
+        </div>
+
+        <div id="tutor-reports-list" class="content-card hidden">
+            <h2 class="text-2xl font-bold mb-4">Select a Tutor</h2>
+            <div id="tutor-list" class="w-full">
+                </div>
+        </div>
+
+        <div id="tutor-reports-content" class="content-card hidden">
+            <div class="flex justify-between items-center mb-4 w-full">
+                <h2 id="tutor-name" class="text-2xl font-bold"></h2>
+                <button id="downloadAllBtn" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Download All Reports</button>
+            </div>
+            <p class="text-gray-400">Click the button above to download all reports for this tutor as a zipped folder.</p>
         </div>
     </div>
-    <script type="module">
-        // This is a mock object. In a real application, this would be dynamic data
-        // fetched from your database or API.
-        const tutorReports = {
-            tutorName: 'John Doe',
-            reportUrls: [
-                'https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf',
-                'https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf',
-                // Add your real report URLs here
-            ]
-        };
+    
+    <script>
+        const navTutorReports = document.getElementById('navTutorReports');
+        const navCards = document.getElementById('nav-cards');
+        const mainContent = document.getElementById('main-content');
+        const tutorReportsList = document.getElementById('tutor-reports-list');
+        const tutorReportsContent = document.getElementById('tutor-reports-content');
+        const defaultMessage = document.getElementById('default-message');
+        const tutorList = document.getElementById('tutor-list');
+        const tutorNameDisplay = document.getElementById('tutor-name');
+        const downloadAllBtn = document.getElementById('downloadAllBtn');
+        
+        // Mock data for tutors and their reports
+        const tutors = [
+            { id: 'tutor1', name: 'John Doe', reports: ['https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf', 'https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf'] },
+            { id: 'tutor2', name: 'Jane Smith', reports: ['https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf', 'https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf'] },
+            { id: 'tutor3', name: 'Peter Jones', reports: ['https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf', 'https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf'] },
+        ];
 
-        document.getElementById('navTutorReports').addEventListener('click', () => {
-            // Hide the initial message and show the reports content
-            document.getElementById('main-message').classList.add('hidden');
-            document.getElementById('tutor-reports-content').classList.remove('hidden');
+        // This is a dynamic section. When you click on a navigation card, the main content area will appear.
+        document.querySelectorAll('.nav-card').forEach(card => {
+            card.addEventListener('click', () => {
+                navCards.classList.add('hidden');
+                mainContent.classList.remove('hidden');
+                tutorReportsList.classList.add('hidden');
+                tutorReportsContent.classList.add('hidden');
+
+                if (card.id === 'navTutorReports') {
+                    mainContent.classList.add('hidden');
+                    tutorReportsList.classList.remove('hidden');
+                    displayTutors();
+                } else {
+                    defaultMessage.textContent = `${card.textContent} page content will be displayed here.`;
+                }
+            });
         });
 
-        document.getElementById('downloadAllBtn').addEventListener('click', async () => {
-            const zip = new JSZip();
-            const tutorFolder = zip.folder(tutorReports.tutorName);
+        // Populate the tutor list dynamically
+        function displayTutors() {
+            tutorList.innerHTML = ''; // Clear existing list
+            tutors.forEach(tutor => {
+                const tutorDiv = document.createElement('div');
+                tutorDiv.className = 'tutor-item';
+                tutorDiv.innerHTML = `<h3>${tutor.name}</h3>`;
+                tutorDiv.addEventListener('click', () => showTutorReports(tutor));
+                tutorList.appendChild(tutorDiv);
+            });
+        }
+
+        // Show reports section for a specific tutor
+        function showTutorReports(tutor) {
+            tutorReportsList.classList.add('hidden');
+            tutorReportsContent.classList.remove('hidden');
+            tutorNameDisplay.textContent = `${tutor.name}'s Reports`;
             
-            // Loop through each report URL
-            for (let i = 0; i < tutorReports.reportUrls.length; i++) {
-                const url = tutorReports.reportUrls[i];
-                const filename = `Report_${i + 1}.pdf`; // You can name the files dynamically
+            // Set the reports to be downloaded for this specific tutor
+            downloadAllBtn.onclick = () => downloadTutorReports(tutor);
+        }
+
+        // Download function for a specific tutor
+        async function downloadTutorReports(tutor) {
+            const zip = new JSZip();
+            const tutorFolder = zip.folder(tutor.name.replace(/\s/g, '_'));
+
+            for (let i = 0; i < tutor.reports.length; i++) {
+                const url = tutor.reports[i];
+                const filename = `Report_${i + 1}.pdf`;
 
                 try {
-                    // Fetch the file as a binary blob
                     const response = await fetch(url);
                     const blob = await response.blob();
-                    
-                    // Add the blob to the tutor's folder in the zip file
                     tutorFolder.file(filename, blob);
                 } catch (error) {
                     console.error(`Failed to fetch and add file: ${url}`, error);
+                    alert(`Failed to download report. Please check the console for details.`);
+                    return;
                 }
             }
 
-            // Generate and download the zip file
             zip.generateAsync({ type: 'blob' }).then(function(content) {
-                saveAs(content, `${tutorReports.tutorName}_Reports.zip`);
+                saveAs(content, `${tutor.name.replace(/\s/g, '_')}_Reports.zip`);
             });
-        });
+        }
     </script>
 </body>
 </html>
