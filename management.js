@@ -235,6 +235,42 @@ async function renderManagementPayAdvice(container) {
     }
 }
 
+async function downloadTutorDataAsZip(tutorId, tutorName) {
+    showLoadingOverlay();
+    try {
+        const checkinsQuery = query(collection(db, `artifacts/${__app_id}/public/data/studentCheckIns`), where('tutorId', '==', tutorId));
+        const checkinsSnapshot = await getDocs(checkinsQuery);
+        const checkinData = checkinsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+
+        if (checkinData.length === 0) {
+            showMessageBox('No Data Found', `No check-in records were found for ${tutorName}.`);
+            return;
+        }
+
+        const zip = new JSZip();
+        checkinData.forEach(checkin => {
+            const fileName = `checkin_${checkin.id}.json`;
+            const fileContent = JSON.stringify(checkin, null, 2);
+            zip.file(fileName, fileContent);
+        });
+
+        const zipBlob = await zip.generateAsync({ type: "blob" });
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(zipBlob);
+        link.download = `${tutorName.toLowerCase().replace(/\s/g, '_')}_data.zip`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+
+        showMessageBox('Download Complete', `All check-in data for ${tutorName} has been downloaded in a ZIP file.`);
+    } catch (error) {
+        console.error("Error creating or downloading zip file:", error);
+        showMessageBox('Download Failed', 'An error occurred while creating the ZIP file. Please check the console for details.');
+    } finally {
+        hideLoadingOverlay();
+    }
+}
+
 async function renderManagementTutorReports(container) {
     container.innerHTML = `
         <div class="bg-white p-6 rounded-lg shadow-lg">
@@ -281,7 +317,7 @@ async function renderManagementTutorReports(container) {
                             </ul>
                         </div>
                         <div class="mt-4 flex justify-end">
-                            <button class="generate-pdf-btn bg-red-500 text-white px-4 py-2 rounded-lg hover:bg-red-600 transition-colors" data-report-id="report-${tutor.id}">Download PDF</button>
+                            <button class="generate-zip-btn bg-red-500 text-white px-4 py-2 rounded-lg hover:bg-red-600 transition-colors" data-tutor-id="${tutor.id}" data-tutor-name="${tutor.name}">Download ZIP</button>
                         </div>
                     </div>
                 `;
@@ -292,13 +328,11 @@ async function renderManagementTutorReports(container) {
             tutorReportsContainer.innerHTML = tutorReportsHTML.join('');
             
             // Add event listeners to the new buttons
-            document.querySelectorAll('.generate-pdf-btn').forEach(button => {
+            document.querySelectorAll('.generate-zip-btn').forEach(button => {
                 button.addEventListener('click', () => {
-                    const reportId = button.getAttribute('data-report-id');
-                    const element = document.getElementById(reportId);
-                    if (element) {
-                        html2pdf().from(element).save(`${tutorId}-report.pdf`);
-                    }
+                    const tutorId = button.getAttribute('data-tutor-id');
+                    const tutorName = button.getAttribute('data-tutor-name');
+                    downloadTutorDataAsZip(tutorId, tutorName);
                 });
             });
             hideLoadingOverlay();
