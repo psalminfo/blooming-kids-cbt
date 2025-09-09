@@ -6,15 +6,33 @@
     <title>Management Portal - Blooming Kids House</title>
     <link rel="icon" href="favicon.ico" />
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css" />
     <style>
-        .nav-btn {
-            padding: 8px 16px;
-            border-bottom: 2px solid transparent;
-            transition: all 0.3s ease;
+        .nav-card {
+            background-color: #ffffff;
+            border-radius: 0.5rem;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            padding: 1.5rem;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            min-width: 150px;
+            min-height: 150px;
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
         }
-        .nav-btn.active { 
-            border-bottom-color: #166534; /* dark-green */
-            color: #166534; 
+        .nav-card:hover {
+            transform: scale(1.05);
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+        }
+        .nav-card.active {
+            border: 2px solid #166534; /* dark-green */
+            color: #166534;
+        }
+        .nav-card-icon {
+            font-size: 3rem;
+            color: #16a34a; /* green-600 */
         }
     </style>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
@@ -22,22 +40,54 @@
 <body class="bg-gray-50 min-h-screen">
     <div class="max-w-7xl mx-auto p-6">
         <div class="flex justify-between items-center mb-6">
-            <div>
+            <button id="hamburgerBtn" class="lg:hidden p-2 rounded-lg text-gray-600 hover:text-green-700">
+                <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16m-7 6h7"></path>
+                </svg>
+            </button>
+            <div class="flex-grow">
                 <h1 id="welcome-message" class="text-3xl font-bold text-green-800">Welcome</h1>
                 <p id="user-role" class="text-md text-gray-600 font-semibold"></p>
             </div>
             <button id="logoutBtn" class="bg-yellow-400 text-white px-4 py-2 rounded hover:bg-yellow-500">Logout</button>
         </div>
-        <nav class="flex space-x-4 mb-6 border-b">
-            <button id="navTutorManagement" class="nav-btn text-lg font-semibold active">Tutor & Student List</button>
-            <button id="navPayAdvice" class="nav-btn text-lg font-semibold text-gray-500 hover:text-green-700">Pay Advice</button>
-            <button id="navTutorReports" class="nav-btn text-lg font-semibold text-gray-500 hover:text-green-700">Tutor Reports</button>
-            <button id="navSummerBreak" class="nav-btn text-lg font-semibold text-gray-500 hover:text-green-700">Summer Break</button>
-        </nav>
+        <div id="nav-container" class="lg:flex lg:space-x-6 space-y-4 lg:space-y-0 lg:justify-center mb-6 hidden lg:flex">
+            <div id="navTutorManagement" class="nav-card cursor-pointer active">
+                <i class="fas fa-users nav-card-icon"></i>
+                <span class="mt-4 text-md font-semibold text-gray-700">Tutor & Student List</span>
+            </div>
+
+            <div id="navPayAdvice" class="nav-card cursor-pointer">
+                <i class="fas fa-file-invoice-dollar nav-card-icon"></i>
+                <span class="mt-4 text-md font-semibold text-gray-700">Pay Advice</span>
+            </div>
+
+            <div id="navTutorReports" class="nav-card cursor-pointer">
+                <i class="fas fa-chart-bar nav-card-icon"></i>
+                <span class="mt-4 text-md font-semibold text-gray-700">Tutor Reports</span>
+            </div>
+
+            <div id="navSummerBreak" class="nav-card cursor-pointer">
+                <i class="fas fa-sun nav-card-icon"></i>
+                <span class="mt-4 text-md font-semibold text-gray-700">Summer Break</span>
+            </div>
+        </div>
         <div id="main-content">
-             <p class="text-center text-gray-600 mt-12">Checking user permissions...</p>
+            <p class="text-center text-gray-600 mt-12">Checking user permissions...</p>
         </div>
     </div>
     <script type="module" src="management.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const hamburgerBtn = document.getElementById('hamburgerBtn');
+            const navContainer = document.getElementById('nav-container');
+
+            hamburgerBtn.addEventListener('click', function() {
+                navContainer.classList.toggle('hidden');
+                navContainer.classList.toggle('flex');
+                navContainer.classList.toggle('flex-col');
+            });
+        });
+    </script>
 </body>
 </html>
