@@ -27,12 +27,18 @@
       padding: 32px;
       text-align: center;
     }
-    /* === Header === (From compare.txt, applied to managementt structure) */
+
+    /* === Header === (Visual upgrade from compare.txt, structure from managementt.txt) */
     .header {
       display: flex;
       justify-content: space-between;
       align-items: center;
       margin-bottom: 40px;
+      background: rgba(255, 255, 255, 0.05);
+      padding: 24px;
+      border-radius: 16px;
+      box-shadow: 0 4px 12px rgba(22, 101, 52, 0.1);
+      border: 1px solid rgba(255, 255, 255, 0.1);
     }
     .header h1 {
       font-size: 2.5rem;
@@ -47,6 +53,8 @@
       font-weight: 600;
       margin-top: 4px;
     }
+
+    /* Logout Button — already beautiful in both, kept as-is */
     .btn-logout {
       background: linear-gradient(90deg, #facc15, #fbbf24);
       color: white;
@@ -63,7 +71,8 @@
       transform: translateY(-1px);
       box-shadow: 0 6px 16px rgba(251, 191, 36, 0.4);
     }
-    /* === Navigation === (Visual style adapted from compare.txt's card design) */
+
+    /* === Navigation === (CRITICAL: Keep <nav> and <button> structure from managementt.txt, but style like compare.txt cards) */
     .nav {
       display: flex;
       gap: 24px;
@@ -72,6 +81,7 @@
       flex-wrap: wrap;
     }
     .nav-btn {
+      /* Visuals from .card in compare.txt */
       background: rgba(255, 255, 255, 0.05);
       border: 1px solid rgba(255, 255, 255, 0.1);
       border-radius: 16px;
@@ -82,7 +92,8 @@
       cursor: pointer;
       box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
       transition: transform 0.2s ease, box-shadow 0.3s ease;
-      border: none;
+      border: none; /* override default button border */
+      min-width: 200px;
     }
     .nav-btn:hover {
       transform: translateY(-4px);
@@ -92,27 +103,31 @@
       background: #166534;
       box-shadow: 0 0 20px rgba(22, 101, 52, 0.6);
     }
+
     /* === Main Content === (From compare.txt) */
     #main-content {
       background: rgba(255, 255, 255, 0.05);
       border-radius: 16px;
       padding: 32px;
       box-shadow: 0 6px 20px rgba(0, 0, 0, 0.1);
+      border: 1px solid rgba(255, 255, 255, 0.1);
     }
     .main-message {
       color: #d1d5db;
       font-size: 1rem;
       margin-top: 24px;
     }
+
+    /* Responsive — from both, enhanced */
     @media (max-width: 768px) {
+      .nav {
+        flex-direction: column;
+        align-items: center;
+      }
       .header {
         flex-direction: column;
         align-items: flex-start;
         gap: 12px;
-      }
-      .nav {
-        flex-direction: column;
-        align-items: center;
       }
     }
   </style>
