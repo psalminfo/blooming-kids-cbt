@@ -26,14 +26,16 @@ onSnapshot(settingsDocRef, (docSnap) => {
 });
 
 
-// --- Utility Functions (This section is untouched) ---
+// ##################################################################
+// # SECTION 1: TUTOR DASHBOARD (Updated as requested)
+// ##################################################################
 function renderTutorDashboard(container, tutor) {
     container.innerHTML = `
         <div class="bg-white p-6 rounded-lg shadow-md mb-6">
             <h2 class="text-2xl font-bold text-green-700 mb-4">Welcome, ${tutor.name}</h2>
             <div class="mb-4">
-                <input type="email" id="searchEmail" class="w-full mt-1 p-2 border rounded" placeholder="Search by parent email...">
-                <button id="searchBtn" class="bg-blue-600 text-white px-4 py-2 rounded mt-2 hover:bg-blue-700">Search</button>
+                <input type="text" id="searchName" class="w-full mt-1 p-2 border rounded" placeholder="Search by parent name...">
+                <button id="searchBtn" class="bg-green-600 text-white px-4 py-2 rounded mt-2 hover:bg-green-700">Search</button>
             </div>
         </div>
         <div id="pendingReportsContainer" class="space-y-4">
@@ -44,23 +46,23 @@ function renderTutorDashboard(container, tutor) {
         </div>
     `;
     document.getElementById('searchBtn').addEventListener('click', async () => {
-        const email = document.getElementById('searchEmail').value.trim();
-        await loadTutorReports(tutor.email, email || null);
+        const name = document.getElementById('searchName').value.trim();
+        await loadTutorReports(tutor.email, name || null);
     });
     loadTutorReports(tutor.email);
 }
 
-async function loadTutorReports(tutorEmail, parentEmail = null) {
-    // This function remains exactly as you provided it.
+async function loadTutorReports(tutorEmail, parentName = null) {
     const pendingReportsContainer = document.getElementById('pendingReportsContainer');
     const gradedReportsContainer = document.getElementById('gradedReportsContainer');
 
     pendingReportsContainer.innerHTML = `<p class="text-gray-500">Loading pending submissions...</p>`;
     if (gradedReportsContainer) gradedReportsContainer.innerHTML = `<p class="text-gray-500">Loading graded submissions...</p>`;
 
+    // Query now searches by parentName instead of parentEmail
     let submissionsQuery = query(collection(db, "tutor_submissions"), where("tutorEmail", "==", tutorEmail));
-    if (parentEmail) {
-        submissionsQuery = query(submissionsQuery, where("parentEmail", "==", parentEmail));
+    if (parentName) {
+        submissionsQuery = query(submissionsQuery, where("parentName", "==", parentName));
     }
 
     try {
@@ -73,12 +75,12 @@ async function loadTutorReports(tutorEmail, parentEmail = null) {
             const reportCardHTML = `
                 <div class="border rounded-lg p-4 shadow-sm bg-white mb-4">
                     <p><strong>Student:</strong> ${data.studentName}</p>
-                    <p><strong>Parent Email:</strong> ${data.parentEmail}</p>
+                    <p><strong>Parent Name:</strong> ${data.parentName || 'N/A'}</p>
                     <p><strong>Grade:</strong> ${data.grade}</p>
                     <p><strong>Submitted At:</strong> ${new Date(data.submittedAt.seconds * 1000).toLocaleString()}</p>
                     <div class="mt-4 border-t pt-4">
                         <h4 class="font-semibold">Creative Writing Submission:</h4>
-                        ${data.fileUrl ? `<a href="${data.fileUrl}" target="_blank" class="text-blue-500 hover:underline">Download File</a>` : `<p class="italic">${data.textAnswer || "No response"}</p>`}
+                        ${data.fileUrl ? `<a href="${data.fileUrl}" target="_blank" class="text-green-600 hover:underline">Download File</a>` : `<p class="italic">${data.textAnswer || "No response"}</p>`}
                         <p class="mt-2"><strong>Status:</strong> ${data.status || 'Pending'}</p>
                         ${(data.status === 'pending_review') ? `
                             <textarea class="tutor-report w-full mt-2 p-2 border rounded" rows="3" placeholder="Write your report here..."></textarea>
@@ -106,7 +108,7 @@ async function loadTutorReports(tutorEmail, parentEmail = null) {
                 if (tutorReport) {
                     const docRef = doc(db, "tutor_submissions", docId);
                     await updateDoc(docRef, { tutorReport: tutorReport, status: 'Graded' });
-                    loadTutorReports(tutorEmail, parentEmail); // Refresh the list
+                    loadTutorReports(tutorEmail, parentName); // Refresh the list
                 }
             });
         });
@@ -142,7 +144,8 @@ async function renderStudentDatabase(container, tutor) {
             studentsHTML += `
                 <div class="bg-gray-100 p-4 rounded-lg shadow-inner mb-4">
                     <h3 class="font-bold text-lg mb-2">Add a New Student</h3>
-                    <input type="text" id="new-student-name" class="w-full mt-1 p-2 border rounded" placeholder="Parent Name">
+                    <input type="text" id="new-parent-name" class="w-full mt-1 p-2 border rounded" placeholder="Parent Name">
+                    <input type="tel" id="new-parent-phone" class="w-full mt-1 p-2 border rounded" placeholder="Parent Phone Number">
                     <input type="text" id="new-student-name" class="w-full mt-1 p-2 border rounded" placeholder="Student Name">
                     <select id="new-student-grade" class="w-full mt-1 p-2 border rounded">
                         <option value="">Select Grade</option>
@@ -154,7 +157,7 @@ async function renderStudentDatabase(container, tutor) {
                         ${Array.from({ length: 7 }, (_, i) => `<option value="${i + 1}">${i + 1}</option>`).join('')}
                     </select>
                     <input type="number" id="new-student-fee" class="w-full mt-1 p-2 border rounded" placeholder="Student Fee (₦)">
-                    <button id="add-student-btn" class="bg-blue-600 text-white px-4 py-2 rounded mt-2 hover:bg-blue-700">Add Student</button>
+                    <button id="add-student-btn" class="bg-green-600 text-white px-4 py-2 rounded mt-2 hover:bg-green-700">Add Student</button>
                 </div>`;
         }
         
@@ -179,7 +182,7 @@ async function renderStudentDatabase(container, tutor) {
                         <td class="px-6 py-4 whitespace-nowrap space-x-2">`;
 
                 if (isSummerBreakEnabled && !isStudentOnBreak) {
-                    studentsHTML += `<button class="summer-break-btn bg-yellow-600 text-white px-3 py-1 rounded" data-student-id="${student.id}">Summer Break</button>`;
+                    studentsHTML += `<button class="summer-break-btn bg-yellow-500 text-white px-3 py-1 rounded" data-student-id="${student.id}">Summer Break</button>`;
                 } else if (isStudentOnBreak) {
                     studentsHTML += `<span class="text-gray-400">On Break</span>`;
                 }
@@ -188,7 +191,7 @@ async function renderStudentDatabase(container, tutor) {
                     if (studentsCount === 1) {
                         studentsHTML += `<button class="submit-single-report-btn bg-green-600 text-white px-3 py-1 rounded" data-student-id="${student.id}">Submit Report</button>`;
                     } else {
-                         studentsHTML += `<button class="enter-report-btn bg-blue-600 text-white px-3 py-1 rounded" data-student-id="${student.id}">${isReportSaved ? 'Edit Report' : 'Enter Report'}</button>`;
+                         studentsHTML += `<button class="enter-report-btn bg-green-600 text-white px-3 py-1 rounded" data-student-id="${student.id}">${isReportSaved ? 'Edit Report' : 'Enter Report'}</button>`;
                     }
                 } else if (!isStudentOnBreak) {
                     studentsHTML += `<span class="text-gray-400">Submission Disabled</span>`;
@@ -199,16 +202,15 @@ async function renderStudentDatabase(container, tutor) {
 
             studentsHTML += `</tbody></table></div>`;
             
-            // ### NEW ### Management Fee Module
             if (tutor.isManagementStaff) {
                 studentsHTML += `
-                    <div class="bg-blue-50 p-4 rounded-lg shadow-md mt-6">
-                        <h3 class="text-lg font-bold text-blue-800 mb-2">Management Fee</h3>
+                    <div class="bg-green-50 p-4 rounded-lg shadow-md mt-6">
+                        <h3 class="text-lg font-bold text-green-800 mb-2">Management Fee</h3>
                         <p class="text-sm text-gray-600 mb-2">As you are part of the management staff, please set your monthly management fee before final submission.</p>
                         <div class="flex items-center space-x-2">
                             <label for="management-fee-input" class="font-semibold">Fee (₦):</label>
                             <input type="number" id="management-fee-input" class="p-2 border rounded w-full" value="${tutor.managementFee || 0}">
-                            <button id="save-management-fee-btn" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Save Fee</button>
+                            <button id="save-management-fee-btn" class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700">Save Fee</button>
                         </div>
                     </div>`;
             }
@@ -239,7 +241,7 @@ async function renderStudentDatabase(container, tutor) {
                 <div><label class="block font-semibold">Recommendations</label><textarea id="report-recs" class="w-full mt-1 p-2 border rounded" rows="2">${existingReport.recommendations || ''}</textarea></div>
                 <div><label class="block font-semibold">General Comments</label><textarea id="report-general" class="w-full mt-1 p-2 border rounded" rows="2">${existingReport.generalComments || ''}</textarea></div>
                 <div class="flex justify-end space-x-2">
-                    <button id="cancel-report-btn" class="bg-gray-400 text-white px-6 py-2 rounded">Cancel</button>
+                    <button id="cancel-report-btn" class="bg-gray-500 text-white px-6 py-2 rounded">Cancel</button>
                     <button id="modal-action-btn" class="bg-green-600 text-white px-6 py-2 rounded">${studentsCount === 1 ? 'Submit Report' : 'Save Report'}</button>
                 </div>
             </div>`;
@@ -273,7 +275,6 @@ async function renderStudentDatabase(container, tutor) {
         });
     }
     
-    // ### FIXED ### This function now saves individual reports to sync with the admin panel.
     async function submitAllReports(reportsArray) {
         if (reportsArray.length === 0) {
             alert("No reports to submit.");
@@ -315,6 +316,8 @@ async function renderStudentDatabase(container, tutor) {
         if (isTutorAddEnabled) {
             document.getElementById('add-student-btn')?.addEventListener('click', async () => {
                 const studentData = {
+                    parentName: document.getElementById('new-parent-name').value,
+                    parentPhone: document.getElementById('new-parent-phone').value,
                     studentName: document.getElementById('new-student-name').value,
                     grade: document.getElementById('new-student-grade').value,
                     subjects: document.getElementById('new-student-subject').value.split(',').map(s => s.trim()),
@@ -322,11 +325,11 @@ async function renderStudentDatabase(container, tutor) {
                     studentFee: parseFloat(document.getElementById('new-student-fee').value),
                     tutorEmail: tutor.email, summerBreak: false
                 };
-                if (studentData.studentName && studentData.grade && !isNaN(studentData.studentFee)) {
+                if (studentData.parentName && studentData.studentName && studentData.grade && !isNaN(studentData.studentFee)) {
                     await addDoc(collection(db, "students"), studentData);
                     renderStudentDatabase(container, tutor);
                 } else {
-                    alert('Please fill in all student details correctly.');
+                    alert('Please fill in all parent and student details correctly.');
                 }
             });
         }
@@ -358,7 +361,6 @@ async function renderStudentDatabase(container, tutor) {
             });
         });
 
-        // ### NEW ### Event listener for saving the management fee
         document.getElementById('save-management-fee-btn')?.addEventListener('click', async () => {
             const feeInput = document.getElementById('management-fee-input');
             const newFee = parseFloat(feeInput.value);
@@ -390,7 +392,8 @@ function initializeTutorPanel() {
     navDashboard.addEventListener('click', () => { setActiveNav(navDashboard); renderTutorDashboard(mainContent, window.tutorData); });
     navStudentDatabase.addEventListener('click', () => { setActiveNav(navStudentDatabase); renderStudentDatabase(mainContent, window.tutorData); });
 
-    setActiveNav(navStudentDatabase);
+    // Default to Student Database on load
+    setActiveNav(navStudentDatabase); 
     renderStudentDatabase(mainContent, window.tutorData);
 }
 
@@ -416,4 +419,3 @@ onAuthStateChanged(auth, async (user) => {
         window.location.href = "tutor-auth.html";
     }
 });
-
