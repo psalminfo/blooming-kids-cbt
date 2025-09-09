@@ -1332,10 +1332,3 @@ onAuthStateChanged(auth, async (user) => {
     }
     // ...
 });
-
-
-
-
-
-
-
