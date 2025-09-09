@@ -24,7 +24,6 @@ function convertPayAdviceToCSV(data) {
 // # PANEL RENDERING FUNCTIONS
 // ##################################
 
-// ### UPDATED as requested ### to group students by tutor
 async function renderManagementTutorView(container) {
     container.innerHTML = `
         <div class="bg-white p-6 rounded-lg shadow-md">
@@ -36,7 +35,7 @@ async function renderManagementTutorView(container) {
                  </div>
             </div>
             <div id="directory-list" class="space-y-4">
-                <p class="text-center text-gray-500 py-10">Loading directory...</p>
+                 <p class="text-center text-gray-500 py-10">Loading directory...</p>
             </div>
         </div>
     `;
@@ -221,6 +220,8 @@ async function renderTutorReportsPanel(container) {
     loadTutorReportsForManagement();
 }
 
+// ### UPDATED and NEW functions below ###
+
 async function loadTutorReportsForManagement() {
     const reportsListContainer = document.getElementById('tutor-reports-list');
     onSnapshot(query(collection(db, "tutor_submissions"), orderBy("submittedAt", "desc")), (snapshot) => {
@@ -248,53 +249,117 @@ async function loadTutorReportsForManagement() {
                     : `<button class="view-report-btn bg-gray-500 text-white px-3 py-1 text-sm rounded" data-report-id="${report.id}">View</button>`;
                 return `<li class="flex justify-between items-center p-2 bg-gray-50 rounded">${report.studentName}<span>${buttonHTML}</span></li>`;
             }).join('');
+            
+            // Add the Zip button if user can download
+            const zipButtonHTML = canDownload 
+                ? `<div class="p-4 border-t"><button class="zip-reports-btn bg-blue-600 text-white px-4 py-2 text-sm rounded w-full hover:bg-blue-700" data-tutor-email="${tutorData.reports[0].tutorEmail}">Zip & Download All Reports</button></div>` 
+                : '';
 
-            return `<details class="border rounded-lg"><summary class="p-4 cursor-pointer font-semibold">${tutorData.name} (${tutorData.reports.length} reports)</summary><div class="p-4 border-t"><ul class="space-y-2">${reportLinks}</ul></div></details>`;
+            return `<details class="border rounded-lg">
+                        <summary class="p-4 cursor-pointer font-semibold">${tutorData.name} (${tutorData.reports.length} reports)</summary>
+                        <div class="p-4 border-t"><ul class="space-y-2">${reportLinks}</ul></div>
+                        ${zipButtonHTML}
+                    </details>`;
         }).join('');
 
+        // Attach all event listeners
         document.querySelectorAll('.download-report-btn').forEach(button => {
             button.addEventListener('click', (e) => {
                 e.stopPropagation();
-                viewReportInNewTab(e.target.dataset.report-id, true);
+                viewReportInNewTab(e.target.dataset.reportId, true);
             });
         });
 
         document.querySelectorAll('.view-report-btn').forEach(button => {
             button.addEventListener('click', (e) => {
                 e.stopPropagation();
-                viewReportInNewTab(e.target.dataset.report-id, false);
+                viewReportInNewTab(e.target.dataset.reportId, false);
+            });
+        });
+
+        document.querySelectorAll('.zip-reports-btn').forEach(button => {
+            button.addEventListener('click', async (e) => {
+                e.stopPropagation();
+                const tutorEmail = e.target.dataset.tutorEmail;
+                const tutorData = reportsByTutor[tutorEmail];
+                if (tutorData) {
+                    await zipAndDownloadTutorReports(tutorData.reports, tutorData.name, e.target);
+                }
             });
         });
     });
 }
 
+// NEW HELPER FUNCTION to generate report HTML
+async function generateReportHTML(reportId) {
+    const reportDoc = await getDoc(doc(db, "tutor_submissions", reportId));
+    if (!reportDoc.exists()) throw new Error("Report not found!");
+    const reportData = reportDoc.data();
+    let parentEmail = 'N/A';
+    if (reportData.studentId) {
+        const studentDoc = await getDoc(doc(db, "students", reportData.studentId));
+        if (studentDoc.exists()) parentEmail = studentDoc.data().parentEmail || 'N/A';
+    }
+
+    const logoUrl = "https://raw.githubusercontent.com/psalminfo/blooming-kids-cbt/main/logo.png";
+    const reportTemplate = `<div style="font-family: Arial, sans-serif; padding: 2rem; max-width: 800px; margin: auto;"><div style="text-align: center; margin-bottom: 2rem;"><img src="${logoUrl}" alt="Company Logo" style="height: 80px;"><h3 style="font-size: 1.8rem; font-weight: bold; color: #15803d; margin: 0;">Blooming Kids House</h3><h1 style="font-size: 1.2rem; font-weight: bold; color: #166534;">MONTHLY LEARNING REPORT</h1><p>Date: ${new Date(reportData.submittedAt.seconds * 1000).toLocaleDateString()}</p></div><div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 2rem;"><p><strong>Student's Name:</strong> ${reportData.studentName}</p><p><strong>Parent's Email:</strong> ${parentEmail}</p><p><strong>Grade:</strong> ${reportData.grade}</p><p><strong>Tutor's Name:</strong> ${reportData.tutorName}</p></div>${Object.entries({"INTRODUCTION": reportData.introduction, "TOPICS & REMARKS": reportData.topics, "PROGRESS & ACHIEVEMENTS": reportData.progress, "STRENGTHS AND WEAKNESSES": reportData.strengthsWeaknesses, "RECOMMENDATIONS": reportData.recommendations, "GENERAL TUTOR'S COMMENTS": reportData.generalComments}).map(([title, content]) => `<div style="border-top: 1px solid #d1d5db; padding-top: 1rem; margin-top: 1rem;"><h2 style="font-size: 1.25rem; font-weight: bold; color: #16a34a;">${title}</h2><p style="line-height: 1.6; white-space: pre-wrap;">${content || 'N/A'}</p></div>`).join('')}<div style="margin-top: 3rem; text-align: right;"><p>Best regards,</p><p style="font-weight: bold;">${reportData.tutorName}</p></div></div>`;
+
+    return { html: reportTemplate, reportData: reportData };
+}
+
+// REFACTORED to use the new helper function
 async function viewReportInNewTab(reportId, shouldDownload = false) {
     try {
-        const reportDoc = await getDoc(doc(db, "tutor_submissions", reportId));
-        if (!reportDoc.exists()) throw new Error("Report not found!");
-        const reportData = reportDoc.data();
-        let parentEmail = 'N/A';
-        if (reportData.studentId) {
-            const studentDoc = await getDoc(doc(db, "students", reportData.studentId));
-            if (studentDoc.exists()) parentEmail = studentDoc.data().parentEmail || 'N/A';
-        }
-
-        const logoUrl = "https://raw.githubusercontent.com/psalminfo/blooming-kids-cbt/main/logo.png";
-        const reportTemplate = `<div style="font-family: Arial, sans-serif; padding: 2rem; max-width: 800px; margin: auto;"><div style="text-align: center; margin-bottom: 2rem;"><img src="${logoUrl}" alt="Company Logo" style="height: 80px;"><h3 style="font-size: 1.8rem; font-weight: bold; color: #15803d; margin: 0;">Blooming Kids House</h3><h1 style="font-size: 1.2rem; font-weight: bold; color: #166534;">MONTHLY LEARNING REPORT</h1><p>Date: ${new Date(reportData.submittedAt.seconds * 1000).toLocaleDateString()}</p></div><div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 2rem;"><p><strong>Student's Name:</strong> ${reportData.studentName}</p><p><strong>Parent's Email:</strong> ${parentEmail}</p><p><strong>Grade:</strong> ${reportData.grade}</p><p><strong>Tutor's Name:</strong> ${reportData.tutorName}</p></div>${Object.entries({"INTRODUCTION": reportData.introduction, "TOPICS & REMARKS": reportData.topics, "PROGRESS & ACHIEVEMENTS": reportData.progress, "STRENGTHS AND WEAKNESSES": reportData.strengthsWeaknesses, "RECOMMENDATIONS": reportData.recommendations, "GENERAL TUTOR'S COMMENTS": reportData.generalComments}).map(([title, content]) => `<div style="border-top: 1px solid #d1d5db; padding-top: 1rem; margin-top: 1rem;"><h2 style="font-size: 1.25rem; font-weight: bold; color: #16a34a;">${title}</h2><p style="line-height: 1.6; white-space: pre-wrap;">${content || 'N/A'}</p></div>`).join('')}<div style="margin-top: 3rem; text-align: right;"><p>Best regards,</p><p style="font-weight: bold;">${reportData.tutorName}</p></div></div>`;
-
+        const { html, reportData } = await generateReportHTML(reportId);
         if (shouldDownload) {
-             html2pdf().from(reportTemplate).save(`${reportData.studentName}_report.pdf`);
+             html2pdf().from(html).save(`${reportData.studentName}_report.pdf`);
         } else {
             const newWindow = window.open();
-            newWindow.document.write(`<html><head><title>${reportData.studentName} Report</title></head><body>${reportTemplate}</body></html>`);
+            newWindow.document.write(`<html><head><title>${reportData.studentName} Report</title></head><body>${html}</body></html>`);
             newWindow.document.close();
         }
     } catch (error) {
-        // NOTE: In a real-world app, this should be a custom modal or message box.
         console.error("Error viewing/downloading report:", error);
         alert(`Error: ${error.message}`);
     }
 }
+
+// NEW ZIPPING FUNCTION
+async function zipAndDownloadTutorReports(reports, tutorName, buttonElement) {
+    const originalButtonText = buttonElement.textContent;
+    buttonElement.textContent = 'Zipping... (0%)';
+    buttonElement.disabled = true;
+
+    try {
+        const zip = new JSZip();
+        let filesGenerated = 0;
+
+        const reportGenerationPromises = reports.map(async (report) => {
+            const { html, reportData } = await generateReportHTML(report.id);
+            const pdfBlob = await html2pdf().from(html).output('blob');
+            filesGenerated++;
+            buttonElement.textContent = `Zipping... (${Math.round((filesGenerated / reports.length) * 100)}%)`;
+            return { name: `${reportData.studentName}_Report_${report.id.substring(0,5)}.pdf`, blob: pdfBlob };
+        });
+
+        const generatedPdfs = await Promise.all(reportGenerationPromises);
+
+        generatedPdfs.forEach(pdf => {
+            zip.file(pdf.name, pdf.blob);
+        });
+
+        const zipBlob = await zip.generateAsync({ type: "blob" });
+        saveAs(zipBlob, `${tutorName}_All_Reports.zip`);
+
+    } catch (error) {
+        console.error("Error creating zip file:", error);
+        alert("Failed to create zip file. See console for details.");
+    } finally {
+        buttonElement.textContent = originalButtonText;
+        buttonElement.disabled = false;
+    }
+}
+
 
 async function renderSummerBreakPanel(container) {
     container.innerHTML = `
