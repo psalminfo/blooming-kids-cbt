@@ -5,135 +5,37 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
     <title>Management Portal - Blooming Kids House</title>
     <link rel="icon" href="favicon.ico" />
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
-    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" />
     <style>
-        /* === Aurora Animated Background from cssview.html === */
-        body {
-            font-family: 'Inter', sans-serif;
-            background: linear-gradient(120deg, #0f172a, #1e293b, #0f172a);
-            background-size: 400% 400%;
-            animation: aurora 15s ease infinite;
-            color: #f1f5f9;
+        .nav-btn {
+            padding: 8px 16px;
+            border-bottom: 2px solid transparent;
+            transition: all 0.3s ease;
         }
-        @keyframes aurora {
-            0% { background-position: 0% 50%; }
-            50% { background-position: 100% 50%; }
-            100% { background-position: 0% 50%; }
-        }
-        /* Preserve the scrollbar and selection style from cssview.html */
-        ::selection {
-            background: linear-gradient(90deg, #38bdf8, #3b82f6);
-            color: white;
-        }
-        ::-webkit-scrollbar { width: 8px; }
-        ::-webkit-scrollbar-track { background: rgba(255,255,255,0.05); }
-        ::-webkit-scrollbar-thumb {
-            background: linear-gradient(#10b981, #16a34a);
-            border-radius: 4px;
-            box-shadow: 0 0 5px #10b981;
-        }
-        ::-webkit-scrollbar-thumb:hover { background: linear-gradient(#34d399, #059669); }
-        /* === END Aurora Background === */
-
-        /* === Custom Styles for Card Navigation & Effects === */
-        /* This replaces the old .nav-btn style */
-        .nav-card {
-            background: rgba(17,24,39,0.6);
-            backdrop-filter: blur(6px);
-            border: 1px solid rgba(255,255,255,0.06);
-            border-radius: 14px;
-            padding: 1.5rem;
-            text-align: center;
-            flex-grow: 1; /* Allows it to grow in flex container */
-            cursor: pointer;
-            transition: transform 0.3s ease, box-shadow 0.3s ease, border-color 0.3s ease;
-            box-shadow: 0 8px 24px rgba(0,0,0,0.25), inset 0 0 0 1px rgba(255,255,255,0.04);
-            display: flex; /* Makes the title center vertically */
-            justify-content: center;
-            align-items: center;
-        }
-
-        .nav-card:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 12px 30px rgba(0,0,0,0.35), 0 0 18px rgba(16, 185, 129, 0.18);
-            border-color: rgba(16, 185, 129, 0.25);
-        }
-
-        .nav-card.active {
-            border-color: #10b981;
-            transform: scale(1.03);
-            box-shadow: 0 0 20px rgba(16, 185, 129, 0.7), 0 0 40px rgba(16, 185, 129, 0.5);
-        }
-        
-        .nav-card h3 {
-            margin: 0;
-            font-size: 1.25rem;
-            font-weight: 600;
-            color: #f1f5f9;
-        }
-        .nav-card.active h3 {
-            color: #10b981;
-        }
-
-        /* Styling for the new header & content elements */
-        .glow-green {
-            color: #10b981;
-            text-shadow: 0 0 10px rgba(16, 185, 129, 0.5);
-        }
-
-        .glow-yellow {
-            background: linear-gradient(45deg, #facc15, #f97316);
-            box-shadow: 0 0 15px rgba(252, 211, 77, 0.5);
-            transition: transform 0.3s ease, box-shadow 0.3s ease;
-        }
-        .glow-yellow:hover {
-            transform: translateY(-3px) scale(1.05);
-            box-shadow: 0 0 20px rgba(252, 211, 77, 0.8);
-        }
-
-        .content-card {
-            background: rgba(17,24,39,0.6);
-            backdrop-filter: blur(6px);
-            padding: 32px;
-            border-radius: 12px;
-            box-shadow: 0 8px 24px rgba(0,0,0,0.25), inset 0 0 0 1px rgba(255,255,255,0.04);
-            min-height: 300px;
-            display: grid;
-            place-items: center;
+        .nav-btn.active { 
+            border-bottom-color: #166534; /* dark-green */
+            color: #166534; 
         }
     </style>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 </head>
-<body class="min-h-screen">
+<body class="bg-gray-50 min-h-screen">
     <div class="max-w-7xl mx-auto p-6">
         <div class="flex justify-between items-center mb-6">
             <div>
-                <h1 id="welcome-message" class="text-3xl font-bold glow-green">Welcome</h1>
-                <p id="user-role" class="text-md text-gray-400 font-semibold"></p>
+                <h1 id="welcome-message" class="text-3xl font-bold text-green-800">Welcome</h1>
+                <p id="user-role" class="text-md text-gray-600 font-semibold"></p>
             </div>
-            <button id="logoutBtn" class="glow-yellow text-white px-4 py-2 rounded-full font-bold">Logout</button>
+            <button id="logoutBtn" class="bg-yellow-400 text-white px-4 py-2 rounded hover:bg-yellow-500">Logout</button>
         </div>
-
-        <nav class="flex flex-wrap space-x-0 md:space-x-4 mb-6 gap-4 justify-center">
-            <div id="navTutorManagement" class="nav-card active">
-                <h3>Tutor & Student List</h3>
-            </div>
-            <div id="navPayAdvice" class="nav-card">
-                <h3>Pay Advice</h3>
-            </div>
-            <div id="navTutorReports" class="nav-card">
-                <h3>Tutor Reports</h3>
-            </div>
-            <div id="navSummerBreak" class="nav-card">
-                <h3>Summer Break</h3>
-            </div>
+        <nav class="flex space-x-4 mb-6 border-b">
+            <button id="navTutorManagement" class="nav-btn text-lg font-semibold active">Tutor & Student List</button>
+            <button id="navPayAdvice" class="nav-btn text-lg font-semibold text-gray-500 hover:text-green-700">Pay Advice</button>
+            <button id="navTutorReports" class="nav-btn text-lg font-semibold text-gray-500 hover:text-green-700">Tutor Reports</button>
+            <button id="navSummerBreak" class="nav-btn text-lg font-semibold text-gray-500 hover:text-green-700">Summer Break</button>
         </nav>
-
-        <div id="main-content" class="content-card">
-             <p class="text-center text-gray-400 text-xl font-medium">Checking user permissions...</p>
+        <div id="main-content">
+             <p class="text-center text-gray-600 mt-12">Checking user permissions...</p>
         </div>
     </div>
     <script type="module" src="management.js"></script>
