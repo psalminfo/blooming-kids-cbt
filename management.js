@@ -51,9 +51,9 @@ async function renderManagementTutorView(container) {
             <div class="flex justify-between items-center mb-4">
                  <h2 class="text-2xl font-bold text-green-700">Tutor & Student Directory</h2>
                  <div class="flex space-x-4">
-                     <div class="bg-blue-100 p-3 rounded-lg text-center shadow"><h4 class="font-bold text-blue-800 text-sm">Total Tutors</h4><p id="tutor-count-badge" class="text-2xl font-extrabold">0</p></div>
-                     <div class="bg-green-100 p-3 rounded-lg text-center shadow"><h4 class="font-bold text-green-800 text-sm">Total Students</h4><p id="student-count-badge" class="text-2xl font-extrabold">0</p></div>
-                 </div>
+                    <div class="bg-blue-100 p-3 rounded-lg text-center shadow"><h4 class="font-bold text-blue-800 text-sm">Total Tutors</h4><p id="tutor-count-badge" class="text-2xl font-extrabold">0</p></div>
+                    <div class="bg-green-100 p-3 rounded-lg text-center shadow"><h4 class="font-bold text-green-800 text-sm">Total Students</h4><p id="student-count-badge" class="text-2xl font-extrabold">0</p></div>
+                </div>
             </div>
             <div id="directory-list" class="space-y-4">
                 <p class="text-center text-gray-500 py-10">Loading directory...</p>
@@ -203,7 +203,7 @@ async function renderManagementPayAdvice(container) {
                 return;
             }
 
-            const payAdvicePromises = tutorSnapshot.docs.map(async (docSnapshot) => {
+            const payAdvicePromises = tutorSnapshot.docs.map(async docSnapshot => {
                 const tutor = { id: docSnapshot.id, ...docSnapshot.data() };
                 const studentCheckinsQuery = query(collection(db, `artifacts/${__app_id}/public/data/studentCheckIns`), where('tutorId', '==', tutor.id));
                 const checkinsSnapshot = await getDocs(studentCheckinsQuery);
@@ -391,9 +391,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const mainContent = document.getElementById('mainContent');
     const logoutBtn = document.getElementById('logoutBtn');
     
-    // Make sure we have the app_id
-    const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-    
     // Set up navigation
     const navItems = [
         { id: 'navTutorManagement', fn: renderManagementTutorView, perm: 'viewTutorManagement', title: 'Tutor & Student List' },
@@ -404,19 +401,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
     onAuthStateChanged(auth, async (user) => {
         if (user) {
-            // Log the user's UID and the path the app is looking for.
-            console.log("Logged-in user UID:", user.uid);
-            console.log("Expected staff document path:", `artifacts/${appId}/public/data/staff/${user.email}`);
-            
-            const userDoc = await getDoc(doc(db, `artifacts/${appId}/public/data/staff`, user.email));
-            if (userDoc.exists()) {
-                const staffData = userDoc.data();
-                
-                // Show the welcome message and role
+            const staffRef = doc(db, `artifacts/${__app_id}/public/data/staff`, user.email);
+            const staffDoc = await getDoc(staffRef);
+
+            if (staffDoc.exists()) {
+                const staffData = staffDoc.data();
                 document.getElementById('welcome-message').textContent = `Welcome, ${staffData.name}`;
                 document.getElementById('user-role').textContent = `Role: ${capitalize(staffData.role)}`;
-
-                // Dynamic Navigation
+                
                 let firstVisibleTab = null;
                 navItems.forEach(item => {
                     const button = document.getElementById(item.id);
@@ -434,7 +426,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         button.style.display = 'none';
                     }
                 });
-                
+
                 if (firstVisibleTab) {
                     document.getElementById(firstVisibleTab).click();
                 } else {
@@ -442,12 +434,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
                 
                 logoutBtn.addEventListener('click', () => signOut(auth).then(() => window.location.href = "management-auth.html"));
-
             } else {
-                console.log("Document does not exist for the logged-in user.");
                 document.getElementById('welcome-message').textContent = `Hello, ${user.email}`;
-                document.getElementById('user-role').textContent = 'Status: Not Registered';
-                mainContent.innerHTML = `<p class="text-center mt-12 text-red-600 font-semibold">Your account is not registered in the staff directory. Ensure your staff profile exists in Firestore and its Document ID matches your User Email.</p>`;
+                document.getElementById('user-role').textContent = 'Status: Pending Approval';
+                mainContent.innerHTML = `<p class="text-center mt-12 text-yellow-600 font-semibold">Your account is awaiting approval.</p>`;
                 logoutBtn.addEventListener('click', () => signOut(auth).then(() => window.location.href = "management-auth.html"));
             }
         } else {
