@@ -6,99 +6,67 @@
     <title>Management Portal - Blooming Kids House</title>
     <link rel="icon" href="favicon.ico" />
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" />
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css" />
-    <style>
-        .icon-card {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            text-align: center;
-            cursor: pointer;
-            transition: transform 0.3s ease;
-        }
-        .icon-card:hover {
-            transform: scale(1.05);
-        }
-        .card-inner-square {
-            width: 120px;
-            height: 120px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            border-radius: 1rem;
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
-            margin-bottom: 0.75rem;
-        }
-        .card-inner-square.active {
-             border: 3px solid #166534; /* dark-green */
-        }
-        .card-icon {
-            font-size: 3rem;
-        }
-    </style>
+  <style>
+    .nav-btn {
+        padding: 8px 16px;
+        border-bottom: 2px solid transparent;
+        transition: all 0.3s ease;
+    }
+    .nav-btn.active { 
+        border-bottom-color: #166534; /* dark-green */
+        color: #166534; 
+    }
+
+    .icon-card {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        text-align: center;
+        cursor: pointer;
+        transition: transform 0.3s ease;
+    }
+    .icon-card:hover {
+        transform: scale(1.05);
+    }
+    .card-inner-square {
+        width: 120px;
+        height: 120px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 1rem;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        margin-bottom: 0.75rem;
+    }
+    .card-inner-square.active {
+        border: 3px solid #166534;
+    }
+    .card-icon {
+        font-size: 3rem;
+    }
+</style>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 </head>
 <body class="bg-gray-50 min-h-screen">
     <div class="max-w-7xl mx-auto p-6">
         <div class="flex justify-between items-center mb-6">
-            <button id="hamburgerBtn" class="p-2 rounded-lg text-gray-600 hover:text-green-700">
-                <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16m-7 6h7"></path>
-                </svg>
-            </button>
-            <div class="flex-grow">
+            <div>
                 <h1 id="welcome-message" class="text-3xl font-bold text-green-800">Welcome</h1>
                 <p id="user-role" class="text-md text-gray-600 font-semibold"></p>
             </div>
             <button id="logoutBtn" class="bg-yellow-400 text-white px-4 py-2 rounded hover:bg-yellow-500">Logout</button>
         </div>
-
-        <div id="nav-container" class="grid grid-cols-2 gap-6 justify-center max-w-2xl mx-auto mb-6 hidden">
-            <div id="navTutorManagement" class="icon-card">
-                <div class="card-inner-square bg-green-500 active">
-                    <i class="fas fa-users card-icon text-white"></i>
-                </div>
-                <span class="text-md font-semibold text-gray-700">Tutor & Student List</span>
-            </div>
-
-            <div id="navPayAdvice" class="icon-card">
-                <div class="card-inner-square bg-yellow-400">
-                    <i class="fas fa-file-invoice-dollar card-icon text-white"></i>
-                </div>
-                <span class="text-md font-semibold text-gray-700">Pay Advice</span>
-            </div>
-
-            <div id="navTutorReports" class="icon-card">
-                <div class="card-inner-square bg-white">
-                    <i class="fas fa-chart-bar card-icon text-gray-700"></i>
-                </div>
-                <span class="text-md font-semibold text-gray-700">Tutor Reports</span>
-            </div>
-
-            <div id="navSummerBreak" class="icon-card">
-                <div class="card-inner-square bg-green-500">
-                    <i class="fas fa-sun card-icon text-white"></i>
-                </div>
-                <span class="text-md font-semibold text-gray-700">Summer Break</span>
-            </div>
-        </div>
-
+        <nav class="flex space-x-4 mb-6 border-b">
+            <button id="navTutorManagement" class="nav-btn text-lg font-semibold active">Tutor & Student List</button>
+            <button id="navPayAdvice" class="nav-btn text-lg font-semibold text-gray-500 hover:text-green-700">Pay Advice</button>
+            <button id="navTutorReports" class="nav-btn text-lg font-semibold text-gray-500 hover:text-green-700">Tutor Reports</button>
+            <button id="navSummerBreak" class="nav-btn text-lg font-semibold text-gray-500 hover:text-green-700">Summer Break</button>
+        </nav>
         <div id="main-content">
-            <p class="text-center text-gray-600 mt-12">Checking user permissions...</p>
+             <p class="text-center text-gray-600 mt-12">Checking user permissions...</p>
         </div>
     </div>
     <script type="module" src="management.js"></script>
-    <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            const hamburgerBtn = document.getElementById('hamburgerBtn');
-            const navContainer = document.getElementById('nav-container');
-
-            hamburgerBtn.addEventListener('click', function() {
-                navContainer.classList.toggle('hidden');
-                navContainer.classList.toggle('grid');
-            });
-        });
-    </script>
 </body>
 </html>
