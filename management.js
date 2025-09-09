@@ -1,7 +1,8 @@
 import { auth, db } from './firebaseConfig.js';
-import { collection, getDocs, doc, getDoc, where, query, orderBy, Timestamp, updateDoc } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
+import { collection, getDocs, doc, getDoc, where, query, orderBy, Timestamp, updateDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
 import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-auth.js";
-import { onSnapshot } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
+import JSZip from "https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js";
+import { saveAs } from "https://cdn.jsdelivr.net/npm/file-saver@2.0.5/dist/FileSaver.min.js";
 
 function capitalize(str) {
     if (!str) return '';
@@ -24,15 +25,14 @@ function convertPayAdviceToCSV(data) {
 // # PANEL RENDERING FUNCTIONS
 // ##################################
 
-// ### UPDATED as requested ### to group students by tutor
 async function renderManagementTutorView(container) {
     container.innerHTML = `
-        <div class="bg-white p-6 rounded-lg shadow-md">
-            <div class="flex justify-between items-center mb-4">
+        <div class="panel">
+            <div class="flex flex-col sm:flex-row justify-between items-center mb-4">
                  <h2 class="text-3xl font-bold text-green-700">Tutor & Student Directory</h2>
-                 <div class="flex space-x-4">
-                    <div class="bg-green-100 p-3 rounded-lg text-center shadow"><h4 class="font-bold text-green-800 text-base">Total Tutors</h4><p id="tutor-count-badge" class="text-3xl font-extrabold">0</p></div>
-                    <div class="bg-yellow-100 p-3 rounded-lg text-center shadow"><h4 class="font-bold text-yellow-800 text-base">Total Students</h4><p id="student-count-badge" class="text-3xl font-extrabold">0</p></div>
+                 <div class="flex flex-col sm:flex-row space-y-4 sm:space-y-0 sm:space-x-4 mt-4 sm:mt-0">
+                    <div class="count-badge"><h4 class="font-bold text-green-800 text-base">Total Tutors</h4><p id="tutor-count-badge" class="text-3xl font-extrabold">0</p></div>
+                    <div class="count-badge"><h4 class="font-bold text-yellow-800 text-base">Total Students</h4><p id="student-count-badge" class="text-3xl font-extrabold">0</p></div>
                 </div>
             </div>
             <div id="directory-list" class="space-y-4">
@@ -101,7 +101,7 @@ async function renderManagementTutorView(container) {
 async function renderPayAdvicePanel(container) {
     const canExport = window.userData.permissions?.actions?.canExportPayAdvice === true;
     container.innerHTML = `
-        <div class="bg-white p-6 rounded-lg shadow-md">
+        <div class="panel">
             <h2 class="text-3xl font-bold text-green-700 mb-4">Tutor Pay Advice</h2>
             <div class="bg-green-50 p-4 rounded-lg mb-6 grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
                 <div>
@@ -113,8 +113,8 @@ async function renderPayAdvicePanel(container) {
                     <input type="date" id="end-date" class="mt-1 block w-full p-2 border rounded-md text-base">
                 </div>
                 <div class="flex items-center space-x-4 col-span-2">
-                     <div class="bg-green-100 p-3 rounded-lg text-center shadow w-full"><h4 class="font-bold text-green-800 text-base">Active Tutors</h4><p id="pay-tutor-count" class="text-3xl font-extrabold">0</p></div>
-                    <div class="bg-yellow-100 p-3 rounded-lg text-center shadow w-full"><h4 class="font-bold text-yellow-800 text-base">Total Students</h4><p id="pay-student-count" class="text-3xl font-extrabold">0</p></div>
+                     <div class="count-badge w-full"><h4 class="font-bold text-green-800 text-base">Active Tutors</h4><p id="pay-tutor-count" class="text-3xl font-extrabold">0</p></div>
+                    <div class="count-badge w-full"><h4 class="font-bold text-yellow-800 text-base">Total Students</h4><p id="pay-student-count" class="text-3xl font-extrabold">0</p></div>
                     ${canExport ? `<button id="export-pay-csv-btn" class="bg-green-600 text-white px-4 py-2 rounded-full hover:bg-green-700 h-full shadow text-base">Export CSV</button>` : ''}
                 </div>
             </div>
@@ -200,146 +200,114 @@ async function loadPayAdviceData(startDate, endDate) {
 
 async function renderTutorReportsPanel(container) {
     container.innerHTML = `
-        <div class="bg-white p-6 rounded-lg shadow-md mb-6">
+        <div class="panel mb-6">
             <h2 class="text-3xl font-bold text-green-700 mb-4">Tutor Reports</h2>
             <div id="tutor-reports-list" class="space-y-4"><p class="text-center">Loading reports...</p></div>
         </div>
     `;
-    loadTutorReportsForManagement();
+    loadTutorReportsForAdmin();
 }
 
-async function loadTutorReportsForManagement() {
+async function loadTutorReportsForAdmin() {
     const reportsListContainer = document.getElementById('tutor-reports-list');
     onSnapshot(query(collection(db, "tutor_submissions"), orderBy("submittedAt", "desc")), (snapshot) => {
+        const tutorCountEl = document.getElementById('report-tutor-count');
+        const reportCountEl = document.getElementById('report-count');
+        if (!tutorCountEl || !reportCountEl) return;
+
         if (snapshot.empty) {
-            reportsListContainer.innerHTML = `<p class="text-center text-gray-500">No reports submitted yet.</p>`;
+            reportsListContainer.innerHTML = `<p class="text-gray-500 text-center">No reports have been submitted yet.</p>`;
+            tutorCountEl.textContent = 0;
+            reportCountEl.textContent = 0;
             return;
         }
 
         const reportsByTutor = {};
         snapshot.forEach(doc => {
             const report = { id: doc.id, ...doc.data() };
-            if (!reportsByTutor[report.tutorEmail]) {
-                reportsByTutor[report.tutorEmail] = { name: report.tutorName || report.tutorEmail, reports: [], email: report.tutorEmail };
+            const tutorEmail = report.tutorEmail;
+            if (!reportsByTutor[tutorEmail]) {
+                reportsByTutor[tutorEmail] = {
+                    name: report.tutorName || tutorEmail,
+                    reports: []
+                };
             }
-            reportsByTutor[report.tutorEmail].reports.push(report);
+            reportsByTutor[tutorEmail].reports.push(report);
         });
 
-        const canDownload = window.userData.permissions?.actions?.canDownloadReports === true;
+        tutorCountEl.textContent = Object.keys(reportsByTutor).length;
+        reportCountEl.textContent = snapshot.size;
 
         reportsListContainer.innerHTML = Object.values(reportsByTutor).map(tutorData => {
-            const reportLinks = tutorData.reports.map(report => {
-                const buttonHTML = canDownload
-                    ? `<button class="download-report-btn bg-green-500 text-white px-3 py-1 text-base rounded-full shadow" data-report-id="${report.id}">Download</button>`
-                    : `<button class="view-report-btn bg-gray-500 text-white px-3 py-1 text-base rounded-full shadow" data-report-id="${report.id}">View</button>`;
-                return `<li class="flex justify-between items-center p-2 bg-gray-50 rounded-lg">${report.studentName}<span class="text-base">${buttonHTML}</span></li>`;
-            }).join('');
-            
-            const downloadAllButton = canDownload ? `<button class="download-all-btn bg-blue-500 text-white px-4 py-2 text-base rounded-full shadow hover:bg-blue-600" data-tutor-email="${tutorData.email}">Download All Reports</button>` : '';
+            const reportLinks = tutorData.reports.map(report => `
+                <li class="flex justify-between items-center p-2 bg-gray-50 rounded-md">
+                    <span>${report.studentName} - ${new Date(report.submittedAt.seconds * 1000).toLocaleDateString()}</span>
+                    <button class="download-single-report-btn bg-blue-500 text-white px-3 py-1 text-sm rounded hover:bg-blue-600" data-report-id="${report.id}">Download PDF</button>
+                </li>
+            `).join('');
 
-            return `<details class="border rounded-lg"><summary class="p-4 cursor-pointer font-bold text-xl">${tutorData.name} (${tutorData.reports.length} reports)</summary><div class="p-4 border-t"><ul class="space-y-2">${reportLinks}</ul><div class="mt-4 text-right">${downloadAllButton}</div></div></details>`;
+            return `
+                <div class="border rounded-lg shadow-sm">
+                    <details>
+                        <summary class="p-4 cursor-pointer flex justify-between items-center font-semibold text-lg">
+                            <div>
+                                ${tutorData.name} 
+                                <span class="ml-2 text-sm font-normal text-gray-500">(${tutorData.reports.length} reports)</span>
+                            </div>
+                            <button class="download-all-btn bg-green-600 text-white px-4 py-2 rounded-full hover:bg-green-700" data-tutor-email="${tutorData.reports[0].tutorEmail}">Download All as ZIP</button>
+                        </summary>
+                        <div class="p-4 border-t">
+                            <ul class="space-y-2">${reportLinks}</ul>
+                        </div>
+                    </details>
+                </div>
+            `;
         }).join('');
 
-        document.querySelectorAll('.download-report-btn').forEach(button => {
+        reportsListContainer.querySelectorAll('.download-single-report-btn').forEach(button => {
             button.addEventListener('click', (e) => {
-                e.stopPropagation();
-                viewReportInNewTab(e.target.dataset.reportId, true);
+                e.stopPropagation(); // Prevent the dropdown from closing
+                downloadAdminReport(e.target.dataset.reportId);
             });
         });
 
-        document.querySelectorAll('.view-report-btn').forEach(button => {
-            button.addEventListener('click', (e) => {
+        reportsListContainer.querySelectorAll('.download-all-btn').forEach(button => {
+            button.addEventListener('click', async (e) => {
                 e.stopPropagation();
-                viewReportInNewTab(e.target.dataset.reportId, false);
-            });
-        });
+                const tutorEmail = e.target.dataset.tutorEmail;
+                const reportsToDownload = reportsByTutor[tutorEmail].reports;
+                
+                button.textContent = 'Zipping...';
+                button.disabled = true;
 
-        document.querySelectorAll('.download-all-btn').forEach(button => {
-            button.addEventListener('click', (e) => {
-                e.stopPropagation();
-                downloadAllReportsForTutor(e.target.dataset.tutorEmail);
+                try {
+                    const zip = new JSZip();
+                    for (const report of reportsToDownload) {
+                        const pdfBlob = await downloadAdminReport(report.id, true);
+                        if (pdfBlob) {
+                            const fileName = `${report.studentName}_${new Date(report.submittedAt.seconds * 1000).toLocaleDateString().replace(/\//g, '-')}.pdf`;
+                            zip.file(fileName, pdfBlob);
+                        }
+                    }
+
+                    const content = await zip.generateAsync({ type: "blob" });
+                    saveAs(content, `${reportsByTutor[tutorEmail].name.replace(/\s+/g, '_')}_Reports.zip`);
+
+                } catch (error) {
+                    console.error("Error creating ZIP file:", error);
+                    alert("An error occurred while creating the ZIP file.");
+                } finally {
+                    button.textContent = 'Download All as ZIP';
+                    button.disabled = false;
+                }
             });
         });
     });
 }
 
-async function viewReportInNewTab(reportId, shouldDownload = false) {
-    try {
-        const reportDoc = await getDoc(doc(db, "tutor_submissions", reportId));
-        if (!reportDoc.exists()) throw new Error("Report not found!");
-        const reportData = reportDoc.data();
-        let parentEmail = 'N/A';
-        if (reportData.studentId) {
-            const studentDoc = await getDoc(doc(db, "students", reportData.studentId));
-            if (studentDoc.exists()) parentEmail = studentDoc.data().parentEmail || 'N/A';
-        }
-
-        const logoUrl = "https://raw.githubusercontent.com/psalminfo/blooming-kids-cbt/main/logo.png";
-        const reportTemplate = `<div style="font-family: Arial, sans-serif; padding: 2rem; max-width: 800px; margin: auto;"><div style="text-align: center; margin-bottom: 2rem;"><img src="${logoUrl}" alt="Company Logo" style="height: 80px;"><h3 style="font-size: 1.8rem; font-weight: bold; color: #15803d; margin: 0;">Blooming Kids House</h3><h1 style="font-size: 1.2rem; font-weight: bold; color: #166534;">MONTHLY LEARNING REPORT</h1><p>Date: ${new Date(reportData.submittedAt.seconds * 1000).toLocaleDateString()}</p></div><div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 2rem;"><p><strong>Student's Name:</strong> ${reportData.studentName}</p><p><strong>Parent's Email:</strong> ${parentEmail}</p><p><strong>Grade:</strong> ${reportData.grade}</p><p><strong>Tutor's Name:</strong> ${reportData.tutorName}</p></div>${Object.entries({"INTRODUCTION": reportData.introduction, "TOPICS & REMARKS": reportData.topics, "PROGRESS & ACHIEVEMENTS": reportData.progress, "STRENGTHS AND WEAKNESSES": reportData.strengthsWeaknesses, "RECOMMENDATIONS": reportData.recommendations, "GENERAL TUTOR'S COMMENTS": reportData.generalComments}).map(([title, content]) => `<div style="border-top: 1px solid #d1d5db; padding-top: 1rem; margin-top: 1rem;"><h2 style="font-size: 1.25rem; font-weight: bold; color: #16a34a;">${title}</h2><p style="line-height: 1.6; white-space: pre-wrap;">${content || 'N/A'}</p></div>`).join('')}<div style="margin-top: 3rem; text-align: right;"><p>Best regards,</p><p style="font-weight: bold;">${reportData.tutorName}</p></div></div>`;
-
-        if (shouldDownload) {
-             html2pdf().from(reportTemplate).save(`${reportData.studentName}_report.pdf`);
-        } else {
-            const newWindow = window.open();
-            newWindow.document.write(`<html><head><title>${reportData.studentName} Report</title></head><body>${reportTemplate}</body></html>`);
-            newWindow.document.close();
-        }
-    } catch (error) {
-        alert(`Error: ${error.message}`);
-    }
-}
-
-async function downloadAllReportsForTutor(tutorEmail) {
-    try {
-        const reportsQuery = query(collection(db, "tutor_submissions"), where("tutorEmail", "==", tutorEmail));
-        const reportsSnapshot = await getDocs(reportsQuery);
-        
-        if (reportsSnapshot.empty) {
-            alert("No reports found for this tutor.");
-            return;
-        }
-
-        const zip = new JSZip();
-        for (const doc of reportsSnapshot.docs) {
-            const reportData = doc.data();
-            let parentEmail = 'N/A';
-            if (reportData.studentId) {
-                const studentDoc = await getDoc(doc(db, "students", reportData.studentId));
-                if (studentDoc.exists()) parentEmail = studentDoc.data().parentEmail || 'N/A';
-            }
-
-            const logoUrl = "https://raw.githubusercontent.com/psalminfo/blooming-kids-cbt/main/logo.png";
-            const reportTemplate = `<div style="font-family: Arial, sans-serif; padding: 2rem; max-width: 800px; margin: auto;"><div style="text-align: center; margin-bottom: 2rem;"><img src="${logoUrl}" alt="Company Logo" style="height: 80px;"><h3 style="font-size: 1.8rem; font-weight: bold; color: #15803d; margin: 0;">Blooming Kids House</h3><h1 style="font-size: 1.2rem; font-weight: bold; color: #166534;">MONTHLY LEARNING REPORT</h1><p>Date: ${new Date(reportData.submittedAt.seconds * 1000).toLocaleDateString()}</p></div><div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 2rem;"><p><strong>Student's Name:</strong> ${reportData.studentName}</p><p><strong>Parent's Email:</strong> ${parentEmail}</p><p><strong>Grade:</strong> ${reportData.grade}</p><p><strong>Tutor's Name:</strong> ${reportData.tutorName}</p></div>${Object.entries({"INTRODUCTION": reportData.introduction, "TOPICS & REMARKS": reportData.topics, "PROGRESS & ACHIEVEMENTS": reportData.progress, "STRENGTHS AND WEAKNESSES": reportData.strengthsWeaknesses, "RECOMMENDATIONS": reportData.recommendations, "GENERAL TUTOR'S COMMENTS": reportData.generalComments}).map(([title, content]) => `<div style="border-top: 1px solid #d1d5db; padding-top: 1rem; margin-top: 1rem;"><h2 style="font-size: 1.25rem; font-weight: bold; color: #16a34a;">${title}</h2><p style="line-height: 1.6; white-space: pre-wrap;">${content || 'N/A'}</p></div>`).join('')}<div style="margin-top: 3rem; text-align: right;"><p>Best regards,</p><p style="font-weight: bold;">${reportData.tutorName}</p></div></div>`;
-            
-            const pdfBlob = await new Promise(resolve => {
-                html2pdf().from(reportTemplate).set({
-                    margin: 1,
-                    filename: `${reportData.studentName}_report.pdf`,
-                    jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' }
-                }).outputPdf('datauristring').then(function(pdfDataUri) {
-                    const base64 = pdfDataUri.split(',')[1];
-                    const binaryString = window.atob(base64);
-                    const bytes = new Uint8Array(binaryString.length);
-                    for (let i = 0; i < binaryString.length; i++) {
-                        bytes[i] = binaryString.charCodeAt(i);
-                    }
-                    resolve(new Blob([bytes.buffer], { type: 'application/pdf' }));
-                });
-            });
-            zip.file(`${reportData.studentName}_report.pdf`, pdfBlob);
-        }
-
-        const content = await zip.generateAsync({ type: "blob" });
-        saveAs(content, `${reportsSnapshot.docs[0].data().tutorName.replace(/\s+/g, '_')}_reports.zip`);
-
-    } catch (error) {
-        alert(`Error: ${error.message}`);
-    }
-}
-
 async function renderSummerBreakPanel(container) {
     container.innerHTML = `
-        <div class="bg-white p-6 rounded-lg shadow-md">
+        <div class="panel">
             <h2 class="text-3xl font-bold text-green-700 mb-4">Students on Summer Break</h2>
             <div id="break-students-list" class="space-y-4"><p class="text-center">Loading...</p></div>
         </div>
@@ -371,6 +339,63 @@ async function renderSummerBreakPanel(container) {
     });
 }
 
+async function downloadAdminReport(reportId, returnBlob = false) {
+    try {
+        const reportDoc = await getDoc(doc(db, "tutor_submissions", reportId));
+        if (!reportDoc.exists()) throw new Error("Report not found!");
+
+        const reportData = reportDoc.data();
+
+        let parentEmail = 'N/A';
+        if (reportData.studentId) {
+            const studentDoc = await getDoc(doc(db, "students", reportData.studentId));
+            if (studentDoc.exists()) {
+                parentEmail = studentDoc.data().parentEmail || 'N/A';
+            }
+        }
+
+        const logoUrl = "https://raw.githubusercontent.com/psalminfo/blooming-kids-cbt/main/logo.png";
+        const reportTemplate = `
+            <div style="font-family: Arial, sans-serif; padding: 2rem; max-width: 800px; margin: auto;">
+                <div style="text-align: center; margin-bottom: 2rem;">
+                    <img src="${logoUrl}" alt="Company Logo" style="height: 80px; margin-bottom: 1rem;">
+                    <h3 style="font-size: 1.8rem; font-weight: bold; color: #15803d; margin: 0;">Blooming Kids House</h3>
+                    <h1 style="font-size: 1.2rem; font-weight: bold; color: #166534; margin-top: 0.5rem;">MONTHLY LEARNING REPORT</h1>
+                    <p style="color: #4b5563;">Date: ${new Date(reportData.submittedAt.seconds * 1000).toLocaleDateString()}</p>
+                </div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 2rem;">
+                    <p><strong>Student's Name:</strong> ${reportData.studentName}</p>
+                    <p><strong>Parent's Email:</strong> ${parentEmail}</p>
+                    <p><strong>Grade:</strong> ${reportData.grade}</p>
+                    <p><strong>Tutor's Name:</strong> ${reportData.tutorName}</p>
+                </div>
+                ${Object.entries({
+                    "INTRODUCTION": reportData.introduction, "TOPICS & REMARKS": reportData.topics, "PROGRESS AND ACHIEVEMENTS": reportData.progress,
+                    "STRENGTHS AND WEAKNESSES": reportData.strengthsWeaknesses, "RECOMMENDATIONS": reportData.recommendations, "GENERAL TUTOR'S COMMENTS": reportData.generalComments
+                }).map(([title, content]) => `<div style="border-top: 1px solid #d1d5db; padding-top: 1rem; margin-top: 1rem;"><h2 style="font-size: 1.25rem; font-weight: bold; color: #16a34a;">${title}</h2><p style="line-height: 1.6; white-space: pre-wrap;">${content || 'N/A'}</p></div>`).join('')}
+                <div style="margin-top: 3rem; text-align: right;"><p>Best regards,</p><p style="font-weight: bold;">${reportData.tutorName}</p></div>
+            </div>`;
+
+        const opt = {
+            margin: 0.5,
+            filename: `${reportData.studentName}_report.pdf`,
+            image: { type: 'jpeg', quality: 0.98 },
+            html2canvas: { scale: 2 },
+            jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' }
+        };
+
+        if (returnBlob) {
+            return await html2pdf().from(reportTemplate).set(opt).outputPdf('blob');
+        } else {
+            html2pdf().from(reportTemplate).set(opt).save();
+        }
+
+    } catch (error) {
+        console.error("Error generating PDF:", error);
+        alert(`Failed to download report: ${error.message}`);
+        return null;
+    }
+}
 
 // ##################################
 // # AUTHENTICATION & INITIALIZATION
@@ -406,19 +431,15 @@ onAuthStateChanged(auth, async (user) => {
                         if (!firstVisibleTab) firstVisibleTab = id;
                         const button = document.createElement('button');
                         button.id = id;
-                        button.className = 'nav-btn text-lg font-bold text-gray-500 hover:text-green-700';
+                        button.className = 'nav-btn text-lg font-bold text-gray-500 hover:text-white';
                         button.textContent = document.querySelector(`[id="${id}"]`)?.textContent || (id === 'navTutorManagement' ? 'Tutor & Student List' : id === 'navPayAdvice' ? 'Pay Advice' : id === 'navTutorReports' ? 'Tutor Reports' : id === 'navSummerBreak' ? 'Summer Break' : '');
                         navContainer.appendChild(button);
                         
                         button.addEventListener('click', () => {
                             document.querySelectorAll('.nav-btn').forEach(btn => {
                                 btn.classList.remove('active');
-                                btn.classList.add('text-gray-500');
-                                btn.classList.remove('text-green-700');
                             });
                             button.classList.add('active');
-                            button.classList.remove('text-gray-500');
-                            button.classList.add('text-green-700');
                             item.fn(mainContent);
                         });
                     }
@@ -428,8 +449,6 @@ onAuthStateChanged(auth, async (user) => {
                     const firstTabButton = document.getElementById(firstVisibleTab);
                     if (firstTabButton) {
                         firstTabButton.classList.add('active');
-                        firstTabButton.classList.remove('text-gray-500');
-                        firstTabButton.classList.add('text-green-700');
                         allNavItems[firstVisibleTab].fn(mainContent);
                     }
                 } else {
