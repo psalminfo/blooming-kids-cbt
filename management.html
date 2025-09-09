@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Management Portal - Blooming Kids House</title>
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🌼</text></svg>" />
+  <link rel="icon" href="favicon.ico" />
   <style>
     /* === Base & Theme === */
     body {
@@ -26,7 +26,6 @@
       max-width: 1200px;
       margin: 0 auto;
       padding: 32px;
-      text-align: center;
     }
 
     /* === Header === */
@@ -70,15 +69,15 @@
       box-shadow: 0 6px 16px rgba(251, 191, 36, 0.4);
     }
 
-    /* === Zoom-style Cards === */
-    .card-grid {
+    /* === Navigation Cards === */
+    .nav {
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
       gap: 24px;
       margin-bottom: 40px;
     }
 
-    .card {
+    .nav-btn {
       background: rgba(255, 255, 255, 0.05);
       border: 1px solid rgba(255, 255, 255, 0.1);
       border-radius: 16px;
@@ -91,12 +90,12 @@
       transition: transform 0.2s ease, box-shadow 0.3s ease;
     }
 
-    .card:hover {
+    .nav-btn:hover {
       transform: translateY(-4px);
       box-shadow: 0 12px 32px rgba(0, 0, 0, 0.3), 0 0 12px rgba(96, 165, 250, 0.3);
     }
 
-    .card.active {
+    .nav-btn.active {
       background: #166534;
       box-shadow: 0 0 20px rgba(22, 101, 52, 0.6);
     }
@@ -107,15 +106,20 @@
       border-radius: 16px;
       padding: 32px;
       box-shadow: 0 6px 20px rgba(0, 0, 0, 0.1);
+      min-height: 300px;
     }
 
     .main-message {
+      text-align: center;
       color: #d1d5db;
       font-size: 1rem;
-      margin-top: 24px;
+      margin-top: 48px;
     }
 
     @media (max-width: 768px) {
+      .nav {
+        grid-template-columns: 1fr;
+      }
       .header {
         flex-direction: column;
         align-items: flex-start;
@@ -123,52 +127,30 @@
       }
     }
   </style>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 </head>
 <body>
   <div class="container">
     <div class="header">
       <div>
         <h1 id="welcome-message">Welcome</h1>
-        <p id="user-role">Management Role</p>
+        <p id="user-role"></p>
       </div>
       <button id="logoutBtn" class="btn-logout">Logout</button>
     </div>
 
-    <div class="card-grid">
-      <div id="navTutorManagement" class="card active">Tutor & Student List</div>
-      <div id="navPayAdvice" class="card">Pay Advice</div>
-      <div id="navTutorReports" class="card">Tutor Reports</div>
-      <div id="navSummerBreak" class="card">Summer Break</div>
-    </div>
+    <nav class="nav">
+      <button id="navTutorManagement" class="nav-btn active">Tutor & Student List</button>
+      <button id="navPayAdvice" class="nav-btn">Pay Advice</button>
+      <button id="navTutorReports" class="nav-btn">Tutor Reports</button>
+      <button id="navSummerBreak" class="nav-btn">Summer Break</button>
+    </nav>
 
     <div id="main-content">
       <p class="main-message">Checking user permissions...</p>
     </div>
   </div>
 
-  <script>
-    document.addEventListener('DOMContentLoaded', function() {
-      // Navigation functionality
-      const navItems = document.querySelectorAll('.card');
-      
-      // Add click events to navigation cards
-      navItems.forEach(item => {
-        item.addEventListener('click', function() {
-          // Update active nav item
-          navItems.forEach(nav => nav.classList.remove('active'));
-          this.classList.add('active');
-          
-          // Update main content based on selection
-          const mainContent = document.getElementById('main-content');
-          mainContent.innerHTML = `<p class="main-message">Loading ${this.textContent}...</p>`;
-        });
-      });
-      
-      // Logout button functionality
-      document.getElementById('logoutBtn').addEventListener('click', function() {
-        alert('Logout successful!');
-      });
-    });
-  </script>
+  <script type="module" src="management.js"></script>
 </body>
 </html>
