@@ -1062,6 +1062,7 @@ async function renderSummerBreakPanel(container) {
 // ##################################################################
 // # SECTION 7: RENDER STAFF PANEL (This is the new section)
 // ##################################################################
+// In your ADMIN.JS file, replace the existing renderStaffPanel with this new version.
 
 async function renderStaffPanel(container) {
     const ROLE_PERMISSIONS = {
@@ -1123,7 +1124,10 @@ async function renderStaffPanel(container) {
                         </select>
                     </td>
                     <td class="px-6 py-4">
-                        <button data-id="${doc.id}" class="manage-permissions-btn bg-blue-600 text-white px-3 py-1 rounded text-sm hover:bg-blue-700">Manage Permissions</button>
+                        <div class="flex space-x-2 items-center">
+                            <button data-id="${doc.id}" class="manage-permissions-btn bg-blue-600 text-white px-3 py-1 rounded text-sm hover:bg-blue-700">Manage Permissions</button>
+                            ${staff.permissions?.actions?.canEndBreak ? `<button data-id="${doc.id}" class="end-break-btn bg-red-600 text-white px-3 py-1 rounded text-sm hover:bg-red-700">End Break</button>` : ''}
+                        </div>
                     </td>
                 </tr>
             `;
@@ -1151,73 +1155,41 @@ async function renderStaffPanel(container) {
         document.querySelectorAll('.manage-permissions-btn').forEach(button => {
             button.addEventListener('click', (e) => openPermissionsModal(e.target.dataset.id));
         });
-    });
-}
 
-// ### NEW HELPER FUNCTION ### This creates the permissions pop-up.
-async function openPermissionsModal(staffId) {
-    const staffDoc = await getDoc(doc(db, "staff", staffId));
-    if (!staffDoc.exists()) return alert("Staff member not found.");
+        document.querySelectorAll('.end-break-btn').forEach(button => {
+            button.addEventListener('click', async (e) => {
+                const staffId = e.target.dataset.id;
+                // Add the logic to end the break here.
+                // This logic is already present in a previous version of the `renderSummerBreakPanel` function.
+                // You can reuse that code here.
+                if (confirm("Are you sure you want to end the summer break for ALL students? This cannot be undone.")) {
+                    e.target.disabled = true;
+                    e.target.textContent = 'Ending...';
+                    try {
+                        const studentsRef = collection(db, "students");
+                        const q = query(studentsRef, where("summerBreak", "==", true));
+                        const querySnapshot = await getDocs(q);
 
-    const staffData = staffDoc.data();
-    const permissions = staffData.permissions || { tabs: {}, actions: {} };
+                        const batch = writeBatch(db);
+                        querySnapshot.forEach((doc) => {
+                            batch.update(doc.ref, {
+                                summerBreak: false,
+                                summerBreakEndedAt: Timestamp.now()
+                            });
+                        });
 
-    const modalHTML = `
-        <div id="permissions-modal" class="fixed inset-0 bg-gray-600 bg-opacity-75 flex items-center justify-center z-50">
-            <div class="bg-white rounded-lg shadow-xl p-8 max-w-lg w-full">
-                <h3 class="text-2xl font-bold mb-4">Edit Permissions for ${staffData.name}</h3>
-                <p class="text-sm text-gray-500 mb-4">Current Role: <span class="font-semibold">${capitalize(staffData.role)}</span></p>
-                
-                <div class="space-y-4">
-                    <div class="border-t pt-4">
-                        <h4 class="font-semibold mb-2">Tab Visibility:</h4>
-                        <div class="grid grid-cols-2 gap-2">
-                            <label class="flex items-center"><input type="checkbox" id="p-viewTutorManagement" class="mr-2" ${permissions.tabs?.viewTutorManagement ? 'checked' : ''}> Tutor List</label>
-                            <label class="flex items-center"><input type="checkbox" id="p-viewPayAdvice" class="mr-2" ${permissions.tabs?.viewPayAdvice ? 'checked' : ''}> Pay Advice</label>
-                            <label class="flex items-center"><input type="checkbox" id="p-viewTutorReports" class="mr-2" ${permissions.tabs?.viewTutorReports ? 'checked' : ''}> Tutor Reports</label>
-                            <label class="flex items-center"><input type="checkbox" id="p-viewSummerBreak" class="mr-2" ${permissions.tabs?.viewSummerBreak ? 'checked' : ''}> Summer Break</label>
-                        </div>
-                    </div>
-
-                    <div class="border-t pt-4">
-                        <h4 class="font-semibold mb-2">Specific Actions:</h4>
-                        <label class="flex items-center"><input type="checkbox" id="p-canDownloadReports" class="mr-2" ${permissions.actions?.canDownloadReports ? 'checked' : ''}> Can Download Reports</label>
-                        <label class="flex items-center"><input type="checkbox" id="p-canExportPayAdvice" class="mr-2" ${permissions.actions?.canExportPayAdvice ? 'checked' : ''}> Can Export Pay Advice</label>
-                        <label class="flex items-center"><input type="checkbox" id="p-canEndBreak" class="mr-2" ${permissions.actions?.canEndBreak ? 'checked' : ''}> Can End Break</label>
-                    </div>
-                </div>
-
-                <div class="flex justify-end space-x-4 mt-6">
-                    <button id="cancel-permissions" class="bg-gray-300 px-4 py-2 rounded">Cancel</button>
-                    <button id="save-permissions" class="bg-green-600 text-white px-4 py-2 rounded">Save Changes</button>
-                </div>
-            </div>
-        </div>
-    `;
-
-    document.body.insertAdjacentHTML('beforeend', modalHTML);
-
-    const closeModal = () => document.getElementById('permissions-modal').remove();
-
-    document.getElementById('cancel-permissions').addEventListener('click', closeModal);
-    document.getElementById('save-permissions').addEventListener('click', async () => {
-        const newPermissions = {
-            tabs: {
-                viewTutorManagement: document.getElementById('p-viewTutorManagement').checked,
-                viewPayAdvice: document.getElementById('p-viewPayAdvice').checked,
-                viewTutorReports: document.getElementById('p-viewTutorReports').checked,
-                viewSummerBreak: document.getElementById('p-viewSummerBreak').checked,
-            },
-            actions: {
-                canDownloadReports: document.getElementById('p-canDownloadReports').checked,
-                canExportPayAdvice: document.getElementById('p-canExportPayAdvice').checked,
-                canEndBreak: document.getElementById('p-canEndBreak').checked,
-            }
-        };
-
-        await updateDoc(doc(db, "staff", staffId), { permissions: newPermissions });
-        alert("Custom permissions saved successfully!");
-        closeModal();
+                        await batch.commit();
+                        alert('Break ended successfully for all students!');
+                    } catch (error) {
+                        console.error("Error ending break:", error);
+                        alert(`Failed to end break: ${error.message}`);
+                    } finally {
+                        e.target.disabled = false;
+                        e.target.textContent = 'End Break';
+                    }
+                }
+            });
+        });
     });
 }
 
@@ -1333,6 +1305,7 @@ onAuthStateChanged(auth, async (user) => {
     }
     // ...
 });
+
 
 
 
