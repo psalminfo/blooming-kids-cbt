@@ -6,7 +6,7 @@
   <title>Management Portal - Blooming Kids House</title>
   <link rel="icon" href="favicon.ico" />
   <style>
-    /* === Base & Theme === */
+    /* === Base & Theme === (From compare.txt) */
     body {
       margin: 0;
       font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -21,21 +21,19 @@
       50% { background-position: 100% 50%; }
       100% { background-position: 0% 50%; }
     }
-
     .container {
       max-width: 1200px;
       margin: 0 auto;
       padding: 32px;
+      text-align: center;
     }
-
-    /* === Header === */
+    /* === Header === (From compare.txt, applied to managementt structure) */
     .header {
       display: flex;
       justify-content: space-between;
       align-items: center;
       margin-bottom: 40px;
     }
-
     .header h1 {
       font-size: 2.5rem;
       font-weight: bold;
@@ -43,14 +41,12 @@
       margin: 0;
       text-shadow: 0 0 10px rgba(22, 101, 52, 0.5);
     }
-
     .header p {
       font-size: 1rem;
       color: #d1d5db;
       font-weight: 600;
       margin-top: 4px;
     }
-
     .btn-logout {
       background: linear-gradient(90deg, #facc15, #fbbf24);
       color: white;
@@ -62,21 +58,19 @@
       box-shadow: 0 4px 12px rgba(251, 191, 36, 0.3);
       transition: transform 0.2s ease, box-shadow 0.3s ease;
     }
-
     .btn-logout:hover {
       background: #f59e0b;
       transform: translateY(-1px);
       box-shadow: 0 6px 16px rgba(251, 191, 36, 0.4);
     }
-
-    /* === Navigation Cards === */
+    /* === Navigation === (Visual style adapted from compare.txt's card design) */
     .nav {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      display: flex;
       gap: 24px;
       margin-bottom: 40px;
+      justify-content: center;
+      flex-wrap: wrap;
     }
-
     .nav-btn {
       background: rgba(255, 255, 255, 0.05);
       border: 1px solid rgba(255, 255, 255, 0.1);
@@ -88,42 +82,37 @@
       cursor: pointer;
       box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
       transition: transform 0.2s ease, box-shadow 0.3s ease;
+      border: none;
     }
-
     .nav-btn:hover {
       transform: translateY(-4px);
       box-shadow: 0 12px 32px rgba(0, 0, 0, 0.3), 0 0 12px rgba(96, 165, 250, 0.3);
     }
-
     .nav-btn.active {
       background: #166534;
       box-shadow: 0 0 20px rgba(22, 101, 52, 0.6);
     }
-
-    /* === Main Content === */
+    /* === Main Content === (From compare.txt) */
     #main-content {
       background: rgba(255, 255, 255, 0.05);
       border-radius: 16px;
       padding: 32px;
       box-shadow: 0 6px 20px rgba(0, 0, 0, 0.1);
-      min-height: 300px;
     }
-
     .main-message {
-      text-align: center;
       color: #d1d5db;
       font-size: 1rem;
-      margin-top: 48px;
+      margin-top: 24px;
     }
-
     @media (max-width: 768px) {
-      .nav {
-        grid-template-columns: 1fr;
-      }
       .header {
         flex-direction: column;
         align-items: flex-start;
         gap: 12px;
+      }
+      .nav {
+        flex-direction: column;
+        align-items: center;
       }
     }
   </style>
@@ -138,19 +127,16 @@
       </div>
       <button id="logoutBtn" class="btn-logout">Logout</button>
     </div>
-
     <nav class="nav">
       <button id="navTutorManagement" class="nav-btn active">Tutor & Student List</button>
       <button id="navPayAdvice" class="nav-btn">Pay Advice</button>
       <button id="navTutorReports" class="nav-btn">Tutor Reports</button>
       <button id="navSummerBreak" class="nav-btn">Summer Break</button>
     </nav>
-
     <div id="main-content">
       <p class="main-message">Checking user permissions...</p>
     </div>
   </div>
-
   <script type="module" src="management.js"></script>
 </body>
 </html>
