@@ -153,8 +153,10 @@
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
             gap: 24px;
+            justify-content: center;
+            align-items: center;
+            text-align: center; /* Ensures text is centered */
         }
-
         .nav-card {
             background: rgba(17,24,39,0.6);
             backdrop-filter: blur(6px);
@@ -165,6 +167,9 @@
             cursor: pointer;
             transition: transform 0.3s ease, box-shadow 0.3s ease, border-color 0.3s ease;
             box-shadow: 0 8px 24px rgba(0,0,0,0.25), inset 0 0 0 1px rgba(255,255,255,0.04);
+            aspect-ratio: 1 / 1;
+            max-width: 300px;
+            margin: 0 auto;
         }
 
         .nav-card:hover {
@@ -290,7 +295,21 @@
     function showPage(pageId) {
         document.querySelectorAll('.page-content').forEach(p => p.classList.add('hidden'));
         document.getElementById(pageId).classList.remove('hidden');
+        
+        // Handle active class for sidebar links
+        document.querySelectorAll('.nav-links li a').forEach(link => {
+            link.classList.remove('active');
+            if (link.getAttribute('onclick').includes(pageId)) {
+                link.classList.add('active');
+            }
+        });
+        
         closeSidebar();
+        
+        // Special function call for tutor reports page
+        if (pageId === 'tutorReports') {
+            displayTutorList();
+        }
     }
 
     function toggleSidebar() {
@@ -351,11 +370,10 @@
         });
     }
 
-    // Initialize the tutor list when the tutor reports page is shown
-    document.getElementById('tutorReports').addEventListener('click', displayTutorList);
-    
-    // Set the initial page to 'home'
-    window.onload = () => showPage('home');
+    // Set the initial page to 'home' and activate the correct sidebar link
+    window.onload = () => {
+        showPage('home');
+    };
 </script>
 </body>
 </html>
