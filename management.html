@@ -6,23 +6,46 @@
     <title>Management Portal - Blooming Kids House</title>
     <link rel="icon" href="favicon.ico" />
     <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
-    <style id="new-styles"></style>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.6.0/jszip.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+    <style id="new-styles">
+        body {
+            background-color: #f7f7f7;
+            background-image: url("data:image/svg+xml,%3Csvg width='42' height='44' viewBox='0 0 42 44' xmlns='http://www.w3.org/2000/svg'%3E%3Cg id='Page-1' stroke='none' stroke-width='1' fill='none' fill-rule='evenodd'%3E%3Cg id='brick-wall' fill='%23ffffff' fill-opacity='1'%3E%3Cpath d='M0 0h42v44H0V0zm1 1h40v20H1V1zM0 23h42v20H0V23zm1 1h20v20H1V24zm21 0h20v20H22V24z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+            background-repeat: repeat;
+        }
+        .nav-btn.active {
+            background-color: #d1fae5;
+            color: #065f46;
+        }
+        .nav-btn {
+            border-radius: 9999px;
+            padding: 0.75rem 1.5rem;
+            transition: all 0.3s ease;
+        }
+        .nav-btn:hover {
+            background-color: #ecfdf5;
+        }
+        .text-xs {
+            font-size: 0.875rem;
+        }
+    </style>
 </head>
 <body class="bg-white min-h-screen">
-    <div class="max-w-7xl mx-auto p-6">
+    <div class="max-w-7xl mx-auto p-6 bg-white bg-opacity-90 rounded-xl shadow-lg my-8">
         <div class="flex justify-between items-center mb-6">
             <div>
                 <h1 id="welcome-message" class="text-3xl font-bold text-green-800">Welcome</h1>
                 <p id="user-role" class="text-md text-gray-600 font-semibold"></p>
             </div>
-            <button id="logoutBtn" class="bg-yellow-400 text-white px-4 py-2 rounded hover:bg-yellow-500">Logout</button>
+            <button id="logoutBtn" class="bg-yellow-400 text-white px-4 py-2 rounded-full hover:bg-yellow-500 shadow">Logout</button>
         </div>
-        <nav class="flex space-x-4 mb-6 border-b border-gray-200">
-            <button id="navTutorManagement" class="nav-btn text-lg font-semibold active">Tutor & Student List</button>
-            <button id="navPayAdvice" class="nav-btn text-lg font-semibold text-gray-500 hover:text-green-700">Pay Advice</button>
-            <button id="navTutorReports" class="nav-btn text-lg font-semibold text-gray-500 hover:text-green-700">Tutor Reports</button>
-            <button id="navSummerBreak" class="nav-btn text-lg font-semibold text-gray-500 hover:text-green-700">Summer Break</button>
+        <nav class="flex space-x-4 mb-6">
+            <button id="navTutorManagement" class="nav-btn text-lg font-bold text-gray-500 hover:text-green-700">Tutor & Student List</button>
+            <button id="navPayAdvice" class="nav-btn text-lg font-bold text-gray-500 hover:text-green-700">Pay Advice</button>
+            <button id="navTutorReports" class="nav-btn text-lg font-bold text-gray-500 hover:text-green-700">Tutor Reports</button>
+            <button id="navSummerBreak" class="nav-btn text-lg font-bold text-gray-500 hover:text-green-700">Summer Break</button>
         </nav>
         <div id="main-content">
              <p class="text-center text-gray-600 mt-12">Checking user permissions...</p>
