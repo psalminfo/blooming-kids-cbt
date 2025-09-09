@@ -5,21 +5,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
     <title>Management Portal - Blooming Kids House</title>
     <link rel="icon" href="favicon.ico" />
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" />
-    <style>
-        .nav-btn {
-            padding: 8px 16px;
-            border-bottom: 2px solid transparent;
-            transition: all 0.3s ease;
-        }
-        .nav-btn.active { 
-            border-bottom-color: #166534; /* dark-green */
-            color: #166534; 
-        }
-    </style>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <style id="new-styles"></style>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 </head>
-<body class="bg-gray-50 min-h-screen">
+<body class="bg-white min-h-screen">
     <div class="max-w-7xl mx-auto p-6">
         <div class="flex justify-between items-center mb-6">
             <div>
@@ -28,7 +18,7 @@
             </div>
             <button id="logoutBtn" class="bg-yellow-400 text-white px-4 py-2 rounded hover:bg-yellow-500">Logout</button>
         </div>
-        <nav class="flex space-x-4 mb-6 border-b">
+        <nav class="flex space-x-4 mb-6 border-b border-gray-200">
             <button id="navTutorManagement" class="nav-btn text-lg font-semibold active">Tutor & Student List</button>
             <button id="navPayAdvice" class="nav-btn text-lg font-semibold text-gray-500 hover:text-green-700">Pay Advice</button>
             <button id="navTutorReports" class="nav-btn text-lg font-semibold text-gray-500 hover:text-green-700">Tutor Reports</button>
