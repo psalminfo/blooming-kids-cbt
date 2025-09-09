@@ -43,14 +43,19 @@
 <body class="bg-gray-50 min-h-screen">
     <div class="max-w-7xl mx-auto p-6">
         <div class="flex justify-between items-center mb-6">
-            <div>
+            <button id="hamburgerBtn" class="lg:hidden p-2 rounded-lg text-gray-600 hover:text-green-700">
+                <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16m-7 6h7"></path>
+                </svg>
+            </button>
+            <div class="flex-grow">
                 <h1 id="welcome-message" class="text-3xl font-bold text-green-800">Welcome</h1>
                 <p id="user-role" class="text-md text-gray-600 font-semibold"></p>
             </div>
             <button id="logoutBtn" class="bg-yellow-400 text-white px-4 py-2 rounded hover:bg-yellow-500">Logout</button>
         </div>
 
-        <div class="grid grid-cols-2 md:grid-cols-4 gap-6 justify-center max-w-2xl mx-auto mb-6">
+        <div id="nav-container" class="lg:grid grid-cols-2 md:grid-cols-4 gap-6 justify-center max-w-2xl mx-auto mb-6 hidden">
             <div id="navTutorManagement" class="icon-card">
                 <div class="card-inner-square bg-blue-500 active">
                     <i class="fas fa-users card-icon"></i>
@@ -85,5 +90,19 @@
         </div>
     </div>
     <script type="module" src="management.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const hamburgerBtn = document.getElementById('hamburgerBtn');
+            const navContainer = document.getElementById('nav-container');
+
+            hamburgerBtn.addEventListener('click', function() {
+                navContainer.classList.toggle('hidden');
+                navContainer.classList.toggle('grid');
+                navContainer.classList.toggle('flex');
+                navContainer.classList.toggle('flex-col');
+                navContainer.classList.toggle('items-center');
+            });
+        });
+    </script>
 </body>
 </html>
