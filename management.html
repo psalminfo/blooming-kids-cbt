@@ -1,47 +1,177 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Management Portal - Blooming Kids House</title>
-  <link rel="icon" href="favicon.ico" />
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet" />
-  <style>
-    /* New CSS styles will go here */
-  </style>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Management Portal - Blooming Kids House</title>
+  <link rel="icon" href="favicon.ico" />
+  <style>
+    /* === Base & Theme === */
+    body {
+      margin: 0;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: linear-gradient(120deg, #0f172a, #166534, #1e3a8a);
+      background-size: 400% 400%;
+      animation: aurora 18s ease infinite;
+      color: #f1f5f9;
+      min-height: 100vh;
+    }
+    @keyframes aurora {
+      0% { background-position: 0% 50%; }
+      50% { background-position: 100% 50%; }
+      100% { background-position: 0% 50%; }
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 24px;
+    }
+
+    /* === Header === */
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 24px;
+      background: rgba(236, 253, 245, 0.15); /* #ecfdf5 with transparency */
+      padding: 16px 24px;
+      border-radius: 12px;
+      box-shadow: 0 4px 12px rgba(22, 101, 52, 0.1);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .header h1 {
+      font-size: 2rem;
+      font-weight: bold;
+      color: #ffffff;
+      margin: 0;
+      text-shadow: 0 0 8px rgba(22, 101, 52, 0.6);
+    }
+
+    .header p {
+      font-size: 1rem;
+      color: #d1d5db;
+      font-weight: 600;
+      margin-top: 4px;
+    }
+
+    .btn-logout {
+      background: linear-gradient(90deg, #facc15, #fbbf24);
+      color: white;
+      font-weight: bold;
+      padding: 10px 16px;
+      border: none;
+      border-radius: 10px;
+      cursor: pointer;
+      box-shadow: 0 4px 12px rgba(251, 191, 36, 0.3);
+      transition: transform 0.2s ease, box-shadow 0.3s ease;
+    }
+
+    .btn-logout:hover {
+      background: #f59e0b;
+      transform: translateY(-1px);
+      box-shadow: 0 6px 16px rgba(251, 191, 36, 0.4);
+    }
+
+    /* === Navigation — TRANSFORMED INTO ZOOM-STYLE CARDS === */
+    .nav {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 20px;
+      margin-bottom: 32px;
+      padding: 0;
+      border-bottom: none; /* Remove original underline */
+    }
+
+    .nav-btn {
+      /* Zoom-style card appearance */
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      border-radius: 16px;
+      padding: 20px;
+      font-size: 1.125rem;
+      font-weight: 600;
+      color: #ffffff;
+      cursor: pointer;
+      box-shadow: 0 6px 16px rgba(0, 0, 0, 0.15);
+      transition: all 0.3s ease;
+      text-align: center;
+      min-height: 80px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .nav-btn:hover {
+      transform: translateY(-3px);
+      box-shadow: 0 10px 24px rgba(0, 0, 0, 0.25), 0 0 12px rgba(96, 165, 250, 0.2);
+      border-color: rgba(255, 255, 255, 0.3);
+    }
+
+    .nav-btn.active {
+      background: rgba(22, 101, 52, 0.4);
+      border-color: #166534;
+      box-shadow: 0 0 24px rgba(22, 101, 52, 0.5);
+      color: #ffffff;
+      text-shadow: 0 0 8px rgba(22, 101, 52, 0.8);
+    }
+
+    /* === Main Content — Keep Default Font & White Background for Readability === */
+    #main-content {
+      background: #ffffff; /* Pure white for counters and tables */
+      color: #1f2937; /* Default dark text */
+      padding: 32px;
+      border-radius: 16px;
+      box-shadow: 0 6px 20px rgba(0, 0, 0, 0.1);
+      min-height: 300px;
+      border: 1px solid #e5e7eb;
+    }
+
+    .main-message {
+      text-align: center;
+      color: #6b7280;
+      font-size: 1rem;
+      margin-top: 48px;
+      font-family: inherit; /* Respect original font */
+    }
+
+    @media (max-width: 768px) {
+      .nav {
+        grid-template-columns: 1fr;
+      }
+      .header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 12px;
+      }
+    }
+  </style>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 </head>
-<body id="aurora-bg">
-  <div class="container">
-    <div class="header">
-      <div>
-        <h1 class="welcome-heading">Welcome</h1>
-        <p class="user-role-text">Management Role</p>
-      </div>
-      <button id="logoutBtn" class="logout-btn">Logout</button>
-    </div>
+<body>
+  <div class="container">
+    <div class="header">
+      <div>
+        <h1 id="welcome-message">Welcome</h1>
+        <p id="user-role"></p>
+      </div>
+      <button id="logoutBtn" class="btn-logout">Logout</button>
+    </div>
 
-    <nav class="nav-cards">
-      <div id="navTutorManagement" class="nav-card active">
-        <h3>Tutor & Student List</h3>
-      </div>
-      <div id="navPayAdvice" class="nav-card">
-        <h3>Pay Advice</h3>
-      </div>
-      <div id="navTutorReports" class="nav-card">
-        <h3>Tutor Reports</h3>
-      </div>
-      <div id="navSummerBreak" class="nav-card">
-        <h3>Summer Break</h3>
-      </div>
-    </nav>
+    <!-- Navigation as Zoom-style Cards — but still <button> inside <nav> for JS compatibility -->
+    <nav class="nav">
+      <button id="navTutorManagement" class="nav-btn active">Tutor & Student List</button>
+      <button id="navPayAdvice" class="nav-btn">Pay Advice</button>
+      <button id="navTutorReports" class="nav-btn">Tutor Reports</button>
+      <button id="navSummerBreak" class="nav-btn">Summer Break</button>
+    </nav>
 
-    <div id="main-content" class="content-box">
-      <p class="main-message">Checking user permissions...</p>
-    </div>
-  </div>
-  <script type="module" src="management.js"></script>
+    <div id="main-content">
+      <p class="main-message">Checking user permissions...</p>
+    </div>
+  </div>
+
+  <script type="module" src="management.js"></script>
 </body>
 </html>
