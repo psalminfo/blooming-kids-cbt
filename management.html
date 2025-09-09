@@ -6,20 +6,12 @@
   <title>Management Portal - Blooming Kids House</title>
   <link rel="icon" href="favicon.ico" />
   <style>
-    /* === Base & Theme === (From compare.txt) */
+    /* === Base Reset & Theme === */
     body {
       margin: 0;
-      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-      background: linear-gradient(120deg, #0f172a, #166534, #1e3a8a);
-      background-size: 400% 400%;
-      animation: aurora 18s ease infinite;
-      color: #f1f5f9;
-      min-height: 100vh;
-    }
-    @keyframes aurora {
-      0% { background-position: 0% 50%; }
-      50% { background-position: 100% 50%; }
-      100% { background-position: 0% 50%; }
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+      background-color: #ffffff; /* WHITE BACKGROUND AS REQUESTED */
+      color: #1f2937;
     }
     .container {
       max-width: 1200px;
@@ -28,33 +20,31 @@
       text-align: center;
     }
 
-    /* === Header === (Visual upgrade from compare.txt, structure from managementt.txt) */
+    /* === Header === */
     .header {
       display: flex;
       justify-content: space-between;
       align-items: center;
       margin-bottom: 40px;
-      background: rgba(255, 255, 255, 0.05);
+      background: #f9fafb;
       padding: 24px;
       border-radius: 16px;
-      box-shadow: 0 4px 12px rgba(22, 101, 52, 0.1);
-      border: 1px solid rgba(255, 255, 255, 0.1);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
     }
     .header h1 {
-      font-size: 2.5rem;
-      font-weight: bold;
-      color: #ffffff;
+      font-size: 2.2rem;
+      font-weight: 700;
+      color: #166534;
       margin: 0;
-      text-shadow: 0 0 10px rgba(22, 101, 52, 0.5);
     }
     .header p {
       font-size: 1rem;
-      color: #d1d5db;
+      color: #4b5563;
       font-weight: 600;
       margin-top: 4px;
     }
 
-    /* Logout Button — already beautiful in both, kept as-is */
+    /* === Logout Button === */
     .btn-logout {
       background: linear-gradient(90deg, #facc15, #fbbf24);
       color: white;
@@ -72,62 +62,62 @@
       box-shadow: 0 6px 16px rgba(251, 191, 36, 0.4);
     }
 
-    /* === Navigation === (CRITICAL: Keep <nav> and <button> structure from managementt.txt, but style like compare.txt cards) */
-    .nav {
-      display: flex;
+    /* === Zoom-style Cards (Navigation Tabs) === */
+    .card-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
       gap: 24px;
       margin-bottom: 40px;
-      justify-content: center;
-      flex-wrap: wrap;
     }
-    .nav-btn {
-      /* Visuals from .card in compare.txt */
-      background: rgba(255, 255, 255, 0.05);
-      border: 1px solid rgba(255, 255, 255, 0.1);
+    .card {
+      background: #ffffff;
+      border: 1px solid #e5e7eb;
       border-radius: 16px;
       padding: 24px;
       font-size: 1.1rem;
       font-weight: 600;
-      color: #ffffff;
+      color: #1f2937;
       cursor: pointer;
-      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
-      transition: transform 0.2s ease, box-shadow 0.3s ease;
-      border: none; /* override default button border */
-      min-width: 200px;
+      box-shadow: 0 6px 16px rgba(0, 0, 0, 0.08);
+      transition: transform 0.2s ease, box-shadow 0.3s ease, border-color 0.3s ease;
     }
-    .nav-btn:hover {
+    .card:hover {
       transform: translateY(-4px);
-      box-shadow: 0 12px 32px rgba(0, 0, 0, 0.3), 0 0 12px rgba(96, 165, 250, 0.3);
+      box-shadow: 0 10px 24px rgba(0, 0, 0, 0.12), 0 0 8px rgba(22, 101, 52, 0.15);
+      border-color: #166534;
     }
-    .nav-btn.active {
-      background: #166534;
-      box-shadow: 0 0 20px rgba(22, 101, 52, 0.6);
+    .card.active {
+      background: #ecfdf5;
+      border-color: #166534;
+      box-shadow: 0 0 20px rgba(22, 101, 52, 0.2);
+      color: #166534;
     }
 
-    /* === Main Content === (From compare.txt) */
+    /* === Main Content === */
     #main-content {
-      background: rgba(255, 255, 255, 0.05);
+      background: #ffffff;
+      border: 1px solid #e5e7eb;
       border-radius: 16px;
       padding: 32px;
-      box-shadow: 0 6px 20px rgba(0, 0, 0, 0.1);
-      border: 1px solid rgba(255, 255, 255, 0.1);
+      box-shadow: 0 6px 20px rgba(0, 0, 0, 0.05);
+      text-align: left; /* Reset to default alignment for tables/counters */
     }
     .main-message {
-      color: #d1d5db;
+      color: #6b7280;
       font-size: 1rem;
       margin-top: 24px;
+      text-align: center;
     }
 
-    /* Responsive — from both, enhanced */
+    /* Responsive */
     @media (max-width: 768px) {
-      .nav {
-        flex-direction: column;
-        align-items: center;
-      }
       .header {
         flex-direction: column;
         align-items: flex-start;
         gap: 12px;
+      }
+      .card-grid {
+        grid-template-columns: 1fr;
       }
     }
   </style>
@@ -142,12 +132,15 @@
       </div>
       <button id="logoutBtn" class="btn-logout">Logout</button>
     </div>
-    <nav class="nav">
-      <button id="navTutorManagement" class="nav-btn active">Tutor & Student List</button>
-      <button id="navPayAdvice" class="nav-btn">Pay Advice</button>
-      <button id="navTutorReports" class="nav-btn">Tutor Reports</button>
-      <button id="navSummerBreak" class="nav-btn">Summer Break</button>
-    </nav>
+
+    <!-- Zoom-style Cards as Navigation -->
+    <div class="card-grid">
+      <div id="navTutorManagement" class="card active">Tutor & Student List</div>
+      <div id="navPayAdvice" class="card">Pay Advice</div>
+      <div id="navTutorReports" class="card">Tutor Reports</div>
+      <div id="navSummerBreak" class="card">Summer Break</div>
+    </div>
+
     <div id="main-content">
       <p class="main-message">Checking user permissions...</p>
     </div>
