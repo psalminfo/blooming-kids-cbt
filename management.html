@@ -31,11 +31,10 @@
             margin-bottom: 0.75rem;
         }
         .card-inner-square.active {
-             border: 3px solid #166534;
+             border: 3px solid #166534; /* dark-green */
         }
         .card-icon {
             font-size: 3rem;
-            color: white;
         }
     </style>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
@@ -43,7 +42,7 @@
 <body class="bg-gray-50 min-h-screen">
     <div class="max-w-7xl mx-auto p-6">
         <div class="flex justify-between items-center mb-6">
-            <button id="hamburgerBtn" class="lg:hidden p-2 rounded-lg text-gray-600 hover:text-green-700">
+            <button id="hamburgerBtn" class="p-2 rounded-lg text-gray-600 hover:text-green-700">
                 <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16m-7 6h7"></path>
                 </svg>
@@ -55,31 +54,31 @@
             <button id="logoutBtn" class="bg-yellow-400 text-white px-4 py-2 rounded hover:bg-yellow-500">Logout</button>
         </div>
 
-        <div id="nav-container" class="lg:grid grid-cols-2 md:grid-cols-4 gap-6 justify-center max-w-2xl mx-auto mb-6 hidden">
+        <div id="nav-container" class="grid grid-cols-2 gap-6 justify-center max-w-2xl mx-auto mb-6 hidden">
             <div id="navTutorManagement" class="icon-card">
-                <div class="card-inner-square bg-blue-500 active">
-                    <i class="fas fa-users card-icon"></i>
+                <div class="card-inner-square bg-green-500 active">
+                    <i class="fas fa-users card-icon text-white"></i>
                 </div>
                 <span class="text-md font-semibold text-gray-700">Tutor & Student List</span>
             </div>
 
             <div id="navPayAdvice" class="icon-card">
-                <div class="card-inner-square bg-orange-500">
-                    <i class="fas fa-file-invoice-dollar card-icon"></i>
+                <div class="card-inner-square bg-yellow-400">
+                    <i class="fas fa-file-invoice-dollar card-icon text-white"></i>
                 </div>
                 <span class="text-md font-semibold text-gray-700">Pay Advice</span>
             </div>
 
             <div id="navTutorReports" class="icon-card">
-                <div class="card-inner-square bg-blue-500">
-                    <i class="fas fa-chart-bar card-icon"></i>
+                <div class="card-inner-square bg-white">
+                    <i class="fas fa-chart-bar card-icon text-gray-700"></i>
                 </div>
                 <span class="text-md font-semibold text-gray-700">Tutor Reports</span>
             </div>
 
             <div id="navSummerBreak" class="icon-card">
-                <div class="card-inner-square bg-orange-500">
-                    <i class="fas fa-sun card-icon"></i>
+                <div class="card-inner-square bg-green-500">
+                    <i class="fas fa-sun card-icon text-white"></i>
                 </div>
                 <span class="text-md font-semibold text-gray-700">Summer Break</span>
             </div>
@@ -98,9 +97,6 @@
             hamburgerBtn.addEventListener('click', function() {
                 navContainer.classList.toggle('hidden');
                 navContainer.classList.toggle('grid');
-                navContainer.classList.toggle('flex');
-                navContainer.classList.toggle('flex-col');
-                navContainer.classList.toggle('items-center');
             });
         });
     </script>
