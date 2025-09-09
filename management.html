@@ -1,194 +1,141 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Management Portal - Blooming Kids House</title>
-  <link rel="icon" href="favicon.ico" />
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
-  <style>
-    /* === Aurora Animated Background from cssview.html === */
-    body {
-      overflow-x: hidden;
-      margin: 0;
-      font-family: 'Inter', sans-serif;
-      background: linear-gradient(120deg, #0f172a, #1e293b, #0f172a);
-      background-size: 400% 400%;
-      animation: aurora 15s ease infinite;
-      color: #f1f5f9;
-    }
-    @keyframes aurora {
-      0% { background-position: 0% 50%; }
-      50% { background-position: 100% 50%; }
-      100% { background-position: 0% 50%; }
-    }
-    ::selection {
-      background: linear-gradient(90deg, #10b981, #16a34a);
-      color: white;
-    }
-    /* === END Aurora Background === */
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>Management Portal - Blooming Kids House</title>
+    <link rel="icon" href="favicon.ico" />
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* === Aurora Animated Background from cssview.html === */
+        body {
+            font-family: 'Inter', sans-serif;
+            background: linear-gradient(120deg, #0f172a, #1e293b, #0f172a);
+            background-size: 400% 400%;
+            animation: aurora 15s ease infinite;
+            color: #f1f5f9;
+        }
+        @keyframes aurora {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+        /* Preserve the scrollbar and selection style from cssview.html */
+        ::selection {
+            background: linear-gradient(90deg, #38bdf8, #3b82f6);
+            color: white;
+        }
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: rgba(255,255,255,0.05); }
+        ::-webkit-scrollbar-thumb {
+            background: linear-gradient(#10b981, #16a34a);
+            border-radius: 4px;
+            box-shadow: 0 0 5px #10b981;
+        }
+        ::-webkit-scrollbar-thumb:hover { background: linear-gradient(#34d399, #059669); }
+        /* === END Aurora Background === */
 
-    .container {
-      max-width: 1200px;
-      margin: 0 auto;
-      padding: 24px;
-      min-height: 100vh;
-      display: flex;
-      flex-direction: column;
-    }
+        /* === Custom Styles for Card Navigation & Effects === */
+        /* This replaces the old .nav-btn style */
+        .nav-card {
+            background: rgba(17,24,39,0.6);
+            backdrop-filter: blur(6px);
+            border: 1px solid rgba(255,255,255,0.06);
+            border-radius: 14px;
+            padding: 1.5rem;
+            text-align: center;
+            flex-grow: 1; /* Allows it to grow in flex container */
+            cursor: pointer;
+            transition: transform 0.3s ease, box-shadow 0.3s ease, border-color 0.3s ease;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.25), inset 0 0 0 1px rgba(255,255,255,0.04);
+            display: flex; /* Makes the title center vertically */
+            justify-content: center;
+            align-items: center;
+        }
 
-    /* === Header Section === */
-    .header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 24px;
-      background: rgba(30, 41, 59, 0.85);
-      backdrop-filter: blur(8px);
-      padding: 16px 24px;
-      border-radius: 12px;
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
-    }
+        .nav-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 12px 30px rgba(0,0,0,0.35), 0 0 18px rgba(16, 185, 129, 0.18);
+            border-color: rgba(16, 185, 129, 0.25);
+        }
 
-    .welcome-heading {
-      font-size: 2rem;
-      font-weight: 700;
-      color: #10b981;
-      margin: 0;
-      text-shadow: 0 0 10px rgba(16, 185, 129, 0.5);
-    }
+        .nav-card.active {
+            border-color: #10b981;
+            transform: scale(1.03);
+            box-shadow: 0 0 20px rgba(16, 185, 129, 0.7), 0 0 40px rgba(16, 185, 129, 0.5);
+        }
+        
+        .nav-card h3 {
+            margin: 0;
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: #f1f5f9;
+        }
+        .nav-card.active h3 {
+            color: #10b981;
+        }
 
-    .user-role-text {
-      font-size: 1rem;
-      color: #9ca3af;
-      font-weight: 600;
-      margin-top: 4px;
-    }
+        /* Styling for the new header & content elements */
+        .glow-green {
+            color: #10b981;
+            text-shadow: 0 0 10px rgba(16, 185, 129, 0.5);
+        }
 
-    .logout-btn {
-      background: linear-gradient(45deg, #facc15, #f97316);
-      color: #1f2937;
-      font-weight: 700;
-      padding: 10px 16px;
-      border: none;
-      border-radius: 10px;
-      cursor: pointer;
-      box-shadow: 0 0 15px rgba(252, 211, 77, 0.5);
-      transition: transform 0.3s ease, box-shadow 0.3s ease;
-    }
+        .glow-yellow {
+            background: linear-gradient(45deg, #facc15, #f97316);
+            box-shadow: 0 0 15px rgba(252, 211, 77, 0.5);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+        .glow-yellow:hover {
+            transform: translateY(-3px) scale(1.05);
+            box-shadow: 0 0 20px rgba(252, 211, 77, 0.8);
+        }
 
-    .logout-btn:hover {
-      transform: translateY(-3px) scale(1.05);
-      box-shadow: 0 0 20px rgba(252, 211, 77, 0.8);
-    }
-    
-    /* === Navigation Cards (instead of tabs) === */
-    .nav-cards {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 16px;
-      margin-bottom: 24px;
-    }
-
-    .nav-card {
-      background: rgba(17,24,39,0.6);
-      backdrop-filter: blur(6px);
-      border: 1px solid rgba(255,255,255,0.06);
-      border-radius: 14px;
-      padding: 1.5rem;
-      text-align: center;
-      flex: 1;
-      cursor: pointer;
-      transition: transform 0.3s ease, box-shadow 0.3s ease, border-color 0.3s ease;
-      box-shadow: 0 8px 24px rgba(0,0,0,0.25), inset 0 0 0 1px rgba(255,255,255,0.04);
-    }
-
-    .nav-card:hover { 
-      transform: translateY(-2px); 
-      box-shadow: 0 12px 30px rgba(0,0,0,0.35), 0 0 18px rgba(16, 185, 129, 0.18); 
-      border-color: rgba(16, 185, 129, 0.25);
-    }
-
-    .nav-card.active {
-      border-color: #10b981;
-      transform: scale(1.03);
-      box-shadow: 0 0 20px rgba(16, 185, 129, 0.7), 0 0 40px rgba(16, 185, 129, 0.5);
-    }
-    
-    .nav-card h3 {
-      margin: 0;
-      font-size: 1.25rem;
-      font-weight: 600;
-      color: #f1f5f9;
-    }
-    .nav-card.active h3 {
-      color: #10b981;
-    }
-
-    /* === Main Content === */
-    #main-content {
-      background: rgba(17,24,39,0.6);
-      backdrop-filter: blur(6px);
-      padding: 32px;
-      border-radius: 12px;
-      box-shadow: 0 8px 24px rgba(0,0,0,0.25), inset 0 0 0 1px rgba(255,255,255,0.04);
-      min-height: 300px;
-      display: grid;
-      place-items: center;
-    }
-
-    .main-message {
-      text-align: center;
-      color: #9ca3af;
-      font-size: 1.5rem;
-      font-weight: 500;
-    }
-
-    @media (max-width: 768px) {
-      .header {
-        flex-direction: column;
-        align-items: flex-start;
-        gap: 12px;
-      }
-      .nav-cards {
-        flex-direction: column;
-      }
-    }
-  </style>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+        .content-card {
+            background: rgba(17,24,39,0.6);
+            backdrop-filter: blur(6px);
+            padding: 32px;
+            border-radius: 12px;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.25), inset 0 0 0 1px rgba(255,255,255,0.04);
+            min-height: 300px;
+            display: grid;
+            place-items: center;
+        }
+    </style>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 </head>
-<body>
-  <div class="container">
-    <div class="header">
-      <div>
-        <h1 class="welcome-heading" id="welcome-message">Welcome</h1>
-        <p class="user-role-text" id="user-role">Management Role</p>
-      </div>
-      <button id="logoutBtn" class="logout-btn">Logout</button>
-    </div>
+<body class="min-h-screen">
+    <div class="max-w-7xl mx-auto p-6">
+        <div class="flex justify-between items-center mb-6">
+            <div>
+                <h1 id="welcome-message" class="text-3xl font-bold glow-green">Welcome</h1>
+                <p id="user-role" class="text-md text-gray-400 font-semibold"></p>
+            </div>
+            <button id="logoutBtn" class="glow-yellow text-white px-4 py-2 rounded-full font-bold">Logout</button>
+        </div>
 
-    <nav class="nav-cards">
-      <div id="navTutorManagement" class="nav-card active">
-        <h3>Tutor & Student List</h3>
-      </div>
-      <div id="navPayAdvice" class="nav-card">
-        <h3>Pay Advice</h3>
-      </div>
-      <div id="navTutorReports" class="nav-card">
-        <h3>Tutor Reports</h3>
-      </div>
-      <div id="navSummerBreak" class="nav-card">
-        <h3>Summer Break</h3>
-      </div>
-    </nav>
+        <nav class="flex flex-wrap space-x-0 md:space-x-4 mb-6 gap-4 justify-center">
+            <div id="navTutorManagement" class="nav-card active">
+                <h3>Tutor & Student List</h3>
+            </div>
+            <div id="navPayAdvice" class="nav-card">
+                <h3>Pay Advice</h3>
+            </div>
+            <div id="navTutorReports" class="nav-card">
+                <h3>Tutor Reports</h3>
+            </div>
+            <div id="navSummerBreak" class="nav-card">
+                <h3>Summer Break</h3>
+            </div>
+        </nav>
 
-    <div id="main-content">
-      <p class="main-message">Checking user permissions...</p>
-    </div>
-  </div>
-
-  <script type="module" src="management.js"></script>
+        <div id="main-content" class="content-card">
+             <p class="text-center text-gray-400 text-xl font-medium">Checking user permissions...</p>
+        </div>
+    </div>
+    <script type="module" src="management.js"></script>
 </body>
 </html>
