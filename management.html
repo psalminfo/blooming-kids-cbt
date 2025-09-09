@@ -107,22 +107,6 @@
       border-radius: 16px;
       padding: 32px;
       box-shadow: 0 6px 20px rgba(0, 0, 0, 0.1);
-      min-height: 300px;
-      text-align: left;
-    }
-
-    .content-section {
-      display: none;
-    }
-    
-    .content-section.active {
-      display: block;
-      animation: fadeIn 0.5s ease;
-    }
-    
-    @keyframes fadeIn {
-      from { opacity: 0; }
-      to { opacity: 1; }
     }
 
     .main-message {
@@ -130,43 +114,12 @@
       font-size: 1rem;
       margin-top: 24px;
     }
-    
-    /* Table Styles */
-    .data-table {
-      width: 100%;
-      border-collapse: collapse;
-      margin-top: 20px;
-    }
-    
-    .data-table th, .data-table td {
-      padding: 12px 15px;
-      text-align: left;
-      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-    }
-    
-    .data-table th {
-      background-color: rgba(22, 101, 52, 0.3);
-      color: #facc15;
-    }
-    
-    .data-table tr:hover {
-      background-color: rgba(255, 255, 255, 0.05);
-    }
-    
-    /* Responsive Design */
+
     @media (max-width: 768px) {
       .header {
         flex-direction: column;
         align-items: flex-start;
         gap: 12px;
-      }
-      
-      .card-grid {
-        grid-template-columns: 1fr;
-      }
-      
-      .container {
-        padding: 16px;
       }
     }
   </style>
@@ -175,8 +128,8 @@
   <div class="container">
     <div class="header">
       <div>
-        <h1 id="welcome-message">Welcome, Administrator</h1>
-        <p id="user-role">Management Portal - Blooming Kids House</p>
+        <h1 id="welcome-message">Welcome</h1>
+        <p id="user-role">Management Role</p>
       </div>
       <button id="logoutBtn" class="btn-logout">Logout</button>
     </div>
@@ -189,157 +142,7 @@
     </div>
 
     <div id="main-content">
-      <!-- Tutor Management Section -->
-      <div id="tutorManagement" class="content-section active">
-        <h2>Tutor & Student List</h2>
-        <table class="data-table">
-          <thead>
-            <tr>
-              <th>Tutor Name</th>
-              <th>Students</th>
-              <th>Subject</th>
-              <th>Schedule</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr>
-              <td>Sarah Johnson</td>
-              <td>Emma, Noah, Olivia</td>
-              <td>Mathematics</td>
-              <td>Mon/Wed 4-6pm</td>
-            </tr>
-            <tr>
-              <td>Michael Chen</td>
-              <td>Liam, Ava, Mason</td>
-              <td>Science</td>
-              <td>Tue/Thu 5-7pm</td>
-            </tr>
-            <tr>
-              <td>Jessica Williams</td>
-              <td>Sophia, William, Isabella</td>
-              <td>English</td>
-              <td>Mon/Fri 3-5pm</td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-      
-      <!-- Pay Advice Section -->
-      <div id="payAdvice" class="content-section">
-        <h2>Pay Advice</h2>
-        <table class="data-table">
-          <thead>
-            <tr>
-              <th>Tutor Name</th>
-              <th>Period</th>
-              <th>Hours</th>
-              <th>Amount</th>
-              <th>Status</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr>
-              <td>Sarah Johnson</td>
-              <td>Sept 1-15, 2023</td>
-              <td>24</td>
-              <td>$960.00</td>
-              <td>Paid</td>
-            </tr>
-            <tr>
-              <td>Michael Chen</td>
-              <td>Sept 1-15, 2023</td>
-              <td>20</td>
-              <td>$800.00</td>
-              <td>Paid</td>
-            </tr>
-            <tr>
-              <td>Jessica Williams</td>
-              <td>Sept 1-15, 2023</td>
-              <td>22</td>
-              <td>$880.00</td>
-              <td>Pending</td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-      
-      <!-- Tutor Reports Section -->
-      <div id="tutorReports" class="content-section">
-        <h2>Tutor Reports</h2>
-        <table class="data-table">
-          <thead>
-            <tr>
-              <th>Report Name</th>
-              <th>Tutor</th>
-              <th>Period</th>
-              <th>Status</th>
-              <th>Action</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr>
-              <td>Progress Report - Mathematics</td>
-              <td>Sarah Johnson</td>
-              <td>September 2023</td>
-              <td>Completed</td>
-              <td><button class="btn-logout" style="padding: 5px 10px;">View</button></td>
-            </tr>
-            <tr>
-              <td>Progress Report - Science</td>
-              <td>Michael Chen</td>
-              <td>September 2023</td>
-              <td>In Progress</td>
-              <td><button class="btn-logout" style="padding: 5px 10px;">View</button></td>
-            </tr>
-            <tr>
-              <td>Progress Report - English</td>
-              <td>Jessica Williams</td>
-              <td>September 2023</td>
-              <td>Not Started</td>
-              <td><button class="btn-logout" style="padding: 5px 10px;">View</button></td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-      
-      <!-- Summer Break Section -->
-      <div id="summerBreak" class="content-section">
-        <h2>Summer Break Schedule</h2>
-        <table class="data-table">
-          <thead>
-            <tr>
-              <th>Program</th>
-              <th>Age Group</th>
-              <th>Dates</th>
-              <th>Time</th>
-              <th>Enrollment</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr>
-              <td>Summer Math Camp</td>
-              <td>8-10 years</td>
-              <td>Jun 5 - Jun 16</td>
-              <td>9am-12pm</td>
-              <td>12/15</td>
-            </tr>
-            <tr>
-              <td>Science Explorers</td>
-              <td>10-12 years</td>
-              <td>Jun 19 - Jun 30</td>
-              <td>1pm-4pm</td>
-              <td>8/15</td>
-            </tr>
-            <tr>
-              <td>Creative Writing</td>
-              <td>9-11 years</td>
-              <td>Jul 10 - Jul 21</td>
-              <td>10am-1pm</td>
-              <td>10/12</td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
+      <p class="main-message">Checking user permissions...</p>
     </div>
   </div>
 
@@ -347,35 +150,23 @@
     document.addEventListener('DOMContentLoaded', function() {
       // Navigation functionality
       const navItems = document.querySelectorAll('.card');
-      const contentSections = document.querySelectorAll('.content-section');
-      
-      // Set initial active state
-      setActiveSection('tutorManagement');
       
       // Add click events to navigation cards
       navItems.forEach(item => {
         item.addEventListener('click', function() {
-          const targetId = this.id.replace('nav', '').toLowerCase();
-          setActiveSection(targetId);
-          
           // Update active nav item
           navItems.forEach(nav => nav.classList.remove('active'));
           this.classList.add('active');
+          
+          // Update main content based on selection
+          const mainContent = document.getElementById('main-content');
+          mainContent.innerHTML = `<p class="main-message">Loading ${this.textContent}...</p>`;
         });
       });
       
-      // Function to set active section
-      function setActiveSection(sectionId) {
-        contentSections.forEach(section => {
-          section.classList.remove('active');
-        });
-        document.getElementById(sectionId).classList.add('active');
-      }
-      
       // Logout button functionality
       document.getElementById('logoutBtn').addEventListener('click', function() {
-        alert('Logout successful! Redirecting to login page.');
-        // In a real application, this would redirect to the login page
+        alert('Logout successful!');
       });
     });
   </script>
