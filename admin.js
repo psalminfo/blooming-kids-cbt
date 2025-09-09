@@ -1062,29 +1062,28 @@ async function renderSummerBreakPanel(container) {
 // ##################################################################
 // # SECTION 7: RENDER STAFF PANEL (This is the new section)
 // ##################################################################
-// In your ADMIN.JS file, replace the existing renderStaffPanel with this new version.
 
 async function renderStaffPanel(container) {
     const ROLE_PERMISSIONS = {
         pending: {
             tabs: { viewTutorManagement: false, viewPayAdvice: false, viewTutorReports: false, viewSummerBreak: false },
-            actions: { canDownloadReports: false, canExportPayAdvice: false }
+            actions: { canDownloadReports: false, canExportPayAdvice: false, canEndBreak: false }
         },
         tutor: {
             tabs: { viewTutorManagement: false, viewPayAdvice: false, viewTutorReports: false, viewSummerBreak: false },
-            actions: { canDownloadReports: false, canExportPayAdvice: false }
+            actions: { canDownloadReports: false, canExportPayAdvice: false, canEndBreak: false }
         },
         manager: {
             tabs: { viewTutorManagement: true, viewPayAdvice: false, viewTutorReports: true, viewSummerBreak: true },
-            actions: { canDownloadReports: false, canExportPayAdvice: false }
+            actions: { canDownloadReports: false, canExportPayAdvice: false, canEndBreak: true }
         },
         director: {
             tabs: { viewTutorManagement: true, viewPayAdvice: true, viewTutorReports: true, viewSummerBreak: true },
-            actions: { canDownloadReports: true, canExportPayAdvice: true }
+            actions: { canDownloadReports: true, canExportPayAdvice: true, canEndBreak: true }
         },
         admin: { // Admin role has all permissions by default
             tabs: { viewTutorManagement: true, viewPayAdvice: true, viewTutorReports: true, viewSummerBreak: true },
-            actions: { canDownloadReports: true, canExportPayAdvice: true }
+            actions: { canDownloadReports: true, canExportPayAdvice: true, canEndBreak: true }
         }
     };
 
@@ -1110,7 +1109,7 @@ async function renderStaffPanel(container) {
     onSnapshot(collection(db, "staff"), (snapshot) => {
         tableBody.innerHTML = snapshot.docs.map(doc => {
             const staff = doc.data();
-            const optionsHTML = Object.keys(ROLE_PERMISSIONS).map(role => 
+            const optionsHTML = Object.keys(ROLE_PERMISSIONS).map(role =>
                 `<option value="${role}" ${staff.role === role ? 'selected' : ''}>${capitalize(role)}</option>`
             ).join('');
 
@@ -1137,9 +1136,9 @@ async function renderStaffPanel(container) {
                 const permissionsTemplate = ROLE_PERMISSIONS[newRole];
 
                 if (confirm(`Change role to "${capitalize(newRole)}"? This will apply default permissions.`)) {
-                    await updateDoc(doc(db, "staff", staffEmail), { 
+                    await updateDoc(doc(db, "staff", staffEmail), {
                         role: newRole,
-                        permissions: permissionsTemplate 
+                        permissions: permissionsTemplate
                     });
                     alert('Role and default permissions updated!');
                 } else {
@@ -1184,6 +1183,7 @@ async function openPermissionsModal(staffId) {
                         <h4 class="font-semibold mb-2">Specific Actions:</h4>
                         <label class="flex items-center"><input type="checkbox" id="p-canDownloadReports" class="mr-2" ${permissions.actions?.canDownloadReports ? 'checked' : ''}> Can Download Reports</label>
                         <label class="flex items-center"><input type="checkbox" id="p-canExportPayAdvice" class="mr-2" ${permissions.actions?.canExportPayAdvice ? 'checked' : ''}> Can Export Pay Advice</label>
+                        <label class="flex items-center"><input type="checkbox" id="p-canEndBreak" class="mr-2" ${permissions.actions?.canEndBreak ? 'checked' : ''}> Can End Break</label>
                     </div>
                 </div>
 
@@ -1194,7 +1194,7 @@ async function openPermissionsModal(staffId) {
             </div>
         </div>
     `;
-    
+
     document.body.insertAdjacentHTML('beforeend', modalHTML);
 
     const closeModal = () => document.getElementById('permissions-modal').remove();
@@ -1211,6 +1211,7 @@ async function openPermissionsModal(staffId) {
             actions: {
                 canDownloadReports: document.getElementById('p-canDownloadReports').checked,
                 canExportPayAdvice: document.getElementById('p-canExportPayAdvice').checked,
+                canEndBreak: document.getElementById('p-canEndBreak').checked,
             }
         };
 
@@ -1332,6 +1333,7 @@ onAuthStateChanged(auth, async (user) => {
     }
     // ...
 });
+
 
 
 
