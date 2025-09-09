@@ -40,136 +40,78 @@
         }
         ::-webkit-scrollbar-thumb:hover { background: linear-gradient(#34d399, #059669); }
 
-        #app-container {
-            display: flex;
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 24px;
             min-height: 100vh;
-        }
-
-        /* === Sidebar === */
-        .sidebar {
-            width: 260px;
-            background: rgba(15,23,42,0.85);
-            backdrop-filter: blur(10px);
-            color: #ecf0f1;
-            height: 100vh;
-            position: fixed;
-            top: 0;
-            left: -260px;
-            transition: left 0.3s ease-in-out;
-            z-index: 1000;
-            border-right: 1px solid rgba(255,255,255,0.06);
-        }
-        .sidebar.active { left: 0; box-shadow: 0 0 30px rgba(16,185,129,0.8); }
-        .sidebar-header {
-            padding: 20px;
-            background: rgba(26,37,47,0.9);
-            text-align: center;
-        }
-        .sidebar-header h3 {
-            margin: 0;
-            color: #fff;
-            text-shadow: 0 0 5px #10b981, 0 0 12px #10b981;
-            font-weight: 700;
-        }
-        .nav-links { list-style: none; padding: 0; margin: 0; }
-        .nav-links li a {
-            display: block;
-            padding: 14px 20px;
-            color: #ecf0f1;
-            text-decoration: none;
-            position: relative;
-            overflow: hidden;
-            transition: color 0.3s ease;
-        }
-        .nav-links li a:hover {
-            color: #10b981;
-            text-shadow: 0 0 6px #10b981;
-        }
-        .nav-links li a.active {
-            color: #facc15;
-            text-shadow: 0 0 6px #facc15;
-        }
-
-        /* === Main Wrapper === */
-        #main-content-wrapper {
-            flex-grow: 1;
-            width: 100%;
-            transition: margin-left 0.3s ease-in-out;
-            margin-left: 0;
-        }
-        #main-content-wrapper.sidebar-active { margin-left: 260px; }
-
-        /* === Header === */
-        .app-header {
-            background: rgba(30,41,59,0.85);
-            backdrop-filter: blur(8px);
-            padding: 0.85rem 1.25rem;
             display: flex;
+            flex-direction: column;
+            gap: 24px;
+        }
+
+        /* === Header Section === */
+        .header {
+            display: flex;
+            justify-content: space-between;
             align-items: center;
-            gap: 12px;
-            box-shadow: 0 2px 12px rgba(0,0,0,0.4);
-            position: sticky;
-            top: 0;
-            z-index: 500;
+            padding: 16px 24px;
+            background: rgba(30, 41, 59, 0.85);
+            backdrop-filter: blur(8px);
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
         }
-        .menu-toggle {
-            background: none;
+        .welcome-message {
+            font-size: 2rem;
+            font-weight: 700;
+            color: #10b981;
+            text-shadow: 0 0 10px rgba(16, 185, 129, 0.5);
+        }
+        .user-role-text {
+            font-size: 1rem;
+            color: #9ca3af;
+            font-weight: 600;
+        }
+        .logout-btn {
+            background: linear-gradient(45deg, #facc15, #f97316);
+            color: #1f2937;
+            font-weight: 700;
+            padding: 10px 16px;
             border: none;
-            color: white;
-            font-size: 24px;
+            border-radius: 10px;
             cursor: pointer;
-            transition: transform 0.2s ease, color 0.3s ease;
+            box-shadow: 0 0 15px rgba(252, 211, 77, 0.5);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
         }
-        .menu-toggle:hover { transform: scale(1.2); color: #10b981; text-shadow: 0 0 5px #10b981, 0 0 10px #10b981; }
-
-        /* === Content Area === */
-        .page-content {
-            padding: 1.25rem;
-            animation: fadeIn 0.4s ease-in-out;
+        .logout-btn:hover {
+            transform: translateY(-3px) scale(1.05);
+            box-shadow: 0 0 20px rgba(252, 211, 77, 0.8);
         }
-        @keyframes fadeIn {
-            from{opacity:0; transform: translateY(8px);}
-            to{opacity:1; transform:none;}
-        }
-
-        /* === Cards / Panels === */
-        .card {
-            background: rgba(17,24,39,0.6);
-            border: 1px solid rgba(255,255,255,0.06);
-            border-radius: 14px;
-            padding: 1.5rem;
-            box-shadow: 0 8px 24px rgba(0,0,0,0.25), inset 0 0 0 1px rgba(255,255,255,0.04);
-            transition: transform 0.2s ease, box-shadow 0.3s ease, border-color 0.3s ease;
-            backdrop-filter: blur(6px);
-        }
-        .card:hover { transform: translateY(-2px); box-shadow: 0 12px 30px rgba(0,0,0,0.35), 0 0 18px rgba(16,185,129,0.18); border-color: rgba(16,185,129,0.25); }
-        .card h3 { margin: 0 0 6px; font-weight: 700; }
-        .row { display: grid; gap: 14px; }
-        .row.cols-2 { grid-template-columns: repeat(2, minmax(0,1fr)); }
-        .row.cols-3 { grid-template-columns: repeat(3, minmax(0,1fr)); }
 
         /* === Navigation Cards (Zoom-style) === */
         .nav-cards {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-            gap: 24px;
+            display: flex;
             justify-content: center;
             align-items: center;
-            text-align: center;
+            flex-wrap: wrap;
+            gap: 24px;
         }
         .nav-card {
-            background: rgba(255,255,255,0.08);
+            background: rgba(17,24,39,0.6);
             backdrop-filter: blur(6px);
-            border: 1px solid rgba(255,255,255,0.12);
+            border: 1px solid rgba(255,255,255,0.06);
             border-radius: 14px;
             padding: 2rem;
             text-align: center;
             cursor: pointer;
             transition: transform 0.3s ease, box-shadow 0.3s ease, border-color 0.3s ease;
-            box-shadow: 0 8px 24px rgba(0,0,0,0.25), inset 0 0 0 1px rgba(255,255,255,0.06);
-            aspect-ratio: 1 / 1;
-            max-width: 300px;
-            margin: 0 auto;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.25), inset 0 0 0 1px rgba(255,255,255,0.04);
+            width: 250px; /* Fixed width for consistent size */
+            height: 250px; /* Fixed height for consistent size */
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
         }
         .nav-card:hover {
             transform: translateY(-4px);
@@ -202,219 +144,210 @@
             margin: 0;
             text-align: center;
         }
-        
-        /* === Utility === */
+
+        /* === Main Content Area === */
+        .content-card {
+            background: rgba(17,24,39,0.6);
+            backdrop-filter: blur(6px);
+            padding: 32px;
+            border-radius: 12px;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.25), inset 0 0 0 1px rgba(255,255,255,0.04);
+            min-height: 400px;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+        .main-message {
+            text-align: center;
+            color: #9ca3af;
+            font-size: 1.5rem;
+            font-weight: 500;
+        }
+
+        /* === Tutor Reports Specific Styles === */
+        #tutor-list h3 {
+            font-size: 1.25rem;
+            margin-bottom: 0.5rem;
+        }
+        .tutor-item {
+            cursor: pointer;
+            padding: 1rem;
+            border-radius: 8px;
+            transition: background 0.2s ease, transform 0.2s ease;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+        .tutor-item:hover {
+            background: rgba(255, 255, 255, 0.05);
+            transform: translateX(5px);
+        }
+        .tutor-reports-section {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        @media (max-width: 768px) {
+            .header {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 12px;
+            }
+            .nav-card {
+                width: 100%; /* Make cards full width on smaller screens */
+                max-width: none;
+            }
+        }
         .hidden { display: none; }
-        .flex { display: flex; }
-        .items-center { align-items: center; }
-        .justify-between { justify-content: space-between; }
-        .p-6 { padding: 1.5rem; }
-        .mb-4 { margin-bottom: 1rem; }
-        .w-full { width: 100%; }
-        .rounded { border-radius: 0.25rem; }
-        .bg-blue-600 { background-color: #2563eb; }
-        .text-white { color: #fff; }
-        .px-4 { padding-left: 1rem; padding-right: 1rem; }
-        .py-2 { padding-top: 0.5rem; padding-bottom: 0.5rem; }
     </style>
 </head>
 <body>
-
-<div id="app-container">
-    <aside class="sidebar" id="sidebar">
-        <div class="sidebar-header">
-            <h3>Management Portal</h3>
-        </div>
-        <ul class="nav-links">
-            <li><a href="#" onclick="showPage('home')">Home</a></li>
-            <li><a href="#" onclick="showPage('tutorManagement')">Tutor & Student List</a></li>
-            <li><a href="#" onclick="showPage('payAdvice')">Pay Advice</a></li>
-            <li><a href="#" onclick="showPage('tutorReports')">Tutor Reports</a></li>
-            <li><a href="#" onclick="showPage('summerBreak')">Summer Break</a></li>
-        </ul>
-    </aside>
-
-    <main id="main-content-wrapper">
-        <div class="app-header">
-            <button class="menu-toggle" onclick="toggleSidebar()">☰</button>
-            <div style="flex-grow: 1;">
-                <h1 id="welcome-message" style="font-size: 2rem; font-weight: 700; color: #10b981;">Welcome</h1>
-                <p id="user-role" style="font-size: 1rem; color: #9ca3af; font-weight: 600;"></p>
+    <div class="container">
+        <div class="header">
+            <div>
+                <h1 id="welcome-message" class="welcome-message">Welcome</h1>
+                <p id="user-role" class="user-role-text">Management Role</p>
             </div>
-            <button id="logoutBtn" style="background: linear-gradient(45deg, #facc15, #f97316); color: #1f2937; font-weight: 700; padding: 10px 16px; border: none; border-radius: 10px; cursor: pointer;">Logout</button>
+            <button id="logoutBtn" class="logout-btn">Logout</button>
         </div>
 
-        <section id="home" class="page-content">
-            <nav id="nav-cards" class="nav-cards">
-                <div class="nav-card" onclick="showPage('tutorManagement')">
-                    <div class="icon">
-                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
-                            <path d="M4 12a1 1 0 011-1h.01a1 1 0 011 1v.01a1 1 0 01-1 1H5a1 1 0 01-1-1v-.01zM10 12a1 1 0 011-1h.01a1 1 0 011 1v.01a1 1 0 01-1 1h-.01a1 1 0 01-1-1v-.01zM16 12a1 1 0 011-1h.01a1 1 0 011 1v.01a1 1 0 01-1 1h-.01a1 1 0 01-1-1v-.01zM4 18a1 1 0 011-1h.01a1 1 0 011 1v.01a1 1 0 01-1 1H5a1 1 0 01-1-1v-.01zM10 18a1 1 0 011-1h.01a1 1 0 011 1v.01a1 1 0 01-1 1h-.01a1 1 0 01-1-1v-.01zM16 18a1 1 0 011-1h.01a1 1 0 011 1v.01a1 1 0 01-1 1h-.01a1 1 0 01-1-1v-.01zM4 6a1 1 0 011-1h.01a1 1 0 011 1v.01a1 1 0 01-1 1H5a1 1 0 01-1-1V6zM10 6a1 1 0 011-1h.01a1 1 0 011 1v.01a1 1 0 01-1 1h-.01a1 1 0 01-1-1V6zM16 6a1 1 0 011-1h.01a1 1 0 011 1v.01a1 1 0 01-1 1h-.01a1 1 0 01-1-1V6z"></path>
-                        </svg>
-                    </div>
-                    <h3>Tutor & Student List</h3>
+        <nav id="nav-cards" class="nav-cards">
+            <div id="navTutorManagement" class="nav-card">
+                <div class="icon">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M4 12a1 1 0 011-1h.01a1 1 0 011 1v.01a1 1 0 01-1 1H5a1 1 0 01-1-1v-.01zM10 12a1 1 0 011-1h.01a1 1 0 011 1v.01a1 1 0 01-1 1h-.01a1 1 0 01-1-1v-.01zM16 12a1 1 0 011-1h.01a1 1 0 011 1v.01a1 1 0 01-1 1h-.01a1 1 0 01-1-1v-.01zM4 18a1 1 0 011-1h.01a1 1 0 011 1v.01a1 1 0 01-1 1H5a1 1 0 01-1-1v-.01zM10 18a1 1 0 011-1h.01a1 1 0 011 1v.01a1 1 0 01-1 1h-.01a1 1 0 01-1-1v-.01zM16 18a1 1 0 011-1h.01a1 1 0 011 1v.01a1 1 0 01-1 1h-.01a1 1 0 01-1-1v-.01zM4 6a1 1 0 011-1h.01a1 1 0 011 1v.01a1 1 0 01-1 1H5a1 1 0 01-1-1V6zM10 6a1 1 0 011-1h.01a1 1 0 011 1v.01a1 1 0 01-1 1h-.01a1 1 0 01-1-1V6zM16 6a1 1 0 011-1h.01a1 1 0 011 1v.01a1 1 0 01-1 1h-.01a1 1 0 01-1-1V6z"></path>
+                    </svg>
                 </div>
-                <div class="nav-card" onclick="showPage('payAdvice')">
-                    <div class="icon">
-                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
-                            <path fill-rule="evenodd" d="M12 2.25c-5.385 0-9.75 4.365-9.75 9.75s4.365 9.75 9.75 9.75 9.75-4.365 9.75-9.75S17.385 2.25 12 2.25zm.5 4.75a.5.5 0 00-1 0v.5a.5.5 0 001 0v-.5zm0 10a.5.5 0 00-1 0v.5a.5.5 0 001 0v-.5zM7.5 12a.5.5 0 00-1 0v.5a.5.5 0 001 0v-.5zM17.5 12a.5.5 0 00-1 0v.5a.5.5 0 001 0v-.5z" clip-rule="evenodd" />
-                            <path d="M12 21.75a9.75 9.75 0 100-19.5 9.75 9.75 0 000 19.5zM12 3a9 9 0 110 18 9 9 0 010-18z" />
-                            <path fill-rule="evenodd" d="M12 18.75a6.75 6.75 0 100-13.5 6.75 6.75 0 000 13.5zM12 5.25a6 6 0 110 12 6 6 0 010-12z" clip-rule="evenodd" />
-                            <path d="M12 18a6 6 0 100-12 6 6 0 000 12zM12 6.75a5.25 5.25 0 110 10.5 5.25 5.25 0 010-10.5z" />
-                        </svg>
-                    </div>
-                    <h3>Pay Advice</h3>
-                </div>
-                <div class="nav-card" onclick="showPage('tutorReports')">
-                    <div class="icon">
-                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
-                            <path d="M20 2H4a2 2 0 00-2 2v16a2 2 0 002 2h16a2 2 0 002-2V4a2 2 0 00-2-2zM4 4h16v16H4V4zm4 4h8v2H8zm0 4h8v2H8zm0 4h5v2H8z" />
-                        </svg>
-                    </div>
-                    <h3>Tutor Reports</h3>
-                </div>
-                <div class="nav-card" onclick="showPage('summerBreak')">
-                    <div class="icon">
-                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
-                            <path d="M12 2a10 10 0 00-9.95 9h-2c.13-5.23 4.29-9.39 9.57-9.5V.99a1 1 0 012 0v1.01c5.28.11 9.44 4.27 9.57 9.5h-2c-.13-4.23-3.41-7.5-7.73-7.73V12a1 1 0 01-2 0V4.28a1 1 0 012 0V12a1 1 0 01-2 0V4.28A9.95 9.95 0 0012 2zM12 22a10 10 0 009.95-9h2c-.13 5.23-4.29 9.39-9.57 9.5v1.01a1 1 0 01-2 0v-1.01c-5.28-.11-9.44-4.27-9.57-9.5h2c.13 4.23 3.41 7.5 7.73 7.73V12a1 1 0 012 0v7.72a1 1 0 01-2 0V12a1 1 0 01-2 0v7.72A9.95 9.95 0 0012 22z" />
-                        </svg>
-                    </div>
-                    <h3>Summer Break</h3>
-                </div>
-            </nav>
-        </section>
-
-        <section id="tutorManagement" class="page-content hidden">
-            <div class="card">
                 <h3>Tutor & Student List</h3>
-                <p>This is the content for Tutor and Student Management.</p>
+            </div>
+            <div id="navPayAdvice" class="nav-card">
+                <div class="icon">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+                        <path fill-rule="evenodd" d="M12 2.25c-5.385 0-9.75 4.365-9.75 9.75s4.365 9.75 9.75 9.75 9.75-4.365 9.75-9.75S17.385 2.25 12 2.25zm.5 4.75a.5.5 0 00-1 0v.5a.5.5 0 001 0v-.5zm0 10a.5.5 0 00-1 0v.5a.5.5 0 001 0v-.5zM7.5 12a.5.5 0 00-1 0v.5a.5.5 0 001 0v-.5zM17.5 12a.5.5 0 00-1 0v.5a.5.5 0 001 0v-.5z" clip-rule="evenodd" />
+                        <path d="M12 21.75a9.75 9.75 0 100-19.5 9.75 9.75 0 000 19.5zM12 3a9 9 0 110 18 9 9 0 010-18z" />
+                        <path fill-rule="evenodd" d="M12 18.75a6.75 6.75 0 100-13.5 6.75 6.75 0 000 13.5zM12 5.25a6 6 0 110 12 6 6 0 010-12z" clip-rule="evenodd" />
+                        <path d="M12 18a6 6 0 100-12 6 6 0 000 12zM12 6.75a5.25 5.25 0 110 10.5 5.25 5.25 0 010-10.5z" />
+                    </svg>
                 </div>
-        </section>
-
-        <section id="payAdvice" class="page-content hidden">
-            <div class="card">
                 <h3>Pay Advice</h3>
-                <p>This is the content for Pay Advice.</p>
+            </div>
+            <div id="navTutorReports" class="nav-card">
+                <div class="icon">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M20 2H4a2 2 0 00-2 2v16a2 2 0 002 2h16a2 2 0 002-2V4a2 2 0 00-2-2zM4 4h16v16H4V4zm4 4h8v2H8zm0 4h8v2H8zm0 4h5v2H8z" />
+                    </svg>
                 </div>
-        </section>
-
-        <section id="tutorReports" class="page-content hidden">
-            <div class="card">
                 <h3>Tutor Reports</h3>
-                <p>Select a tutor below to view their reports.</p>
-                <div id="tutor-list-container" style="margin-top: 1rem;">
-                    <ul id="tutor-list" style="list-style-type: none; padding: 0;"></ul>
-                </div>
             </div>
-            
-            <div id="tutor-reports-content" class="card hidden" style="margin-top: 1rem;">
-                <div class="flex justify-between items-center mb-4 w-full">
-                    <h4 id="tutor-name-display"></h4>
-                    <button id="downloadAllBtn" style="background: linear-gradient(45deg, #10b981, #16a34a); color: white; font-weight: 700; padding: 10px 16px; border: none; border-radius: 10px; cursor: pointer;">Download All Reports</button>
+            <div id="navSummerBreak" class="nav-card">
+                <div class="icon">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M12 2a10 10 0 00-9.95 9h-2c.13-5.23 4.29-9.39 9.57-9.5V.99a1 1 0 012 0v1.01c5.28.11 9.44 4.27 9.57 9.5h-2c-.13-4.23-3.41-7.5-7.73-7.73V12a1 1 0 01-2 0V4.28a1 1 0 012 0V12a1 1 0 01-2 0V4.28A9.95 9.95 0 0012 2zM12 22a10 10 0 009.95-9h2c-.13 5.23-4.29 9.39-9.57 9.5v1.01a1 1 0 01-2 0v-1.01c-5.28-.11-9.44-4.27-9.57-9.5h2c.13 4.23 3.41 7.5 7.73 7.73V12a1 1 0 012 0v7.72a1 1 0 01-2 0V12a1 1 0 01-2 0v7.72A9.95 9.95 0 0012 22z" />
+                    </svg>
                 </div>
-                <p>Reports for this tutor will be displayed here.</p>
-            </div>
-        </section>
-
-        <section id="summerBreak" class="page-content hidden">
-            <div class="card">
                 <h3>Summer Break</h3>
-                <p>This is the content for Summer Break.</p>
-                </div>
-        </section>
-    </main>
-</div>
+            </div>
+        </nav>
 
-<script>
-    // Mock data for tutors and their reports
-    const tutors = [
-        { id: 'tutor1', name: 'John Doe', reports: ['https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf', 'https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf'] },
-        { id: 'tutor2', name: 'Jane Smith', reports: ['https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf', 'https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf'] },
-        { id: 'tutor3', name: 'Peter Jones', reports: ['https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf', 'https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf'] },
-    ];
+        <div id="main-content" class="content-card">
+            <p id="default-message" class="main-message">Select an option above to get started.</p>
+        </div>
 
-    function showPage(pageId) {
-        document.querySelectorAll('.page-content').forEach(p => p.classList.add('hidden'));
-        document.getElementById(pageId).classList.remove('hidden');
-        
-        // Handle active class for sidebar links
-        document.querySelectorAll('.nav-links li a').forEach(link => {
-            link.classList.remove('active');
-            if (link.getAttribute('onclick').includes(pageId)) {
-                link.classList.add('active');
-            }
-        });
-        
-        closeSidebar();
-        
-        // Special function call for tutor reports page
-        if (pageId === 'tutorReports') {
-            displayTutorList();
-        }
-    }
+        <div id="tutor-reports-list" class="content-card hidden">
+            <h2>Select a Tutor</h2>
+            <div id="tutor-list" class="w-full"></div>
+        </div>
 
-    function toggleSidebar() {
-        document.getElementById('sidebar').classList.toggle('active');
-        document.getElementById('main-content-wrapper').classList.toggle('sidebar-active');
-    }
-
-    function closeSidebar() {
-        document.getElementById('sidebar').classList.remove('active');
-        document.getElementById('main-content-wrapper').classList.remove('sidebar-active');
-    }
+        <div id="tutor-reports-content" class="content-card hidden">
+            <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+                <h2 id="tutor-name"></h2>
+                <button id="downloadAllBtn" style="background: linear-gradient(45deg, #10b981, #16a34a); color: white; font-weight: 700; padding: 10px 16px; border: none; border-radius: 10px; cursor: pointer;">Download All Reports</button>
+            </div>
+            <p style="color: #9ca3af;">Click the button above to download all reports for this tutor as a zipped folder.</p>
+        </div>
+    </div>
     
-    // Function to populate the tutor list
-    function displayTutorList() {
-        const listContainer = document.getElementById('tutor-list');
-        listContainer.innerHTML = '';
-        tutors.forEach(tutor => {
-            const li = document.createElement('li');
-            li.style.cssText = 'padding: 8px 0; cursor: pointer; border-bottom: 1px solid rgba(255,255,255,0.1);';
-            li.innerHTML = `<span>${tutor.name}</span>`;
-            li.onclick = () => showTutorReports(tutor);
-            listContainer.appendChild(li);
-        });
-    }
-
-    // Function to show a tutor's reports section
-    function showTutorReports(tutor) {
-        const reportsContainer = document.getElementById('tutor-reports-content');
-        const tutorNameDisplay = document.getElementById('tutor-name-display');
-        reportsContainer.classList.remove('hidden');
-        tutorNameDisplay.textContent = tutor.name + "'s Reports";
+    <script>
+        const navCards = document.getElementById('nav-cards');
+        const mainContent = document.getElementById('main-content');
+        const tutorReportsList = document.getElementById('tutor-reports-list');
+        const tutorReportsContent = document.getElementById('tutor-reports-content');
+        const defaultMessage = document.getElementById('default-message');
+        const tutorList = document.getElementById('tutor-list');
+        const tutorNameDisplay = document.getElementById('tutor-name');
+        const downloadAllBtn = document.getElementById('downloadAllBtn');
         
-        // Setup download button for the specific tutor
-        document.getElementById('downloadAllBtn').onclick = () => downloadTutorReports(tutor);
-    }
-    
-    async function downloadTutorReports(tutor) {
-        const zip = new JSZip();
-        const tutorFolder = zip.folder(tutor.name.replace(/\s/g, '_'));
+        // Mock data for tutors and their reports
+        const tutors = [
+            { id: 'tutor1', name: 'John Doe', reports: ['https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf', 'https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf'] },
+            { id: 'tutor2', name: 'Jane Smith', reports: ['https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf', 'https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf'] },
+            { id: 'tutor3', name: 'Peter Jones', reports: ['https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf', 'https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf'] },
+        ];
 
-        for (let i = 0; i < tutor.reports.length; i++) {
-            const url = tutor.reports[i];
-            const filename = `Report_${i + 1}.pdf`;
+        // This is a dynamic section. When you click on a navigation card, the main content area will appear.
+        document.querySelectorAll('.nav-card').forEach(card => {
+            card.addEventListener('click', () => {
+                // First, hide all content sections
+                mainContent.classList.add('hidden');
+                tutorReportsList.classList.add('hidden');
+                tutorReportsContent.classList.add('hidden');
 
-            try {
-                const response = await fetch(url);
-                const blob = await response.blob();
-                tutorFolder.file(filename, blob);
-            } catch (error) {
-                console.error(`Failed to fetch and add file: ${url}`, error);
-                alert(`Failed to download report. Please check the console for details.`);
-                return;
-            }
+                // Now, show the correct section based on the clicked card
+                if (card.id === 'navTutorReports') {
+                    tutorReportsList.classList.remove('hidden');
+                    displayTutors();
+                } else {
+                    mainContent.classList.remove('hidden');
+                    defaultMessage.textContent = `${card.textContent} page content will be displayed here.`;
+                }
+            });
+        });
+
+        // Populate the tutor list dynamically
+        function displayTutors() {
+            tutorList.innerHTML = ''; // Clear existing list
+            tutors.forEach(tutor => {
+                const tutorDiv = document.createElement('div');
+                tutorDiv.className = 'tutor-item';
+                tutorDiv.innerHTML = `<h3>${tutor.name}</h3>`;
+                tutorDiv.addEventListener('click', () => showTutorReports(tutor));
+                tutorList.appendChild(tutorDiv);
+            });
         }
 
-        zip.generateAsync({ type: 'blob' }).then(function(content) {
-            saveAs(content, `${tutor.name.replace(/\s/g, '_')}_Reports.zip`);
-        });
-    }
+        // Show reports section for a specific tutor
+        function showTutorReports(tutor) {
+            tutorReportsList.classList.add('hidden');
+            tutorReportsContent.classList.remove('hidden');
+            tutorNameDisplay.textContent = `${tutor.name}'s Reports`;
+            
+            // Set the reports to be downloaded for this specific tutor
+            downloadAllBtn.onclick = () => downloadTutorReports(tutor);
+        }
 
-    // Set the initial page to 'home' and activate the correct sidebar link
-    window.onload = () => {
-        showPage('home');
-    };
-</script>
+        // Download function for a specific tutor
+        async function downloadTutorReports(tutor) {
+            const zip = new JSZip();
+            const tutorFolder = zip.folder(tutor.name.replace(/\s/g, '_'));
+
+            for (let i = 0; i < tutor.reports.length; i++) {
+                const url = tutor.reports[i];
+                const filename = `Report_${i + 1}.pdf`;
+
+                try {
+                    const response = await fetch(url);
+                    const blob = await response.blob();
+                    tutorFolder.file(filename, blob);
+                } catch (error) {
+                    console.error(`Failed to fetch and add file: ${url}`, error);
+                    alert(`Failed to download report. Please check the console for details.`);
+                    return;
+                }
+            }
+
+            zip.generateAsync({ type: 'blob' }).then(function(content) {
+                saveAs(content, `${tutor.name.replace(/\s/g, '_')}_Reports.zip`);
+            });
+        }
+    </script>
 </body>
 </html>
