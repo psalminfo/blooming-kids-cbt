@@ -18,6 +18,8 @@
         }
     </style>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.7.1/jszip.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
 </head>
 <body class="bg-gray-50 min-h-screen">
     <div class="max-w-7xl mx-auto p-6">
@@ -35,9 +37,61 @@
             <button id="navSummerBreak" class="nav-btn text-lg font-semibold text-gray-500 hover:text-green-700">Summer Break</button>
         </nav>
         <div id="main-content">
-             <p class="text-center text-gray-600 mt-12">Checking user permissions...</p>
+             <div id="tutor-reports-content" class="p-4 hidden">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-2xl font-bold">Tutor Reports</h2>
+                    <button id="downloadAllBtn" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Download All Reports</button>
+                </div>
+                <p class="text-gray-600">Click the button above to download all reports for this tutor as a zipped folder.</p>
+            </div>
+
+            <p id="main-message" class="text-center text-gray-600 mt-12">Checking user permissions...</p>
         </div>
     </div>
-    <script type="module" src="management.js"></script>
+    <script type="module">
+        // This is a mock object. In a real application, this would be dynamic data
+        // fetched from your database or API.
+        const tutorReports = {
+            tutorName: 'John Doe',
+            reportUrls: [
+                'https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf',
+                'https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf',
+                // Add your real report URLs here
+            ]
+        };
+
+        document.getElementById('navTutorReports').addEventListener('click', () => {
+            // Hide the initial message and show the reports content
+            document.getElementById('main-message').classList.add('hidden');
+            document.getElementById('tutor-reports-content').classList.remove('hidden');
+        });
+
+        document.getElementById('downloadAllBtn').addEventListener('click', async () => {
+            const zip = new JSZip();
+            const tutorFolder = zip.folder(tutorReports.tutorName);
+            
+            // Loop through each report URL
+            for (let i = 0; i < tutorReports.reportUrls.length; i++) {
+                const url = tutorReports.reportUrls[i];
+                const filename = `Report_${i + 1}.pdf`; // You can name the files dynamically
+
+                try {
+                    // Fetch the file as a binary blob
+                    const response = await fetch(url);
+                    const blob = await response.blob();
+                    
+                    // Add the blob to the tutor's folder in the zip file
+                    tutorFolder.file(filename, blob);
+                } catch (error) {
+                    console.error(`Failed to fetch and add file: ${url}`, error);
+                }
+            }
+
+            // Generate and download the zip file
+            zip.generateAsync({ type: 'blob' }).then(function(content) {
+                saveAs(content, `${tutorReports.tutorName}_Reports.zip`);
+            });
+        });
+    </script>
 </body>
 </html>
