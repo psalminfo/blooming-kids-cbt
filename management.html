@@ -16,70 +16,10 @@
             border-bottom-color: #166534; /* dark-green */
             color: #166534; 
         }
-        .loading-overlay {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background-color: rgba(0, 0, 0, 0.7);
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            z-index: 1000;
-        }
-        .spinner {
-            border: 4px solid rgba(255, 255, 255, 0.3);
-            border-top: 4px solid #fff;
-            border-radius: 50%;
-            width: 40px;
-            height: 40px;
-            animation: spin 1s linear infinite;
-        }
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
-        /* Style for the message box/modal */
-        .message-box {
-            position: fixed;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            padding: 20px;
-            background-color: #fff;
-            border-radius: 8px;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-            z-index: 2000;
-            text-align: center;
-        }
-        .message-box-content h3 {
-            font-size: 1.5rem;
-            font-weight: bold;
-            color: #166534;
-            margin-bottom: 1rem;
-        }
-        .message-box-content p {
-            color: #333;
-        }
     </style>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 </head>
 <body class="bg-gray-50 min-h-screen">
-    <!-- Loading Overlay -->
-    <div id="loading-overlay" class="loading-overlay hidden">
-        <div class="spinner"></div>
-    </div>
-
-    <!-- Message Box -->
-    <div id="message-box" class="message-box hidden">
-        <div class="message-box-content">
-            <h3 id="message-title"></h3>
-            <p id="message-text"></p>
-            <button onclick="closeMessageBox()" class="mt-4 bg-green-500 text-white px-4 py-2 rounded">OK</button>
-        </div>
-    </div>
-
     <div class="max-w-7xl mx-auto p-6">
         <div class="flex justify-between items-center mb-6">
             <div>
@@ -92,13 +32,12 @@
             <button id="navTutorManagement" class="nav-btn text-lg font-semibold active">Tutor & Student List</button>
             <button id="navPayAdvice" class="nav-btn text-lg font-semibold text-gray-500 hover:text-green-700">Pay Advice</button>
             <button id="navTutorReports" class="nav-btn text-lg font-semibold text-gray-500 hover:text-green-700">Tutor Reports</button>
-            <button id="navStudentRecords" class="nav-btn text-lg font-semibold text-gray-500 hover:text-green-700">Student Records</button>
+            <button id="navSummerBreak" class="nav-btn text-lg font-semibold text-gray-500 hover:text-green-700">Summer Break</button>
         </nav>
-        <div id="mainContent" class="bg-white p-6 rounded-lg shadow-lg">
-            <p class="text-center text-gray-500">Loading content...</p>
+        <div id="main-content">
+             <p class="text-center text-gray-600 mt-12">Checking user permissions...</p>
         </div>
     </div>
-    
     <script type="module" src="management.js"></script>
 </body>
 </html>
