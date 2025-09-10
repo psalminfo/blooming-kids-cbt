@@ -1,7 +1,6 @@
 import { auth, db } from './firebaseConfig.js';
-import { collection, getDocs, doc, getDoc, where, query, orderBy, Timestamp, writeBatch, updateDoc } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
+import { collection, getDocs, doc, getDoc, where, query, orderBy, Timestamp, writeBatch, updateDoc, onSnapshot, addDoc, deleteDoc, arrayRemove } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
 import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-auth.js";
-import { onSnapshot } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
 
 function capitalize(str) {
     if (!str) return '';
@@ -239,8 +238,6 @@ async function renderTutorReportsPanel(container) {
     loadTutorReportsForManagement();
 }
 
-// ### UPDATED and NEW functions below ###
-
 async function loadTutorReportsForManagement() {
     const reportsListContainer = document.getElementById('tutor-reports-list');
     onSnapshot(query(collection(db, "tutor_submissions"), orderBy("submittedAt", "desc")), (snapshot) => {
@@ -254,265 +251,300 @@ async function loadTutorReportsForManagement() {
         snapshot.forEach(doc => {
             const report = { id: doc.id, ...doc.data() };
             if (!reportsByTutor[report.tutorEmail]) {
-                reportsByTutor[report.tutorEmail] = { name: report.tutorName || report.tutorEmail, reports: [] };
+                reportsByTutor[report.tutorEmail] = {
+                    name: report.tutorName || report.tutorEmail,
+                    reports: []
+                };
             }
             reportsByTutor[report.tutorEmail].reports.push(report);
         });
 
         const canDownload = window.userData.permissions?.actions?.canDownloadReports === true;
-
         reportsListContainer.innerHTML = Object.values(reportsByTutor).map(tutorData => {
-            const reportLinks = tutorData.reports.map(report => {
-                const buttonHTML = canDownload
-                    ? `<button class="download-report-btn bg-green-500 text-white px-3 py-1 text-sm rounded" data-report-id="${report.id}">Download</button>`
-                    : `<button class="view-report-btn bg-gray-500 text-white px-3 py-1 text-sm rounded" data-report-id="${report.id}">View</button>`;
-                return `<li class="flex justify-between items-center p-2 bg-gray-50 rounded">${report.studentName}<span>${buttonHTML}</span></li>`;
-            }).join('');
-            
-            // Add the Zip button if user can download
-            const zipButtonHTML = canDownload
-                ? `<div class="p-4 border-t"><button class="zip-reports-btn bg-blue-600 text-white px-4 py-2 text-sm rounded w-full hover:bg-blue-700" data-tutor-email="${tutorData.reports[0].tutorEmail}">Zip & Download All Reports</button></div>`
-                : '';
+            const reportsHtml = tutorData.reports.map(report => `
+                <div class="bg-white p-4 rounded-lg border border-gray-200">
+                    <h5 class="font-semibold text-sm">Report for ${report.month} ${report.year}</h5>
+                    <p class="text-xs text-gray-500">Submitted on: ${report.submittedAt?.toDate().toLocaleString()}</p>
+                    <ul class="list-disc list-inside mt-2 text-sm text-gray-700">
+                        <li>Total Hours: ${report.totalHours}</li>
+                        <li>Total Taught: ${report.totalTaught}</li>
+                    </ul>
+                    ${report.studentSummary?.length > 0 ? `
+                        <div class="mt-2">
+                            <h6 class="font-medium text-xs text-gray-600">Student Summary:</h6>
+                            <ul class="list-disc list-inside text-xs mt-1">
+                                ${report.studentSummary.map(s => `<li>${s.studentName}: ${s.status}</li>`).join('')}
+                            </ul>
+                        </div>
+                    ` : ''}
+                    ${canDownload ? `<button onclick="window.downloadReport('${report.id}')" class="mt-4 bg-green-500 text-white text-xs px-3 py-1 rounded hover:bg-green-600">Download Report</button>` : ''}
+                </div>
+            `).join('');
 
-            return `<details class="border rounded-lg">
-                        <summary class="p-4 cursor-pointer font-semibold">${tutorData.name} (${tutorData.reports.length} reports)</summary>
-                        <div class="p-4 border-t"><ul class="space-y-2">${reportLinks}</ul></div>
-                        ${zipButtonHTML}
-                    </details>`;
+            return `
+                <div class="border rounded-lg shadow-sm">
+                    <details>
+                        <summary class="p-4 cursor-pointer flex justify-between items-center font-bold text-lg text-green-800 bg-gray-50">
+                            ${tutorData.name} (${tutorData.reports.length} reports)
+                        </summary>
+                        <div class="p-4 space-y-4 border-t border-gray-200">
+                            ${reportsHtml}
+                        </div>
+                    </details>
+                </div>
+            `;
         }).join('');
-
-        // Attach all event listeners
-        document.querySelectorAll('.download-report-btn').forEach(button => {
-            button.addEventListener('click', (e) => {
-                e.stopPropagation();
-                viewReportInNewTab(e.target.dataset.reportId, true);
-            });
-        });
-
-        document.querySelectorAll('.view-report-btn').forEach(button => {
-            button.addEventListener('click', (e) => {
-                e.stopPropagation();
-                viewReportInNewTab(e.target.dataset.reportId, false);
-            });
-        });
-
-        document.querySelectorAll('.zip-reports-btn').forEach(button => {
-            button.addEventListener('click', async (e) => {
-                e.stopPropagation();
-                const tutorEmail = e.target.dataset.tutorEmail;
-                const tutorData = reportsByTutor[tutorEmail];
-                if (tutorData) {
-                    await zipAndDownloadTutorReports(tutorData.reports, tutorData.name, e.target);
-                }
-            });
-        });
     });
 }
-
-// NEW HELPER FUNCTION to generate report HTML
-async function generateReportHTML(reportId) {
-    const reportDoc = await getDoc(doc(db, "tutor_submissions", reportId));
-    if (!reportDoc.exists()) throw new Error("Report not found!");
-    const reportData = reportDoc.data();
-    
-    const logoUrl = "https://raw.githubusercontent.com/psalminfo/blooming-kids-cbt/main/logo.png";
-    const reportTemplate = `<div style="font-family: Arial, sans-serif; padding: 2rem; max-width: 800px; margin: auto;"><div style="text-align: center; margin-bottom: 2rem;"><img src="${logoUrl}" alt="Company Logo" style="height: 80px;"><h3 style="font-size: 1.8rem; font-weight: bold; color: #15803d; margin: 0;">Blooming Kids House</h3><h1 style="font-size: 1.2rem; font-weight: bold; color: #166534;">MONTHLY LEARNING REPORT</h1><p>Date: ${new Date(reportData.submittedAt.seconds * 1000).toLocaleDateString()}</p></div><div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 2rem;"><p><strong>Student's Name:</strong> ${reportData.studentName}</p><p><strong>Parent's Name:</strong> ${reportData.parentName || 'N/A'}</p><p><strong>Parent's Phone:</strong> ${reportData.parentPhone || 'N/A'}</p><p><strong>Grade:</strong> ${reportData.grade}</p><p><strong>Tutor's Name:</strong> ${reportData.tutorName}</p></div>${Object.entries({"INTRODUCTION": reportData.introduction, "TOPICS & REMARKS": reportData.topics, "PROGRESS & ACHIEVEMENTS": reportData.progress, "STRENGTHS AND WEAKNESSES": reportData.strengthsWeaknesses, "RECOMMENDATIONS": reportData.recommendations, "GENERAL TUTOR'S COMMENTS": reportData.generalComments}).map(([title, content]) => `<div style="border-top: 1px solid #d1d5db; padding-top: 1rem; margin-top: 1rem;"><h2 style="font-size: 1.25rem; font-weight: bold; color: #16a34a;">${title}</h2><p style="line-height: 1.6; white-space: pre-wrap;">${content || 'N/A'}</p></div>`).join('')}<div style="margin-top: 3rem; text-align: right;"><p>Best regards,</p><p style="font-weight: bold;">${reportData.tutorName}</p></div></div>`;
-
-    return { html: reportTemplate, reportData: reportData };
-}
-
-// REFACTORED to use the new helper function
-async function viewReportInNewTab(reportId, shouldDownload = false) {
-    try {
-        const { html, reportData } = await generateReportHTML(reportId);
-        if (shouldDownload) {
-            html2pdf().from(html).save(`${reportData.studentName}_report.pdf`);
-        } else {
-            const newWindow = window.open();
-            newWindow.document.write(`<html><head><title>${reportData.studentName} Report</title></head><body>${html}</body></html>`);
-            newWindow.document.close();
-        }
-    } catch (error) {
-        console.error("Error viewing/downloading report:", error);
-        alert(`Error: ${error.message}`);
-    }
-}
-
-// NEW ZIPPING FUNCTION
-async function zipAndDownloadTutorReports(reports, tutorName, buttonElement) {
-    const originalButtonText = buttonElement.textContent;
-    buttonElement.textContent = 'Zipping... (0%)';
-    buttonElement.disabled = true;
-
-    try {
-        const zip = new JSZip();
-        let filesGenerated = 0;
-
-        const reportGenerationPromises = reports.map(async (report) => {
-            const { html, reportData } = await generateReportHTML(report.id);
-            const pdfBlob = await html2pdf().from(html).output('blob');
-            filesGenerated++;
-            buttonElement.textContent = `Zipping... (${Math.round((filesGenerated / reports.length) * 100)}%)`;
-            return { name: `${reportData.studentName}_Report_${report.id.substring(0,5)}.pdf`, blob: pdfBlob };
-        });
-
-        const generatedPdfs = await Promise.all(reportGenerationPromises);
-
-        generatedPdfs.forEach(pdf => {
-            zip.file(pdf.name, pdf.blob);
-        });
-
-        const zipBlob = await zip.generateAsync({ type: "blob" });
-        saveAs(zipBlob, `${tutorName}_All_Reports.zip`);
-
-    } catch (error) {
-        console.error("Error creating zip file:", error);
-        alert("Failed to create zip file. See console for details.");
-    } finally {
-        buttonElement.textContent = originalButtonText;
-        buttonElement.disabled = false;
-    }
-}
-
 
 async function renderSummerBreakPanel(container) {
     container.innerHTML = `
         <div class="bg-white p-6 rounded-lg shadow-md">
-            <h2 class="text-2xl font-bold text-green-700">Students on Summer Break</h2>
-            <div id="break-status-message" class="text-center font-semibold mb-4 hidden"></div>
-            <div id="break-students-list" class="space-y-4">
-                <p class="text-center">Loading...</p>
+            <h2 class="text-2xl font-bold text-green-700 mb-4">Summer Break Management</h2>
+            <div id="summer-break-content">
+                <p class="text-center text-gray-500">Feature not yet implemented. Placeholder content for Summer Break management.</p>
             </div>
         </div>
     `;
+}
 
-    const statusMessageDiv = document.getElementById('break-status-message');
-    const listContainer = document.getElementById('break-students-list');
+// ### PENDING APPROVALS ###
+async function renderPendingApprovalsPanel(container) {
+    container.innerHTML = `
+        <div class="bg-white p-6 rounded-lg shadow-md">
+            <h2 class="text-2xl font-bold text-green-700 mb-4">Pending Student Approvals</h2>
+            <div id="pending-approvals-list" class="space-y-4">
+                <p class="text-center text-gray-500">Loading pending students...</p>
+            </div>
+        </div>
+    `;
+    loadPendingStudents(document.getElementById('pending-approvals-list'));
+}
 
-    onSnapshot(query(collection(db, "students"), where("summerBreak", "==", true)), (snapshot) => {
-        if (!listContainer) return;
+async function handleStudentApproval(studentId, isApproved) {
+    const studentRef = doc(db, 'students', studentId);
+    try {
+        const batch = writeBatch(db);
+        batch.update(studentRef, {
+            isPending: false,
+            isActive: isApproved,
+            status: isApproved ? 'Active' : 'Rejected'
+        });
         
+        // If rejected, also remove the student from the tutor's list
+        if (!isApproved) {
+            const studentSnap = await getDoc(studentRef);
+            if(studentSnap.exists()){
+                const studentData = studentSnap.data();
+                if(studentData.tutorEmail){
+                    const tutorRef = doc(db, 'tutors', studentData.tutorEmail);
+                    batch.update(tutorRef, {
+                        studentList: arrayRemove(studentId)
+                    });
+                }
+            }
+        }
+        await batch.commit();
+        alert(`Student ${isApproved ? 'approved' : 'rejected'} successfully.`);
+    } catch(error) {
+        console.error("Error updating student approval status:", error);
+        alert("Failed to update student status.");
+    }
+}
+
+async function handleStudentEdit(studentId, currentData) {
+    const studentName = prompt("Edit Student Name:", currentData.studentName);
+    const grade = prompt("Edit Grade:", currentData.grade);
+    const days = prompt("Edit Days/Week:", currentData.days);
+    const fee = prompt("Edit Student Fee:", currentData.studentFee);
+
+    if (studentName && grade && days && fee) {
+        try {
+            await updateDoc(doc(db, 'students', studentId), {
+                studentName,
+                grade: Number(grade),
+                days: Number(days),
+                studentFee: Number(fee),
+                isPending: false,
+                isActive: true,
+                status: 'Active'
+            });
+            alert("Student information updated and approved.");
+        } catch(error) {
+            console.error("Error editing student info:", error);
+            alert("Failed to edit student information.");
+        }
+    }
+}
+
+async function handleStudentDelete(studentId) {
+    if (confirm("Are you sure you want to delete this student?")) {
+        try {
+            await deleteDoc(doc(db, 'students', studentId));
+            alert("Student deleted successfully.");
+        } catch (error) {
+            console.error("Error deleting student:", error);
+            alert("Failed to delete student.");
+        }
+    }
+}
+
+function loadPendingStudents(container) {
+    const pendingQuery = query(collection(db, "students"), where("isPending", "==", true));
+
+    onSnapshot(pendingQuery, (snapshot) => {
         if (snapshot.empty) {
-            listContainer.innerHTML = `<p class="text-center text-gray-500">No students are on break.</p>`;
+            container.innerHTML = `<p class="text-center text-gray-500">No pending student approvals at this time.</p>`;
             return;
         }
 
-        const canEndBreak = window.userData.permissions?.actions?.canEndBreak;
-        
-        listContainer.innerHTML = snapshot.docs.map(doc => {
-            const student = doc.data();
-            const studentId = doc.id;
-            const endBreakButton = canEndBreak 
-                ? `<button class="end-break-btn bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700 transition-colors" data-student-id="${studentId}">End Break</button>`
-                : '';
-
+        container.innerHTML = snapshot.docs.map(doc => {
+            const student = { id: doc.id, ...doc.data() };
             return `
-                <div class="border p-4 rounded-lg flex justify-between items-center bg-gray-50">
-                    <div>
-                        <p><strong>Student:</strong> ${student.studentName}</p>
-                        <p><strong>Tutor:</strong> ${student.tutorEmail}</p>
-                    </div>
-                    <div class="flex items-center space-x-2">
-                         <span class="text-yellow-600 font-semibold px-3 py-1 bg-yellow-100 rounded-full text-sm">On Break</span>
-                         ${endBreakButton}
+                <div class="bg-gray-100 p-4 rounded-lg shadow-sm border border-yellow-200">
+                    <h4 class="font-bold text-lg text-yellow-800">${student.studentName}</h4>
+                    <p class="text-sm text-gray-600">Tutor: ${student.tutorName}</p>
+                    <p class="text-sm text-gray-600">Grade: ${student.grade}</p>
+                    <p class="text-sm text-gray-600">Days: ${student.days}</p>
+                    <p class="text-sm text-gray-600">Fee: ₦${student.studentFee}</p>
+                    <div class="mt-4 flex space-x-2">
+                        <button onclick="handleStudentApproval('${student.id}', true)" class="bg-green-500 text-white text-xs px-3 py-1 rounded hover:bg-green-600">Approve</button>
+                        <button onclick="handleStudentApproval('${student.id}', false)" class="bg-red-500 text-white text-xs px-3 py-1 rounded hover:bg-red-600">Reject</button>
+                        <button onclick="handleStudentEdit('${student.id}', ${JSON.stringify(student)})" class="bg-blue-500 text-white text-xs px-3 py-1 rounded hover:bg-blue-600">Edit</button>
+                        <button onclick="handleStudentDelete('${student.id}')" class="bg-gray-500 text-white text-xs px-3 py-1 rounded hover:bg-gray-600">Delete</button>
                     </div>
                 </div>
             `;
         }).join('');
 
-        // Attach event listeners to the new buttons
-        if (canEndBreak) {
-            document.querySelectorAll('.end-break-btn').forEach(button => {
-                button.addEventListener('click', async (e) => {
-                    const studentId = e.target.dataset.studentId;
-                    try {
-                        await updateDoc(doc(db, "students", studentId), { summerBreak: false, lastBreakEnd: Timestamp.now() });
-                        statusMessageDiv.textContent = `Break ended for ${e.target.closest('div').querySelector('p').textContent.replace('Student: ', '')}.`;
-                        statusMessageDiv.classList.remove('hidden');
-                        statusMessageDiv.className = 'text-center font-semibold mb-4 text-green-600';
-                    } catch (error) {
-                        console.error("Error ending summer break:", error);
-                        statusMessageDiv.textContent = "Failed to end summer break. Check the console for details.";
-                        statusMessageDiv.className = 'text-center font-semibold mb-4 text-red-600';
-                        statusMessageDiv.classList.remove('hidden');
-                    }
-                });
-            });
-        }
+        window.handleStudentApproval = handleStudentApproval;
+        window.handleStudentEdit = handleStudentEdit;
+        window.handleStudentDelete = handleStudentDelete;
     });
 }
 
+// ##################################
+// # INITIALIZATION LOGIC
+// ##################################
 
-// ##################################
-// # AUTHENTICATION & INITIALIZATION
-// ##################################
+function initializeManagementPanel(staffData) {
+    const mainContent = document.getElementById('main-content');
+    const welcomeMessage = document.getElementById('welcome-message');
+    const userRole = document.getElementById('user-role');
+    const logoutBtn = document.getElementById('logoutBtn');
+
+    if (!mainContent || !welcomeMessage || !userRole || !logoutBtn) {
+        console.error("Critical elements not found in the DOM.");
+        return;
+    }
+
+    welcomeMessage.textContent = `Hello, ${staffData.name}`;
+    userRole.textContent = staffData.role;
+
+    const allNavItems = {
+        navTutorManagement: { fn: renderManagementTutorView, requiredPermission: 'canManageTutorsAndStudents' },
+        navPayAdvice: { fn: renderPayAdvicePanel, requiredPermission: 'canAccessPayAdvice' },
+        navStudentApprovals: { fn: renderPendingApprovalsPanel, requiredPermission: 'canApproveStudents' },
+        navTutorReports: { fn: renderTutorReportsPanel, requiredPermission: 'canAccessTutorReports' },
+        navSummerBreak: { fn: renderSummerBreakPanel, requiredPermission: 'canManageSummerBreak' }
+    };
+
+    const navContainer = document.querySelector('nav');
+    navContainer.innerHTML = '';
+    
+    let firstVisibleTab = null;
+
+    Object.entries(allNavItems).forEach(([id, item]) => {
+        if (staffData.permissions?.tabs?.[item.requiredPermission]) {
+            const button = document.createElement('button');
+            button.id = id;
+            button.className = 'nav-btn text-lg font-bold text-gray-500 hover:text-white';
+            button.textContent = document.getElementById(id)?.textContent || capitalize(id.replace('nav', ''));
+            navContainer.appendChild(button);
+
+            if (!firstVisibleTab) {
+                firstVisibleTab = id;
+            }
+
+            button.addEventListener('click', () => {
+                document.querySelectorAll('.nav-btn').forEach(btn => btn.classList.remove('active'));
+                button.classList.add('active');
+                item.fn(mainContent);
+            });
+        }
+    });
+
+    if (firstVisibleTab) {
+        document.getElementById(firstVisibleTab).click();
+    } else {
+        mainContent.innerHTML = `<p class="text-center">You have no permissions assigned.</p>`;
+    }
+
+    logoutBtn.addEventListener('click', () => signOut(auth).then(() => window.location.href = "management-auth.html"));
+}
 
 onAuthStateChanged(auth, async (user) => {
     const mainContent = document.getElementById('main-content');
     const logoutBtn = document.getElementById('logoutBtn');
+    if (!mainContent || !logoutBtn) return;
+
     if (user) {
-        // ### ADD THIS onSnapshot LISTENER ###
-        const staffDocRef = doc(db, "staff", user.email);
-        onSnapshot(staffDocRef, (docSnap) => {
-            if (docSnap.exists() && docSnap.data().role !== 'pending') {
-                const staffData = docSnap.data();
+        const staffDocRef = doc(db, 'management', user.email);
+        const unsubscribe = onSnapshot(staffDocRef, async (docSnap) => {
+            const staffData = docSnap.data();
+
+            if (docSnap.exists() && staffData?.status === 'approved') {
+                if (window.userData && JSON.stringify(window.userData.permissions) === JSON.stringify(staffData.permissions)) {
+                    return; // No change in permissions, no re-render needed
+                }
                 window.userData = staffData;
                 
-                document.getElementById('welcome-message').textContent = `Welcome, ${staffData.name}`;
-                document.getElementById('user-role').textContent = `Role: ${capitalize(staffData.role)}`;
-
-                const allNavItems = {
-                    navTutorManagement: { fn: renderManagementTutorView, perm: 'viewTutorManagement' },
-                    navPayAdvice: { fn: renderPayAdvicePanel, perm: 'viewPayAdvice' },
-                    navTutorReports: { fn: renderTutorReportsPanel, perm: 'viewTutorReports' },
-                    navSummerBreak: { fn: renderSummerBreakPanel, perm: 'viewSummerBreak' }
-                };
+                const welcomeMessage = document.getElementById('welcome-message');
+                const userRole = document.getElementById('user-role');
+                if (welcomeMessage) welcomeMessage.textContent = `Hello, ${staffData.name}`;
+                if (userRole) userRole.textContent = staffData.role;
 
                 const navContainer = document.querySelector('nav');
-                const originalNavButtons = {};
-                if(navContainer) {
-                    // Temporarily store original text content if needed
-                    navContainer.querySelectorAll('.nav-btn').forEach(btn => {
-                        originalNavButtons[btn.id] = btn.textContent;
-                    });
-                    navContainer.innerHTML = '';
-                    let firstVisibleTab = null;
+                navContainer.innerHTML = '';
+                
+                let firstVisibleTab = null;
 
-                    Object.entries(allNavItems).forEach(([id, item]) => {
-                        if (window.userData.permissions?.tabs?.[item.perm]) {
-                            if (!firstVisibleTab) firstVisibleTab = id;
-                            const button = document.createElement('button');
-                            button.id = id;
-                            button.className = 'nav-btn text-lg font-semibold text-gray-500 hover:text-green-700';
-                            button.textContent = originalNavButtons[id];
-                            navContainer.appendChild(button);
-                            
-                            button.addEventListener('click', () => {
-                                document.querySelectorAll('.nav-btn').forEach(btn => btn.classList.remove('active'));
-                                button.classList.add('active');
-                                item.fn(mainContent);
-                            });
-                        }
-                    });
+                const allNavItems = {
+                    navTutorManagement: { fn: renderManagementTutorView, requiredPermission: 'canManageTutorsAndStudents' },
+                    navPayAdvice: { fn: renderPayAdvicePanel, requiredPermission: 'canAccessPayAdvice' },
+                    navStudentApprovals: { fn: renderPendingApprovalsPanel, requiredPermission: 'canApproveStudents' },
+                    navTutorReports: { fn: renderTutorReportsPanel, requiredPermission: 'canAccessTutorReports' },
+                    navSummerBreak: { fn: renderSummerBreakPanel, requiredPermission: 'canManageSummerBreak' }
+                };
 
-                    if (firstVisibleTab) {
-                        // Check if the current tab is still available after the permission update.
-                        const activeNav = document.querySelector('.nav-btn.active');
-                        const activeNavId = activeNav?.id;
-                        if (!activeNav || !document.getElementById(activeNavId)) {
-                            // The current tab is no longer available, so switch to the first available one.
-                            document.getElementById(firstVisibleTab).click();
-                        } else {
-                            // The current tab is still available, re-render it to apply new permissions.
-                            const currentItem = allNavItems[activeNavId];
-                            if(currentItem) currentItem.fn(mainContent);
+                Object.entries(allNavItems).forEach(([id, item]) => {
+                    if (staffData.permissions?.tabs?.[item.requiredPermission]) {
+                        const button = document.createElement('button');
+                        button.id = id;
+                        button.className = 'nav-btn text-lg font-bold text-gray-500 hover:text-white';
+                        button.textContent = document.getElementById(id)?.textContent || capitalize(id.replace('nav', ''));
+                        navContainer.appendChild(button);
+
+                        if (!firstVisibleTab) {
+                            firstVisibleTab = id;
                         }
-                    } else {
-                        if (mainContent) mainContent.innerHTML = `<p class="text-center">You have no permissions assigned.</p>`;
+                        
+                        button.addEventListener('click', () => {
+                            document.querySelectorAll('.nav-btn').forEach(btn => btn.classList.remove('active'));
+                            button.classList.add('active');
+                            item.fn(mainContent);
+                        });
                     }
+                });
+
+                if (firstVisibleTab) {
+                    document.getElementById(firstVisibleTab).click();
+                } else {
+                    if (mainContent) mainContent.innerHTML = `<p class="text-center">You have no permissions assigned.</p>`;
                 }
+
             } else {
-                if (document.getElementById('welcome-message')) document.getElementById('welcome-message').textContent = `Hello, ${docSnap.data()?.name}`;
+                if (document.getElementById('welcome-message')) document.getElementById('welcome-message').textContent = `Hello, ${staffData.name}`;
                 if (document.getElementById('user-role')) document.getElementById('user-role').textContent = 'Status: Pending Approval';
                 if (mainContent) mainContent.innerHTML = `<p class="text-center mt-12 text-yellow-600 font-semibold">Your account is awaiting approval.</p>`;
             }
