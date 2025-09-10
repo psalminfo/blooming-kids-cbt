@@ -4,39 +4,66 @@ import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/
 import { onSnapshot } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
 
 /* ---------------------------
-   HELPERS
+    HELPERS
 ---------------------------- */
 function capitalize(str) {
     if (typeof str !== 'string') return '';
     return str.charAt(0).toUpperCase() + str.slice(1);
 }
 
-/* ---------------------------
-   EXISTING PANELS
----------------------------- */
-function renderManagementTutorView(container) {
-    container.innerHTML = `<h2 class="text-2xl font-bold">Tutor Management</h2>`;
-    // ... your original tutor management logic ...
-}
+// Global state to manage listeners for cleanup
+const listeners = {};
 
-function renderPayAdvicePanel(container) {
-    container.innerHTML = `<h2 class="text-2xl font-bold">Pay Advice</h2>`;
-    // ... your original pay advice logic ...
-}
-
-function renderTutorReportsPanel(container) {
-    container.innerHTML = `<h2 class="text-2xl font-bold">Tutor Reports</h2>`;
-    // ... your original tutor reports logic ...
-}
-
-function renderSummerBreakPanel(container) {
-    container.innerHTML = `<h2 class="text-2xl font-bold">Summer Break</h2>`;
-    // ... your original summer break logic ...
+function cleanupListeners() {
+    Object.values(listeners).forEach(unsubscribe => unsubscribe());
+    for (const key in listeners) {
+        delete listeners[key];
+    }
 }
 
 /* ---------------------------
-   NEW: Pending Approvals Panel
+    PANEL RENDERERS
 ---------------------------- */
+const panels = {
+    tutorManagement: {
+        fn: (container) => {
+            container.innerHTML = `<h2 class="text-2xl font-bold">Tutor Management</h2>`;
+            // ... your original tutor management logic ...
+        },
+        perm: 'viewTutorManagement',
+        navText: 'Tutor Management'
+    },
+    payAdvice: {
+        fn: (container) => {
+            container.innerHTML = `<h2 class="text-2xl font-bold">Pay Advice</h2>`;
+            // ... your original pay advice logic ...
+        },
+        perm: 'viewPayAdvice',
+        navText: 'Pay Advice'
+    },
+    tutorReports: {
+        fn: (container) => {
+            container.innerHTML = `<h2 class="text-2xl font-bold">Tutor Reports</h2>`;
+            // ... your original tutor reports logic ...
+        },
+        perm: 'viewTutorReports',
+        navText: 'Tutor Reports'
+    },
+    summerBreak: {
+        fn: (container) => {
+            container.innerHTML = `<h2 class="text-2xl font-bold">Summer Break</h2>`;
+            // ... your original summer break logic ...
+        },
+        perm: 'viewSummerBreak',
+        navText: 'Summer Break'
+    },
+    pendingApprovals: {
+        fn: renderPendingApprovalsPanel,
+        perm: 'canApproveStudents',
+        navText: 'Pending Approvals'
+    }
+};
+
 async function renderPendingApprovalsPanel(container) {
     container.innerHTML = `
         <div class="bg-white p-6 rounded-lg shadow-md">
@@ -48,8 +75,11 @@ async function renderPendingApprovalsPanel(container) {
     `;
 
     const listContainer = document.getElementById('pending-approvals-list');
-
-    onSnapshot(query(collection(db, "students"), where("status", "==", "pending")), (snapshot) => {
+    
+    // Cleanup any existing listener for this panel
+    if (listeners.pendingApprovals) listeners.pendingApprovals();
+    
+    const unsubscribe = onSnapshot(query(collection(db, "students"), where("status", "==", "pending")), (snapshot) => {
         if (snapshot.empty) {
             listContainer.innerHTML = `<p class="text-center text-gray-500">No students awaiting approval.</p>`;
             return;
@@ -78,58 +108,69 @@ async function renderPendingApprovalsPanel(container) {
 
         attachPendingApprovalEventListeners();
     });
+    listeners.pendingApprovals = unsubscribe; // Store the unsubscribe function
 }
 
 /* ---------------------------
-   NEW: Event Listeners
+    EVENT LISTENERS
 ---------------------------- */
 function attachPendingApprovalEventListeners() {
-    document.querySelectorAll('.approve-btn').forEach(btn => {
-        btn.onclick = async (e) => {
-            await updateDoc(doc(db, "students", e.target.dataset.id), { status: "approved", approvedAt: Timestamp.now() });
-        };
-    });
+    const listContainer = document.getElementById('pending-approvals-list');
+    if (!listContainer) return;
 
-    document.querySelectorAll('.reject-btn').forEach(btn => {
-        btn.onclick = async (e) => {
-            await updateDoc(doc(db, "students", e.target.dataset.id), { status: "rejected", rejectedAt: Timestamp.now() });
-        };
-    });
+    listContainer.addEventListener('click', async (e) => {
+        const target = e.target;
+        const studentId = target.dataset.id;
+        if (!studentId) return;
 
-    document.querySelectorAll('.edit-btn').forEach(btn => {
-        btn.onclick = async (e) => {
-            const ref = doc(db, "students", e.target.dataset.id);
-            const snap = await getDoc(ref);
-            if (!snap.exists()) return alert("Student not found");
-            const s = snap.data();
-            const newName = prompt("Edit Name:", s.studentName);
-            const newGrade = prompt("Edit Grade:", s.grade);
-            const newDays = prompt("Edit Days/Week:", s.days);
-            const newFee = parseFloat(prompt("Edit Fee:", s.studentFee || 0));
-            await updateDoc(ref, {
-                studentName: newName || s.studentName,
-                grade: newGrade || s.grade,
-                days: newDays || s.days,
-                studentFee: isNaN(newFee) ? s.studentFee : newFee
-            });
-        };
-    });
-
-    document.querySelectorAll('.delete-btn').forEach(btn => {
-        btn.onclick = async (e) => {
-            if (confirm("Delete this student permanently?")) {
-                await deleteDoc(doc(db, "students", e.target.dataset.id));
+        try {
+            if (target.classList.contains('approve-btn')) {
+                await updateDoc(doc(db, "students", studentId), { status: "approved", approvedAt: Timestamp.now() });
+            } else if (target.classList.contains('reject-btn')) {
+                await updateDoc(doc(db, "students", studentId), { status: "rejected", rejectedAt: Timestamp.now() });
+            } else if (target.classList.contains('edit-btn')) {
+                const ref = doc(db, "students", studentId);
+                const snap = await getDoc(ref);
+                if (!snap.exists()) {
+                    alert("Student not found");
+                    return;
+                }
+                const s = snap.data();
+                // Note: Consider replacing these prompts with a proper modal for better UX.
+                const newName = prompt("Edit Name:", s.studentName);
+                const newGrade = prompt("Edit Grade:", s.grade);
+                const newDays = prompt("Edit Days/Week:", s.days);
+                const newFee = parseFloat(prompt("Edit Fee:", s.studentFee || 0));
+                await updateDoc(ref, {
+                    studentName: newName || s.studentName,
+                    grade: newGrade || s.grade,
+                    days: newDays || s.days,
+                    studentFee: isNaN(newFee) ? s.studentFee : newFee
+                });
+            } else if (target.classList.contains('delete-btn')) {
+                if (confirm("Delete this student permanently?")) {
+                    await deleteDoc(doc(db, "students", studentId));
+                }
             }
-        };
+        } catch (error) {
+            console.error("Error handling student action:", error);
+            alert("An error occurred. Please try again.");
+        }
     });
 }
 
 /* ---------------------------
-   AUTH & NAVIGATION
+    AUTH & NAVIGATION
 ---------------------------- */
 onAuthStateChanged(auth, async (user) => {
     const mainContent = document.getElementById('main-content');
     const logoutBtn = document.getElementById('logoutBtn');
+    const welcomeMessage = document.getElementById('welcome-message');
+    const userRole = document.getElementById('user-role');
+    const navContainer = document.querySelector('nav');
+
+    // Clean up any old listeners from a previous session
+    cleanupListeners();
 
     if (!user) {
         window.location.href = "management-auth.html";
@@ -137,53 +178,57 @@ onAuthStateChanged(auth, async (user) => {
     }
 
     const staffDocRef = doc(db, "staff", user.email);
-    onSnapshot(staffDocRef, (docSnap) => {
+    
+    // Store the unsubscribe function to clean up later
+    listeners.staff = onSnapshot(staffDocRef, (docSnap) => {
         if (docSnap.exists() && docSnap.data().role !== 'pending') {
             const staffData = docSnap.data();
             window.userData = staffData;
 
-            document.getElementById('welcome-message').textContent = `Welcome, ${staffData.name}`;
-            document.getElementById('user-role').textContent = `Role: ${capitalize(staffData.role)}`;
+            welcomeMessage.textContent = `Welcome, ${staffData.name}`;
+            userRole.textContent = `Role: ${capitalize(staffData.role)}`;
 
-            const allNavItems = {
-                navTutorManagement: { fn: renderManagementTutorView, perm: 'viewTutorManagement' },
-                navPayAdvice: { fn: renderPayAdvicePanel, perm: 'viewPayAdvice' },
-                navTutorReports: { fn: renderTutorReportsPanel, perm: 'viewTutorReports' },
-                navSummerBreak: { fn: renderSummerBreakPanel, perm: 'viewSummerBreak' },
-                navPendingApprovals: { fn: renderPendingApprovalsPanel, perm: 'canApproveStudents' }
-            };
-
-            const navContainer = document.querySelector('nav');
-            const originalNavButtons = {};
-            navContainer.querySelectorAll('.nav-btn').forEach(btn => {
-                originalNavButtons[btn.id] = btn.textContent;
-            });
+            // Build and render the navigation tabs based on permissions
             navContainer.innerHTML = '';
-            let firstVisibleTab = null;
-
-            Object.entries(allNavItems).forEach(([id, item]) => {
-                if (staffData.permissions?.tabs?.[item.perm]) {
-                    if (!firstVisibleTab) firstVisibleTab = id;
+            let firstVisiblePanel = null;
+            Object.entries(panels).forEach(([key, panel]) => {
+                if (staffData.permissions?.tabs?.[panel.perm]) {
+                    if (!firstVisiblePanel) firstVisiblePanel = key;
                     const button = document.createElement('button');
-                    button.id = id;
+                    button.id = `nav-${key}`;
                     button.className = 'nav-btn text-lg font-semibold text-gray-500 hover:text-green-700';
-                    button.textContent = originalNavButtons[id] || (id === 'navPendingApprovals' ? 'Pending Approvals' : id);
+                    button.textContent = panel.navText;
                     navContainer.appendChild(button);
-                    button.onclick = () => {
+                    
+                    // Use a proper event listener with a click handler
+                    button.addEventListener('click', () => {
                         document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
                         button.classList.add('active');
-                        item.fn(mainContent);
-                    };
+                        panel.fn(mainContent);
+                    });
                 }
             });
 
-            if (firstVisibleTab) {
-                document.getElementById(firstVisibleTab).click();
+            // Automatically click the first visible tab if one exists
+            if (firstVisiblePanel) {
+                document.getElementById(`nav-${firstVisiblePanel}`).click();
             } else {
                 mainContent.innerHTML = `<p class="text-center">You have no permissions assigned.</p>`;
             }
         } else {
-            document.getElementById('welcome-message').textContent = `Hello, ${docSnap.data()?.name || ''}`;
-            document.getElementById('user-role').textContent = 'Status: Pending Approval';
+            welcomeMessage.textContent = `Hello, ${docSnap.data()?.name || ''}`;
+            userRole.textContent = 'Status: Pending Approval';
             mainContent.innerHTML = `<p class="text-center mt-12 text-yellow-600 font-semibold">Your account is awaiting approval.</p>`;
         }
+    });
+});
+
+logoutBtn.addEventListener('click', () => {
+    signOut(auth).then(() => {
+        cleanupListeners();
+        console.log("User signed out.");
+        // Firebase Auth will handle the redirect via the onAuthStateChanged listener
+    }).catch((error) => {
+        console.error("Sign out error:", error);
+    });
+});
