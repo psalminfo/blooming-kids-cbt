@@ -11,16 +11,24 @@ function capitalize(str) {
     return str.charAt(0).toUpperCase() + str.slice(1);
 }
 
-// ... all your original helper functions remain here ...
+// ... any other helpers from your original file ...
 
 /* ---------------------------
    EXISTING PANELS
 ---------------------------- */
-// renderManagementTutorView(container) { ... }
-// renderPayAdvicePanel(container) { ... }
-// renderTutorReportsPanel(container) { ... }
-// renderSummerBreakPanel(container) { ... }
-// (Kept exactly as in your working file)
+function renderManagementTutorView(container) {
+    container.innerHTML = `
+        <div class="bg-white p-6 rounded-lg shadow-md">
+            <h2 class="text-2xl font-bold text-green-700 mb-4">Tutor Management</h2>
+            <p>Existing tutor management functionality here...</p>
+        </div>
+    `;
+}
+
+// Keep your other panels exactly as they were:
+function renderPayAdvicePanel(container) { /* ... */ }
+function renderTutorReportsPanel(container) { /* ... */ }
+function renderSummerBreakPanel(container) { /* ... */ }
 
 /* ---------------------------
    NEW: Pending Approvals Panel
@@ -139,7 +147,7 @@ onAuthStateChanged(auth, async (user) => {
                     navPayAdvice: { fn: renderPayAdvicePanel, perm: 'viewPayAdvice' },
                     navTutorReports: { fn: renderTutorReportsPanel, perm: 'viewTutorReports' },
                     navSummerBreak: { fn: renderSummerBreakPanel, perm: 'viewSummerBreak' },
-                    navPendingApprovals: { fn: renderPendingApprovalsPanel, perm: 'canApproveStudents' } // NEW
+                    navPendingApprovals: { fn: renderPendingApprovalsPanel, perm: 'canApproveStudents' }
                 };
 
                 const navContainer = document.querySelector('nav');
@@ -175,6 +183,16 @@ onAuthStateChanged(auth, async (user) => {
                     }
                 }
             } else {
-                if (document.getElementById('welcome-message')) document.getElementById('welcome-message').textContent = `Hello, ${docSnap.data()?.name}`;
-                if (document.getElementById('user-role')) document.getElementById('user-role').textContent = 'Status: Pending Approval';
-                if (mainContent) mainContent.innerHTML = `<p class="text-center mt-12 text-yellow-600 font-semibold
+                if (document.getElementById('welcome-message')) {
+                    document.getElementById('welcome-message').textContent = `Hello, ${docSnap.data()?.name}`;
+                }
+                if (document.getElementById('user-role')) {
+                    document.getElementById('user-role').textContent = 'Status: Pending Approval';
+                }
+                if (mainContent) {
+                    mainContent.innerHTML = `<p class="text-center mt-12 text-yellow-600 font-semibold">Your account is awaiting approval.</p>`;
+                }
+            }
+        });
+
+        const staff
