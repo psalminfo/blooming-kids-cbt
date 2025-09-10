@@ -1,5 +1,5 @@
 import { auth, db } from './firebaseConfig.js';
-import { collection, getDocs, doc, getDoc, where, query, orderBy, Timestamp, writeBatch, updateDoc } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
+import { collection, getDocs, doc, getDoc, where, query, orderBy, Timestamp, writeBatch, updateDoc, setDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
 import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-auth.js";
 import { onSnapshot } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
 
@@ -374,6 +374,65 @@ async function zipAndDownloadTutorReports(reports, tutorName, buttonElement) {
     }
 }
 
+async function renderPendingApprovalsPanel(container) {
+    container.innerHTML = `
+        <div class="bg-white p-6 rounded-lg shadow-md">
+            <h2 class="text-2xl font-bold text-yellow-700 mb-4">Pending Student Approvals</h2>
+            <div id="pending-students-list" class="space-y-4">
+                <p class="text-center text-gray-500 py-10">Loading pending students...</p>
+            </div>
+        </div>
+    `;
+
+    const listContainer = document.getElementById('pending-students-list');
+    onSnapshot(query(collection(db, "students"), where("status", "==", "pending")), (snapshot) => {
+        if (!listContainer) return;
+        if (snapshot.empty) {
+            listContainer.innerHTML = `<p class="text-center text-gray-500">No students are awaiting approval.</p>`;
+            return;
+        }
+
+        listContainer.innerHTML = snapshot.docs.map(doc => {
+            const student = doc.data();
+            const studentId = doc.id;
+            return `
+                <div class="border p-4 rounded-lg flex flex-col md:flex-row justify-between items-start md:items-center bg-yellow-50">
+                    <div class="flex-1 mb-4 md:mb-0">
+                        <p class="font-bold text-lg">${student.studentName} <span class="text-sm text-gray-600 font-normal">(${student.tutorEmail})</span></p>
+                        <p class="text-gray-700 text-sm mt-1">Grade: ${student.grade} | Subjects: ${student.subjects?.join(', ') || 'N/A'}</p>
+                    </div>
+                    <div class="flex space-x-2">
+                        <button class="approve-btn bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700" data-student-id="${studentId}" data-student-name="${student.studentName}">Approve</button>
+                        <button class="edit-btn bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700" data-student-id="${studentId}" data-student-name="${student.studentName}">Edit</button>
+                        <button class="delete-btn bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700" data-student-id="${studentId}" data-student-name="${student.studentName}">Delete</button>
+                    </div>
+                </div>
+            `;
+        }).join('');
+
+        // Add event listeners for new buttons
+        document.querySelectorAll('.approve-btn').forEach(button => button.addEventListener('click', async (e) => {
+            const studentId = e.target.dataset.studentId;
+            const studentName = e.target.dataset.studentName;
+            if (confirm(`Are you sure you want to approve ${studentName}?`)) {
+                await approveStudent(studentId);
+            }
+        }));
+
+        document.querySelectorAll('.edit-btn').forEach(button => button.addEventListener('click', async (e) => {
+            const studentId = e.target.dataset.studentId;
+            await editStudent(studentId);
+        }));
+
+        document.querySelectorAll('.delete-btn').forEach(button => button.addEventListener('click', async (e) => {
+            const studentId = e.target.dataset.studentId;
+            const studentName = e.target.dataset.studentName;
+            if (confirm(`Are you sure you want to permanently delete ${studentName}? This action cannot be undone.`)) {
+                await deleteStudent(studentId);
+            }
+        }));
+    });
+}
 
 async function renderSummerBreakPanel(container) {
     container.innerHTML = `
@@ -443,6 +502,58 @@ async function renderSummerBreakPanel(container) {
 }
 
 
+// NEW STUDENT MANAGEMENT FUNCTIONS
+async function approveStudent(studentId) {
+    const studentRef = doc(db, "students", studentId);
+    try {
+        await updateDoc(studentRef, { status: "active", enrollmentDate: Timestamp.now() });
+        alert("Student approved successfully!");
+    } catch (error) {
+        console.error("Error approving student:", error);
+        alert("Failed to approve student. See console for details.");
+    }
+}
+
+async function editStudent(studentId) {
+    const studentRef = doc(db, "students", studentId);
+    const studentSnap = await getDoc(studentRef);
+    if (!studentSnap.exists()) {
+        alert("Student not found.");
+        return;
+    }
+    const studentData = studentSnap.data();
+    const newName = prompt("Enter new student name:", studentData.studentName);
+    const newGrade = prompt("Enter new grade:", studentData.grade);
+    const newDays = prompt("Enter new days/week:", studentData.days);
+    const newFee = prompt("Enter new student fee:", studentData.studentFee);
+
+    if (newName && newGrade && newDays && newFee) {
+        try {
+            await updateDoc(studentRef, {
+                studentName: newName,
+                grade: newGrade,
+                days: newDays,
+                studentFee: parseFloat(newFee)
+            });
+            alert("Student details updated successfully!");
+        } catch (error) {
+            console.error("Error editing student:", error);
+            alert("Failed to edit student. See console for details.");
+        }
+    }
+}
+
+async function deleteStudent(studentId) {
+    try {
+        await deleteDoc(doc(db, "students", studentId));
+        alert("Student deleted successfully.");
+    } catch (error) {
+        console.error("Error deleting student:", error);
+        alert("Failed to delete student. See console for details.");
+    }
+}
+
+
 // ##################################
 // # AUTHENTICATION & INITIALIZATION
 // ##################################
@@ -463,6 +574,7 @@ onAuthStateChanged(auth, async (user) => {
 
                 const allNavItems = {
                     navTutorManagement: { fn: renderManagementTutorView, perm: 'viewTutorManagement' },
+                    navPendingApprovals: { fn: renderPendingApprovalsPanel, perm: 'canApproveStudents' },
                     navPayAdvice: { fn: renderPayAdvicePanel, perm: 'viewPayAdvice' },
                     navTutorReports: { fn: renderTutorReportsPanel, perm: 'viewTutorReports' },
                     navSummerBreak: { fn: renderSummerBreakPanel, perm: 'viewSummerBreak' }
