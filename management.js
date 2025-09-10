@@ -1,120 +1,64 @@
-async function renderManagementTutorView(container) {
-    container.innerHTML = `
-        <div class="bg-white p-6 rounded-lg shadow-md">
-            <div class="flex justify-between items-center mb-4">
-                <h2 class="text-2xl font-bold text-green-700">Tutor & Student Directory</h2>
-                <div class="flex space-x-4">
-                    <div class="bg-green-100 p-3 rounded-lg text-center shadow"><h4 class="font-bold text-green-800 text-sm">Total Tutors</h4><p id="tutor-count-badge" class="text-2xl font-extrabold">0</p></div>
-                    <div class="bg-yellow-100 p-3 rounded-lg text-center shadow"><h4 class="font-bold text-yellow-800 text-sm">Total Students</h4><p id="student-count-badge" class="text-2xl font-extrabold">0</p></div>
-                </div>
-            </div>
-            <div id="directory-list" class="space-y-4">
-                <p class="text-center text-gray-500 py-10">Loading directory...</p>
-            </div>
-        </div>
-    `;
+onAuthStateChanged(auth, async (user) => {
+    // DEBUG: Log the user object to see if a user is logged in
+    console.log("DEBUG: Authentication state changed. Current user:", user);
 
-    try {
-        const [tutorsSnapshot, studentsSnapshot] = await Promise.all([
-            getDocs(query(collection(db, "tutors"), orderBy("name"))),
-            getDocs(collection(db, "students"))
-        ]);
+    if (user) {
+        // User is signed in.
+        try {
+            // DEBUG: Log the user's email before fetching their document
+            console.log("DEBUG: User logged in. Fetching staff document for:", user.email);
+            const staffDocRef = doc(db, "staff", user.email);
+            const staffDoc = await getDoc(staffDocRef);
 
-        document.getElementById('tutor-count-badge').textContent = tutorsSnapshot.size;
-        document.getElementById('student-count-badge').textContent = studentsSnapshot.size;
+            if (staffDoc.exists()) {
+                const staffData = staffDoc.data();
+                // DEBUG: Log the fetched user data and role
+                console.log("DEBUG: Staff document found. User role:", staffData.role);
+                document.getElementById('welcome-message').textContent = `Welcome, ${staffData.name}`;
+                document.getElementById('user-role').textContent = `${capitalize(staffData.role)} Portal`;
 
-        const studentsByTutor = {};
-        studentsSnapshot.forEach(doc => {
-            const student = doc.data();
-            if (!studentsByTutor[student.tutorEmail]) {
-                studentsByTutor[student.tutorEmail] = [];
-            }
-            studentsByTutor[student.tutorEmail].push(student);
-        });
-
-        const directoryList = document.getElementById('directory-list');
-        if (!directoryList) return;
-
-        // Use a DocumentFragment for better performance with multiple appends
-        const fragment = document.createDocumentFragment();
-
-        tutorsSnapshot.docs.forEach(tutorDoc => {
-            const tutor = tutorDoc.data();
-            const assignedStudents = studentsByTutor[tutor.email] || [];
-            
-            // Create the main container div
-            const tutorDiv = document.createElement('div');
-            tutorDiv.className = "border rounded-lg shadow-sm";
-            
-            // Create the details element
-            const detailsElement = document.createElement('details');
-            
-            // Create the summary element
-            const summaryElement = document.createElement('summary');
-            summaryElement.className = "p-4 cursor-pointer flex justify-between items-center font-semibold text-lg";
-            summaryElement.innerHTML = `
-                ${tutor.name}
-                <span class="ml-2 text-sm font-normal text-gray-500">(${assignedStudents.length} students)</span>
-            `;
-            
-            // Create the inner div
-            const innerDiv = document.createElement('div');
-            innerDiv.className = "border-t p-2";
-            
-            // Create the table
-            const tableElement = document.createElement('table');
-            tableElement.className = "min-w-full text-sm";
-            tableElement.innerHTML = `
-                <thead class="bg-gray-50 text-left">
-                    <tr>
-                        <th class="px-4 py-2 font-medium">Student's Name</th>
-                        <th class="px-4 py-2 font-medium">Parent's Name</th>
-                        <th class="px-4 py-2 font-medium">Parent's Phone No.</th>
-                    </tr>
-                </thead>
-            `;
-
-            const tableBody = document.createElement('tbody');
-            tableBody.className = "bg-white divide-y divide-gray-200";
-
-            assignedStudents
-                .sort((a, b) => a.studentName.localeCompare(b.studentName))
-                .forEach(student => {
-                    const row = document.createElement('tr');
-                    row.className = "hover:bg-gray-50";
-
-                    const studentNameCell = document.createElement('td');
-                    studentNameCell.className = "px-4 py-2 font-medium";
-                    studentNameCell.textContent = student.studentName || 'N/A';
-                    
-                    const parentNameCell = document.createElement('td');
-                    parentNameCell.className = "px-4 py-2";
-                    parentNameCell.textContent = student.parentName || 'N/A';
-                    
-                    const parentPhoneCell = document.createElement('td');
-                    parentPhoneCell.className = "px-4 py-2";
-                    parentPhoneCell.textContent = student.parentPhone || 'N/A';
-                    
-                    row.appendChild(studentNameCell);
-                    row.appendChild(parentNameCell);
-                    row.appendChild(parentPhoneCell);
-                    tableBody.appendChild(row);
+                // Based on permissions, build the menu and render the initial panel
+                // This is where you should add console.log statements to check which panel is being rendered
+                // e.g. console.log("DEBUG: Rendering tutor management panel.");
+                
+                const navButtons = document.querySelectorAll('.nav-btn');
+                navButtons.forEach(btn => {
+                    btn.addEventListener('click', () => {
+                        // DEBUG: Log the clicked button's ID
+                        console.log("DEBUG: Navigation button clicked:", btn.id);
+                        // ... your existing logic here
+                    });
                 });
 
-            tableElement.appendChild(tableBody);
-            innerDiv.appendChild(tableElement);
-            detailsElement.appendChild(summaryElement);
-            detailsElement.appendChild(innerDiv);
-            tutorDiv.appendChild(detailsElement);
-            fragment.appendChild(tutorDiv);
-        });
-
-        directoryList.innerHTML = ''; // Clear the "Loading..." message
-        directoryList.appendChild(fragment);
-
-    } catch(error) {
-        console.error("Error in renderManagementTutorView:", error);
-        document.getElementById('directory-list').innerHTML = `<p class="text-center text-red-500 py-10">Failed to load data.</p>`;
+                // Trigger the initial rendering (example)
+                // This is the line that calls the first function to render a panel.
+                // It is likely what is failing.
+                // DEBUG: Log before trying to find and click the first nav button
+                console.log("DEBUG: Attempting to render initial panel.");
+                const firstNavBtn = document.querySelector('.nav-btn');
+                if (firstNavBtn) {
+                    firstNavBtn.click();
+                    // DEBUG: Confirm the click was triggered
+                    console.log("DEBUG: Initial panel render triggered.");
+                } else {
+                    // DEBUG: Log if the nav button was not found
+                    console.error("DEBUG: No navigation button found to trigger initial render.");
+                }
+            } else {
+                // DEBUG: Log if the staff document does not exist
+                console.error("DEBUG: Staff document not found for user:", user.email);
+                await signOut(auth); // Sign them out if their document is missing
+                window.location.href = "login.html";
+            }
+        } catch (error) {
+            // DEBUG: Catch any errors during the process
+            console.error("DEBUG: An error occurred during user authentication process:", error);
+            await signOut(auth);
+            window.location.href = "login.html";
+        }
+    } else {
+        // DEBUG: Log if no user is found
+        console.log("DEBUG: No user is signed in. Redirecting to login page.");
+        window.location.href = "login.html";
     }
-}
-
+});
