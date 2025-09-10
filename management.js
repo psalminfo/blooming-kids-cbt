@@ -1,5 +1,5 @@
 import { auth, db } from './firebaseConfig.js';
-import { collection, getDocs, doc, getDoc, where, query, orderBy, Timestamp, writeBatch } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
+import { collection, getDocs, doc, getDoc, where, query, orderBy, Timestamp, writeBatch, updateDoc } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
 import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-auth.js";
 import { onSnapshot } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
 
@@ -371,88 +371,67 @@ async function zipAndDownloadTutorReports(reports, tutorName, buttonElement) {
     }
 }
 
-
 async function renderSummerBreakPanel(container) {
     container.innerHTML = `
         <div class="bg-white p-6 rounded-lg shadow-md">
-            <div class="flex flex-col sm:flex-row justify-between items-center mb-4">
-                <h2 class="text-2xl font-bold text-green-700">Students on Summer Break</h2>
-                <button id="endBreakBtn" class="mt-4 sm:mt-0 bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700 transition-colors">End Break & Reset Accounts</button>
+            <h2 class="text-2xl font-bold text-green-700">Students on Summer Break</h2>
+            <p id="break-status-message" class="text-center font-semibold mb-4 hidden"></p>
+            <div id="break-students-list" class="space-y-4">
+                <p class="text-center">Loading...</p>
             </div>
-            <div id="break-status-message" class="text-center font-semibold mb-4 hidden"></div>
-            <div id="break-students-list" class="space-y-4"><p class="text-center">Loading...</p></div>
         </div>
     `;
 
-    const endBreakBtn = document.getElementById('endBreakBtn');
     const statusMessageDiv = document.getElementById('break-status-message');
-
-    if (endBreakBtn) {
-        endBreakBtn.addEventListener('click', async () => {
-            statusMessageDiv.textContent = 'Are you sure you want to end the summer break for ALL students? This cannot be undone.';
-            statusMessageDiv.className = 'text-center font-semibold mb-4 text-red-600';
-            
-            const confirmBtn = document.createElement('button');
-            confirmBtn.textContent = 'Yes, End Break';
-            confirmBtn.className = 'bg-red-600 text-white px-4 py-2 rounded ml-2 hover:bg-red-700 transition-colors';
-            
-            const cancelBtn = document.createElement('button');
-            cancelBtn.textContent = 'Cancel';
-            cancelBtn.className = 'bg-gray-400 text-white px-4 py-2 rounded ml-2 hover:bg-gray-500 transition-colors';
-            
-            statusMessageDiv.appendChild(confirmBtn);
-            statusMessageDiv.appendChild(cancelBtn);
-
-            confirmBtn.addEventListener('click', async () => {
-                try {
-                    statusMessageDiv.innerHTML = 'Ending break...';
-                    confirmBtn.disabled = true;
-                    cancelBtn.disabled = true;
-
-                    const studentsRef = collection(db, "students");
-                    const studentsOnBreakQuery = query(studentsRef, where("summerBreak", "==", true));
-                    const snapshot = await getDocs(studentsOnBreakQuery);
-
-                    if (snapshot.empty) {
-                        statusMessageDiv.textContent = "No students are currently on break.";
-                        statusMessageDiv.className = 'text-center font-semibold mb-4 text-green-600';
-                    } else {
-                        const batch = writeBatch(db);
-                        snapshot.docs.forEach(doc => {
-                            batch.update(doc.ref, { summerBreak: false, lastBreakEnd: Timestamp.now() });
-                        });
-                        await batch.commit();
-                        statusMessageDiv.textContent = "Summer break has been ended for all students.";
-                        statusMessageDiv.className = 'text-center font-semibold mb-4 text-green-600';
-                    }
-                } catch (error) {
-                    console.error("Error ending summer break:", error);
-                    statusMessageDiv.textContent = "Failed to end summer break. Check the console for details.";
-                    statusMessageDiv.className = 'text-center font-semibold mb-4 text-red-600';
-                } finally {
-                    confirmBtn.remove();
-                    cancelBtn.remove();
-                }
-            });
-
-            cancelBtn.addEventListener('click', () => {
-                statusMessageDiv.innerHTML = '';
-                statusMessageDiv.classList.add('hidden');
-            });
-        });
-    }
+    const listContainer = document.getElementById('break-students-list');
 
     onSnapshot(query(collection(db, "students"), where("summerBreak", "==", true)), (snapshot) => {
-        const listContainer = document.getElementById('break-students-list');
         if (!listContainer) return;
+        
         if (snapshot.empty) {
             listContainer.innerHTML = `<p class="text-center text-gray-500">No students are on break.</p>`;
             return;
         }
+
+        const canEndBreak = window.userData.permissions?.actions?.canEndBreak;
+        
         listContainer.innerHTML = snapshot.docs.map(doc => {
             const student = doc.data();
-            return `<div class="border p-4 rounded-lg flex justify-between items-center bg-gray-50"><div><p><strong>Student:</strong> ${student.studentName}</p><p><strong>Tutor:</strong> ${student.tutorEmail}</p></div><span class="text-yellow-600 font-semibold px-3 py-1 bg-yellow-100 rounded-full text-sm">On Break</span></div>`;
+            const studentId = doc.id;
+            const endBreakButton = canEndBreak 
+                ? `<button class="end-break-btn bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700 transition-colors" data-student-id="${studentId}">End Break</button>`
+                : '';
+
+            return `
+                <div class="border p-4 rounded-lg flex justify-between items-center bg-gray-50">
+                    <div>
+                        <p><strong>Student:</strong> ${student.studentName}</p>
+                        <p><strong>Tutor:</strong> ${student.tutorEmail}</p>
+                    </div>
+                    ${endBreakButton}
+                </div>
+            `;
         }).join('');
+
+        // Attach event listeners to the new buttons
+        if (canEndBreak) {
+            document.querySelectorAll('.end-break-btn').forEach(button => {
+                button.addEventListener('click', async (e) => {
+                    const studentId = e.target.dataset.studentId;
+                    try {
+                        await updateDoc(doc(db, "students", studentId), { summerBreak: false, lastBreakEnd: Timestamp.now() });
+                        statusMessageDiv.textContent = `Break ended for ${e.target.closest('div').querySelector('p').textContent.replace('Student: ', '')}.`;
+                        statusMessageDiv.classList.remove('hidden');
+                        statusMessageDiv.className = 'text-center font-semibold mb-4 text-green-600';
+                    } catch (error) {
+                        console.error("Error ending summer break:", error);
+                        statusMessageDiv.textContent = "Failed to end summer break. Check the console for details.";
+                        statusMessageDiv.className = 'text-center font-semibold mb-4 text-red-600';
+                        statusMessageDiv.classList.remove('hidden');
+                    }
+                });
+            });
+        }
     });
 }
 
@@ -525,7 +504,7 @@ onAuthStateChanged(auth, async (user) => {
                 if (logoutBtn) logoutBtn.addEventListener('click', () => signOut(auth).then(() => window.location.href = "management-auth.html"));
             }
         } else {
-            if (mainContent) mainContent.innerHTML = `<p class="text-center mt-12 text-red-600">Account not registered in staff directory.</p>`;
+            if (mainContent) mainContent.innerHTML = `<p class="text-center mt-12 text-red-600\">Account not registered in staff directory.</p>`;
             if (logoutBtn) logoutBtn.classList.add('hidden');
         }
     } else {
