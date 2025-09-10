@@ -493,78 +493,47 @@ onAuthStateChanged(auth, async (user) => {
     }
 
     if (user) {
+        // IMPORTANT: Verify this collection name. Your working file uses "staff", 
+        // your previous file used "management". Use the one that is correct for your database.
         const staffDocRef = doc(db, 'management', user.email);
-        
+
+        // This single listener handles all scenarios: approved, pending, or not found.
         onSnapshot(staffDocRef, (docSnap) => {
             if (docSnap.exists()) {
                 const staffData = docSnap.data();
-                
+
+                // Check if the user is approved
                 if (staffData?.status === 'approved') {
-                    // Logic for an approved account
+                    // This logic prevents re-rendering the entire nav if permissions haven't changed.
                     if (window.userData && JSON.stringify(window.userData.permissions) === JSON.stringify(staffData.permissions)) {
-                        return; // No change in permissions, no re-render needed
+                        return; 
                     }
                     window.userData = staffData;
-                    
-                    const welcomeMessage = document.getElementById('welcome-message');
-                    const userRole = document.getElementById('user-role');
-                    if (welcomeMessage) welcomeMessage.textContent = `Hello, ${staffData.name}`;
-                    if (userRole) userRole.textContent = staffData.role;
-                    
-                    const navContainer = document.querySelector('nav');
-                    if (navContainer) {
-                        navContainer.innerHTML = '';
-                        let firstVisibleTab = null;
-                        const allNavItems = {
-                            navTutorManagement: { fn: renderManagementTutorView, requiredPermission: 'canManageTutorsAndStudents' },
-                            navPayAdvice: { fn: renderPayAdvicePanel, requiredPermission: 'canAccessPayAdvice' },
-                            navStudentApprovals: { fn: renderPendingApprovalsPanel, requiredPermission: 'canApproveStudents' },
-                            navTutorReports: { fn: renderTutorReportsPanel, requiredPermission: 'canAccessTutorReports' },
-                            navSummerBreak: { fn: renderSummerBreakPanel, requiredPermission: 'canManageSummerBreak' }
-                        };
-        
-                        Object.entries(allNavItems).forEach(([id, item]) => {
-                            if (staffData.permissions?.tabs?.[item.requiredPermission]) {
-                                const button = document.createElement('button');
-                                button.id = id;
-                                button.className = 'nav-btn text-lg font-bold text-gray-500 hover:text-white';
-                                button.textContent = document.getElementById(id)?.textContent || capitalize(id.replace('nav', ''));
-                                navContainer.appendChild(button);
-        
-                                if (!firstVisibleTab) {
-                                    firstVisibleTab = id;
-                                }
-                                
-                                button.addEventListener('click', () => {
-                                    document.querySelectorAll('.nav-btn').forEach(btn => btn.classList.remove('active'));
-                                    button.classList.add('active');
-                                    item.fn(mainContent);
-                                });
-                            }
-                        });
-        
-                        if (firstVisibleTab) {
-                            document.getElementById(firstVisibleTab).click();
-                        } else {
-                            if (mainContent) mainContent.innerHTML = `<p class="text-center">You have no permissions assigned.</p>`;
-                        }
-                    }
+                    // Initialize or re-initialize the panel with current data
+                    initializeManagementPanel(staffData); 
                 } else {
-                    // Logic for an account that is not approved (pending)
+                    // Logic for a pending account
                     if (document.getElementById('welcome-message')) document.getElementById('welcome-message').textContent = `Hello, ${staffData.name}`;
                     if (document.getElementById('user-role')) document.getElementById('user-role').textContent = 'Status: Pending Approval';
-                    if (mainContent) mainContent.innerHTML = `<p class="text-center mt-12 text-yellow-600 font-semibold">Your account is awaiting approval.</p>`;
+                    mainContent.innerHTML = `<p class="text-center mt-12 text-yellow-600 font-semibold">Your account is awaiting approval.</p>`;
+                    document.querySelector('nav').innerHTML = ''; // Clear nav buttons
                 }
             } else {
-                // Logic for a user who is not a registered staff member
-                if (mainContent) mainContent.innerHTML = `<p class="text-center mt-12 text-red-600">Account not registered in staff directory.</p>`;
-                if (logoutBtn) logoutBtn.classList.add('hidden');
+                // Logic for a user who is not in the staff directory
+                mainContent.innerHTML = `<p class="text-center mt-12 text-red-600">Account not registered in staff directory.</p>`;
+                document.querySelector('nav').innerHTML = ''; // Clear nav buttons
+                if (document.getElementById('welcome-message')) document.getElementById('welcome-message').textContent = 'Access Denied';
+                if (document.getElementById('user-role')) document.getElementById('user-role').textContent = '';
             }
         });
 
-        if(logoutBtn) logoutBtn.addEventListener('click', () => signOut(auth).then(() => window.location.href = "management-auth.html"));
+        logoutBtn.addEventListener('click', () => signOut(auth).then(() => window.location.href = "management-auth.html"));
 
     } else {
+        // If no user is logged in, redirect to the auth page.
         window.location.href = "management-auth.html";
     }
 });
+
+// IMPORTANT: Make sure your `initializeManagementPanel` function from the non-working file is
+// also present, as it is called from the code above.
