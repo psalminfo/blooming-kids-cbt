@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>Management Portal - Blooming Kids House</title>
+    <link rel="icon" href="favicon.ico" />
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.6.0/jszip.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+    <style id="new-styles">
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(120deg, #d1fae5, #ecfdf5, #d1fae5);
+            background-size: 400% 400%;
+            animation: aurora 15s ease infinite;
+        }
+        @keyframes aurora {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+        .nav-btn.active {
+            background-color: #065f46;
+            color: white;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        }
+        .nav-btn {
+            border-radius: 9999px;
+            padding: 0.75rem 1.5rem;
+            transition: all 0.3s ease;
+            box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
+        }
+        .nav-btn:hover {
+            background-color: #065f46;
+            color: white;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        }
+        .panel {
+            background-color: white;
+            padding: 1.5rem;
+            border-radius: 1rem;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+        }
+        .count-badge {
+            background-color: #d1fae5;
+            padding: 1rem;
+            border-radius: 0.75rem;
+            text-align: center;
+            box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
+        }
+    </style>
+</head>
+<body class="bg-white min-h-screen">
+    <div class="max-w-7xl mx-auto p-6 panel my-8">
+        <div class="flex flex-col sm:flex-row justify-between items-center mb-6">
+            <div>
+                <h1 id="welcome-message" class="text-3xl font-bold text-green-800">Welcome</h1>
+                <p id="user-role" class="text-md text-gray-600 font-semibold"></p>
+            </div>
+            <button id="logoutBtn" class="mt-4 sm:mt-0 bg-yellow-400 text-white px-6 py-3 rounded-full hover:bg-yellow-500 shadow-md">Logout</button>
+        </div>
+        <nav class="flex flex-col sm:flex-row space-y-4 sm:space-y-0 sm:space-x-4 mb-6">
+            <button id="navTutorManagement" class="nav-btn text-lg font-bold text-gray-500 hover:text-white">Tutor & Student List</button>
+            <button id="navPayAdvice" class="nav-btn text-lg font-bold text-gray-500 hover:text-white">Pay Advice</button>
+            <button id="navTutorReports" class="nav-btn text-lg font-bold text-gray-500 hover:text-white">Tutor Reports</button>
+            <button id="navSummerBreak" class="nav-btn text-lg font-bold text-gray-500 hover:text-white">Summer Break</button>
+        </nav>
+        <div id="main-content">
+             <p class="text-center text-gray-600 mt-12">Checking user permissions...</p>
+        </div>
+    </div>
+    <script type="module" src="management.js"></script>
+</body>
+</html>
