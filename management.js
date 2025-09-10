@@ -486,75 +486,81 @@ function initializeManagementPanel(staffData) {
 onAuthStateChanged(auth, async (user) => {
     const mainContent = document.getElementById('main-content');
     const logoutBtn = document.getElementById('logoutBtn');
-    if (!mainContent || !logoutBtn) return;
+    
+    if (!mainContent || !logoutBtn) {
+        console.error("Critical DOM elements not found.");
+        return;
+    }
 
     if (user) {
         const staffDocRef = doc(db, 'management', user.email);
-        const unsubscribe = onSnapshot(staffDocRef, async (docSnap) => {
-            const staffData = docSnap.data();
-
-            if (docSnap.exists() && staffData?.status === 'approved') {
-                if (window.userData && JSON.stringify(window.userData.permissions) === JSON.stringify(staffData.permissions)) {
-                    return; // No change in permissions, no re-render needed
-                }
-                window.userData = staffData;
+        
+        onSnapshot(staffDocRef, (docSnap) => {
+            if (docSnap.exists()) {
+                const staffData = docSnap.data();
                 
-                const welcomeMessage = document.getElementById('welcome-message');
-                const userRole = document.getElementById('user-role');
-                if (welcomeMessage) welcomeMessage.textContent = `Hello, ${staffData.name}`;
-                if (userRole) userRole.textContent = staffData.role;
-
-                const navContainer = document.querySelector('nav');
-                navContainer.innerHTML = '';
-                
-                let firstVisibleTab = null;
-
-                const allNavItems = {
-                    navTutorManagement: { fn: renderManagementTutorView, requiredPermission: 'canManageTutorsAndStudents' },
-                    navPayAdvice: { fn: renderPayAdvicePanel, requiredPermission: 'canAccessPayAdvice' },
-                    navStudentApprovals: { fn: renderPendingApprovalsPanel, requiredPermission: 'canApproveStudents' },
-                    navTutorReports: { fn: renderTutorReportsPanel, requiredPermission: 'canAccessTutorReports' },
-                    navSummerBreak: { fn: renderSummerBreakPanel, requiredPermission: 'canManageSummerBreak' }
-                };
-
-                Object.entries(allNavItems).forEach(([id, item]) => {
-                    if (staffData.permissions?.tabs?.[item.requiredPermission]) {
-                        const button = document.createElement('button');
-                        button.id = id;
-                        button.className = 'nav-btn text-lg font-bold text-gray-500 hover:text-white';
-                        button.textContent = document.getElementById(id)?.textContent || capitalize(id.replace('nav', ''));
-                        navContainer.appendChild(button);
-
-                        if (!firstVisibleTab) {
-                            firstVisibleTab = id;
-                        }
-                        
-                        button.addEventListener('click', () => {
-                            document.querySelectorAll('.nav-btn').forEach(btn => btn.classList.remove('active'));
-                            button.classList.add('active');
-                            item.fn(mainContent);
-                        });
+                if (staffData?.status === 'approved') {
+                    // Logic for an approved account
+                    if (window.userData && JSON.stringify(window.userData.permissions) === JSON.stringify(staffData.permissions)) {
+                        return; // No change in permissions, no re-render needed
                     }
-                });
-
-                if (firstVisibleTab) {
-                    document.getElementById(firstVisibleTab).click();
+                    window.userData = staffData;
+                    
+                    const welcomeMessage = document.getElementById('welcome-message');
+                    const userRole = document.getElementById('user-role');
+                    if (welcomeMessage) welcomeMessage.textContent = `Hello, ${staffData.name}`;
+                    if (userRole) userRole.textContent = staffData.role;
+                    
+                    const navContainer = document.querySelector('nav');
+                    if (navContainer) {
+                        navContainer.innerHTML = '';
+                        let firstVisibleTab = null;
+                        const allNavItems = {
+                            navTutorManagement: { fn: renderManagementTutorView, requiredPermission: 'canManageTutorsAndStudents' },
+                            navPayAdvice: { fn: renderPayAdvicePanel, requiredPermission: 'canAccessPayAdvice' },
+                            navStudentApprovals: { fn: renderPendingApprovalsPanel, requiredPermission: 'canApproveStudents' },
+                            navTutorReports: { fn: renderTutorReportsPanel, requiredPermission: 'canAccessTutorReports' },
+                            navSummerBreak: { fn: renderSummerBreakPanel, requiredPermission: 'canManageSummerBreak' }
+                        };
+        
+                        Object.entries(allNavItems).forEach(([id, item]) => {
+                            if (staffData.permissions?.tabs?.[item.requiredPermission]) {
+                                const button = document.createElement('button');
+                                button.id = id;
+                                button.className = 'nav-btn text-lg font-bold text-gray-500 hover:text-white';
+                                button.textContent = document.getElementById(id)?.textContent || capitalize(id.replace('nav', ''));
+                                navContainer.appendChild(button);
+        
+                                if (!firstVisibleTab) {
+                                    firstVisibleTab = id;
+                                }
+                                
+                                button.addEventListener('click', () => {
+                                    document.querySelectorAll('.nav-btn').forEach(btn => btn.classList.remove('active'));
+                                    button.classList.add('active');
+                                    item.fn(mainContent);
+                                });
+                            }
+                        });
+        
+                        if (firstVisibleTab) {
+                            document.getElementById(firstVisibleTab).click();
+                        } else {
+                            if (mainContent) mainContent.innerHTML = `<p class="text-center">You have no permissions assigned.</p>`;
+                        }
+                    }
                 } else {
-                    if (mainContent) mainContent.innerHTML = `<p class="text-center">You have no permissions assigned.</p>`;
+                    // Logic for an account that is not approved (pending)
+                    if (document.getElementById('welcome-message')) document.getElementById('welcome-message').textContent = `Hello, ${staffData.name}`;
+                    if (document.getElementById('user-role')) document.getElementById('user-role').textContent = 'Status: Pending Approval';
+                    if (mainContent) mainContent.innerHTML = `<p class="text-center mt-12 text-yellow-600 font-semibold">Your account is awaiting approval.</p>`;
                 }
-
             } else {
-                if (document.getElementById('welcome-message')) document.getElementById('welcome-message').textContent = `Hello, ${staffData.name}`;
-                if (document.getElementById('user-role')) document.getElementById('user-role').textContent = 'Status: Pending Approval';
-                if (mainContent) mainContent.innerHTML = `<p class="text-center mt-12 text-yellow-600 font-semibold">Your account is awaiting approval.</p>`;
+                // Logic for a user who is not a registered staff member
+                if (mainContent) mainContent.innerHTML = `<p class="text-center mt-12 text-red-600">Account not registered in staff directory.</p>`;
+                if (logoutBtn) logoutBtn.classList.add('hidden');
             }
         });
-
-        const staffDocSnap = await getDoc(staffDocRef);
-        if (!staffDocSnap.exists()) {
-            if (mainContent) mainContent.innerHTML = `<p class="text-center mt-12 text-red-600">Account not registered in staff directory.</p>`;
-            if (logoutBtn) logoutBtn.classList.add('hidden');
-        }
 
         if(logoutBtn) logoutBtn.addEventListener('click', () => signOut(auth).then(() => window.location.href = "management-auth.html"));
 
