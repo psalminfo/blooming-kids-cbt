@@ -23,6 +23,12 @@ async function renderManagementTutorView(container) {
         document.getElementById('tutor-count-badge').textContent = tutorsSnapshot.size;
         document.getElementById('student-count-badge').textContent = studentsSnapshot.size;
 
+        const studentsByTutor = {};
+        studentsSnapshot.forEach(doc => {
+            const student = doc.data();
+            if (!studentsByTutor[student.tutorEmail]) {
+                studentsByTutor[student.tutorEmail] = [];
+            }
             studentsByTutor[student.tutorEmail].push(student);
         });
 
