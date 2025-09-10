@@ -78,6 +78,7 @@ async function renderManagementTutorView(container) {
                         <td class="px-4 py-2 font-medium">${student.studentName}</td>
                         <td class="px-4 py-2">${student.grade}</td>
                         <td class="px-4 py-2">${student.days}</td>
+                        <td class="px-4 py-2">${student.subject || 'N/A'}</td>
                         <td class="px-4 py-2">${student.parentName || 'N/A'}</td>
                         <td class="px-4 py-2">${student.parentPhone || 'N/A'}</td>
                     </tr>
@@ -96,6 +97,7 @@ async function renderManagementTutorView(container) {
                                     <th class="px-4 py-2 font-medium">Student Name</th>
                                     <th class="px-4 py-2 font-medium">Grade</th>
                                     <th class="px-4 py-2 font-medium">Days/Week</th>
+                                    <th class="px-4 py-2 font-medium">Subject</th>
                                     <th class="px-4 py-2 font-medium">Parent's Name</th>
                                     <th class="px-4 py-2 font-medium">Parent's Phone</th>
                                 </tr></thead>
@@ -375,7 +377,7 @@ async function renderSummerBreakPanel(container) {
         <div class="bg-white p-6 rounded-lg shadow-md">
             <div class="flex flex-col sm:flex-row justify-between items-center mb-4">
                 <h2 class="text-2xl font-bold text-green-700">Students on Summer Break</h2>
-                <button id="endBreakBtn" class="mt-4 sm:mt-0 bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700 transition-colors hidden">End Break & Reset Accounts</button>
+                <button id="endBreakBtn" class="mt-4 sm:mt-0 bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700 transition-colors">End Break & Reset Accounts</button>
             </div>
             <div id="break-status-message" class="text-center font-semibold mb-4 hidden"></div>
             <div id="break-students-list" class="space-y-4"><p class="text-center">Loading...</p></div>
@@ -385,8 +387,7 @@ async function renderSummerBreakPanel(container) {
     const endBreakBtn = document.getElementById('endBreakBtn');
     const statusMessageDiv = document.getElementById('break-status-message');
 
-    if (endBreakBtn && window.userData.permissions?.actions?.canEndBreak) {
-        endBreakBtn.classList.remove('hidden');
+    if (endBreakBtn) {
         endBreakBtn.addEventListener('click', async () => {
             statusMessageDiv.textContent = 'Are you sure you want to end the summer break for ALL students? This cannot be undone.';
             statusMessageDiv.className = 'text-center font-semibold mb-4 text-red-600';
