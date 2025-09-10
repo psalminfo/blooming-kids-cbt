@@ -78,7 +78,7 @@ async function renderManagementTutorView(container) {
         if (!directoryList) return;
 
         directoryList.innerHTML = tutorsSnapshot.docs.map(tutorDoc => {
-            const tutor = tutor.data();
+            const tutor = tutorDoc.data(); // This is the corrected line
             const assignedStudents = studentsByTutor[tutor.email] || [];
             
             const studentsTableRows = assignedStudents
