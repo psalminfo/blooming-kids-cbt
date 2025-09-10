@@ -1,9 +1,7 @@
 import { auth, db } from './firebaseConfig.js';
-import { collection, getDocs, doc, getDoc, where, query, orderBy, Timestamp, writeBatch, updateDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
+import { collection, getDocs, doc, getDoc, where, query, orderBy, Timestamp, writeBatch, updateDoc } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
 import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-auth.js";
 import { onSnapshot } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
-import { JSZip } from "https://cdn.jsdelivr.net/npm/jszip@3.7.1/dist/jszip.min.js";
-import { saveAs } from "https://cdn.jsdelivr.net/npm/file-saver@2.0.5/dist/FileSaver.min.js";
 
 function capitalize(str) {
     if (!str) return '';
@@ -76,7 +74,6 @@ async function renderManagementTutorView(container) {
             const studentsTableRows = assignedStudents
                 .sort((a, b) => a.studentName.localeCompare(b.studentName))
                 .map(student => {
-                    [cite_start]// NEW: Display subjects, handling the new 'subjects' field [cite: 5]
                     const subjects = student.subjects && Array.isArray(student.subjects) ? student.subjects.join(', ') : 'N/A';
                     return `
                         <tr class="hover:bg-gray-50">
@@ -445,168 +442,6 @@ async function renderSummerBreakPanel(container) {
     });
 }
 
-[cite_start]// NEW FUNCTION: Renders the pending approvals panel [cite: 1]
-async function renderPendingApprovalsPanel(container) {
-    container.innerHTML = `
-        <div class="bg-white p-6 rounded-lg shadow-md">
-            <h2 class="text-2xl font-bold text-green-700">Pending Student Approvals</h2>
-            <div id="approval-status-message" class="text-center font-semibold mb-4 hidden"></div>
-            <div id="pending-students-list" class="space-y-4">
-                <p class="text-center">Loading...</p>
-            </div>
-        </div>
-    `;
-    loadPendingStudents();
-}
-
-[cite_start]// NEW FUNCTION: Loads pending students and sets up listeners [cite: 1]
-async function loadPendingStudents() {
-    const listContainer = document.getElementById('pending-students-list');
-    const statusMessageDiv = document.getElementById('approval-status-message');
-
-    onSnapshot(query(collection(db, "students"), where("status", "==", "pending")), (snapshot) => {
-        if (!listContainer) return;
-        
-        if (snapshot.empty) {
-            listContainer.innerHTML = `<p class="text-center text-gray-500">No students are awaiting approval.</p>`;
-            return;
-        }
-
-        listContainer.innerHTML = snapshot.docs.map(doc => {
-            const student = doc.data();
-            const studentId = doc.id;
-            return `
-                <div id="student-${studentId}" class="border p-4 rounded-lg bg-gray-50">
-                    <div class="flex justify-between items-start mb-2">
-                        <div>
-                            <p><strong>Name:</strong> <span class="student-name">${student.studentName}</span></p>
-                            <p><strong>Grade:</strong> <span class="student-grade">${student.grade}</span></p>
-                            <p><strong>Days:</strong> <span class="student-days">${student.days}</span></p>
-                            <p><strong>Fee (₦):</strong> <span class="student-fee">${student.studentFee || 'N/A'}</span></p>
-                            <p><strong>Subjects:</strong> <span class="student-subjects">${student.subjects?.join(', ') || 'N/A'}</span></p>
-                        </div>
-                        <div class="flex space-x-2">
-                            <button class="edit-btn bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700" data-student-id="${studentId}">Edit</button>
-                            <button class="approve-btn bg-green-600 text-white px-3 py-1 rounded hover:bg-green-700" data-student-id="${studentId}">Approve</button>
-                            <button class="reject-btn bg-red-600 text-white px-3 py-1 rounded hover:bg-red-700" data-student-id="${studentId}">Reject</button>
-                        </div>
-                    </div>
-                </div>
-            `;
-        }).join('');
-
-        document.querySelectorAll('.approve-btn').forEach(button => {
-            button.addEventListener('click', (e) => approveStudent(e.target.dataset.studentId, statusMessageDiv));
-        });
-
-        document.querySelectorAll('.reject-btn').forEach(button => {
-            button.addEventListener('click', (e) => rejectStudent(e.target.dataset.studentId, statusMessageDiv));
-        });
-
-        document.querySelectorAll('.edit-btn').forEach(button => {
-            button.addEventListener('click', (e) => startEdit(e.target.dataset.studentId, statusMessageDiv));
-        });
-    });
-}
-
-[cite_start]// NEW FUNCTION: Approves a student [cite: 2]
-async function approveStudent(studentId, statusMessageDiv) {
-    try {
-        await updateDoc(doc(db, "students", studentId), { status: "approved", approvedAt: Timestamp.now() });
-        statusMessageDiv.textContent = `Student approved successfully!`;
-        statusMessageDiv.className = 'text-center font-semibold mb-4 text-green-600';
-        statusMessageDiv.classList.remove('hidden');
-    } catch (error) {
-        console.error("Error approving student:", error);
-        statusMessageDiv.textContent = "Failed to approve student. Check console for details.";
-        statusMessageDiv.className = 'text-center font-semibold mb-4 text-red-600';
-        statusMessageDiv.classList.remove('hidden');
-    }
-}
-
-[cite_start]// NEW FUNCTION: Rejects (deletes) a student [cite: 2, 4]
-async function rejectStudent(studentId, statusMessageDiv) {
-    if (!confirm("Are you sure you want to reject and permanently delete this student record? This action cannot be undone.")) {
-        return;
-    }
-    try {
-        await deleteDoc(doc(db, "students", studentId));
-        statusMessageDiv.textContent = `Student record deleted successfully!`;
-        statusMessageDiv.className = 'text-center font-semibold mb-4 text-green-600';
-        statusMessageDiv.classList.remove('hidden');
-    } catch (error) {
-        console.error("Error rejecting student:", error);
-        statusMessageDiv.textContent = "Failed to delete student record. Check console for details.";
-        statusMessageDiv.className = 'text-center font-semibold mb-4 text-red-600';
-        statusMessageDiv.classList.remove('hidden');
-    }
-}
-
-[cite_start]// NEW FUNCTION: Starts the editing process for a student [cite: 3]
-async function startEdit(studentId, statusMessageDiv) {
-    try {
-        const studentDoc = await getDoc(doc(db, "students", studentId));
-        if (!studentDoc.exists()) {
-            throw new Error("Student not found.");
-        }
-        const student = studentDoc.data();
-        
-        const container = document.getElementById(`student-${studentId}`);
-        container.innerHTML = `
-            <div class="bg-white p-4 rounded-lg shadow-inner">
-                <div class="space-y-2">
-                    <label class="block">Name: <input type="text" id="edit-name-${studentId}" value="${student.studentName}" class="w-full border rounded p-1"></label>
-                    <label class="block">Grade: <input type="text" id="edit-grade-${studentId}" value="${student.grade}" class="w-full border rounded p-1"></label>
-                    <label class="block">Days/Week: <input type="text" id="edit-days-${studentId}" value="${student.days}" class="w-full border rounded p-1"></label>
-                    <label class="block">Fee (₦): <input type="number" id="edit-fee-${studentId}" value="${student.studentFee || ''}" class="w-full border rounded p-1"></label>
-                </div>
-                <div class="flex justify-end space-x-2 mt-4">
-                    <button class="save-edit-btn bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700" data-student-id="${studentId}">Save</button>
-                    <button class="cancel-edit-btn bg-gray-400 text-white px-4 py-2 rounded hover:bg-gray-500" data-student-id="${studentId}">Cancel</button>
-                </div>
-            </div>
-        `;
-
-        document.querySelector(`.save-edit-btn[data-student-id="${studentId}"]`).addEventListener('click', () => saveEdit(studentId, statusMessageDiv));
-        document.querySelector(`.cancel-edit-btn[data-student-id="${studentId}"]`).addEventListener('click', () => {
-            loadPendingStudents(); // Re-render the list to cancel the edit view
-            statusMessageDiv.classList.add('hidden');
-        });
-        
-    } catch (error) {
-        console.error("Error starting edit:", error);
-        statusMessageDiv.textContent = `Failed to start edit: ${error.message}`;
-        statusMessageDiv.className = 'text-center font-semibold mb-4 text-red-600';
-        statusMessageDiv.classList.remove('hidden');
-    }
-}
-
-[cite_start]// NEW FUNCTION: Saves the edited student information [cite: 3]
-async function saveEdit(studentId, statusMessageDiv) {
-    const name = document.getElementById(`edit-name-${studentId}`).value;
-    const grade = document.getElementById(`edit-grade-${studentId}`).value;
-    const days = document.getElementById(`edit-days-${studentId}`).value;
-    const fee = parseFloat(document.getElementById(`edit-fee-${studentId}`).value);
-
-    try {
-        await updateDoc(doc(db, "students", studentId), {
-            studentName: name,
-            grade: grade,
-            days: days,
-            studentFee: isNaN(fee) ? null : fee,
-        });
-        statusMessageDiv.textContent = `Student information updated successfully!`;
-        statusMessageDiv.className = 'text-center font-semibold mb-4 text-green-600';
-        statusMessageDiv.classList.remove('hidden');
-        loadPendingStudents(); // Re-render to show updated info and restore action buttons
-    } catch (error) {
-        console.error("Error saving edit:", error);
-        statusMessageDiv.textContent = "Failed to save changes. Check console for details.";
-        statusMessageDiv.className = 'text-center font-semibold mb-4 text-red-600';
-        statusMessageDiv.classList.remove('hidden');
-    }
-}
-
 
 // ##################################
 // # AUTHENTICATION & INITIALIZATION
@@ -630,9 +465,7 @@ onAuthStateChanged(auth, async (user) => {
                     navTutorManagement: { fn: renderManagementTutorView, perm: 'viewTutorManagement' },
                     navPayAdvice: { fn: renderPayAdvicePanel, perm: 'viewPayAdvice' },
                     navTutorReports: { fn: renderTutorReportsPanel, perm: 'viewTutorReports' },
-                    navSummerBreak: { fn: renderSummerBreakPanel, perm: 'viewSummerBreak' },
-                    [cite_start]// NEW: Add the pending approvals tab item [cite: 1]
-                    navPendingApprovals: { fn: renderPendingApprovalsPanel, perm: 'canApproveStudents' }
+                    navSummerBreak: { fn: renderSummerBreakPanel, perm: 'viewSummerBreak' }
                 };
 
                 const navContainer = document.querySelector('nav');
@@ -646,34 +479,12 @@ onAuthStateChanged(auth, async (user) => {
                     let firstVisibleTab = null;
 
                     Object.entries(allNavItems).forEach(([id, item]) => {
-                        if (window.userData.permissions?.tabs?.[item.perm] || window.userData.permissions?.actions?.[item.perm]) {
+                        if (window.userData.permissions?.tabs?.[item.perm]) {
                             if (!firstVisibleTab) firstVisibleTab = id;
                             const button = document.createElement('button');
                             button.id = id;
                             button.className = 'nav-btn text-lg font-semibold text-gray-500 hover:text-green-700';
-                            
-                            // NEW: Set button text for the new tab
-                            switch(id) {
-                                case 'navPendingApprovals':
-                                    button.textContent = 'Pending Approvals';
-                                    break;
-                                case 'navTutorManagement':
-                                    button.textContent = 'Tutor Management';
-                                    break;
-                                case 'navPayAdvice':
-                                    button.textContent = 'Pay Advice';
-                                    break;
-                                case 'navTutorReports':
-                                    button.textContent = 'Tutor Reports';
-                                    break;
-                                case 'navSummerBreak':
-                                    button.textContent = 'Summer Break';
-                                    break;
-                                default:
-                                    button.textContent = originalNavButtons[id];
-                                    break;
-                            }
-                            
+                            button.textContent = originalNavButtons[id];
                             navContainer.appendChild(button);
                             
                             button.addEventListener('click', () => {
