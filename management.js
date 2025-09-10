@@ -3,11 +3,23 @@ import { collection, getDocs, doc, getDoc, where, query, orderBy, Timestamp, wri
 import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-auth.js";
 import { onSnapshot } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
 
-// ... [YOUR EXISTING CODE ABOVE REMAINS UNCHANGED] ...
+/* ---------------------------
+   HELPER FUNCTIONS
+---------------------------- */
+function capitalize(str) {
+    if (typeof str !== 'string') return '';
+    return str.charAt(0).toUpperCase() + str.slice(1);
+}
 
-// ##################################
-// # NEW: Pending Approvals Panel
-// ##################################
+/* ---------------------------
+   EXISTING FUNCTIONS
+   (Your original code remains here)
+---------------------------- */
+// ... your original management.js logic above remains unchanged ...
+
+/* ---------------------------
+   NEW: Pending Approvals Panel
+---------------------------- */
 async function renderPendingApprovalsPanel(container) {
     container.innerHTML = `
         <div class="bg-white p-6 rounded-lg shadow-md">
@@ -51,9 +63,9 @@ async function renderPendingApprovalsPanel(container) {
     });
 }
 
-// ##################################
-// # NEW: Event Listeners for Pending Approvals
-// ##################################
+/* ---------------------------
+   NEW: Event Listeners for Pending Approvals
+---------------------------- */
 function attachPendingApprovalEventListeners() {
     document.querySelectorAll('.approve-btn').forEach(btn => {
         btn.addEventListener('click', async (e) => {
@@ -101,9 +113,9 @@ function attachPendingApprovalEventListeners() {
     });
 }
 
-// ##################################
-// # AUTHENTICATION & NAVIGATION UPDATE
-// ##################################
+/* ---------------------------
+   AUTHENTICATION & NAVIGATION UPDATE
+---------------------------- */
 onAuthStateChanged(auth, async (user) => {
     const mainContent = document.getElementById('main-content');
     const logoutBtn = document.getElementById('logoutBtn');
@@ -122,7 +134,7 @@ onAuthStateChanged(auth, async (user) => {
                     navPayAdvice: { fn: renderPayAdvicePanel, perm: 'viewPayAdvice' },
                     navTutorReports: { fn: renderTutorReportsPanel, perm: 'viewTutorReports' },
                     navSummerBreak: { fn: renderSummerBreakPanel, perm: 'viewSummerBreak' },
-                    navPendingApprovals: { fn: renderPendingApprovalsPanel, perm: 'canApproveStudents' } // NEW TAB
+                    navPendingApprovals: { fn: renderPendingApprovalsPanel, perm: 'canApproveStudents' }
                 };
 
                 const navContainer = document.querySelector('nav');
