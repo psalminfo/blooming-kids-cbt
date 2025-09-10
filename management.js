@@ -183,4 +183,7 @@ onAuthStateChanged(auth, async (user) => {
                 mainContent.innerHTML = `<p class="text-center">You have no permissions assigned.</p>`;
             }
         } else {
-            document.getElementById('welcome-message').textContent = `
+            document.getElementById('welcome-message').textContent = `Hello, ${docSnap.data()?.name || ''}`;
+            document.getElementById('user-role').textContent = 'Status: Pending Approval';
+            mainContent.innerHTML = `<p class="text-center mt-12 text-yellow-600 font-semibold">Your account is awaiting approval.</p>`;
+        }
