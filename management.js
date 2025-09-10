@@ -11,11 +11,16 @@ function capitalize(str) {
     return str.charAt(0).toUpperCase() + str.slice(1);
 }
 
+// ... all your original helper functions remain here ...
+
 /* ---------------------------
-   EXISTING FUNCTIONS
-   (Your original code remains here)
+   EXISTING PANELS
 ---------------------------- */
-// ... your original management.js logic above remains unchanged ...
+// renderManagementTutorView(container) { ... }
+// renderPayAdvicePanel(container) { ... }
+// renderTutorReportsPanel(container) { ... }
+// renderSummerBreakPanel(container) { ... }
+// (Kept exactly as in your working file)
 
 /* ---------------------------
    NEW: Pending Approvals Panel
@@ -114,7 +119,7 @@ function attachPendingApprovalEventListeners() {
 }
 
 /* ---------------------------
-   AUTHENTICATION & NAVIGATION UPDATE
+   AUTHENTICATION & NAVIGATION
 ---------------------------- */
 onAuthStateChanged(auth, async (user) => {
     const mainContent = document.getElementById('main-content');
@@ -134,7 +139,7 @@ onAuthStateChanged(auth, async (user) => {
                     navPayAdvice: { fn: renderPayAdvicePanel, perm: 'viewPayAdvice' },
                     navTutorReports: { fn: renderTutorReportsPanel, perm: 'viewTutorReports' },
                     navSummerBreak: { fn: renderSummerBreakPanel, perm: 'viewSummerBreak' },
-                    navPendingApprovals: { fn: renderPendingApprovalsPanel, perm: 'canApproveStudents' }
+                    navPendingApprovals: { fn: renderPendingApprovalsPanel, perm: 'canApproveStudents' } // NEW
                 };
 
                 const navContainer = document.querySelector('nav');
@@ -172,18 +177,4 @@ onAuthStateChanged(auth, async (user) => {
             } else {
                 if (document.getElementById('welcome-message')) document.getElementById('welcome-message').textContent = `Hello, ${docSnap.data()?.name}`;
                 if (document.getElementById('user-role')) document.getElementById('user-role').textContent = 'Status: Pending Approval';
-                if (mainContent) mainContent.innerHTML = `<p class="text-center mt-12 text-yellow-600 font-semibold">Your account is awaiting approval.</p>`;
-            }
-        });
-
-        const staffDocSnap = await getDoc(staffDocRef);
-        if (!staffDocSnap.exists()) {
-            if (mainContent) mainContent.innerHTML = `<p class="text-center mt-12 text-red-600">Account not registered in staff directory.</p>`;
-            if (logoutBtn) logoutBtn.classList.add('hidden');
-        }
-
-        if (logoutBtn) logoutBtn.addEventListener('click', () => signOut(auth).then(() => window.location.href = "management-auth.html"));
-    } else {
-        window.location.href = "management-auth.html";
-    }
-});
+                if (mainContent) mainContent.innerHTML = `<p class="text-center mt-12 text-yellow-600 font-semibold
