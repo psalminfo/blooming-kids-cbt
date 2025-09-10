@@ -23,12 +23,6 @@ async function renderManagementTutorView(container) {
         document.getElementById('tutor-count-badge').textContent = tutorsSnapshot.size;
         document.getElementById('student-count-badge').textContent = studentsSnapshot.size;
 
-        const studentsByTutor = {};
-        studentsSnapshot.forEach(doc => {
-            const student = doc.data();
-            if (!studentsByTutor[student.tutorEmail]) {
-                studentsByTutor[student.tutorEmail] = [];
-            }
             studentsByTutor[student.tutorEmail].push(student);
         });
 
@@ -117,3 +111,4 @@ async function renderManagementTutorView(container) {
         document.getElementById('directory-list').innerHTML = `<p class="text-center text-red-500 py-10">Failed to load data.</p>`;
     }
 }
+
