@@ -1,34 +1,38 @@
 import { auth, db } from './firebaseConfig.js';
-import { collection, getDocs, doc, getDoc, where, query, orderBy, Timestamp, writeBatch, updateDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
+import { collection, getDocs, doc, getDoc, where, query, orderBy, Timestamp, updateDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
 import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-auth.js";
 import { onSnapshot } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
 
 /* ---------------------------
-   HELPER FUNCTIONS
+   HELPERS
 ---------------------------- */
 function capitalize(str) {
     if (typeof str !== 'string') return '';
     return str.charAt(0).toUpperCase() + str.slice(1);
 }
 
-// ... any other helpers from your original file ...
-
 /* ---------------------------
    EXISTING PANELS
 ---------------------------- */
 function renderManagementTutorView(container) {
-    container.innerHTML = `
-        <div class="bg-white p-6 rounded-lg shadow-md">
-            <h2 class="text-2xl font-bold text-green-700 mb-4">Tutor Management</h2>
-            <p>Existing tutor management functionality here...</p>
-        </div>
-    `;
+    container.innerHTML = `<h2 class="text-2xl font-bold">Tutor Management</h2>`;
+    // ... your original tutor management logic ...
 }
 
-// Keep your other panels exactly as they were:
-function renderPayAdvicePanel(container) { /* ... */ }
-function renderTutorReportsPanel(container) { /* ... */ }
-function renderSummerBreakPanel(container) { /* ... */ }
+function renderPayAdvicePanel(container) {
+    container.innerHTML = `<h2 class="text-2xl font-bold">Pay Advice</h2>`;
+    // ... your original pay advice logic ...
+}
+
+function renderTutorReportsPanel(container) {
+    container.innerHTML = `<h2 class="text-2xl font-bold">Tutor Reports</h2>`;
+    // ... your original tutor reports logic ...
+}
+
+function renderSummerBreakPanel(container) {
+    container.innerHTML = `<h2 class="text-2xl font-bold">Summer Break</h2>`;
+    // ... your original summer break logic ...
+}
 
 /* ---------------------------
    NEW: Pending Approvals Panel
@@ -54,7 +58,7 @@ async function renderPendingApprovalsPanel(container) {
         listContainer.innerHTML = snapshot.docs.map(docSnap => {
             const student = docSnap.data();
             const studentId = docSnap.id;
-            const subjects = student.subjects && Array.isArray(student.subjects) ? student.subjects.join(', ') : 'N/A';
+            const subjects = Array.isArray(student.subjects) ? student.subjects.join(', ') : 'N/A';
             return `
                 <div class="border p-4 rounded-lg bg-gray-50">
                     <p><strong>Name:</strong> ${student.studentName}</p>
@@ -77,122 +81,106 @@ async function renderPendingApprovalsPanel(container) {
 }
 
 /* ---------------------------
-   NEW: Event Listeners for Pending Approvals
+   NEW: Event Listeners
 ---------------------------- */
 function attachPendingApprovalEventListeners() {
     document.querySelectorAll('.approve-btn').forEach(btn => {
-        btn.addEventListener('click', async (e) => {
-            const id = e.target.dataset.id;
-            await updateDoc(doc(db, "students", id), { status: "approved", approvedAt: Timestamp.now() });
-        });
+        btn.onclick = async (e) => {
+            await updateDoc(doc(db, "students", e.target.dataset.id), { status: "approved", approvedAt: Timestamp.now() });
+        };
     });
 
     document.querySelectorAll('.reject-btn').forEach(btn => {
-        btn.addEventListener('click', async (e) => {
-            const id = e.target.dataset.id;
-            await updateDoc(doc(db, "students", id), { status: "rejected", rejectedAt: Timestamp.now() });
-        });
+        btn.onclick = async (e) => {
+            await updateDoc(doc(db, "students", e.target.dataset.id), { status: "rejected", rejectedAt: Timestamp.now() });
+        };
     });
 
     document.querySelectorAll('.edit-btn').forEach(btn => {
-        btn.addEventListener('click', async (e) => {
-            const id = e.target.dataset.id;
-            const studentRef = doc(db, "students", id);
-            const studentSnap = await getDoc(studentRef);
-            if (!studentSnap.exists()) return alert("Student not found");
-
-            const student = studentSnap.data();
-            const newName = prompt("Edit Name:", student.studentName);
-            const newGrade = prompt("Edit Grade:", student.grade);
-            const newDays = prompt("Edit Days/Week:", student.days);
-            const newFee = parseFloat(prompt("Edit Fee:", student.studentFee || 0));
-
-            await updateDoc(studentRef, {
-                studentName: newName || student.studentName,
-                grade: newGrade || student.grade,
-                days: newDays || student.days,
-                studentFee: isNaN(newFee) ? student.studentFee : newFee
+        btn.onclick = async (e) => {
+            const ref = doc(db, "students", e.target.dataset.id);
+            const snap = await getDoc(ref);
+            if (!snap.exists()) return alert("Student not found");
+            const s = snap.data();
+            const newName = prompt("Edit Name:", s.studentName);
+            const newGrade = prompt("Edit Grade:", s.grade);
+            const newDays = prompt("Edit Days/Week:", s.days);
+            const newFee = parseFloat(prompt("Edit Fee:", s.studentFee || 0));
+            await updateDoc(ref, {
+                studentName: newName || s.studentName,
+                grade: newGrade || s.grade,
+                days: newDays || s.days,
+                studentFee: isNaN(newFee) ? s.studentFee : newFee
             });
-        });
+        };
     });
 
     document.querySelectorAll('.delete-btn').forEach(btn => {
-        btn.addEventListener('click', async (e) => {
-            const id = e.target.dataset.id;
-            if (confirm("Are you sure you want to permanently delete this student?")) {
-                await deleteDoc(doc(db, "students", id));
+        btn.onclick = async (e) => {
+            if (confirm("Delete this student permanently?")) {
+                await deleteDoc(doc(db, "students", e.target.dataset.id));
             }
-        });
+        };
     });
 }
 
 /* ---------------------------
-   AUTHENTICATION & NAVIGATION
+   AUTH & NAVIGATION
 ---------------------------- */
 onAuthStateChanged(auth, async (user) => {
     const mainContent = document.getElementById('main-content');
     const logoutBtn = document.getElementById('logoutBtn');
-    if (user) {
-        const staffDocRef = doc(db, "staff", user.email);
-        onSnapshot(staffDocRef, (docSnap) => {
-            if (docSnap.exists() && docSnap.data().role !== 'pending') {
-                const staffData = docSnap.data();
-                window.userData = staffData;
 
-                document.getElementById('welcome-message').textContent = `Welcome, ${staffData.name}`;
-                document.getElementById('user-role').textContent = `Role: ${capitalize(staffData.role)}`;
+    if (!user) {
+        window.location.href = "management-auth.html";
+        return;
+    }
 
-                const allNavItems = {
-                    navTutorManagement: { fn: renderManagementTutorView, perm: 'viewTutorManagement' },
-                    navPayAdvice: { fn: renderPayAdvicePanel, perm: 'viewPayAdvice' },
-                    navTutorReports: { fn: renderTutorReportsPanel, perm: 'viewTutorReports' },
-                    navSummerBreak: { fn: renderSummerBreakPanel, perm: 'viewSummerBreak' },
-                    navPendingApprovals: { fn: renderPendingApprovalsPanel, perm: 'canApproveStudents' }
-                };
+    const staffDocRef = doc(db, "staff", user.email);
+    onSnapshot(staffDocRef, (docSnap) => {
+        if (docSnap.exists() && docSnap.data().role !== 'pending') {
+            const staffData = docSnap.data();
+            window.userData = staffData;
 
-                const navContainer = document.querySelector('nav');
-                const originalNavButtons = {};
-                if (navContainer) {
-                    navContainer.querySelectorAll('.nav-btn').forEach(btn => {
-                        originalNavButtons[btn.id] = btn.textContent;
-                    });
-                    navContainer.innerHTML = '';
-                    let firstVisibleTab = null;
+            document.getElementById('welcome-message').textContent = `Welcome, ${staffData.name}`;
+            document.getElementById('user-role').textContent = `Role: ${capitalize(staffData.role)}`;
 
-                    Object.entries(allNavItems).forEach(([id, item]) => {
-                        if (window.userData.permissions?.tabs?.[item.perm]) {
-                            if (!firstVisibleTab) firstVisibleTab = id;
-                            const button = document.createElement('button');
-                            button.id = id;
-                            button.className = 'nav-btn text-lg font-semibold text-gray-500 hover:text-green-700';
-                            button.textContent = originalNavButtons[id] || id;
-                            navContainer.appendChild(button);
+            const allNavItems = {
+                navTutorManagement: { fn: renderManagementTutorView, perm: 'viewTutorManagement' },
+                navPayAdvice: { fn: renderPayAdvicePanel, perm: 'viewPayAdvice' },
+                navTutorReports: { fn: renderTutorReportsPanel, perm: 'viewTutorReports' },
+                navSummerBreak: { fn: renderSummerBreakPanel, perm: 'viewSummerBreak' },
+                navPendingApprovals: { fn: renderPendingApprovalsPanel, perm: 'canApproveStudents' }
+            };
 
-                            button.addEventListener('click', () => {
-                                document.querySelectorAll('.nav-btn').forEach(btn => btn.classList.remove('active'));
-                                button.classList.add('active');
-                                item.fn(mainContent);
-                            });
-                        }
-                    });
+            const navContainer = document.querySelector('nav');
+            const originalNavButtons = {};
+            navContainer.querySelectorAll('.nav-btn').forEach(btn => {
+                originalNavButtons[btn.id] = btn.textContent;
+            });
+            navContainer.innerHTML = '';
+            let firstVisibleTab = null;
 
-                    if (firstVisibleTab) {
-                        document.getElementById(firstVisibleTab).click();
-                    } else {
-                        if (mainContent) mainContent.innerHTML = `<p class="text-center">You have no permissions assigned.</p>`;
-                    }
+            Object.entries(allNavItems).forEach(([id, item]) => {
+                if (staffData.permissions?.tabs?.[item.perm]) {
+                    if (!firstVisibleTab) firstVisibleTab = id;
+                    const button = document.createElement('button');
+                    button.id = id;
+                    button.className = 'nav-btn text-lg font-semibold text-gray-500 hover:text-green-700';
+                    button.textContent = originalNavButtons[id] || (id === 'navPendingApprovals' ? 'Pending Approvals' : id);
+                    navContainer.appendChild(button);
+                    button.onclick = () => {
+                        document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+                        button.classList.add('active');
+                        item.fn(mainContent);
+                    };
                 }
+            });
+
+            if (firstVisibleTab) {
+                document.getElementById(firstVisibleTab).click();
             } else {
-                if (document.getElementById('welcome-message')) {
-                    document.getElementById('welcome-message').textContent = `Hello, ${docSnap.data()?.name}`;
-                }
-                if (document.getElementById('user-role')) {
-                    document.getElementById('user-role').textContent = 'Status: Pending Approval';
-                }
-                if (mainContent) {
-                    mainContent.innerHTML = `<p class="text-center mt-12 text-yellow-600 font-semibold">Your account is awaiting approval.</p>`;
-                }
+                mainContent.innerHTML = `<p class="text-center">You have no permissions assigned.</p>`;
             }
-        });
-
-        const staffDocRef = doc(db, "staff", user.email);
+        } else {
+            document.getElementById('welcome-message').textContent = `
