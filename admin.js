@@ -1068,23 +1068,23 @@ async function renderStaffPanel(container) {
     const ROLE_PERMISSIONS = {
         pending: {
             tabs: { viewTutorManagement: false, viewPayAdvice: false, viewTutorReports: false, viewSummerBreak: false },
-            actions: { canDownloadReports: false, canExportPayAdvice: false }
+            actions: { canDownloadReports: false, canExportPayAdvice: false, canEndSummerBreak: false }
         },
         tutor: {
             tabs: { viewTutorManagement: false, viewPayAdvice: false, viewTutorReports: false, viewSummerBreak: false },
-            actions: { canDownloadReports: false, canExportPayAdvice: false }
+            actions: { canDownloadReports: false, canExportPayAdvice: false, canEndSummerBreak: false }
         },
         manager: {
             tabs: { viewTutorManagement: true, viewPayAdvice: false, viewTutorReports: true, viewSummerBreak: true },
-            actions: { canDownloadReports: false, canExportPayAdvice: false }
+            actions: { canDownloadReports: false, canExportPayAdvice: false, canEndSummerBreak: false }
         },
         director: {
             tabs: { viewTutorManagement: true, viewPayAdvice: true, viewTutorReports: true, viewSummerBreak: true },
-            actions: { canDownloadReports: true, canExportPayAdvice: true }
+            actions: { canDownloadReports: true, canExportPayAdvice: true, canEndSummerBreak: true }
         },
         admin: { // Admin role has all permissions by default
             tabs: { viewTutorManagement: true, viewPayAdvice: true, viewTutorReports: true, viewSummerBreak: true },
-            actions: { canDownloadReports: true, canExportPayAdvice: true }
+            actions: { canDownloadReports: true, canExportPayAdvice: true, canEndSummerBreak: true }
         }
     };
 
@@ -1184,6 +1184,7 @@ async function openPermissionsModal(staffId) {
                         <h4 class="font-semibold mb-2">Specific Actions:</h4>
                         <label class="flex items-center"><input type="checkbox" id="p-canDownloadReports" class="mr-2" ${permissions.actions?.canDownloadReports ? 'checked' : ''}> Can Download Reports</label>
                         <label class="flex items-center"><input type="checkbox" id="p-canExportPayAdvice" class="mr-2" ${permissions.actions?.canExportPayAdvice ? 'checked' : ''}> Can Export Pay Advice</label>
+                        <label class="flex items-center"><input type="checkbox" id="p-canEndSummerBreak" class="mr-2" ${permissions.actions?.canEndSummerBreak ? 'checked' : ''}> Can End Summer Break</label>
                     </div>
                 </div>
 
@@ -1211,6 +1212,7 @@ async function openPermissionsModal(staffId) {
             actions: {
                 canDownloadReports: document.getElementById('p-canDownloadReports').checked,
                 canExportPayAdvice: document.getElementById('p-canExportPayAdvice').checked,
+                canEndSummerBreak: document.getElementById('p-canEndSummerBreak').checked,
             }
         };
 
@@ -1332,3 +1334,4 @@ onAuthStateChanged(auth, async (user) => {
     }
     // ...
 });
+
