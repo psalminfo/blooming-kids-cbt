@@ -73,16 +73,19 @@ async function renderManagementTutorView(container) {
             
             const studentsTableRows = assignedStudents
                 .sort((a, b) => a.studentName.localeCompare(b.studentName))
-                .map(student => `
-                    <tr class="hover:bg-gray-50">
-                        <td class="px-4 py-2 font-medium">${student.studentName}</td>
-                        <td class="px-4 py-2">${student.grade}</td>
-                        <td class="px-4 py-2">${student.days}</td>
-                        <td class="px-4 py-2">${student.subject || 'N/A'}</td>
-                        <td class="px-4 py-2">${student.parentName || 'N/A'}</td>
-                        <td class="px-4 py-2">${student.parentPhone || 'N/A'}</td>
-                    </tr>
-                `).join('');
+                .map(student => {
+                    const subjects = student.subjects && Array.isArray(student.subjects) ? student.subjects.join(', ') : 'N/A';
+                    return `
+                        <tr class="hover:bg-gray-50">
+                            <td class="px-4 py-2 font-medium">${student.studentName}</td>
+                            <td class="px-4 py-2">${student.grade}</td>
+                            <td class="px-4 py-2">${student.days}</td>
+                            <td class="px-4 py-2">${subjects}</td>
+                            <td class="px-4 py-2">${student.parentName || 'N/A'}</td>
+                            <td class="px-4 py-2">${student.parentPhone || 'N/A'}</td>
+                        </tr>
+                    `;
+                }).join('');
 
             return `
                 <div class="border rounded-lg shadow-sm">
@@ -371,11 +374,12 @@ async function zipAndDownloadTutorReports(reports, tutorName, buttonElement) {
     }
 }
 
+
 async function renderSummerBreakPanel(container) {
     container.innerHTML = `
         <div class="bg-white p-6 rounded-lg shadow-md">
             <h2 class="text-2xl font-bold text-green-700">Students on Summer Break</h2>
-            <p id="break-status-message" class="text-center font-semibold mb-4 hidden"></p>
+            <div id="break-status-message" class="text-center font-semibold mb-4 hidden"></div>
             <div id="break-students-list" class="space-y-4">
                 <p class="text-center">Loading...</p>
             </div>
@@ -504,7 +508,7 @@ onAuthStateChanged(auth, async (user) => {
                 if (logoutBtn) logoutBtn.addEventListener('click', () => signOut(auth).then(() => window.location.href = "management-auth.html"));
             }
         } else {
-            if (mainContent) mainContent.innerHTML = `<p class="text-center mt-12 text-red-600\">Account not registered in staff directory.</p>`;
+            if (mainContent) mainContent.innerHTML = `<p class="text-center mt-12 text-red-600">Account not registered in staff directory.</p>`;
             if (logoutBtn) logoutBtn.classList.add('hidden');
         }
     } else {
