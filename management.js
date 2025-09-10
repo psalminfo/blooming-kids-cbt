@@ -1,6 +1,7 @@
 import { auth, db } from './firebaseConfig.js';
-import { collection, getDocs, doc, getDoc, where, query, orderBy, Timestamp, writeBatch, updateDoc, onSnapshot, addDoc, deleteDoc, arrayRemove } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
+import { collection, getDocs, doc, getDoc, where, query, orderBy, Timestamp, writeBatch, updateDoc } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
 import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-auth.js";
+import { onSnapshot } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
 
 function capitalize(str) {
     if (!str) return '';
@@ -238,302 +239,248 @@ async function renderTutorReportsPanel(container) {
     loadTutorReportsForManagement();
 }
 
-async function loadTutorReportsForManagement() {
-    const reportsListContainer = document.getElementById('tutor-reports-list');
-    onSnapshot(query(collection(db, "tutor_submissions"), orderBy("submittedAt", "desc")), (snapshot) => {
-        if (!reportsListContainer) return;
-        if (snapshot.empty) {
-            reportsListContainer.innerHTML = `<p class="text-center text-gray-500">No reports submitted yet.</p>`;
-            return;
-        }
+// ### START: NEW STUDENT APPROVAL FUNCTIONS ###
 
-        const reportsByTutor = {};
-        snapshot.forEach(doc => {
-            const report = { id: doc.id, ...doc.data() };
-            if (!reportsByTutor[report.tutorEmail]) {
-                reportsByTutor[report.tutorEmail] = {
-                    name: report.tutorName || report.tutorEmail,
-                    reports: []
-                };
-            }
-            reportsByTutor[report.tutorEmail].reports.push(report);
-        });
-
-        const canDownload = window.userData.permissions?.actions?.canDownloadReports === true;
-        reportsListContainer.innerHTML = Object.values(reportsByTutor).map(tutorData => {
-            const reportsHtml = tutorData.reports.map(report => `
-                <div class="bg-white p-4 rounded-lg border border-gray-200">
-                    <h5 class="font-semibold text-sm">Report for ${report.month} ${report.year}</h5>
-                    <p class="text-xs text-gray-500">Submitted on: ${report.submittedAt?.toDate().toLocaleString()}</p>
-                    <ul class="list-disc list-inside mt-2 text-sm text-gray-700">
-                        <li>Total Hours: ${report.totalHours}</li>
-                        <li>Total Taught: ${report.totalTaught}</li>
-                    </ul>
-                    ${report.studentSummary?.length > 0 ? `
-                        <div class="mt-2">
-                            <h6 class="font-medium text-xs text-gray-600">Student Summary:</h6>
-                            <ul class="list-disc list-inside text-xs mt-1">
-                                ${report.studentSummary.map(s => `<li>${s.studentName}: ${s.status}</li>`).join('')}
-                            </ul>
-                        </div>
-                    ` : ''}
-                    ${canDownload ? `<button onclick="window.downloadReport('${report.id}')" class="mt-4 bg-green-500 text-white text-xs px-3 py-1 rounded hover:bg-green-600">Download Report</button>` : ''}
-                </div>
-            `).join('');
-
-            return `
-                <div class="border rounded-lg shadow-sm">
-                    <details>
-                        <summary class="p-4 cursor-pointer flex justify-between items-center font-bold text-lg text-green-800 bg-gray-50">
-                            ${tutorData.name} (${tutorData.reports.length} reports)
-                        </summary>
-                        <div class="p-4 space-y-4 border-t border-gray-200">
-                            ${reportsHtml}
-                        </div>
-                    </details>
-                </div>
-            `;
-        }).join('');
-    });
-}
-
-async function renderSummerBreakPanel(container) {
-    container.innerHTML = `
-        <div class="bg-white p-6 rounded-lg shadow-md">
-            <h2 class="text-2xl font-bold text-green-700 mb-4">Summer Break Management</h2>
-            <div id="summer-break-content">
-                <p class="text-center text-gray-500">Feature not yet implemented. Placeholder content for Summer Break management.</p>
-            </div>
-        </div>
-    `;
-}
-
-// ### PENDING APPROVALS ###
 async function renderPendingApprovalsPanel(container) {
     container.innerHTML = `
         <div class="bg-white p-6 rounded-lg shadow-md">
             <h2 class="text-2xl font-bold text-green-700 mb-4">Pending Student Approvals</h2>
-            <div id="pending-approvals-list" class="space-y-4">
-                <p class="text-center text-gray-500">Loading pending students...</p>
+            <div id="pending-students-list" class="space-y-4">
+                <p class="text-center text-gray-500 py-10">Loading pending students...</p>
+            </div>
+        </div>
+        
+        <div id="edit-student-modal" class="fixed inset-0 bg-gray-600 bg-opacity-50 hidden items-center justify-center">
+            <div class="bg-white rounded-lg shadow-xl p-6 w-full max-w-md">
+                <h3 class="text-xl font-bold mb-4">Edit Student</h3>
+                <form id="edit-student-form">
+                    <input type="hidden" id="edit-student-id">
+                    <div class="mb-4">
+                        <label for="edit-student-name" class="block text-sm font-medium">Student Name</label>
+                        <input type="text" id="edit-student-name" class="mt-1 block w-full p-2 border rounded-md" required>
+                    </div>
+                    <div class="mb-4">
+                        <label for="edit-student-grade" class="block text-sm font-medium">Grade</label>
+                        <input type="text" id="edit-student-grade" class="mt-1 block w-full p-2 border rounded-md" required>
+                    </div>
+                    <div class="mb-4">
+                        <label for="edit-student-days" class="block text-sm font-medium">Days/Week</label>
+                        <input type="number" id="edit-student-days" class="mt-1 block w-full p-2 border rounded-md" required>
+                    </div>
+                    <div class="mb-4">
+                        <label for="edit-student-fee" class="block text-sm font-medium">Student Fee (₦)</label>
+                        <input type="number" id="edit-student-fee" class="mt-1 block w-full p-2 border rounded-md" required>
+                    </div>
+                    <div class="flex justify-end space-x-4">
+                        <button type="button" id="cancel-edit-btn" class="bg-gray-300 px-4 py-2 rounded">Cancel</button>
+                        <button type="submit" class="bg-green-600 text-white px-4 py-2 rounded">Save Changes</button>
+                    </div>
+                </form>
             </div>
         </div>
     `;
-    loadPendingStudents(document.getElementById('pending-approvals-list'));
+    loadPendingStudents();
 }
 
-async function handleStudentApproval(studentId, isApproved) {
-    const studentRef = doc(db, 'students', studentId);
-    try {
-        const batch = writeBatch(db);
-        batch.update(studentRef, {
-            isPending: false,
-            isActive: isApproved,
-            status: isApproved ? 'Active' : 'Rejected'
-        });
-        
-        // If rejected, also remove the student from the tutor's list
-        if (!isApproved) {
-            const studentSnap = await getDoc(studentRef);
-            if(studentSnap.exists()){
-                const studentData = studentSnap.data();
-                if(studentData.tutorEmail){
-                    const tutorRef = doc(db, 'tutors', studentData.tutorEmail);
-                    batch.update(tutorRef, {
-                        studentList: arrayRemove(studentId)
-                    });
-                }
-            }
-        }
-        await batch.commit();
-        alert(`Student ${isApproved ? 'approved' : 'rejected'} successfully.`);
-    } catch(error) {
-        console.error("Error updating student approval status:", error);
-        alert("Failed to update student status.");
-    }
-}
+function loadPendingStudents() {
+    const listContainer = document.getElementById('pending-students-list');
+    const q = query(collection(db, "students"), where("status", "==", "pending"));
 
-async function handleStudentEdit(studentId, currentData) {
-    const studentName = prompt("Edit Student Name:", currentData.studentName);
-    const grade = prompt("Edit Grade:", currentData.grade);
-    const days = prompt("Edit Days/Week:", currentData.days);
-    const fee = prompt("Edit Student Fee:", currentData.studentFee);
-
-    if (studentName && grade && days && fee) {
-        try {
-            await updateDoc(doc(db, 'students', studentId), {
-                studentName,
-                grade: Number(grade),
-                days: Number(days),
-                studentFee: Number(fee),
-                isPending: false,
-                isActive: true,
-                status: 'Active'
-            });
-            alert("Student information updated and approved.");
-        } catch(error) {
-            console.error("Error editing student info:", error);
-            alert("Failed to edit student information.");
-        }
-    }
-}
-
-async function handleStudentDelete(studentId) {
-    if (confirm("Are you sure you want to delete this student?")) {
-        try {
-            await deleteDoc(doc(db, 'students', studentId));
-            alert("Student deleted successfully.");
-        } catch (error) {
-            console.error("Error deleting student:", error);
-            alert("Failed to delete student.");
-        }
-    }
-}
-
-function loadPendingStudents(container) {
-    const pendingQuery = query(collection(db, "students"), where("isPending", "==", true));
-
-    onSnapshot(pendingQuery, (snapshot) => {
+    onSnapshot(q, (snapshot) => {
+        if (!listContainer) return;
         if (snapshot.empty) {
-            container.innerHTML = `<p class="text-center text-gray-500">No pending student approvals at this time.</p>`;
+            listContainer.innerHTML = `<p class="text-center text-gray-500">No students are currently awaiting approval.</p>`;
             return;
         }
 
-        container.innerHTML = snapshot.docs.map(doc => {
+        listContainer.innerHTML = snapshot.docs.map(doc => {
             const student = { id: doc.id, ...doc.data() };
+            const subjects = student.subjects?.join(', ') || 'N/A';
             return `
-                <div class="bg-gray-100 p-4 rounded-lg shadow-sm border border-yellow-200">
-                    <h4 class="font-bold text-lg text-yellow-800">${student.studentName}</h4>
-                    <p class="text-sm text-gray-600">Tutor: ${student.tutorName}</p>
-                    <p class="text-sm text-gray-600">Grade: ${student.grade}</p>
-                    <p class="text-sm text-gray-600">Days: ${student.days}</p>
-                    <p class="text-sm text-gray-600">Fee: ₦${student.studentFee}</p>
-                    <div class="mt-4 flex space-x-2">
-                        <button onclick="handleStudentApproval('${student.id}', true)" class="bg-green-500 text-white text-xs px-3 py-1 rounded hover:bg-green-600">Approve</button>
-                        <button onclick="handleStudentApproval('${student.id}', false)" class="bg-red-500 text-white text-xs px-3 py-1 rounded hover:bg-red-600">Reject</button>
-                        <button onclick="handleStudentEdit('${student.id}', ${JSON.stringify(student)})" class="bg-blue-500 text-white text-xs px-3 py-1 rounded hover:bg-blue-600">Edit</button>
-                        <button onclick="handleStudentDelete('${student.id}')" class="bg-gray-500 text-white text-xs px-3 py-1 rounded hover:bg-gray-600">Delete</button>
+                <div class="border p-4 rounded-lg shadow-sm bg-gray-50">
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-start">
+                        <div>
+                            <p><strong>Student:</strong> ${student.studentName}</p>
+                            <p><strong>Grade:</strong> ${student.grade}</p>
+                            <p><strong>Subjects:</strong> ${subjects}</p>
+                        </div>
+                        <div>
+                            <p><strong>Parent:</strong> ${student.parentName || 'N/A'}</p>
+                            <p><strong>Phone:</strong> ${student.parentPhone || 'N/A'}</p>
+                            <p><strong>Assigned Tutor:</strong> ${student.tutorEmail}</p>
+                        </div>
+                        <div class="flex flex-col md:flex-row md:items-center md:justify-end space-y-2 md:space-y-0 md:space-x-2">
+                            <button class="edit-student-btn bg-blue-500 text-white px-3 py-1 rounded text-sm" data-student-id="${student.id}">Edit</button>
+                            <button class="approve-student-btn bg-green-600 text-white px-3 py-1 rounded text-sm" data-student-id="${student.id}">Approve</button>
+                            <button class="reject-student-btn bg-red-600 text-white px-3 py-1 rounded text-sm" data-student-id="${student.id}" data-student-name="${student.studentName}">Reject</button>
+                        </div>
                     </div>
                 </div>
             `;
         }).join('');
 
-        window.handleStudentApproval = handleStudentApproval;
-        window.handleStudentEdit = handleStudentEdit;
-        window.handleStudentDelete = handleStudentDelete;
+        // Attach event listeners
+        attachPendingStudentActionListeners();
     });
 }
 
-// ##################################
-// # INITIALIZATION LOGIC
-// ##################################
+function attachPendingStudentActionListeners() {
+    document.querySelectorAll('.approve-student-btn').forEach(btn => {
+        btn.onclick = async (e) => {
+            const studentId = e.target.dataset.studentId;
+            if (confirm('Are you sure you want to approve this student?')) {
+                await updateDoc(doc(db, "students", studentId), { status: "active" });
+                alert('Student approved.');
+            }
+        };
+    });
 
-function initializeManagementPanel(staffData) {
-    const mainContent = document.getElementById('main-content');
-    const welcomeMessage = document.getElementById('welcome-message');
-    const userRole = document.getElementById('user-role');
-    const logoutBtn = document.getElementById('logoutBtn');
+    document.querySelectorAll('.reject-student-btn').forEach(btn => {
+        btn.onclick = async (e) => {
+            const studentId = e.target.dataset.studentId;
+            const studentName = e.target.dataset.studentName;
+            if (confirm(`Are you sure you want to REJECT and DELETE ${studentName}? This action cannot be undone.`)) {
+                await deleteDoc(doc(db, "students", studentId));
+                alert('Student rejected and deleted.');
+            }
+        };
+    });
 
-    if (!mainContent || !welcomeMessage || !userRole || !logoutBtn) {
-        console.error("Critical elements not found in the DOM.");
-        return;
-    }
+    document.querySelectorAll('.edit-student-btn').forEach(btn => {
+        btn.onclick = async (e) => {
+            const studentId = e.target.dataset.studentId;
+            const studentDoc = await getDoc(doc(db, "students", studentId));
+            if (studentDoc.exists()) {
+                showEditStudentModal(studentDoc.data(), studentId);
+            }
+        };
+    });
+}
 
-    welcomeMessage.textContent = `Hello, ${staffData.name}`;
-    userRole.textContent = staffData.role;
+function showEditStudentModal(studentData, studentId) {
+    const modal = document.getElementById('edit-student-modal');
+    document.getElementById('edit-student-id').value = studentId;
+    document.getElementById('edit-student-name').value = studentData.studentName || '';
+    document.getElementById('edit-student-grade').value = studentData.grade || '';
+    document.getElementById('edit-student-days').value = studentData.days || 0;
+    document.getElementById('edit-student-fee').value = studentData.studentFee || 0;
+    
+    modal.classList.remove('hidden');
+    modal.classList.add('flex');
 
-    const allNavItems = {
-        navTutorManagement: { fn: renderManagementTutorView, requiredPermission: 'canManageTutorsAndStudents' },
-        navPayAdvice: { fn: renderPayAdvicePanel, requiredPermission: 'canAccessPayAdvice' },
-        navStudentApprovals: { fn: renderPendingApprovalsPanel, requiredPermission: 'canApproveStudents' },
-        navTutorReports: { fn: renderTutorReportsPanel, requiredPermission: 'canAccessTutorReports' },
-        navSummerBreak: { fn: renderSummerBreakPanel, requiredPermission: 'canManageSummerBreak' }
+    const form = document.getElementById('edit-student-form');
+    const cancelBtn = document.getElementById('cancel-edit-btn');
+    
+    const closeModal = () => {
+        modal.classList.add('hidden');
+        modal.classList.remove('flex');
     };
 
-    const navContainer = document.querySelector('nav');
-    navContainer.innerHTML = '';
+    form.onsubmit = async (e) => {
+        e.preventDefault();
+        const updatedData = {
+            studentName: document.getElementById('edit-student-name').value,
+            grade: document.getElementById('edit-student-grade').value,
+            days: parseInt(document.getElementById('edit-student-days').value, 10),
+            studentFee: parseFloat(document.getElementById('edit-student-fee').value)
+        };
+        await updateDoc(doc(db, "students", studentId), updatedData);
+        alert('Student details updated.');
+        closeModal();
+    };
     
-    let firstVisibleTab = null;
-
-    Object.entries(allNavItems).forEach(([id, item]) => {
-        if (staffData.permissions?.tabs?.[item.requiredPermission]) {
-            const button = document.createElement('button');
-            button.id = id;
-            button.className = 'nav-btn text-lg font-bold text-gray-500 hover:text-white';
-            button.textContent = document.getElementById(id)?.textContent || capitalize(id.replace('nav', ''));
-            navContainer.appendChild(button);
-
-            if (!firstVisibleTab) {
-                firstVisibleTab = id;
-            }
-
-            button.addEventListener('click', () => {
-                document.querySelectorAll('.nav-btn').forEach(btn => btn.classList.remove('active'));
-                button.classList.add('active');
-                item.fn(mainContent);
-            });
-        }
-    });
-
-    if (firstVisibleTab) {
-        document.getElementById(firstVisibleTab).click();
-    } else {
-        mainContent.innerHTML = `<p class="text-center">You have no permissions assigned.</p>`;
-    }
-
-    logoutBtn.addEventListener('click', () => signOut(auth).then(() => window.location.href = "management-auth.html"));
+    cancelBtn.onclick = closeModal;
 }
+
+// ### END: NEW STUDENT APPROVAL FUNCTIONS ###
+
+
+// ##################################
+// # AUTHENTICATION & INITIALIZATION
+// ##################################
 
 onAuthStateChanged(auth, async (user) => {
     const mainContent = document.getElementById('main-content');
     const logoutBtn = document.getElementById('logoutBtn');
-    
-    if (!mainContent || !logoutBtn) {
-        console.error("Critical DOM elements not found.");
-        return;
-    }
-
     if (user) {
-        // IMPORTANT: Verify this collection name. Your working file uses "staff", 
-        // your previous file used "management". Use the one that is correct for your database.
-        const staffDocRef = doc(db, 'management', user.email);
-
-        // This single listener handles all scenarios: approved, pending, or not found.
+        // ### ADD THIS onSnapshot LISTENER ###
+        const staffDocRef = doc(db, "staff", user.email);
         onSnapshot(staffDocRef, (docSnap) => {
-            if (docSnap.exists()) {
+            if (docSnap.exists() && docSnap.data().role !== 'pending') {
                 const staffData = docSnap.data();
+                window.userData = staffData;
+                
+                document.getElementById('welcome-message').textContent = `Welcome, ${staffData.name}`;
+                document.getElementById('user-role').textContent = `Role: ${capitalize(staffData.role)}`;
 
-                // Check if the user is approved
-                if (staffData?.status === 'approved') {
-                    // This logic prevents re-rendering the entire nav if permissions haven't changed.
-                    if (window.userData && JSON.stringify(window.userData.permissions) === JSON.stringify(staffData.permissions)) {
-                        return; 
+                const allNavItems = {
+                    navTutorManagement: { fn: renderManagementTutorView, perm: 'viewTutorManagement' },
+                    // ADD THIS NEW LINE
+                    navPendingApprovals: { fn: renderPendingApprovalsPanel, perm: 'canApproveStudents' },
+                    navPayAdvice: { fn: renderPayAdvicePanel, perm: 'viewPayAdvice' },
+                    navTutorReports: { fn: renderTutorReportsPanel, perm: 'viewTutorReports' },
+                    navSummerBreak: { fn: renderSummerBreakPanel, perm: 'viewSummerBreak' }
+                };
+
+                const navContainer = document.querySelector('nav');
+                const originalNavButtons = {};
+                if(navContainer) {
+                    // Temporarily store original text content if needed
+                    navContainer.querySelectorAll('.nav-btn').forEach(btn => {
+                        originalNavButtons[btn.id] = btn.textContent;
+                    });
+                    navContainer.innerHTML = '';
+                    let firstVisibleTab = null;
+
+                    Object.entries(allNavItems).forEach(([id, item]) => {
+                        if (window.userData.permissions?.tabs?.[item.perm]) {
+                            if (!firstVisibleTab) firstVisibleTab = id;
+                            const button = document.createElement('button');
+                            button.id = id;
+                            button.className = 'nav-btn text-lg font-semibold text-gray-500 hover:text-green-700';
+                            button.textContent = originalNavButtons[id];
+                            navContainer.appendChild(button);
+                            
+                            button.addEventListener('click', () => {
+                                document.querySelectorAll('.nav-btn').forEach(btn => btn.classList.remove('active'));
+                                button.classList.add('active');
+                                item.fn(mainContent);
+                            });
+                        }
+                    });
+
+                    if (firstVisibleTab) {
+                        // Check if the current tab is still available after the permission update.
+                        const activeNav = document.querySelector('.nav-btn.active');
+                        const activeNavId = activeNav?.id;
+                        if (!activeNav || !document.getElementById(activeNavId)) {
+                            // The current tab is no longer available, so switch to the first available one.
+                            document.getElementById(firstVisibleTab).click();
+                        } else {
+                            // The current tab is still available, re-render it to apply new permissions.
+                            const currentItem = allNavItems[activeNavId];
+                            if(currentItem) currentItem.fn(mainContent);
+                        }
+                    } else {
+                        if (mainContent) mainContent.innerHTML = `<p class="text-center">You have no permissions assigned.</p>`;
                     }
-                    window.userData = staffData;
-                    // Initialize or re-initialize the panel with current data
-                    initializeManagementPanel(staffData); 
-                } else {
-                    // Logic for a pending account
-                    if (document.getElementById('welcome-message')) document.getElementById('welcome-message').textContent = `Hello, ${staffData.name}`;
-                    if (document.getElementById('user-role')) document.getElementById('user-role').textContent = 'Status: Pending Approval';
-                    mainContent.innerHTML = `<p class="text-center mt-12 text-yellow-600 font-semibold">Your account is awaiting approval.</p>`;
-                    document.querySelector('nav').innerHTML = ''; // Clear nav buttons
                 }
             } else {
-                // Logic for a user who is not in the staff directory
-                mainContent.innerHTML = `<p class="text-center mt-12 text-red-600">Account not registered in staff directory.</p>`;
-                document.querySelector('nav').innerHTML = ''; // Clear nav buttons
-                if (document.getElementById('welcome-message')) document.getElementById('welcome-message').textContent = 'Access Denied';
-                if (document.getElementById('user-role')) document.getElementById('user-role').textContent = '';
+                if (document.getElementById('welcome-message')) document.getElementById('welcome-message').textContent = `Hello, ${docSnap.data()?.name}`;
+                if (document.getElementById('user-role')) document.getElementById('user-role').textContent = 'Status: Pending Approval';
+                if (mainContent) mainContent.innerHTML = `<p class="text-center mt-12 text-yellow-600 font-semibold">Your account is awaiting approval.</p>`;
             }
         });
 
-        logoutBtn.addEventListener('click', () => signOut(auth).then(() => window.location.href = "management-auth.html"));
+        const staffDocSnap = await getDoc(staffDocRef);
+        if (!staffDocSnap.exists()) {
+            if (mainContent) mainContent.innerHTML = `<p class="text-center mt-12 text-red-600">Account not registered in staff directory.</p>`;
+            if (logoutBtn) logoutBtn.classList.add('hidden');
+        }
+
+        if(logoutBtn) logoutBtn.addEventListener('click', () => signOut(auth).then(() => window.location.href = "management-auth.html"));
 
     } else {
-        // If no user is logged in, redirect to the auth page.
         window.location.href = "management-auth.html";
     }
 });
-
-// IMPORTANT: Make sure your `initializeManagementPanel` function from the non-working file is
-// also present, as it is called from the code above.
