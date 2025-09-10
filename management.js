@@ -195,4 +195,4 @@ onAuthStateChanged(auth, async (user) => {
             }
         });
 
-        const staff
+        const staffDocRef = doc(db, "staff", user.email);
