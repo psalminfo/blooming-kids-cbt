@@ -412,7 +412,10 @@ async function renderSummerBreakPanel(container) {
                         <p><strong>Student:</strong> ${student.studentName}</p>
                         <p><strong>Tutor:</strong> ${student.tutorEmail}</p>
                     </div>
-                    ${endBreakButton}
+                    <div class="flex items-center space-x-2">
+                         <span class="text-yellow-600 font-semibold px-3 py-1 bg-yellow-100 rounded-full text-sm">On Break</span>
+                         ${endBreakButton}
+                    </div>
                 </div>
             `;
         }).join('');
