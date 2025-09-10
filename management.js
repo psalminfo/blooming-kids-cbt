@@ -451,13 +451,13 @@ onAuthStateChanged(auth, async (user) => {
     const mainContent = document.getElementById('main-content');
     const logoutBtn = document.getElementById('logoutBtn');
     if (user) {
+        // ### ADD THIS onSnapshot LISTENER ###
         const staffDocRef = doc(db, "staff", user.email);
-        const staffDocSnap = await getDoc(staffDocRef);
-
-        if (staffDocSnap.exists()) {
-            const staffData = staffDocSnap.data();
-            if (staffData.role && staffData.role !== 'pending') {
+        onSnapshot(staffDocRef, (docSnap) => {
+            if (docSnap.exists() && docSnap.data().role !== 'pending') {
+                const staffData = docSnap.data();
                 window.userData = staffData;
+                
                 document.getElementById('welcome-message').textContent = `Welcome, ${staffData.name}`;
                 document.getElementById('user-role').textContent = `Role: ${capitalize(staffData.role)}`;
 
@@ -471,10 +471,10 @@ onAuthStateChanged(auth, async (user) => {
                 const navContainer = document.querySelector('nav');
                 const originalNavButtons = {};
                 if(navContainer) {
+                    // Temporarily store original text content if needed
                     navContainer.querySelectorAll('.nav-btn').forEach(btn => {
                         originalNavButtons[btn.id] = btn.textContent;
                     });
-
                     navContainer.innerHTML = '';
                     let firstVisibleTab = null;
 
@@ -496,24 +496,36 @@ onAuthStateChanged(auth, async (user) => {
                     });
 
                     if (firstVisibleTab) {
-                        document.getElementById(firstVisibleTab).click();
+                        // Check if the current tab is still available after the permission update.
+                        const activeNav = document.querySelector('.nav-btn.active');
+                        const activeNavId = activeNav?.id;
+                        if (!activeNav || !document.getElementById(activeNavId)) {
+                            // The current tab is no longer available, so switch to the first available one.
+                            document.getElementById(firstVisibleTab).click();
+                        } else {
+                            // The current tab is still available, re-render it to apply new permissions.
+                            const currentItem = allNavItems[activeNavId];
+                            if(currentItem) currentItem.fn(mainContent);
+                        }
                     } else {
                         if (mainContent) mainContent.innerHTML = `<p class="text-center">You have no permissions assigned.</p>`;
                     }
                 }
-                
-                if(logoutBtn) logoutBtn.addEventListener('click', () => signOut(auth).then(() => window.location.href = "management-auth.html"));
-
             } else {
-                if (document.getElementById('welcome-message')) document.getElementById('welcome-message').textContent = `Hello, ${staffData.name}`;
+                if (document.getElementById('welcome-message')) document.getElementById('welcome-message').textContent = `Hello, ${docSnap.data()?.name}`;
                 if (document.getElementById('user-role')) document.getElementById('user-role').textContent = 'Status: Pending Approval';
                 if (mainContent) mainContent.innerHTML = `<p class="text-center mt-12 text-yellow-600 font-semibold">Your account is awaiting approval.</p>`;
-                if (logoutBtn) logoutBtn.addEventListener('click', () => signOut(auth).then(() => window.location.href = "management-auth.html"));
             }
-        } else {
+        });
+
+        const staffDocSnap = await getDoc(staffDocRef);
+        if (!staffDocSnap.exists()) {
             if (mainContent) mainContent.innerHTML = `<p class="text-center mt-12 text-red-600">Account not registered in staff directory.</p>`;
             if (logoutBtn) logoutBtn.classList.add('hidden');
         }
+
+        if(logoutBtn) logoutBtn.addEventListener('click', () => signOut(auth).then(() => window.location.href = "management-auth.html"));
+
     } else {
         window.location.href = "management-auth.html";
     }
