@@ -15,7 +15,7 @@ function capitalize(str) {
 const listeners = {};
 
 function cleanupListeners() {
-    Object.values(listeners).forEach(unsubscribe => unsubscribe());
+    Object.values(listeners).forEach(unsubscribe => unsubscribe && unsubscribe());
     for (const key in listeners) {
         delete listeners[key];
     }
@@ -76,7 +76,6 @@ async function renderPendingApprovalsPanel(container) {
 
     const listContainer = document.getElementById('pending-approvals-list');
     
-    // Cleanup any existing listener for this panel
     if (listeners.pendingApprovals) listeners.pendingApprovals();
     
     const unsubscribe = onSnapshot(query(collection(db, "students"), where("status", "==", "pending")), (snapshot) => {
@@ -108,7 +107,7 @@ async function renderPendingApprovalsPanel(container) {
 
         attachPendingApprovalEventListeners();
     });
-    listeners.pendingApprovals = unsubscribe; // Store the unsubscribe function
+    listeners.pendingApprovals = unsubscribe;
 }
 
 /* ---------------------------
@@ -136,7 +135,6 @@ function attachPendingApprovalEventListeners() {
                     return;
                 }
                 const s = snap.data();
-                // Note: Consider replacing these prompts with a proper modal for better UX.
                 const newName = prompt("Edit Name:", s.studentName);
                 const newGrade = prompt("Edit Grade:", s.grade);
                 const newDays = prompt("Edit Days/Week:", s.days);
@@ -169,7 +167,6 @@ onAuthStateChanged(auth, async (user) => {
     const userRole = document.getElementById('user-role');
     const navContainer = document.querySelector('nav');
 
-    // Clean up any old listeners from a previous session
     cleanupListeners();
 
     if (!user) {
@@ -177,58 +174,4 @@ onAuthStateChanged(auth, async (user) => {
         return;
     }
 
-    const staffDocRef = doc(db, "staff", user.email);
-    
-    // Store the unsubscribe function to clean up later
-    listeners.staff = onSnapshot(staffDocRef, (docSnap) => {
-        if (docSnap.exists() && docSnap.data().role !== 'pending') {
-            const staffData = docSnap.data();
-            window.userData = staffData;
-
-            welcomeMessage.textContent = `Welcome, ${staffData.name}`;
-            userRole.textContent = `Role: ${capitalize(staffData.role)}`;
-
-            // Build and render the navigation tabs based on permissions
-            navContainer.innerHTML = '';
-            let firstVisiblePanel = null;
-            Object.entries(panels).forEach(([key, panel]) => {
-                if (staffData.permissions?.tabs?.[panel.perm]) {
-                    if (!firstVisiblePanel) firstVisiblePanel = key;
-                    const button = document.createElement('button');
-                    button.id = `nav-${key}`;
-                    button.className = 'nav-btn text-lg font-semibold text-gray-500 hover:text-green-700';
-                    button.textContent = panel.navText;
-                    navContainer.appendChild(button);
-                    
-                    // Use a proper event listener with a click handler
-                    button.addEventListener('click', () => {
-                        document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
-                        button.classList.add('active');
-                        panel.fn(mainContent);
-                    });
-                }
-            });
-
-            // Automatically click the first visible tab if one exists
-            if (firstVisiblePanel) {
-                document.getElementById(`nav-${firstVisiblePanel}`).click();
-            } else {
-                mainContent.innerHTML = `<p class="text-center">You have no permissions assigned.</p>`;
-            }
-        } else {
-            welcomeMessage.textContent = `Hello, ${docSnap.data()?.name || ''}`;
-            userRole.textContent = 'Status: Pending Approval';
-            mainContent.innerHTML = `<p class="text-center mt-12 text-yellow-600 font-semibold">Your account is awaiting approval.</p>`;
-        }
-    });
-});
-
-logoutBtn.addEventListener('click', () => {
-    signOut(auth).then(() => {
-        cleanupListeners();
-        console.log("User signed out.");
-        // Firebase Auth will handle the redirect via the onAuthStateChanged listener
-    }).catch((error) => {
-        console.error("Sign out error:", error);
-    });
-});
+    const staffDocRef
