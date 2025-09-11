@@ -208,7 +208,7 @@ async function renderStudentDatabase(container, tutor) {
                         if (studentsCount === 1) {
                             studentsHTML += `<button class="submit-single-report-btn bg-green-600 text-white px-3 py-1 rounded" data-student-id="${student.id}">Submit Report</button>`;
                         } else {
-                            studentsHTML += `<button class="enter-report-btn bg-green-600 text-white px-3 py-1 rounded" data-student-id="${student.id}">${isReportSaved ? 'Edit Report' : 'Enter Report'}</button>`;
+                             studentsHTML += `<button class="enter-report-btn bg-green-600 text-white px-3 py-1 rounded" data-student-id="${student.id}">${isReportSaved ? 'Edit Report' : 'Enter Report'}</button>`;
                         }
                     } else if (!isStudentOnBreak) {
                         studentsHTML += `<span class="text-gray-400">Submission Disabled</span>`;
@@ -341,10 +341,13 @@ async function renderStudentDatabase(container, tutor) {
                     subjects: document.getElementById('new-student-subject').value.split(',').map(s => s.trim()),
                     days: document.getElementById('new-student-days').value,
                     studentFee: parseFloat(document.getElementById('new-student-fee').value),
-                    tutorEmail: tutor.email, summerBreak: false
+                    tutorEmail: tutor.email, 
+                    summerBreak: false,
+                    approvalStatus: 'pending' // New field added
                 };
                 if (studentData.parentName && studentData.studentName && studentData.grade && !isNaN(studentData.studentFee)) {
                     await addDoc(collection(db, "students"), studentData);
+                    alert('Student added successfully. Awaiting management approval.');
                     renderStudentDatabase(container, tutor);
                 } else {
                     alert('Please fill in all parent and student details correctly.');
