@@ -1067,24 +1067,24 @@ async function renderSummerBreakPanel(container) {
 async function renderStaffPanel(container) {
     const ROLE_PERMISSIONS = {
         pending: {
-            tabs: { viewTutorManagement: false, viewPayAdvice: false, viewTutorReports: false, viewSummerBreak: false },
-            actions: { canDownloadReports: false, canExportPayAdvice: false, canEndSummerBreak: false }
+            tabs: { viewTutorManagement: false, viewPayAdvice: false, viewTutorReports: false, viewSummerBreak: false, viewPendingApprovals: false, viewStaffManagement: false },
+            actions: { canDownloadReports: false, canExportPayAdvice: false, canEndSummerBreak: false, canEditStudents: false, canDeleteStudents: false }
         },
         tutor: {
-            tabs: { viewTutorManagement: false, viewPayAdvice: false, viewTutorReports: false, viewSummerBreak: false },
-            actions: { canDownloadReports: false, canExportPayAdvice: false, canEndSummerBreak: false }
+            tabs: { viewTutorManagement: false, viewPayAdvice: false, viewTutorReports: false, viewSummerBreak: false, viewPendingApprovals: false, viewStaffManagement: false },
+            actions: { canDownloadReports: false, canExportPayAdvice: false, canEndSummerBreak: false, canEditStudents: false, canDeleteStudents: false }
         },
         manager: {
-            tabs: { viewTutorManagement: true, viewPayAdvice: false, viewTutorReports: true, viewSummerBreak: true },
-            actions: { canDownloadReports: false, canExportPayAdvice: false, canEndSummerBreak: false }
+            tabs: { viewTutorManagement: true, viewPayAdvice: false, viewTutorReports: true, viewSummerBreak: true, viewPendingApprovals: true, viewStaffManagement: false },
+            actions: { canDownloadReports: false, canExportPayAdvice: false, canEndSummerBreak: false, canEditStudents: true, canDeleteStudents: false }
         },
         director: {
-            tabs: { viewTutorManagement: true, viewPayAdvice: true, viewTutorReports: true, viewSummerBreak: true },
-            actions: { canDownloadReports: true, canExportPayAdvice: true, canEndSummerBreak: true }
+            tabs: { viewTutorManagement: true, viewPayAdvice: true, viewTutorReports: true, viewSummerBreak: true, viewPendingApprovals: true, viewStaffManagement: true },
+            actions: { canDownloadReports: true, canExportPayAdvice: true, canEndSummerBreak: true, canEditStudents: true, canDeleteStudents: true }
         },
         admin: { // Admin role has all permissions by default
-            tabs: { viewTutorManagement: true, viewPayAdvice: true, viewTutorReports: true, viewSummerBreak: true },
-            actions: { canDownloadReports: true, canExportPayAdvice: true, canEndSummerBreak: true }
+            tabs: { viewTutorManagement: true, viewPayAdvice: true, viewTutorReports: true, viewSummerBreak: true, viewPendingApprovals: true, viewStaffManagement: true },
+            actions: { canDownloadReports: true, canExportPayAdvice: true, canEndSummerBreak: true, canEditStudents: true, canDeleteStudents: true }
         }
     };
 
@@ -1173,10 +1173,12 @@ async function openPermissionsModal(staffId) {
                     <div class="border-t pt-4">
                         <h4 class="font-semibold mb-2">Tab Visibility:</h4>
                         <div class="grid grid-cols-2 gap-2">
-                            <label class="flex items-center"><input type="checkbox" id="p-viewTutorManagement" class="mr-2" ${permissions.tabs?.viewTutorManagement ? 'checked' : ''}> Tutor List</label>
+                            <label class="flex items-center"><input type="checkbox" id="p-viewTutorManagement" class="mr-2" ${permissions.tabs?.viewTutorManagement ? 'checked' : ''}> Tutor & Student List</label>
                             <label class="flex items-center"><input type="checkbox" id="p-viewPayAdvice" class="mr-2" ${permissions.tabs?.viewPayAdvice ? 'checked' : ''}> Pay Advice</label>
                             <label class="flex items-center"><input type="checkbox" id="p-viewTutorReports" class="mr-2" ${permissions.tabs?.viewTutorReports ? 'checked' : ''}> Tutor Reports</label>
                             <label class="flex items-center"><input type="checkbox" id="p-viewSummerBreak" class="mr-2" ${permissions.tabs?.viewSummerBreak ? 'checked' : ''}> Summer Break</label>
+                            <label class="flex items-center"><input type="checkbox" id="p-viewPendingApprovals" class="mr-2" ${permissions.tabs?.viewPendingApprovals ? 'checked' : ''}> Pending Approvals</label>
+                            <label class="flex items-center"><input type="checkbox" id="p-viewStaffManagement" class="mr-2" ${permissions.tabs?.viewStaffManagement ? 'checked' : ''}> Staff Management</label>
                         </div>
                     </div>
 
@@ -1185,6 +1187,8 @@ async function openPermissionsModal(staffId) {
                         <label class="flex items-center"><input type="checkbox" id="p-canDownloadReports" class="mr-2" ${permissions.actions?.canDownloadReports ? 'checked' : ''}> Can Download Reports</label>
                         <label class="flex items-center"><input type="checkbox" id="p-canExportPayAdvice" class="mr-2" ${permissions.actions?.canExportPayAdvice ? 'checked' : ''}> Can Export Pay Advice</label>
                         <label class="flex items-center"><input type="checkbox" id="p-canEndSummerBreak" class="mr-2" ${permissions.actions?.canEndSummerBreak ? 'checked' : ''}> Can End Summer Break</label>
+                        <label class="flex items-center"><input type="checkbox" id="p-canEditStudents" class="mr-2" ${permissions.actions?.canEditStudents ? 'checked' : ''}> Can Edit Students</label>
+                        <label class="flex items-center"><input type="checkbox" id="p-canDeleteStudents" class="mr-2" ${permissions.actions?.canDeleteStudents ? 'checked' : ''}> Can Delete Students</label>
                     </div>
                 </div>
 
@@ -1208,11 +1212,15 @@ async function openPermissionsModal(staffId) {
                 viewPayAdvice: document.getElementById('p-viewPayAdvice').checked,
                 viewTutorReports: document.getElementById('p-viewTutorReports').checked,
                 viewSummerBreak: document.getElementById('p-viewSummerBreak').checked,
+                viewPendingApprovals: document.getElementById('p-viewPendingApprovals').checked,
+                viewStaffManagement: document.getElementById('p-viewStaffManagement').checked,
             },
             actions: {
                 canDownloadReports: document.getElementById('p-canDownloadReports').checked,
                 canExportPayAdvice: document.getElementById('p-canExportPayAdvice').checked,
                 canEndSummerBreak: document.getElementById('p-canEndSummerBreak').checked,
+                canEditStudents: document.getElementById('p-canEditStudents').checked,
+                canDeleteStudents: document.getElementById('p-canDeleteStudents').checked,
             }
         };
 
@@ -1401,5 +1409,6 @@ onAuthStateChanged(auth, async (user) => {
     }
     // ...
 });
+
 
 
