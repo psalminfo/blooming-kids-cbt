@@ -784,7 +784,7 @@ onAuthStateChanged(auth, async (user) => {
 
         const staffDocSnap = await getDoc(staffDocRef);
         if (!staffDocSnap.exists()) {
-            if (mainContent) mainContent.innerHTML = `<p class="text-center mt-12 text-red-600\">Account not registered in staff directory.</p>`;
+            if (mainContent) mainContent.innerHTML = `<p class="text-center mt-12 text-red-600">Account not registered in staff directory.</p>`;
             if (logoutBtn) logoutBtn.classList.add('hidden');
         }
 
