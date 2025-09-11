@@ -1,5 +1,5 @@
 import { auth, db } from './firebaseConfig.js';
-import { collection, getDocs, doc, updateDoc, getDoc, where, query, addDoc, writeBatch } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
+import { collection, getDocs, doc, updateDoc, getDoc, where, query, addDoc, writeBatch, setDoc } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
 import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-auth.js";
 import { onSnapshot } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
 
@@ -219,7 +219,7 @@ async function renderStudentDatabase(container, tutor) {
             });
 
             studentsHTML += `</tbody></table></div>`;
-
+            
             if (tutor.isManagementStaff) {
                 studentsHTML += `
                     <div class="bg-green-50 p-4 rounded-lg shadow-md mt-6">
@@ -427,4 +427,3 @@ onAuthStateChanged(auth, async (user) => {
         window.location.href = "tutor-auth.html";
     }
 });
-
