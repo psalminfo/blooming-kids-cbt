@@ -23,20 +23,20 @@ function convertPayAdviceToCSV(data) {
 }
 
 // ##################################
-// # ACTION HANDLER FUNCTIONS
+// # NEW ACTION HANDLER FUNCTIONS
 // ##################################
 
 // UPDATED: This function now fetches student data and opens a modal for editing
 async function handleEditStudent(studentId) {
     try {
-        const studentDoc = await getDoc(doc(db, "pending_pending_students", studentId));
+        const studentDoc = await getDoc(doc(db, "students", studentId));
         if (!studentDoc.exists()) {
             alert("Student not found!");
             return;
         }
 
         const studentData = studentDoc.data();
-        showEditStudentModal(studentId, studentData, "pending_pending_students");
+        showEditStudentModal(studentId, studentData, "students");
 
     } catch (error) {
         console.error("Error fetching student for edit: ", error);
@@ -47,14 +47,14 @@ async function handleEditStudent(studentId) {
 // NEW FUNCTION: Handle editing a pending student
 async function handleEditPendingStudent(studentId) {
     try {
-        const studentDoc = await getDoc(doc(db, "pending_pending_students", studentId));
+        const studentDoc = await getDoc(doc(db, "pending_students", studentId));
         if (!studentDoc.exists()) {
             alert("Pending student not found!");
             return;
         }
 
         const studentData = studentDoc.data();
-        showEditStudentModal(studentId, studentData, "pending_pending_students");
+        showEditStudentModal(studentId, studentData, "pending_students");
 
     } catch (error) {
         console.error("Error fetching pending student for edit: ", error);
@@ -126,7 +126,7 @@ function showEditStudentModal(studentId, studentData, collectionName) {
 async function handleDeleteStudent(studentId) {
     if (confirm("Are you sure you want to delete this student? This action cannot be undone.")) {
         try {
-            await deleteDoc(doc(db, "pending_pending_students", studentId));
+            await deleteDoc(doc(db, "students", studentId));
             console.log("Student successfully deleted!");
             alert("Student deleted successfully!");
             // Rerender the view to update the list.
@@ -142,7 +142,7 @@ async function handleDeleteStudent(studentId) {
 async function handleApproveStudent(studentId) {
     if (confirm("Are you sure you want to approve this student?")) {
         try {
-            const studentRef = doc(db, "pending_pending_students", studentId);
+            const studentRef = doc(db, "pending_students", studentId);
             const studentDoc = await getDoc(studentRef);
             if (!studentDoc.exists()) {
                 alert("Student not found.");
@@ -153,11 +153,11 @@ async function handleApproveStudent(studentId) {
             // Create a write batch
             const batch = writeBatch(db);
             
-            // Set the student data in the main 'pending_pending_students' collection
-            const newStudentRef = doc(db, "pending_pending_students", studentId);
+            // Set the student data in the main 'students' collection
+            const newStudentRef = doc(db, "students", studentId);
             batch.set(newStudentRef, { ...studentData, status: 'approved' });
             
-            // Delete the student from the 'pending_pending_students' collection
+            // Delete the student from the 'pending_students' collection
             batch.delete(studentRef);
             
             // Commit the batch
@@ -176,7 +176,7 @@ async function handleApproveStudent(studentId) {
 async function handleRejectStudent(studentId) {
     if (confirm("Are you sure you want to reject this student? This will delete their entry.")) {
         try {
-            await deleteDoc(doc(db, "pending_pending_students", studentId));
+            await deleteDoc(doc(db, "pending_students", studentId));
             alert("Student rejected successfully!");
             // The onSnapshot listener will automatically re-render the view
         } catch (error) {
@@ -202,7 +202,7 @@ async function renderManagementTutorView(container) {
                         <p id="tutor-count-badge" class="text-2xl font-extrabold">0</p>
                     </div>
                     <div class="bg-yellow-100 p-3 rounded-lg text-center shadow">
-                        <h4 class="font-bold text-yellow-800 text-sm">Total pending_pending_students</h4>
+                        <h4 class="font-bold text-yellow-800 text-sm">Total Students</h4>
                         <p id="student-count-badge" class="text-2xl font-extrabold">0</p>
                     </div>
                 </div>
@@ -214,41 +214,41 @@ async function renderManagementTutorView(container) {
     `;
 
     try {
-        const [tutorsSnapshot, pending_pending_studentsSnapshot] = await Promise.all([
+        const [tutorsSnapshot, studentsSnapshot] = await Promise.all([
             getDocs(query(collection(db, "tutors"), orderBy("name"))),
-            getDocs(collection(db, "pending_pending_students"))
+            getDocs(collection(db, "students"))
         ]);
 
         document.getElementById('tutor-count-badge').textContent = tutorsSnapshot.size;
-        document.getElementById('student-count-badge').textContent = pending_pending_studentsSnapshot.size;
+        document.getElementById('student-count-badge').textContent = studentsSnapshot.size;
 
-        const pending_pending_studentsByTutor = {};
-        pending_pending_studentsSnapshot.forEach(doc => {
+        const studentsByTutor = {};
+        studentsSnapshot.forEach(doc => {
             const student = { id: doc.id, ...doc.data() };
-            if (!pending_pending_studentsByTutor[student.tutorEmail]) {
-                pending_pending_studentsByTutor[student.tutorEmail] = [];
+            if (!studentsByTutor[student.tutorEmail]) {
+                studentsByTutor[student.tutorEmail] = [];
             }
-            pending_pending_studentsByTutor[student.tutorEmail].push(student);
+            studentsByTutor[student.tutorEmail].push(student);
         });
 
         const directoryList = document.getElementById('directory-list');
         if (!directoryList) return;
 
-        const canEditpending_pending_students = window.userData.permissions?.actions?.canEditpending_pending_students === true;
-        const canDeletepending_pending_students = window.userData.permissions?.actions?.canDeletepending_pending_students === true;
-        const showActionsColumn = canEditpending_pending_students || canDeletepending_pending_students;
+        const canEditStudents = window.userData.permissions?.actions?.canEditStudents === true;
+        const canDeleteStudents = window.userData.permissions?.actions?.canDeleteStudents === true;
+        const showActionsColumn = canEditStudents || canDeleteStudents;
 
         directoryList.innerHTML = tutorsSnapshot.docs.map(tutorDoc => {
             const tutor = tutorDoc.data();
-            const assignedpending_pending_students = pending_pending_studentsByTutor[tutor.email] || [];
+            const assignedStudents = studentsByTutor[tutor.email] || [];
             
-            const pending_pending_studentsTableRows = assignedpending_pending_students
+            const studentsTableRows = assignedStudents
                 .sort((a, b) => a.studentName.localeCompare(b.studentName))
                 .map(student => {
                     const subjects = student.subjects && Array.isArray(student.subjects) ? student.subjects.join(', ') : 'N/A';
                     const actionButtons = `
-                        ${canEditpending_pending_students ? `<button class="edit-student-btn bg-blue-500 text-white px-3 py-1 rounded-full text-xs" data-student-id="${student.id}">Edit</button>` : ''}
-                        ${canDeletepending_pending_students ? `<button class="delete-student-btn bg-red-500 text-white px-3 py-1 rounded-full text-xs" data-student-id="${student.id}">Delete</button>` : ''}
+                        ${canEditStudents ? `<button class="edit-student-btn bg-blue-500 text-white px-3 py-1 rounded-full text-xs" data-student-id="${student.id}">Edit</button>` : ''}
+                        ${canDeleteStudents ? `<button class="delete-student-btn bg-red-500 text-white px-3 py-1 rounded-full text-xs" data-student-id="${student.id}">Delete</button>` : ''}
                     `;
                     return `
                         <tr class="hover:bg-gray-50">
@@ -269,7 +269,7 @@ async function renderManagementTutorView(container) {
                     <details>
                         <summary class="p-4 cursor-pointer flex justify-between items-center font-semibold text-lg">
                             ${tutor.name}
-                            <span class="ml-2 text-sm font-normal text-gray-500">(${assignedpending_pending_students.length} pending_pending_students)</span>
+                            <span class="ml-2 text-sm font-normal text-gray-500">(${assignedStudents.length} students)</span>
                         </summary>
                         <div class="border-t p-2">
                             <table class="min-w-full text-sm">
@@ -283,7 +283,7 @@ async function renderManagementTutorView(container) {
                                     <th class="px-4 py-2 font-medium">Parent's Phone</th>
                                     ${showActionsColumn ? `<th class="px-4 py-2 font-medium">Actions</th>` : ''}
                                 </tr></thead>
-                                <tbody class="bg-white divide-y divide-gray-200">${pending_pending_studentsTableRows}</tbody>
+                                <tbody class="bg-white divide-y divide-gray-200">${studentsTableRows}</tbody>
                             </table>
                         </div>
                     </details>
@@ -291,12 +291,12 @@ async function renderManagementTutorView(container) {
             `;
         }).join('');
 
-        if (canEditpending_pending_students) {
+        if (canEditStudents) {
             document.querySelectorAll('.edit-student-btn').forEach(button => {
                 button.addEventListener('click', () => handleEditStudent(button.dataset.studentId));
             });
         }
-        if (canDeletepending_pending_students) {
+        if (canDeleteStudents) {
             document.querySelectorAll('.delete-student-btn').forEach(button => {
                 button.addEventListener('click', () => handleDeleteStudent(button.dataset.studentId));
             });
@@ -328,7 +328,7 @@ async function renderPayAdvicePanel(container) {
                         <p id="pay-tutor-count" class="text-2xl font-extrabold">0</p>
                     </div>
                     <div class="bg-yellow-100 p-3 rounded-lg text-center shadow w-full">
-                        <h4 class="font-bold text-yellow-800 text-sm">Total pending_pending_students</h4>
+                        <h4 class="font-bold text-yellow-800 text-sm">Total Students</h4>
                         <p id="pay-student-count" class="text-2xl font-extrabold">0</p>
                     </div>
                     ${canExport ? `<button id="export-pay-csv-btn" class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 h-full">Export CSV</button>` : ''}
@@ -336,7 +336,7 @@ async function renderPayAdvicePanel(container) {
             </div>
             <div class="overflow-x-auto">
                 <table class="min-w-full divide-y divide-gray-200">
-                    <thead class="bg-gray-50"><tr><th class="px-6 py-3 text-left text-xs font-medium uppercase">Tutor</th><th class="px-6 py-3 text-left text-xs font-medium uppercase">pending_pending_students</th><th class="px-6 py-3 text-left text-xs font-medium uppercase">Student Fees</th><th class="px-6 py-3 text-left text-xs font-medium uppercase">Mgmt. Fee</th><th class="px-6 py-3 text-left text-xs font-medium uppercase">Total Pay</th></tr></thead>
+                    <thead class="bg-gray-50"><tr><th class="px-6 py-3 text-left text-xs font-medium uppercase">Tutor</th><th class="px-6 py-3 text-left text-xs font-medium uppercase">Students</th><th class="px-6 py-3 text-left text-xs font-medium uppercase">Student Fees</th><th class="px-6 py-3 text-left text-xs font-medium uppercase">Mgmt. Fee</th><th class="px-6 py-3 text-left text-xs font-medium uppercase">Total Pay</th></tr></thead>
                     <tbody id="pay-advice-table-body" class="divide-y"><tr><td colspan="5" class="text-center py-4">Select a date range.</td></tr></tbody>
                 </table>
             </div>
@@ -376,24 +376,24 @@ async function loadPayAdviceData(startDate, endDate) {
             return;
         }
 
-        const [tutorsSnapshot, pending_pending_studentsSnapshot] = await Promise.all([
+        const [tutorsSnapshot, studentsSnapshot] = await Promise.all([
             getDocs(query(collection(db, "tutors"), where("email", "in", activeTutorEmails))),
-            getDocs(collection(db, "pending_pending_students"))
+            getDocs(collection(db, "students"))
         ]);
 
-        const allpending_pending_students = pending_pending_studentsSnapshot.docs.map(doc => doc.data());
+        const allStudents = studentsSnapshot.docs.map(doc => doc.data());
         let totalStudentCount = 0;
         const payData = [];
 
         tutorsSnapshot.forEach(doc => {
             const tutor = doc.data();
-            const assignedpending_pending_students = allpending_pending_students.filter(s => s.tutorEmail === tutor.email);
-            const totalStudentFees = assignedpending_pending_students.reduce((sum, s) => sum + (s.studentFee || 0), 0);
+            const assignedStudents = allStudents.filter(s => s.tutorEmail === tutor.email);
+            const totalStudentFees = assignedStudents.reduce((sum, s) => sum + (s.studentFee || 0), 0);
             const managementFee = (tutor.isManagementStaff && tutor.managementFee) ? tutor.managementFee : 0;
-            totalStudentCount += assignedpending_pending_students.length;
+            totalStudentCount += assignedStudents.length;
 
             payData.push({
-                tutorName: tutor.name, studentCount: assignedpending_pending_students.length,
+                tutorName: tutor.name, studentCount: assignedStudents.length,
                 totalStudentFees: totalStudentFees, managementFee: managementFee,
                 totalPay: totalStudentFees + managementFee
             });
@@ -430,17 +430,73 @@ async function renderTutorReportsPanel(container) {
     loadTutorReportsForManagement();
 }
 
-// ### NEW PANEL RENDERING FUNCTION ###
 async function renderPendingApprovalsPanel(container) {
     container.innerHTML = `
         <div class="bg-white p-6 rounded-lg shadow-md">
             <h2 class="text-2xl font-bold text-green-700 mb-4">Pending Approvals</h2>
             <div id="pending-approvals-list" class="space-y-4">
-                <p class="text-center text-gray-500 py-10">Loading pending pending_pending_students...</p>
+                <p class="text-center text-gray-500 py-10">Loading pending students...</p>
             </div>
         </div>
     `;
     loadPendingApprovals();
+}
+
+// NEW FUNCTION
+async function loadPendingApprovals() {
+    const listContainer = document.getElementById('pending-approvals-list');
+    onSnapshot(query(collection(db, "pending_students"), orderBy("submissionDate", "desc")), (snapshot) => {
+        console.log("Found pending students:", snapshot.docs.length); // DEBUG LOG
+        if (!listContainer) return;
+
+        if (snapshot.empty) {
+            listContainer.innerHTML = `<p class="text-center text-gray-500">No students are awaiting approval.</p>`;
+            return;
+        }
+
+        const canApprove = window.userData.permissions?.actions?.canApproveStudents === true; // Assuming a new permission `canApproveStudents`
+        const canReject = window.userData.permissions?.actions?.canDeleteStudents === true; // Reusing `canDeleteStudents` for rejection
+        const canEditPending = window.userData.permissions?.actions?.canEditStudents === true;
+
+        listContainer.innerHTML = snapshot.docs.map(doc => {
+            const student = { id: doc.id, ...doc.data() };
+            const date = student.submissionDate ? new Date(student.submissionDate.seconds * 1000).toLocaleDateString() : 'N/A';
+            const actionButtons = `
+                ${canEditPending ? `<button class="edit-pending-btn bg-blue-500 text-white px-3 py-1 text-sm rounded-full" data-student-id="${student.id}">Edit</button>` : ''}
+                ${canApprove ? `<button class="approve-btn bg-green-600 text-white px-3 py-1 text-sm rounded-full" data-student-id="${student.id}">Approve</button>` : ''}
+                ${canReject ? `<button class="reject-btn bg-red-600 text-white px-3 py-1 text-sm rounded-full" data-student-id="${student.id}">Reject</button>` : ''}
+            `;
+            return `
+                <div class="border p-4 rounded-lg flex justify-between items-center bg-gray-50">
+                    <div>
+                        <p><strong>Student:</strong> ${student.studentName}</p>
+                        <p><strong>Fee:</strong> ₦${(student.studentFee || 0).toFixed(2)}</p>
+                        <p><strong>Submitted by:</strong> ${student.submittedByEmail}</p>
+                        <p><strong>Submission Date:</strong> ${date}</p>
+                    </div>
+                    <div class="flex items-center space-x-2">
+                        ${actionButtons}
+                    </div>
+                </div>
+            `;
+        }).join('');
+
+        if (canEditPending) {
+            document.querySelectorAll('.edit-pending-btn').forEach(button => {
+                button.addEventListener('click', () => handleEditPendingStudent(button.dataset.studentId));
+            });
+        }
+        if (canApprove) {
+            document.querySelectorAll('.approve-btn').forEach(button => {
+                button.addEventListener('click', () => handleApproveStudent(button.dataset.studentId));
+            });
+        }
+        if (canReject) {
+            document.querySelectorAll('.reject-btn').forEach(button => {
+                button.addEventListener('click', () => handleRejectStudent(button.dataset.studentId));
+            });
+        }
+    });
 }
 
 
@@ -514,7 +570,6 @@ async function loadTutorReportsForManagement() {
     });
 }
 
-
 // NEW HELPER FUNCTION to generate report HTML
 async function generateReportHTML(reportId) {
     const reportDoc = await getDoc(doc(db, "tutor_submissions", reportId));
@@ -580,101 +635,29 @@ async function zipAndDownloadTutorReports(reports, tutorName, buttonElement) {
     }
 }
 
-// NEW FUNCTION: Load pending approvals and attach listeners
-async function loadPendingApprovals() {
-    const listContainer = document.getElementById('pending-approvals-list');
-    onSnapshot(query(collection(db, "pending_pending_students"), orderBy("submissionDate", "desc")), (snapshot) => {
-        console.log("Found pending pending_pending_students:", snapshot.docs.length); // DEBUG LOG
-        if (!listContainer) return;
-
-        if (snapshot.empty) {
-            listContainer.innerHTML = `<p class="text-center text-gray-500">No pending_pending_students are awaiting approval.</p>`;
-            return;
-        }
-
-        const canApprove = window.userData.permissions?.actions?.canApprovepending_pending_students === true;
-        const canReject = window.userData.permissions?.actions?.canDeletepending_pending_students === true;
-        const canEditPending = window.userData.permissions?.actions?.canEditpending_pending_students === true;
-
-        listContainer.innerHTML = snapshot.docs.map(doc => {
-            const student = { id: doc.id, ...doc.data() };
-            const date = student.submissionDate ? new Date(student.submissionDate.seconds * 1000).toLocaleDateString() : 'N/A';
-            const actionButtons = `
-                ${canEditPending ? `<button class="edit-pending-btn bg-blue-500 text-white px-3 py-1 text-sm rounded-full" data-student-id="${student.id}">Edit</button>` : ''}
-                ${canApprove ? `<button class="approve-btn bg-green-600 text-white px-3 py-1 text-sm rounded-full" data-student-id="${student.id}">Approve</button>` : ''}
-                ${canReject ? `<button class="reject-btn bg-red-600 text-white px-3 py-1 text-sm rounded-full" data-student-id="${student.id}">Reject</button>` : ''}
-            `;
-            return `
-                <div class="border p-4 rounded-lg flex justify-between items-center bg-gray-50">
-                    <div>
-                        <p><strong>Student:</strong> ${student.studentName}</p>
-                        <p><strong>Fee:</strong> ₦${(student.studentFee || 0).toFixed(2)}</p>
-                        <p><strong>Submitted by:</strong> ${student.submittedByEmail}</p>
-                        <p><strong>Submission Date:</strong> ${date}</p>
-                    </div>
-                    <div class="flex items-center space-x-2">
-                        ${actionButtons}
-                    </div>
-                </div>
-            `;
-        }).join('');
-
-        if (canEditPending) {
-            document.querySelectorAll('.edit-pending-btn').forEach(button => {
-                button.addEventListener('click', () => handleEditPendingStudent(button.dataset.studentId));
-            });
-        }
-        if (canApprove) {
-            document.querySelectorAll('.approve-btn').forEach(button => {
-                button.addEventListener('click', () => handleApproveStudent(button.dataset.studentId));
-            });
-        }
-        if (canReject) {
-            document.querySelectorAll('.reject-btn').forEach(button => {
-                button.addEventListener('click', () => handleRejectStudent(button.dataset.studentId));
-            });
-        }
-    });
-}
-
-async function handleEndBreak(studentId, studentName) {
-    if (confirm(`Are you sure you want to end the break for ${studentName}?`)) {
-        try {
-            const statusMessageDiv = document.getElementById('break-status-message');
-            await updateDoc(doc(db, "pending_pending_students", studentId), { summerBreak: false, lastBreakEnd: Timestamp.now() });
-            statusMessageDiv.textContent = `Break ended for ${studentName}.`;
-            statusMessageDiv.className = 'text-center font-semibold mb-4 text-green-600';
-            statusMessageDiv.classList.remove('hidden');
-        } catch (error) {
-            console.error("Error ending summer break:", error);
-            statusMessageDiv.textContent = "Failed to end summer break. Check the console for details.";
-            statusMessageDiv.className = 'text-center font-semibold mb-4 text-red-600';
-            statusMessageDiv.classList.remove('hidden');
-        }
-    }
-}
 
 async function renderSummerBreakPanel(container) {
     container.innerHTML = `
         <div class="bg-white p-6 rounded-lg shadow-md">
-            <h2 class="text-2xl font-bold text-green-700">pending_pending_students on Summer Break</h2>
+            <h2 class="text-2xl font-bold text-green-700">Students on Summer Break</h2>
             <div id="break-status-message" class="text-center font-semibold mb-4 hidden"></div>
-            <div id="break-pending_pending_students-list" class="space-y-4">
+            <div id="break-students-list" class="space-y-4">
                 <p class="text-center">Loading...</p>
             </div>
         </div>
     `;
 
     const statusMessageDiv = document.getElementById('break-status-message');
-    const listContainer = document.getElementById('break-pending_pending_students-list');
+    const listContainer = document.getElementById('break-students-list');
 
-    onSnapshot(query(collection(db, "pending_pending_students"), where("summerBreak", "==", true)), (snapshot) => {
+    onSnapshot(query(collection(db, "students"), where("summerBreak", "==", true)), (snapshot) => {
         if (!listContainer) return;
         
-        const canEndBreak = window.userData?.permissions?.actions?.canEndBreak === true;
+        const canEndBreak = window.userData.permissions?.actions?.canEndBreak === true;
+        console.log("canEndBreak permission status:", canEndBreak); // DEBUG LOG
 
         if (snapshot.empty) {
-            listContainer.innerHTML = `<p class="text-center text-gray-500">No pending_pending_students are on break.</p>`;
+            listContainer.innerHTML = `<p class="text-center text-gray-500">No students are on break.</p>`;
             return;
         }
         
@@ -682,7 +665,7 @@ async function renderSummerBreakPanel(container) {
             const student = doc.data();
             const studentId = doc.id;
             const endBreakButton = canEndBreak 
-                ? `<button class="end-break-btn bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700 transition-colors" data-student-id="${studentId}" data-student-name="${student.studentName}">End Break</button>`
+                ? `<button class="end-break-btn bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700 transition-colors" data-student-id="${studentId}">End Break</button>`
                 : '';
 
             return `
@@ -702,9 +685,20 @@ async function renderSummerBreakPanel(container) {
         // Attach event listeners to the new buttons
         if (canEndBreak) {
             document.querySelectorAll('.end-break-btn').forEach(button => {
-                const studentId = button.dataset.studentId;
-                const studentName = button.dataset.studentName;
-                button.addEventListener('click', () => handleEndBreak(studentId, studentName));
+                button.addEventListener('click', async (e) => {
+                    const studentId = e.target.dataset.studentId;
+                    try {
+                        await updateDoc(doc(db, "students", studentId), { summerBreak: false, lastBreakEnd: Timestamp.now() });
+                        statusMessageDiv.textContent = `Break ended for ${e.target.closest('div').querySelector('p').textContent.replace('Student: ', '')}.`;
+                        statusMessageDiv.classList.remove('hidden');
+                        statusMessageDiv.className = 'text-center font-semibold mb-4 text-green-600';
+                    } catch (error) {
+                        console.error("Error ending summer break:", error);
+                        statusMessageDiv.textContent = "Failed to end summer break. Check the console for details.";
+                        statusMessageDiv.className = 'text-center font-semibold mb-4 text-red-600';
+                        statusMessageDiv.classList.remove('hidden');
+                    }
+                });
             });
         }
     });
@@ -719,6 +713,7 @@ onAuthStateChanged(auth, async (user) => {
     const mainContent = document.getElementById('main-content');
     const logoutBtn = document.getElementById('logoutBtn');
     if (user) {
+        // ### ADD THIS onSnapshot LISTENER ###
         const staffDocRef = doc(db, "staff", user.email);
         onSnapshot(staffDocRef, (docSnap) => {
             if (docSnap.exists() && docSnap.data().role !== 'pending') {
@@ -728,6 +723,7 @@ onAuthStateChanged(auth, async (user) => {
                 document.getElementById('welcome-message').textContent = `Welcome, ${staffData.name}`;
                 document.getElementById('user-role').textContent = `Role: ${capitalize(staffData.role)}`;
 
+                // ### UPDATED: Added new nav item here ###
                 const allNavItems = {
                     navTutorManagement: { fn: renderManagementTutorView, perm: 'viewTutorManagement' },
                     navPayAdvice: { fn: renderPayAdvicePanel, perm: 'viewPayAdvice' },
@@ -739,6 +735,7 @@ onAuthStateChanged(auth, async (user) => {
                 const navContainer = document.querySelector('nav');
                 const originalNavButtons = {};
                 if(navContainer) {
+                    // Temporarily store original text content if needed
                     navContainer.querySelectorAll('.nav-btn').forEach(btn => {
                         originalNavButtons[btn.id] = btn.textContent;
                     });
@@ -763,11 +760,14 @@ onAuthStateChanged(auth, async (user) => {
                     });
 
                     if (firstVisibleTab) {
+                        // Check if the current tab is still available after the permission update.
                         const activeNav = document.querySelector('.nav-btn.active');
                         const activeNavId = activeNav?.id;
                         if (!activeNav || !document.getElementById(activeNavId)) {
+                            // The current tab is no longer available, so switch to the first available one.
                             document.getElementById(firstVisibleTab).click();
                         } else {
+                            // The current tab is still available, re-render it to apply new permissions.
                             const currentItem = allNavItems[activeNavId];
                             if(currentItem) currentItem.fn(mainContent);
                         }
@@ -794,5 +794,3 @@ onAuthStateChanged(auth, async (user) => {
         window.location.href = "management-auth.html";
     }
 });
-
-
