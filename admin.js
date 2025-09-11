@@ -32,6 +32,48 @@ async function uploadImageToCloudinary(file) {
     return "https://via.placeholder.com/150";
 }
 
+// ### ADD YOUR NEW FUNCTION HERE ###
+async function updateStaffPermissions(staffEmail, newRole) {
+    const staffDocRef = doc(db, "staff", staffEmail);
+    // This object needs to be defined in your file, as per your code.
+    const ROLE_PERMISSIONS = {
+        pending: {
+            tabs: { viewTutorManagement: false, viewPayAdvice: false, viewTutorReports: false, viewSummerBreak: false, viewPendingApprovals: false, viewStaffManagement: false },
+            actions: { canDownloadReports: false, canExportPayAdvice: false, canEndSummerBreak: false, canEditStudents: false, canDeleteStudents: false }
+        },
+        tutor: {
+            tabs: { viewTutorManagement: false, viewPayAdvice: false, viewTutorReports: false, viewSummerBreak: false, viewPendingApprovals: false, viewStaffManagement: false },
+            actions: { canDownloadReports: false, canExportPayAdvice: false, canEndSummerBreak: false, canEditStudents: false, canDeleteStudents: false }
+        },
+        manager: {
+            tabs: { viewTutorManagement: true, viewPayAdvice: false, viewTutorReports: true, viewSummerBreak: true, viewPendingApprovals: true, viewStaffManagement: false },
+            actions: { canDownloadReports: false, canExportPayAdvice: false, canEndSummerBreak: false, canEditStudents: true, canDeleteStudents: false }
+        },
+        director: {
+            tabs: { viewTutorManagement: true, viewPayAdvice: true, viewTutorReports: true, viewSummerBreak: true, viewPendingApprovals: true, viewStaffManagement: true },
+            actions: { canDownloadReports: true, canExportPayAdvice: true, canEndSummerBreak: true, canEditStudents: true, canDeleteStudents: true }
+        },
+        admin: {
+            tabs: { viewTutorManagement: true, viewPayAdvice: true, viewTutorReports: true, viewSummerBreak: true, viewPendingApprovals: true, viewStaffManagement: true },
+            actions: { canDownloadReports: true, canExportPayAdvice: true, canEndSummerBreak: true, canEditStudents: true, canDeleteStudents: true }
+        }
+    };
+    const newPermissions = ROLE_PERMISSIONS[newRole];
+    if (!newPermissions) {
+        console.error("Invalid role specified:", newRole);
+        return;
+    }
+    try {
+        await updateDoc(staffDocRef, {
+            role: newRole,
+            permissions: newPermissions
+        });
+        console.log(`Successfully updated permissions for ${staffEmail} to role: ${newRole}`);
+    } catch (error) {
+        console.error("Error updating staff permissions:", error);
+    }
+}
+
 // ##################################################################
 // # SECTION 1: DASHBOARD PANEL (Restored to original as requested)
 // ##################################################################
@@ -1403,6 +1445,7 @@ onAuthStateChanged(auth, async (user) => {
     }
     // ...
 });
+
 
 
 
