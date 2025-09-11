@@ -445,8 +445,6 @@ async function renderPendingApprovalsPanel(container) {
 // ### UPDATED FUNCTION ###
 async function loadPendingApprovals() {
     const listContainer = document.getElementById('pending-approvals-list');
-    // NOTE: Removed orderBy clause because tutor.js does not add a 'submissionDate' field.
-    // This prevents an error and ensures all pending students are fetched.
     onSnapshot(query(collection(db, "pending_students")), (snapshot) => {
         if (!listContainer) return;
 
@@ -455,16 +453,13 @@ async function loadPendingApprovals() {
             return;
         }
 
-        const canApprove = window.userData.permissions?.actions?.canApproveStudents === true;
-        const canReject = window.userData.permissions?.actions?.canDeleteStudents === true;
-        const canEditPending = window.userData.permissions?.actions?.canEditStudents === true;
-
+        // Action buttons are now always visible for any user who can see this tab.
         listContainer.innerHTML = snapshot.docs.map(doc => {
             const student = { id: doc.id, ...doc.data() };
             const actionButtons = `
-                ${canEditPending ? `<button class="edit-pending-btn bg-blue-500 text-white px-3 py-1 text-sm rounded-full" data-student-id="${student.id}">Edit</button>` : ''}
-                ${canApprove ? `<button class="approve-btn bg-green-600 text-white px-3 py-1 text-sm rounded-full" data-student-id="${student.id}">Approve</button>` : ''}
-                ${canReject ? `<button class="reject-btn bg-red-600 text-white px-3 py-1 text-sm rounded-full" data-student-id="${student.id}">Reject</button>` : ''}
+                <button class="edit-pending-btn bg-blue-500 text-white px-3 py-1 text-sm rounded-full" data-student-id="${student.id}">Edit</button>
+                <button class="approve-btn bg-green-600 text-white px-3 py-1 text-sm rounded-full" data-student-id="${student.id}">Approve</button>
+                <button class="reject-btn bg-red-600 text-white px-3 py-1 text-sm rounded-full" data-student-id="${student.id}">Reject</button>
             `;
             return `
                 <div class="border p-4 rounded-lg flex justify-between items-center bg-gray-50">
@@ -480,21 +475,16 @@ async function loadPendingApprovals() {
             `;
         }).join('');
 
-        if (canEditPending) {
-            document.querySelectorAll('.edit-pending-btn').forEach(button => {
-                button.addEventListener('click', () => handleEditPendingStudent(button.dataset.studentId));
-            });
-        }
-        if (canApprove) {
-            document.querySelectorAll('.approve-btn').forEach(button => {
-                button.addEventListener('click', () => handleApproveStudent(button.dataset.studentId));
-            });
-        }
-        if (canReject) {
-            document.querySelectorAll('.reject-btn').forEach(button => {
-                button.addEventListener('click', () => handleRejectStudent(button.dataset.studentId));
-            });
-        }
+        // Event listeners are now always attached.
+        document.querySelectorAll('.edit-pending-btn').forEach(button => {
+            button.addEventListener('click', () => handleEditPendingStudent(button.dataset.studentId));
+        });
+        document.querySelectorAll('.approve-btn').forEach(button => {
+            button.addEventListener('click', () => handleApproveStudent(button.dataset.studentId));
+        });
+        document.querySelectorAll('.reject-btn').forEach(button => {
+            button.addEventListener('click', () => handleRejectStudent(button.dataset.studentId));
+        });
     });
 }
 
