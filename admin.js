@@ -1232,7 +1232,7 @@ async function openPermissionsModal(staffId) {
 
 
 // ##################################################################
-// # MAIN APP INITIALIZATION (FIXED & MERGED)
+// # MAIN APP INITIALIZATION (Updated)
 // ##################################################################
 
 onAuthStateChanged(auth, async (user) => {
@@ -1240,26 +1240,20 @@ onAuthStateChanged(auth, async (user) => {
     const logoutBtn = document.getElementById('logoutBtn');
     if (user && user.email === ADMIN_EMAIL) {
         mainContent.innerHTML = '';
-        
-        // This object maps the button ID to the function that renders its content.
         const navItems = {
             navDashboard: renderAdminPanel,
             navContent: renderContentManagerPanel,
-            navStaff: renderStaffPanel, // This line correctly adds the new panel
             navTutorManagement: renderTutorManagementPanel,
             navPayAdvice: renderPayAdvicePanel,
             navTutorReports: renderTutorReportsPanel,
-            navSummerBreak: renderSummerBreakPanel
+            navSummerBreak: renderSummerBreakPanel,
+            navStaff: renderStaffPanel,
+            navPendingApprovals: renderPendingApprovalsPanel // ### ADD THIS LINE ###
         };
 
-        const setActiveNav = (activeId) => {
-            Object.keys(navItems).forEach(id => {
-                const navElement = document.getElementById(id);
-                if (navElement) {
-                     navElement.classList.toggle('active', id === activeId);
-                }
-            });
-        };
+        const setActiveNav = (activeId) => Object.keys(navItems).forEach(id => {
+            document.getElementById(id)?.classList.toggle('active', id === activeId);
+        });
 
         Object.entries(navItems).forEach(([id, renderFn]) => {
             const navElement = document.getElementById(id);
@@ -1271,7 +1265,7 @@ onAuthStateChanged(auth, async (user) => {
             }
         });
 
-        // Initial Load on page open
+        // Initial Load
         setActiveNav('navDashboard');
         renderAdminPanel(mainContent);
 
@@ -1409,6 +1403,7 @@ onAuthStateChanged(auth, async (user) => {
     }
     // ...
 });
+
 
 
 
