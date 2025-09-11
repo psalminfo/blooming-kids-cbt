@@ -326,7 +326,7 @@ async function renderStudentDatabase(container, tutor) {
                     tutorEmail: tutor.email, summerBreak: false
                 };
                 if (studentData.parentName && studentData.studentName && studentData.grade && !isNaN(studentData.studentFee)) {
-                    await addDoc(collection(db, "students"), studentData);
+                    await addDoc(collection(db, "pending_students"), studentData);
                     renderStudentDatabase(container, tutor);
                 } else {
                     alert('Please fill in all parent and student details correctly.');
@@ -419,3 +419,4 @@ onAuthStateChanged(auth, async (user) => {
         window.location.href = "tutor-auth.html";
     }
 });
+
