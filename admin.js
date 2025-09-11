@@ -1276,6 +1276,72 @@ onAuthStateChanged(auth, async (user) => {
 });
 
 // ##################################################################
+// # SECTION 8: PENDING APPROVALS
+// ##################################################################
+async function renderPendingApprovalsPanel(container) {
+    container.innerHTML = `<h2 class="text-2xl font-bold text-green-700 mb-4">Pending Approvals</h2><div id="pending-list" class="space-y-4"></div>`;
+    const pendingListContainer = document.getElementById('pending-list');
+    pendingListContainer.innerHTML = `<p class="text-gray-500">Loading pending accounts...</p>`;
+
+    try {
+        const tutorsQuery = query(collection(db, "tutors"), where("status", "==", "pending"));
+        const studentsQuery = query(collection(db, "students"), where("approvalStatus", "==", "pending"));
+
+        const [tutorsSnap, studentsSnap] = await Promise.all([getDocs(tutorsQuery), getDocs(studentsQuery)]);
+
+        let pendingHTML = '';
+        tutorsSnap.forEach(doc => {
+            const tutor = doc.data();
+            pendingHTML += `
+                <div class="bg-white p-4 rounded-lg shadow-sm border border-yellow-200">
+                    <p class="font-semibold">${tutor.name} (Tutor)</p>
+                    <p class="text-gray-600 text-sm">${tutor.email}</p>
+                    <div class="mt-2 space-x-2">
+                        <button class="approve-btn bg-green-500 text-white px-3 py-1 rounded" data-id="${doc.id}" data-type="tutor">Approve</button>
+                        <button class="reject-btn bg-red-500 text-white px-3 py-1 rounded" data-id="${doc.id}" data-type="tutor">Reject</button>
+                    </div>
+                </div>
+            `;
+        });
+
+        studentsSnap.forEach(doc => {
+            const student = doc.data();
+            pendingHTML += `
+                <div class="bg-white p-4 rounded-lg shadow-sm border border-yellow-200">
+                    <p class="font-semibold">${student.studentName} (Student - Grade ${student.grade})</p>
+                    <p class="text-gray-600 text-sm">Parent: ${student.parentName}</p>
+                    <div class="mt-2 space-x-2">
+                        <button class="approve-btn bg-green-500 text-white px-3 py-1 rounded" data-id="${doc.id}" data-type="student">Approve</button>
+                        <button class="reject-btn bg-red-500 text-white px-3 py-1 rounded" data-id="${doc.id}" data-type="student">Reject</button>
+                    </div>
+                </div>
+            `;
+        });
+
+        pendingListContainer.innerHTML = pendingHTML || `<p class="text-gray-500">No pending accounts to review.</p>`;
+        
+        document.querySelectorAll('.approve-btn').forEach(btn => {
+            btn.addEventListener('click', () => handleApproval(btn.dataset.id, btn.dataset.type, 'approved'));
+        });
+        document.querySelectorAll('.reject-btn').forEach(btn => {
+            btn.addEventListener('click', () => handleApproval(btn.dataset.id, btn.dataset.type, 'rejected'));
+        });
+
+    } catch (error) {
+        console.error("Error loading pending approvals:", error);
+        pendingListContainer.innerHTML = `<p class="text-red-500">Failed to load pending approvals.</p>`;
+    }
+}
+
+async function handleApproval(id, type, status) {
+    const collectionName = type === 'tutor' ? 'tutors' : 'students';
+    const docRef = doc(db, collectionName, id);
+    await updateDoc(docRef, { [type === 'tutor' ? 'status' : 'approvalStatus']: status });
+    alert(`${type.charAt(0).toUpperCase() + type.slice(1)} ${status} successfully.`);
+    // Re-render the panel to show the updated list
+    renderPendingApprovalsPanel(document.getElementById('main-content'));
+}
+// ##################################################################
 // # MAIN APP INITIALIZATION (Updated)
 // ##################################################################
 
@@ -1290,7 +1356,8 @@ onAuthStateChanged(auth, async (user) => {
             navTutorManagement: renderTutorManagementPanel,
             navPayAdvice: renderPayAdvicePanel,
             navTutorReports: renderTutorReportsPanel,
-            navSummerBreak: renderSummerBreakPanel
+            navSummerBreak: renderSummerBreakPanel,
+            navPendingApprovals: renderPendingApprovalsPanel
         };
 
         const setActiveNav = (activeId) => Object.keys(navItems).forEach(id => {
@@ -1334,4 +1401,5 @@ onAuthStateChanged(auth, async (user) => {
     }
     // ...
 });
+
 
