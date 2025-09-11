@@ -451,7 +451,6 @@ onAuthStateChanged(auth, async (user) => {
     const mainContent = document.getElementById('main-content');
     const logoutBtn = document.getElementById('logoutBtn');
     if (user) {
-        // ### ADD THIS onSnapshot LISTENER ###
         const staffDocRef = doc(db, "staff", user.email);
         onSnapshot(staffDocRef, (docSnap) => {
             if (docSnap.exists() && docSnap.data().role !== 'pending') {
@@ -471,7 +470,6 @@ onAuthStateChanged(auth, async (user) => {
                 const navContainer = document.querySelector('nav');
                 const originalNavButtons = {};
                 if(navContainer) {
-                    // Temporarily store original text content if needed
                     navContainer.querySelectorAll('.nav-btn').forEach(btn => {
                         originalNavButtons[btn.id] = btn.textContent;
                     });
@@ -496,14 +494,11 @@ onAuthStateChanged(auth, async (user) => {
                     });
 
                     if (firstVisibleTab) {
-                        // Check if the current tab is still available after the permission update.
                         const activeNav = document.querySelector('.nav-btn.active');
                         const activeNavId = activeNav?.id;
                         if (!activeNav || !document.getElementById(activeNavId)) {
-                            // The current tab is no longer available, so switch to the first available one.
                             document.getElementById(firstVisibleTab).click();
                         } else {
-                            // The current tab is still available, re-render it to apply new permissions.
                             const currentItem = allNavItems[activeNavId];
                             if(currentItem) currentItem.fn(mainContent);
                         }
@@ -512,7 +507,7 @@ onAuthStateChanged(auth, async (user) => {
                     }
                 }
             } else {
-                if (document.getElementById('welcome-message')) document.getElementById('welcome-message').textContent = `Hello, ${docSnap.data()?.name}`;
+                if (document.getElementById('welcome-message')) document.getElementById('welcome-message').textContent = `Hello, ${docSnap.data()?.name || ''}`;
                 if (document.getElementById('user-role')) document.getElementById('user-role').textContent = 'Status: Pending Approval';
                 if (mainContent) mainContent.innerHTML = `<p class="text-center mt-12 text-yellow-600 font-semibold">Your account is awaiting approval.</p>`;
             }
