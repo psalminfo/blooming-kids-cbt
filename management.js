@@ -3,11 +3,13 @@ import { collection, getDocs, doc, getDoc, where, query, orderBy, Timestamp, wri
 import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-auth.js";
 import { onSnapshot } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
 
+// Utility function to capitalize strings
 function capitalize(str) {
     if (!str) return '';
     return str.replace(/\b\w/g, l => l.toUpperCase());
 }
 
+// Utility function to convert data to CSV
 function convertPayAdviceToCSV(data) {
     const header = ['Tutor Name', 'Student Count', 'Total Student Fees (₦)', 'Management Fee (₦)', 'Total Pay (₦)'];
     const rows = data.map(item => [
@@ -24,34 +26,101 @@ function convertPayAdviceToCSV(data) {
 // # NEW ACTION HANDLER FUNCTIONS
 // ##################################
 
-// UPDATED: This function now fetches student data and prepares for editing
+// UPDATED: This function now fetches student data and opens a modal for editing
 async function handleEditStudent(studentId) {
     try {
-        const studentRef = doc(db, "students", studentId);
-        const studentDoc = await getDoc(studentRef);
-
+        const studentDoc = await getDoc(doc(db, "students", studentId));
         if (!studentDoc.exists()) {
             alert("Student not found!");
             return;
         }
 
         const studentData = studentDoc.data();
-        console.log("Student data fetched for editing:", studentData);
-
-        // ### IMPORTANT: THIS IS WHERE YOU'D OPEN YOUR EDIT MODAL/FORM ###
-        // For now, we'll just show an alert with the data, but you
-        // would take studentData and populate a form with it.
-        const newStudentName = prompt(`Editing ${studentData.studentName}. Enter new name:`, studentData.studentName);
-        if (newStudentName !== null && newStudentName.trim() !== "") {
-            await updateDoc(studentRef, { studentName: newStudentName });
-            alert("Student name updated successfully!");
-        }
+        showEditStudentModal(studentId, studentData, "students");
 
     } catch (error) {
         console.error("Error fetching student for edit: ", error);
         alert("Error fetching student data. Check the console for details.");
     }
 }
+
+// NEW FUNCTION: Handle editing a pending student
+async function handleEditPendingStudent(studentId) {
+    try {
+        const studentDoc = await getDoc(doc(db, "pending_students", studentId));
+        if (!studentDoc.exists()) {
+            alert("Pending student not found!");
+            return;
+        }
+
+        const studentData = studentDoc.data();
+        showEditStudentModal(studentId, studentData, "pending_students");
+
+    } catch (error) {
+        console.error("Error fetching pending student for edit: ", error);
+        alert("Error fetching student data. Check the console for details.");
+    }
+}
+
+
+// UPDATED: Centralized function to show the edit modal
+function showEditStudentModal(studentId, studentData, collectionName) {
+    const modalHtml = `
+        <div id="edit-modal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-center justify-center">
+            <div class="relative p-8 bg-white w-96 max-w-lg rounded-lg shadow-xl">
+                <button class="absolute top-2 right-2 text-gray-500 hover:text-gray-800 text-2xl font-bold" onclick="document.getElementById('edit-modal').remove()">&times;</button>
+                <h3 class="text-xl font-bold mb-4">Edit Student Details</h3>
+                <form id="edit-student-form">
+                    <input type="hidden" id="edit-student-id" value="${studentId}">
+                    <input type="hidden" id="edit-collection-name" value="${collectionName}">
+
+                    <div class="mb-2"><label class="block text-sm font-medium">Student Name</label><input type="text" id="edit-studentName" value="${studentData.studentName}" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2"></div>
+                    <div class="mb-2"><label class="block text-sm font-medium">Student Grade</label><input type="text" id="edit-grade" value="${studentData.grade}" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2"></div>
+                    <div class="mb-2"><label class="block text-sm font-medium">Days/Week</label><input type="text" id="edit-days" value="${studentData.days}" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2"></div>
+                    <div class="mb-2"><label class="block text-sm font-medium">Subjects (comma-separated)</label><input type="text" id="edit-subjects" value="${studentData.subjects ? studentData.subjects.join(', ') : ''}" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2"></div>
+                    <div class="mb-2"><label class="block text-sm font-medium">Parent Name</label><input type="text" id="edit-parentName" value="${studentData.parentName || ''}" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2"></div>
+                    <div class="mb-2"><label class="block text-sm font-medium">Parent Phone</label><input type="text" id="edit-parentPhone" value="${studentData.parentPhone || ''}" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2"></div>
+                    <div class="mb-2"><label class="block text-sm font-medium">Student Fee (₦)</label><input type="number" id="edit-studentFee" value="${studentData.studentFee || 0}" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2"></div>
+
+                    <div class="flex justify-end mt-4">
+                        <button type="button" onclick="document.getElementById('edit-modal').remove()" class="mr-2 px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300">Cancel</button>
+                        <button type="submit" class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700">Save Changes</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    `;
+
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+
+    document.getElementById('edit-student-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const form = e.target;
+        const editedId = form.elements['edit-student-id'].value;
+        const targetCollection = form.elements['edit-collection-name'].value;
+
+        const updatedData = {
+            studentName: form.elements['edit-studentName'].value,
+            grade: form.elements['edit-grade'].value,
+            days: form.elements['edit-days'].value,
+            subjects: form.elements['edit-subjects'].value.split(',').map(s => s.trim()).filter(s => s),
+            parentName: form.elements['edit-parentName'].value,
+            parentPhone: form.elements['edit-parentPhone'].value,
+            studentFee: Number(form.elements['edit-studentFee'].value) || 0,
+        };
+        
+        try {
+            await updateDoc(doc(db, targetCollection, editedId), updatedData);
+            alert("Student details updated successfully!");
+            document.getElementById('edit-modal').remove();
+            // The onSnapshot listener will automatically re-render the view
+        } catch (error) {
+            console.error("Error updating document: ", error);
+            alert("Failed to save changes. Check the console for details.");
+        }
+    });
+}
+
 
 // Placeholder function to handle student deletion
 async function handleDeleteStudent(studentId) {
@@ -184,6 +253,7 @@ async function renderManagementTutorView(container) {
                     return `
                         <tr class="hover:bg-gray-50">
                             <td class="px-4 py-2 font-medium">${student.studentName}</td>
+                            <td class="px-4 py-2">₦${(student.studentFee || 0).toFixed(2)}</td>
                             <td class="px-4 py-2">${student.grade}</td>
                             <td class="px-4 py-2">${student.days}</td>
                             <td class="px-4 py-2">${subjects}</td>
@@ -205,6 +275,7 @@ async function renderManagementTutorView(container) {
                             <table class="min-w-full text-sm">
                                 <thead class="bg-gray-50 text-left"><tr>
                                     <th class="px-4 py-2 font-medium">Student Name</th>
+                                    <th class="px-4 py-2 font-medium">Fee</th>
                                     <th class="px-4 py-2 font-medium">Grade</th>
                                     <th class="px-4 py-2 font-medium">Days/Week</th>
                                     <th class="px-4 py-2 font-medium">Subject</th>
@@ -375,6 +446,7 @@ async function renderPendingApprovalsPanel(container) {
 async function loadPendingApprovals() {
     const listContainer = document.getElementById('pending-approvals-list');
     onSnapshot(query(collection(db, "pending_students"), orderBy("submissionDate", "desc")), (snapshot) => {
+        console.log("Found pending students:", snapshot.docs.length); // DEBUG LOG
         if (!listContainer) return;
 
         if (snapshot.empty) {
@@ -384,11 +456,13 @@ async function loadPendingApprovals() {
 
         const canApprove = window.userData.permissions?.actions?.canApproveStudents === true; // Assuming a new permission `canApproveStudents`
         const canReject = window.userData.permissions?.actions?.canDeleteStudents === true; // Reusing `canDeleteStudents` for rejection
+        const canEditPending = window.userData.permissions?.actions?.canEditStudents === true;
 
         listContainer.innerHTML = snapshot.docs.map(doc => {
             const student = { id: doc.id, ...doc.data() };
             const date = student.submissionDate ? new Date(student.submissionDate.seconds * 1000).toLocaleDateString() : 'N/A';
             const actionButtons = `
+                ${canEditPending ? `<button class="edit-pending-btn bg-blue-500 text-white px-3 py-1 text-sm rounded-full" data-student-id="${student.id}">Edit</button>` : ''}
                 ${canApprove ? `<button class="approve-btn bg-green-600 text-white px-3 py-1 text-sm rounded-full" data-student-id="${student.id}">Approve</button>` : ''}
                 ${canReject ? `<button class="reject-btn bg-red-600 text-white px-3 py-1 text-sm rounded-full" data-student-id="${student.id}">Reject</button>` : ''}
             `;
@@ -396,6 +470,7 @@ async function loadPendingApprovals() {
                 <div class="border p-4 rounded-lg flex justify-between items-center bg-gray-50">
                     <div>
                         <p><strong>Student:</strong> ${student.studentName}</p>
+                        <p><strong>Fee:</strong> ₦${(student.studentFee || 0).toFixed(2)}</p>
                         <p><strong>Submitted by:</strong> ${student.submittedByEmail}</p>
                         <p><strong>Submission Date:</strong> ${date}</p>
                     </div>
@@ -406,6 +481,11 @@ async function loadPendingApprovals() {
             `;
         }).join('');
 
+        if (canEditPending) {
+            document.querySelectorAll('.edit-pending-btn').forEach(button => {
+                button.addEventListener('click', () => handleEditPendingStudent(button.dataset.studentId));
+            });
+        }
         if (canApprove) {
             document.querySelectorAll('.approve-btn').forEach(button => {
                 button.addEventListener('click', () => handleApproveStudent(button.dataset.studentId));
@@ -573,12 +653,13 @@ async function renderSummerBreakPanel(container) {
     onSnapshot(query(collection(db, "students"), where("summerBreak", "==", true)), (snapshot) => {
         if (!listContainer) return;
         
+        const canEndBreak = window.userData.permissions?.actions?.canEndBreak === true;
+        console.log("canEndBreak permission status:", canEndBreak); // DEBUG LOG
+
         if (snapshot.empty) {
             listContainer.innerHTML = `<p class="text-center text-gray-500">No students are on break.</p>`;
             return;
         }
-
-        const canEndBreak = window.userData.permissions?.actions?.canEndBreak;
         
         listContainer.innerHTML = snapshot.docs.map(doc => {
             const student = doc.data();
