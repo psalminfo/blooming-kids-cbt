@@ -1,5 +1,5 @@
 import { auth, db } from './firebaseConfig.js';
-import { collection, getDocs, doc, updateDoc, getDoc, where, query, addDoc, writeBatch } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
+import { collection, getDocs, doc, updateDoc, getDoc, where, query, addDoc, writeBatch, setDoc, orderBy, Timestamp } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
 import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-auth.js";
 import { onSnapshot } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
 
@@ -26,358 +26,196 @@ onSnapshot(settingsDocRef, (docSnap) => {
 });
 
 
-// ##################################################################
-// # SECTION 1: TUTOR DASHBOARD (Updated as requested)
-// ##################################################################
-function renderTutorDashboard(container, tutor) {
-    container.innerHTML = `
-        <div class="bg-white p-6 rounded-lg shadow-md mb-6">
-            <h2 class="text-2xl font-bold text-green-700 mb-4">Welcome, ${tutor.name}</h2>
-            <div class="mb-4">
-                <input type="text" id="searchName" class="w-full mt-1 p-2 border rounded" placeholder="Search by parent name...">
-                <button id="searchBtn" class="bg-green-600 text-white px-4 py-2 rounded mt-2 hover:bg-green-700">Search</button>
-            </div>
-        </div>
-        <div id="pendingReportsContainer" class="space-y-4">
-            <p class="text-gray-500">Loading pending submissions...</p>
-        </div>
-        <div id="gradedReportsContainer" class="space-y-4 hidden">
-            <p class="text-gray-500">Loading graded submissions...</p>
-        </div>
-    `;
-    document.getElementById('searchBtn').addEventListener('click', async () => {
-        const name = document.getElementById('searchName').value.trim();
-        await loadTutorReports(tutor.email, name || null);
-    });
-    loadTutorReports(tutor.email);
-}
+// ##################################
+// # NEW ACTION HANDLER FUNCTIONS
+// ##################################
 
-async function loadTutorReports(tutorEmail, parentName = null) {
-    const pendingReportsContainer = document.getElementById('pendingReportsContainer');
-    const gradedReportsContainer = document.getElementById('gradedReportsContainer');
-
-    pendingReportsContainer.innerHTML = `<p class="text-gray-500">Loading pending submissions...</p>`;
-    if (gradedReportsContainer) gradedReportsContainer.innerHTML = `<p class="text-gray-500">Loading graded submissions...</p>`;
-
-    // Query now searches by parentName instead of parentEmail
-    let submissionsQuery = query(collection(db, "tutor_submissions"), where("tutorEmail", "==", tutorEmail));
-    if (parentName) {
-        submissionsQuery = query(submissionsQuery, where("parentName", "==", parentName));
-    }
-
+// UPDATED: This function now adds a student to the "pending_students" collection
+async function addStudent(studentData, tutorEmail) {
     try {
-        const querySnapshot = await getDocs(submissionsQuery);
-        let pendingHTML = '';
-        let gradedHTML = '';
-
-        querySnapshot.forEach(doc => {
-            const data = doc.data();
-            const reportCardHTML = `
-                <div class="border rounded-lg p-4 shadow-sm bg-white mb-4">
-                    <p><strong>Student:</strong> ${data.studentName}</p>
-                    <p><strong>Parent Name:</strong> ${data.parentName || 'N/A'}</p>
-                    <p><strong>Grade:</strong> ${data.grade}</p>
-                    <p><strong>Submitted At:</strong> ${new Date(data.submittedAt.seconds * 1000).toLocaleString()}</p>
-                    <div class="mt-4 border-t pt-4">
-                        <h4 class="font-semibold">Creative Writing Submission:</h4>
-                        ${data.fileUrl ? `<a href="${data.fileUrl}" target="_blank" class="text-green-600 hover:underline">Download File</a>` : `<p class="italic">${data.textAnswer || "No response"}</p>`}
-                        <p class="mt-2"><strong>Status:</strong> ${data.status || 'Pending'}</p>
-                        ${(data.status === 'pending_review') ? `
-                            <textarea class="tutor-report w-full mt-2 p-2 border rounded" rows="3" placeholder="Write your report here..."></textarea>
-                            <button class="submit-report-btn bg-green-600 text-white px-4 py-2 rounded mt-2" data-doc-id="${doc.id}">Submit Report</button>
-                        ` : `
-                            <p class="mt-2"><strong>Tutor's Report:</strong> ${data.tutorReport || 'N/A'}</p>
-                        `}
-                    </div>
-                </div>
-            `;
-            if (data.status === 'pending_review') {
-                pendingHTML += reportCardHTML;
-            } else {
-                gradedHTML += reportCardHTML;
-            }
+        const docRef = await addDoc(collection(db, "pending_students"), {
+            ...studentData,
+            tutorEmail: tutorEmail,
+            dateAdded: Timestamp.now(),
+            status: "Awaiting Approval" // The new status for a pending student
         });
-        pendingReportsContainer.innerHTML = pendingHTML || `<p class="text-gray-500">No pending submissions found.</p>`;
-        if (gradedReportsContainer) gradedReportsContainer.innerHTML = gradedHTML || `<p class="text-gray-500">No graded submissions found.</p>`;
-
-        document.querySelectorAll('.submit-report-btn').forEach(button => {
-            button.addEventListener('click', async (e) => {
-                const docId = e.target.getAttribute('data-doc-id');
-                const reportTextarea = e.target.closest('.border').querySelector('.tutor-report');
-                const tutorReport = reportTextarea.value.trim();
-                if (tutorReport) {
-                    const docRef = doc(db, "tutor_submissions", docId);
-                    await updateDoc(docRef, { tutorReport: tutorReport, status: 'Graded' });
-                    loadTutorReports(tutorEmail, parentName); // Refresh the list
-                }
-            });
-        });
-    } catch (error) {
-        console.error("Error loading tutor reports:", error);
-        pendingReportsContainer.innerHTML = `<p class="text-red-500">Failed to load reports.</p>`;
-        if (gradedReportsContainer) gradedReportsContainer.innerHTML = `<p class="text-red-500">Failed to load reports.</p>`;
+        console.log("Document written with ID: ", docRef.id);
+        return { success: true, message: "Student added successfully and is awaiting approval." };
+    } catch (e) {
+        console.error("Error adding document: ", e);
+        return { success: false, message: "Error adding student. Please try again." };
     }
 }
 
+async function renderTutorDashboard(mainContent, tutorData) {
+    // Check if the current user has the appropriate role or permissions
+    const tutorId = tutorData.id;
 
-// ##################################################################
-// # SECTION 2: STUDENT DATABASE (Updated as requested)
-// ##################################################################
+    // Fetch students linked to the current tutor
+    const qStudents = query(collection(db, "students"), where("tutorEmail", "==", tutorId), orderBy("name"));
+    const studentsSnap = await getDocs(qStudents);
+    const students = studentsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 
-async function renderStudentDatabase(container, tutor) {
-    if (!container) {
-        console.error("Container element not found.");
-        return;
-    }
+    // Fetch total fees and payments
+    const fees = students.reduce((sum, student) => sum + (student.fees || 0), 0);
+    const payments = students.reduce((sum, student) => sum + (student.payments || 0), 0);
+    const totalEarnings = fees - payments;
 
-    let savedReports = {};
-
-    const studentQuery = query(collection(db, "students"), where("tutorEmail", "==", tutor.email));
-    const studentsSnapshot = await getDocs(studentQuery);
-    const students = studentsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-    const studentsCount = students.length;
-
-    function renderUI() {
-        let studentsHTML = `<h2 class="text-2xl font-bold text-green-700 mb-4">My Students (${studentsCount})</h2>`;
-
-        if (isTutorAddEnabled) {
-            studentsHTML += `
-                <div class="bg-gray-100 p-4 rounded-lg shadow-inner mb-4">
-                    <h3 class="font-bold text-lg mb-2">Add a New Student</h3>
-                    <input type="text" id="new-parent-name" class="w-full mt-1 p-2 border rounded" placeholder="Parent Name">
-                    <input type="tel" id="new-parent-phone" class="w-full mt-1 p-2 border rounded" placeholder="Parent Phone Number">
-                    <input type="text" id="new-student-name" class="w-full mt-1 p-2 border rounded" placeholder="Student Name">
-                    <select id="new-student-grade" class="w-full mt-1 p-2 border rounded">
-                        <option value="">Select Grade</option>
-                        ${Array.from({ length: 12 }, (_, i) => `<option value="${i + 1}">${i + 1}</option>`).join('')}
-                    </select>
-                    <input type="text" id="new-student-subject" class="w-full mt-1 p-2 border rounded" placeholder="Subject(s) (e.g., Math, English)">
-                    <select id="new-student-days" class="w-full mt-1 p-2 border rounded">
-                        <option value="">Select Days</option>
-                        ${Array.from({ length: 7 }, (_, i) => `<option value="${i + 1}">${i + 1}</option>`).join('')}
-                    </select>
-                    <input type="number" id="new-student-fee" class="w-full mt-1 p-2 border rounded" placeholder="Student Fee (₦)">
-                    <button id="add-student-btn" class="bg-green-600 text-white px-4 py-2 rounded mt-2 hover:bg-green-700">Add Student</button>
-                </div>`;
-        }
-        
-        studentsHTML += `<p class="text-sm text-gray-600 mb-4">Report submission is currently <strong class="${isSubmissionEnabled ? 'text-green-600' : 'text-red-500'}">${isSubmissionEnabled ? 'Enabled' : 'Disabled'}</strong> by the admin.</p>`;
-
-        if (studentsCount === 0) {
-            studentsHTML += `<p class="text-gray-500">You are not assigned to any students yet.</p>`;
-        } else {
-            studentsHTML += `
+    mainContent.innerHTML = `
+        <div id="tutor-dashboard-view" class="p-6 bg-gray-100 min-h-screen">
+            <h2 class="text-3xl font-bold text-gray-800 mb-6">Tutor Dashboard</h2>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+                <div class="bg-white p-6 rounded-lg shadow-lg">
+                    <h3 class="text-xl font-semibold text-gray-700">Total Students</h3>
+                    <p class="text-3xl font-bold text-blue-600 mt-2">${students.length}</p>
+                </div>
+                <div class="bg-white p-6 rounded-lg shadow-lg">
+                    <h3 class="text-xl font-semibold text-gray-700">Total Earnings</h3>
+                    <p class="text-3xl font-bold text-green-600 mt-2">₦${totalEarnings.toLocaleString()}</p>
+                </div>
+                <div class="bg-white p-6 rounded-lg shadow-lg">
+                    <h3 class="text-xl font-semibold text-gray-700">Latest Report</h3>
+                    <p class="text-sm text-gray-500 mt-2">No reports submitted recently.</p>
+                </div>
+            </div>
+            <div class="bg-white p-6 rounded-lg shadow-lg">
+                <h3 class="text-xl font-semibold text-gray-700 mb-4">My Students</h3>
                 <div class="overflow-x-auto">
                     <table class="min-w-full divide-y divide-gray-200">
-                        <thead><tr><th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Student Name</th><th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th><th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th></tr></thead>
-                        <tbody class="bg-white divide-y divide-gray-200">`;
-
-            students.forEach(student => {
-                const isStudentOnBreak = student.summerBreak;
-                const isReportSaved = savedReports[student.id];
-                studentsHTML += `
-                    <tr>
-                        <td class="px-6 py-4 whitespace-nowrap">${student.studentName} (Grade ${student.grade})</td>
-                        <td class="px-6 py-4 whitespace-nowrap"><span class="status-indicator ${isReportSaved ? 'text-green-600 font-semibold' : 'text-gray-500'}">${isReportSaved ? 'Report Saved' : 'Pending Report'}</span></td>
-                        <td class="px-6 py-4 whitespace-nowrap space-x-2">`;
-
-                if (isSummerBreakEnabled && !isStudentOnBreak) {
-                    studentsHTML += `<button class="summer-break-btn bg-yellow-500 text-white px-3 py-1 rounded" data-student-id="${student.id}">Summer Break</button>`;
-                } else if (isStudentOnBreak) {
-                    studentsHTML += `<span class="text-gray-400">On Break</span>`;
-                }
-
-                if (isSubmissionEnabled && !isStudentOnBreak) {
-                    if (studentsCount === 1) {
-                        studentsHTML += `<button class="submit-single-report-btn bg-green-600 text-white px-3 py-1 rounded" data-student-id="${student.id}">Submit Report</button>`;
-                    } else {
-                         studentsHTML += `<button class="enter-report-btn bg-green-600 text-white px-3 py-1 rounded" data-student-id="${student.id}">${isReportSaved ? 'Edit Report' : 'Enter Report'}</button>`;
-                    }
-                } else if (!isStudentOnBreak) {
-                    studentsHTML += `<span class="text-gray-400">Submission Disabled</span>`;
-                }
-                
-                studentsHTML += `</td></tr>`;
-            });
-
-            studentsHTML += `</tbody></table></div>`;
-            
-            if (tutor.isManagementStaff) {
-                studentsHTML += `
-                    <div class="bg-green-50 p-4 rounded-lg shadow-md mt-6">
-                        <h3 class="text-lg font-bold text-green-800 mb-2">Management Fee</h3>
-                        <p class="text-sm text-gray-600 mb-2">As you are part of the management staff, please set your monthly management fee before final submission.</p>
-                        <div class="flex items-center space-x-2">
-                            <label for="management-fee-input" class="font-semibold">Fee (₦):</label>
-                            <input type="number" id="management-fee-input" class="p-2 border rounded w-full" value="${tutor.managementFee || 0}">
-                            <button id="save-management-fee-btn" class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700">Save Fee</button>
-                        </div>
-                    </div>`;
-            }
-
-            if (studentsCount > 1 && isSubmissionEnabled) {
-                const allReportsSaved = Object.keys(savedReports).length === students.filter(s => !s.summerBreak).length;
-                studentsHTML += `
-                    <div class="mt-6 text-right">
-                        <button id="submit-all-reports-btn" class="bg-green-700 text-white px-6 py-3 rounded-lg font-bold ${!allReportsSaved ? 'opacity-50 cursor-not-allowed' : 'hover:bg-green-800'}" ${!allReportsSaved ? 'disabled' : ''}>
-                            Submit All Reports
-                        </button>
-                    </div>`;
-            }
-        }
-        container.innerHTML = `<div id="student-list-view" class="bg-white p-6 rounded-lg shadow-md">${studentsHTML}</div>`;
-        attachEventListeners();
-    }
-
-    function showReportModal(student) {
-        const existingReport = savedReports[student.id] || {};
-        const reportFormHTML = `
-            <h3 class="text-xl font-bold mb-4">Monthly Report for ${student.studentName}</h3>
-            <div class="space-y-4">
-                <div><label class="block font-semibold">Introduction</label><textarea id="report-intro" class="w-full mt-1 p-2 border rounded" rows="2">${existingReport.introduction || ''}</textarea></div>
-                <div><label class="block font-semibold">Topics & Remarks</label><textarea id="report-topics" class="w-full mt-1 p-2 border rounded" rows="3">${existingReport.topics || ''}</textarea></div>
-                <div><label class="block font-semibold">Progress & Achievements</label><textarea id="report-progress" class="w-full mt-1 p-2 border rounded" rows="2">${existingReport.progress || ''}</textarea></div>
-                <div><label class="block font-semibold">Strengths & Weaknesses</label><textarea id="report-sw" class="w-full mt-1 p-2 border rounded" rows="2">${existingReport.strengthsWeaknesses || ''}</textarea></div>
-                <div><label class="block font-semibold">Recommendations</label><textarea id="report-recs" class="w-full mt-1 p-2 border rounded" rows="2">${existingReport.recommendations || ''}</textarea></div>
-                <div><label class="block font-semibold">General Comments</label><textarea id="report-general" class="w-full mt-1 p-2 border rounded" rows="2">${existingReport.generalComments || ''}</textarea></div>
-                <div class="flex justify-end space-x-2">
-                    <button id="cancel-report-btn" class="bg-gray-500 text-white px-6 py-2 rounded">Cancel</button>
-                    <button id="modal-action-btn" class="bg-green-600 text-white px-6 py-2 rounded">${studentsCount === 1 ? 'Submit Report' : 'Save Report'}</button>
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fees Due</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Last Activity</th>
+                            </tr>
+                        </thead>
+                        <tbody id="dashboard-student-list" class="bg-white divide-y divide-gray-200">
+                            ${students.map(student => `
+                                <tr>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">${student.name}</td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">₦${(student.fees - student.payments).toLocaleString()}</td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${student.lastActivity ? student.lastActivity.toDate().toLocaleDateString() : 'N/A'}</td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
                 </div>
-            </div>`;
-
-        const reportModal = document.createElement('div');
-        reportModal.className = 'fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex items-center justify-center z-50';
-        reportModal.innerHTML = `<div class="relative bg-white p-8 rounded-lg shadow-xl w-full max-w-2xl mx-auto">${reportFormHTML}</div>`;
-        document.body.appendChild(reportModal);
-
-        document.getElementById('cancel-report-btn').addEventListener('click', () => reportModal.remove());
-        
-        document.getElementById('modal-action-btn').addEventListener('click', async () => {
-            const reportData = {
-                studentId: student.id, studentName: student.studentName, grade: student.grade,
-                introduction: document.getElementById('report-intro').value,
-                topics: document.getElementById('report-topics').value,
-                progress: document.getElementById('report-progress').value,
-                strengthsWeaknesses: document.getElementById('report-sw').value,
-                recommendations: document.getElementById('report-recs').value,
-                generalComments: document.getElementById('report-general').value
-            };
-
-            if (studentsCount === 1) {
-                await submitAllReports([reportData]);
-            } else {
-                savedReports[student.id] = reportData;
-                alert(`${student.studentName}'s report has been saved.`);
-                renderUI();
-            }
-            reportModal.remove();
-        });
-    }
-    
-    async function submitAllReports(reportsArray) {
-        if (reportsArray.length === 0) {
-            alert("No reports to submit.");
-            return;
-        }
-
-        const batch = writeBatch(db);
-
-        reportsArray.forEach(report => {
-            const newReportRef = doc(collection(db, "tutor_submissions"));
-            batch.set(newReportRef, {
-                tutorEmail: tutor.email,
-                tutorName: tutor.name,
-                submittedAt: new Date(),
-                studentId: report.studentId,
-                studentName: report.studentName,
-                grade: report.grade,
-                introduction: report.introduction,
-                topics: report.topics,
-                progress: report.progress,
-                strengthsWeaknesses: report.strengthsWeaknesses,
-                recommendations: report.recommendations,
-                generalComments: report.generalComments
-            });
-        });
-
-        try {
-            await batch.commit();
-            alert(`Successfully submitted ${reportsArray.length} report(s)!`);
-            savedReports = {};
-            renderUI();
-        } catch (error) {
-            console.error("Error submitting reports:", error);
-            alert(`Error: ${error.message}`);
-        }
-    }
-
-    function attachEventListeners() {
-        if (isTutorAddEnabled) {
-            document.getElementById('add-student-btn')?.addEventListener('click', async () => {
-                const studentData = {
-                    parentName: document.getElementById('new-parent-name').value,
-                    parentPhone: document.getElementById('new-parent-phone').value,
-                    studentName: document.getElementById('new-student-name').value,
-                    grade: document.getElementById('new-student-grade').value,
-                    subjects: document.getElementById('new-student-subject').value.split(',').map(s => s.trim()),
-                    days: document.getElementById('new-student-days').value,
-                    studentFee: parseFloat(document.getElementById('new-student-fee').value),
-                    tutorEmail: tutor.email, summerBreak: false
-                };
-                if (studentData.parentName && studentData.studentName && studentData.grade && !isNaN(studentData.studentFee)) {
-                    await addDoc(collection(db, "students"), studentData);
-                    renderStudentDatabase(container, tutor);
-                } else {
-                    alert('Please fill in all parent and student details correctly.');
-                }
-            });
-        }
-        
-        document.querySelector('.submit-single-report-btn')?.addEventListener('click', (e) => {
-            const student = students.find(s => s.id === e.target.dataset.studentId);
-            showReportModal(student);
-        });
-
-        document.querySelectorAll('.enter-report-btn').forEach(button => {
-            button.addEventListener('click', (e) => {
-                const student = students.find(s => s.id === e.target.dataset.studentId);
-                showReportModal(student);
-            });
-        });
-
-        document.getElementById('submit-all-reports-btn')?.addEventListener('click', async () => {
-            if (confirm("Are you sure you want to submit all reports?")) {
-                await submitAllReports(Object.values(savedReports));
-            }
-        });
-        
-         document.querySelectorAll('.summer-break-btn').forEach(button => {
-            button.addEventListener('click', async (e) => {
-                if (confirm("Mark this student as on summer break?")) {
-                    await updateDoc(doc(db, "students", e.target.dataset.studentId), { summerBreak: true });
-                    renderStudentDatabase(container, tutor);
-                }
-            });
-        });
-
-        document.getElementById('save-management-fee-btn')?.addEventListener('click', async () => {
-            const feeInput = document.getElementById('management-fee-input');
-            const newFee = parseFloat(feeInput.value);
-            if (!isNaN(newFee) && newFee >= 0) {
-                const tutorRef = doc(db, "tutors", auth.currentUser.email);
-                await updateDoc(tutorRef, { managementFee: newFee });
-                alert('Management fee updated successfully!');
-            } else {
-                alert('Please enter a valid fee.');
-            }
-        });
-    }
-
-    renderUI();
+            </div>
+        </div>
+    `;
 }
 
-// --- Main App Initialization ---
+// UPDATED: This function now fetches students from both "students" and "pending_students"
+async function renderStudentDatabase(mainContent, tutorData) {
+    const tutorEmail = tutorData.id;
+
+    // Fetch approved students
+    const qApprovedStudents = query(collection(db, "students"), where("tutorEmail", "==", tutorEmail));
+    const approvedStudentsSnap = await getDocs(qApprovedStudents);
+    const approvedStudents = approvedStudentsSnap.docs.map(doc => ({ id: doc.id, ...doc.data(), status: 'Approved' }));
+
+    // Fetch pending students
+    const qPendingStudents = query(collection(db, "pending_students"), where("tutorEmail", "==", tutorEmail));
+    const pendingStudentsSnap = await getDocs(qPendingStudents);
+    const pendingStudents = pendingStudentsSnap.docs.map(doc => ({ id: doc.id, ...doc.data(), status: 'Awaiting Approval' }));
+
+    // Combine and sort all students by name
+    const allStudents = [...approvedStudents, ...pendingStudents].sort((a, b) => a.name.localeCompare(b.name));
+
+    mainContent.innerHTML = `
+        <div id="student-list-view" class="p-6 bg-gray-100 min-h-screen">
+            <h2 class="text-3xl font-bold text-gray-800 mb-6">Student Database</h2>
+            
+            <div id="message-area" class="mb-4 text-center text-sm font-medium text-green-600"></div>
+
+            <div class="bg-white p-6 rounded-lg shadow-lg mb-6">
+                <h3 class="text-xl font-semibold text-gray-700 mb-4">Add New Student</h3>
+                <form id="addStudentForm" class="space-y-4">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label for="studentName" class="block text-sm font-medium text-gray-700">Name</label>
+                            <input type="text" id="studentName" name="studentName" class="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500" required>
+                        </div>
+                        <div>
+                            <label for="studentSchool" class="block text-sm font-medium text-gray-700">School</label>
+                            <input type="text" id="studentSchool" name="studentSchool" class="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500" required>
+                        </div>
+                        <div>
+                            <label for="studentClass" class="block text-sm font-medium text-gray-700">Class</label>
+                            <input type="text" id="studentClass" name="studentClass" class="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+                        </div>
+                        <div>
+                            <label for="studentPhone" class="block text-sm font-medium text-gray-700">Phone</label>
+                            <input type="tel" id="studentPhone" name="studentPhone" class="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+                        </div>
+                    </div>
+                    <button type="submit" id="addStudentBtn" class="w-full inline-flex items-center justify-center px-4 py-2 border border-transparent rounded-md shadow-sm text-base font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition duration-150 ease-in-out">
+                        Add Student
+                    </button>
+                </form>
+            </div>
+
+            <div class="bg-white p-6 rounded-lg shadow-lg">
+                <h3 class="text-xl font-semibold text-gray-700 mb-4">My Students (${allStudents.length})</h3>
+                <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-gray-200">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">School</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Class</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody class="bg-white divide-y divide-gray-200">
+                            ${allStudents.length > 0 ? allStudents.map(student => `
+                                <tr>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">${student.name}</td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${student.school}</td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${student.class}</td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm font-semibold ${student.status === 'Approved' ? 'text-green-600' : 'text-yellow-600'}">${student.status}</td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                                        <button class="text-blue-600 hover:text-blue-900 mx-1">Edit</button>
+                                        <button class="text-red-600 hover:text-red-900 mx-1">Delete</button>
+                                    </td>
+                                </tr>
+                            `).join('') : `
+                                <tr>
+                                    <td colspan="5" class="px-6 py-4 text-center text-gray-500">No students found.</td>
+                                </tr>
+                            `}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    `;
+
+    const addStudentForm = mainContent.querySelector('#addStudentForm');
+    const messageArea = mainContent.querySelector('#message-area');
+    if (addStudentForm) {
+        addStudentForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const studentData = {
+                name: addStudentForm.studentName.value,
+                school: addStudentForm.studentSchool.value,
+                class: addStudentForm.studentClass.value,
+                phone: addStudentForm.studentPhone.value,
+            };
+
+            const result = await addStudent(studentData, tutorEmail);
+            messageArea.textContent = result.message;
+            if (result.success) {
+                addStudentForm.reset();
+                // Re-render the student list to show the new pending student
+                renderStudentDatabase(mainContent, tutorData);
+            }
+        });
+    }
+}
+
+
 function initializeTutorPanel() {
     const mainContent = document.getElementById('mainContent');
     const navDashboard = document.getElementById('navDashboard');
@@ -393,7 +231,7 @@ function initializeTutorPanel() {
     navStudentDatabase.addEventListener('click', () => { setActiveNav(navStudentDatabase); renderStudentDatabase(mainContent, window.tutorData); });
 
     // Default to Student Database on load
-    setActiveNav(navStudentDatabase); 
+    setActiveNav(navStudentDatabase);
     renderStudentDatabase(mainContent, window.tutorData);
 }
 
