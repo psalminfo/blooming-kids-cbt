@@ -132,9 +132,19 @@ async function renderStudentDatabase(container, tutor) {
 
     let savedReports = {};
 
-    const studentQuery = query(collection(db, "students"), where("tutorEmail", "==", tutor.email));
-    const studentsSnapshot = await getDocs(studentQuery);
-    const students = studentsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    // Fetch approved students
+const studentQuery = query(collection(db, "students"), where("tutorEmail", "==", tutor.email));
+const studentsSnapshot = await getDocs(studentQuery);
+const approvedStudents = studentsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data(), approved: true }));
+
+// Fetch pending students
+const pendingQuery = query(collection(db, "pending_students"), where("tutorEmail", "==", tutor.email));
+const pendingSnapshot = await getDocs(pendingQuery);
+const pendingStudents = pendingSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data(), approved: false }));
+
+// Merge both
+const students = [...approvedStudents, ...pendingStudents];
+const studentsCount = students.length;
     const studentsCount = students.length;
 
     function renderUI() {
@@ -178,7 +188,14 @@ async function renderStudentDatabase(container, tutor) {
                 studentsHTML += `
                     <tr>
                         <td class="px-6 py-4 whitespace-nowrap">${student.studentName} (Grade ${student.grade})</td>
-                        <td class="px-6 py-4 whitespace-nowrap"><span class="status-indicator ${isReportSaved ? 'text-green-600 font-semibold' : 'text-gray-500'}">${isReportSaved ? 'Report Saved' : 'Pending Report'}</span></td>
+                       <td class="px-6 py-4 whitespace-nowrap">
+  ${student.approved
+    ? `<span class="status-indicator ${isReportSaved ? 'text-green-600 font-semibold' : 'text-gray-500'}">
+         ${isReportSaved ? 'Report Saved' : 'Pending Report'}
+       </span>`
+    : `<span class="text-yellow-600 font-semibold">Awaiting Approval</span>`
+  }
+</td>
                         <td class="px-6 py-4 whitespace-nowrap space-x-2">`;
 
                 if (isSummerBreakEnabled && !isStudentOnBreak) {
@@ -326,8 +343,13 @@ async function renderStudentDatabase(container, tutor) {
                     tutorEmail: tutor.email, summerBreak: false
                 };
                 if (studentData.parentName && studentData.studentName && studentData.grade && !isNaN(studentData.studentFee)) {
-                    await addDoc(collection(db, "students"), studentData);
-                    renderStudentDatabase(container, tutor);
+                    await addDoc(collection(db, "pending_students"), {
+    ...studentData,
+    status: "awaiting_approval",  // flag for tutors to see
+    createdAt: new Date()
+});
+alert("Student submitted for approval. Awaiting admin confirmation.");
+renderStudentDatabase(container, tutor);
                 } else {
                     alert('Please fill in all parent and student details correctly.');
                 }
