@@ -23,26 +23,8 @@ function convertPayAdviceToCSV(data) {
 }
 
 // ##################################
-// # NEW ACTION HANDLER FUNCTIONS
+// # ACTION HANDLER FUNCTIONS
 // ##################################
-
-// UPDATED: This function now fetches student data and opens a modal for editing
-async function handleEditStudent(studentId) {
-    try {
-        const studentDoc = await getDoc(doc(db, "students", studentId));
-        if (!studentDoc.exists()) {
-            alert("Student not found!");
-            return;
-        }
-
-        const studentData = studentDoc.data();
-        showEditStudentModal(studentId, studentData, "students");
-
-    } catch (error) {
-        console.error("Error fetching student for edit: ", error);
-        alert("Error fetching student data. Check the console for details.");
-    }
-}
 
 // NEW FUNCTION: Handle editing a pending student
 async function handleEditPendingStudent(studentId) {
