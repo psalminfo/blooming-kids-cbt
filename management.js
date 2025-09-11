@@ -24,11 +24,33 @@ function convertPayAdviceToCSV(data) {
 // # NEW ACTION HANDLER FUNCTIONS
 // ##################################
 
-// Placeholder function to handle student editing
+// UPDATED: This function now fetches student data and prepares for editing
 async function handleEditStudent(studentId) {
-    console.log(`Edit functionality for student with ID: ${studentId} needs to be implemented.`);
-    alert("Edit Student function is not yet implemented.");
-    // Example: You would open a modal here to edit student details.
+    try {
+        const studentRef = doc(db, "students", studentId);
+        const studentDoc = await getDoc(studentRef);
+
+        if (!studentDoc.exists()) {
+            alert("Student not found!");
+            return;
+        }
+
+        const studentData = studentDoc.data();
+        console.log("Student data fetched for editing:", studentData);
+
+        // ### IMPORTANT: THIS IS WHERE YOU'D OPEN YOUR EDIT MODAL/FORM ###
+        // For now, we'll just show an alert with the data, but you
+        // would take studentData and populate a form with it.
+        const newStudentName = prompt(`Editing ${studentData.studentName}. Enter new name:`, studentData.studentName);
+        if (newStudentName !== null && newStudentName.trim() !== "") {
+            await updateDoc(studentRef, { studentName: newStudentName });
+            alert("Student name updated successfully!");
+        }
+
+    } catch (error) {
+        console.error("Error fetching student for edit: ", error);
+        alert("Error fetching student data. Check the console for details.");
+    }
 }
 
 // Placeholder function to handle student deletion
