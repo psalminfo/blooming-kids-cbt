@@ -216,7 +216,7 @@ async function renderManagementTutorView(container) {
     try {
         const [tutorsSnapshot, studentsSnapshot] = await Promise.all([
             getDocs(query(collection(db, "tutors"), orderBy("name"))),
-            getDocs(collection(db, "students"))
+            getDocs(collection(db, "students")) // This correctly only fetches approved students
         ]);
 
         document.getElementById('tutor-count-badge').textContent = tutorsSnapshot.size;
@@ -442,11 +442,12 @@ async function renderPendingApprovalsPanel(container) {
     loadPendingApprovals();
 }
 
-// NEW FUNCTION
+// ### UPDATED FUNCTION ###
 async function loadPendingApprovals() {
     const listContainer = document.getElementById('pending-approvals-list');
-    onSnapshot(query(collection(db, "pending_students"), orderBy("submissionDate", "desc")), (snapshot) => {
-        console.log("Found pending students:", snapshot.docs.length); // DEBUG LOG
+    // NOTE: Removed orderBy clause because tutor.js does not add a 'submissionDate' field.
+    // This prevents an error and ensures all pending students are fetched.
+    onSnapshot(query(collection(db, "pending_students")), (snapshot) => {
         if (!listContainer) return;
 
         if (snapshot.empty) {
@@ -454,13 +455,12 @@ async function loadPendingApprovals() {
             return;
         }
 
-        const canApprove = window.userData.permissions?.actions?.canApproveStudents === true; // Assuming a new permission `canApproveStudents`
-        const canReject = window.userData.permissions?.actions?.canDeleteStudents === true; // Reusing `canDeleteStudents` for rejection
+        const canApprove = window.userData.permissions?.actions?.canApproveStudents === true;
+        const canReject = window.userData.permissions?.actions?.canDeleteStudents === true;
         const canEditPending = window.userData.permissions?.actions?.canEditStudents === true;
 
         listContainer.innerHTML = snapshot.docs.map(doc => {
             const student = { id: doc.id, ...doc.data() };
-            const date = student.submissionDate ? new Date(student.submissionDate.seconds * 1000).toLocaleDateString() : 'N/A';
             const actionButtons = `
                 ${canEditPending ? `<button class="edit-pending-btn bg-blue-500 text-white px-3 py-1 text-sm rounded-full" data-student-id="${student.id}">Edit</button>` : ''}
                 ${canApprove ? `<button class="approve-btn bg-green-600 text-white px-3 py-1 text-sm rounded-full" data-student-id="${student.id}">Approve</button>` : ''}
@@ -471,8 +471,7 @@ async function loadPendingApprovals() {
                     <div>
                         <p><strong>Student:</strong> ${student.studentName}</p>
                         <p><strong>Fee:</strong> ₦${(student.studentFee || 0).toFixed(2)}</p>
-                        <p><strong>Submitted by:</strong> ${student.submittedByEmail}</p>
-                        <p><strong>Submission Date:</strong> ${date}</p>
+                        <p><strong>Submitted by Tutor:</strong> ${student.tutorEmail || 'N/A'}</p>
                     </div>
                     <div class="flex items-center space-x-2">
                         ${actionButtons}
@@ -654,7 +653,6 @@ async function renderSummerBreakPanel(container) {
         if (!listContainer) return;
         
         const canEndBreak = window.userData.permissions?.actions?.canEndBreak === true;
-        console.log("canEndBreak permission status:", canEndBreak); // DEBUG LOG
 
         if (snapshot.empty) {
             listContainer.innerHTML = `<p class="text-center text-gray-500">No students are on break.</p>`;
@@ -687,16 +685,18 @@ async function renderSummerBreakPanel(container) {
             document.querySelectorAll('.end-break-btn').forEach(button => {
                 button.addEventListener('click', async (e) => {
                     const studentId = e.target.dataset.studentId;
-                    try {
-                        await updateDoc(doc(db, "students", studentId), { summerBreak: false, lastBreakEnd: Timestamp.now() });
-                        statusMessageDiv.textContent = `Break ended for ${e.target.closest('div').querySelector('p').textContent.replace('Student: ', '')}.`;
-                        statusMessageDiv.classList.remove('hidden');
-                        statusMessageDiv.className = 'text-center font-semibold mb-4 text-green-600';
-                    } catch (error) {
-                        console.error("Error ending summer break:", error);
-                        statusMessageDiv.textContent = "Failed to end summer break. Check the console for details.";
-                        statusMessageDiv.className = 'text-center font-semibold mb-4 text-red-600';
-                        statusMessageDiv.classList.remove('hidden');
+                    if (confirm("Are you sure you want to end the summer break for this student?")) {
+                        try {
+                            await updateDoc(doc(db, "students", studentId), { summerBreak: false, lastBreakEnd: Timestamp.now() });
+                            statusMessageDiv.textContent = `Break ended successfully.`;
+                            statusMessageDiv.classList.remove('hidden');
+                            statusMessageDiv.className = 'text-center font-semibold mb-4 text-green-600';
+                        } catch (error) {
+                            console.error("Error ending summer break:", error);
+                            statusMessageDiv.textContent = "Failed to end summer break. Check the console for details.";
+                            statusMessageDiv.className = 'text-center font-semibold mb-4 text-red-600';
+                            statusMessageDiv.classList.remove('hidden');
+                        }
                     }
                 });
             });
