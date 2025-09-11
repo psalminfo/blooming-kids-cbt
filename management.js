@@ -1,5 +1,5 @@
 import { auth, db } from './firebaseConfig.js';
-import { collection, getDocs, doc, getDoc, where, query, orderBy, Timestamp, writeBatch, updateDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
+import { collection, getDocs, doc, getDoc, where, query, orderBy, Timestamp, writeBatch, updateDoc, deleteDoc, setDoc } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
 import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-auth.js";
 import { onSnapshot } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
 
@@ -43,6 +43,54 @@ async function handleDeleteStudent(studentId) {
         } catch (error) {
             console.error("Error removing student: ", error);
             alert("Error deleting student. Check the console for details.");
+        }
+    }
+}
+
+// NEW function to handle accepting a student
+async function handleApproveStudent(studentId) {
+    if (confirm("Are you sure you want to approve this student?")) {
+        try {
+            const studentRef = doc(db, "pending_students", studentId);
+            const studentDoc = await getDoc(studentRef);
+            if (!studentDoc.exists()) {
+                alert("Student not found.");
+                return;
+            }
+            const studentData = studentDoc.data();
+            
+            // Create a write batch
+            const batch = writeBatch(db);
+            
+            // Set the student data in the main 'students' collection
+            const newStudentRef = doc(db, "students", studentId);
+            batch.set(newStudentRef, { ...studentData, status: 'approved' });
+            
+            // Delete the student from the 'pending_students' collection
+            batch.delete(studentRef);
+            
+            // Commit the batch
+            await batch.commit();
+
+            alert("Student approved successfully!");
+            // The onSnapshot listener will automatically re-render the view
+        } catch (error) {
+            console.error("Error approving student: ", error);
+            alert("Error approving student. Check the console for details.");
+        }
+    }
+}
+
+// NEW function to handle rejecting (deleting) a student
+async function handleRejectStudent(studentId) {
+    if (confirm("Are you sure you want to reject this student? This will delete their entry.")) {
+        try {
+            await deleteDoc(doc(db, "pending_students", studentId));
+            alert("Student rejected successfully!");
+            // The onSnapshot listener will automatically re-render the view
+        } catch (error) {
+            console.error("Error rejecting student: ", error);
+            alert("Error rejecting student. Check the console for details.");
         }
     }
 }
@@ -95,7 +143,6 @@ async function renderManagementTutorView(container) {
         const directoryList = document.getElementById('directory-list');
         if (!directoryList) return;
 
-        // ### NEW: Check for edit/delete permissions ###
         const canEditStudents = window.userData.permissions?.actions?.canEditStudents === true;
         const canDeleteStudents = window.userData.permissions?.actions?.canDeleteStudents === true;
         const showActionsColumn = canEditStudents || canDeleteStudents;
@@ -108,7 +155,6 @@ async function renderManagementTutorView(container) {
                 .sort((a, b) => a.studentName.localeCompare(b.studentName))
                 .map(student => {
                     const subjects = student.subjects && Array.isArray(student.subjects) ? student.subjects.join(', ') : 'N/A';
-                    // ### MODIFIED: Added a new table cell for actions ###
                     const actionButtons = `
                         ${canEditStudents ? `<button class="edit-student-btn bg-blue-500 text-white px-3 py-1 rounded-full text-xs" data-student-id="${student.id}">Edit</button>` : ''}
                         ${canDeleteStudents ? `<button class="delete-student-btn bg-red-500 text-white px-3 py-1 rounded-full text-xs" data-student-id="${student.id}">Delete</button>` : ''}
@@ -152,7 +198,6 @@ async function renderManagementTutorView(container) {
             `;
         }).join('');
 
-        // ### NEW: Attach event listeners for edit and delete buttons ###
         if (canEditStudents) {
             document.querySelectorAll('.edit-student-btn').forEach(button => {
                 button.addEventListener('click', () => handleEditStudent(button.dataset.studentId));
@@ -292,14 +337,64 @@ async function renderTutorReportsPanel(container) {
     loadTutorReportsForManagement();
 }
 
-// ### NEW: PENDING APPROVALS PANEL ###
 async function renderPendingApprovalsPanel(container) {
     container.innerHTML = `
         <div class="bg-white p-6 rounded-lg shadow-md">
             <h2 class="text-2xl font-bold text-green-700 mb-4">Pending Approvals</h2>
-            <p>This is where pending approvals will be displayed. This page is currently under development.</p>
+            <div id="pending-approvals-list" class="space-y-4">
+                <p class="text-center text-gray-500 py-10">Loading pending students...</p>
+            </div>
         </div>
     `;
+    loadPendingApprovals();
+}
+
+// NEW FUNCTION
+async function loadPendingApprovals() {
+    const listContainer = document.getElementById('pending-approvals-list');
+    onSnapshot(query(collection(db, "pending_students"), orderBy("submissionDate", "desc")), (snapshot) => {
+        if (!listContainer) return;
+
+        if (snapshot.empty) {
+            listContainer.innerHTML = `<p class="text-center text-gray-500">No students are awaiting approval.</p>`;
+            return;
+        }
+
+        const canApprove = window.userData.permissions?.actions?.canApproveStudents === true; // Assuming a new permission `canApproveStudents`
+        const canReject = window.userData.permissions?.actions?.canDeleteStudents === true; // Reusing `canDeleteStudents` for rejection
+
+        listContainer.innerHTML = snapshot.docs.map(doc => {
+            const student = { id: doc.id, ...doc.data() };
+            const date = student.submissionDate ? new Date(student.submissionDate.seconds * 1000).toLocaleDateString() : 'N/A';
+            const actionButtons = `
+                ${canApprove ? `<button class="approve-btn bg-green-600 text-white px-3 py-1 text-sm rounded-full" data-student-id="${student.id}">Approve</button>` : ''}
+                ${canReject ? `<button class="reject-btn bg-red-600 text-white px-3 py-1 text-sm rounded-full" data-student-id="${student.id}">Reject</button>` : ''}
+            `;
+            return `
+                <div class="border p-4 rounded-lg flex justify-between items-center bg-gray-50">
+                    <div>
+                        <p><strong>Student:</strong> ${student.studentName}</p>
+                        <p><strong>Submitted by:</strong> ${student.submittedByEmail}</p>
+                        <p><strong>Submission Date:</strong> ${date}</p>
+                    </div>
+                    <div class="flex items-center space-x-2">
+                        ${actionButtons}
+                    </div>
+                </div>
+            `;
+        }).join('');
+
+        if (canApprove) {
+            document.querySelectorAll('.approve-btn').forEach(button => {
+                button.addEventListener('click', () => handleApproveStudent(button.dataset.studentId));
+            });
+        }
+        if (canReject) {
+            document.querySelectorAll('.reject-btn').forEach(button => {
+                button.addEventListener('click', () => handleRejectStudent(button.dataset.studentId));
+            });
+        }
+    });
 }
 
 
