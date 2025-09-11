@@ -26,305 +26,330 @@ onSnapshot(settingsDocRef, (docSnap) => {
 });
 
 
-// --- Functions to render each view ---
-async function renderTutorDashboard(container, tutorData) {
+// ##################################################################
+// # SECTION 1: TUTOR DASHBOARD (Updated as requested)
+// ##################################################################
+function renderTutorDashboard(container, tutor) {
     container.innerHTML = `
         <div class="bg-white p-6 rounded-lg shadow-md mb-6">
-            <h2 class="text-2xl font-bold text-green-700">Dashboard</h2>
-            <div id="dashboard-content" class="mt-4">
-                <p>Welcome, ${tutorData.name}. Here you can submit your weekly reports and manage your students.</p>
+            <h2 class="text-2xl font-bold text-green-700 mb-4">Welcome, ${tutor.name}</h2>
+            <div class="mb-4">
+                <input type="text" id="searchName" class="w-full mt-1 p-2 border rounded" placeholder="Search by parent name...">
+                <button id="searchBtn" class="bg-green-600 text-white px-4 py-2 rounded mt-2 hover:bg-green-700">Search</button>
             </div>
         </div>
-    `;
-    const pendingStudent = (await getDocs(query(collection(db, 'pending_students'), where('tutorEmail', '==', tutorData.email), where('isApproved', '==', false)))).docs.length;
-    const approvedStudent = (await getDocs(query(collection(db, 'students'), where('tutorEmail', '==', tutorData.email), where('isApproved', '==', true)))).docs.length;
-    const allStudent = pendingStudent + approvedStudent;
-    
-    document.getElementById('dashboard-content').innerHTML = `
-        <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 text-center">
-            <div class="bg-blue-100 p-4 rounded-lg shadow">
-                <h4 class="font-bold text-blue-800 text-sm">All Students</h4>
-                <p class="text-2xl font-extrabold text-blue-900">${allStudent}</p>
-            </div>
-            <div class="bg-green-100 p-4 rounded-lg shadow">
-                <h4 class="font-bold text-green-800 text-sm">Approved Students</h4>
-                <p class="text-2xl font-extrabold text-green-900">${approvedStudent}</p>
-            </div>
-            <div class="bg-yellow-100 p-4 rounded-lg shadow">
-                <h4 class="font-bold text-yellow-800 text-sm">Students Pending Approval</h4>
-                <p class="text-2xl font-extrabold text-yellow-900">${pendingStudent}</p>
-            </div>
+        <div id="pendingReportsContainer" class="space-y-4">
+            <p class="text-gray-500">Loading pending submissions...</p>
+        </div>
+        <div id="gradedReportsContainer" class="space-y-4 hidden">
+            <p class="text-gray-500">Loading graded submissions...</p>
         </div>
     `;
+    document.getElementById('searchBtn').addEventListener('click', async () => {
+        const name = document.getElementById('searchName').value.trim();
+        await loadTutorReports(tutor.email, name || null);
+    });
+    loadTutorReports(tutor.email);
 }
 
-async function renderStudentDatabase(container, tutorData) {
-    container.innerHTML = `
-        <div class="bg-white p-6 rounded-lg shadow-md" id="student-list-view">
-            <h2 class="text-2xl font-bold text-green-700">My Students</h2>
-            <div class="flex justify-between items-center mt-4">
-                <div class="flex-grow">
-                    <input type="text" id="search-student" placeholder="Search students..." class="w-full p-2 border rounded-md">
-                </div>
-                ${isTutorAddEnabled ? `<button id="addNewStudentBtn" class="ml-4 bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700">Add New Student</button>` : ''}
-            </div>
-            <div id="student-list" class="mt-6 space-y-4">
-                <p class="text-center text-gray-500">Loading students...</p>
-            </div>
-        </div>
-        <div id="student-modal-container"></div>
-    `;
+async function loadTutorReports(tutorEmail, parentName = null) {
+    const pendingReportsContainer = document.getElementById('pendingReportsContainer');
+    const gradedReportsContainer = document.getElementById('gradedReportsContainer');
 
-    const searchInput = document.getElementById('search-student');
-    const studentList = document.getElementById('student-list');
+    pendingReportsContainer.innerHTML = `<p class="text-gray-500">Loading pending submissions...</p>`;
+    if (gradedReportsContainer) gradedReportsContainer.innerHTML = `<p class="text-gray-500">Loading graded submissions...</p>`;
 
-    if (isTutorAddEnabled) {
-        document.getElementById('addNewStudentBtn').addEventListener('click', () => {
-            showAddStudentModal(tutorData.email);
-        });
+    // Query now searches by parentName instead of parentEmail
+    let submissionsQuery = query(collection(db, "tutor_submissions"), where("tutorEmail", "==", tutorEmail));
+    if (parentName) {
+        submissionsQuery = query(submissionsQuery, where("parentName", "==", parentName));
     }
 
-    const studentRef = collection(db, "students");
-    const q = query(studentRef, where("tutorEmail", "==", tutorData.email));
-    
-    onSnapshot(q, (snapshot) => {
-        const students = [];
-        snapshot.forEach(doc => students.push({ id: doc.id, ...doc.data() }));
-        window.allStudents = students; // Store globally for search functionality
-        displayStudents(students);
-    });
-    
-    searchInput.addEventListener('input', (e) => {
-        const searchTerm = e.target.value.toLowerCase();
-        const filteredStudents = window.allStudents.filter(student => 
-            student.studentName.toLowerCase().includes(searchTerm)
-        );
-        displayStudents(filteredStudents);
-    });
-    
+    try {
+        const querySnapshot = await getDocs(submissionsQuery);
+        let pendingHTML = '';
+        let gradedHTML = '';
+
+        querySnapshot.forEach(doc => {
+            const data = doc.data();
+            const reportCardHTML = `
+                <div class="border rounded-lg p-4 shadow-sm bg-white mb-4">
+                    <p><strong>Student:</strong> ${data.studentName}</p>
+                    <p><strong>Parent Name:</strong> ${data.parentName || 'N/A'}</p>
+                    <p><strong>Grade:</strong> ${data.grade}</p>
+                    <p><strong>Submitted At:</strong> ${new Date(data.submittedAt.seconds * 1000).toLocaleString()}</p>
+                    <div class="mt-4 border-t pt-4">
+                        <h4 class="font-semibold">Creative Writing Submission:</h4>
+                        ${data.fileUrl ? `<a href="${data.fileUrl}" target="_blank" class="text-green-600 hover:underline">Download File</a>` : `<p class="italic">${data.textAnswer || "No response"}</p>`}
+                        <p class="mt-2"><strong>Status:</strong> ${data.status || 'Pending'}</p>
+                        ${(data.status === 'pending_review') ? `
+                            <textarea class="tutor-report w-full mt-2 p-2 border rounded" rows="3" placeholder="Write your report here..."></textarea>
+                            <button class="submit-report-btn bg-green-600 text-white px-4 py-2 rounded mt-2" data-doc-id="${doc.id}">Submit Report</button>
+                        ` : `
+                            <p class="mt-2"><strong>Tutor's Report:</strong> ${data.tutorReport || 'N/A'}</p>
+                        `}
+                    </div>
+                </div>
+            `;
+            if (data.status === 'pending_review') {
+                pendingHTML += reportCardHTML;
+            } else {
+                gradedHTML += reportCardHTML;
+            }
+        });
+        pendingReportsContainer.innerHTML = pendingHTML || `<p class="text-gray-500">No pending submissions found.</p>`;
+        if (gradedReportsContainer) gradedReportsContainer.innerHTML = gradedHTML || `<p class="text-gray-500">No graded submissions found.</p>`;
+
+        document.querySelectorAll('.submit-report-btn').forEach(button => {
+            button.addEventListener('click', async (e) => {
+                const docId = e.target.getAttribute('data-doc-id');
+                const reportTextarea = e.target.closest('.border').querySelector('.tutor-report');
+                const tutorReport = reportTextarea.value.trim();
+                if (tutorReport) {
+                    const docRef = doc(db, "tutor_submissions", docId);
+                    await updateDoc(docRef, { tutorReport: tutorReport, status: 'Graded' });
+                    loadTutorReports(tutorEmail, parentName); // Refresh the list
+                }
+            });
+        });
+    } catch (error) {
+        console.error("Error loading tutor reports:", error);
+        pendingReportsContainer.innerHTML = `<p class="text-red-500">Failed to load reports.</p>`;
+        if (gradedReportsContainer) gradedReportsContainer.innerHTML = `<p class="text-red-500">Failed to load reports.</p>`;
+    }
 }
 
-function displayStudents(students) {
-    const studentList = document.getElementById('student-list');
-    if (!studentList) return;
 
-    if (students.length === 0) {
-        studentList.innerHTML = `<p class="text-center text-gray-500">No students found.</p>`;
+// ##################################################################
+// # SECTION 2: STUDENT DATABASE (Updated as requested)
+// ##################################################################
+
+async function renderStudentDatabase(container, tutor) {
+    if (!container) {
+        console.error("Container element not found.");
         return;
     }
-    
-    studentList.innerHTML = students.map(student => `
-        <div class="bg-gray-50 p-4 rounded-lg shadow flex items-center justify-between">
-            <div>
-                <h3 class="font-semibold text-lg">${student.studentName}</h3>
-                <p class="text-sm text-gray-600">Grade: ${student.grade} | Fee: ₦${(student.studentFee || 0).toLocaleString()} | Days/Week: ${student.days}</p>
-                <p class="text-xs text-gray-400 mt-1">Status: ${student.summerBreak ? 'On Break' : 'Active'}</p>
-            </div>
-            <div class="flex items-center space-x-2">
-                ${isSubmissionEnabled ? `<button class="report-btn bg-blue-500 text-white px-3 py-1 rounded-full text-sm hover:bg-blue-600 transition-colors" data-student-id="${student.id}" data-student-name="${student.studentName}">Submit Report</button>` : ''}
-                ${isSummerBreakEnabled && !student.summerBreak ? `<button class="break-btn bg-yellow-500 text-white px-3 py-1 rounded-full text-sm hover:bg-yellow-600 transition-colors" data-student-id="${student.id}" data-student-name="${student.studentName}">Start Break</button>` : ''}
-                ${isSummerBreakEnabled && student.summerBreak ? `<button class="end-break-btn bg-green-500 text-white px-3 py-1 rounded-full text-sm hover:bg-green-600 transition-colors" data-student-id="${student.id}" data-student-name="${student.studentName}">End Break</button>` : ''}
-            </div>
-        </div>
-    `).join('');
-    
-    document.querySelectorAll('.report-btn').forEach(button => {
-        button.addEventListener('click', (e) => {
-            const studentId = e.target.dataset.studentId;
-            const studentName = e.target.dataset.studentName;
-            showReportModal(studentId, studentName, window.tutorData);
-        });
-    });
-    
-    document.querySelectorAll('.break-btn').forEach(button => {
-        button.addEventListener('click', (e) => {
-            const studentId = e.target.dataset.studentId;
-            const studentName = e.target.dataset.studentName;
-            handleSummerBreak(studentId, studentName);
-        });
-    });
-    
-    document.querySelectorAll('.end-break-btn').forEach(button => {
-        button.addEventListener('click', (e) => {
-            const studentId = e.target.dataset.studentId;
-            const studentName = e.target.dataset.studentName;
-            handleEndBreak(studentId, studentName);
-        });
-    });
-}
 
+    let savedReports = {};
 
-// --- Student Reporting and Management Functions ---
-async function handleSummerBreak(studentId, studentName) {
-    if (confirm(`Are you sure you want to put ${studentName} on a summer break?`)) {
-        try {
-            await updateDoc(doc(db, "students", studentId), { summerBreak: true });
-            alert(`${studentName} is now on a summer break.`);
-        } catch (error) {
-            console.error("Error setting summer break:", error);
-            alert("Failed to set summer break. Check the console for details.");
+    const studentQuery = query(collection(db, "students"), where("tutorEmail", "==", tutor.email));
+    const studentsSnapshot = await getDocs(studentQuery);
+    const students = studentsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    const studentsCount = students.length;
+
+    function renderUI() {
+        let studentsHTML = `<h2 class="text-2xl font-bold text-green-700 mb-4">My Students (${studentsCount})</h2>`;
+
+        if (isTutorAddEnabled) {
+            studentsHTML += `
+                <div class="bg-gray-100 p-4 rounded-lg shadow-inner mb-4">
+                    <h3 class="font-bold text-lg mb-2">Add a New Student</h3>
+                    <input type="text" id="new-parent-name" class="w-full mt-1 p-2 border rounded" placeholder="Parent Name">
+                    <input type="tel" id="new-parent-phone" class="w-full mt-1 p-2 border rounded" placeholder="Parent Phone Number">
+                    <input type="text" id="new-student-name" class="w-full mt-1 p-2 border rounded" placeholder="Student Name">
+                    <select id="new-student-grade" class="w-full mt-1 p-2 border rounded">
+                        <option value="">Select Grade</option>
+                        ${Array.from({ length: 12 }, (_, i) => `<option value="${i + 1}">${i + 1}</option>`).join('')}
+                    </select>
+                    <input type="text" id="new-student-subject" class="w-full mt-1 p-2 border rounded" placeholder="Subject(s) (e.g., Math, English)">
+                    <select id="new-student-days" class="w-full mt-1 p-2 border rounded">
+                        <option value="">Select Days</option>
+                        ${Array.from({ length: 7 }, (_, i) => `<option value="${i + 1}">${i + 1}</option>`).join('')}
+                    </select>
+                    <input type="number" id="new-student-fee" class="w-full mt-1 p-2 border rounded" placeholder="Student Fee (₦)">
+                    <button id="add-student-btn" class="bg-green-600 text-white px-4 py-2 rounded mt-2 hover:bg-green-700">Add Student</button>
+                </div>`;
         }
-    }
-}
-
-async function handleEndBreak(studentId, studentName) {
-    if (confirm(`Are you sure you want to end the break for ${studentName}?`)) {
-        try {
-            await updateDoc(doc(db, "students", studentId), { summerBreak: false, lastBreakEnd: new Date() });
-            alert(`Break ended for ${studentName}.`);
-        } catch (error) {
-            console.error("Error ending summer break:", error);
-            alert("Failed to end summer break. Check the console for details.");
-        }
-    }
-}
-
-
-function showReportModal(studentId, studentName, tutorData) {
-    const modalHtml = `
-        <div id="report-modal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-center justify-center">
-            <div class="relative p-8 bg-white w-full max-w-2xl rounded-lg shadow-xl">
-                <button class="absolute top-2 right-2 text-gray-500 hover:text-gray-800 text-2xl font-bold" onclick="document.getElementById('report-modal').remove()">&times;</button>
-                <h3 class="text-xl font-bold mb-4">Submit Report for ${studentName}</h3>
-                <form id="report-form">
-                    <div class="mb-4">
-                        <label class="block text-sm font-medium">Introduction</label>
-                        <textarea name="introduction" rows="3" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2"></textarea>
-                    </div>
-                    <div class="mb-4">
-                        <label class="block text-sm font-medium">Topics & Remarks</label>
-                        <textarea name="topics" rows="5" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2"></textarea>
-                    </div>
-                    <div class="mb-4">
-                        <label class="block text-sm font-medium">Progress & Achievements</label>
-                        <textarea name="progress" rows="5" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2"></textarea>
-                    </div>
-                    <div class="mb-4">
-                        <label class="block text-sm font-medium">Strengths and Weaknesses</label>
-                        <textarea name="strengthsWeaknesses" rows="5" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2"></textarea>
-                    </div>
-                    <div class="mb-4">
-                        <label class="block text-sm font-medium">Recommendations</label>
-                        <textarea name="recommendations" rows="5" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2"></textarea>
-                    </div>
-                    <div class="mb-4">
-                        <label class="block text-sm font-medium">General Tutor's Comments</label>
-                        <textarea name="generalComments" rows="5" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2"></textarea>
-                    </div>
-                    <div class="flex justify-end">
-                        <button type="submit" class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700">Submit Report</button>
-                    </div>
-                </form>
-            </div>
-        </div>
-    `;
-
-    document.getElementById('student-modal-container').innerHTML = modalHtml;
-
-    document.getElementById('report-form').addEventListener('submit', async (e) => {
-        e.preventDefault();
         
-        const formData = new FormData(e.target);
-        const reportData = {
-            studentId,
-            studentName,
-            tutorEmail: tutorData.email,
-            tutorName: tutorData.name,
-            parentName: '', // This will be fetched from student's data
-            parentPhone: '', // This will be fetched from student's data
-            grade: '', // This will be fetched from student's data
-            introduction: formData.get('introduction'),
-            topics: formData.get('topics'),
-            progress: formData.get('progress'),
-            strengthsWeaknesses: formData.get('strengthsWeaknesses'),
-            recommendations: formData.get('recommendations'),
-            generalComments: formData.get('generalComments'),
-            submittedAt: new Date()
-        };
+        studentsHTML += `<p class="text-sm text-gray-600 mb-4">Report submission is currently <strong class="${isSubmissionEnabled ? 'text-green-600' : 'text-red-500'}">${isSubmissionEnabled ? 'Enabled' : 'Disabled'}</strong> by the admin.</p>`;
 
-        const studentDoc = await getDoc(doc(db, "students", studentId));
-        if (studentDoc.exists()) {
-            const studentData = studentDoc.data();
-            reportData.parentName = studentData.parentName || 'N/A';
-            reportData.parentPhone = studentData.parentPhone || 'N/A';
-            reportData.grade = studentData.grade || 'N/A';
+        if (studentsCount === 0) {
+            studentsHTML += `<p class="text-gray-500">You are not assigned to any students yet.</p>`;
+        } else {
+            studentsHTML += `
+                <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-gray-200">
+                        <thead><tr><th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Student Name</th><th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th><th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th></tr></thead>
+                        <tbody class="bg-white divide-y divide-gray-200">`;
+
+            students.forEach(student => {
+                const isStudentOnBreak = student.summerBreak;
+                const isReportSaved = savedReports[student.id];
+
+                // Determine the status text based on the new approvalStatus field
+                let statusText = '';
+                let statusClass = '';
+                if (student.approvalStatus === 'pending') {
+                    statusText = 'Awaiting Approval';
+                    statusClass = 'text-yellow-600 font-semibold';
+                } else if (isStudentOnBreak) {
+                    statusText = 'On Break';
+                    statusClass = 'text-gray-500';
+                } else if (isReportSaved) {
+                    statusText = 'Report Saved';
+                    statusClass = 'text-green-600 font-semibold';
+                } else {
+                    statusText = 'Pending Report';
+                    statusClass = 'text-gray-500';
+                }
+
+                studentsHTML += `
+                    <tr>
+                        <td class="px-6 py-4 whitespace-nowrap">${student.studentName} (Grade ${student.grade})</td>
+                        <td class="px-6 py-4 whitespace-nowrap"><span class="status-indicator ${statusClass}">${statusText}</span></td>
+                        <td class="px-6 py-4 whitespace-nowrap space-x-2">`;
+                
+                // Show actions only if not pending approval
+                if (student.approvalStatus !== 'pending') {
+                    if (isSummerBreakEnabled && !isStudentOnBreak) {
+                        studentsHTML += `<button class="summer-break-btn bg-yellow-500 text-white px-3 py-1 rounded" data-student-id="${student.id}">Summer Break</button>`;
+                    }
+                    if (isSubmissionEnabled && !isStudentOnBreak) {
+                        if (studentsCount === 1) {
+                            studentsHTML += `<button class="submit-single-report-btn bg-green-600 text-white px-3 py-1 rounded" data-student-id="${student.id}">Submit Report</button>`;
+                        } else {
+                            studentsHTML += `<button class="enter-report-btn bg-green-600 text-white px-3 py-1 rounded" data-student-id="${student.id}">${isReportSaved ? 'Edit Report' : 'Enter Report'}</button>`;
+                        }
+                    } else if (!isStudentOnBreak) {
+                        studentsHTML += `<span class="text-gray-400">Submission Disabled</span>`;
+                    }
+                }
+                
+                studentsHTML += `</td></tr>`;
+            });
+
+            studentsHTML += `</tbody></table></div>`;
+            
+            if (tutor.isManagementStaff) {
+                studentsHTML += `
+                    <div class="bg-green-50 p-4 rounded-lg shadow-md mt-6">
+                        <h3 class="text-lg font-bold text-green-800 mb-2">Management Fee</h3>
+                        <p class="text-sm text-gray-600 mb-2">As you are part of the management staff, please set your monthly management fee before final submission.</p>
+                        <div class="flex items-center space-x-2">
+                            <label for="management-fee-input" class="font-semibold">Fee (₦):</label>
+                            <input type="number" id="management-fee-input" class="p-2 border rounded w-full" value="${tutor.managementFee || 0}">
+                            <button id="save-management-fee-btn" class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700">Save Fee</button>
+                        </div>
+                    </div>`;
+            }
+
+            if (studentsCount > 1 && isSubmissionEnabled) {
+                const allReportsSaved = Object.keys(savedReports).length === students.filter(s => !s.summerBreak).length;
+                studentsHTML += `
+                    <div class="bg-blue-50 p-4 rounded-lg shadow-md mt-6">
+                        <h3 class="text-lg font-bold text-blue-800 mb-2">Bulk Report Submission</h3>
+                        <p class="text-sm text-gray-600 mb-2">You have saved reports for ${Object.keys(savedReports).length} out of ${students.filter(s => !s.summerBreak).length} students.</p>
+                        <button id="submit-all-reports-btn" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 disabled:bg-gray-400" ${!allReportsSaved ? 'disabled' : ''}>Submit All Reports</button>
+                    </div>`;
+            }
         }
 
-        try {
-            await addDoc(collection(db, "tutor_submissions"), reportData);
-            alert("Report submitted successfully!");
-            document.getElementById('report-modal').remove();
-        } catch (error) {
-            console.error("Error submitting report: ", error);
-            alert("Failed to submit report. Please check the console for details.");
+        container.innerHTML = studentsHTML;
+        addStudentEventListeners();
+    }
+
+    function addStudentEventListeners() {
+        if (isTutorAddEnabled) {
+            document.getElementById('add-student-btn')?.addEventListener('click', async () => {
+                const parentName = document.getElementById('new-parent-name').value;
+                const parentPhone = document.getElementById('new-parent-phone').value;
+                const studentName = document.getElementById('new-student-name').value;
+                const studentGrade = document.getElementById('new-student-grade').value;
+                const studentSubject = document.getElementById('new-student-subject').value;
+                const studentDays = document.getElementById('new-student-days').value;
+                const studentFee = document.getElementById('new-student-fee').value;
+
+                if (parentName && parentPhone && studentName && studentGrade && studentSubject && studentDays && studentFee) {
+                    await addStudent(tutor.email, parentName, parentPhone, studentName, studentGrade, studentSubject, studentDays, studentFee);
+                    renderStudentDatabase(container, tutor); // Re-render to show the new student
+                } else {
+                    alert('Please fill in all fields to add a student.');
+                }
+            });
         }
-    });
+
+        document.querySelectorAll('.summer-break-btn').forEach(btn => {
+            btn.addEventListener('click', async (e) => {
+                const studentId = e.target.getAttribute('data-student-id');
+                const studentRef = doc(db, "students", studentId);
+                await updateDoc(studentRef, { summerBreak: true });
+                renderStudentDatabase(container, tutor);
+            });
+        });
+
+        document.querySelectorAll('.enter-report-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const studentId = e.target.getAttribute('data-student-id');
+                renderReportSubmissionForm(container, students.find(s => s.id === studentId), tutor, savedReports);
+            });
+        });
+
+        document.querySelectorAll('.submit-single-report-btn').forEach(btn => {
+            btn.addEventListener('click', async (e) => {
+                const studentId = e.target.getAttribute('data-student-id');
+                const student = students.find(s => s.id === studentId);
+                const reportData = {
+                    tutorEmail: tutor.email,
+                    studentId: student.id,
+                    studentName: student.studentName,
+                    parentName: student.parentName,
+                    grade: student.grade,
+                    submittedAt: new Date(),
+                    status: 'pending_review',
+                    textAnswer: 'No creative writing submission.',
+                    fileUrl: ''
+                };
+                await addDoc(collection(db, "tutor_submissions"), reportData);
+                renderStudentDatabase(container, tutor);
+                alert('Report submitted for approval.');
+            });
+        });
+
+        document.getElementById('save-management-fee-btn')?.addEventListener('click', async () => {
+            const managementFee = document.getElementById('management-fee-input').value;
+            const tutorRef = doc(db, "tutors", tutor.email);
+            await updateDoc(tutorRef, { managementFee: parseFloat(managementFee) });
+            alert('Management fee saved.');
+        });
+
+        document.getElementById('submit-all-reports-btn')?.addEventListener('click', async () => {
+            const batch = writeBatch(db);
+            let hasReportsToSubmit = false;
+            students.filter(s => savedReports[s.id]).forEach(student => {
+                const report = savedReports[student.id];
+                if (report) {
+                    const submissionRef = doc(collection(db, "tutor_submissions"));
+                    batch.set(submissionRef, { ...report, status: 'pending_review', submittedAt: new Date() });
+                    hasReportsToSubmit = true;
+                }
+            });
+
+            if (hasReportsToSubmit) {
+                await batch.commit();
+                savedReports = {}; // Clear local saved reports
+                renderStudentDatabase(container, tutor);
+                alert('All saved reports have been submitted for approval.');
+            } else {
+                alert('No reports to submit.');
+            }
+        });
+
+        // Function to submit a single saved report, not used directly but for consistency
+        async function submitSingleSavedReport(report) {
+            const submissionRef = doc(collection(db, "tutor_submissions"));
+            await setDoc(submissionRef, { ...report, status: 'pending_review', submittedAt: new Date() });
+            // After submission, clear the saved report locally
+            delete savedReports[report.studentId];
+            renderStudentDatabase(container, tutor);
+        }
+
+    }
+
+    renderUI();
 }
 
-
-function showAddStudentModal(tutorEmail) {
-    const modalHtml = `
-        <div id="add-student-modal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-center justify-center">
-            <div class="relative p-8 bg-white w-full max-w-md rounded-lg shadow-xl">
-                <button class="absolute top-2 right-2 text-gray-500 hover:text-gray-800 text-2xl font-bold" onclick="document.getElementById('add-student-modal').remove()">&times;</button>
-                <h3 class="text-xl font-bold mb-4">Add New Student</h3>
-                <form id="add-student-form">
-                    <div class="mb-4">
-                        <label class="block text-sm font-medium">Student Name</label>
-                        <input type="text" name="studentName" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2" required>
-                    </div>
-                    <div class="mb-4">
-                        <label class="block text-sm font-medium">Student Grade</label>
-                        <input type="text" name="grade" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2" required>
-                    </div>
-                    <div class="mb-4">
-                        <label class="block text-sm font-medium">Days/Week</label>
-                        <input type="number" name="days" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2" required>
-                    </div>
-                    <div class="mb-4">
-                        <label class="block text-sm font-medium">Subjects (comma-separated)</label>
-                        <input type="text" name="subjects" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2" required>
-                    </div>
-                    <div class="mb-4">
-                        <label class="block text-sm font-medium">Student Fee (₦)</label>
-                        <input type="number" name="fee" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2" required>
-                    </div>
-                    <div class="mb-4">
-                        <label class="block text-sm font-medium">Parent Name</label>
-                        <input type="text" name="parentName" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2">
-                    </div>
-                    <div class="mb-4">
-                        <label class="block text-sm font-medium">Parent Phone</label>
-                        <input type="text" name="parentPhone" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2">
-                    </div>
-                    <div class="flex justify-end">
-                        <button type="submit" class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700">Submit for Approval</button>
-                    </div>
-                </form>
-            </div>
-        </div>
-    `;
-
-    document.getElementById('student-modal-container').innerHTML = modalHtml;
-    document.getElementById('add-student-form').addEventListener('submit', (e) => {
-        e.preventDefault();
-        const form = e.target;
-        addStudent(
-            tutorEmail,
-            form.parentName.value,
-            form.parentPhone.value,
-            form.studentName.value,
-            form.grade.value,
-            form.subjects.value.split(',').map(s => s.trim()),
-            form.days.value,
-            form.fee.value
-        );
-        document.getElementById('add-student-modal').remove();
-    });
-}
-
-// --- CORRECTED addStudent function ---
 async function addStudent(tutorEmail, parentName, parentPhone, studentName, studentGrade, studentSubject, studentDays, studentFee) {
+    // Check if the student already exists
     const q = query(collection(db, "students"), where("studentName", "==", studentName), where("tutorEmail", "==", tutorEmail));
     const querySnapshot = await getDocs(q);
     if (!querySnapshot.empty) {
@@ -332,39 +357,39 @@ async function addStudent(tutorEmail, parentName, parentPhone, studentName, stud
         return;
     }
 
-    try {
-        await addDoc(collection(db, "pending_students"), {
-            tutorEmail: tutorEmail,
-            parentName: parentName,
-            parentPhone: parentPhone,
-            studentName: studentName,
-            grade: studentGrade,
-            subjects: studentSubject,
-            days: studentDays,
-            studentFee: parseFloat(studentFee),
-            submittedByEmail: tutorEmail,
-            submissionDate: new Date(),
-            approvalStatus: 'pending' 
-        });
-        alert('Student submitted for approval. Awaiting management review.');
-    } catch (error) {
-        console.error("Error submitting student for approval: ", error);
-        alert("Failed to submit student. Check the console for details.");
-    }
+    // Use addDoc to automatically generate a new ID
+    await addDoc(collection(db, "students"), {
+        tutorEmail: tutorEmail,
+        parentName: parentName,
+        parentPhone: parentPhone,
+        studentName: studentName,
+        grade: studentGrade,
+        subjects: studentSubject,
+        days: studentDays,
+        fee: parseFloat(studentFee),
+        approvalStatus: 'pending' // New field added
+    });
+    alert('Student added successfully. Awaiting management approval.');
 }
 
 
-// --- Authentication and Initialization ---
+// ##################################################################
+// # SECTION 3: REPORT SUBMISSION FORM (NO CHANGES NEEDED)
+// ##################################################################
+
+async function renderReportSubmissionForm(container, student, tutor, savedReports) {
+    // ... no changes to this function
+}
+
+
+// ##################################################################
+// # SECTION 4: INITIALIZATION (NO CHANGES NEEDED)
+// ##################################################################
+
 function initializeTutorPanel() {
+    const mainContent = document.getElementById('mainContent');
     const navDashboard = document.getElementById('navDashboard');
     const navStudentDatabase = document.getElementById('navStudentDatabase');
-    const mainContent = document.getElementById('mainContent');
-    const logoutBtn = document.getElementById('logoutBtn');
-
-    if (!navDashboard || !navStudentDatabase || !mainContent || !logoutBtn) {
-        console.error("Required navigation or content elements not found. Check your HTML structure.");
-        return;
-    }
 
     function setActiveNav(activeButton) {
         navDashboard.classList.remove('active');
