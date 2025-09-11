@@ -1,5 +1,5 @@
 import { auth, db } from './firebaseConfig.js';
-import { collection, getDocs, doc, getDoc, where, query, orderBy, Timestamp, writeBatch, updateDoc } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
+import { collection, getDocs, doc, getDoc, where, query, orderBy, Timestamp, writeBatch, updateDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
 import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-auth.js";
 import { onSnapshot } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
 
@@ -19,6 +19,34 @@ function convertPayAdviceToCSV(data) {
     ]);
     return [header.join(','), ...rows.map(row => row.join(','))].join('\n');
 }
+
+// ##################################
+// # NEW ACTION HANDLER FUNCTIONS
+// ##################################
+
+// Placeholder function to handle student editing
+async function handleEditStudent(studentId) {
+    console.log(`Edit functionality for student with ID: ${studentId} needs to be implemented.`);
+    alert("Edit Student function is not yet implemented.");
+    // Example: You would open a modal here to edit student details.
+}
+
+// Placeholder function to handle student deletion
+async function handleDeleteStudent(studentId) {
+    if (confirm("Are you sure you want to delete this student? This action cannot be undone.")) {
+        try {
+            await deleteDoc(doc(db, "students", studentId));
+            console.log("Student successfully deleted!");
+            alert("Student deleted successfully!");
+            // Rerender the view to update the list.
+            renderManagementTutorView(document.getElementById('main-content'));
+        } catch (error) {
+            console.error("Error removing student: ", error);
+            alert("Error deleting student. Check the console for details.");
+        }
+    }
+}
+
 
 // ##################################
 // # PANEL RENDERING FUNCTIONS
@@ -57,7 +85,7 @@ async function renderManagementTutorView(container) {
 
         const studentsByTutor = {};
         studentsSnapshot.forEach(doc => {
-            const student = doc.data();
+            const student = { id: doc.id, ...doc.data() };
             if (!studentsByTutor[student.tutorEmail]) {
                 studentsByTutor[student.tutorEmail] = [];
             }
@@ -67,6 +95,11 @@ async function renderManagementTutorView(container) {
         const directoryList = document.getElementById('directory-list');
         if (!directoryList) return;
 
+        // ### NEW: Check for edit/delete permissions ###
+        const canEditStudents = window.userData.permissions?.actions?.canEditStudents === true;
+        const canDeleteStudents = window.userData.permissions?.actions?.canDeleteStudents === true;
+        const showActionsColumn = canEditStudents || canDeleteStudents;
+
         directoryList.innerHTML = tutorsSnapshot.docs.map(tutorDoc => {
             const tutor = tutorDoc.data();
             const assignedStudents = studentsByTutor[tutor.email] || [];
@@ -75,6 +108,11 @@ async function renderManagementTutorView(container) {
                 .sort((a, b) => a.studentName.localeCompare(b.studentName))
                 .map(student => {
                     const subjects = student.subjects && Array.isArray(student.subjects) ? student.subjects.join(', ') : 'N/A';
+                    // ### MODIFIED: Added a new table cell for actions ###
+                    const actionButtons = `
+                        ${canEditStudents ? `<button class="edit-student-btn bg-blue-500 text-white px-3 py-1 rounded-full text-xs" data-student-id="${student.id}">Edit</button>` : ''}
+                        ${canDeleteStudents ? `<button class="delete-student-btn bg-red-500 text-white px-3 py-1 rounded-full text-xs" data-student-id="${student.id}">Delete</button>` : ''}
+                    `;
                     return `
                         <tr class="hover:bg-gray-50">
                             <td class="px-4 py-2 font-medium">${student.studentName}</td>
@@ -83,6 +121,7 @@ async function renderManagementTutorView(container) {
                             <td class="px-4 py-2">${subjects}</td>
                             <td class="px-4 py-2">${student.parentName || 'N/A'}</td>
                             <td class="px-4 py-2">${student.parentPhone || 'N/A'}</td>
+                            ${showActionsColumn ? `<td class="px-4 py-2">${actionButtons}</td>` : ''}
                         </tr>
                     `;
                 }).join('');
@@ -103,6 +142,7 @@ async function renderManagementTutorView(container) {
                                     <th class="px-4 py-2 font-medium">Subject</th>
                                     <th class="px-4 py-2 font-medium">Parent's Name</th>
                                     <th class="px-4 py-2 font-medium">Parent's Phone</th>
+                                    ${showActionsColumn ? `<th class="px-4 py-2 font-medium">Actions</th>` : ''}
                                 </tr></thead>
                                 <tbody class="bg-white divide-y divide-gray-200">${studentsTableRows}</tbody>
                             </table>
@@ -111,6 +151,19 @@ async function renderManagementTutorView(container) {
                 </div>
             `;
         }).join('');
+
+        // ### NEW: Attach event listeners for edit and delete buttons ###
+        if (canEditStudents) {
+            document.querySelectorAll('.edit-student-btn').forEach(button => {
+                button.addEventListener('click', () => handleEditStudent(button.dataset.studentId));
+            });
+        }
+        if (canDeleteStudents) {
+            document.querySelectorAll('.delete-student-btn').forEach(button => {
+                button.addEventListener('click', () => handleDeleteStudent(button.dataset.studentId));
+            });
+        }
+
     } catch(error) {
         console.error("Error in renderManagementTutorView:", error);
         document.getElementById('directory-list').innerHTML = `<p class="text-center text-red-500 py-10">Failed to load data.</p>`;
