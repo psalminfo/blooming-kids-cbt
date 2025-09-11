@@ -23,8 +23,26 @@ function convertPayAdviceToCSV(data) {
 }
 
 // ##################################
-// # ACTION HANDLER FUNCTIONS
+// # NEW ACTION HANDLER FUNCTIONS
 // ##################################
+
+// UPDATED: This function now fetches student data and opens a modal for editing
+async function handleEditStudent(studentId) {
+    try {
+        const studentDoc = await getDoc(doc(db, "students", studentId));
+        if (!studentDoc.exists()) {
+            alert("Student not found!");
+            return;
+        }
+
+        const studentData = studentDoc.data();
+        showEditStudentModal(studentId, studentData, "students");
+
+    } catch (error) {
+        console.error("Error fetching student for edit: ", error);
+        alert("Error fetching student data. Check the console for details.");
+    }
+}
 
 // NEW FUNCTION: Handle editing a pending student
 async function handleEditPendingStudent(studentId) {
@@ -412,7 +430,6 @@ async function renderTutorReportsPanel(container) {
     loadTutorReportsForManagement();
 }
 
-// ### NEW PANEL RENDERING FUNCTION ###
 async function renderPendingApprovalsPanel(container) {
     container.innerHTML = `
         <div class="bg-white p-6 rounded-lg shadow-md">
@@ -423,6 +440,63 @@ async function renderPendingApprovalsPanel(container) {
         </div>
     `;
     loadPendingApprovals();
+}
+
+// NEW FUNCTION
+async function loadPendingApprovals() {
+    const listContainer = document.getElementById('pending-approvals-list');
+    onSnapshot(query(collection(db, "pending_students"), orderBy("submissionDate", "desc")), (snapshot) => {
+        console.log("Found pending students:", snapshot.docs.length); // DEBUG LOG
+        if (!listContainer) return;
+
+        if (snapshot.empty) {
+            listContainer.innerHTML = `<p class="text-center text-gray-500">No students are awaiting approval.</p>`;
+            return;
+        }
+
+        const canApprove = window.userData.permissions?.actions?.canApproveStudents === true; // Assuming a new permission `canApproveStudents`
+        const canReject = window.userData.permissions?.actions?.canDeleteStudents === true; // Reusing `canDeleteStudents` for rejection
+        const canEditPending = window.userData.permissions?.actions?.canEditStudents === true;
+
+        listContainer.innerHTML = snapshot.docs.map(doc => {
+            const student = { id: doc.id, ...doc.data() };
+            const date = student.submissionDate ? new Date(student.submissionDate.seconds * 1000).toLocaleDateString() : 'N/A';
+            const actionButtons = `
+                ${canEditPending ? `<button class="edit-pending-btn bg-blue-500 text-white px-3 py-1 text-sm rounded-full" data-student-id="${student.id}">Edit</button>` : ''}
+                ${canApprove ? `<button class="approve-btn bg-green-600 text-white px-3 py-1 text-sm rounded-full" data-student-id="${student.id}">Approve</button>` : ''}
+                ${canReject ? `<button class="reject-btn bg-red-600 text-white px-3 py-1 text-sm rounded-full" data-student-id="${student.id}">Reject</button>` : ''}
+            `;
+            return `
+                <div class="border p-4 rounded-lg flex justify-between items-center bg-gray-50">
+                    <div>
+                        <p><strong>Student:</strong> ${student.studentName}</p>
+                        <p><strong>Fee:</strong> ₦${(student.studentFee || 0).toFixed(2)}</p>
+                        <p><strong>Submitted by:</strong> ${student.submittedByEmail}</p>
+                        <p><strong>Submission Date:</strong> ${date}</p>
+                    </div>
+                    <div class="flex items-center space-x-2">
+                        ${actionButtons}
+                    </div>
+                </div>
+            `;
+        }).join('');
+
+        if (canEditPending) {
+            document.querySelectorAll('.edit-pending-btn').forEach(button => {
+                button.addEventListener('click', () => handleEditPendingStudent(button.dataset.studentId));
+            });
+        }
+        if (canApprove) {
+            document.querySelectorAll('.approve-btn').forEach(button => {
+                button.addEventListener('click', () => handleApproveStudent(button.dataset.studentId));
+            });
+        }
+        if (canReject) {
+            document.querySelectorAll('.reject-btn').forEach(button => {
+                button.addEventListener('click', () => handleRejectStudent(button.dataset.studentId));
+            });
+        }
+    });
 }
 
 
@@ -496,7 +570,6 @@ async function loadTutorReportsForManagement() {
     });
 }
 
-
 // NEW HELPER FUNCTION to generate report HTML
 async function generateReportHTML(reportId) {
     const reportDoc = await getDoc(doc(db, "tutor_submissions", reportId));
@@ -562,62 +635,6 @@ async function zipAndDownloadTutorReports(reports, tutorName, buttonElement) {
     }
 }
 
-// NEW FUNCTION: Load pending approvals and attach listeners
-async function loadPendingApprovals() {
-    const listContainer = document.getElementById('pending-approvals-list');
-    onSnapshot(query(collection(db, "pending_students"), orderBy("submissionDate", "desc")), (snapshot) => {
-        console.log("Found pending students:", snapshot.docs.length); // DEBUG LOG
-        if (!listContainer) return;
-
-        if (snapshot.empty) {
-            listContainer.innerHTML = `<p class="text-center text-gray-500">No students are awaiting approval.</p>`;
-            return;
-        }
-
-        const canApprove = window.userData.permissions?.actions?.canApproveStudents === true;
-        const canReject = window.userData.permissions?.actions?.canDeleteStudents === true;
-        const canEditPending = window.userData.permissions?.actions?.canEditStudents === true;
-
-        listContainer.innerHTML = snapshot.docs.map(doc => {
-            const student = { id: doc.id, ...doc.data() };
-            const date = student.submissionDate ? new Date(student.submissionDate.seconds * 1000).toLocaleDateString() : 'N/A';
-            const actionButtons = `
-                ${canEditPending ? `<button class="edit-pending-btn bg-blue-500 text-white px-3 py-1 text-sm rounded-full" data-student-id="${student.id}">Edit</button>` : ''}
-                ${canApprove ? `<button class="approve-btn bg-green-600 text-white px-3 py-1 text-sm rounded-full" data-student-id="${student.id}">Approve</button>` : ''}
-                ${canReject ? `<button class="reject-btn bg-red-600 text-white px-3 py-1 text-sm rounded-full" data-student-id="${student.id}">Reject</button>` : ''}
-            `;
-            return `
-                <div class="border p-4 rounded-lg flex justify-between items-center bg-gray-50">
-                    <div>
-                        <p><strong>Student:</strong> ${student.studentName}</p>
-                        <p><strong>Fee:</strong> ₦${(student.studentFee || 0).toFixed(2)}</p>
-                        <p><strong>Submitted by:</strong> ${student.submittedByEmail}</p>
-                        <p><strong>Submission Date:</strong> ${date}</p>
-                    </div>
-                    <div class="flex items-center space-x-2">
-                        ${actionButtons}
-                    </div>
-                </div>
-            `;
-        }).join('');
-
-        if (canEditPending) {
-            document.querySelectorAll('.edit-pending-btn').forEach(button => {
-                button.addEventListener('click', () => handleEditPendingStudent(button.dataset.studentId));
-            });
-        }
-        if (canApprove) {
-            document.querySelectorAll('.approve-btn').forEach(button => {
-                button.addEventListener('click', () => handleApproveStudent(button.dataset.studentId));
-            });
-        }
-        if (canReject) {
-            document.querySelectorAll('.reject-btn').forEach(button => {
-                button.addEventListener('click', () => handleRejectStudent(button.dataset.studentId));
-            });
-        }
-    });
-}
 
 async function renderSummerBreakPanel(container) {
     container.innerHTML = `
@@ -696,6 +713,7 @@ onAuthStateChanged(auth, async (user) => {
     const mainContent = document.getElementById('main-content');
     const logoutBtn = document.getElementById('logoutBtn');
     if (user) {
+        // ### ADD THIS onSnapshot LISTENER ###
         const staffDocRef = doc(db, "staff", user.email);
         onSnapshot(staffDocRef, (docSnap) => {
             if (docSnap.exists() && docSnap.data().role !== 'pending') {
@@ -705,6 +723,7 @@ onAuthStateChanged(auth, async (user) => {
                 document.getElementById('welcome-message').textContent = `Welcome, ${staffData.name}`;
                 document.getElementById('user-role').textContent = `Role: ${capitalize(staffData.role)}`;
 
+                // ### UPDATED: Added new nav item here ###
                 const allNavItems = {
                     navTutorManagement: { fn: renderManagementTutorView, perm: 'viewTutorManagement' },
                     navPayAdvice: { fn: renderPayAdvicePanel, perm: 'viewPayAdvice' },
@@ -716,6 +735,7 @@ onAuthStateChanged(auth, async (user) => {
                 const navContainer = document.querySelector('nav');
                 const originalNavButtons = {};
                 if(navContainer) {
+                    // Temporarily store original text content if needed
                     navContainer.querySelectorAll('.nav-btn').forEach(btn => {
                         originalNavButtons[btn.id] = btn.textContent;
                     });
@@ -740,11 +760,14 @@ onAuthStateChanged(auth, async (user) => {
                     });
 
                     if (firstVisibleTab) {
+                        // Check if the current tab is still available after the permission update.
                         const activeNav = document.querySelector('.nav-btn.active');
                         const activeNavId = activeNav?.id;
                         if (!activeNav || !document.getElementById(activeNavId)) {
+                            // The current tab is no longer available, so switch to the first available one.
                             document.getElementById(firstVisibleTab).click();
                         } else {
+                            // The current tab is still available, re-render it to apply new permissions.
                             const currentItem = allNavItems[activeNavId];
                             if(currentItem) currentItem.fn(mainContent);
                         }
