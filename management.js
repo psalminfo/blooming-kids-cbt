@@ -637,6 +637,23 @@ async function loadPendingApprovals() {
     });
 }
 
+async function handleEndBreak(studentId, studentName) {
+    if (confirm(`Are you sure you want to end the break for ${studentName}?`)) {
+        try {
+            const statusMessageDiv = document.getElementById('break-status-message');
+            await updateDoc(doc(db, "students", studentId), { summerBreak: false, lastBreakEnd: Timestamp.now() });
+            statusMessageDiv.textContent = `Break ended for ${studentName}.`;
+            statusMessageDiv.className = 'text-center font-semibold mb-4 text-green-600';
+            statusMessageDiv.classList.remove('hidden');
+        } catch (error) {
+            console.error("Error ending summer break:", error);
+            statusMessageDiv.textContent = "Failed to end summer break. Check the console for details.";
+            statusMessageDiv.className = 'text-center font-semibold mb-4 text-red-600';
+            statusMessageDiv.classList.remove('hidden');
+        }
+    }
+}
+
 async function renderSummerBreakPanel(container) {
     container.innerHTML = `
         <div class="bg-white p-6 rounded-lg shadow-md">
@@ -654,8 +671,7 @@ async function renderSummerBreakPanel(container) {
     onSnapshot(query(collection(db, "students"), where("summerBreak", "==", true)), (snapshot) => {
         if (!listContainer) return;
         
-        const canEndBreak = window.userData.permissions?.actions?.canEndBreak === true;
-        console.log("canEndBreak permission status:", canEndBreak); // DEBUG LOG
+        const canEndBreak = window.userData?.permissions?.actions?.canEndBreak === true;
 
         if (snapshot.empty) {
             listContainer.innerHTML = `<p class="text-center text-gray-500">No students are on break.</p>`;
@@ -666,7 +682,7 @@ async function renderSummerBreakPanel(container) {
             const student = doc.data();
             const studentId = doc.id;
             const endBreakButton = canEndBreak 
-                ? `<button class="end-break-btn bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700 transition-colors" data-student-id="${studentId}">End Break</button>`
+                ? `<button class="end-break-btn bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700 transition-colors" data-student-id="${studentId}" data-student-name="${student.studentName}">End Break</button>`
                 : '';
 
             return `
@@ -686,20 +702,9 @@ async function renderSummerBreakPanel(container) {
         // Attach event listeners to the new buttons
         if (canEndBreak) {
             document.querySelectorAll('.end-break-btn').forEach(button => {
-                button.addEventListener('click', async (e) => {
-                    const studentId = e.target.dataset.studentId;
-                    try {
-                        await updateDoc(doc(db, "students", studentId), { summerBreak: false, lastBreakEnd: Timestamp.now() });
-                        statusMessageDiv.textContent = `Break ended for ${e.target.closest('div').querySelector('p').textContent.replace('Student: ', '')}.`;
-                        statusMessageDiv.classList.remove('hidden');
-                        statusMessageDiv.className = 'text-center font-semibold mb-4 text-green-600';
-                    } catch (error) {
-                        console.error("Error ending summer break:", error);
-                        statusMessageDiv.textContent = "Failed to end summer break. Check the console for details.";
-                        statusMessageDiv.className = 'text-center font-semibold mb-4 text-red-600';
-                        statusMessageDiv.classList.remove('hidden');
-                    }
-                });
+                const studentId = button.dataset.studentId;
+                const studentName = button.dataset.studentName;
+                button.addEventListener('click', () => handleEndBreak(studentId, studentName));
             });
         }
     });
@@ -779,7 +784,7 @@ onAuthStateChanged(auth, async (user) => {
 
         const staffDocSnap = await getDoc(staffDocRef);
         if (!staffDocSnap.exists()) {
-            if (mainContent) mainContent.innerHTML = `<p class="text-center mt-12 text-red-600">Account not registered in staff directory.</p>`;
+            if (mainContent) mainContent.innerHTML = `<p class="text-center mt-12 text-red-600\">Account not registered in staff directory.</p>`;
             if (logoutBtn) logoutBtn.classList.add('hidden');
         }
 
