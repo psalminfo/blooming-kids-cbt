@@ -47,14 +47,14 @@ async function handleEditStudent(studentId) {
 // NEW FUNCTION: Handle editing a pending student
 async function handleEditPendingStudent(studentId) {
     try {
-        const studentDoc = await getDoc(doc(db, "pending_students", studentId));
+        const studentDoc = await getDoc(doc(db, "students", studentId));
         if (!studentDoc.exists()) {
             alert("Pending student not found!");
             return;
         }
 
         const studentData = studentDoc.data();
-        showEditStudentModal(studentId, studentData, "pending_students");
+        showEditStudentModal(studentId, studentData, "students");
 
     } catch (error) {
         console.error("Error fetching pending student for edit: ", error);
@@ -142,7 +142,7 @@ async function handleDeleteStudent(studentId) {
 async function handleApproveStudent(studentId) {
     if (confirm("Are you sure you want to approve this student?")) {
         try {
-            const studentRef = doc(db, "pending_students", studentId);
+            const studentRef = doc(db, "students", studentId);
             const studentDoc = await getDoc(studentRef);
             if (!studentDoc.exists()) {
                 alert("Student not found.");
@@ -157,7 +157,7 @@ async function handleApproveStudent(studentId) {
             const newStudentRef = doc(db, "students", studentId);
             batch.set(newStudentRef, { ...studentData, status: 'approved' });
             
-            // Delete the student from the 'pending_students' collection
+            // Delete the student from the 'students' collection
             batch.delete(studentRef);
             
             // Commit the batch
@@ -176,7 +176,7 @@ async function handleApproveStudent(studentId) {
 async function handleRejectStudent(studentId) {
     if (confirm("Are you sure you want to reject this student? This will delete their entry.")) {
         try {
-            await deleteDoc(doc(db, "pending_students", studentId));
+            await deleteDoc(doc(db, "students", studentId));
             alert("Student rejected successfully!");
             // The onSnapshot listener will automatically re-render the view
         } catch (error) {
@@ -583,7 +583,7 @@ async function zipAndDownloadTutorReports(reports, tutorName, buttonElement) {
 // NEW FUNCTION: Load pending approvals and attach listeners
 async function loadPendingApprovals() {
     const listContainer = document.getElementById('pending-approvals-list');
-    onSnapshot(query(collection(db, "pending_students"), orderBy("submissionDate", "desc")), (snapshot) => {
+    onSnapshot(query(collection(db, "students"), orderBy("submissionDate", "desc")), (snapshot) => {
         console.log("Found pending students:", snapshot.docs.length); // DEBUG LOG
         if (!listContainer) return;
 
@@ -794,3 +794,4 @@ onAuthStateChanged(auth, async (user) => {
         window.location.href = "management-auth.html";
     }
 });
+
