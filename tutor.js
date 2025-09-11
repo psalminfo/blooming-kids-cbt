@@ -346,7 +346,7 @@ async function renderStudentDatabase(container, tutor) {
                     approvalStatus: 'pending' // New field added
                 };
                 if (studentData.parentName && studentData.studentName && studentData.grade && !isNaN(studentData.studentFee)) {
-                    await addDoc(collection(db, "students"), studentData);
+                    await addDoc(collection(db, "pending_students"), studentData);
                     alert('Student added successfully. Awaiting management approval.');
                     renderStudentDatabase(container, tutor);
                 } else {
@@ -440,3 +440,4 @@ onAuthStateChanged(auth, async (user) => {
         window.location.href = "tutor-auth.html";
     }
 });
+
