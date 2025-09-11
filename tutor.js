@@ -357,8 +357,8 @@ async function addStudent(tutorEmail, parentName, parentPhone, studentName, stud
         return;
     }
 
-    const newStudentRef = doc(collection(db, "students"));
-    await setDoc(newStudentRef, {
+    // Use addDoc to automatically generate a new ID
+    await addDoc(collection(db, "students"), {
         tutorEmail: tutorEmail,
         parentName: parentName,
         parentPhone: parentPhone,
@@ -427,3 +427,4 @@ onAuthStateChanged(auth, async (user) => {
         window.location.href = "tutor-auth.html";
     }
 });
+
