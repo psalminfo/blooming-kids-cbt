@@ -2,7 +2,6 @@ import { auth, db } from './firebaseConfig.js';
 import { collection, getDocs, doc, updateDoc, getDoc, where, query, addDoc, writeBatch } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
 import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-auth.js";
 import { onSnapshot } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
-import { setDoc } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
 
 // --- Global state to hold report submission status ---
 let isSubmissionEnabled = false;
@@ -220,7 +219,7 @@ async function renderStudentDatabase(container, tutor) {
             });
 
             studentsHTML += `</tbody></table></div>`;
-            
+
             if (tutor.isManagementStaff) {
                 studentsHTML += `
                     <div class="bg-green-50 p-4 rounded-lg shadow-md mt-6">
@@ -346,83 +345,85 @@ async function renderStudentDatabase(container, tutor) {
 
     }
 
-    async function addStudent(tutorEmail, parentName, parentPhone, studentName, studentGrade, studentSubject, studentDays, studentFee) {
-        // Check if the student already exists
-        const q = query(collection(db, "students"), where("studentName", "==", studentName), where("tutorEmail", "==", tutorEmail));
-        const querySnapshot = await getDocs(q);
-        if (!querySnapshot.empty) {
-            alert("A student with this name already exists under your account.");
-            return;
-        }
-    
-        // Use addDoc to automatically generate a new ID
-        await addDoc(collection(db, "students"), {
-            tutorEmail: tutorEmail,
-            parentName: parentName,
-            parentPhone: parentPhone,
-            studentName: studentName,
-            grade: studentGrade,
-            subjects: studentSubject,
-            days: studentDays,
-            fee: parseFloat(studentFee),
-            approvalStatus: 'pending' // New field added
-        });
-        alert('Student added successfully. Awaiting management approval.');
-    }
-    
-
-    // ##################################################################
-    // # SECTION 3: REPORT SUBMISSION FORM (NO CHANGES NEEDED)
-    // ##################################################################
-
-    async function renderReportSubmissionForm(container, student, tutor, savedReports) {
-        // ... no changes to this function
-    }
-
-
-    // ##################################################################
-    // # SECTION 4: INITIALIZATION (NO CHANGES NEEDED)
-    // ##################################################################
-
-    function initializeTutorPanel() {
-        const mainContent = document.getElementById('mainContent');
-        const navDashboard = document.getElementById('navDashboard');
-        const navStudentDatabase = document.getElementById('navStudentDatabase');
-
-        function setActiveNav(activeButton) {
-            navDashboard.classList.remove('active');
-            navStudentDatabase.classList.remove('active');
-            activeButton.classList.add('active');
-        }
-
-        navDashboard.addEventListener('click', () => { setActiveNav(navDashboard); renderTutorDashboard(mainContent, window.tutorData); });
-        navStudentDatabase.addEventListener('click', () => { setActiveNav(navStudentDatabase); renderStudentDatabase(mainContent, window.tutorData); });
-
-        // Default to Student Database on load
-        setActiveNav(navStudentDatabase);
-        renderStudentDatabase(mainContent, window.tutorData);
-    }
-
-    onAuthStateChanged(auth, async (user) => {
-        const mainContent = document.getElementById('mainContent');
-        const logoutBtn = document.getElementById('logoutBtn');
-
-        if (user) {
-            const tutorRef = doc(db, "tutors", user.email);
-            const tutorSnap = await getDoc(tutorRef);
-            if (tutorSnap.exists()) {
-                window.tutorData = tutorSnap.data();
-                initializeTutorPanel();
-                logoutBtn.addEventListener('click', async () => {
-                    await signOut(auth);
-                    window.location.href = "tutor-auth.html";
-                });
-            } else {
-                mainContent.innerHTML = `<p class="text-center mt-12 text-red-600">Your account is not registered as a tutor.</p>`;
-                logoutBtn.classList.add('hidden');
-            }
-        } else {
-            window.location.href = "tutor-auth.html";
-        }
-    });
+    renderUI();
 }
+
+async function addStudent(tutorEmail, parentName, parentPhone, studentName, studentGrade, studentSubject, studentDays, studentFee) {
+    // Check if the student already exists
+    const q = query(collection(db, "students"), where("studentName", "==", studentName), where("tutorEmail", "==", tutorEmail));
+    const querySnapshot = await getDocs(q);
+    if (!querySnapshot.empty) {
+        alert("A student with this name already exists under your account.");
+        return;
+    }
+
+    const newStudentRef = doc(collection(db, "students"));
+    await setDoc(newStudentRef, {
+        tutorEmail: tutorEmail,
+        parentName: parentName,
+        parentPhone: parentPhone,
+        studentName: studentName,
+        grade: studentGrade,
+        subjects: studentSubject,
+        days: studentDays,
+        fee: parseFloat(studentFee),
+        approvalStatus: 'pending' // New field added
+    });
+    alert('Student added successfully. Awaiting management approval.');
+}
+
+
+// ##################################################################
+// # SECTION 3: REPORT SUBMISSION FORM (NO CHANGES NEEDED)
+// ##################################################################
+
+async function renderReportSubmissionForm(container, student, tutor, savedReports) {
+    // ... no changes to this function
+}
+
+
+// ##################################################################
+// # SECTION 4: INITIALIZATION (NO CHANGES NEEDED)
+// ##################################################################
+
+function initializeTutorPanel() {
+    const mainContent = document.getElementById('mainContent');
+    const navDashboard = document.getElementById('navDashboard');
+    const navStudentDatabase = document.getElementById('navStudentDatabase');
+
+    function setActiveNav(activeButton) {
+        navDashboard.classList.remove('active');
+        navStudentDatabase.classList.remove('active');
+        activeButton.classList.add('active');
+    }
+
+    navDashboard.addEventListener('click', () => { setActiveNav(navDashboard); renderTutorDashboard(mainContent, window.tutorData); });
+    navStudentDatabase.addEventListener('click', () => { setActiveNav(navStudentDatabase); renderStudentDatabase(mainContent, window.tutorData); });
+
+    // Default to Student Database on load
+    setActiveNav(navStudentDatabase);
+    renderStudentDatabase(mainContent, window.tutorData);
+}
+
+onAuthStateChanged(auth, async (user) => {
+    const mainContent = document.getElementById('mainContent');
+    const logoutBtn = document.getElementById('logoutBtn');
+
+    if (user) {
+        const tutorRef = doc(db, "tutors", user.email);
+        const tutorSnap = await getDoc(tutorRef);
+        if (tutorSnap.exists()) {
+            window.tutorData = tutorSnap.data();
+            initializeTutorPanel();
+            logoutBtn.addEventListener('click', async () => {
+                await signOut(auth);
+                window.location.href = "tutor-auth.html";
+            });
+        } else {
+            mainContent.innerHTML = `<p class="text-center mt-12 text-red-600">Your account is not registered as a tutor.</p>`;
+            logoutBtn.classList.add('hidden');
+        }
+    } else {
+        window.location.href = "tutor-auth.html";
+    }
+});
