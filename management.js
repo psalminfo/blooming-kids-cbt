@@ -239,6 +239,17 @@ async function renderTutorReportsPanel(container) {
     loadTutorReportsForManagement();
 }
 
+// ### NEW: PENDING APPROVALS PANEL ###
+async function renderPendingApprovalsPanel(container) {
+    container.innerHTML = `
+        <div class="bg-white p-6 rounded-lg shadow-md">
+            <h2 class="text-2xl font-bold text-green-700 mb-4">Pending Approvals</h2>
+            <p>This is where pending approvals will be displayed. This page is currently under development.</p>
+        </div>
+    `;
+}
+
+
 // ### UPDATED and NEW functions below ###
 
 async function loadTutorReportsForManagement() {
@@ -461,11 +472,13 @@ onAuthStateChanged(auth, async (user) => {
                 document.getElementById('welcome-message').textContent = `Welcome, ${staffData.name}`;
                 document.getElementById('user-role').textContent = `Role: ${capitalize(staffData.role)}`;
 
+                // ### UPDATED: Added new nav item here ###
                 const allNavItems = {
                     navTutorManagement: { fn: renderManagementTutorView, perm: 'viewTutorManagement' },
                     navPayAdvice: { fn: renderPayAdvicePanel, perm: 'viewPayAdvice' },
                     navTutorReports: { fn: renderTutorReportsPanel, perm: 'viewTutorReports' },
-                    navSummerBreak: { fn: renderSummerBreakPanel, perm: 'viewSummerBreak' }
+                    navSummerBreak: { fn: renderSummerBreakPanel, perm: 'viewSummerBreak' },
+                    navPendingApprovals: { fn: renderPendingApprovalsPanel, perm: 'viewPendingApprovals' }
                 };
 
                 const navContainer = document.querySelector('nav');
