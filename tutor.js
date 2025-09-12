@@ -276,7 +276,7 @@ async function renderStudentDatabase(container, tutor) {
                 showAccountDetailsModal([reportData]);
             } else {
                 savedReports[student.id] = reportData;
-                alert(`${student.studentName}'s report has been saved.`);
+                showCustomAlert(`${student.studentName}'s report has been saved.`);
                 renderUI();
             }
         });
@@ -321,7 +321,7 @@ async function renderStudentDatabase(container, tutor) {
             };
 
             if (!accountDetails.beneficiaryBank || !accountDetails.beneficiaryAccount || !accountDetails.beneficiaryName) {
-                alert("Please fill in all bank account details before submitting.");
+                showCustomAlert("Please fill in all bank account details before submitting.");
                 return;
             }
 
@@ -333,7 +333,7 @@ async function renderStudentDatabase(container, tutor) {
     // MODIFICATION: Updated function to accept and process accountDetails
     async function submitAllReports(reportsArray, accountDetails) {
         if (reportsArray.length === 0) {
-            alert("No reports to submit.");
+            showCustomAlert("No reports to submit.");
             return;
         }
 
@@ -354,33 +354,79 @@ async function renderStudentDatabase(container, tutor) {
 
         try {
             await batch.commit();
-            alert(`Successfully submitted ${reportsArray.length} report(s)!`);
+            showCustomAlert(`Successfully submitted ${reportsArray.length} report(s)!`);
             savedReports = {};
             renderUI();
         } catch (error) {
             console.error("Error submitting reports:", error);
-            alert(`Error: ${error.message}`);
+            showCustomAlert(`Error: ${error.message}`);
         }
+    }
+
+    // NEW FUNCTION: Custom Alert Modal
+    function showCustomAlert(message) {
+        const alertModal = document.createElement('div');
+        alertModal.className = 'fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex items-center justify-center z-50';
+        alertModal.innerHTML = `
+            <div class="relative bg-white p-8 rounded-lg shadow-xl w-full max-w-sm mx-auto text-center">
+                <p class="text-lg font-semibold mb-4">${message}</p>
+                <button id="close-alert-btn" class="bg-green-600 text-white px-6 py-2 rounded">OK</button>
+            </div>`;
+        document.body.appendChild(alertModal);
+        document.getElementById('close-alert-btn').addEventListener('click', () => alertModal.remove());
     }
 
     function attachEventListeners() {
         if (isTutorAddEnabled) {
             document.getElementById('add-student-btn')?.addEventListener('click', async () => {
-                const studentData = {
-                    parentName: document.getElementById('new-parent-name').value,
-                    parentPhone: document.getElementById('new-parent-phone').value,
-                    studentName: document.getElementById('new-student-name').value,
-                    grade: document.getElementById('new-student-grade').value,
-                    subjects: document.getElementById('new-student-subject').value.split(',').map(s => s.trim()),
-                    days: document.getElementById('new-student-days').value,
-                    studentFee: parseFloat(document.getElementById('new-student-fee').value),
-                    tutorEmail: tutor.email, summerBreak: false
-                };
-                if (studentData.parentName && studentData.studentName && studentData.grade && !isNaN(studentData.studentFee)) {
+                const parentName = document.getElementById('new-parent-name').value.trim();
+                const parentPhone = document.getElementById('new-parent-phone').value.trim();
+                const studentName = document.getElementById('new-student-name').value.trim();
+                const studentGrade = document.getElementById('new-student-grade').value.trim();
+                const studentSubjects = document.getElementById('new-student-subject').value.split(',').map(s => s.trim());
+                const studentDays = document.getElementById('new-student-days').value.trim();
+                const studentFee = parseFloat(document.getElementById('new-student-fee').value);
+                const tutorEmail = tutor.email;
+
+                if (!parentName || !studentName || !studentGrade || isNaN(studentFee) || !parentPhone || !studentDays) {
+                    showCustomAlert('Please fill in all parent and student details correctly.');
+                    return;
+                }
+
+                // Check for duplicate student before adding
+                const duplicateQuery = query(
+                    collection(db, "students"),
+                    where("tutorEmail", "==", tutorEmail),
+                    where("studentName", "==", studentName),
+                    where("parentName", "==", parentName)
+                );
+                
+                try {
+                    const querySnapshot = await getDocs(duplicateQuery);
+                    if (!querySnapshot.empty) {
+                        showCustomAlert('This student and parent combination already exists. Cannot add duplicate.');
+                        return;
+                    }
+
+                    // No duplicate found, proceed with adding the new student
+                    const studentData = {
+                        parentName: parentName,
+                        parentPhone: parentPhone,
+                        studentName: studentName,
+                        grade: studentGrade,
+                        subjects: studentSubjects,
+                        days: studentDays,
+                        studentFee: studentFee,
+                        tutorEmail: tutorEmail,
+                        summerBreak: false
+                    };
+
                     await addDoc(collection(db, "students"), studentData);
+                    showCustomAlert(`${studentName} has been successfully added.`);
                     renderStudentDatabase(container, tutor);
-                } else {
-                    alert('Please fill in all parent and student details correctly.');
+                } catch (error) {
+                    console.error("Error adding student:", error);
+                    showCustomAlert(`An error occurred: ${error.message}`);
                 }
             });
         }
@@ -398,20 +444,23 @@ async function renderStudentDatabase(container, tutor) {
         });
 
         document.getElementById('submit-all-reports-btn')?.addEventListener('click', async () => {
-            if (confirm("Are you ready to enter your payment details and submit all reports?")) {
-                // MODIFICATION: Show account modal before submitting
+            showCustomAlert("Are you ready to enter your payment details and submit all reports?");
+            document.getElementById('close-alert-btn').addEventListener('click', () => {
+                document.querySelector('.fixed.inset-0')?.remove();
                 showAccountDetailsModal(Object.values(savedReports));
-            }
+            });
         });
         
          document.querySelectorAll('.summer-break-btn').forEach(button => {
-            button.addEventListener('click', async (e) => {
-                if (confirm("Mark this student as on summer break?")) {
+             button.addEventListener('click', async (e) => {
+                 showCustomAlert("Are you sure you want to mark this student as on summer break?");
+                 document.getElementById('close-alert-btn').addEventListener('click', async () => {
+                    document.querySelector('.fixed.inset-0')?.remove();
                     await updateDoc(doc(db, "students", e.target.dataset.studentId), { summerBreak: true });
                     renderStudentDatabase(container, tutor);
-                }
-            });
-        });
+                 });
+             });
+         });
 
         document.getElementById('save-management-fee-btn')?.addEventListener('click', async () => {
             const feeInput = document.getElementById('management-fee-input');
@@ -419,9 +468,9 @@ async function renderStudentDatabase(container, tutor) {
             if (!isNaN(newFee) && newFee >= 0) {
                 const tutorRef = doc(db, "tutors", auth.currentUser.email);
                 await updateDoc(tutorRef, { managementFee: newFee });
-                alert('Management fee updated successfully!');
+                showCustomAlert('Management fee updated successfully!');
             } else {
-                alert('Please enter a valid fee.');
+                showCustomAlert('Please enter a valid fee.');
             }
         });
     }
@@ -471,5 +520,3 @@ onAuthStateChanged(auth, async (user) => {
         window.location.href = "tutor-auth.html";
     }
 });
-
-
