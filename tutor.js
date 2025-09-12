@@ -149,6 +149,8 @@ async function renderStudentDatabase(container, tutor) {
                     <input type="text" id="new-student-name" class="w-full mt-1 p-2 border rounded" placeholder="Student Name">
                     <select id="new-student-grade" class="w-full mt-1 p-2 border rounded">
                         <option value="">Select Grade</option>
+                        <option value="Pre-School">Pre-School</option>
+                        <option value="Kindergarten">Kindergarten</option>
                         ${Array.from({ length: 12 }, (_, i) => `<option value="${i + 1}">${i + 1}</option>`).join('')}
                     </select>
                     <input type="text" id="new-student-subject" class="w-full mt-1 p-2 border rounded" placeholder="Subject(s) (e.g., Math, English)">
@@ -242,7 +244,7 @@ async function renderStudentDatabase(container, tutor) {
                 <div><label class="block font-semibold">General Comments</label><textarea id="report-general" class="w-full mt-1 p-2 border rounded" rows="2">${existingReport.generalComments || ''}</textarea></div>
                 <div class="flex justify-end space-x-2">
                     <button id="cancel-report-btn" class="bg-gray-500 text-white px-6 py-2 rounded">Cancel</button>
-                    <button id="modal-action-btn" class="bg-green-600 text-white px-6 py-2 rounded">${studentsCount === 1 ? 'Submit Report' : 'Save Report'}</button>
+                    <button id="modal-action-btn" class="bg-green-600 text-white px-6 py-2 rounded">${studentsCount === 1 ? 'Proceed to Submit' : 'Save Report'}</button>
                 </div>
             </div>`;
 
@@ -256,6 +258,9 @@ async function renderStudentDatabase(container, tutor) {
         document.getElementById('modal-action-btn').addEventListener('click', async () => {
             const reportData = {
                 studentId: student.id, studentName: student.studentName, grade: student.grade,
+                // MODIFICATION: Add parent details to the report data object
+                parentName: student.parentName,
+                parentPhone: student.parentPhone,
                 introduction: document.getElementById('report-intro').value,
                 topics: document.getElementById('report-topics').value,
                 progress: document.getElementById('report-progress').value,
@@ -264,18 +269,69 @@ async function renderStudentDatabase(container, tutor) {
                 generalComments: document.getElementById('report-general').value
             };
 
+            reportModal.remove(); // Close the report modal first
+
             if (studentsCount === 1) {
-                await submitAllReports([reportData]);
+                // MODIFICATION: Show account modal before submitting
+                showAccountDetailsModal([reportData]);
             } else {
                 savedReports[student.id] = reportData;
                 alert(`${student.studentName}'s report has been saved.`);
                 renderUI();
             }
-            reportModal.remove();
+        });
+    }
+
+    // NEW FUNCTION: Modal for Account Details
+    function showAccountDetailsModal(reportsArray) {
+        const accountFormHTML = `
+            <h3 class="text-xl font-bold mb-4">Enter Your Payment Details</h3>
+            <p class="text-sm text-gray-600 mb-4">Please provide your bank details for payment processing. This is required before final submission.</p>
+            <div class="space-y-4">
+                <div>
+                    <label class="block font-semibold">Beneficiary Bank Name</label>
+                    <input type="text" id="beneficiary-bank" class="w-full mt-1 p-2 border rounded" placeholder="e.g., Zenith Bank">
+                </div>
+                <div>
+                    <label class="block font-semibold">Beneficiary Account Number</label>
+                    <input type="text" id="beneficiary-account" class="w-full mt-1 p-2 border rounded" placeholder="Your 10-digit account number">
+                </div>
+                <div>
+                    <label class="block font-semibold">Beneficiary Name</label>
+                    <input type="text" id="beneficiary-name" class="w-full mt-1 p-2 border rounded" placeholder="Your full name as on the account">
+                </div>
+                <div class="flex justify-end space-x-2 mt-6">
+                    <button id="cancel-account-btn" class="bg-gray-500 text-white px-6 py-2 rounded">Cancel</button>
+                    <button id="confirm-submit-btn" class="bg-green-600 text-white px-6 py-2 rounded">Confirm & Submit Report(s)</button>
+                </div>
+            </div>`;
+
+        const accountModal = document.createElement('div');
+        accountModal.className = 'fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex items-center justify-center z-50';
+        accountModal.innerHTML = `<div class="relative bg-white p-8 rounded-lg shadow-xl w-full max-w-lg mx-auto">${accountFormHTML}</div>`;
+        document.body.appendChild(accountModal);
+
+        document.getElementById('cancel-account-btn').addEventListener('click', () => accountModal.remove());
+
+        document.getElementById('confirm-submit-btn').addEventListener('click', async () => {
+            const accountDetails = {
+                beneficiaryBank: document.getElementById('beneficiary-bank').value.trim(),
+                beneficiaryAccount: document.getElementById('beneficiary-account').value.trim(),
+                beneficiaryName: document.getElementById('beneficiary-name').value.trim(),
+            };
+
+            if (!accountDetails.beneficiaryBank || !accountDetails.beneficiaryAccount || !accountDetails.beneficiaryName) {
+                alert("Please fill in all bank account details before submitting.");
+                return;
+            }
+
+            accountModal.remove();
+            await submitAllReports(reportsArray, accountDetails);
         });
     }
     
-    async function submitAllReports(reportsArray) {
+    // MODIFICATION: Updated function to accept and process accountDetails
+    async function submitAllReports(reportsArray, accountDetails) {
         if (reportsArray.length === 0) {
             alert("No reports to submit.");
             return;
@@ -289,15 +345,10 @@ async function renderStudentDatabase(container, tutor) {
                 tutorEmail: tutor.email,
                 tutorName: tutor.name,
                 submittedAt: new Date(),
-                studentId: report.studentId,
-                studentName: report.studentName,
-                grade: report.grade,
-                introduction: report.introduction,
-                topics: report.topics,
-                progress: report.progress,
-                strengthsWeaknesses: report.strengthsWeaknesses,
-                recommendations: report.recommendations,
-                generalComments: report.generalComments
+                // Report content
+                ...report,
+                // Account details
+                ...accountDetails
             });
         });
 
@@ -347,8 +398,9 @@ async function renderStudentDatabase(container, tutor) {
         });
 
         document.getElementById('submit-all-reports-btn')?.addEventListener('click', async () => {
-            if (confirm("Are you sure you want to submit all reports?")) {
-                await submitAllReports(Object.values(savedReports));
+            if (confirm("Are you ready to enter your payment details and submit all reports?")) {
+                // MODIFICATION: Show account modal before submitting
+                showAccountDetailsModal(Object.values(savedReports));
             }
         });
         
@@ -419,3 +471,4 @@ onAuthStateChanged(auth, async (user) => {
         window.location.href = "tutor-auth.html";
     }
 });
+
