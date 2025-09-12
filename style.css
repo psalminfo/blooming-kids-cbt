@@ -3,7 +3,6 @@ body {
     overflow-x: hidden;
     margin: 0;
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-    /* Updated: Dark green gradient for body background */
     background: linear-gradient(120deg, #0f4f2c, #1a643d, #0f4f2c); /* Darker, richer greens */
     background-size: 400% 400%;
     animation: aurora 15s ease infinite;
@@ -44,10 +43,43 @@ html {
     background: linear-gradient(#a7f3d0, #059669); /* Lighter green to dark green */
 }
 
+/* --- FIX FOR INPUT TEXT VISIBILITY --- */
+/* Target common input elements to ensure their text and backgrounds are visible */
+input[type="text"],
+input[type="email"],
+input[type="password"],
+textarea,
+select {
+    color: #333; /* Darker text color for better contrast on light backgrounds */
+    background-color: #f0f0f0; /* Light background for input fields */
+    border: 1px solid #ccc; /* Clear border */
+    padding: 8px 12px;
+    border-radius: 4px;
+    box-shadow: inset 0 1px 3px rgba(0,0,0,0.1);
+    /* Ensure default font family for consistency or adjust as needed */
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+input[type="text"]:focus,
+input[type="email"]:focus,
+input[type="password"]:focus,
+textarea:focus,
+select:focus {
+    border-color: #16a34a; /* Brand green on focus */
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(22, 163, 74, 0.2); /* Light green glow on focus */
+}
+
+/* Placeholder text color for better visibility */
+::placeholder {
+    color: #999;
+}
+/* --- END FIX --- */
+
+
 /* === Sidebar === */
 .sidebar {
     width: 250px;
-    /* Updated: Darker green for sidebar background */
     background: rgba(15, 79, 44, 0.9); /* Darker shade of brand green */
     backdrop-filter: blur(10px);
     color: #ecf0f1; /* Light gray for sidebar text */
@@ -57,24 +89,20 @@ html {
     left: -250px;
     transition: left 0.3s ease-in-out, box-shadow 0.3s ease-in-out;
     z-index: 1000;
-    /* Updated: Sidebar shadow to brand green */
     box-shadow: 0 0 20px rgba(20, 150, 80, 0.4); /* Green shadow */
 }
 .sidebar.active {
     left: 0;
-    /* Updated: Sidebar shadow to brand green */
     box-shadow: 0 0 30px rgba(20, 150, 80, 0.8); /* Stronger green shadow */
 }
 .sidebar-header {
     padding: 20px;
-    /* Updated: Darker header background */
     background: rgba(26, 80, 48, 0.95); /* Even darker green */
     text-align: center;
 }
 .sidebar-header h3 {
     margin: 0;
     color: #fff;
-    /* Updated: Header text shadow to brand green */
     text-shadow: 0 0 5px #16a34a, 0 0 15px #16a34a; /* Brand green glow */
 }
 .nav-links {
@@ -97,7 +125,6 @@ html {
     top: 0;
     width: 100%;
     height: 100%;
-    /* Updated: Nav link hover background to brand green */
     background: rgba(22, 163, 74, 0.15); /* Transparent brand green */
     transition: left 0.3s;
 }
@@ -106,24 +133,19 @@ html {
 }
 .nav-links li a:hover,
 .nav-links li a.active {
-    /* Updated: Nav link active/hover color to brand green */
     color: #a7f3d0; /* Lighter brand green */
-    /* Updated: Nav link active/hover text shadow to brand green */
     text-shadow: 0 0 5px #a7f3d0;
 }
 .nav-links li a.active {
-    /* Updated: Active link glow to brand green */
     animation: pulseGlow 2s infinite;
 }
 @keyframes pulseGlow {
-    /* Updated: Pulse glow to brand green */
     0%, 100% { text-shadow: 0 0 5px #a7f3d0; }
     50% { text-shadow: 0 0 15px #a7f3d0; }
 }
 
 /* === Header === */
 .app-header {
-    /* Updated: Darker green for app header background */
     background: rgba(26, 80, 48, 0.85); /* Darker green */
     backdrop-filter: blur(8px);
     padding: 1rem 1.5rem;
@@ -138,7 +160,6 @@ html {
     position: absolute;
     top: 0; left: -50%;
     width: 50%; height: 100%;
-    /* Updated: Shimmer effect to white-green */
     background: linear-gradient(120deg, transparent, rgba(255,255,255,0.1), transparent);
     transform: skewX(-20deg);
     animation: shimmer 5s infinite;
@@ -159,7 +180,6 @@ html {
 }
 .menu-toggle:hover {
     transform: scale(1.2);
-    /* Updated: Menu toggle hover color to brand green */
     color: #a7f3d0; /* Lighter brand green */
     text-shadow: 0 0 5px #a7f3d0, 0 0 10px #a7f3d0;
 }
@@ -176,7 +196,6 @@ html {
 
 /* === Buttons === */
 button, .btn {
-    /* Updated: Button background gradient to brand green */
     background: linear-gradient(90deg, #16a34a, #047857); /* Brand green to darker green */
     color: white;
     border: none;
@@ -185,13 +204,11 @@ button, .btn {
     cursor: pointer;
     font-weight: 500;
     transition: box-shadow 0.3s ease, transform 0.2s ease;
-    /* Updated: Button shadow to brand green */
     box-shadow: 0 0 10px rgba(22, 163, 74, 0.5); /* Green shadow */
     position: relative;
     overflow: hidden;
 }
 button:hover, .btn:hover {
-    /* Updated: Button hover shadow to brand green */
     box-shadow: 0 0 15px #16a34a, 0 0 30px #16a34a; /* Stronger green shadow */
     transform: translateY(-2px);
 }
@@ -224,3 +241,21 @@ button:active::after {
 .btn-yellow:hover {
     box-shadow: 0 0 15px #facc15, 0 0 30px #facc15;
 }
+
+/* --- LOGO STYLING FOR SIGN-UP PAGES --- */
+/* Assuming your sign-up HTML page has an <img> tag for the logo with class "logo-signup" */
+.logo-signup {
+    display: block; /* Ensures it takes its own line and can be centered */
+    margin: 0 auto 30px auto; /* Centers horizontally and adds space below */
+    max-width: 200px; /* Max width to prevent it from getting too large on big screens */
+    height: auto; /* Maintain aspect ratio */
+    /* If you want a specific height, use: height: 160px; */
+    /* Add a subtle glow/shadow for emphasis */
+    filter: drop-shadow(0 0 15px rgba(22, 163, 74, 0.7)); /* Green glow */
+    transition: filter 0.3s ease;
+}
+
+.logo-signup:hover {
+    filter: drop-shadow(0 0 25px rgba(22, 163, 74, 1)); /* Stronger glow on hover */
+}
+/* --- END LOGO STYLING --- */
