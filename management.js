@@ -9,18 +9,26 @@ function capitalize(str) {
     return str.replace(/\b\w/g, l => l.toUpperCase());
 }
 
-// Utility function to convert data to CSV
+// ### UPDATED FUNCTION ###
+// Utility function to convert data to CSV, now includes bank details
 function convertPayAdviceToCSV(data) {
-    const header = ['Tutor Name', 'Student Count', 'Total Student Fees (₦)', 'Management Fee (₦)', 'Total Pay (₦)'];
+    const header = [
+        'Tutor Name', 'Student Count', 'Total Student Fees (₦)', 'Management Fee (₦)', 'Total Pay (₦)',
+        'Beneficiary Bank', 'Beneficiary Account', 'Beneficiary Name'
+    ];
     const rows = data.map(item => [
         `"${item.tutorName}"`,
         item.studentCount,
         item.totalStudentFees,
         item.managementFee,
-        item.totalPay
+        item.totalPay,
+        `"${item.beneficiaryBank || 'N/A'}"`,
+        `"${item.beneficiaryAccount || 'N/A'}"`,
+        `"${item.beneficiaryName || 'N/A'}"`
     ]);
     return [header.join(','), ...rows.map(row => row.join(','))].join('\n');
 }
+
 
 // ##################################
 // # NEW ACTION HANDLER FUNCTIONS
@@ -308,6 +316,7 @@ async function renderManagementTutorView(container) {
     }
 }
 
+// ### UPDATED FUNCTION ###
 async function renderPayAdvicePanel(container) {
     const canExport = window.userData.permissions?.actions?.canExportPayAdvice === true;
     container.innerHTML = `
@@ -336,8 +345,19 @@ async function renderPayAdvicePanel(container) {
             </div>
             <div class="overflow-x-auto">
                 <table class="min-w-full divide-y divide-gray-200">
-                    <thead class="bg-gray-50"><tr><th class="px-6 py-3 text-left text-xs font-medium uppercase">Tutor</th><th class="px-6 py-3 text-left text-xs font-medium uppercase">Students</th><th class="px-6 py-3 text-left text-xs font-medium uppercase">Student Fees</th><th class="px-6 py-3 text-left text-xs font-medium uppercase">Mgmt. Fee</th><th class="px-6 py-3 text-left text-xs font-medium uppercase">Total Pay</th></tr></thead>
-                    <tbody id="pay-advice-table-body" class="divide-y"><tr><td colspan="5" class="text-center py-4">Select a date range.</td></tr></tbody>
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th class="px-6 py-3 text-left text-xs font-medium uppercase">Tutor</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium uppercase">Students</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium uppercase">Student Fees</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium uppercase">Mgmt. Fee</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium uppercase">Total Pay</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium uppercase">Bank Name</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium uppercase">Account No.</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium uppercase">Account Name</th>
+                        </tr>
+                    </thead>
+                    <tbody id="pay-advice-table-body" class="divide-y"><tr><td colspan="8" class="text-center py-4">Select a date range.</td></tr></tbody>
                 </table>
             </div>
         </div>
@@ -357,10 +377,11 @@ async function renderPayAdvicePanel(container) {
     endDateInput.addEventListener('change', handleDateChange);
 }
 
+// ### UPDATED FUNCTION ###
 async function loadPayAdviceData(startDate, endDate) {
     const tableBody = document.getElementById('pay-advice-table-body');
     if (!tableBody) return;
-    tableBody.innerHTML = `<tr><td colspan="5" class="text-center py-4">Loading pay data...</td></tr>`;
+    tableBody.innerHTML = `<tr><td colspan="8" class="text-center py-4">Loading pay data...</td></tr>`;
 
     const startTimestamp = Timestamp.fromDate(startDate);
     const endTimestamp = Timestamp.fromDate(endDate);
@@ -370,11 +391,25 @@ async function loadPayAdviceData(startDate, endDate) {
         const activeTutorEmails = [...new Set(reportsSnapshot.docs.map(doc => doc.data().tutorEmail))];
 
         if (activeTutorEmails.length === 0) {
-            tableBody.innerHTML = `<tr><td colspan="5" class="text-center py-4">No active tutors in this period.</td></tr>`;
+            tableBody.innerHTML = `<tr><td colspan="8" class="text-center py-4">No active tutors in this period.</td></tr>`;
             document.getElementById('pay-tutor-count').textContent = 0;
             document.getElementById('pay-student-count').textContent = 0;
             return;
         }
+
+        // Extract the latest bank details for each tutor from the reports
+        const tutorBankDetails = {};
+        reportsSnapshot.forEach(doc => {
+            const data = doc.data();
+            // We only need one record of bank details per tutor for the period
+            if (!tutorBankDetails[data.tutorEmail]) {
+                 tutorBankDetails[data.tutorEmail] = {
+                    beneficiaryBank: data.beneficiaryBank,
+                    beneficiaryAccount: data.beneficiaryAccount,
+                    beneficiaryName: data.beneficiaryName,
+                };
+            }
+        });
 
         const [tutorsSnapshot, studentsSnapshot] = await Promise.all([
             getDocs(query(collection(db, "tutors"), where("email", "in", activeTutorEmails))),
@@ -391,17 +426,33 @@ async function loadPayAdviceData(startDate, endDate) {
             const totalStudentFees = assignedStudents.reduce((sum, s) => sum + (s.studentFee || 0), 0);
             const managementFee = (tutor.isManagementStaff && tutor.managementFee) ? tutor.managementFee : 0;
             totalStudentCount += assignedStudents.length;
+            const bankDetails = tutorBankDetails[tutor.email] || {};
 
             payData.push({
-                tutorName: tutor.name, studentCount: assignedStudents.length,
-                totalStudentFees: totalStudentFees, managementFee: managementFee,
-                totalPay: totalStudentFees + managementFee
+                tutorName: tutor.name, 
+                studentCount: assignedStudents.length,
+                totalStudentFees: totalStudentFees, 
+                managementFee: managementFee,
+                totalPay: totalStudentFees + managementFee,
+                ...bankDetails // Add bank details to the object
             });
         });
 
         document.getElementById('pay-tutor-count').textContent = payData.length;
         document.getElementById('pay-student-count').textContent = totalStudentCount;
-        tableBody.innerHTML = payData.map(d => `<tr><td class="px-6 py-4">${d.tutorName}</td><td class="px-6 py-4">${d.studentCount}</td><td class="px-6 py-4">₦${d.totalStudentFees.toFixed(2)}</td><td class="px-6 py-4">₦${d.managementFee.toFixed(2)}</td><td class="px-6 py-4 font-bold">₦${d.totalPay.toFixed(2)}</td></tr>`).join('');
+        
+        tableBody.innerHTML = payData.map(d => `
+            <tr>
+                <td class="px-6 py-4">${d.tutorName}</td>
+                <td class="px-6 py-4">${d.studentCount}</td>
+                <td class="px-6 py-4">₦${d.totalStudentFees.toFixed(2)}</td>
+                <td class="px-6 py-4">₦${d.managementFee.toFixed(2)}</td>
+                <td class="px-6 py-4 font-bold">₦${d.totalPay.toFixed(2)}</td>
+                <td class="px-6 py-4">${d.beneficiaryBank || 'N/A'}</td>
+                <td class="px-6 py-4">${d.beneficiaryAccount || 'N/A'}</td>
+                <td class="px-6 py-4">${d.beneficiaryName || 'N/A'}</td>
+            </tr>
+        `).join('');
         
         const exportBtn = document.getElementById('export-pay-csv-btn');
         if (exportBtn) {
@@ -416,7 +467,7 @@ async function loadPayAdviceData(startDate, endDate) {
         }
     } catch(error) {
         console.error("Error loading pay advice data:", error);
-        tableBody.innerHTML = `<tr><td colspan="5" class="text-center py-4 text-red-500">Failed to load data.</td></tr>`;
+        tableBody.innerHTML = `<tr><td colspan="8" class="text-center py-4 text-red-500">Failed to load data.</td></tr>`;
     }
 }
 
