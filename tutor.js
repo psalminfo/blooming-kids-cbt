@@ -149,7 +149,7 @@ async function renderStudentDatabase(container, tutor) {
                     <input type="text" id="new-student-name" class="w-full mt-1 p-2 border rounded" placeholder="Student Name">
                     <select id="new-student-grade" class="w-full mt-1 p-2 border rounded">
                         <option value="">Select Grade</option>
-                        <option value="Pre-School">Pre-School</option>
+                        <option value="Preschool">Preschool</option>
                         <option value="Kindergarten">Kindergarten</option>
                         ${Array.from({ length: 12 }, (_, i) => `<option value="${i + 1}">${i + 1}</option>`).join('')}
                     </select>
@@ -471,4 +471,5 @@ onAuthStateChanged(auth, async (user) => {
         window.location.href = "tutor-auth.html";
     }
 });
+
 
