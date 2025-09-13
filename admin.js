@@ -568,481 +568,243 @@ onSnapshot(settingsDocRef, (docSnap) => {
 });
 
 // ##################################################################
-
 // # SECTION 3: TUTOR MANAGEMENT (Upgraded)
-
 // ##################################################################
 
-
-
 async function renderTutorManagementPanel(container) {
+    container.innerHTML = `
+        <div class="bg-white p-6 rounded-lg shadow-md mb-6">
+            <h2 class="text-2xl font-bold text-green-700 mb-4">Global Settings</h2>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+                <label class="flex items-center"><span class="text-gray-700 font-semibold mr-4">Report Submission:</span><label class="relative inline-flex items-center cursor-pointer"><input type="checkbox" id="report-toggle" class="sr-only peer"><div class="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div><span id="report-status-label" class="ml-3 text-sm font-medium"></span></label></label>
+                <label class="flex items-center"><span class="text-gray-700 font-semibold mr-4">Tutors Can Add Students:</span><label class="relative inline-flex items-center cursor-pointer"><input type="checkbox" id="tutor-add-toggle" class="sr-only peer"><div class="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div><span id="tutor-add-status-label" class="ml-3 text-sm font-medium"></span></label></label>
+                <label class="flex items-center"><span class="text-gray-700 font-semibold mr-4">Enable Summer Break:</span><label class="relative inline-flex items-center cursor-pointer"><input type="checkbox" id="summer-break-toggle" class="sr-only peer"><div class="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div><span id="summer-break-status-label" class="ml-3 text-sm font-medium"></span></label></label>
+            </div>
+        </div>
 
-    container.innerHTML = `
-
-        <div class="bg-white p-6 rounded-lg shadow-md mb-6">
-
-            <h2 class="text-2xl font-bold text-green-700 mb-4">Global Settings</h2>
-
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
-
-                <label class="flex items-center"><span class="text-gray-700 font-semibold mr-4">Report Submission:</span><label class="relative inline-flex items-center cursor-pointer"><input type="checkbox" id="report-toggle" class="sr-only peer"><div class="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div><span id="report-status-label" class="ml-3 text-sm font-medium"></span></label></label>
-
-                <label class="flex items-center"><span class="text-gray-700 font-semibold mr-4">Tutors Can Add Students:</span><label class="relative inline-flex items-center cursor-pointer"><input type="checkbox" id="tutor-add-toggle" class="sr-only peer"><div class="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div><span id="tutor-add-status-label" class="ml-3 text-sm font-medium"></span></label></label>
-
-                <label class="flex items-center"><span class="text-gray-700 font-semibold mr-4">Enable Summer Break:</span><label class="relative inline-flex items-center cursor-pointer"><input type="checkbox" id="summer-break-toggle" class="sr-only peer"><div class="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div><span id="summer-break-status-label" class="ml-3 text-sm font-medium"></span></label></label>
-
-            </div>
-
-        </div>
-
-
-
-        <div class="bg-white p-6 rounded-lg shadow-md">
-
-            <div class="flex justify-between items-start mb-4">
-
-                <h3 class="text-2xl font-bold text-green-700">Manage Tutors</h3>
-
-                <div class="flex space-x-4">
-
-                    <div class="bg-blue-100 p-3 rounded-lg text-center shadow"><h4 class="font-bold text-blue-800 text-sm">Total Tutors</h4><p id="tutor-count-badge" class="text-2xl text-blue-600 font-extrabold">0</p></div>
-
-                    <div class="bg-green-100 p-3 rounded-lg text-center shadow"><h4 class="font-bold text-green-800 text-sm">Total Students</h4><p id="student-count-badge" class="text-2xl text-green-600 font-extrabold">0</p></div>
-
-                </div>
-
-            </div>
-
-            <div class="mb-4">
-
-                <label for="tutor-select" class="block font-semibold">Select Tutor:</label>
-
-                <select id="tutor-select" class="w-full p-2 border rounded mt-1"></select>
-
-            </div>
-
-            <div id="selected-tutor-details" class="mt-4"><p class="text-gray-500">Please select a tutor to view details.</p></div>
-
-        </div>
-
-    `;
-
-    setupTutorManagementListeners();
-
+        <div class="bg-white p-6 rounded-lg shadow-md">
+            <div class="flex justify-between items-start mb-4">
+                <h3 class="text-2xl font-bold text-green-700">Manage Tutors</h3>
+                <div class="flex space-x-4">
+                    <div class="bg-blue-100 p-3 rounded-lg text-center shadow"><h4 class="font-bold text-blue-800 text-sm">Total Tutors</h4><p id="tutor-count-badge" class="text-2xl text-blue-600 font-extrabold">0</p></div>
+                    <div class="bg-green-100 p-3 rounded-lg text-center shadow"><h4 class="font-bold text-green-800 text-sm">Total Students</h4><p id="student-count-badge" class="text-2xl text-green-600 font-extrabold">0</p></div>
+                </div>
+            </div>
+            <div class="mb-4">
+                <label for="tutor-select" class="block font-semibold">Select Tutor:</label>
+                <select id="tutor-select" class="w-full p-2 border rounded mt-1"></select>
+            </div>
+            <div id="selected-tutor-details" class="mt-4"><p class="text-gray-500">Please select a tutor to view details.</p></div>
+        </div>
+    `;
+    setupTutorManagementListeners();
 }
-
-
 
 async function setupTutorManagementListeners() {
-
-    const settingsDocRef = doc(db, "settings", "global_settings");
-
-
-
-    onSnapshot(settingsDocRef, (docSnap) => {
-
-        if (docSnap.exists()) {
-
-            const data = docSnap.data();
-
-            ['report', 'tutor-add', 'summer-break'].forEach(type => {
-
-                const key = `is${capitalize(type.split('-')[0])}${capitalize(type.split('-')[1] || '')}Enabled`;
-
-                const toggle = document.getElementById(`${type}-toggle`);
-
-                const label = document.getElementById(`${type}-status-label`);
-
-                if (toggle && label) {
-
-                    toggle.checked = data[key];
-
-                    label.textContent = data[key] ? 'Enabled' : 'Disabled';
-
-                }
-
-            });
-
-        }
-
-    });
-
-
-
-    document.getElementById('report-toggle').addEventListener('change', e => updateDoc(settingsDocRef, {
-
-        isReportEnabled: e.target.checked
-
-    }));
-
-    document.getElementById('tutor-add-toggle').addEventListener('change', e => updateDoc(settingsDocRef, {
-
-        isTutorAddEnabled: e.target.checked
-
-    }));
-
-    document.getElementById('summer-break-toggle').addEventListener('change', e => updateDoc(settingsDocRef, {
-
-        isSummerBreakEnabled: e.target.checked
-
-    }));
-
-
-
-    const tutorSelect = document.getElementById('tutor-select');
-
-    tutorSelect.addEventListener('change', e => {
-
-        activeTutorId = e.target.value;
-
-        renderSelectedTutorDetails(activeTutorId);
-
-    });
-
-
-
-    // ### NEW ### Real-time counter updates
-
-    onSnapshot(collection(db, "tutors"), (snapshot) => {
-
-        const badge = document.getElementById('tutor-count-badge');
-
-        if (badge) badge.textContent = snapshot.size;
-
-    });
-
-    onSnapshot(collection(db, "students"), (snapshot) => {
-
-        const badge = document.getElementById('student-count-badge');
-
-        if (badge) badge.textContent = snapshot.size;
-
-    });
-
-
-
-    onSnapshot(collection(db, "tutors"), (snapshot) => {
-
-        const tutorsData = {};
-
-        let currentSelection = tutorSelect.value;
-
-        tutorSelect.innerHTML = `<option value="">-- Select a Tutor --</option>`;
-
-        snapshot.forEach(doc => {
-
-            tutorsData[doc.id] = {
-
-                id: doc.id,
-
-                ...doc.data()
-
-            };
-
-            const option = document.createElement('option');
-
-            option.value = doc.id;
-
-            option.textContent = doc.data().name;
-
-            tutorSelect.appendChild(option);
-
-        });
-
-        window.allTutorsData = tutorsData;
-
-        if (activeTutorId && tutorsData[activeTutorId]) {
-
-            tutorSelect.value = activeTutorId;
-
-        }
-
-    });
-
+    const settingsDocRef = doc(db, "settings", "global_settings");
+
+    onSnapshot(settingsDocRef, (docSnap) => {
+        if (docSnap.exists()) {
+            const data = docSnap.data();
+            ['report', 'tutor-add', 'summer-break'].forEach(type => {
+                const key = `is${capitalize(type.split('-')[0])}${capitalize(type.split('-')[1] || '')}Enabled`;
+                const toggle = document.getElementById(`${type}-toggle`);
+                const label = document.getElementById(`${type}-status-label`);
+                if (toggle && label) {
+                    toggle.checked = data[key];
+                    label.textContent = data[key] ? 'Enabled' : 'Disabled';
+                }
+            });
+        }
+    });
+
+    document.getElementById('report-toggle').addEventListener('change', e => updateDoc(settingsDocRef, {
+        isReportEnabled: e.target.checked
+    }));
+    document.getElementById('tutor-add-toggle').addEventListener('change', e => updateDoc(settingsDocRef, {
+        isTutorAddEnabled: e.target.checked
+    }));
+    document.getElementById('summer-break-toggle').addEventListener('change', e => updateDoc(settingsDocRef, {
+        isSummerBreakEnabled: e.target.checked
+    }));
+
+    const tutorSelect = document.getElementById('tutor-select');
+    tutorSelect.addEventListener('change', e => {
+        activeTutorId = e.target.value;
+        renderSelectedTutorDetails(activeTutorId);
+    });
+
+    // ### NEW ### Real-time counter updates
+    onSnapshot(collection(db, "tutors"), (snapshot) => {
+        const badge = document.getElementById('tutor-count-badge');
+        if (badge) badge.textContent = snapshot.size;
+    });
+    onSnapshot(collection(db, "students"), (snapshot) => {
+        const badge = document.getElementById('student-count-badge');
+        if (badge) badge.textContent = snapshot.size;
+    });
+
+    onSnapshot(collection(db, "tutors"), (snapshot) => {
+        const tutorsData = {};
+        let currentSelection = tutorSelect.value;
+        tutorSelect.innerHTML = `<option value="">-- Select a Tutor --</option>`;
+        snapshot.forEach(doc => {
+            tutorsData[doc.id] = {
+                id: doc.id,
+                ...doc.data()
+            };
+            const option = document.createElement('option');
+            option.value = doc.id;
+            option.textContent = doc.data().name;
+            tutorSelect.appendChild(option);
+        });
+        window.allTutorsData = tutorsData;
+        if (activeTutorId && tutorsData[activeTutorId]) {
+            tutorSelect.value = activeTutorId;
+        }
+    });
 }
-
-
 
 // ### UPDATED ### With full student form and CSV/Excel import
-
 async function renderSelectedTutorDetails(tutorId) {
-
-    const container = document.getElementById('selected-tutor-details');
-
-    if (!tutorId || !window.allTutorsData) {
-
-        container.innerHTML = `<p class="text-gray-500">Please select a tutor to view details.</p>`;
-
-        return;
-
-    }
-
-    const tutor = window.allTutorsData[tutorId];
-
-
-
-    onSnapshot(query(collection(db, "students"), where("tutorEmail", "==", tutor.email)), (studentsSnapshot) => {
-
-        const studentsListHTML = studentsSnapshot.docs.map(doc => {
-
-            const student = doc.data();
-
-            return `<li class="flex justify-between items-center bg-gray-50 p-2 rounded-md">
-
-                        <span>${student.studentName} (Grade ${student.grade}) - Fee: ₦${student.studentFee}</span>
-
-                        <button class="remove-student-btn text-red-500 hover:text-red-700" data-student-id="${doc.id}">Remove</button>
-
-                    </li>`;
-
-        }).join('');
-
-
-
-        const gradeOptions = Array.from({
-
-            length: 12
-
-        }, (_, i) => `<option value="${i + 1}">${i + 1}</option>`).join('');
-
-        const dayOptions = Array.from({
-
-            length: 7
-
-        }, (_, i) => `<option value="${i + 1}">${i + 1}</option>`).join('');
-
-
-
-        container.innerHTML = `
-
-            <div class="p-4 border rounded-lg shadow-sm">
-
-                <div class="flex items-center justify-between mb-4">
-
-                    <h4 class="font-bold text-xl">${tutor.name} (${studentsSnapshot.size} students)</h4>
-
-                    <label class="flex items-center space-x-2">
-
-                        <span class="font-semibold">Management Staff:</span>
-
-                        <input type="checkbox" id="management-staff-toggle" class="h-5 w-5" ${tutor.isManagementStaff ? 'checked' : ''}>
-
-                    </label>
-
-                </div>
-
-
-
-                <div class="mb-4">
-
-                    <p><strong>Students:</strong></p>
-
-                    <ul class="space-y-2 mt-2">${studentsListHTML || '<p class="text-gray-500">No students assigned.</p>'}</ul>
-
-                </div>
-
-
-
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 border-t pt-4">
-
-                    <div class="add-student-form space-y-2">
-
-                        <h5 class="font-semibold text-gray-700">Add New Student Manually:</h5>
-
-                        <input type="text" id="new-student-name" class="w-full p-2 border rounded" placeholder="Parent Name">
-
-                        <input type="text" id="new-student-name" class="w-full p-2 border rounded" placeholder="Student Name">
-
-                        <select id="new-student-grade" class="w-full p-2 border rounded"><option value="">Select Grade</option>${gradeOptions}</select>
-
-                        <input type="text" id="new-student-subject" class="w-full p-2 border rounded" placeholder="Subject(s) (e.g., Math, English)">
-
-                        <select id="new-student-days" class="w-full p-2 border rounded"><option value="">Select Days per Week</option>${dayOptions}</select>
-
-                        <input type="number" id="new-student-fee" class="w-full p-2 border rounded" placeholder="Student Fee (₦)">
-
-                        <button id="add-student-btn" class="bg-green-600 text-white w-full px-4 py-2 rounded hover:bg-green-700">Add Student</button>
-
-                    </div>
-
-
-
-                    <div class="import-students-form">
-
-                         <h5 class="font-semibold text-gray-700">Import Students from File:</h5>
-
-                         <p class="text-xs text-gray-500 mb-2">Upload a .csv or .xlsx file with columns: <strong>Student Name, Grade, Subjects, Days, Fee</strong></p>
-
-                         <input type="file" id="student-import-file" class="w-full text-sm border rounded p-1" accept=".csv, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/vnd.ms-excel">
-
-                         <button id="import-students-btn" class="bg-blue-600 text-white w-full px-4 py-2 rounded mt-2 hover:bg-blue-700">Import Students</button>
-
-                         <p id="import-status" class="text-sm mt-2"></p>
-
-                    </div>
-
-                </div>
-
-            </div>
-
-        `;
-
-
-
-        document.getElementById('management-staff-toggle').addEventListener('change', async (e) => {
-
-            await updateDoc(doc(db, "tutors", tutorId), {
-
-                isManagementStaff: e.target.checked
-
-            });
-
-        });
-
-
-
-        document.getElementById('add-student-btn').addEventListener('click', async () => {
-
-            const studentData = {
-
-                studentName: document.getElementById('new-student-name').value,
-
-                grade: document.getElementById('new-student-grade').value,
-
-                subjects: document.getElementById('new-student-subject').value.split(',').map(s => s.trim()),
-
-                days: document.getElementById('new-student-days').value,
-
-                studentFee: parseFloat(document.getElementById('new-student-fee').value),
-
-                tutorEmail: tutor.email,
-
-                summerBreak: false
-
-            };
-
-            if (studentData.studentName && studentData.grade && !isNaN(studentData.studentFee)) {
-
-                await addDoc(collection(db, "students"), studentData);
-
-            } else {
-
-                alert('Please fill in all details correctly.');
-
-            }
-
-        });
-
-
-
-        document.getElementById('import-students-btn').addEventListener('click', handleStudentImport);
-
-
-
-        container.querySelectorAll('.remove-student-btn').forEach(btn => btn.addEventListener('click', async (e) => {
-
-            if (confirm('Are you sure?')) await deleteDoc(doc(db, "students", e.target.dataset.studentId));
-
-        }));
-
-    });
-
+    const container = document.getElementById('selected-tutor-details');
+    if (!tutorId || !window.allTutorsData) {
+        container.innerHTML = `<p class="text-gray-500">Please select a tutor to view details.</p>`;
+        return;
+    }
+    const tutor = window.allTutorsData[tutorId];
+
+    onSnapshot(query(collection(db, "students"), where("tutorEmail", "==", tutor.email)), (studentsSnapshot) => {
+        const studentsListHTML = studentsSnapshot.docs.map(doc => {
+            const student = doc.data();
+            return `<li class="flex justify-between items-center bg-gray-50 p-2 rounded-md">
+                        <span>${student.studentName} (Grade ${student.grade}) - Fee: ₦${student.studentFee}</span>
+                        <button class="remove-student-btn text-red-500 hover:text-red-700" data-student-id="${doc.id}">Remove</button>
+                    </li>`;
+        }).join('');
+
+        const gradeOptions = Array.from({
+            length: 12
+        }, (_, i) => `<option value="${i + 1}">${i + 1}</option>`).join('');
+        const dayOptions = Array.from({
+            length: 7
+        }, (_, i) => `<option value="${i + 1}">${i + 1}</option>`).join('');
+
+        container.innerHTML = `
+            <div class="p-4 border rounded-lg shadow-sm">
+                <div class="flex items-center justify-between mb-4">
+                    <h4 class="font-bold text-xl">${tutor.name} (${studentsSnapshot.size} students)</h4>
+                    <label class="flex items-center space-x-2">
+                        <span class="font-semibold">Management Staff:</span>
+                        <input type="checkbox" id="management-staff-toggle" class="h-5 w-5" ${tutor.isManagementStaff ? 'checked' : ''}>
+                    </label>
+                </div>
+
+                <div class="mb-4">
+                    <p><strong>Students:</strong></p>
+                    <ul class="space-y-2 mt-2">${studentsListHTML || '<p class="text-gray-500">No students assigned.</p>'}</ul>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 border-t pt-4">
+                    <div class="add-student-form space-y-2">
+                        <h5 class="font-semibold text-gray-700">Add New Student Manually:</h5>
+                        <input type="text" id="new-student-name" class="w-full p-2 border rounded" placeholder="Parent Name">
+                        <input type="text" id="new-student-name" class="w-full p-2 border rounded" placeholder="Student Name">
+                        <select id="new-student-grade" class="w-full p-2 border rounded"><option value="">Select Grade</option>${gradeOptions}</select>
+                        <input type="text" id="new-student-subject" class="w-full p-2 border rounded" placeholder="Subject(s) (e.g., Math, English)">
+                        <select id="new-student-days" class="w-full p-2 border rounded"><option value="">Select Days per Week</option>${dayOptions}</select>
+                        <input type="number" id="new-student-fee" class="w-full p-2 border rounded" placeholder="Student Fee (₦)">
+                        <button id="add-student-btn" class="bg-green-600 text-white w-full px-4 py-2 rounded hover:bg-green-700">Add Student</button>
+                    </div>
+
+                    <div class="import-students-form">
+                         <h5 class="font-semibold text-gray-700">Import Students from File:</h5>
+                         <p class="text-xs text-gray-500 mb-2">Upload a .csv or .xlsx file with columns: <strong>Student Name, Grade, Subjects, Days, Fee</strong></p>
+                         <input type="file" id="student-import-file" class="w-full text-sm border rounded p-1" accept=".csv, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/vnd.ms-excel">
+                         <button id="import-students-btn" class="bg-blue-600 text-white w-full px-4 py-2 rounded mt-2 hover:bg-blue-700">Import Students</button>
+                         <p id="import-status" class="text-sm mt-2"></p>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        document.getElementById('management-staff-toggle').addEventListener('change', async (e) => {
+            await updateDoc(doc(db, "tutors", tutorId), {
+                isManagementStaff: e.target.checked
+            });
+        });
+
+        document.getElementById('add-student-btn').addEventListener('click', async () => {
+            const studentData = {
+                studentName: document.getElementById('new-student-name').value,
+                grade: document.getElementById('new-student-grade').value,
+                subjects: document.getElementById('new-student-subject').value.split(',').map(s => s.trim()),
+                days: document.getElementById('new-student-days').value,
+                studentFee: parseFloat(document.getElementById('new-student-fee').value),
+                tutorEmail: tutor.email,
+                summerBreak: false
+            };
+            if (studentData.studentName && studentData.grade && !isNaN(studentData.studentFee)) {
+                await addDoc(collection(db, "students"), studentData);
+            } else {
+                alert('Please fill in all details correctly.');
+            }
+        });
+
+        document.getElementById('import-students-btn').addEventListener('click', handleStudentImport);
+
+        container.querySelectorAll('.remove-student-btn').forEach(btn => btn.addEventListener('click', async (e) => {
+            if (confirm('Are you sure?')) await deleteDoc(doc(db, "students", e.target.dataset.studentId));
+        }));
+    });
 }
 
-
-
 async function handleStudentImport() {
+    const fileInput = document.getElementById('student-import-file');
+    const statusEl = document.getElementById('import-status');
+    const tutor = window.allTutorsData[activeTutorId];
+    if (!fileInput.files[0]) return statusEl.textContent = "Please select a file first.";
+    if (!tutor) return statusEl.textContent = "Error: No tutor selected.";
 
-    const fileInput = document.getElementById('student-import-file');
+    statusEl.textContent = "Reading file...";
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+        try {
+            const data = new Uint8Array(e.target.result);
+            const workbook = XLSX.read(data, {
+                type: 'array'
+            });
+            const sheetName = workbook.SheetNames[0];
+            const worksheet = workbook.Sheets[sheetName];
+            const json = XLSX.utils.sheet_to_json(worksheet);
 
-    const statusEl = document.getElementById('import-status');
+            if (json.length === 0) throw new Error("Sheet is empty or format is incorrect.");
 
-    const tutor = window.allTutorsData[activeTutorId];
-
-    if (!fileInput.files[0]) return statusEl.textContent = "Please select a file first.";
-
-    if (!tutor) return statusEl.textContent = "Error: No tutor selected.";
-
-
-
-    statusEl.textContent = "Reading file...";
-
-    const reader = new FileReader();
-
-    reader.onload = async (e) => {
-
-        try {
-
-            const data = new Uint8Array(e.target.result);
-
-            const workbook = XLSX.read(data, {
-
-                type: 'array'
-
-            });
-
-            const sheetName = workbook.SheetNames[0];
-
-            const worksheet = workbook.Sheets[sheetName];
-
-            const json = XLSX.utils.sheet_to_json(worksheet);
-
-
-
-            if (json.length === 0) throw new Error("Sheet is empty or format is incorrect.");
-
-
-
-            statusEl.textContent = `Importing ${json.length} students...`;
-
-            const batch = writeBatch(db);
-
-            json.forEach(row => {
-
-                const studentDocRef = doc(collection(db, "students"));
-
-                const studentData = {
-
-                    studentName: row['Student Name'],
-
-                    grade: row['Grade'],
-
-                    subjects: (row['Subjects'] || '').toString().split(',').map(s => s.trim()),
-
-                    days: row['Days'],
-
-                    studentFee: parseFloat(row['Fee']),
-
-                    tutorEmail: tutor.email,
-
-                    summerBreak: false
-
-                };
-
-                if (!studentData.studentName || isNaN(studentData.studentFee)) return; // Skip invalid rows
-
-                batch.set(studentDocRef, studentData);
-
-            });
-
-            await batch.commit();
-
-            statusEl.textContent = `✅ Successfully imported ${json.length} students for ${tutor.name}.`;
-
-            fileInput.value = ''; // Clear file input
-
-        } catch (error) {
-
-            statusEl.textContent = `❌ Error: ${error.message}`;
-
-            console.error(error);
-
-        }
-
-    };
-
-    reader.readAsArrayBuffer(fileInput.files[0]);
-
+            statusEl.textContent = `Importing ${json.length} students...`;
+            const batch = writeBatch(db);
+            json.forEach(row => {
+                const studentDocRef = doc(collection(db, "students"));
+                const studentData = {
+                    studentName: row['Student Name'],
+                    grade: row['Grade'],
+                    subjects: (row['Subjects'] || '').toString().split(',').map(s => s.trim()),
+                    days: row['Days'],
+                    studentFee: parseFloat(row['Fee']),
+                    tutorEmail: tutor.email,
+                    summerBreak: false
+                };
+                if (!studentData.studentName || isNaN(studentData.studentFee)) return; // Skip invalid rows
+                batch.set(studentDocRef, studentData);
+            });
+            await batch.commit();
+            statusEl.textContent = `✅ Successfully imported ${json.length} students for ${tutor.name}.`;
+            fileInput.value = ''; // Clear file input
+        } catch (error) {
+            statusEl.textContent = `❌ Error: ${error.message}`;
+            console.error(error);
+        }
+    };
+    reader.readAsArrayBuffer(fileInput.files[0]);
 }
 
 
@@ -1713,6 +1475,7 @@ onAuthStateChanged(auth, async (user) => {
     }
     // ...
 });
+
 
 
 
