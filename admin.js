@@ -540,294 +540,237 @@ async function setupContentManager() {
 // ##################################################################
 // # SECTION 3: TUTOR MANAGEMENT (Upgraded)
 // ##################################################################
+
+// Helper function to render the list of students
+function renderStudentList(container, students) {
+    const tableHtml = `
+    <div class="overflow-x-auto">
+        <table class="min-w-full divide-y divide-gray-200">
+            <thead class="bg-gray-50">
+                <tr>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Email</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider student-fees-header" style="display:none;">Fees (₦)</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                </tr>
+            </thead>
+            <tbody class="bg-white divide-y divide-gray-200" id="students-table-body">
+                ${students.map(student => `
+                    <tr data-student-id="${student.id}" class="hover:bg-gray-100">
+                        <td class="px-6 py-4 whitespace-nowrap">${capitalize(student.studentName)}</td>
+                        <td class="px-6 py-4 whitespace-nowrap">${student.parentEmail}</td>
+                        <td class="px-6 py-4 whitespace-nowrap student-fees-cell" style="display:none;">${student.fees || 'N/A'}</td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <button class="edit-btn bg-blue-500 text-white px-3 py-1 rounded text-sm hover:bg-blue-600 mr-2" data-id="${student.id}" data-student-name="${student.studentName}">Edit</button>
+                            <button class="delete-btn bg-red-500 text-white px-3 py-1 rounded text-sm hover:bg-red-600" data-id="${student.id}" data-student-name="${student.studentName}">Delete</button>
+                        </td>
+                    </tr>
+                `).join('')}
+            </tbody>
+        </table>
+    </div>
+    `;
+
+    const studentsListContainer = container.querySelector('#students-list-container');
+    if (studentsListContainer) {
+        studentsListContainer.innerHTML = students.length > 0 ? tableHtml : '<p class="text-center text-gray-500">No students found for this tutor.</p>';
+    }
+}
+
+// Function to filter students based on search input
+function filterStudentList(query) {
+    const filteredStudents = allTutorStudents.filter(student =>
+        student.studentName.toLowerCase().includes(query.toLowerCase()) ||
+        student.parentEmail.toLowerCase().includes(query.toLowerCase())
+    );
+    const studentsListContainer = document.getElementById('students-list-container');
+    if (studentsListContainer) {
+        renderStudentList(document, filteredStudents);
+    }
+}
+
+// Function to toggle fees visibility
+function toggleStudentFees(show) {
+    document.querySelectorAll('.student-fees-header').forEach(el => el.style.display = show ? 'table-cell' : 'none');
+    document.querySelectorAll('.student-fees-cell').forEach(el => el.style.display = show ? 'table-cell' : 'none');
+}
+
+// Function to handle student edit
+async function handleEditStudent(studentId, studentData) {
+    const newName = prompt("Edit Student Name:", studentData.studentName);
+    const newFees = prompt("Edit Student Fees:", studentData.fees || '');
+    if (newName !== null && newFees !== null) {
+        try {
+            const studentRef = doc(db, "students", studentId);
+            await updateDoc(studentRef, {
+                studentName: newName,
+                fees: newFees
+            });
+            alert("Student details updated successfully!");
+            renderSelectedTutorDetails(activeTutorId);
+        } catch (error) {
+            console.error("Error updating student:", error);
+            alert("Failed to update student. See console for details.");
+        }
+    }
+}
+
+// Function to handle student deletion
+async function handleDeleteStudent(studentId, studentName) {
+    if (confirm(`Are you sure you want to delete the student '${studentName}'? This action cannot be undone.`)) {
+        try {
+            await deleteDoc(doc(db, "students", studentId));
+            alert("Student deleted successfully!");
+            renderSelectedTutorDetails(activeTutorId);
+        } catch (error) {
+            console.error("Error deleting student:", error);
+            alert("Failed to delete student. See console for details.");
+        }
+    }
+}
+
+// New function to setup listeners for the tutor management panel
+function setupTutorManagementListeners(container) {
+    container.addEventListener('input', (e) => {
+        if (e.target.id === 'student-search-bar') {
+            filterStudentList(e.target.value);
+        }
+    });
+
+    container.addEventListener('change', (e) => {
+        if (e.target.id === 'show-fees-toggle') {
+            toggleStudentFees(e.target.checked);
+        }
+    });
+
+    container.addEventListener('click', async (e) => {
+        if (e.target.classList.contains('edit-btn')) {
+            const studentId = e.target.dataset.id;
+            const studentData = allTutorStudents.find(s => s.id === studentId);
+            if (studentData) {
+                await handleEditStudent(studentId, studentData);
+            }
+        }
+        if (e.target.classList.contains('delete-btn')) {
+            const studentId = e.target.dataset.id;
+            const studentName = e.target.dataset.studentName;
+            await handleDeleteStudent(studentId, studentName);
+        }
+    });
+}
+
+// The main function to render the Tutor Management panel
 async function renderTutorManagementPanel(container) {
     container.innerHTML = `
         <div class="bg-white p-6 rounded-lg shadow-md mb-6">
-            <h2 class="text-2xl font-bold text-green-700 mb-4">Global Settings</h2>
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
-                <label class="flex items-center"><span class="text-gray-700 font-semibold mr-4">Report Submission:</span><label class="relative inline-flex items-center cursor-pointer"><input type="checkbox" id="report-toggle" class="sr-only peer"><div class="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div><span id="report-status-label" class="ml-3 text-sm font-medium"></span></label></label>
-                <label class="flex items-center"><span class="text-gray-700 font-semibold mr-4">Tutors Can Add Students:</span><label class="relative inline-flex items-center cursor-pointer"><input type="checkbox" id="tutor-add-toggle" class="sr-only peer"><div class="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div><span id="tutor-add-status-label" class="ml-3 text-sm font-medium"></span></label></label>
-                <label class="flex items-center"><span class="text-gray-700 font-semibold mr-4">Enable Summer Break:</span><label class="relative inline-flex items-center cursor-pointer"><input type="checkbox" id="summer-break-toggle" class="sr-only peer"><div class="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div><span id="summer-break-status-label" class="ml-3 text-sm font-medium"></span></label></label>
-            </div>
-        </div>
-
-        <div class="bg-white p-6 rounded-lg shadow-md">
-            <div class="flex justify-between items-start mb-4">
-                <h3 class="text-2xl font-bold text-green-700">Manage Tutors</h3>
-                <div class="flex space-x-4">
-                    <div class="bg-blue-100 p-3 rounded-lg text-center shadow"><h4 class="font-bold text-blue-800 text-sm">Total Tutors</h4><p id="tutor-count-badge" class="text-2xl text-blue-600 font-extrabold">0</p></div>
-                    <div class="bg-green-100 p-3 rounded-lg text-center shadow"><h4 class="font-bold text-green-800 text-sm">Total Students</h4><p id="student-count-badge" class="text-2xl text-green-600 font-extrabold">0</p></div>
+            <h2 class="text-2xl font-bold text-green-700 mb-4">Tutor Management</h2>
+            <div class="flex items-center space-x-4 mb-4">
+                <div class="relative flex-grow">
+                    <input type="text" id="student-search-bar" placeholder="Search students..." class="w-full p-2 pl-10 border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-600">
+                    <svg class="w-5 h-5 text-gray-400 absolute left-3 top-1/2 transform -translate-y-1/2" fill="currentColor" viewBox="0 0 20 20">
+                        <path d="M12.9 14.32a8 8 0 111.41-1.41l5.35 5.35-1.42 1.42-5.35-5.35zM8 14A6 6 0 108 2a6 6 0 000 12z"></path>
+                    </svg>
                 </div>
+                <label class="flex items-center cursor-pointer">
+                    <span class="text-gray-700 mr-2">Show Fees</span>
+                    <input type="checkbox" id="show-fees-toggle" class="sr-only peer">
+                    <div class="relative w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-green-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border after:border-gray-300 after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-600"></div>
+                </label>
             </div>
             <div class="mb-4">
-                <label for="tutor-select" class="block font-semibold">Select Tutor:</label>
-                <select id="tutor-select" class="w-full p-2 border rounded mt-1"></select>
+                <label for="tutor-select" class="block text-gray-700">Select a Tutor</label>
+                <select id="tutor-select" class="w-full mt-1 p-2 border rounded"></select>
             </div>
-            <div id="selected-tutor-details" class="mt-4"><p class="text-gray-500">Please select a tutor to view details.</p></div>
+            <div id="tutor-details-container" class="space-y-4" style="display:none;">
+                <h3 class="text-xl font-bold text-blue-700">Students</h3>
+                <div id="students-list-container">
+                    <p class="text-center text-gray-500">Please select a tutor to view their students.</p>
+                </div>
+            </div>
+        </div>
+        <div id="student-modal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full" style="display:none;">
+            <div class="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
+                <div class="mt-3 text-center">
+                    <h3 class="text-lg leading-6 font-medium text-gray-900" id="modal-title">Edit Student</h3>
+                    <div class="mt-2 px-7 py-3">
+                        <label for="modal-student-name" class="block text-left text-sm font-medium text-gray-700">Student Name</label>
+                        <input type="text" id="modal-student-name" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50">
+                        <label for="modal-student-fees" class="block text-left text-sm font-medium text-gray-700 mt-4">Fees</label>
+                        <input type="number" id="modal-student-fees" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50">
+                    </div>
+                    <div class="items-center px-4 py-3">
+                        <button id="modal-save-btn" class="px-4 py-2 bg-green-500 text-white text-base font-medium rounded-md w-full shadow-sm hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500">Save</button>
+                        <button id="modal-cancel-btn" class="mt-2 px-4 py-2 bg-gray-300 text-gray-700 text-base font-medium rounded-md w-full shadow-sm hover:bg-gray-400 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500">Cancel</button>
+                    </div>
+                </div>
+            </div>
         </div>
     `;
-    setupTutorManagementListeners();
+
+    setupTutorManagementListeners(container);
+    await loadTutorsForManagement();
 }
 
-async function setupTutorManagementListeners() {
-    const settingsDocRef = doc(db, "settings", "global_settings");
-
-    onSnapshot(settingsDocRef, (docSnap) => {
-        if (docSnap.exists()) {
-            const data = docSnap.data();
-            ['report', 'tutor-add', 'summer-break'].forEach(type => {
-                const key = `is${capitalize(type.split('-')[0])}${capitalize(type.split('-')[1] || '')}Enabled`;
-                const toggle = document.getElementById(`${type}-toggle`);
-                const label = document.getElementById(`${type}-status-label`);
-                if (toggle && label) {
-                    toggle.checked = data[key];
-                    label.textContent = data[key] ? 'Enabled' : 'Disabled';
-                }
-            });
-        }
-    });
-
-    document.getElementById('report-toggle').addEventListener('change', e => updateDoc(settingsDocRef, {
-        isReportEnabled: e.target.checked
-    }));
-    document.getElementById('tutor-add-toggle').addEventListener('change', e => updateDoc(settingsDocRef, {
-        isTutorAddEnabled: e.target.checked
-    }));
-    document.getElementById('summer-break-toggle').addEventListener('change', e => updateDoc(settingsDocRef, {
-        isSummerBreakEnabled: e.target.checked
-    }));
-
+async function loadTutorsForManagement() {
     const tutorSelect = document.getElementById('tutor-select');
-    tutorSelect.addEventListener('change', e => {
-        activeTutorId = e.target.value;
-        renderSelectedTutorDetails(activeTutorId);
-    });
+    tutorSelect.innerHTML = `<option value="">Loading tutors...</option>`;
+    try {
+        const tutorsSnapshot = await getDocs(collection(db, "tutors"));
+        tutorsSnapshot.forEach(doc => {
+            allTutorsData[doc.id] = doc.data();
+        });
 
-    // ### NEW ### Real-time counter updates
-    onSnapshot(collection(db, "tutors"), (snapshot) => {
-        const badge = document.getElementById('tutor-count-badge');
-        if (badge) badge.textContent = snapshot.size;
-    });
-    onSnapshot(collection(db, "students"), (snapshot) => {
-        const badge = document.getElementById('student-count-badge');
-        if (badge) badge.textContent = snapshot.size;
-    });
-
-    onSnapshot(collection(db, "tutors"), (snapshot) => {
-        const tutorsData = {};
-        let currentSelection = tutorSelect.value;
         tutorSelect.innerHTML = `<option value="">-- Select a Tutor --</option>`;
-        snapshot.forEach(doc => {
-            tutorsData[doc.id] = {
-                id: doc.id,
-                ...doc.data()
-            };
+        tutorsSnapshot.docs.forEach(doc => {
+            const tutor = doc.data();
             const option = document.createElement('option');
             option.value = doc.id;
-            option.textContent = doc.data().name;
+            option.textContent = `${tutor.name} (${tutor.email})`;
             tutorSelect.appendChild(option);
         });
-        window.allTutorsData = tutorsData;
-        if (activeTutorId && tutorsData[activeTutorId]) {
-            tutorSelect.value = activeTutorId;
-        }
-    });
+
+        // Set up listener for tutor selection change
+        tutorSelect.addEventListener('change', e => {
+            activeTutorId = e.target.value;
+            renderSelectedTutorDetails(activeTutorId);
+        });
+    } catch (error) {
+        console.error("Error loading tutors:", error);
+        tutorSelect.innerHTML = `<option value="">Error loading tutors</option>`;
+    }
 }
 
-// ### UPDATED ### With full student form, CSV/Excel import, new search bar, and edit/delete/fee toggle
 async function renderSelectedTutorDetails(tutorId) {
-    const container = document.getElementById('selected-tutor-details');
-    if (!tutorId || !window.allTutorsData) {
-        container.innerHTML = `<p class="text-gray-500">Please select a tutor to view details.</p>`;
+    const detailsContainer = document.getElementById('tutor-details-container');
+    const studentsListContainer = document.getElementById('students-list-container');
+    const searchBar = document.getElementById('student-search-bar');
+    const showFeesToggle = document.getElementById('show-fees-toggle');
+
+    if (!tutorId) {
+        detailsContainer.style.display = 'none';
         return;
     }
-    const tutor = window.allTutorsData[tutorId];
 
-    // Listen for changes to the show fee toggle and store it in local storage
-    let showFees = localStorage.getItem('showStudentFees') === 'true';
+    studentsListContainer.innerHTML = '<p class="text-center text-gray-500">Loading students...</p>';
+    detailsContainer.style.display = 'block';
 
-    onSnapshot(query(collection(db, "students"), where("tutorEmail", "==", tutor.email)), (studentsSnapshot) => {
-        const studentsData = studentsSnapshot.docs.map(doc => ({
-            id: doc.id,
-            ...doc.data()
-        }));
+    try {
+        const tutorEmail = allTutorsData[tutorId].email;
+        const studentsQuery = query(collection(db, "students"), where("tutorEmail", "==", tutorEmail));
+        const studentsSnapshot = await getDocs(studentsQuery);
 
-        // The main container HTML structure
-        container.innerHTML = `
-            <div class="p-4 border rounded-lg shadow-sm">
-                <div class="flex items-center justify-between mb-4">
-                    <h4 class="font-bold text-xl">${tutor.name} (${studentsData.length} students)</h4>
-                    <label class="flex items-center space-x-2">
-                        <span class="font-semibold">Management Staff:</span>
-                        <input type="checkbox" id="management-staff-toggle" class="h-5 w-5" ${tutor.isManagementStaff ? 'checked' : ''}>
-                    </label>
-                </div>
+        allTutorStudents = studentsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 
-                <div class="mb-4">
-                    <div class="flex justify-between items-center mb-2">
-                        <p class="font-semibold text-gray-700">Students:</p>
-                        <div class="flex items-center space-x-4">
-                             <label class="flex items-center space-x-2">
-                                <span class="text-sm font-medium">Show Fees:</span>
-                                <input type="checkbox" id="show-fees-toggle" class="h-4 w-4" ${showFees ? 'checked' : ''}>
-                             </label>
-                             <input type="text" id="student-search-bar" class="p-1 border rounded text-sm" placeholder="Search students...">
-                        </div>
-                    </div>
-                    <ul id="students-list" class="space-y-2 mt-2"></ul>
-                </div>
+        renderStudentList(document, allTutorStudents);
+        // Reset search and fees toggle
+        searchBar.value = '';
+        showFeesToggle.checked = false;
+        toggleStudentFees(false);
 
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 border-t pt-4">
-                    <div class="add-student-form space-y-2">
-                        <h5 class="font-semibold text-gray-700">Add New Student Manually:</h5>
-                        <input type="text" id="new-parent-name" class="w-full p-2 border rounded" placeholder="Parent Name">
-                        <input type="text" id="new-student-name" class="w-full p-2 border rounded" placeholder="Student Name">
-                        <select id="new-student-grade" class="w-full p-2 border rounded"><option value="">Select Grade</option>${Array.from({ length: 12 }, (_, i) => `<option value="${i + 1}">${i + 1}</option>`).join('')}</select>
-                        <input type="text" id="new-student-subject" class="w-full p-2 border rounded" placeholder="Subject(s) (e.g., Math, English)">
-                        <select id="new-student-days" class="w-full p-2 border rounded"><option value="">Select Days per Week</option>${Array.from({ length: 7 }, (_, i) => `<option value="${i + 1}">${i + 1}</option>`).join('')}</select>
-                        <input type="number" id="new-student-fee" class="w-full p-2 border rounded" placeholder="Student Fee (₦)">
-                        <button id="add-student-btn" class="bg-green-600 text-white w-full px-4 py-2 rounded hover:bg-green-700">Add Student</button>
-                    </div>
-
-                    <div class="import-students-form">
-                         <h5 class="font-semibold text-gray-700">Import Students from File:</h5>
-                         <p class="text-xs text-gray-500 mb-2">Upload a .csv or .xlsx file with columns: <strong>Student Name, Grade, Subjects, Days, Fee</strong></p>
-                         <input type="file" id="student-import-file" class="w-full text-sm border rounded p-1" accept=".csv, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/vnd.ms-excel">
-                         <button id="import-students-btn" class="bg-blue-600 text-white w-full px-4 py-2 rounded mt-2 hover:bg-blue-700">Import Students</button>
-                         <p id="import-status" class="text-sm mt-2"></p>
-                    </div>
-                </div>
-            </div>
-        `;
-
-        // Function to render the student list based on current data and showFees state
-        function renderStudentsList(students) {
-            const listContainer = document.getElementById('students-list');
-            const studentsListHTML = students.map(student => {
-                const feeDisplay = showFees ? ` - Fee: ₦${student.studentFee}` : '';
-                return `
-                    <li class="flex justify-between items-center bg-gray-50 p-2 rounded-md">
-                        <span>${student.studentName} (Grade ${student.grade})${feeDisplay}</span>
-                        <div class="flex space-x-2">
-                            <button class="edit-student-btn text-blue-500 hover:text-blue-700" data-student-id="${student.id}">Edit</button>
-                            <button class="remove-student-btn text-red-500 hover:text-red-700" data-student-id="${student.id}">Delete</button>
-                        </div>
-                    </li>`;
-            }).join('');
-            listContainer.innerHTML = studentsListHTML || '<p class="text-gray-500">No students assigned.</p>';
-
-            // Add event listeners for new buttons
-            container.querySelectorAll('.edit-student-btn').forEach(btn => btn.addEventListener('click', (e) => handleEditStudent(e.target.dataset.studentId)));
-            container.querySelectorAll('.remove-student-btn').forEach(btn => btn.addEventListener('click', async (e) => {
-                if (confirm('Are you sure you want to delete this student? This action cannot be undone.')) {
-                    await deleteDoc(doc(db, "students", e.target.dataset.studentId));
-                }
-            }));
-        }
-
-        // Initial render of the students list
-        renderStudentsList(studentsData);
-
-        // Add event listeners for new search and fee toggle
-        document.getElementById('show-fees-toggle').addEventListener('change', (e) => {
-            showFees = e.target.checked;
-            localStorage.setItem('showStudentFees', showFees);
-            renderStudentsList(studentsData);
-        });
-
-        document.getElementById('student-search-bar').addEventListener('input', (e) => {
-            const searchTerm = e.target.value.toLowerCase();
-            const filteredStudents = studentsData.filter(student =>
-                student.studentName.toLowerCase().includes(searchTerm)
-            );
-            renderStudentsList(filteredStudents);
-        });
-
-        // Existing event listeners from the original code
-        document.getElementById('management-staff-toggle').addEventListener('change', async (e) => {
-            await updateDoc(doc(db, "tutors", tutorId), {
-                isManagementStaff: e.target.checked
-            });
-        });
-
-        document.getElementById('add-student-btn').addEventListener('click', async () => {
-            const studentName = document.getElementById('new-student-name').value;
-            const grade = document.getElementById('new-student-grade').value;
-            const subjects = document.getElementById('new-student-subject').value.split(',').map(s => s.trim());
-            const days = document.getElementById('new-student-days').value;
-            const studentFee = parseFloat(document.getElementById('new-student-fee').value);
-            const parentName = document.getElementById('new-parent-name').value;
-
-            if (studentName && grade && !isNaN(studentFee) && parentName) {
-                const newStudentData = {
-                    studentName: studentName,
-                    parentName: parentName,
-                    grade: grade,
-                    subjects: subjects,
-                    days: days,
-                    studentFee: studentFee,
-                    tutorEmail: tutor.email,
-                    summerBreak: false,
-                    isArchived: false,
-                    onBreak: false,
-                };
-                await addDoc(collection(db, "students"), newStudentData);
-            } else {
-                alert('Please fill in all details correctly.');
-            }
-        });
-
-        document.getElementById('import-students-btn').addEventListener('click', handleStudentImport);
-
-    });
-}
-
-async function handleStudentImport() {
-    const fileInput = document.getElementById('student-import-file');
-    const statusEl = document.getElementById('import-status');
-    const tutor = window.allTutorsData[activeTutorId];
-    if (!fileInput.files[0]) return statusEl.textContent = "Please select a file first.";
-    if (!tutor) return statusEl.textContent = "Error: No tutor selected.";
-
-    statusEl.textContent = "Reading file...";
-    const reader = new FileReader();
-    reader.onload = async (e) => {
-        try {
-            const data = new Uint8Array(e.target.result);
-            const workbook = XLSX.read(data, {
-                type: 'array'
-            });
-            const sheetName = workbook.SheetNames[0];
-            const worksheet = workbook.Sheets[sheetName];
-            const json = XLSX.utils.sheet_to_json(worksheet);
-
-            if (json.length === 0) throw new Error("Sheet is empty or format is incorrect.");
-
-            statusEl.textContent = `Importing ${json.length} students...`;
-            const batch = writeBatch(db);
-            json.forEach(row => {
-                const studentDocRef = doc(collection(db, "students"));
-                const studentData = {
-                    studentName: row['Student Name'],
-                    grade: row['Grade'],
-                    subjects: (row['Subjects'] || '').toString().split(',').map(s => s.trim()),
-                    days: row['Days'],
-                    studentFee: parseFloat(row['Fee']),
-                    tutorEmail: tutor.email,
-                    summerBreak: false
-                };
-                if (!studentData.studentName || isNaN(studentData.studentFee)) return; // Skip invalid rows
-                batch.set(studentDocRef, studentData);
-            });
-            await batch.commit();
-            statusEl.textContent = `✅ Successfully imported ${json.length} students for ${tutor.name}.`;
-            fileInput.value = ''; // Clear file input
-        } catch (error) {
-            statusEl.textContent = `❌ Error: ${error.message}`;
-            console.error(error);
-        }
-    };
-    reader.readAsArrayBuffer(fileInput.files[0]);
+    } catch (error) {
+        console.error("Error fetching students:", error);
+        studentsListContainer.innerHTML = `<p class="text-center text-red-500">Failed to load students. ${error.message}</p>`;
+    }
 }
 
 
@@ -1498,6 +1441,7 @@ onAuthStateChanged(auth, async (user) => {
     }
     // ...
 });
+
 
 
 
