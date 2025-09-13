@@ -558,480 +558,136 @@ async function renderTutorManagementPanel(container) {
     container.innerHTML = `
         <div class="bg-white p-6 rounded-lg shadow-md mb-6">
             <h2 class="text-2xl font-bold text-green-700 mb-4">Global Settings</h2>
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
-                <label class="flex items-center"><span class="text-gray-700 font-semibold mr-4">Report Submission:</span><label class="relative inline-flex items-center cursor-pointer"><input type="checkbox" id="report-toggle" class="sr-only peer"><div class="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div><span id="report-status-label" class="ml-3 text-sm font-medium"></span></label></label>
-                <label class="flex items-center"><span class="text-gray-700 font-semibold mr-4">Tutors Can Add Students:</span><label class="relative inline-flex items-center cursor-pointer"><input type="checkbox" id="tutor-add-toggle" class="sr-only peer"><div class="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div><span id="tutor-add-status-label" class="ml-3 text-sm font-medium"></span></label></label>
-                <label class="flex items-center"><span class="text-gray-700 font-semibold mr-4">Enable Summer Break:</span><label class="relative inline-flex items-center cursor-pointer"><input type="checkbox" id="summer-break-toggle" class="sr-only peer"><div class="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div><span id="summer-break-status-label" class="ml-3 text-sm font-medium"></span></label></label>
-            </div>
-
-            <!-- New: Student Fees Toggle -->
-            <div class="flex items-center justify-between p-4 bg-gray-100 rounded-lg shadow-inner mt-4">
-                <div class="flex-1">
-                    <h3 class="text-xl font-semibold text-gray-700">Student Fees Visibility</h3>
-                    <p class="text-sm text-gray-500">Enable this to allow tutors to view the fees of their assigned students.</p>
-                </div>
-                <label class="flex items-center cursor-pointer ml-4">
-                    <div class="relative">
-                        <input type="checkbox" id="student-fees-toggle" class="sr-only">
-                        <div class="block bg-gray-600 w-14 h-8 rounded-full transition-all toggle-bg"></div>
-                        <div class="dot absolute left-1 top-1 bg-white w-6 h-6 rounded-full transition-all duration-300"></div>
-                    </div>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                <label class="flex items-center">
+                    <span class="text-gray-700 font-semibold mr-4">Show Student Fees:</span>
+                    <input type="checkbox" id="student-fee-toggle" class="toggle-checkbox">
                 </label>
-            </div>
-            
-            <!-- New: Delete Monthly Reports Button -->
-            <div class="flex items-center justify-between p-4 bg-red-100 rounded-lg shadow-inner mt-4">
-                <div class="flex-1">
-                    <h3 class="text-xl font-semibold text-red-700">Delete All Monthly Reports</h3>
-                    <p class="text-sm text-red-500">WARNING: This will permanently delete all student reports submitted for the current month. This action is irreversible.</p>
-                </div>
-                <button id="delete-reports-btn" class="bg-red-600 text-white px-6 py-3 rounded-md font-semibold hover:bg-red-700 transition duration-300 shadow-md">
-                    Delete Reports
-                </button>
+                <label class="flex items-center">
+                    <span class="text-gray-700 font-semibold mr-4">Delete Monthly Reports:</span>
+                    <input type="checkbox" id="delete-monthly-toggle" class="toggle-checkbox">
+                </label>
             </div>
         </div>
 
         <div class="bg-white p-6 rounded-lg shadow-md">
-            <div class="flex justify-between items-start mb-4">
+            <div class="flex justify-between items-center mb-4">
                 <h3 class="text-2xl font-bold text-green-700">Manage Tutors</h3>
-                <div class="flex space-x-4">
-                    <div class="bg-blue-100 p-3 rounded-lg text-center shadow"><h4 class="font-bold text-blue-800 text-sm">Total Tutors</h4><p id="tutor-count-badge" class="text-2xl text-blue-600 font-extrabold">0</p></div>
-                    <div class="bg-green-100 p-3 rounded-lg text-center shadow"><h4 class="font-bold text-green-800 text-sm">Total Students</h4><p id="student-count-badge" class="text-2xl text-green-600 font-extrabold">0</p></div>
-                </div>
+                <input type="text" id="search-bar" class="p-2 border rounded w-1/3" placeholder="Search by name...">
             </div>
-            
-            <!-- New: Search Bar -->
-            <div class="mb-4">
-                <input type="text" id="tutor-search" class="w-full p-2 border rounded mt-1" placeholder="Search by name (tutor, student, or parent)...">
-            </div>
-
-            <!-- New: List of Tutors with Edit/Delete Buttons -->
-            <div id="tutors-list" class="space-y-4">
-                <p class="text-gray-500 text-center">Loading tutors...</p>
-            </div>
-        </div>
-        
-        <!-- Custom Modal for Edit/Delete -->
-        <div id="modal-container" class="hidden fixed inset-0 bg-gray-900 bg-opacity-50 flex items-center justify-center p-4 z-50">
-            <div class="bg-white rounded-lg p-8 max-w-md w-full shadow-lg transform scale-100 transition-transform duration-300">
-                <h3 id="modal-title" class="text-2xl font-bold mb-4"></h3>
-                <form id="tutor-form" class="space-y-4">
-                    <div>
-                        <label for="name" class="block text-gray-700 font-semibold mb-1">Name</label>
-                        <input type="text" id="tutor-name" name="name" class="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500">
-                    </div>
-                    <div>
-                        <label for="email" class="block text-gray-700 font-semibold mb-1">Email</label>
-                        <input type="email" id="tutor-email" name="email" class="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500">
-                    </div>
-                    <div>
-                        <label for="phone" class="block text-gray-700 font-semibold mb-1">Phone</label>
-                        <input type="tel" id="tutor-phone" name="phone" class="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500">
-                    </div>
-                    <div class="flex justify-end space-x-4">
-                        <button type="button" id="close-modal-btn" class="bg-gray-300 text-gray-800 px-6 py-2 rounded-md font-semibold hover:bg-gray-400">Cancel</button>
-                        <button type="submit" id="submit-modal-btn" class="bg-indigo-600 text-white px-6 py-2 rounded-md font-semibold hover:bg-indigo-700">Save Changes</button>
-                    </div>
-                </form>
-            </div>
+            <div id="tutor-list" class="space-y-4"></div>
         </div>
     `;
+
     setupTutorManagementListeners();
 }
 
 async function setupTutorManagementListeners() {
-    const settingsDocRef = doc(db, "settings", "global_settings");
+    const settingsRef = doc(db, "settings", "global_settings");
 
-    // Listen for real-time updates on global settings
-    onSnapshot(settingsDocRef, (docSnap) => {
-        if (docSnap.exists()) {
-            const data = docSnap.data();
-            ['report', 'tutor-add', 'summer-break', 'student-fees'].forEach(type => {
-                const key = `is${capitalize(type.split('-')[0])}${capitalize(type.split('-')[1] || '')}Enabled`;
-                const toggle = document.getElementById(`${type}-toggle`);
-                const label = document.getElementById(`${type}-status-label`);
-                if (toggle) {
-                    toggle.checked = data[key] || false;
-                }
-                if (label) {
-                    label.textContent = data[key] ? 'Enabled' : 'Disabled';
-                }
-            });
-        }
+    document.getElementById("student-fee-toggle").addEventListener("change", async (e) => {
+        await updateDoc(settingsRef, { showStudentFees: e.target.checked });
     });
 
-    // Toggle listeners for global settings
-    document.getElementById('report-toggle').addEventListener('change', e => updateDoc(settingsDocRef, { isReportEnabled: e.target.checked }));
-    document.getElementById('tutor-add-toggle').addEventListener('change', e => updateDoc(settingsDocRef, { isTutorAddEnabled: e.target.checked }));
-    document.getElementById('summer-break-toggle').addEventListener('change', e => updateDoc(settingsDocRef, { isSummerBreakEnabled: e.target.checked }));
-    document.getElementById('student-fees-toggle').addEventListener('change', e => updateDoc(settingsDocRef, { isStudentFeesEnabled: e.target.checked }));
-    
-    // Monthly reports deletion logic
-    document.getElementById('delete-reports-btn').addEventListener('click', async () => {
-        const modal = document.getElementById('modal-container');
-        const modalTitle = document.getElementById('modal-title');
-        const tutorForm = document.getElementById('tutor-form');
-
-        modalTitle.textContent = "Confirm Deletion";
-        tutorForm.innerHTML = `
-            <p class="text-red-600 mb-4">Are you absolutely sure you want to delete all monthly reports? This action cannot be undone.</p>
-            <div class="flex justify-end space-x-4">
-                <button type="button" id="cancel-delete-btn" class="bg-gray-300 text-gray-800 px-6 py-2 rounded-md font-semibold hover:bg-gray-400">Cancel</button>
-                <button type="button" id="confirm-delete-btn" class="bg-red-600 text-white px-6 py-2 rounded-md font-semibold hover:bg-red-700">Delete Reports</button>
-            </div>
-        `;
-        modal.classList.remove('hidden');
-
-        document.getElementById('cancel-delete-btn').addEventListener('click', () => modal.classList.add('hidden'));
-
-        document.getElementById('confirm-delete-btn').addEventListener('click', async () => {
-            const now = new Date();
-            const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-            const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
-            
-            const reportsRef = collection(db, 'reports');
-            const q = query(reportsRef, where('timestamp', '>=', startOfMonth), where('timestamp', '<=', endOfMonth));
-            
-            try {
-                const querySnapshot = await getDocs(q);
-                if (querySnapshot.empty) {
-                    alert("No reports found for this month to delete.");
-                    modal.classList.add('hidden');
-                    return;
-                }
-                
+    document.getElementById("delete-monthly-toggle").addEventListener("change", async (e) => {
+        if (e.target.checked) {
+            const confirm1 = confirm("Are you sure you want to delete all monthly reports?");
+            const confirm2 = confirm("This action cannot be undone. Proceed?");
+            if (confirm1 && confirm2) {
+                const now = new Date();
+                const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+                const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+                const reportsQuery = query(
+                    collection(db, "student_results"),
+                    where("submittedAt", ">=", Timestamp.fromDate(startOfMonth)),
+                    where("submittedAt", "<=", Timestamp.fromDate(endOfMonth))
+                );
+                const snapshot = await getDocs(reportsQuery);
                 const batch = writeBatch(db);
-                querySnapshot.forEach(doc => batch.delete(doc.ref));
+                snapshot.forEach(doc => batch.delete(doc.ref));
                 await batch.commit();
-                alert("All monthly reports for this month have been deleted successfully!");
-            } catch (error) {
-                console.error("Error deleting monthly reports: ", error);
-                alert("An error occurred while deleting reports. Please try again.");
-            } finally {
-                modal.classList.add('hidden');
-            }
-        });
-    });
-
-    const tutorsListContainer = document.getElementById('tutors-list');
-    const tutorSearchInput = document.getElementById('tutor-search');
-
-    // Fetch and cache all data (tutors, students, parents) for local search
-    const fetchData = async () => {
-        const [tutorsSnapshot, studentsSnapshot, parentsSnapshot] = await Promise.all([
-            getDocs(collection(db, "tutors")),
-            getDocs(collection(db, "students")),
-            getDocs(collection(db, "parents")),
-        ]);
-
-        const tutors = tutorsSnapshot.docs.map(d => ({ id: d.id, ...d.data() }));
-        const students = studentsSnapshot.docs.map(d => ({ id: d.id, ...d.data() }));
-        const parents = parentsSnapshot.docs.map(d => ({ id: d.id, ...d.data() }));
-
-        document.getElementById('tutor-count-badge').textContent = tutors.length;
-        document.getElementById('student-count-badge').textContent = students.length;
-
-        allDataCache = { tutors, students, parents };
-        renderTutorList(tutors);
-    };
-
-    // Render the tutor list with Edit and Delete buttons
-    const renderTutorList = (tutorsToRender) => {
-        if (tutorsToRender.length === 0) {
-            tutorsListContainer.innerHTML = `<p class="text-gray-500 text-center">No tutors found.</p>`;
-            return;
-        }
-
-        tutorsListContainer.innerHTML = tutorsToRender.map(tutor => `
-            <div class="bg-gray-50 p-4 rounded-lg shadow-sm flex items-center justify-between">
-                <div>
-                    <h3 class="text-lg font-semibold text-gray-800">${tutor.name}</h3>
-                    <p class="text-gray-600 text-sm">${tutor.email}</p>
-                </div>
-                <div class="flex space-x-2">
-                    <button class="edit-tutor-btn bg-yellow-500 text-white p-2 rounded-md hover:bg-yellow-600" data-id="${tutor.id}">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                          <path d="M17.414 2.586a2 2 0 00-2.828 0L7 10.172V13h2.828l7.586-7.586a2 2 0 000-2.828z" />
-                          <path fill-rule="evenodd" d="M2 6a2 2 0 012-2h4a1 1 0 010 2H4v10h10v-4a1 1 0 112 0v4a2 2 0 01-2 2H4a2 2 0 01-2-2V6z" clip-rule="evenodd" />
-                        </svg>
-                    </button>
-                    <button class="delete-tutor-btn bg-red-600 text-white p-2 rounded-md hover:bg-red-700" data-id="${tutor.id}">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                          <path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd" />
-                        </svg>
-                    </button>
-                </div>
-            </div>
-        `).join('');
-
-        // Add event listeners for the edit and delete buttons
-        tutorsListContainer.querySelectorAll('.edit-tutor-btn').forEach(btn => btn.addEventListener('click', handleEditTutor));
-        tutorsListContainer.querySelectorAll('.delete-tutor-btn').forEach(btn => btn.addEventListener('click', handleDeleteTutor));
-    };
-    
-    // Live search functionality
-    tutorSearchInput.addEventListener('input', (e) => {
-        const searchTerm = e.target.value.toLowerCase();
-        const filteredTutors = allDataCache.tutors.filter(tutor => {
-            const tutorMatch = tutor.name.toLowerCase().includes(searchTerm);
-            const studentMatch = allDataCache.students.some(student => 
-                student.tutorEmail === tutor.email && student.studentName.toLowerCase().includes(searchTerm)
-            );
-            const parentMatch = allDataCache.parents.some(parent => 
-                allDataCache.students.some(student => student.parentId === parent.id && student.tutorEmail === tutor.email) && parent.name.toLowerCase().includes(searchTerm)
-            );
-            return tutorMatch || studentMatch || parentMatch;
-        });
-        renderTutorList(filteredTutors);
-    });
-
-    // Handle Edit Tutor
-    const handleEditTutor = (e) => {
-        const tutorId = e.currentTarget.dataset.id;
-        activeTutorId = tutorId;
-        const tutor = allDataCache.tutors.find(t => t.id === tutorId);
-        
-        const modal = document.getElementById('modal-container');
-        const modalTitle = document.getElementById('modal-title');
-        const tutorForm = document.getElementById('tutor-form');
-        
-        modalTitle.textContent = "Edit Tutor Details";
-        tutorForm.innerHTML = `
-            <div>
-                <label for="name" class="block text-gray-700 font-semibold mb-1">Name</label>
-                <input type="text" id="tutor-name" name="name" class="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500" value="${tutor.name}">
-            </div>
-            <div>
-                <label for="email" class="block text-gray-700 font-semibold mb-1">Email</label>
-                <input type="email" id="tutor-email" name="email" class="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500" value="${tutor.email}">
-            </div>
-            <div>
-                <label for="phone" class="block text-gray-700 font-semibold mb-1">Phone</label>
-                <input type="tel" id="tutor-phone" name="phone" class="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500" value="${tutor.phone || ''}">
-            </div>
-            <div class="flex justify-end space-x-4">
-                <button type="button" id="close-modal-btn" class="bg-gray-300 text-gray-800 px-6 py-2 rounded-md font-semibold hover:bg-gray-400">Cancel</button>
-                <button type="submit" id="submit-modal-btn" class="bg-indigo-600 text-white px-6 py-2 rounded-md font-semibold hover:bg-indigo-700">Save Changes</button>
-            </div>
-        `;
-        modal.classList.remove('hidden');
-
-        document.getElementById('close-modal-btn').addEventListener('click', () => modal.classList.add('hidden'));
-
-        tutorForm.addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const newName = document.getElementById('tutor-name').value;
-            const newEmail = document.getElementById('tutor-email').value;
-            const newPhone = document.getElementById('tutor-phone').value;
-
-            try {
-                await updateDoc(doc(db, "tutors", tutorId), {
-                    name: newName,
-                    email: newEmail,
-                    phone: newPhone
-                });
-                modal.classList.add('hidden');
-                alert("Tutor details updated successfully!");
-            } catch (error) {
-                console.error("Error updating tutor: ", error);
-                alert("An error occurred. Please try again.");
-            }
-        });
-    };
-    
-    // Handle Delete Tutor
-    const handleDeleteTutor = (e) => {
-        const tutorId = e.currentTarget.dataset.id;
-        const tutor = allDataCache.tutors.find(t => t.id === tutorId);
-        
-        const modal = document.getElementById('modal-container');
-        const modalTitle = document.getElementById('modal-title');
-        const tutorForm = document.getElementById('tutor-form');
-        
-        modalTitle.textContent = "Confirm Deletion";
-        tutorForm.innerHTML = `
-            <p class="text-red-600 mb-4">Are you sure you want to delete ${tutor.name}? This will permanently remove them and their associated data. This action cannot be undone.</p>
-            <div class="flex justify-end space-x-4">
-                <button type="button" id="cancel-delete-btn" class="bg-gray-300 text-gray-800 px-6 py-2 rounded-md font-semibold hover:bg-gray-400">Cancel</button>
-                <button type="button" id="confirm-delete-btn" class="bg-red-600 text-white px-6 py-2 rounded-md font-semibold hover:bg-red-700">Delete</button>
-            </div>
-        `;
-        modal.classList.remove('hidden');
-        
-        document.getElementById('cancel-delete-btn').addEventListener('click', () => modal.classList.add('hidden'));
-
-        document.getElementById('confirm-delete-btn').addEventListener('click', async () => {
-            try {
-                await deleteDoc(doc(db, "tutors", tutorId));
-                modal.classList.add('hidden');
-                alert("Tutor deleted successfully!");
-            } catch (error) {
-                console.error("Error deleting tutor: ", error);
-                alert("An error occurred. Please try again.");
-            }
-        });
-    };
-
-    // Initial data fetch
-    fetchData();
-
-    // Listen to real-time changes on tutor and student collections
-    onSnapshot(collection(db, "tutors"), fetchData);
-    onSnapshot(collection(db, "students"), fetchData);
-}
-
-// ### UPDATED ### With full student form and CSV/Excel import
-async function renderSelectedTutorDetails(tutorId) {
-    const container = document.getElementById('selected-tutor-details');
-    if (!tutorId || !allDataCache.tutors) {
-        container.innerHTML = `<p class="text-gray-500">Please select a tutor to view details.</p>`;
-        return;
-    }
-    const tutor = allDataCache.tutors.find(t => t.id === tutorId);
-
-    // Fetch global settings to check for fee visibility
-    const settingsDoc = await getDocs(collection(db, "settings"));
-    const settingsData = settingsDoc.docs.find(d => d.id === "global_settings")?.data() || {};
-    const isStudentFeesEnabled = settingsData.isStudentFeesEnabled || false;
-
-    onSnapshot(query(collection(db, "students"), where("tutorEmail", "==", tutor.email)), (studentsSnapshot) => {
-        const studentsListHTML = studentsSnapshot.docs.map(doc => {
-            const student = doc.data();
-            const feeDisplay = isStudentFeesEnabled ? ` - Fee: ₦${student.studentFee}` : '';
-            return `<li class="flex justify-between items-center bg-gray-50 p-2 rounded-md">
-                        <span>${student.studentName} (Grade ${student.grade})${feeDisplay}</span>
-                        <button class="remove-student-btn text-red-500 hover:text-red-700" data-student-id="${doc.id}">Remove</button>
-                    </li>`;
-        }).join('');
-
-        const gradeOptions = Array.from({
-            length: 12
-        }, (_, i) => `<option value="${i + 1}">${i + 1}</option>`).join('');
-        const dayOptions = Array.from({
-            length: 7
-        }, (_, i) => `<option value="${i + 1}">${i + 1}</option>`).join('');
-
-        const feeInputHTML = isStudentFeesEnabled ? `
-            <input type="number" id="new-student-fee" class="w-full p-2 border rounded" placeholder="Student Fee (₦)">
-        ` : '';
-
-        container.innerHTML = `
-            <div class="p-4 border rounded-lg shadow-sm">
-                <div class="flex items-center justify-between mb-4">
-                    <h4 class="font-bold text-xl">${tutor.name} (${studentsSnapshot.size} students)</h4>
-                    <label class="flex items-center space-x-2">
-                        <span class="font-semibold">Management Staff:</span>
-                        <input type="checkbox" id="management-staff-toggle" class="h-5 w-5" ${tutor.isManagementStaff ? 'checked' : ''}>
-                    </label>
-                </div>
-
-                <div class="mb-4">
-                    <p><strong>Students:</strong></p>
-                    <ul class="space-y-2 mt-2">${studentsListHTML || '<p class="text-gray-500">No students assigned.</p>'}</ul>
-                </div>
-
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 border-t pt-4">
-                    <div class="add-student-form space-y-2">
-                        <h5 class="font-semibold text-gray-700">Add New Student Manually:</h5>
-                        <input type="text" id="new-parent-name" class="w-full p-2 border rounded" placeholder="Parent Name">
-                        <input type="text" id="new-student-name" class="w-full p-2 border rounded" placeholder="Student Name">
-                        <select id="new-student-grade" class="w-full p-2 border rounded"><option value="">Select Grade</option>${gradeOptions}</select>
-                        <input type="text" id="new-student-subject" class="w-full p-2 border rounded" placeholder="Subject(s) (e.g., Math, English)">
-                        <select id="new-student-days" class="w-full p-2 border rounded"><option value="">Select Days per Week</option>${dayOptions}</select>
-                        ${feeInputHTML}
-                        <button id="add-student-btn" class="bg-green-600 text-white w-full px-4 py-2 rounded hover:bg-green-700">Add Student</button>
-                    </div>
-
-                    <div class="import-students-form">
-                        <h5 class="font-semibold text-gray-700">Import Students from File:</h5>
-                        <p class="text-xs text-gray-500 mb-2">Upload a .csv or .xlsx file with columns: <strong>Student Name, Grade, Subjects, Days, Fee</strong></p>
-                        <input type="file" id="student-import-file" class="w-full text-sm border rounded p-1" accept=".csv, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/vnd.ms-excel">
-                        <button id="import-students-btn" class="bg-blue-600 text-white w-full px-4 py-2 rounded mt-2 hover:bg-blue-700">Import Students</button>
-                        <p id="import-status" class="text-sm mt-2"></p>
-                    </div>
-                </div>
-            </div>
-        `;
-
-        document.getElementById('management-staff-toggle').addEventListener('change', async (e) => {
-            await updateDoc(doc(db, "tutors", tutorId), {
-                isManagementStaff: e.target.checked
-            });
-        });
-
-        document.getElementById('add-student-btn').addEventListener('click', async () => {
-            const studentData = {
-                studentName: document.getElementById('new-student-name').value,
-                grade: document.getElementById('new-student-grade').value,
-                subjects: document.getElementById('new-student-subject').value.split(',').map(s => s.trim()),
-                days: document.getElementById('new-student-days').value,
-                studentFee: parseFloat(document.getElementById('new-student-fee')?.value || 0),
-                tutorEmail: tutor.email,
-                summerBreak: false
-            };
-            if (studentData.studentName && studentData.grade && (!isStudentFeesEnabled || !isNaN(studentData.studentFee))) {
-                await addDoc(collection(db, "students"), studentData);
+                alert("Monthly reports deleted.");
             } else {
-                alert('Please fill in all details correctly.');
+                e.target.checked = false;
             }
+        }
+    });
+
+    const tutorList = document.getElementById("tutor-list");
+    const searchBar = document.getElementById("search-bar");
+
+    onSnapshot(collection(db, "tutors"), (snapshot) => {
+        const tutors = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        renderTutorList(tutors);
+        searchBar.addEventListener("input", () => {
+            const query = searchBar.value.toLowerCase();
+            const filtered = tutors.filter(t =>
+                t.name.toLowerCase().includes(query) ||
+                t.email.toLowerCase().includes(query)
+            );
+            renderTutorList(filtered);
+        });
+    });
+
+    function renderTutorList(tutors) {
+        tutorList.innerHTML = tutors.map(tutor => `
+            <div class="border p-4 rounded-lg shadow-sm flex justify-between items-center">
+                <div>
+                    <p><strong>Name:</strong> ${tutor.name}</p>
+                    <p><strong>Email:</strong> ${tutor.email}</p>
+                </div>
+                <div class="space-x-2">
+                    <button class="edit-btn bg-blue-600 text-white px-3 py-1 rounded" data-id="${tutor.id}">Edit</button>
+                    <button class="delete-btn bg-red-600 text-white px-3 py-1 rounded" data-id="${tutor.id}">Delete</button>
+                </div>
+            </div>
+        `).join("");
+
+        document.querySelectorAll(".edit-btn").forEach(btn => {
+            btn.addEventListener("click", () => openEditModal(btn.dataset.id));
         });
 
-        document.getElementById('import-students-btn').addEventListener('click', handleStudentImport);
-
-        container.querySelectorAll('.remove-student-btn').forEach(btn => btn.addEventListener('click', async (e) => {
-            if (confirm('Are you sure?')) await deleteDoc(doc(db, "students", e.target.dataset.studentId));
-        }));
-    });
-}
-
-async function handleStudentImport() {
-    const fileInput = document.getElementById('student-import-file');
-    const statusEl = document.getElementById('import-status');
-    const tutor = allDataCache.tutors.find(t => t.id === activeTutorId);
-    if (!fileInput.files[0]) return statusEl.textContent = "Please select a file first.";
-    if (!tutor) return statusEl.textContent = "Error: No tutor selected.";
-
-    statusEl.textContent = "Reading file...";
-    const reader = new FileReader();
-    reader.onload = async (e) => {
-        try {
-            const data = new Uint8Array(e.target.result);
-            const workbook = XLSX.read(data, {
-                type: 'array'
+        document.querySelectorAll(".delete-btn").forEach(btn => {
+            btn.addEventListener("click", async () => {
+                if (confirm("Are you sure you want to delete this tutor?")) {
+                    await deleteDoc(doc(db, "tutors", btn.dataset.id));
+                    alert("Tutor deleted.");
+                }
             });
-            const sheetName = workbook.SheetNames[0];
-            const worksheet = workbook.Sheets[sheetName];
-            const json = XLSX.utils.sheet_to_json(worksheet);
+        });
+    }
 
-            if (json.length === 0) throw new Error("Sheet is empty or format is incorrect.");
+    async function openEditModal(tutorId) {
+        const docSnap = await getDoc(doc(db, "tutors", tutorId));
+        if (!docSnap.exists()) return alert("Tutor not found.");
+        const tutor = docSnap.data();
 
-            statusEl.textContent = `Importing ${json.length} students...`;
-            const batch = writeBatch(db);
-            json.forEach(row => {
-                const studentDocRef = doc(collection(db, "students"));
-                const studentData = {
-                    studentName: row['Student Name'],
-                    grade: row['Grade'],
-                    subjects: (row['Subjects'] || '').toString().split(',').map(s => s.trim()),
-                    days: row['Days'],
-                    studentFee: parseFloat(row['Fee']),
-                    tutorEmail: tutor.email,
-                    summerBreak: false
-                };
-                if (!studentData.studentName || isNaN(studentData.studentFee)) return; // Skip invalid rows
-                batch.set(studentDocRef, studentData);
-            });
-            await batch.commit();
-            statusEl.textContent = `✅ Successfully imported ${json.length} students for ${tutor.name}.`;
-            fileInput.value = ''; // Clear file input
-        } catch (error) {
-            statusEl.textContent = `❌ Error: ${error.message}`;
-            console.error(error);
-        }
-    };
-    reader.readAsArrayBuffer(fileInput.files[0]);
+        const modal = document.createElement("div");
+        modal.innerHTML = `
+            <div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                <div class="bg-white p-6 rounded-lg shadow-lg w-full max-w-md">
+                    <h3 class="text-xl font-bold mb-4">Edit Tutor</h3>
+                    <input type="text" id="edit-name" class="w-full p-2 border rounded mb-2" value="${tutor.name}">
+                    <input type="email" id="edit-email" class="w-full p-2 border rounded mb-2" value="${tutor.email}">
+                    <div class="flex justify-end space-x-2 mt-4">
+                        <button id="cancel-edit" class="px-4 py-2 bg-gray-300 rounded">Cancel</button>
+                        <button id="save-edit" class="px-4 py-2 bg-green-600 text-white rounded">Save</button>
+                    </div>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(modal);
+
+        document.getElementById("cancel-edit").onclick = () => modal.remove();
+        document.getElementById("save-edit").onclick = async () => {
+            const newName = document.getElementById("edit-name").value;
+            const newEmail = document.getElementById("edit-email").value;
+            await updateDoc(doc(db, "tutors", tutorId), { name: newName, email: newEmail });
+            modal.remove();
+            alert("Tutor updated.");
+        };
+    }
 }
-
 
 
 // ##################################################################
@@ -1701,6 +1357,7 @@ onAuthStateChanged(auth, async (user) => {
     }
     // ...
 });
+
 
 
 
