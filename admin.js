@@ -605,22 +605,23 @@ function filterStudentList(query) {
     }
 }
 
-// Function to toggle fees visibility
-function toggleStudentFees(show) {
-    document.querySelectorAll('.student-fees-header').forEach(el => el.style.display = show ? 'table-cell' : 'none');
-    document.querySelectorAll('.student-fees-cell').forEach(el => el.style.display = show ? 'table-cell' : 'none');
-}
-
 // Function to handle student edit
 async function handleEditStudent(studentId, studentData) {
     const newName = prompt("Edit Student Name:", studentData.studentName);
     const newFees = prompt("Edit Student Fees:", studentData.studentFee || '');
-    if (newName !== null && newFees !== null) {
+    const newGrade = prompt("Edit Student Grade:", studentData.grade || '');
+    const newSubjects = prompt("Edit Student Subject(s) (comma-separated):", studentData.subjects ? studentData.subjects.join(', ') : '');
+    const newDays = prompt("Edit Student Days per Week:", studentData.days || '');
+
+    if (newName !== null && newFees !== null && newGrade !== null && newSubjects !== null && newDays !== null) {
         try {
             const studentRef = doc(db, "students", studentId);
             await updateDoc(studentRef, {
                 studentName: newName,
-                studentFee: parseFloat(newFees)
+                studentFee: parseFloat(newFees),
+                grade: newGrade,
+                subjects: newSubjects.split(',').map(s => s.trim()),
+                days: newDays,
             });
             alert("Student details updated successfully!");
         } catch (error) {
@@ -1565,6 +1566,7 @@ onAuthStateChanged(auth, async (user) => {
     }
     // ...
 });
+
 
 
 
