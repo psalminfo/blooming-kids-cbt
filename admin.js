@@ -542,16 +542,20 @@ async function setupContentManager() {
 // ##################################################################
 let allTutorStudents = []; // Global variable to hold students for the currently selected tutor
 let allTutorsData = {}; // Global variable to cache tutor data
+// activeTutorId is already declared globally at the top of the file
 
 // Helper function to render the list of students
 function renderStudentList(container, students, showFees) {
+    const studentsListContainer = container.querySelector('#students-list-container');
+    if (!studentsListContainer) return;
+
     const tableHtml = `
     <div class="overflow-x-auto">
         <table class="min-w-full divide-y divide-gray-200">
             <thead class="bg-gray-50">
                 <tr>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Email</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Parent Email</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider student-fees-header" style="display:${showFees ? 'table-cell' : 'none'};">Fees (₦)</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
                 </tr>
@@ -561,10 +565,10 @@ function renderStudentList(container, students, showFees) {
                     <tr data-student-id="${student.id}" class="hover:bg-gray-100">
                         <td class="px-6 py-4 whitespace-nowrap">${capitalize(student.studentName)}</td>
                         <td class="px-6 py-4 whitespace-nowrap">${student.parentEmail || 'N/A'}</td>
-                        <td class="px-6 py-4 whitespace-nowrap student-fees-cell" style="display:${showFees ? 'table-cell' : 'none'};">${student.fees || 'N/A'}</td>
+                        <td class="px-6 py-4 whitespace-nowrap student-fees-cell" style="display:${showFees ? 'table-cell' : 'none'};">${student.studentFee || 'N/A'}</td>
                         <td class="px-6 py-4 whitespace-nowrap">
-                            <button class="edit-btn bg-blue-500 text-white px-3 py-1 rounded text-sm hover:bg-blue-600 mr-2" data-id="${student.id}" data-student-name="${student.studentName}">Edit</button>
-                            <button class="delete-btn bg-red-500 text-white px-3 py-1 rounded text-sm hover:bg-red-600" data-id="${student.id}" data-student-name="${student.studentName}">Delete</button>
+                            <button class="edit-student-btn bg-blue-500 text-white px-3 py-1 rounded text-sm hover:bg-blue-600 mr-2" data-student-id="${student.id}" data-student-name="${student.studentName}">Edit</button>
+                            <button class="remove-student-btn bg-red-500 text-white px-3 py-1 rounded text-sm hover:bg-red-600" data-student-id="${student.id}" data-student-name="${student.studentName}">Delete</button>
                         </td>
                     </tr>
                 `).join('')}
@@ -573,10 +577,19 @@ function renderStudentList(container, students, showFees) {
     </div>
     `;
 
-    const studentsListContainer = container.querySelector('#students-list-container');
-    if (studentsListContainer) {
-        studentsListContainer.innerHTML = students.length > 0 ? tableHtml : '<p class="text-center text-gray-500">No students found for this tutor.</p>';
-    }
+    studentsListContainer.innerHTML = students.length > 0 ? tableHtml : '<p class="text-center text-gray-500">No students found for this tutor.</p>';
+
+    // Re-attach event listeners after rendering
+    container.querySelectorAll('.edit-student-btn').forEach(btn => btn.addEventListener('click', (e) => {
+        const studentId = e.target.dataset.studentId;
+        const studentData = allTutorStudents.find(s => s.id === studentId);
+        if (studentData) handleEditStudent(studentId, studentData);
+    }));
+    container.querySelectorAll('.remove-student-btn').forEach(btn => btn.addEventListener('click', (e) => {
+        const studentId = e.target.dataset.studentId;
+        const studentName = e.target.dataset.studentName;
+        handleDeleteStudent(studentId, studentName);
+    }));
 }
 
 // Function to filter students based on search input
@@ -585,10 +598,10 @@ function filterStudentList(query) {
         student.studentName.toLowerCase().includes(query.toLowerCase()) ||
         (student.parentEmail && student.parentEmail.toLowerCase().includes(query.toLowerCase()))
     );
-    const studentsListContainer = document.getElementById('students-list-container');
-    const showFees = document.getElementById('show-fees-toggle').checked;
+    const studentsListContainer = document.getElementById('selected-tutor-details');
+    const showFees = document.getElementById('show-fees-toggle')?.checked;
     if (studentsListContainer) {
-        renderStudentList(document, filteredStudents, showFees);
+        renderStudentList(studentsListContainer, filteredStudents, showFees);
     }
 }
 
@@ -601,16 +614,15 @@ function toggleStudentFees(show) {
 // Function to handle student edit
 async function handleEditStudent(studentId, studentData) {
     const newName = prompt("Edit Student Name:", studentData.studentName);
-    const newFees = prompt("Edit Student Fees:", studentData.fees || '');
+    const newFees = prompt("Edit Student Fees:", studentData.studentFee || '');
     if (newName !== null && newFees !== null) {
         try {
             const studentRef = doc(db, "students", studentId);
             await updateDoc(studentRef, {
                 studentName: newName,
-                fees: newFees
+                studentFee: parseFloat(newFees)
             });
             alert("Student details updated successfully!");
-            renderSelectedTutorDetails(activeTutorId);
         } catch (error) {
             console.error("Error updating student:", error);
             alert("Failed to update student. See console for details.");
@@ -624,7 +636,6 @@ async function handleDeleteStudent(studentId, studentName) {
         try {
             await deleteDoc(doc(db, "students", studentId));
             alert("Student deleted successfully!");
-            renderSelectedTutorDetails(activeTutorId);
         } catch (error) {
             console.error("Error deleting student:", error);
             alert("Failed to delete student. See console for details.");
@@ -721,7 +732,7 @@ async function setupTutorManagementListeners() {
     });
 }
 
-// ### UPDATED ### With full student form, CSV/Excel import, new search bar, and edit/delete/fee toggle
+// ### UPDATED ###
 async function renderSelectedTutorDetails(tutorId) {
     const container = document.getElementById('selected-tutor-details');
     if (!tutorId || !window.allTutorsData) {
@@ -736,6 +747,7 @@ async function renderSelectedTutorDetails(tutorId) {
             id: doc.id,
             ...doc.data()
         }));
+        allTutorStudents = studentsData;
 
         container.innerHTML = `
             <div class="p-4 border rounded-lg shadow-sm">
@@ -758,13 +770,14 @@ async function renderSelectedTutorDetails(tutorId) {
                              <input type="text" id="student-search-bar" class="p-1 border rounded text-sm" placeholder="Search students...">
                         </div>
                     </div>
-                    <ul id="students-list" class="space-y-2 mt-2"></ul>
+                    <div id="students-list-container"></div>
                 </div>
 
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-6 border-t pt-4">
                     <div class="add-student-form space-y-2">
                         <h5 class="font-semibold text-gray-700">Add New Student Manually:</h5>
                         <input type="text" id="new-parent-name" class="w-full p-2 border rounded" placeholder="Parent Name">
+                        <input type="text" id="new-parent-email" class="w-full p-2 border rounded" placeholder="Parent Email">
                         <input type="text" id="new-student-name" class="w-full p-2 border rounded" placeholder="Student Name">
                         <select id="new-student-grade" class="w-full p-2 border rounded"><option value="">Select Grade</option>${Array.from({ length: 12 }, (_, i) => `<option value="${i + 1}">${i + 1}</option>`).join('')}</select>
                         <input type="text" id="new-student-subject" class="w-full p-2 border rounded" placeholder="Subject(s) (e.g., Math, English)">
@@ -784,57 +797,41 @@ async function renderSelectedTutorDetails(tutorId) {
             </div>
         `;
 
-        function renderStudentsList(students) {
-            const listContainer = document.getElementById('students-list');
-            const studentsListHTML = students.map(student => {
-                const feeDisplay = showFees ? ` - Fee: ₦${student.studentFee}` : '';
-                return `
-                    <li class="flex justify-between items-center bg-gray-50 p-2 rounded-md">
-                        <span>${student.studentName} (Grade ${student.grade})${feeDisplay}</span>
-                        <div class="flex space-x-2">
-                            <button class="edit-student-btn text-blue-500 hover:text-blue-700" data-student-id="${student.id}">Edit</button>
-                            <button class="remove-student-btn text-red-500 hover:text-red-700" data-student-id="${student.id}">Delete</button>
-                        </div>
-                    </li>`;
-            }).join('');
-            listContainer.innerHTML = studentsListHTML || '<p class="text-gray-500">No students assigned.</p>';
-            container.querySelectorAll('.edit-student-btn').forEach(btn => btn.addEventListener('click', (e) => handleEditStudent(e.target.dataset.studentId, studentsData.find(s => s.id === e.target.dataset.studentId))));
-            container.querySelectorAll('.remove-student-btn').forEach(btn => btn.addEventListener('click', async (e) => {
-                if (confirm('Are you sure you want to delete this student? This action cannot be undone.')) {
-                    await deleteDoc(doc(db, "students", e.target.dataset.studentId));
-                }
-            }));
-        }
+        // Initial render of the students list
+        renderStudentList(container, studentsData, showFees);
 
-        renderStudentsList(studentsData);
+        // Add event listeners for new search and fee toggle
         document.getElementById('show-fees-toggle').addEventListener('change', (e) => {
             showFees = e.target.checked;
             localStorage.setItem('showStudentFees', showFees);
-            renderStudentsList(studentsData);
+            renderStudentList(container, allTutorStudents, showFees);
         });
+
         document.getElementById('student-search-bar').addEventListener('input', (e) => {
-            const searchTerm = e.target.value.toLowerCase();
-            const filteredStudents = studentsData.filter(student =>
-                student.studentName.toLowerCase().includes(searchTerm)
-            );
-            renderStudentsList(filteredStudents);
+            filterStudentList(e.target.value);
         });
+
+        // Existing event listeners from the original code
         document.getElementById('management-staff-toggle').addEventListener('change', async (e) => {
             await updateDoc(doc(db, "tutors", tutorId), {
                 isManagementStaff: e.target.checked
             });
         });
+
         document.getElementById('add-student-btn').addEventListener('click', async () => {
             const studentName = document.getElementById('new-student-name').value;
+            const parentName = document.getElementById('new-parent-name').value;
+            const parentEmail = document.getElementById('new-parent-email').value;
             const grade = document.getElementById('new-student-grade').value;
             const subjects = document.getElementById('new-student-subject').value.split(',').map(s => s.trim());
             const days = document.getElementById('new-student-days').value;
             const studentFee = parseFloat(document.getElementById('new-student-fee').value);
-            const parentName = document.getElementById('new-parent-name').value;
-            if (studentName && grade && !isNaN(studentFee) && parentName) {
+
+            if (studentName && grade && !isNaN(studentFee) && parentName && parentEmail) {
                 const newStudentData = {
                     studentName: studentName,
                     parentName: parentName,
+                    parentEmail: parentEmail,
                     grade: grade,
                     subjects: subjects,
                     days: days,
@@ -849,7 +846,9 @@ async function renderSelectedTutorDetails(tutorId) {
                 alert('Please fill in all details correctly.');
             }
         });
+
         document.getElementById('import-students-btn').addEventListener('click', handleStudentImport);
+
     });
 }
 
@@ -1566,6 +1565,7 @@ onAuthStateChanged(auth, async (user) => {
     }
     // ...
 });
+
 
 
 
