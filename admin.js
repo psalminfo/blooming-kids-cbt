@@ -537,36 +537,6 @@ async function setupContentManager() {
 }
 
 
-import { auth, db } from './firebaseConfig.js';
-import { collection, getDocs, doc, updateDoc, getDoc, where, query, addDoc, writeBatch, deleteDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
-import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-auth.js";
-
-// --- Global state for settings and data ---
-let isSubmissionEnabled = false;
-let isTutorAddEnabled = false;
-let isSummerBreakEnabled = false;
-let isStudentFeeEnabled = false;
-let activeTutorId = null;
-let allTutorsData = {};
-let allStudentsData = {};
-
-function capitalize(s) {
-    if (typeof s !== 'string' || s.length === 0) return '';
-    return s.charAt(0).toUpperCase() + s.slice(1);
-}
-
-// Listen for changes to the admin settings in real-time
-const settingsDocRef = doc(db, "settings", "global_settings");
-onSnapshot(settingsDocRef, (docSnap) => {
-    if (docSnap.exists()) {
-        const data = docSnap.data();
-        isSubmissionEnabled = data.isReportEnabled;
-        isTutorAddEnabled = data.isTutorAddEnabled;
-        isSummerBreakEnabled = data.isSummerBreakEnabled;
-        isStudentFeeEnabled = data.isStudentFeeEnabled;
-    }
-});
-
 // ##################################################################
 // # SECTION 3: TUTOR MANAGEMENT (Upgraded)
 // ##################################################################
@@ -1475,10 +1445,6 @@ onAuthStateChanged(auth, async (user) => {
     }
     // ...
 });
-
-
-
-
 
 
 
