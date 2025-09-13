@@ -545,10 +545,11 @@ async function renderTutorManagementPanel(container) {
     container.innerHTML = `
         <div class="bg-white p-6 rounded-lg shadow-md mb-6">
             <h2 class="text-2xl font-bold text-green-700 mb-4">Global Settings</h2>
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
                 <label class="flex items-center"><span class="text-gray-700 font-semibold mr-4">Report Submission:</span><label class="relative inline-flex items-center cursor-pointer"><input type="checkbox" id="report-toggle" class="sr-only peer"><div class="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div><span id="report-status-label" class="ml-3 text-sm font-medium"></span></label></label>
                 <label class="flex items-center"><span class="text-gray-700 font-semibold mr-4">Tutors Can Add Students:</span><label class="relative inline-flex items-center cursor-pointer"><input type="checkbox" id="tutor-add-toggle" class="sr-only peer"><div class="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div><span id="tutor-add-status-label" class="ml-3 text-sm font-medium"></span></label></label>
                 <label class="flex items-center"><span class="text-gray-700 font-semibold mr-4">Enable Summer Break:</span><label class="relative inline-flex items-center cursor-pointer"><input type="checkbox" id="summer-break-toggle" class="sr-only peer"><div class="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div><span id="summer-break-status-label" class="ml-3 text-sm font-medium"></span></label></label>
+                <label class="flex items-center"><span class="text-gray-700 font-semibold mr-4">Show Student Fees:</span><label class="relative inline-flex items-center cursor-pointer"><input type="checkbox" id="show-fees-toggle" class="sr-only peer"><div class="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div><span id="show-fees-status-label" class="ml-3 text-sm font-medium"></span></label></label>
             </div>
         </div>
 
@@ -588,15 +589,27 @@ async function setupTutorManagementListeners() {
         }
     });
 
-    document.getElementById('report-toggle').addEventListener('change', e => updateDoc(settingsDocRef, {
-        isReportEnabled: e.target.checked
-    }));
-    document.getElementById('tutor-add-toggle').addEventListener('change', e => updateDoc(settingsDocRef, {
-        isTutorAddEnabled: e.target.checked
-    }));
-    document.getElementById('summer-break-toggle').addEventListener('change', e => updateDoc(settingsDocRef, {
-        isSummerBreakEnabled: e.target.checked
-    }));
+    // ### NEW ### Listener for Fee Visibility Toggle
+    const showFeesToggle = document.getElementById('show-fees-toggle');
+    const showFeesLabel = document.getElementById('show-fees-status-label');
+    if (showFeesToggle && showFeesLabel) {
+        const initialShowFees = localStorage.getItem('showStudentFees') === 'true';
+        showFeesToggle.checked = initialShowFees;
+        showFeesLabel.textContent = initialShowFees ? 'Visible' : 'Hidden';
+
+        showFeesToggle.addEventListener('change', (e) => {
+            const isVisible = e.target.checked;
+            localStorage.setItem('showStudentFees', isVisible);
+            showFeesLabel.textContent = isVisible ? 'Visible' : 'Hidden';
+            if (activeTutorId) {
+                renderSelectedTutorDetails(activeTutorId); // Re-render to apply change
+            }
+        });
+    }
+
+    document.getElementById('report-toggle').addEventListener('change', e => updateDoc(settingsDocRef, { isReportEnabled: e.target.checked }));
+    document.getElementById('tutor-add-toggle').addEventListener('change', e => updateDoc(settingsDocRef, { isTutorAddEnabled: e.target.checked }));
+    document.getElementById('summer-break-toggle').addEventListener('change', e => updateDoc(settingsDocRef, { isSummerBreakEnabled: e.target.checked }));
 
     const tutorSelect = document.getElementById('tutor-select');
     tutorSelect.addEventListener('change', e => {
@@ -619,10 +632,7 @@ async function setupTutorManagementListeners() {
         let currentSelection = tutorSelect.value;
         tutorSelect.innerHTML = `<option value="">-- Select a Tutor --</option>`;
         snapshot.forEach(doc => {
-            tutorsData[doc.id] = {
-                id: doc.id,
-                ...doc.data()
-            };
+            tutorsData[doc.id] = { id: doc.id, ...doc.data() };
             const option = document.createElement('option');
             option.value = doc.id;
             option.textContent = doc.data().name;
@@ -635,7 +645,35 @@ async function setupTutorManagementListeners() {
     });
 }
 
-// ### UPDATED ### With full student form and CSV/Excel import
+// ### NEW ### Helper function to reset the student form
+function resetStudentForm() {
+    const form = document.querySelector('.add-student-form');
+    if (!form) return;
+
+    // Clear form fields
+    form.querySelector('#new-parent-name').value = '';
+    form.querySelector('#new-student-name').value = '';
+    form.querySelector('#new-student-grade').value = '';
+    form.querySelector('#new-student-subject').value = '';
+    form.querySelector('#new-student-days').value = '';
+    form.querySelector('#new-student-fee').value = '';
+
+    // Reset button
+    const actionButton = form.querySelector('#add-student-btn');
+    if (actionButton) {
+        actionButton.textContent = 'Add Student';
+        delete actionButton.dataset.editingId;
+    }
+
+    // Remove cancel button
+    const cancelButton = form.querySelector('#cancel-edit-btn');
+    if (cancelButton) {
+        cancelButton.remove();
+    }
+}
+
+
+// ### FULLY REPLACED ### With search, edit/delete buttons, and fee visibility
 async function renderSelectedTutorDetails(tutorId) {
     const container = document.getElementById('selected-tutor-details');
     if (!tutorId || !window.allTutorsData) {
@@ -643,42 +681,50 @@ async function renderSelectedTutorDetails(tutorId) {
         return;
     }
     const tutor = window.allTutorsData[tutorId];
+    const showFees = localStorage.getItem('showStudentFees') === 'true';
 
     onSnapshot(query(collection(db, "students"), where("tutorEmail", "==", tutor.email)), (studentsSnapshot) => {
         const studentsListHTML = studentsSnapshot.docs.map(doc => {
             const student = doc.data();
-            return `<li class="flex justify-between items-center bg-gray-50 p-2 rounded-md">
-                        <span>${student.studentName} (Grade ${student.grade}) - Fee: ₦${student.studentFee}</span>
-                        <button class="remove-student-btn text-red-500 hover:text-red-700" data-student-id="${doc.id}">Remove</button>
+            const studentId = doc.id;
+            const feeDisplay = showFees ? ` - Fee: ₦${student.studentFee}` : '';
+            return `<li class="flex justify-between items-center bg-gray-50 p-2 rounded-md" data-student-name="${student.studentName.toLowerCase()}">
+                        <span>${student.studentName} (Grade ${student.grade})${feeDisplay}</span>
+                        <div class="flex items-center space-x-2">
+                            <button class="edit-student-btn text-blue-500 hover:text-blue-700 font-semibold" 
+                                data-student-id="${studentId}"
+                                data-parent-name="${student.parentName || ''}"
+                                data-student-name="${student.studentName}"
+                                data-grade="${student.grade}"
+                                data-subjects="${(student.subjects || []).join(', ')}"
+                                data-days="${student.days}"
+                                data-fee="${student.studentFee}"
+                            >Edit</button>
+                            <button class="delete-student-btn text-red-500 hover:text-red-700 font-semibold" data-student-id="${studentId}">Delete</button>
+                        </div>
                     </li>`;
         }).join('');
 
-        const gradeOptions = Array.from({
-            length: 12
-        }, (_, i) => `<option value="${i + 1}">${i + 1}</option>`).join('');
-        const dayOptions = Array.from({
-            length: 7
-        }, (_, i) => `<option value="${i + 1}">${i + 1}</option>`).join('');
+        const gradeOptions = Array.from({ length: 12 }, (_, i) => `<option value="${i + 1}">${i + 1}</option>`).join('');
+        const dayOptions = Array.from({ length: 7 }, (_, i) => `<option value="${i + 1}">${i + 1}</option>`).join('');
 
         container.innerHTML = `
             <div class="p-4 border rounded-lg shadow-sm">
                 <div class="flex items-center justify-between mb-4">
                     <h4 class="font-bold text-xl">${tutor.name} (${studentsSnapshot.size} students)</h4>
-                    <label class="flex items-center space-x-2">
-                        <span class="font-semibold">Management Staff:</span>
-                        <input type="checkbox" id="management-staff-toggle" class="h-5 w-5" ${tutor.isManagementStaff ? 'checked' : ''}>
-                    </label>
+                    <label class="flex items-center space-x-2"><span class="font-semibold">Management Staff:</span><input type="checkbox" id="management-staff-toggle" class="h-5 w-5" ${tutor.isManagementStaff ? 'checked' : ''}></label>
                 </div>
 
                 <div class="mb-4">
                     <p><strong>Students:</strong></p>
-                    <ul class="space-y-2 mt-2">${studentsListHTML || '<p class="text-gray-500">No students assigned.</p>'}</ul>
+                    <input type="search" id="student-search-bar" placeholder="Filter by student name..." class="w-full p-2 border rounded mt-2 mb-2">
+                    <ul id="students-list-ul" class="space-y-2 mt-2">${studentsListHTML || '<p class="text-gray-500">No students assigned.</p>'}</ul>
                 </div>
 
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-6 border-t pt-4">
                     <div class="add-student-form space-y-2">
-                        <h5 class="font-semibold text-gray-700">Add New Student Manually:</h5>
-                        <input type="text" id="new-student-name" class="w-full p-2 border rounded" placeholder="Parent Name">
+                        <h5 class="font-semibold text-gray-700">Add/Edit Student Details:</h5>
+                        <input type="text" id="new-parent-name" class="w-full p-2 border rounded" placeholder="Parent Name">
                         <input type="text" id="new-student-name" class="w-full p-2 border rounded" placeholder="Student Name">
                         <select id="new-student-grade" class="w-full p-2 border rounded"><option value="">Select Grade</option>${gradeOptions}</select>
                         <input type="text" id="new-student-subject" class="w-full p-2 border rounded" placeholder="Subject(s) (e.g., Math, English)">
@@ -686,10 +732,9 @@ async function renderSelectedTutorDetails(tutorId) {
                         <input type="number" id="new-student-fee" class="w-full p-2 border rounded" placeholder="Student Fee (₦)">
                         <button id="add-student-btn" class="bg-green-600 text-white w-full px-4 py-2 rounded hover:bg-green-700">Add Student</button>
                     </div>
-
                     <div class="import-students-form">
                          <h5 class="font-semibold text-gray-700">Import Students from File:</h5>
-                         <p class="text-xs text-gray-500 mb-2">Upload a .csv or .xlsx file with columns: <strong>Student Name, Grade, Subjects, Days, Fee</strong></p>
+                         <p class="text-xs text-gray-500 mb-2">Upload a .csv or .xlsx file with columns: <strong>Parent Name, Student Name, Grade, Subjects, Days, Fee</strong></p>
                          <input type="file" id="student-import-file" class="w-full text-sm border rounded p-1" accept=".csv, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/vnd.ms-excel">
                          <button id="import-students-btn" class="bg-blue-600 text-white w-full px-4 py-2 rounded mt-2 hover:bg-blue-700">Import Students</button>
                          <p id="import-status" class="text-sm mt-2"></p>
@@ -698,24 +743,41 @@ async function renderSelectedTutorDetails(tutorId) {
             </div>
         `;
 
+        // --- ATTACH EVENT LISTENERS ---
+
         document.getElementById('management-staff-toggle').addEventListener('change', async (e) => {
-            await updateDoc(doc(db, "tutors", tutorId), {
-                isManagementStaff: e.target.checked
+            await updateDoc(doc(db, "tutors", tutorId), { isManagementStaff: e.target.checked });
+        });
+
+        // Search listener
+        document.getElementById('student-search-bar').addEventListener('input', (e) => {
+            const searchTerm = e.target.value.toLowerCase();
+            document.querySelectorAll('#students-list-ul li').forEach(li => {
+                li.style.display = (li.dataset.studentName || '').includes(searchTerm) ? 'flex' : 'none';
             });
         });
 
-        document.getElementById('add-student-btn').addEventListener('click', async () => {
+        // Add/Update button listener
+        document.getElementById('add-student-btn').addEventListener('click', async (e) => {
+            const btn = e.currentTarget;
+            const editingId = btn.dataset.editingId;
             const studentData = {
+                parentName: document.getElementById('new-parent-name').value,
                 studentName: document.getElementById('new-student-name').value,
                 grade: document.getElementById('new-student-grade').value,
                 subjects: document.getElementById('new-student-subject').value.split(',').map(s => s.trim()),
                 days: document.getElementById('new-student-days').value,
                 studentFee: parseFloat(document.getElementById('new-student-fee').value),
                 tutorEmail: tutor.email,
-                summerBreak: false
             };
             if (studentData.studentName && studentData.grade && !isNaN(studentData.studentFee)) {
-                await addDoc(collection(db, "students"), studentData);
+                if (editingId) {
+                    await updateDoc(doc(db, "students", editingId), studentData);
+                } else {
+                    studentData.summerBreak = false;
+                    await addDoc(collection(db, "students"), studentData);
+                }
+                resetStudentForm();
             } else {
                 alert('Please fill in all details correctly.');
             }
@@ -723,8 +785,37 @@ async function renderSelectedTutorDetails(tutorId) {
 
         document.getElementById('import-students-btn').addEventListener('click', handleStudentImport);
 
-        container.querySelectorAll('.remove-student-btn').forEach(btn => btn.addEventListener('click', async (e) => {
-            if (confirm('Are you sure?')) await deleteDoc(doc(db, "students", e.target.dataset.studentId));
+        // Edit button listeners
+        container.querySelectorAll('.edit-student-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const data = e.currentTarget.dataset;
+                document.getElementById('new-parent-name').value = data.parentName;
+                document.getElementById('new-student-name').value = data.studentName;
+                document.getElementById('new-student-grade').value = data.grade;
+                document.getElementById('new-student-subject').value = data.subjects;
+                document.getElementById('new-student-days').value = data.days;
+                document.getElementById('new-student-fee').value = data.fee;
+
+                const actionButton = document.getElementById('add-student-btn');
+                actionButton.textContent = 'Update Student';
+                actionButton.dataset.editingId = data.studentId;
+
+                if (!document.getElementById('cancel-edit-btn')) {
+                    const cancelButton = document.createElement('button');
+                    cancelButton.id = 'cancel-edit-btn';
+                    cancelButton.textContent = 'Cancel Edit';
+                    cancelButton.className = 'bg-gray-500 text-white w-full px-4 py-2 rounded hover:bg-gray-600 mt-2';
+                    actionButton.insertAdjacentElement('afterend', cancelButton);
+                    cancelButton.addEventListener('click', resetStudentForm);
+                }
+            });
+        });
+
+        // Delete button listeners
+        container.querySelectorAll('.delete-student-btn').forEach(btn => btn.addEventListener('click', async (e) => {
+            if (confirm('Are you sure you want to delete this student?')) {
+                await deleteDoc(doc(db, "students", e.target.dataset.studentId));
+            }
         }));
     });
 }
@@ -741,9 +832,7 @@ async function handleStudentImport() {
     reader.onload = async (e) => {
         try {
             const data = new Uint8Array(e.target.result);
-            const workbook = XLSX.read(data, {
-                type: 'array'
-            });
+            const workbook = XLSX.read(data, { type: 'array' });
             const sheetName = workbook.SheetNames[0];
             const worksheet = workbook.Sheets[sheetName];
             const json = XLSX.utils.sheet_to_json(worksheet);
@@ -755,6 +844,7 @@ async function handleStudentImport() {
             json.forEach(row => {
                 const studentDocRef = doc(collection(db, "students"));
                 const studentData = {
+                    parentName: row['Parent Name'] || '', // Added Parent Name field
                     studentName: row['Student Name'],
                     grade: row['Grade'],
                     subjects: (row['Subjects'] || '').toString().split(',').map(s => s.trim()),
@@ -1445,6 +1535,7 @@ onAuthStateChanged(auth, async (user) => {
     }
     // ...
 });
+
 
 
 
