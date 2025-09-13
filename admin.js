@@ -542,7 +542,6 @@ async function setupContentManager() {
 // ##################################################################
 let allTutorStudents = []; // Global variable to hold students for the currently selected tutor
 let allTutorsData = {}; // Global variable to cache tutor data
-let activeTutorId = null; // Ensure this is also declared globally for this section
 
 // Helper function to render the list of students
 function renderStudentList(container, students, showFees) {
@@ -730,8 +729,6 @@ async function renderSelectedTutorDetails(tutorId) {
         return;
     }
     const tutor = window.allTutorsData[tutorId];
-
-    // Listen for changes to the show fee toggle and store it in local storage
     let showFees = localStorage.getItem('showStudentFees') === 'true';
 
     onSnapshot(query(collection(db, "students"), where("tutorEmail", "==", tutor.email)), (studentsSnapshot) => {
@@ -740,7 +737,6 @@ async function renderSelectedTutorDetails(tutorId) {
             ...doc.data()
         }));
 
-        // The main container HTML structure
         container.innerHTML = `
             <div class="p-4 border rounded-lg shadow-sm">
                 <div class="flex items-center justify-between mb-4">
@@ -788,7 +784,6 @@ async function renderSelectedTutorDetails(tutorId) {
             </div>
         `;
 
-        // Function to render the student list based on current data and showFees state
         function renderStudentsList(students) {
             const listContainer = document.getElementById('students-list');
             const studentsListHTML = students.map(student => {
@@ -811,7 +806,6 @@ async function renderSelectedTutorDetails(tutorId) {
             }));
         }
 
-        // Initial render of the students list
         renderStudentsList(studentsData);
         document.getElementById('show-fees-toggle').addEventListener('change', (e) => {
             showFees = e.target.checked;
@@ -890,12 +884,12 @@ async function handleStudentImport() {
                     tutorEmail: tutor.email,
                     summerBreak: false
                 };
-                if (!studentData.studentName || isNaN(studentData.studentFee)) return; // Skip invalid rows
+                if (!studentData.studentName || isNaN(studentData.studentFee)) return;
                 batch.set(studentDocRef, studentData);
             });
             await batch.commit();
             statusEl.textContent = `✅ Successfully imported ${json.length} students for ${tutor.name}.`;
-            fileInput.value = ''; // Clear file input
+            fileInput.value = '';
         } catch (error) {
             statusEl.textContent = `❌ Error: ${error.message}`;
             console.error(error);
@@ -1572,6 +1566,7 @@ onAuthStateChanged(auth, async (user) => {
     }
     // ...
 });
+
 
 
 
