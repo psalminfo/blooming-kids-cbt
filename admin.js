@@ -568,10 +568,10 @@ onSnapshot(settingsDocRef, (docSnap) => {
 });
 
 // ##################################################################
-// # SECTION 3: TUTOR MANAGEMENT (Upgraded)
-// ##################################################################
+  // # SECTION 3: TUTOR MANAGEMENT (Upgraded)
+  // ##################################################################
 
-async function renderTutorManagementPanel(container) {
+  async function renderTutorManagementPanel(container) {
     container.innerHTML = `
         <div class="bg-white p-6 rounded-lg shadow-md mb-6">
             <h2 class="text-2xl font-bold text-green-700 mb-4">Global Settings</h2>
@@ -579,9 +579,13 @@ async function renderTutorManagementPanel(container) {
                 <label class="flex items-center"><span class="text-gray-700 font-semibold mr-4">Report Submission:</span><label class="relative inline-flex items-center cursor-pointer"><input type="checkbox" id="report-toggle" class="sr-only peer"><div class="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div><span id="report-status-label" class="ml-3 text-sm font-medium"></span></label></label>
                 <label class="flex items-center"><span class="text-gray-700 font-semibold mr-4">Tutors Can Add Students:</span><label class="relative inline-flex items-center cursor-pointer"><input type="checkbox" id="tutor-add-toggle" class="sr-only peer"><div class="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div><span id="tutor-add-status-label" class="ml-3 text-sm font-medium"></span></label></label>
                 <label class="flex items-center"><span class="text-gray-700 font-semibold mr-4">Enable Summer Break:</span><label class="relative inline-flex items-center cursor-pointer"><input type="checkbox" id="summer-break-toggle" class="sr-only peer"><div class="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div><span id="summer-break-status-label" class="ml-3 text-sm font-medium"></span></label></label>
-                <label class="flex items-center"><span class="text-gray-700 font-semibold mr-4">Tutors See Student Fee:</span><label class="relative inline-flex items-center cursor-pointer"><input type="checkbox" id="student-fee-toggle" class="sr-only peer"><div class="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div><span id="student-fee-status-label" class="ml-3 text-sm font-medium"></span></label></label>
+                <label class="flex items-center"><span class="text-gray-700 font-semibold mr-4">Show Student Fees:</span><label class="relative inline-flex items-center cursor-pointer"><input type="checkbox" id="show-fees-toggle" class="sr-only peer"><div class="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div><span id="show-fees-status-label" class="ml-3 text-sm font-medium"></span></label></label>
             </div>
-            <button id="delete-reports-btn" class="bg-red-600 text-white w-full px-4 py-2 rounded hover:bg-red-700 mt-4">Delete All Monthly Reports</button>
+            <hr class="my-4">
+            <div class="flex flex-col items-start space-y-2">
+                <h4 class="font-semibold text-gray-700">Monthly Report Actions:</h4>
+                <button id="delete-monthly-reports-btn" class="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600">Delete All This Month's Reports</button>
+            </div>
         </div>
 
         <div class="bg-white p-6 rounded-lg shadow-md">
@@ -593,143 +597,177 @@ async function renderTutorManagementPanel(container) {
                 </div>
             </div>
             <div class="mb-4">
-                <label for="tutor-search-input" class="block font-semibold">Search Tutors/Students:</label>
-                <input type="text" id="tutor-search-input" class="w-full p-2 border rounded mt-1" placeholder="Search by tutor, student, or parent name">
-                <label for="tutor-select" class="block font-semibold mt-4">Select Tutor:</label>
+                <label for="tutor-search" class="block font-semibold">Search Tutors/Students/Parents:</label>
+                <input type="text" id="tutor-search" class="w-full p-2 border rounded mt-1" placeholder="Search by name...">
+            </div>
+            <div class="mb-4">
+                <label for="tutor-select" class="block font-semibold">Select Tutor:</label>
                 <select id="tutor-select" class="w-full p-2 border rounded mt-1"></select>
             </div>
             <div id="selected-tutor-details" class="mt-4"><p class="text-gray-500">Please select a tutor to view details.</p></div>
         </div>
     `;
     setupTutorManagementListeners();
-}
+  }
 
-async function setupTutorManagementListeners() {
+  async function setupTutorManagementListeners() {
     const settingsDocRef = doc(db, "settings", "global_settings");
-    const tutorSelect = document.getElementById('tutor-select');
-    const searchInput = document.getElementById('tutor-search-input');
 
     onSnapshot(settingsDocRef, (docSnap) => {
         if (docSnap.exists()) {
             const data = docSnap.data();
-            ['report', 'tutor-add', 'summer-break', 'student-fee'].forEach(type => {
+            // ADDED: 'show-fees' to the array
+            ['report', 'tutor-add', 'summer-break', 'show-fees'].forEach(type => {
                 const key = `is${capitalize(type.split('-')[0])}${capitalize(type.split('-')[1] || '')}Enabled`;
                 const toggle = document.getElementById(`${type}-toggle`);
                 const label = document.getElementById(`${type}-status-label`);
                 if (toggle && label) {
-                    toggle.checked = data[key];
-                    label.textContent = data[key] ? 'Enabled' : 'Disabled';
+                    // Adjusted key for the new toggle
+                    const dataKey = type === 'show-fees' ? 'isFeesEnabled' : key;
+                    toggle.checked = data[dataKey] || false;
+                    label.textContent = data[dataKey] ? 'Enabled' : 'Disabled';
                 }
             });
         }
     });
 
-    document.getElementById('report-toggle').addEventListener('change', e => updateDoc(settingsDocRef, { isReportEnabled: e.target.checked }));
-    document.getElementById('tutor-add-toggle').addEventListener('change', e => updateDoc(settingsDocRef, { isTutorAddEnabled: e.target.checked }));
-    document.getElementById('summer-break-toggle').addEventListener('change', e => updateDoc(settingsDocRef, { isSummerBreakEnabled: e.target.checked }));
-    document.getElementById('student-fee-toggle').addEventListener('change', e => updateDoc(settingsDocRef, { isStudentFeeEnabled: e.target.checked }));
+    document.getElementById('report-toggle').addEventListener('change', e => updateDoc(settingsDocRef, {
+        isReportEnabled: e.target.checked
+    }));
+    document.getElementById('tutor-add-toggle').addEventListener('change', e => updateDoc(settingsDocRef, {
+        isTutorAddEnabled: e.target.checked
+    }));
+    document.getElementById('summer-break-toggle').addEventListener('change', e => updateDoc(settingsDocRef, {
+        isSummerBreakEnabled: e.target.checked
+    }));
+    // ADDED: New event listener for the show-fees toggle
+    document.getElementById('show-fees-toggle').addEventListener('change', e => updateDoc(settingsDocRef, {
+        isFeesEnabled: e.target.checked
+    }));
+    // ADDED: New event listener for the delete reports button
+    document.getElementById('delete-monthly-reports-btn').addEventListener('click', async () => {
+        const confirmDelete = confirm("Are you sure you want to delete ALL monthly reports for this month? This action is permanent.");
+        if (!confirmDelete) return;
 
+        const finalConfirm = confirm("This is your final warning. All reports for this month will be permanently deleted. Click OK to proceed.");
+        if (!finalConfirm) return;
+        
+        const now = new Date();
+        const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+        const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
+
+        const q = query(collection(db, "reports"), where("submittedAt", ">=", startOfMonth), where("submittedAt", "<=", endOfMonth));
+        const querySnapshot = await getDocs(q);
+
+        if (querySnapshot.empty) {
+            alert("No reports found to delete for this month.");
+            return;
+        }
+
+        const batch = writeBatch(db);
+        querySnapshot.forEach(doc => {
+            batch.delete(doc.ref);
+        });
+
+        try {
+            await batch.commit();
+            alert(`Successfully deleted ${querySnapshot.size} reports.`);
+        } catch (error) {
+            alert("An error occurred during deletion.");
+            console.error("Error deleting monthly reports:", error);
+        }
+    });
+
+    const tutorSelect = document.getElementById('tutor-select');
     tutorSelect.addEventListener('change', e => {
         activeTutorId = e.target.value;
         renderSelectedTutorDetails(activeTutorId);
     });
+    // ADDED: New event listener for the search input
+    document.getElementById('tutor-search').addEventListener('input', e => {
+        const query = e.target.value.toLowerCase();
+        const selectOptions = tutorSelect.options;
+        for (let i = 0; i < selectOptions.length; i++) {
+            const option = selectOptions[i];
+            const tutorId = option.value;
+            const tutorData = window.allTutorsData[tutorId];
 
-    // Handle delete reports button
-    document.getElementById('delete-reports-btn').addEventListener('click', handleDeleteMonthlyReports);
-
-    // Filter tutors on search input
-    searchInput.addEventListener('input', () => {
-        renderTutorSelect(allTutorsData, allStudentsData, searchInput.value.trim());
+            const tutorMatches = tutorData && tutorData.name.toLowerCase().includes(query);
+            // NOTE: The student/parent search here is a simplified example.
+            // A more robust solution would involve a server-side search or denormalized data.
+            const studentMatches = tutorData && tutorData.students && tutorData.students.some(s => s.studentName.toLowerCase().includes(query) || (s.parentName || '').toLowerCase().includes(query));
+            
+            if (tutorMatches || studentMatches || query === '') {
+                option.style.display = 'block';
+            } else {
+                option.style.display = 'none';
+            }
+        }
     });
 
-    // Real-time counter updates
+    // ### NEW ### Real-time counter updates
     onSnapshot(collection(db, "tutors"), (snapshot) => {
-        allTutorsData = {};
-        snapshot.forEach(doc => {
-            allTutorsData[doc.id] = { id: doc.id, ...doc.data() };
-        });
         const badge = document.getElementById('tutor-count-badge');
         if (badge) badge.textContent = snapshot.size;
-        renderTutorSelect(allTutorsData, allStudentsData, searchInput.value.trim());
     });
-
     onSnapshot(collection(db, "students"), (snapshot) => {
-        allStudentsData = {};
-        snapshot.forEach(doc => {
-            const data = doc.data();
-            allStudentsData[doc.id] = { id: doc.id, ...data };
-        });
         const badge = document.getElementById('student-count-badge');
         if (badge) badge.textContent = snapshot.size;
-        renderTutorSelect(allTutorsData, allStudentsData, searchInput.value.trim());
     });
-}
 
-function renderTutorSelect(tutorsData, studentsData, searchTerm) {
-    const tutorSelect = document.getElementById('tutor-select');
-    let currentSelection = tutorSelect.value;
-    tutorSelect.innerHTML = `<option value="">-- Select a Tutor --</option>`;
-
-    let filteredTutors = Object.values(tutorsData);
-
-    if (searchTerm) {
-        const lowerCaseSearch = searchTerm.toLowerCase();
-        filteredTutors = filteredTutors.filter(tutor => {
-            // Check tutor name
-            if (tutor.name.toLowerCase().includes(lowerCaseSearch)) {
-                return true;
-            }
-            // Check associated student or parent names
-            const hasMatch = Object.values(studentsData).some(student => {
-                return student.tutorEmail === tutor.email && (
-                    (student.studentName && student.studentName.toLowerCase().includes(lowerCaseSearch)) ||
-                    (student.parentName && student.parentName.toLowerCase().includes(lowerCaseSearch))
-                );
-            });
-            return hasMatch;
+    onSnapshot(collection(db, "tutors"), (snapshot) => {
+        const tutorsData = {};
+        let currentSelection = tutorSelect.value;
+        tutorSelect.innerHTML = `<option value="">-- Select a Tutor --</option>`;
+        snapshot.forEach(doc => {
+            tutorsData[doc.id] = {
+                id: doc.id,
+                ...doc.data()
+            };
+            const option = document.createElement('option');
+            option.value = doc.id;
+            option.textContent = doc.data().name;
+            tutorSelect.appendChild(option);
         });
-    }
-
-    filteredTutors.forEach(tutor => {
-        const option = document.createElement('option');
-        option.value = tutor.id;
-        option.textContent = tutor.name;
-        tutorSelect.appendChild(option);
+        window.allTutorsData = tutorsData;
+        if (activeTutorId && tutorsData[activeTutorId]) {
+            tutorSelect.value = activeTutorId;
+        }
     });
+  }
 
-    if (activeTutorId && tutorsData[activeTutorId]) {
-        tutorSelect.value = activeTutorId;
-    }
-}
-
-async function renderSelectedTutorDetails(tutorId) {
+  // ### UPDATED ### With full student form and CSV/Excel import
+  async function renderSelectedTutorDetails(tutorId) {
     const container = document.getElementById('selected-tutor-details');
-    if (!tutorId || !allTutorsData[tutorId]) {
+    if (!tutorId || !window.allTutorsData) {
         container.innerHTML = `<p class="text-gray-500">Please select a tutor to view details.</p>`;
         return;
     }
-    const tutor = allTutorsData[tutorId];
+    const tutor = window.allTutorsData[tutorId];
 
     onSnapshot(query(collection(db, "students"), where("tutorEmail", "==", tutor.email)), (studentsSnapshot) => {
         const studentsListHTML = studentsSnapshot.docs.map(doc => {
             const student = doc.data();
-            const feeDisplay = isStudentFeeEnabled ? ` - Fee: ₦${student.studentFee}` : '';
             return `<li class="flex justify-between items-center bg-gray-50 p-2 rounded-md">
-                        <span>${student.studentName} (Grade ${student.grade})${feeDisplay}</span>
+                        <span>${student.studentName} (Grade ${student.grade}) - Fee: ₦${student.studentFee}</span>
                         <button class="remove-student-btn text-red-500 hover:text-red-700" data-student-id="${doc.id}">Remove</button>
                     </li>`;
         }).join('');
 
-        const gradeOptions = Array.from({ length: 12 }, (_, i) => `<option value="${i + 1}">${i + 1}</option>`).join('');
-        const dayOptions = Array.from({ length: 7 }, (_, i) => `<option value="${i + 1}">${i + 1}</option>`).join('');
+        const gradeOptions = Array.from({
+            length: 12
+        }, (_, i) => `<option value="${i + 1}">${i + 1}</option>`).join('');
+        const dayOptions = Array.from({
+            length: 7
+        }, (_, i) => `<option value="${i + 1}">${i + 1}</option>`).join('');
 
         container.innerHTML = `
             <div class="p-4 border rounded-lg shadow-sm">
                 <div class="flex items-center justify-between mb-4">
                     <h4 class="font-bold text-xl">${tutor.name} (${studentsSnapshot.size} students)</h4>
-                    <div class="flex space-x-2">
-                        <button id="edit-tutor-btn" class="bg-yellow-500 text-white px-3 py-1 rounded hover:bg-yellow-600">Edit</button>
-                        <button id="delete-tutor-btn" class="bg-red-500 text-white px-3 py-1 rounded hover:bg-red-600">Delete</button>
+                    <div class="flex items-center space-x-2">
+                        <button id="edit-tutor-btn" class="bg-blue-500 text-white px-3 py-1 rounded hover:bg-blue-600 text-sm">Edit</button>
+                        <button id="delete-tutor-btn" class="bg-red-500 text-white px-3 py-1 rounded hover:bg-red-600 text-sm">Delete</button>
                         <label class="flex items-center space-x-2">
                             <span class="font-semibold">Management Staff:</span>
                             <input type="checkbox" id="management-staff-toggle" class="h-5 w-5" ${tutor.isManagementStaff ? 'checked' : ''}>
@@ -756,7 +794,7 @@ async function renderSelectedTutorDetails(tutorId) {
 
                     <div class="import-students-form">
                         <h5 class="font-semibold text-gray-700">Import Students from File:</h5>
-                        <p class="text-xs text-gray-500 mb-2">Upload a .csv or .xlsx file with columns: <strong>Parent Name, Student Name, Grade, Subjects, Days, Fee</strong></p>
+                        <p class="text-xs text-gray-500 mb-2">Upload a .csv or .xlsx file with columns: <strong>Student Name, Grade, Subjects, Days, Fee</strong></p>
                         <input type="file" id="student-import-file" class="w-full text-sm border rounded p-1" accept=".csv, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/vnd.ms-excel">
                         <button id="import-students-btn" class="bg-blue-600 text-white w-full px-4 py-2 rounded mt-2 hover:bg-blue-700">Import Students</button>
                         <p id="import-status" class="text-sm mt-2"></p>
@@ -764,18 +802,40 @@ async function renderSelectedTutorDetails(tutorId) {
                 </div>
             </div>
         `;
-
-        document.getElementById('management-staff-toggle').addEventListener('change', async (e) => {
-            await updateDoc(doc(db, "tutors", tutorId), { isManagementStaff: e.target.checked });
+        // ADDED: Listeners for the new Edit and Delete buttons
+        document.getElementById('edit-tutor-btn').addEventListener('click', async () => {
+            const newName = prompt("Enter new name for tutor:", tutor.name);
+            if (newName && newName !== tutor.name) {
+                await updateDoc(doc(db, "tutors", tutorId), { name: newName });
+            }
         });
 
-        document.getElementById('edit-tutor-btn').addEventListener('click', () => handleEditTutor(tutorId));
-        document.getElementById('delete-tutor-btn').addEventListener('click', () => handleDeleteTutor(tutorId));
+        document.getElementById('delete-tutor-btn').addEventListener('click', async () => {
+            if (confirm(`Are you sure you want to delete ${tutor.name} and all their students? This action is permanent.`)) {
+                const studentsToDelete = await getDocs(query(collection(db, "students"), where("tutorEmail", "==", tutor.email)));
+                const batch = writeBatch(db);
+                studentsToDelete.forEach(studentDoc => {
+                    batch.delete(studentDoc.ref);
+                });
+                await batch.commit();
+
+                await deleteDoc(doc(db, "tutors", tutorId));
+                alert(`${tutor.name} and all their students have been deleted.`);
+                
+                document.getElementById('selected-tutor-details').innerHTML = `<p class="text-gray-500">Please select a tutor to view details.</p>`;
+            }
+        });
+
+        document.getElementById('management-staff-toggle').addEventListener('change', async (e) => {
+            await updateDoc(doc(db, "tutors", tutorId), {
+                isManagementStaff: e.target.checked
+            });
+        });
 
         document.getElementById('add-student-btn').addEventListener('click', async () => {
             const studentData = {
-                parentName: document.getElementById('new-parent-name').value,
                 studentName: document.getElementById('new-student-name').value,
+                parentName: document.getElementById('new-parent-name').value, // ADDED: parent name field
                 grade: document.getElementById('new-student-grade').value,
                 subjects: document.getElementById('new-student-subject').value.split(',').map(s => s.trim()),
                 days: document.getElementById('new-student-days').value,
@@ -783,7 +843,7 @@ async function renderSelectedTutorDetails(tutorId) {
                 tutorEmail: tutor.email,
                 summerBreak: false
             };
-            if (studentData.studentName && studentData.grade && studentData.parentName && !isNaN(studentData.studentFee)) {
+            if (studentData.studentName && studentData.parentName && studentData.grade && !isNaN(studentData.studentFee)) {
                 await addDoc(collection(db, "students"), studentData);
             } else {
                 alert('Please fill in all details correctly.');
@@ -796,92 +856,12 @@ async function renderSelectedTutorDetails(tutorId) {
             if (confirm('Are you sure?')) await deleteDoc(doc(db, "students", e.target.dataset.studentId));
         }));
     });
-}
+  }
 
-// NEW: Handle tutor editing
-async function handleEditTutor(tutorId) {
-    const tutor = allTutorsData[tutorId];
-    const newName = prompt("Enter new tutor name:", tutor.name);
-    const newEmail = prompt("Enter new tutor email:", tutor.email);
-    if (newName && newEmail) {
-        try {
-            await updateDoc(doc(db, "tutors", tutorId), {
-                name: newName,
-                email: newEmail
-            });
-            alert("Tutor details updated successfully!");
-        } catch (error) {
-            console.error("Error updating tutor:", error);
-            alert("Failed to update tutor. Check console for details.");
-        }
-    }
-}
-
-// NEW: Handle tutor and student deletion
-async function handleDeleteTutor(tutorId) {
-    const tutor = allTutorsData[tutorId];
-    const confirmDelete = confirm(`Are you sure you want to delete ${tutor.name} and all their students? This action cannot be undone.`);
-    if (!confirmDelete) return;
-
-    try {
-        const studentsQuery = query(collection(db, "students"), where("tutorEmail", "==", tutor.email));
-        const studentsSnapshot = await getDocs(studentsQuery);
-        const batch = writeBatch(db);
-
-        studentsSnapshot.docs.forEach(doc => {
-            batch.delete(doc.ref);
-        });
-        batch.delete(doc(db, "tutors", tutorId));
-        await batch.commit();
-        alert(`${tutor.name} and their students have been successfully deleted.`);
-        activeTutorId = null;
-        renderSelectedTutorDetails(null);
-    } catch (error) {
-        console.error("Error deleting tutor and students:", error);
-        alert("Failed to delete tutor and students. Check console for details.");
-    }
-}
-
-// NEW: Handle monthly report deletion
-async function handleDeleteMonthlyReports() {
-    const confirm1 = confirm("Are you sure you want to delete ALL monthly reports for the current month?");
-    if (!confirm1) return;
-    const confirm2 = confirm("This is a double-check. This action is irreversible. Are you absolutely sure you want to proceed?");
-    if (!confirm2) return;
-
-    try {
-        const now = new Date();
-        const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-        const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
-
-        const reportsQuery = query(collection(db, "tutor_submissions"),
-            where("submittedAt", ">=", startOfMonth),
-            where("submittedAt", "<=", endOfMonth)
-        );
-
-        const reportsSnapshot = await getDocs(reportsQuery);
-        if (reportsSnapshot.empty) {
-            alert("No reports found for the current month to delete.");
-            return;
-        }
-
-        const batch = writeBatch(db);
-        reportsSnapshot.forEach(doc => {
-            batch.delete(doc.ref);
-        });
-
-        await batch.commit();
-        alert(`✅ Successfully deleted ${reportsSnapshot.size} reports for the current month.`);
-    } catch (error) {
-        console.error("Error deleting monthly reports:", error);
-        alert(`❌ Error deleting reports: ${error.message}`);
-    }
-}
-
-async function handleStudentImport() {
+  async function handleStudentImport() {
     const fileInput = document.getElementById('student-import-file');
     const statusEl = document.getElementById('import-status');
-    const tutor = allTutorsData[activeTutorId];
+    const tutor = window.allTutorsData[activeTutorId];
     if (!fileInput.files[0]) return statusEl.textContent = "Please select a file first.";
     if (!tutor) return statusEl.textContent = "Error: No tutor selected.";
 
@@ -904,7 +884,7 @@ async function handleStudentImport() {
             json.forEach(row => {
                 const studentDocRef = doc(collection(db, "students"));
                 const studentData = {
-                    parentName: row['Parent Name'],
+                    parentName: row['Parent Name'], // ADDED: Parent Name field for import
                     studentName: row['Student Name'],
                     grade: row['Grade'],
                     subjects: (row['Subjects'] || '').toString().split(',').map(s => s.trim()),
@@ -913,7 +893,7 @@ async function handleStudentImport() {
                     tutorEmail: tutor.email,
                     summerBreak: false
                 };
-                if (!studentData.studentName || !studentData.parentName || isNaN(studentData.studentFee)) return; // Skip invalid rows
+                if (!studentData.studentName || isNaN(studentData.studentFee)) return; // Skip invalid rows
                 batch.set(studentDocRef, studentData);
             });
             await batch.commit();
@@ -925,7 +905,7 @@ async function handleStudentImport() {
         }
     };
     reader.readAsArrayBuffer(fileInput.files[0]);
-}
+  }
 
 
 // ##################################################################
@@ -1595,6 +1575,7 @@ onAuthStateChanged(auth, async (user) => {
     }
     // ...
 });
+
 
 
 
