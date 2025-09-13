@@ -538,7 +538,7 @@ async function setupContentManager() {
 
 
 // ##################################################################
-// # SECTION 3: TUTOR MANAGEMENT (Upgraded)
+// # SECTION 3: TUTOR MANAGEMENT (Upgraded with Global Search)
 // ##################################################################
 
 async function renderTutorManagementPanel(container) {
@@ -561,19 +561,28 @@ async function renderTutorManagementPanel(container) {
                     <div class="bg-green-100 p-3 rounded-lg text-center shadow"><h4 class="font-bold text-green-800 text-sm">Total Students</h4><p id="student-count-badge" class="text-2xl text-green-600 font-extrabold">0</p></div>
                 </div>
             </div>
+
             <div class="mb-4">
-                <label for="tutor-select" class="block font-semibold">Select Tutor:</label>
-                <select id="tutor-select" class="w-full p-2 border rounded mt-1"></select>
+                <label for="global-search-bar" class="block font-semibold">Search Student, Parent, or Tutor:</label>
+                <input type="search" id="global-search-bar" class="w-full p-2 border rounded mt-1" placeholder="Start typing a name...">
             </div>
-            <div id="selected-tutor-details" class="mt-4"><p class="text-gray-500">Please select a tutor to view details.</p></div>
+            <div id="global-search-results" class="mb-4"></div>
+
+            <div id="tutor-management-area">
+                <div class="mb-4">
+                    <label for="tutor-select" class="block font-semibold">Select Tutor Manually:</label>
+                    <select id="tutor-select" class="w-full p-2 border rounded mt-1"></select>
+                </div>
+                <div id="selected-tutor-details" class="mt-4"><p class="text-gray-500">Please select a tutor to view details.</p></div>
+            </div>
         </div>
     `;
     setupTutorManagementListeners();
 }
 
 async function setupTutorManagementListeners() {
+    // --- GLOBAL SETTINGS LISTENERS ---
     const settingsDocRef = doc(db, "settings", "global_settings");
-
     onSnapshot(settingsDocRef, (docSnap) => {
         if (docSnap.exists()) {
             const data = docSnap.data();
@@ -589,20 +598,18 @@ async function setupTutorManagementListeners() {
         }
     });
 
-    // ### NEW ### Listener for Fee Visibility Toggle
     const showFeesToggle = document.getElementById('show-fees-toggle');
     const showFeesLabel = document.getElementById('show-fees-status-label');
     if (showFeesToggle && showFeesLabel) {
         const initialShowFees = localStorage.getItem('showStudentFees') === 'true';
         showFeesToggle.checked = initialShowFees;
         showFeesLabel.textContent = initialShowFees ? 'Visible' : 'Hidden';
-
         showFeesToggle.addEventListener('change', (e) => {
             const isVisible = e.target.checked;
             localStorage.setItem('showStudentFees', isVisible);
             showFeesLabel.textContent = isVisible ? 'Visible' : 'Hidden';
             if (activeTutorId) {
-                renderSelectedTutorDetails(activeTutorId); // Re-render to apply change
+                renderSelectedTutorDetails(activeTutorId);
             }
         });
     }
@@ -611,46 +618,107 @@ async function setupTutorManagementListeners() {
     document.getElementById('tutor-add-toggle').addEventListener('change', e => updateDoc(settingsDocRef, { isTutorAddEnabled: e.target.checked }));
     document.getElementById('summer-break-toggle').addEventListener('change', e => updateDoc(settingsDocRef, { isSummerBreakEnabled: e.target.checked }));
 
+    // --- DATA FETCHING AND CACHING FOR SEARCH & MANAGEMENT ---
     const tutorSelect = document.getElementById('tutor-select');
+
+    onSnapshot(collection(db, "tutors"), (snapshot) => {
+        const tutorsData = {};
+        const tutorsByEmail = {};
+        tutorSelect.innerHTML = `<option value="">-- Select a Tutor --</option>`;
+        snapshot.forEach(doc => {
+            const tutor = { id: doc.id, ...doc.data() };
+            tutorsData[doc.id] = tutor;
+            tutorsByEmail[tutor.email] = tutor;
+            const option = document.createElement('option');
+            option.value = doc.id;
+            option.textContent = tutor.name;
+            tutorSelect.appendChild(option);
+        });
+        window.allTutorsData = tutorsData;
+        window.tutorsByEmail = tutorsByEmail; // Cache for search
+        const badge = document.getElementById('tutor-count-badge');
+        if (badge) badge.textContent = snapshot.size;
+        if (activeTutorId && tutorsData[activeTutorId]) {
+            tutorSelect.value = activeTutorId;
+        }
+    });
+
+    onSnapshot(collection(db, "students"), (snapshot) => {
+        const studentsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        window.allStudentsData = studentsData; // Cache for search
+        const badge = document.getElementById('student-count-badge');
+        if (badge) badge.textContent = snapshot.size;
+    });
+
+    // --- EVENT LISTENERS FOR UI INTERACTION ---
     tutorSelect.addEventListener('change', e => {
         activeTutorId = e.target.value;
         renderSelectedTutorDetails(activeTutorId);
     });
 
-    // ### NEW ### Real-time counter updates
-    onSnapshot(collection(db, "tutors"), (snapshot) => {
-        const badge = document.getElementById('tutor-count-badge');
-        if (badge) badge.textContent = snapshot.size;
-    });
-    onSnapshot(collection(db, "students"), (snapshot) => {
-        const badge = document.getElementById('student-count-badge');
-        if (badge) badge.textContent = snapshot.size;
-    });
+    // ### NEW ### Global Search Listener
+    const searchBar = document.getElementById('global-search-bar');
+    const searchResultsContainer = document.getElementById('global-search-results');
+    const tutorManagementArea = document.getElementById('tutor-management-area');
 
-    onSnapshot(collection(db, "tutors"), (snapshot) => {
-        const tutorsData = {};
-        let currentSelection = tutorSelect.value;
-        tutorSelect.innerHTML = `<option value="">-- Select a Tutor --</option>`;
-        snapshot.forEach(doc => {
-            tutorsData[doc.id] = { id: doc.id, ...doc.data() };
-            const option = document.createElement('option');
-            option.value = doc.id;
-            option.textContent = doc.data().name;
-            tutorSelect.appendChild(option);
-        });
-        window.allTutorsData = tutorsData;
-        if (activeTutorId && tutorsData[activeTutorId]) {
-            tutorSelect.value = activeTutorId;
+    searchBar.addEventListener('input', (e) => {
+        const searchTerm = e.target.value.toLowerCase().trim();
+        
+        if (searchTerm.length < 2) {
+            searchResultsContainer.innerHTML = '';
+            tutorManagementArea.style.display = 'block';
+            return;
         }
+        
+        tutorManagementArea.style.display = 'none';
+        const { allStudentsData = [], tutorsByEmail = {} } = window;
+        
+        const results = allStudentsData.filter(student => {
+            const tutor = tutorsByEmail[student.tutorEmail] || { name: 'N/A' };
+            return (
+                student.studentName?.toLowerCase().includes(searchTerm) ||
+                student.parentName?.toLowerCase().includes(searchTerm) ||
+                tutor.name?.toLowerCase().includes(searchTerm)
+            );
+        });
+        
+        if (results.length > 0) {
+            searchResultsContainer.innerHTML = `
+                <h4 class="font-bold mb-2">${results.length} matching student(s) found:</h4>
+                <ul class="space-y-2 border rounded-lg p-2">${results.map(student => {
+                    const tutor = tutorsByEmail[student.tutorEmail] || { id: '', name: 'Unassigned' };
+                    return `<li class="flex justify-between items-center bg-gray-50 p-2 rounded-md">
+                                <div>
+                                    <p class="font-semibold">${student.studentName} (Parent: ${student.parentName || 'N/A'})</p>
+                                    <p class="text-sm text-gray-600">Assigned to: ${tutor.name}</p>
+                                </div>
+                                <button class="manage-tutor-from-search-btn bg-blue-500 text-white px-3 py-1 rounded-md text-sm hover:bg-blue-600" data-tutor-id="${tutor.id}">Manage Tutor</button>
+                            </li>`
+                }).join('')}</ul>`;
+        } else {
+            searchResultsContainer.innerHTML = `<p class="text-gray-500">No matches found.</p>`;
+        }
+        
+        // Add listeners for the new buttons in search results
+        searchResultsContainer.querySelectorAll('.manage-tutor-from-search-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const tutorId = e.currentTarget.dataset.tutorId;
+                if(tutorId) {
+                    tutorSelect.value = tutorId;
+                    tutorSelect.dispatchEvent(new Event('change')); // Trigger the original select handler
+                    searchBar.value = '';
+                    searchResultsContainer.innerHTML = '';
+                    tutorManagementArea.style.display = 'block';
+                }
+            });
+        });
     });
 }
 
-// ### NEW ### Helper function to reset the student form
 function resetStudentForm() {
     const form = document.querySelector('.add-student-form');
     if (!form) return;
 
-    // Clear form fields
     form.querySelector('#new-parent-name').value = '';
     form.querySelector('#new-student-name').value = '';
     form.querySelector('#new-student-grade').value = '';
@@ -658,22 +726,17 @@ function resetStudentForm() {
     form.querySelector('#new-student-days').value = '';
     form.querySelector('#new-student-fee').value = '';
 
-    // Reset button
     const actionButton = form.querySelector('#add-student-btn');
     if (actionButton) {
         actionButton.textContent = 'Add Student';
         delete actionButton.dataset.editingId;
     }
-
-    // Remove cancel button
     const cancelButton = form.querySelector('#cancel-edit-btn');
     if (cancelButton) {
         cancelButton.remove();
     }
 }
 
-
-// ### FULLY REPLACED ### With search, edit/delete buttons, and fee visibility
 async function renderSelectedTutorDetails(tutorId) {
     const container = document.getElementById('selected-tutor-details');
     if (!tutorId || !window.allTutorsData) {
@@ -692,14 +755,9 @@ async function renderSelectedTutorDetails(tutorId) {
                         <span>${student.studentName} (Grade ${student.grade})${feeDisplay}</span>
                         <div class="flex items-center space-x-2">
                             <button class="edit-student-btn text-blue-500 hover:text-blue-700 font-semibold" 
-                                data-student-id="${studentId}"
-                                data-parent-name="${student.parentName || ''}"
-                                data-student-name="${student.studentName}"
-                                data-grade="${student.grade}"
-                                data-subjects="${(student.subjects || []).join(', ')}"
-                                data-days="${student.days}"
-                                data-fee="${student.studentFee}"
-                            >Edit</button>
+                                data-student-id="${studentId}" data-parent-name="${student.parentName || ''}" data-student-name="${student.studentName}"
+                                data-grade="${student.grade}" data-subjects="${(student.subjects || []).join(', ')}"
+                                data-days="${student.days}" data-fee="${student.studentFee}">Edit</button>
                             <button class="delete-student-btn text-red-500 hover:text-red-700 font-semibold" data-student-id="${studentId}">Delete</button>
                         </div>
                     </li>`;
@@ -709,18 +767,16 @@ async function renderSelectedTutorDetails(tutorId) {
         const dayOptions = Array.from({ length: 7 }, (_, i) => `<option value="${i + 1}">${i + 1}</option>`).join('');
 
         container.innerHTML = `
-            <div class="p-4 border rounded-lg shadow-sm">
+            <div class="p-4 border rounded-lg shadow-sm bg-blue-50">
                 <div class="flex items-center justify-between mb-4">
                     <h4 class="font-bold text-xl">${tutor.name} (${studentsSnapshot.size} students)</h4>
                     <label class="flex items-center space-x-2"><span class="font-semibold">Management Staff:</span><input type="checkbox" id="management-staff-toggle" class="h-5 w-5" ${tutor.isManagementStaff ? 'checked' : ''}></label>
                 </div>
-
                 <div class="mb-4">
-                    <p><strong>Students:</strong></p>
-                    <input type="search" id="student-search-bar" placeholder="Filter by student name..." class="w-full p-2 border rounded mt-2 mb-2">
+                    <p><strong>Students Assigned to ${tutor.name}:</strong></p>
+                    <input type="search" id="student-filter-bar" placeholder="Filter this list..." class="w-full p-2 border rounded mt-2 mb-2">
                     <ul id="students-list-ul" class="space-y-2 mt-2">${studentsListHTML || '<p class="text-gray-500">No students assigned.</p>'}</ul>
                 </div>
-
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-6 border-t pt-4">
                     <div class="add-student-form space-y-2">
                         <h5 class="font-semibold text-gray-700">Add/Edit Student Details:</h5>
@@ -733,85 +789,59 @@ async function renderSelectedTutorDetails(tutorId) {
                         <button id="add-student-btn" class="bg-green-600 text-white w-full px-4 py-2 rounded hover:bg-green-700">Add Student</button>
                     </div>
                     <div class="import-students-form">
-                         <h5 class="font-semibold text-gray-700">Import Students from File:</h5>
+                         <h5 class="font-semibold text-gray-700">Import Students for ${tutor.name}:</h5>
                          <p class="text-xs text-gray-500 mb-2">Upload a .csv or .xlsx file with columns: <strong>Parent Name, Student Name, Grade, Subjects, Days, Fee</strong></p>
                          <input type="file" id="student-import-file" class="w-full text-sm border rounded p-1" accept=".csv, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/vnd.ms-excel">
                          <button id="import-students-btn" class="bg-blue-600 text-white w-full px-4 py-2 rounded mt-2 hover:bg-blue-700">Import Students</button>
                          <p id="import-status" class="text-sm mt-2"></p>
                     </div>
                 </div>
-            </div>
-        `;
+            </div>`;
 
-        // --- ATTACH EVENT LISTENERS ---
-
-        document.getElementById('management-staff-toggle').addEventListener('change', async (e) => {
-            await updateDoc(doc(db, "tutors", tutorId), { isManagementStaff: e.target.checked });
-        });
-
-        // Search listener
-        document.getElementById('student-search-bar').addEventListener('input', (e) => {
+        document.getElementById('management-staff-toggle').addEventListener('change', (e) => updateDoc(doc(db, "tutors", tutorId), { isManagementStaff: e.target.checked }));
+        document.getElementById('student-filter-bar').addEventListener('input', (e) => {
             const searchTerm = e.target.value.toLowerCase();
             document.querySelectorAll('#students-list-ul li').forEach(li => {
                 li.style.display = (li.dataset.studentName || '').includes(searchTerm) ? 'flex' : 'none';
             });
         });
-
-        // Add/Update button listener
         document.getElementById('add-student-btn').addEventListener('click', async (e) => {
             const btn = e.currentTarget;
             const editingId = btn.dataset.editingId;
             const studentData = {
-                parentName: document.getElementById('new-parent-name').value,
-                studentName: document.getElementById('new-student-name').value,
-                grade: document.getElementById('new-student-grade').value,
-                subjects: document.getElementById('new-student-subject').value.split(',').map(s => s.trim()),
-                days: document.getElementById('new-student-days').value,
-                studentFee: parseFloat(document.getElementById('new-student-fee').value),
-                tutorEmail: tutor.email,
+                parentName: document.getElementById('new-parent-name').value, studentName: document.getElementById('new-student-name').value,
+                grade: document.getElementById('new-student-grade').value, subjects: document.getElementById('new-student-subject').value.split(',').map(s => s.trim()),
+                days: document.getElementById('new-student-days').value, studentFee: parseFloat(document.getElementById('new-student-fee').value), tutorEmail: tutor.email,
             };
             if (studentData.studentName && studentData.grade && !isNaN(studentData.studentFee)) {
                 if (editingId) {
                     await updateDoc(doc(db, "students", editingId), studentData);
                 } else {
-                    studentData.summerBreak = false;
-                    await addDoc(collection(db, "students"), studentData);
+                    studentData.summerBreak = false; await addDoc(collection(db, "students"), studentData);
                 }
                 resetStudentForm();
             } else {
                 alert('Please fill in all details correctly.');
             }
         });
-
         document.getElementById('import-students-btn').addEventListener('click', handleStudentImport);
-
-        // Edit button listeners
         container.querySelectorAll('.edit-student-btn').forEach(btn => {
             btn.addEventListener('click', (e) => {
                 const data = e.currentTarget.dataset;
-                document.getElementById('new-parent-name').value = data.parentName;
-                document.getElementById('new-student-name').value = data.studentName;
-                document.getElementById('new-student-grade').value = data.grade;
-                document.getElementById('new-student-subject').value = data.subjects;
-                document.getElementById('new-student-days').value = data.days;
-                document.getElementById('new-student-fee').value = data.fee;
-
+                document.getElementById('new-parent-name').value = data.parentName; document.getElementById('new-student-name').value = data.studentName;
+                document.getElementById('new-student-grade').value = data.grade; document.getElementById('new-student-subject').value = data.subjects;
+                document.getElementById('new-student-days').value = data.days; document.getElementById('new-student-fee').value = data.fee;
                 const actionButton = document.getElementById('add-student-btn');
-                actionButton.textContent = 'Update Student';
-                actionButton.dataset.editingId = data.studentId;
-
+                actionButton.textContent = 'Update Student'; actionButton.dataset.editingId = data.studentId;
                 if (!document.getElementById('cancel-edit-btn')) {
                     const cancelButton = document.createElement('button');
-                    cancelButton.id = 'cancel-edit-btn';
-                    cancelButton.textContent = 'Cancel Edit';
+                    cancelButton.id = 'cancel-edit-btn'; cancelButton.textContent = 'Cancel Edit';
                     cancelButton.className = 'bg-gray-500 text-white w-full px-4 py-2 rounded hover:bg-gray-600 mt-2';
                     actionButton.insertAdjacentElement('afterend', cancelButton);
                     cancelButton.addEventListener('click', resetStudentForm);
                 }
             });
         });
-
-        // Delete button listeners
         container.querySelectorAll('.delete-student-btn').forEach(btn => btn.addEventListener('click', async (e) => {
             if (confirm('Are you sure you want to delete this student?')) {
                 await deleteDoc(doc(db, "students", e.target.dataset.studentId));
@@ -836,15 +866,13 @@ async function handleStudentImport() {
             const sheetName = workbook.SheetNames[0];
             const worksheet = workbook.Sheets[sheetName];
             const json = XLSX.utils.sheet_to_json(worksheet);
-
             if (json.length === 0) throw new Error("Sheet is empty or format is incorrect.");
-
             statusEl.textContent = `Importing ${json.length} students...`;
             const batch = writeBatch(db);
             json.forEach(row => {
                 const studentDocRef = doc(collection(db, "students"));
                 const studentData = {
-                    parentName: row['Parent Name'] || '', // Added Parent Name field
+                    parentName: row['Parent Name'] || '',
                     studentName: row['Student Name'],
                     grade: row['Grade'],
                     subjects: (row['Subjects'] || '').toString().split(',').map(s => s.trim()),
@@ -853,12 +881,12 @@ async function handleStudentImport() {
                     tutorEmail: tutor.email,
                     summerBreak: false
                 };
-                if (!studentData.studentName || isNaN(studentData.studentFee)) return; // Skip invalid rows
+                if (!studentData.studentName || isNaN(studentData.studentFee)) return;
                 batch.set(studentDocRef, studentData);
             });
             await batch.commit();
             statusEl.textContent = `✅ Successfully imported ${json.length} students for ${tutor.name}.`;
-            fileInput.value = ''; // Clear file input
+            fileInput.value = '';
         } catch (error) {
             statusEl.textContent = `❌ Error: ${error.message}`;
             console.error(error);
@@ -1535,6 +1563,7 @@ onAuthStateChanged(auth, async (user) => {
     }
     // ...
 });
+
 
 
 
