@@ -7,7 +7,6 @@ import { onSnapshot } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-f
 let isSubmissionEnabled = false;
 let isTutorAddEnabled = false;
 let isSummerBreakEnabled = false;
-let isBypassApprovalEnabled = false; // NEW: To check if we can bypass pending students
 
 // Listen for changes to the admin settings in real-time
 const settingsDocRef = doc(db, "settings", "global_settings");
@@ -17,7 +16,6 @@ onSnapshot(settingsDocRef, (docSnap) => {
         isSubmissionEnabled = data.isReportEnabled;
         isTutorAddEnabled = data.isTutorAddEnabled;
         isSummerBreakEnabled = data.isSummerBreakEnabled;
-        isBypassApprovalEnabled = data.bypassPendingApproval; // NEW: Update the global setting
 
         // Re-render the student database if the page is currently active
         const mainContent = document.getElementById('mainContent');
@@ -29,7 +27,7 @@ onSnapshot(settingsDocRef, (docSnap) => {
 
 
 // ##################################################################
-// # SECTION 1: TUTOR DASHBOARD
+// # SECTION 1: TUTOR DASHBOARD (Updated as requested)
 // ##################################################################
 function renderTutorDashboard(container, tutor) {
     container.innerHTML = `
@@ -61,6 +59,7 @@ async function loadTutorReports(tutorEmail, parentName = null) {
     pendingReportsContainer.innerHTML = `<p class="text-gray-500">Loading pending submissions...</p>`;
     if (gradedReportsContainer) gradedReportsContainer.innerHTML = `<p class="text-gray-500">Loading graded submissions...</p>`;
 
+    // Query now searches by parentName instead of parentEmail
     let submissionsQuery = query(collection(db, "tutor_submissions"), where("tutorEmail", "==", tutorEmail));
     if (parentName) {
         submissionsQuery = query(submissionsQuery, where("parentName", "==", parentName));
@@ -122,66 +121,8 @@ async function loadTutorReports(tutorEmail, parentName = null) {
 
 
 // ##################################################################
-// # SECTION 2: STUDENT DATABASE (MERGED FUNCTIONALITY)
+// # SECTION 2: STUDENT DATABASE (Updated as requested)
 // ##################################################################
-
-// Helper function to generate the new student form fields
-function getNewStudentFormFields() {
-    // Generate Grade Options
-    const gradeOptions = `
-        <option value="">Select Grade</option>
-        <option value="Preschool">Preschool</option>
-        <option value="Kindergarten">Kindergarten</option>
-        ${Array.from({ length: 12 }, (_, i) => `<option value="Grade ${i + 1}">Grade ${i + 1}</option>`).join('')}
-        <option value="Pre-College">Pre-College</option>
-        <option value="College">College</option>
-        <option value="Adults">Adults</option>
-    `;
-
-    // Generate Fee Options
-    let feeOptions = '<option value="">Select Fee (₦)</option>';
-    for (let fee = 20000; fee <= 200000; fee += 5000) {
-        feeOptions += `<option value="${fee}">${fee.toLocaleString()}</option>`;
-    }
-    
-    // Define Subjects
-    const subjectsByCategory = {
-        "Academics": ["Math", "Language Arts", "Geography", "Science", "Biology", "Physics", "Chemistry"],
-        "Pre-College Exams": ["SAT", "IGCSE", "A-Levels", "SSCE", "JAMB"],
-        "Languages": ["French", "German", "Spanish", "Yoruba", "Igbo", "Hausa"],
-        "Tech Courses": ["Coding", "Stop motion animation", "YouTube for kids", "Graphic design", "Videography", "Comic/book creation", "Artificial Intelligence", "Chess"],
-        "Support Programs": ["Bible study", "Child counseling programs", "Speech therapy", "Behavioral therapy", "Public speaking", "Adult education", "Communication skills"]
-    };
-
-    let subjectsHTML = `<h4 class="font-semibold text-gray-700 mt-2">Subjects</h4><div id="new-student-subjects-container" class="space-y-2 border p-3 rounded bg-gray-50 max-h-48 overflow-y-auto">`;
-    for (const category in subjectsByCategory) {
-        subjectsHTML += `
-            <details>
-                <summary class="font-semibold cursor-pointer text-sm">${category}</summary>
-                <div class="pl-4 grid grid-cols-2 sm:grid-cols-3 gap-2 mt-2">
-                    ${subjectsByCategory[category].map(subject => `<div><label class="text-sm font-normal"><input type="checkbox" name="subjects" value="${subject}"> ${subject}</label></div>`).join('')}
-                </div>
-            </details>
-        `;
-    }
-    subjectsHTML += `
-        <div class="font-semibold pt-2 border-t"><label class="text-sm"><input type="checkbox" name="subjects" value="Music"> Music</label></div>
-    </div>`;
-
-
-    return `
-        <input type="text" id="new-parent-name" class="w-full mt-1 p-2 border rounded" placeholder="Parent Name">
-        <input type="tel" id="new-parent-phone" class="w-full mt-1 p-2 border rounded" placeholder="Parent Phone Number">
-        <input type="text" id="new-student-name" class="w-full mt-1 p-2 border rounded" placeholder="Student Name">
-        <select id="new-student-grade" class="w-full mt-1 p-2 border rounded">${gradeOptions}</select>
-        ${subjectsHTML}
-        <select id="new-student-days" class="w-full mt-1 p-2 border rounded">
-            <option value="">Select Days per Week</option>
-            ${Array.from({ length: 7 }, (_, i) => `<option value="${i + 1}">${i + 1}</option>`).join('')}
-        </select>
-        <select id="new-student-fee" class="w-full mt-1 p-2 border rounded">${feeOptions}</select>
-    `;
-}
 
 async function renderStudentDatabase(container, tutor) {
     if (!container) {
@@ -191,19 +132,9 @@ async function renderStudentDatabase(container, tutor) {
 
     let savedReports = {};
 
-    // Fetch both approved and pending students
     const studentQuery = query(collection(db, "students"), where("tutorEmail", "==", tutor.email));
-    const pendingStudentQuery = query(collection(db, "pending_students"), where("tutorEmail", "==", tutor.email));
-
-    const [studentsSnapshot, pendingStudentsSnapshot] = await Promise.all([
-        getDocs(studentQuery),
-        getDocs(pendingStudentQuery)
-    ]);
-
-    const approvedStudents = studentsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data(), isPending: false }));
-    const pendingStudents = pendingStudentsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data(), isPending: true }));
-
-    const students = [...approvedStudents, ...pendingStudents];
+    const studentsSnapshot = await getDocs(studentQuery);
+    const students = studentsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
     const studentsCount = students.length;
 
     function renderUI() {
@@ -213,10 +144,22 @@ async function renderStudentDatabase(container, tutor) {
             studentsHTML += `
                 <div class="bg-gray-100 p-4 rounded-lg shadow-inner mb-4">
                     <h3 class="font-bold text-lg mb-2">Add a New Student</h3>
-                    <div class="space-y-2">
-                        ${getNewStudentFormFields()}
-                    </div>
-                    <button id="add-student-btn" class="bg-green-600 text-white px-4 py-2 rounded mt-3 hover:bg-green-700">Add Student</button>
+                    <input type="text" id="new-parent-name" class="w-full mt-1 p-2 border rounded" placeholder="Parent Name">
+                    <input type="tel" id="new-parent-phone" class="w-full mt-1 p-2 border rounded" placeholder="Parent Phone Number">
+                    <input type="text" id="new-student-name" class="w-full mt-1 p-2 border rounded" placeholder="Student Name">
+                    <select id="new-student-grade" class="w-full mt-1 p-2 border rounded">
+                        <option value="">Select Grade</option>
+                        <option value="Pre-School">Pre-School</option>
+                        <option value="Kindergarten">Kindergarten</option>
+                        ${Array.from({ length: 12 }, (_, i) => `<option value="${i + 1}">${i + 1}</option>`).join('')}
+                    </select>
+                    <input type="text" id="new-student-subject" class="w-full mt-1 p-2 border rounded" placeholder="Subject(s) (e.g., Math, English)">
+                    <select id="new-student-days" class="w-full mt-1 p-2 border rounded">
+                        <option value="">Select Days</option>
+                        ${Array.from({ length: 7 }, (_, i) => `<option value="${i + 1}">${i + 1}</option>`).join('')}
+                    </select>
+                    <input type="number" id="new-student-fee" class="w-full mt-1 p-2 border rounded" placeholder="Student Fee (₦)">
+                    <button id="add-student-btn" class="bg-green-600 text-white px-4 py-2 rounded mt-2 hover:bg-green-700">Add Student</button>
                 </div>`;
         }
         
@@ -234,45 +177,29 @@ async function renderStudentDatabase(container, tutor) {
             students.forEach(student => {
                 const isStudentOnBreak = student.summerBreak;
                 const isReportSaved = savedReports[student.id];
-
-                let statusHTML = '';
-                let actionsHTML = '';
-                
-                const subjects = student.subjects ? student.subjects.join(', ') : 'N/A';
-                const days = student.days ? `${student.days} days/week` : 'N/A';
-
-                if (student.isPending) {
-                    statusHTML = `<span class="status-indicator text-yellow-600 font-semibold">Awaiting Approval</span>`;
-                    actionsHTML = `<span class="text-gray-400">No actions available</span>`;
-                } else {
-                    statusHTML = `<span class="status-indicator ${isReportSaved ? 'text-green-600 font-semibold' : 'text-gray-500'}">${isReportSaved ? 'Report Saved' : 'Pending Report'}</span>`;
-
-                    if (isSummerBreakEnabled && !isStudentOnBreak) {
-                        actionsHTML += `<button class="summer-break-btn bg-yellow-500 text-white px-3 py-1 rounded" data-student-id="${student.id}">Summer Break</button>`;
-                    } else if (isStudentOnBreak) {
-                        actionsHTML += `<span class="text-gray-400">On Break</span>`;
-                    }
-
-                    if (isSubmissionEnabled && !isStudentOnBreak) {
-                        if (approvedStudents.length === 1) {
-                            actionsHTML += `<button class="submit-single-report-btn bg-green-600 text-white px-3 py-1 rounded" data-student-id="${student.id}">Submit Report</button>`;
-                        } else {
-                            actionsHTML += `<button class="enter-report-btn bg-green-600 text-white px-3 py-1 rounded" data-student-id="${student.id}">${isReportSaved ? 'Edit Report' : 'Enter Report'}</button>`;
-                        }
-                    } else if (!isStudentOnBreak) {
-                        actionsHTML += `<span class="text-gray-400">Submission Disabled</span>`;
-                    }
-                }
-                
                 studentsHTML += `
                     <tr>
-                        <td class="px-6 py-4 whitespace-nowrap">
-                            ${student.studentName} (Grade ${student.grade})
-                            <div class="text-xs text-gray-500">Subjects: ${subjects} | Days: ${days}</div>
-                        </td>
-                        <td class="px-6 py-4 whitespace-nowrap">${statusHTML}</td>
-                        <td class="px-6 py-4 whitespace-nowrap space-x-2">${actionsHTML}</td>
-                    </tr>`;
+                        <td class="px-6 py-4 whitespace-nowrap">${student.studentName} (Grade ${student.grade})</td>
+                        <td class="px-6 py-4 whitespace-nowrap"><span class="status-indicator ${isReportSaved ? 'text-green-600 font-semibold' : 'text-gray-500'}">${isReportSaved ? 'Report Saved' : 'Pending Report'}</span></td>
+                        <td class="px-6 py-4 whitespace-nowrap space-x-2">`;
+
+                if (isSummerBreakEnabled && !isStudentOnBreak) {
+                    studentsHTML += `<button class="summer-break-btn bg-yellow-500 text-white px-3 py-1 rounded" data-student-id="${student.id}">Summer Break</button>`;
+                } else if (isStudentOnBreak) {
+                    studentsHTML += `<span class="text-gray-400">On Break</span>`;
+                }
+
+                if (isSubmissionEnabled && !isStudentOnBreak) {
+                    if (studentsCount === 1) {
+                        studentsHTML += `<button class="submit-single-report-btn bg-green-600 text-white px-3 py-1 rounded" data-student-id="${student.id}">Submit Report</button>`;
+                    } else {
+                         studentsHTML += `<button class="enter-report-btn bg-green-600 text-white px-3 py-1 rounded" data-student-id="${student.id}">${isReportSaved ? 'Edit Report' : 'Enter Report'}</button>`;
+                    }
+                } else if (!isStudentOnBreak) {
+                    studentsHTML += `<span class="text-gray-400">Submission Disabled</span>`;
+                }
+                
+                studentsHTML += `</td></tr>`;
             });
 
             studentsHTML += `</tbody></table></div>`;
@@ -290,9 +217,8 @@ async function renderStudentDatabase(container, tutor) {
                     </div>`;
             }
 
-            if (approvedStudents.length > 1 && isSubmissionEnabled) {
-                const submittableStudents = approvedStudents.filter(s => !s.summerBreak).length;
-                const allReportsSaved = Object.keys(savedReports).length === submittableStudents;
+            if (studentsCount > 1 && isSubmissionEnabled) {
+                const allReportsSaved = Object.keys(savedReports).length === students.filter(s => !s.summerBreak).length;
                 studentsHTML += `
                     <div class="mt-6 text-right">
                         <button id="submit-all-reports-btn" class="bg-green-700 text-white px-6 py-3 rounded-lg font-bold ${!allReportsSaved ? 'opacity-50 cursor-not-allowed' : 'hover:bg-green-800'}" ${!allReportsSaved ? 'disabled' : ''}>
@@ -307,8 +233,6 @@ async function renderStudentDatabase(container, tutor) {
 
     function showReportModal(student) {
         const existingReport = savedReports[student.id] || {};
-        const isSingleApprovedStudent = approvedStudents.filter(s => !s.summerBreak).length === 1;
-        
         const reportFormHTML = `
             <h3 class="text-xl font-bold mb-4">Monthly Report for ${student.studentName}</h3>
             <div class="space-y-4">
@@ -320,7 +244,7 @@ async function renderStudentDatabase(container, tutor) {
                 <div><label class="block font-semibold">General Comments</label><textarea id="report-general" class="w-full mt-1 p-2 border rounded" rows="2">${existingReport.generalComments || ''}</textarea></div>
                 <div class="flex justify-end space-x-2">
                     <button id="cancel-report-btn" class="bg-gray-500 text-white px-6 py-2 rounded">Cancel</button>
-                    <button id="modal-action-btn" class="bg-green-600 text-white px-6 py-2 rounded">${isSingleApprovedStudent ? 'Proceed to Submit' : 'Save Report'}</button>
+                    <button id="modal-action-btn" class="bg-green-600 text-white px-6 py-2 rounded">${studentsCount === 1 ? 'Proceed to Submit' : 'Save Report'}</button>
                 </div>
             </div>`;
 
@@ -334,7 +258,9 @@ async function renderStudentDatabase(container, tutor) {
         document.getElementById('modal-action-btn').addEventListener('click', async () => {
             const reportData = {
                 studentId: student.id, studentName: student.studentName, grade: student.grade,
-                parentName: student.parentName, parentPhone: student.parentPhone,
+                // MODIFICATION: Add parent details to the report data object
+                parentName: student.parentName,
+                parentPhone: student.parentPhone,
                 introduction: document.getElementById('report-intro').value,
                 topics: document.getElementById('report-topics').value,
                 progress: document.getElementById('report-progress').value,
@@ -343,18 +269,20 @@ async function renderStudentDatabase(container, tutor) {
                 generalComments: document.getElementById('report-general').value
             };
 
-            reportModal.remove();
+            reportModal.remove(); // Close the report modal first
 
-            if (isSingleApprovedStudent) {
+            if (studentsCount === 1) {
+                // MODIFICATION: Show account modal before submitting
                 showAccountDetailsModal([reportData]);
             } else {
                 savedReports[student.id] = reportData;
-                showCustomAlert(`${student.studentName}'s report has been saved.`);
+                alert(`${student.studentName}'s report has been saved.`);
                 renderUI();
             }
         });
     }
 
+    // NEW FUNCTION: Modal for Account Details
     function showAccountDetailsModal(reportsArray) {
         const accountFormHTML = `
             <h3 class="text-xl font-bold mb-4">Enter Your Payment Details</h3>
@@ -393,7 +321,7 @@ async function renderStudentDatabase(container, tutor) {
             };
 
             if (!accountDetails.beneficiaryBank || !accountDetails.beneficiaryAccount || !accountDetails.beneficiaryName) {
-                showCustomAlert("Please fill in all bank account details before submitting.");
+                alert("Please fill in all bank account details before submitting.");
                 return;
             }
 
@@ -402,9 +330,10 @@ async function renderStudentDatabase(container, tutor) {
         });
     }
     
+    // MODIFICATION: Updated function to accept and process accountDetails
     async function submitAllReports(reportsArray, accountDetails) {
         if (reportsArray.length === 0) {
-            showCustomAlert("No reports to submit.");
+            alert("No reports to submit.");
             return;
         }
 
@@ -416,76 +345,42 @@ async function renderStudentDatabase(container, tutor) {
                 tutorEmail: tutor.email,
                 tutorName: tutor.name,
                 submittedAt: new Date(),
+                // Report content
                 ...report,
+                // Account details
                 ...accountDetails
             });
         });
 
         try {
             await batch.commit();
-            showCustomAlert(`Successfully submitted ${reportsArray.length} report(s)!`);
+            alert(`Successfully submitted ${reportsArray.length} report(s)!`);
             savedReports = {};
             renderUI();
         } catch (error) {
             console.error("Error submitting reports:", error);
-            showCustomAlert(`Error: ${error.message}`);
+            alert(`Error: ${error.message}`);
         }
-    }
-
-    function showCustomAlert(message) {
-        const alertModal = document.createElement('div');
-        alertModal.className = 'fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex items-center justify-center z-50';
-        alertModal.innerHTML = `
-            <div class="relative bg-white p-8 rounded-lg shadow-xl w-full max-w-sm mx-auto text-center">
-                <p class="text-lg font-semibold mb-4">${message}</p>
-                <button id="close-alert-btn" class="bg-green-600 text-white px-6 py-2 rounded">OK</button>
-            </div>`;
-        document.body.appendChild(alertModal);
-        document.getElementById('close-alert-btn').addEventListener('click', () => alertModal.remove());
     }
 
     function attachEventListeners() {
         if (isTutorAddEnabled) {
             document.getElementById('add-student-btn')?.addEventListener('click', async () => {
-                const parentName = document.getElementById('new-parent-name').value.trim();
-                const parentPhone = document.getElementById('new-parent-phone').value.trim();
-                const studentName = document.getElementById('new-student-name').value.trim();
-                const studentGrade = document.getElementById('new-student-grade').value.trim();
-                
-                const selectedSubjects = [];
-                document.querySelectorAll('input[name="subjects"]:checked').forEach(checkbox => {
-                    selectedSubjects.push(checkbox.value);
-                });
-
-                const studentDays = document.getElementById('new-student-days').value.trim();
-                const studentFee = parseFloat(document.getElementById('new-student-fee').value);
-                const tutorEmail = tutor.email;
-
-                if (!parentName || !studentName || !studentGrade || isNaN(studentFee) || !parentPhone || !studentDays || selectedSubjects.length === 0) {
-                    showCustomAlert('Please fill in all parent and student details correctly, including at least one subject.');
-                    return;
-                }
-
-                try {
-                    const studentData = {
-                        parentName: parentName, parentPhone: parentPhone,
-                        studentName: studentName, grade: studentGrade,
-                        subjects: selectedSubjects, days: studentDays,
-                        studentFee: studentFee, tutorEmail: tutorEmail,
-                        summerBreak: false
-                    };
-                    
-                    // FIXED: Check bypass toggle to decide which collection to add to
-                    const collectionName = isBypassApprovalEnabled ? "students" : "pending_students";
-                    await addDoc(collection(db, collectionName), studentData);
-
-                    const message = isBypassApprovalEnabled ? 'Student has been added directly to your list.' : 'Student has been added and is awaiting admin approval.';
-                    showCustomAlert(message);
-                    
+                const studentData = {
+                    parentName: document.getElementById('new-parent-name').value,
+                    parentPhone: document.getElementById('new-parent-phone').value,
+                    studentName: document.getElementById('new-student-name').value,
+                    grade: document.getElementById('new-student-grade').value,
+                    subjects: document.getElementById('new-student-subject').value.split(',').map(s => s.trim()),
+                    days: document.getElementById('new-student-days').value,
+                    studentFee: parseFloat(document.getElementById('new-student-fee').value),
+                    tutorEmail: tutor.email, summerBreak: false
+                };
+                if (studentData.parentName && studentData.studentName && studentData.grade && !isNaN(studentData.studentFee)) {
+                    await addDoc(collection(db, "students"), studentData);
                     renderStudentDatabase(container, tutor);
-                } catch (error) {
-                    console.error("Error adding student:", error);
-                    showCustomAlert(`An error occurred: ${error.message}`);
+                } else {
+                    alert('Please fill in all parent and student details correctly.');
                 }
             });
         }
@@ -503,27 +398,30 @@ async function renderStudentDatabase(container, tutor) {
         });
 
         document.getElementById('submit-all-reports-btn')?.addEventListener('click', async () => {
-            showAccountDetailsModal(Object.values(savedReports));
+            if (confirm("Are you ready to enter your payment details and submit all reports?")) {
+                // MODIFICATION: Show account modal before submitting
+                showAccountDetailsModal(Object.values(savedReports));
+            }
         });
         
          document.querySelectorAll('.summer-break-btn').forEach(button => {
-             button.addEventListener('click', async (e) => {
-                if(confirm("Are you sure you want to mark this student as on summer break?")){
+            button.addEventListener('click', async (e) => {
+                if (confirm("Mark this student as on summer break?")) {
                     await updateDoc(doc(db, "students", e.target.dataset.studentId), { summerBreak: true });
                     renderStudentDatabase(container, tutor);
                 }
-             });
-         });
+            });
+        });
 
         document.getElementById('save-management-fee-btn')?.addEventListener('click', async () => {
             const feeInput = document.getElementById('management-fee-input');
             const newFee = parseFloat(feeInput.value);
             if (!isNaN(newFee) && newFee >= 0) {
-                const tutorRef = doc(db, "tutors", auth.currentUser.uid); // Use UID for security
+                const tutorRef = doc(db, "tutors", auth.currentUser.email);
                 await updateDoc(tutorRef, { managementFee: newFee });
-                showCustomAlert('Management fee updated successfully!');
+                alert('Management fee updated successfully!');
             } else {
-                showCustomAlert('Please enter a valid fee.');
+                alert('Please enter a valid fee.');
             }
         });
     }
@@ -556,7 +454,7 @@ onAuthStateChanged(auth, async (user) => {
     const logoutBtn = document.getElementById('logoutBtn');
 
     if (user) {
-        const tutorRef = doc(db, "tutors", user.uid); // Using UID is more secure and standard
+        const tutorRef = doc(db, "tutors", user.email);
         const tutorSnap = await getDoc(tutorRef);
         if (tutorSnap.exists()) {
             window.tutorData = tutorSnap.data();
@@ -573,3 +471,4 @@ onAuthStateChanged(auth, async (user) => {
         window.location.href = "tutor-auth.html";
     }
 });
+
