@@ -545,7 +545,6 @@ async function setupContentManager() {
 let globalSettings = {
     showEditDeleteButtons: false
 };
-let activeTutorId = null; // Keep track of the currently viewed tutor
 
 // Helper function to generate the new student form fields for the admin panel
 function getAdminStudentFormFields() {
@@ -1747,6 +1746,7 @@ onAuthStateChanged(auth, async (user) => {
     }
     // ...
 });
+
 
 
 
