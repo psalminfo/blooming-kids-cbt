@@ -552,10 +552,32 @@ async function renderTutorManagementPanel(container) {
                 <label class="flex items-center"><span class="text-gray-700 font-semibold mr-4">Show Student Fees:</span><label class="relative inline-flex items-center cursor-pointer"><input type="checkbox" id="show-fees-toggle" class="sr-only peer"><div class="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div><span id="show-fees-status-label" class="ml-3 text-sm font-medium"></span></label></label>
                 
                 <label class="flex items-center"><span class="text-gray-700 font-semibold mr-4">Student Edit/Delete:</span><label class="relative inline-flex items-center cursor-pointer"><input type="checkbox" id="edit-delete-toggle" class="sr-only peer"><div class="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div><span id="edit-delete-status-label" class="ml-3 text-sm font-medium"></span></label></label>
-                <label class="flex items-center"><span class="text-gray-700 font-semibold mr-4">Direct Student Add:</span><label class="relative inline-flex items-center cursor-pointer"><input type="checkbox" id="bypass-approval-toggle" class="sr-only peer"><div class="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div><span id="bypass-approval-status-label" class="ml-3 text-sm font-medium"></span></label></label>
+                <label class="flex items-center"><span class="text-gray-700 font-semibold mr-4">Direct Student Add:</span><label class="relative inline-flex items-center cursor-pointer"><input type="checkbox" id="bypass-approval-toggle" class="sr-only peer"><div class="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border after:rounded-full after:h-5 after-w-5 after:transition-all peer-checked:bg-blue-600"></div><span id="bypass-approval-status-label" class="ml-3 text-sm font-medium"></span></label></label>
             </div>
         </div>
 
+        <div class="bg-white p-6 rounded-lg shadow-md mb-6">
+            <h2 class="text-2xl font-bold text-green-700 mb-4">Grades & Subjects Management</h2>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                    <h3 class="text-xl font-bold text-gray-700 mb-2">Manage Grades</h3>
+                    <div class="flex mb-4">
+                        <input type="text" id="new-grade-input" class="w-full p-2 border rounded-l" placeholder="e.g., Grade 1, JSS 2">
+                        <button id="add-grade-btn" class="bg-blue-600 text-white px-4 py-2 rounded-r hover:bg-blue-700">Add Grade</button>
+                    </div>
+                    <ul id="grades-list" class="space-y-2"></ul>
+                </div>
+                <div>
+                    <h3 class="text-xl font-bold text-gray-700 mb-2">Manage Subjects</h3>
+                    <div class="flex mb-4">
+                        <input type="text" id="new-subject-input" class="w-full p-2 border rounded-l" placeholder="e.g., Mathematics, Geography">
+                        <button id="add-subject-btn" class="bg-blue-600 text-white px-4 py-2 rounded-r hover:bg-blue-700">Add Subject</button>
+                    </div>
+                    <ul id="subjects-list" class="space-y-2"></ul>
+                </div>
+            </div>
+        </div>
+        
         <div class="bg-white p-6 rounded-lg shadow-md">
             <div class="flex justify-between items-start mb-4">
                 <h3 class="text-2xl font-bold text-green-700">Manage Tutors</h3>
@@ -586,6 +608,8 @@ async function renderTutorManagementPanel(container) {
 async function setupTutorManagementListeners() {
     // --- GLOBAL SETTINGS LISTENERS ---
     const settingsDocRef = doc(db, "settings", "global_settings");
+    const curriculumDocRef = doc(db, "settings", "curriculum");
+
     onSnapshot(settingsDocRef, (docSnap) => {
         if (docSnap.exists()) {
             const data = docSnap.data();
@@ -625,6 +649,18 @@ async function setupTutorManagementListeners() {
         }
     });
 
+    // --- NEW: GRADES AND SUBJECTS LISTENERS ---
+    onSnapshot(curriculumDocRef, (docSnap) => {
+        if (docSnap.exists()) {
+            const data = docSnap.data();
+            const gradesList = document.getElementById('grades-list');
+            const subjectsList = document.getElementById('subjects-list');
+
+            gradesList.innerHTML = (data.grades || []).map(grade => `<li class="flex justify-between items-center bg-gray-100 p-2 rounded-md">${grade}</li>`).join('');
+            subjectsList.innerHTML = (data.subjects || []).map(subject => `<li class="flex justify-between items-center bg-gray-100 p-2 rounded-md">${subject}</li>`).join('');
+        }
+    });
+
     // Existing toggle listeners
     document.getElementById('report-toggle').addEventListener('change', e => updateDoc(settingsDocRef, { isReportEnabled: e.target.checked }));
     document.getElementById('tutor-add-toggle').addEventListener('change', e => updateDoc(settingsDocRef, { isTutorAddEnabled: e.target.checked }));
@@ -657,6 +693,29 @@ async function setupTutorManagementListeners() {
             }
         });
     }
+
+    // --- NEW: GRADES AND SUBJECTS BUTTON LISTENERS ---
+    document.getElementById('add-grade-btn').addEventListener('click', async () => {
+        const input = document.getElementById('new-grade-input');
+        const newGrade = input.value.trim();
+        if (newGrade) {
+            await updateDoc(curriculumDocRef, {
+                grades: arrayUnion(newGrade)
+            }, { merge: true });
+            input.value = '';
+        }
+    });
+
+    document.getElementById('add-subject-btn').addEventListener('click', async () => {
+        const input = document.getElementById('new-subject-input');
+        const newSubject = input.value.trim();
+        if (newSubject) {
+            await updateDoc(curriculumDocRef, {
+                subjects: arrayUnion(newSubject)
+            }, { merge: true });
+            input.value = '';
+        }
+    });
 
     // --- DATA FETCHING AND CACHING FOR SEARCH & MANAGEMENT ---
     const tutorSelect = document.getElementById('tutor-select');
@@ -829,11 +888,11 @@ async function renderSelectedTutorDetails(tutorId) {
                         <button id="add-student-btn" class="bg-green-600 text-white w-full px-4 py-2 rounded hover:bg-green-700">Add Student</button>
                     </div>
                     <div class="import-students-form">
-                         <h5 class="font-semibold text-gray-700">Import Students for ${tutor.name}:</h5>
-                         <p class="text-xs text-gray-500 mb-2">Upload a .csv or .xlsx file with columns: <strong>Parent Name, Student Name, Grade, Subjects, Days, Fee</strong></p>
-                         <input type="file" id="student-import-file" class="w-full text-sm border rounded p-1" accept=".csv, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/vnd.ms-excel">
-                         <button id="import-students-btn" class="bg-blue-600 text-white w-full px-4 py-2 rounded mt-2 hover:bg-blue-700">Import Students</button>
-                         <p id="import-status" class="text-sm mt-2"></p>
+                            <h5 class="font-semibold text-gray-700">Import Students for ${tutor.name}:</h5>
+                            <p class="text-xs text-gray-500 mb-2">Upload a .csv or .xlsx file with columns: <strong>Parent Name, Student Name, Grade, Subjects, Days, Fee</strong></p>
+                            <input type="file" id="student-import-file" class="w-full text-sm border rounded p-1" accept=".csv, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/vnd.ms-excel">
+                            <button id="import-students-btn" class="bg-blue-600 text-white w-full px-4 py-2 rounded mt-2 hover:bg-blue-700">Import Students</button>
+                            <p id="import-status" class="text-sm mt-2"></p>
                     </div>
                 </div>
             </div>`;
@@ -1603,6 +1662,7 @@ onAuthStateChanged(auth, async (user) => {
     }
     // ...
 });
+
 
 
 
