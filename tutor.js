@@ -1,5 +1,5 @@
 import { auth, db } from './firebaseConfig.js';
-import { collection, getDocs, doc, updateDoc, getDoc, where, query, addDoc, writeBatch } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
+import { collection, getDocs, doc, updateDoc, getDoc, where, query, addDoc, writeBatch, deleteDoc } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
 import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-auth.js";
 import { onSnapshot } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
 
@@ -200,10 +200,35 @@ async function renderStudentDatabase(container, tutor) {
         getDocs(pendingStudentQuery)
     ]);
 
-    const approvedStudents = studentsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data(), isPending: false }));
-    const pendingStudents = pendingStudentsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data(), isPending: true }));
+    const approvedStudents = studentsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data(), isPending: false, collection: "students" }));
+    const pendingStudents = pendingStudentsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data(), isPending: true, collection: "pending_students" }));
 
-    const students = [...approvedStudents, ...pendingStudents];
+    let students = [...approvedStudents, ...pendingStudents];
+    
+    // START: Duplicate Student Cleanup
+    const seenStudents = new Set();
+    const duplicatesToDelete = [];
+
+    students = students.filter(student => {
+        const studentIdentifier = `${student.studentName}-${student.tutorEmail}`;
+        if (seenStudents.has(studentIdentifier)) {
+            duplicatesToDelete.push({ id: student.id, collection: student.collection });
+            return false; // Filter out duplicates
+        }
+        seenStudents.add(studentIdentifier);
+        return true; // Keep the first instance
+    });
+
+    if (duplicatesToDelete.length > 0) {
+        const batch = writeBatch(db);
+        duplicatesToDelete.forEach(dup => {
+            batch.delete(doc(db, dup.collection, dup.id));
+        });
+        await batch.commit();
+        console.log(`Cleaned up ${duplicatesToDelete.length} duplicate student entries.`);
+    }
+    // END: Duplicate Student Cleanup
+
     const studentsCount = students.length;
 
     function renderUI() {
@@ -467,6 +492,16 @@ async function renderStudentDatabase(container, tutor) {
                 }
 
                 try {
+                    // Check for existing students before adding
+                    const existingStudentQuery = query(collection(db, "students"), where("tutorEmail", "==", tutorEmail), where("studentName", "==", studentName));
+                    const existingPendingQuery = query(collection(db, "pending_students"), where("tutorEmail", "==", tutorEmail), where("studentName", "==", studentName));
+                    const [existingStudentSnapshot, existingPendingSnapshot] = await Promise.all([getDocs(existingStudentQuery), getDocs(existingPendingQuery)]);
+
+                    if (!existingStudentSnapshot.empty || !existingPendingSnapshot.empty) {
+                        showCustomAlert(`A student with the name "${studentName}" has already been added.`);
+                        return; // Stop the function from proceeding
+                    }
+                    
                     const studentData = {
                         parentName: parentName, parentPhone: parentPhone,
                         studentName: studentName, grade: studentGrade,
@@ -506,12 +541,12 @@ async function renderStudentDatabase(container, tutor) {
             showAccountDetailsModal(Object.values(savedReports));
         });
         
-         document.querySelectorAll('.summer-break-btn').forEach(button => {
+        document.querySelectorAll('.summer-break-btn').forEach(button => {
              button.addEventListener('click', async (e) => {
-                if(confirm("Are you sure you want to mark this student as on summer break?")){
-                    await updateDoc(doc(db, "students", e.target.dataset.studentId), { summerBreak: true });
-                    renderStudentDatabase(container, tutor);
-                }
+                 if(confirm("Are you sure you want to mark this student as on summer break?")){
+                     await updateDoc(doc(db, "students", e.target.dataset.studentId), { summerBreak: true });
+                     renderStudentDatabase(container, tutor);
+                 }
              });
          });
 
