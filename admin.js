@@ -1,4 +1,4 @@
-import { auth, db } from './firebaseConfig.js';
+let activeTutorId = null; // Keep track of the currently viewed tutorimport { auth, db } from './firebaseConfig.js';
 import { collection, getDocs, doc, addDoc, query, where, getDoc, updateDoc, setDoc, deleteDoc, orderBy, writeBatch, Timestamp } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
 import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-auth.js";
 import { onSnapshot } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
@@ -545,7 +545,6 @@ async function setupContentManager() {
 let globalSettings = {
     showEditDeleteButtons: false
 };
-let activeTutorId = null; // Keep track of the currently viewed tutor
 
 // Helper function to generate the new student form fields for the admin panel
 function getAdminStudentFormFields() {
@@ -1732,6 +1731,7 @@ onAuthStateChanged(auth, async (user) => {
     }
     // ...
 });
+
 
 
 
