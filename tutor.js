@@ -1,5 +1,3 @@
-// This file has been updated to include logic for the new admin toggles.
-
 import { auth, db } from './firebaseConfig.js';
 import { collection, getDocs, doc, updateDoc, getDoc, where, query, addDoc, writeBatch, deleteDoc } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
 import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-auth.js";
@@ -27,7 +25,7 @@ onSnapshot(settingsDocRef, (docSnap) => {
         isEditDeleteEnabled = data.isEditDeleteEnabled || false; // NEW: Reading the value from Firestore
         isTotalFeeEnabled = data.isTotalFeeEnabled || false; // NEW: Reading the value from Firestore
         isBypassApprovalEnabled = data.bypassPendingApproval || false; // NEW: Reading the value from Firestore
-        
+
         // Re-render the student database if the page is currently active
         const mainContent = document.getElementById('mainContent');
         if (mainContent.querySelector('#student-list-view')) {
@@ -43,7 +41,7 @@ onSnapshot(adminSettingsRef, (docSnap) => {
         const data = docSnap.data();
         subjectsFromAdmin = data.subjects || [];
         gradesFromAdmin = data.grades || [];
-        
+
         // Re-render the student database if the page is currently active
         const mainContent = document.getElementById('mainContent');
         if (mainContent.querySelector('#student-list-view')) {
@@ -106,12 +104,12 @@ async function loadTutorReports(tutorEmail, parentName = null) {
                         ${data.fileUrl ? `<a href="${data.fileUrl}" target="_blank" class="text-green-600 hover:underline">Download File</a>` : `<p class="italic">${data.textAnswer || "No response"}</p>`}
                         <p class="mt-2"><strong>Status:</strong> ${data.status || 'Pending'}</p>
                         ${(data.status === 'pending_review') ?
-                            `
+                `
                             <textarea class="tutor-report w-full mt-2 p-2 border rounded" rows="3" placeholder="Write your report here..."></textarea>
                             <button class="submit-report-btn bg-green-600 text-white px-4 py-2 rounded mt-2" data-doc-id="${doc.id}">Submit Report</button>
                         ` : `
                             <p class="mt-2"><strong>Tutor's Report:</strong> ${data.tutorReport ||
-                                'N/A'}</p>
+                'N/A'}</p>
                         `}
                     </div>
                 </div>
@@ -175,10 +173,10 @@ async function renderStudentDatabase(container, tutor) {
     function renderUI() {
         const availableSubjects = subjectsFromAdmin.length > 0 ?
             subjectsFromAdmin : defaultSubjects;
-        let subjectsCheckboxes = availableSubjects.map(subject => 
+        let subjectsCheckboxes = availableSubjects.map(subject =>
             `<label class="inline-flex items-center mt-3 mr-4"><input type="checkbox" name="subject" value="${subject}" class="form-checkbox h-5 w-5 text-green-600"><span class="ml-2 text-gray-700">${subject}</span></label>`
         ).join('');
-        let gradesOptions = gradesFromAdmin.map(grade => 
+        let gradesOptions = gradesFromAdmin.map(grade =>
             `<option value="${grade}">${grade}</option>`
         ).join('');
         if (gradesOptions === '' && gradesFromAdmin.length === 0) {
@@ -186,7 +184,7 @@ async function renderStudentDatabase(container, tutor) {
                              <option value="Kindergarten">Kindergarten</option>
                              ${Array.from({ length: 12 }, (_, i) => `<option value="${i + 1}">${i + 1}</option>`).join('')}`;
         }
-        
+
         let studentsHTML = `<h2 class="text-2xl font-bold text-green-700 mb-4">My Students (${studentsCount})</h2>`;
         if (isTutorAddEnabled) {
             studentsHTML += `
@@ -214,7 +212,7 @@ async function renderStudentDatabase(container, tutor) {
                 </div>
             `;
         }
-        
+
         studentsHTML += `<p class="text-sm text-gray-600 mb-4">Report submission is currently <strong class="${isSubmissionEnabled ? 'text-green-600' : 'text-red-500'}">${isSubmissionEnabled ?
             'Enabled' : 'Disabled'}</strong> by the admin.</p>`;
 
@@ -232,7 +230,7 @@ async function renderStudentDatabase(container, tutor) {
 
                 let statusHTML = '';
                 let actionsHTML = '';
-                
+
                 const subjects = Array.isArray(student.subjects) ? student.subjects.join(', ') : student.subjects;
                 const days = student.days ? `${student.days} days/week` : 'N/A';
                 const studentFee = isTotalFeeEnabled && student.studentFee ? `| Total Fee: ₦${student.studentFee}` : ''; // NEW: Conditional display of fees
@@ -246,7 +244,7 @@ async function renderStudentDatabase(container, tutor) {
                 } else {
                     statusHTML = `<span class="status-indicator ${isReportSaved ? 'text-green-600 font-semibold' : 'text-gray-500'}">${isReportSaved ?
                         'Report Saved' : 'Pending Report'}</span>`;
-                    
+
                     if (isEditDeleteEnabled) { // NEW: Conditional display of edit/delete buttons
                         actionsHTML += `<button class="edit-student-btn bg-blue-500 text-white px-3 py-1 rounded hover:bg-blue-600" data-student-id="${student.id}" data-is-pending="false">Edit</button>
                                         <button class="delete-student-btn bg-red-500 text-white px-3 py-1 rounded hover:bg-red-600" data-student-id="${student.id}" data-is-pending="false">Delete</button>`;
@@ -269,7 +267,7 @@ async function renderStudentDatabase(container, tutor) {
                         actionsHTML += `<span class="text-gray-400">Submission Disabled</span>`;
                     }
                 }
-                
+
                 studentsHTML += `
                     <tr>
                         <td class="px-6 py-4 whitespace-nowrap">
@@ -282,7 +280,7 @@ async function renderStudentDatabase(container, tutor) {
             });
 
             studentsHTML += `</tbody></table></div>`;
-            
+
             if (tutor.isManagementStaff) {
                 studentsHTML += `
                     <div class="bg-green-50 p-4 rounded-lg shadow-md mt-6">
@@ -302,7 +300,7 @@ async function renderStudentDatabase(container, tutor) {
                 studentsHTML += `
                     <div class="mt-6 text-right">
                         <button id="submit-all-reports-btn" class="bg-green-700 text-white px-6 py-3 rounded-lg font-bold ${!allReportsSaved ? 'opacity-50 cursor-not-allowed' : 'hover:bg-green-800'}" ${!allReportsSaved ?
-                            'disabled' : ''}>
+                        'disabled' : ''}>
                             Submit All Reports
                         </button>
                     </div>`;
@@ -316,26 +314,26 @@ async function renderStudentDatabase(container, tutor) {
         const existingReport = savedReports[student.id] ||
             {};
         const isSingleApprovedStudent = approvedStudents.filter(s => !s.summerBreak).length === 1;
-        
+
         const reportFormHTML = `
             <h3 class="text-xl font-bold mb-4">Monthly Report for ${student.studentName}</h3>
             <div class="space-y-4">
                 <div><label class="block font-semibold">Introduction</label><textarea id="report-intro" class="w-full mt-1 p-2 border rounded" rows="2">${existingReport.introduction ||
-                    ''}</textarea></div>
+            ''}</textarea></div>
                 <div><label class="block font-semibold">Topics & Remarks</label><textarea id="report-topics" class="w-full mt-1 p-2 border rounded" rows="3">${existingReport.topics ||
-                    ''}</textarea></div>
+            ''}</textarea></div>
                 <div><label class="block font-semibold">Progress & Achievements</label><textarea id="report-progress" class="w-full mt-1 p-2 border rounded" rows="2">${existingReport.progress ||
-                    ''}</textarea></div>
+            ''}</textarea></div>
                 <div><label class="block font-semibold">Strengths & Weaknesses</label><textarea id="report-sw" class="w-full mt-1 p-2 border rounded" rows="2">${existingReport.strengthsWeaknesses ||
-                    ''}</textarea></div>
+            ''}</textarea></div>
                 <div><label class="block font-semibold">Recommendations</label><textarea id="report-recs" class="w-full mt-1 p-2 border rounded" rows="2">${existingReport.recommendations ||
-                    ''}</textarea></div>
+            ''}</textarea></div>
                 <div><label class="block font-semibold">General Comments</label><textarea id="report-general" class="w-full mt-1 p-2 border rounded" rows="2">${existingReport.generalComments ||
-                    ''}</textarea></div>
+            ''}</textarea></div>
                 <div class="flex justify-end space-x-2">
                     <button id="cancel-report-btn" class="bg-gray-500 text-white px-6 py-2 rounded">Cancel</button>
                     <button id="modal-action-btn" class="bg-green-600 text-white px-6 py-2 rounded">${isSingleApprovedStudent ?
-                        'Proceed to Submit' : 'Save Report'}</button>
+                'Proceed to Submit' : 'Save Report'}</button>
                 </div>
             </div>`;
         const reportModal = document.createElement('div');
@@ -485,7 +483,7 @@ async function renderStudentDatabase(container, tutor) {
                 messageEl.textContent = "Student added to pending list for admin approval.";
             }
             messageEl.style.color = 'green';
-            document.getElementById('add-student-form').reset(); // Assuming there's a form with this ID
+            //document.getElementById('add-student-form').reset(); // Assuming there's a form with this ID
             renderStudentDatabase(document.getElementById('mainContent'), window.tutorData);
         } catch (error) {
             console.error("Error adding student:", error);
@@ -618,11 +616,6 @@ function initializeTutorPanel() {
     const mainContent = document.getElementById('mainContent');
     const navDashboard = document.getElementById('navDashboard');
     const navStudentDatabase = document.getElementById('navStudentDatabase');
-    const navSupport = document.getElementById('navSupport');
-
-    navSupport.addEventListener('click', () => {
-        mainContent.innerHTML = `<h2 class="text-2xl font-bold text-green-700 mb-4">Support & Feedback</h2><p>For any issues or suggestions, please contact the admin.</p>`;
-    });
 
     function setActiveNav(activeButton) {
         navDashboard.classList.remove('active');
