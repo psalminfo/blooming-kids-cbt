@@ -214,12 +214,6 @@ function showEditStudentModal(student) {
         <option value="College" ${student.grade === 'College' ? 'selected' : ''}>College</option>
         <option value="Adults" ${student.grade === 'Adults' ? 'selected' : ''}>Adults</option>
     `;
-
-    // Generate Fee Options with the current fee selected
-    let feeOptions = '<option value="">Select Fee (₦)</option>';
-    for (let fee = 20000; fee <= 200000; fee += 5000) {
-        feeOptions += `<option value="${fee}" ${student.studentFee === fee ? 'selected' : ''}>${fee.toLocaleString()}</option>`;
-    }
     
     // Generate Days Options with the current days selected
     let daysOptions = '<option value="">Select Days per Week</option>';
@@ -280,7 +274,9 @@ function showEditStudentModal(student) {
             </div>
             <div>
                 <label class="block font-semibold">Fee (₦)</label>
-                <select id="edit-student-fee" class="w-full mt-1 p-2 border rounded">${feeOptions}</select>
+                <input type="text" id="edit-student-fee" class="w-full mt-1 p-2 border rounded" 
+                       value="${(student.studentFee || 0).toLocaleString()}" 
+                       placeholder="Enter fee (e.g., 50,000)">
             </div>
             <div class="flex justify-end space-x-2 mt-6">
                 <button id="cancel-edit-btn" class="bg-gray-500 text-white px-6 py-2 rounded">Cancel</button>
@@ -309,10 +305,18 @@ function showEditStudentModal(student) {
         });
 
         const studentDays = document.getElementById('edit-student-days').value.trim();
-        const studentFee = parseFloat(document.getElementById('edit-student-fee').value);
+        
+        // Parse the fee value (remove commas and convert to number)
+        const feeValue = document.getElementById('edit-student-fee').value.trim();
+        const studentFee = parseFloat(feeValue.replace(/,/g, ''));
 
         if (!parentName || !studentName || !studentGrade || isNaN(studentFee) || !parentPhone || !studentDays || selectedSubjects.length === 0) {
             showCustomAlert('Please fill in all parent and student details correctly, including at least one subject.');
+            return;
+        }
+
+        if (isNaN(studentFee) || studentFee < 0) {
+            showCustomAlert('Please enter a valid fee amount.');
             return;
         }
 
