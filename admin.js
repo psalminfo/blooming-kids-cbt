@@ -543,280 +543,222 @@ async function setupContentManager() {
 
 // --- Global state for settings ---
 let globalSettings = {
-    showEditDeleteButtons: false
+    isReportEnabled: false,
+    isTutorAddEnabled: false,
+    bypassPendingApproval: false,
+    isSummerBreakEnabled: false,
+    showEditDeleteButtons: false, // NEW
+    showIndividualStudentFee: false, // NEW
 };
-// Helper function to generate the new student form fields for the admin panel
-function getAdminStudentFormFields() {
-    // Generate Grade Options
-    const gradeOptions = `
-        <option value="">Select Grade</option>
-        <option value="Preschool">Preschool</option>
-        <option value="Kindergarten">Kindergarten</option>
-        ${Array.from({ length: 12 }, (_, i) => `<option value="Grade ${i + 1}">Grade ${i + 1}</option>`).join('')}
-        <option value="Pre-College">Pre-College</option>
-        <option value="College">College</option>
-        <option value="Adults">Adults">Adults</option>
-    `;
-
-    // Generate Fee Options
-    let feeOptions = '<option value="">Select Fee (₦)</option>';
-    for (let fee = 20000; fee <= 200000; fee += 5000) {
-        feeOptions += `<option value="${fee}">${fee.toLocaleString()}</option>`;
-    }
-
-    // Define Subjects
-    const subjectsByCategory = {
-        "Academics": ["Math", "Language Arts", "Geography", "Science", "Biology", "Physics", "Chemistry"],
-        "Pre-College Exams": ["SAT", "IGCSE", "A-Levels", "SSCE", "JAMB"],
-        "Languages": ["French", "German", "Spanish", "Yoruba", "Igbo", "Hausa"],
-        "Tech Courses": ["Coding", "Stop motion animation", "YouTube for kids", "Graphic design", "Videography", "Comic/book creation", "Artificial Intelligence", "Chess"],
-        "Support Programs": ["Bible study", "Child counseling programs",
-        "Speech therapy", "Behavioral therapy", "Public speaking", "Adult education", "Communication skills"]
-    };
-    let subjectsHTML = `<h5 class="font-semibold text-gray-700">Subjects</h5><div id="new-student-subjects-container" class="space-y-2 border p-3 rounded bg-white max-h-48 overflow-y-auto">`;
-    for (const category in subjectsByCategory) {
-        subjectsHTML += `
-            <details>
-                <summary class="font-semibold cursor-pointer text-sm">${category}</summary>
-                <div class="pl-4 grid grid-cols-2 sm:grid-cols-3 gap-2 mt-2">
-                    ${subjectsByCategory[category].map(subject => `<div><label class="text-sm font-normal"><input type="checkbox" name="subjects" value="${subject}"> ${subject}</label></div>`).join('')}
-                </div>
-            </details>
-        `;
-    }
-    subjectsHTML += `
-        <div class="font-semibold pt-2 border-t"><label class="text-sm"><input type="checkbox" name="subjects" value="Music"> Music</label></div>
-    </div>`;
-    return { gradeOptions, feeOptions, subjectsHTML };
-}
 
 async function renderTutorManagementPanel(container) {
+    const { gradeOptions, feeOptions, subjectsHtml } = getAdminStudentFormFields();
+
     container.innerHTML = `
         <div class="bg-white p-6 rounded-lg shadow-md mb-6">
             <h2 class="text-2xl font-bold text-green-700 mb-4">Global Settings</h2>
-            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-6">
-                <label class="flex items-center"><span class="text-gray-700 font-semibold mr-4">Report Submission:</span><label class="relative inline-flex items-center cursor-pointer"><input type="checkbox" id="report-toggle" class="sr-only peer"><div class="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:after:translate-x-full
-peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div><span id="report-status-label" class="ml-3 text-sm font-medium"></span></label></label>
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
+                <label class="flex items-center"><span class="text-gray-700 font-semibold mr-4">Report Submission:</span><label class="relative inline-flex items-center cursor-pointer"><input type="checkbox" id="report-toggle" class="sr-only peer"><div class="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div><span id="report-status-label" class="ml-3 text-sm font-medium"></span></label></label>
                 <label class="flex items-center"><span class="text-gray-700 font-semibold mr-4">Tutors Can Add Students:</span><label class="relative inline-flex items-center cursor-pointer"><input type="checkbox" id="tutor-add-toggle" class="sr-only peer"><div class="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div><span id="tutor-add-status-label" class="ml-3 text-sm font-medium"></span></label></label>
-                <label class="flex items-center"><span class="text-gray-700 font-semibold mr-4">Enable Summer Break:</span><label class="relative inline-flex items-center cursor-pointer"><input type="checkbox" id="summer-break-toggle" class="sr-only
-peer"><div class="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div><span id="summer-break-status-label" class="ml-3 text-sm font-medium"></span></label></label>
-                <label class="flex items-center"><span class="text-gray-700 font-semibold mr-4">Show Student Fees:</span><label class="relative inline-flex items-center cursor-pointer"><input type="checkbox" id="show-fees-toggle" class="sr-only peer"><div class="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div><span id="show-fees-status-label" class="ml-3 text-sm font-medium"></span></label></label>
-                <label class="flex items-center"><span class="text-gray-700 font-semibold mr-4">Student Edit/Delete:</span><label class="relative inline-flex
-items-center cursor-pointer"><input type="checkbox" id="edit-delete-toggle" class="sr-only peer"><div class="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div><span id="edit-delete-status-label" class="ml-3 text-sm font-medium"></span></label></label>
-                <label class="flex items-center"><span class="text-gray-700 font-semibold mr-4">Direct Student Add:</span><label class="relative inline-flex items-center cursor-pointer"><input type="checkbox" id="bypass-approval-toggle" class="sr-only peer"><div class="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border after:rounded-full after:h-5 after-w-5 after:transition-all peer-checked:bg-blue-600"></div><span id="bypass-approval-status-label" class="ml-3 text-sm font-medium"></span></label></label>
+                <label class="flex items-center"><span class="text-gray-700 font-semibold mr-4">Enable Summer Break:</span><label class="relative inline-flex items-center cursor-pointer"><input type="checkbox" id="summer-break-toggle" class="sr-only peer"><div class="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div><span id="summer-break-status-label" class="ml-3 text-sm font-medium"></span></label></label>
+                <label class="flex items-center"><span class="text-gray-700 font-semibold mr-4">Show Edit/Delete:</span><label class="relative inline-flex items-center cursor-pointer"><input type="checkbox" id="edit-delete-toggle" class="sr-only peer"><div class="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div><span id="edit-delete-status-label" class="ml-3 text-sm font-medium"></span></label></label>
+                <label class="flex items-center"><span class="text-gray-700 font-semibold mr-4">Show Student Fee:</span><label class="relative inline-flex items-center cursor-pointer"><input type="checkbox" id="student-fee-toggle" class="sr-only peer"><div class="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div><span id="student-fee-status-label" class="ml-3 text-sm font-medium"></span></label></label>
+                <label class="flex items-center"><span class="text-gray-700 font-semibold mr-4">Bypass Pending Approval:</span><label class="relative inline-flex items-center cursor-pointer"><input type="checkbox" id="bypass-approval-toggle" class="sr-only peer"><div class="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div><span id="bypass-approval-status-label" class="ml-3 text-sm font-medium"></span></label></label>
             </div>
         </div>
-
         <div class="bg-white p-6 rounded-lg shadow-md mb-6">
-            <h2 class="text-2xl font-bold text-green-700 mb-4">Grades & Subjects Management</h2>
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                    <h3 class="text-xl font-bold text-gray-700 mb-2">Manage Grades</h3>
-                    <div class="flex mb-4">
-                        <input type="text" id="new-grade-input" class="w-full p-2 border rounded-l" placeholder="e.g., Grade 1, JSS 2">
-                        <button id="add-grade-btn" class="bg-blue-600 text-white px-4 py-2 rounded-r hover:bg-blue-700">Add Grade</button>
-                    </div>
-                    <ul id="grades-list" class="space-y-2"></ul>
-                </div>
-                <div>
-                    <h3 class="text-xl font-bold text-gray-700 mb-2">Manage Subjects</h3>
-                    <div class="flex mb-4">
-                        <input type="text" id="new-subject-input" class="w-full p-2 border rounded-l" placeholder="e.g., Mathematics, Geography">
-                        <button id="add-subject-btn" class="bg-blue-600 text-white px-4 py-2 rounded-r hover:bg-blue-700">Add Subject</button>
-                    </div>
-                    <ul id="subjects-list" class="space-y-2"></ul>
-                </div>
-            </div>
-        </div>
-
-        <div class="bg-white p-6 rounded-lg shadow-md">
-            <div class="flex justify-between items-start mb-4">
-                <h3 class="text-2xl font-bold text-green-700">Manage Tutors</h3>
-                <div class="flex space-x-4">
-                    <div class="bg-blue-100 p-3 rounded-lg text-center shadow"><h4 class="font-bold text-blue-800 text-sm">Total Tutors</h4><p id="tutor-count-badge" class="text-2xl text-blue-600 font-extrabold">0</p></div>
-                    <div class="bg-green-100 p-3 rounded-lg text-center shadow"><h4 class="font-bold text-green-800 text-sm">Total Students</h4><p id="student-count-badge" class="text-2xl text-green-600 font-extrabold">0</p></div>
-                </div>
-            </div>
-
+            <h2 class="text-2xl font-bold text-green-700 mb-4">Manage Tutors & Students</h2>
             <div class="mb-4">
-                <label for="global-search-bar" class="block font-semibold">Search Student, Parent, or Tutor:</label>
-                <input type="search" id="global-search-bar" class="w-full p-2 border rounded mt-1" placeholder="Start typing a name...">
+                <input type="text" id="global-search-tutors" class="w-full mt-1 p-2 border rounded" placeholder="Search for tutors or students...">
             </div>
-            <div id="global-search-results" class="mb-4"></div>
-
-            <div id="tutor-management-area">
-                <div class="mb-4">
-                    <label for="tutor-select" class="block font-semibold">Select Tutor Manually:</label>
-                    <select id="tutor-select" class="w-full p-2 border rounded mt-1"></select>
+            <div id="tutor-management-area" class="space-y-4">
+                <p class="text-gray-500">Search for a tutor or student to manage their details.</p>
+            </div>
+            <div id="global-search-results" class="mt-4 space-y-4"></div>
+        </div>
+        <div id="tutor-student-form-container" class="bg-white p-6 rounded-lg shadow-md hidden">
+            <h2 class="text-2xl font-bold text-green-700 mb-4" id="form-title">Add New Student to Tutor</h2>
+            <form id="tutor-student-form">
+                <input type="hidden" id="form-tutor-email">
+                <input type="hidden" id="form-student-id">
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <div class="mb-4"><label for="studentName" class="block text-gray-700">Student Name</label><input type="text" id="studentName" class="w-full mt-1 p-2 border rounded" required></div>
+                    <div class="mb-4"><label for="parentName" class="block text-gray-700">Parent Name</label><input type="text" id="parentName" class="w-full mt-1 p-2 border rounded" required></div>
+                    <div class="mb-4"><label for="grade" class="block text-gray-700">Grade</label><select id="grade" required class="w-full mt-1 p-2 border rounded">${gradeOptions}</select></div>
+                    <div class="mb-4"><label for="subjects" class="block text-gray-700">Subjects</label><select id="subjects" required multiple class="w-full mt-1 p-2 border rounded">${subjectsHtml}</select></div>
+                    <div class="mb-4"><label for="days" class="block text-gray-700">Days</label><input type="text" id="days" class="w-full mt-1 p-2 border rounded" required></div>
+                    <div class="mb-4"><label for="studentFee" class="block text-gray-700">Student Fee (₦)</label><select id="studentFee" required class="w-full mt-1 p-2 border rounded">${feeOptions}</select></div>
+                    <div class="mb-4"><label for="tutor" class="block text-gray-700">Tutor</label><select id="tutor" required class="w-full mt-1 p-2 border rounded"></select></div>
                 </div>
-                <div id="selected-tutor-details" class="mt-4"><p class="text-gray-500">Please select a tutor to view details.</p></div>
-            </div>
+                <div class="flex space-x-4 mt-4">
+                    <button type="submit" class="bg-green-600 text-white px-6 py-2 rounded hover:bg-green-700" id="form-submit-btn">Save Student</button>
+                    <button type="button" class="bg-gray-400 text-white px-6 py-2 rounded hover:bg-gray-500" id="form-cancel-btn">Cancel</button>
+                </div>
+            </form>
+            <p id="formMessage" class="mt-4 text-sm"></p>
+        </div>
+        <div id="pending-students-container" class="bg-white p-6 rounded-lg shadow-md mt-6 hidden">
+            <h2 class="text-2xl font-bold text-green-700 mb-4">Pending Student Approvals</h2>
+            <div id="pending-students-list"></div>
         </div>
     `;
     setupTutorManagementListeners();
+    await loadTutorsForForm();
 }
 
-// #### THIS IS THE FIRST CORRECTED FUNCTION ####
 async function setupTutorManagementListeners() {
-    // --- GLOBAL SETTINGS LISTENERS ---
+    const reportToggle = document.getElementById('report-toggle');
+    const reportStatusLabel = document.getElementById('report-status-label');
+    const tutorAddToggle = document.getElementById('tutor-add-toggle');
+    const tutorAddStatusLabel = document.getElementById('tutor-add-status-label');
+    const summerBreakToggle = document.getElementById('summer-break-toggle');
+    const summerBreakStatusLabel = document.getElementById('summer-break-status-label');
+    const editDeleteToggle = document.getElementById('edit-delete-toggle');
+    const editDeleteStatusLabel = document.getElementById('edit-delete-status-label');
+    const studentFeeToggle = document.getElementById('student-fee-toggle');
+    const studentFeeStatusLabel = document.getElementById('student-fee-status-label');
+    const bypassApprovalToggle = document.getElementById('bypass-approval-toggle');
+    const bypassApprovalStatusLabel = document.getElementById('bypass-approval-status-label');
+
     const settingsDocRef = doc(db, "settings", "global_settings");
+
+    // Real-time listener for global settings
     onSnapshot(settingsDocRef, (docSnap) => {
         if (docSnap.exists()) {
             const data = docSnap.data();
-            globalSettings = data; // Store all settings globally
-
-            // Standard toggles
-            ['report', 'tutor-add', 'summer-break', 'edit-delete', 'bypass-approval', 'show-fees'].forEach(type => {
-                const keyMap = {
-                    'report': 'isReportEnabled',
-                    'tutor-add': 'isTutorAddEnabled',
-                    'summer-break': 'isSummerBreakEnabled',
-                    'edit-delete': 'showEditDeleteButtons',
-                    'bypass-approval': 'bypassPendingApproval',
-                    'show-fees': 'showStudentFees'
-                };
-                const key = keyMap[type];
-                const toggle = document.getElementById(`${type}-toggle`);
-                const label = document.getElementById(`${type}-status-label`);
-                if (toggle && label) {
-                    toggle.checked = !!data[key];
-                    if (key === 'showEditDeleteButtons' || key === 'showStudentFees') {
-                        label.textContent = data[key] ? 'Enabled' : 'Disabled';
-                    } else if (key === 'bypassPendingApproval') {
-                        label.textContent = data[key] ? 'Bypass' : 'Pending';
-                    } else {
-                        label.textContent = data[key] ? 'Enabled' : 'Disabled';
-                    }
-                }
-            });
-            
-            // Re-render the selected tutor's details to reflect the new settings immediately
-            if (activeTutorId) {
-                renderSelectedTutorDetails(activeTutorId);
-            }
+            reportToggle.checked = data.isReportEnabled;
+            reportStatusLabel.textContent = data.isReportEnabled ? 'Enabled' : 'Disabled';
+            tutorAddToggle.checked = data.isTutorAddEnabled;
+            tutorAddStatusLabel.textContent = data.isTutorAddEnabled ? 'Enabled' : 'Disabled';
+            summerBreakToggle.checked = data.isSummerBreakEnabled;
+            summerBreakStatusLabel.textContent = data.isSummerBreakEnabled ? 'Enabled' : 'Disabled';
+            editDeleteToggle.checked = data.showEditDeleteButtons || false;
+            editDeleteStatusLabel.textContent = data.showEditDeleteButtons ? 'Enabled' : 'Disabled';
+            studentFeeToggle.checked = data.showStudentFee || false;
+            studentFeeStatusLabel.textContent = data.showStudentFee ? 'Enabled' : 'Disabled';
+            bypassApprovalToggle.checked = data.bypassPendingApproval || false;
+            bypassApprovalStatusLabel.textContent = data.bypassPendingApproval ? 'Enabled' : 'Disabled';
         }
     });
 
-    // --- Event Listeners for Toggles ---
-    document.getElementById('report-toggle')?.addEventListener('change', e => updateDoc(settingsDocRef, { isReportEnabled: e.target.checked }));
-    document.getElementById('tutor-add-toggle')?.addEventListener('change', e => updateDoc(settingsDocRef, { isTutorAddEnabled: e.target.checked }));
-    document.getElementById('summer-break-toggle')?.addEventListener('change', e => updateDoc(settingsDocRef, { isSummerBreakEnabled: e.target.checked }));
-    document.getElementById('edit-delete-toggle')?.addEventListener('change', e => updateDoc(settingsDocRef, { showEditDeleteButtons: e.target.checked }));
-    document.getElementById('bypass-approval-toggle')?.addEventListener('change', e => updateDoc(settingsDocRef, { bypassPendingApproval: e.target.checked }));
-    document.getElementById('show-fees-toggle')?.addEventListener('change', e => updateDoc(settingsDocRef, { showStudentFees: e.target.checked }));
-    
-    // --- The rest of the function remains the same ---
-    const curriculumDocRef = doc(db, "settings", "curriculum");
-    onSnapshot(curriculumDocRef, (docSnap) => {
-        if (docSnap.exists()) {
-            const data = docSnap.data();
-            const gradesList = document.getElementById('grades-list');
-            const subjectsList = document.getElementById('subjects-list');
-
-            gradesList.innerHTML = (data.grades || []).map(grade => `<li class="flex justify-between items-center bg-gray-100 p-2 rounded-md">${grade} <button class="delete-grade-btn text-red-500" data-grade="${grade}">✖</button></li>`).join('');
-            subjectsList.innerHTML = (data.subjects || []).map(subject => `<li class="flex justify-between items-center bg-gray-100 p-2 rounded-md">${subject} <button class="delete-subject-btn text-red-500" data-subject="${subject}">✖</button></li>`).join('');
-
-            document.querySelectorAll('.delete-grade-btn').forEach(btn => btn.addEventListener('click', async e => {
-                await updateDoc(curriculumDocRef, { grades: arrayRemove(e.target.dataset.grade) });
-            }));
-             document.querySelectorAll('.delete-subject-btn').forEach(btn => btn.addEventListener('click', async e => {
-                 await updateDoc(curriculumDocRef, { subjects: arrayRemove(e.target.dataset.subject) });
-            }));
-        }
+    // Event listeners for the toggles
+    reportToggle.addEventListener('change', async (e) => {
+        await updateDoc(settingsDocRef, { isReportEnabled: e.target.checked });
+    });
+    tutorAddToggle.addEventListener('change', async (e) => {
+        await updateDoc(settingsDocRef, { isTutorAddEnabled: e.target.checked });
+    });
+    summerBreakToggle.addEventListener('change', async (e) => {
+        await updateDoc(settingsDocRef, { isSummerBreakEnabled: e.target.checked });
+    });
+    editDeleteToggle.addEventListener('change', async (e) => {
+        await updateDoc(settingsDocRef, { showEditDeleteButtons: e.target.checked });
+    });
+    studentFeeToggle.addEventListener('change', async (e) => {
+        await updateDoc(settingsDocRef, { showStudentFee: e.target.checked });
+    });
+    bypassApprovalToggle.addEventListener('change', async (e) => {
+        await updateDoc(settingsDocRef, { bypassPendingApproval: e.target.checked });
     });
 
-    document.getElementById('add-grade-btn').addEventListener('click', async () => {
-        const input = document.getElementById('new-grade-input');
-        const newGrade = input.value.trim();
-        if (newGrade) {
-            await updateDoc(curriculumDocRef, { grades: arrayUnion(newGrade) }, { merge: true });
-            input.value = '';
-        }
-    });
-    document.getElementById('add-subject-btn').addEventListener('click', async () => {
-        const input = document.getElementById('new-subject-input');
-        const newSubject = input.value.trim();
-        if (newSubject) {
-            await updateDoc(curriculumDocRef, { subjects: arrayUnion(newSubject) }, { merge: true });
-            input.value = '';
-        }
-    });
-    const tutorSelect = document.getElementById('tutor-select');
-    onSnapshot(collection(db, "tutors"), (snapshot) => {
-        const tutorsData = {};
-        const tutorsByEmail = {};
-        tutorSelect.innerHTML = `<option value="">-- Select a Tutor --</option>`;
-        snapshot.forEach(doc => {
-            const tutor = { id: doc.id, ...doc.data() };
-            tutorsData[doc.id] = tutor;
-            tutorsByEmail[tutor.email] = tutor;
-            const option = document.createElement('option');
-            option.value = doc.id;
-            option.textContent = `${tutor.name} (${tutor.email})`;
-            tutorSelect.appendChild(option);
-        });
-        window.allTutorsData = tutorsData;
-        window.tutorsByEmail = tutorsByEmail;
-        document.getElementById('tutor-count-badge').textContent = snapshot.size;
-        if (activeTutorId && tutorsData[activeTutorId]) {
-            tutorSelect.value = activeTutorId;
-        }
-    });
-
-    onSnapshot(collection(db, "students"), (snapshot) => {
-        window.allStudentsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        document.getElementById('student-count-badge').textContent = snapshot.size;
-    });
-
-    tutorSelect.addEventListener('change', e => {
-        activeTutorId = e.target.value;
-        renderSelectedTutorDetails(activeTutorId);
-    });
-    const searchBar = document.getElementById('global-search-bar');
-    const searchResultsContainer = document.getElementById('global-search-results');
-    const tutorManagementArea = document.getElementById('tutor-management-area');
-    searchBar.addEventListener('input', (e) => {
-        const searchTerm = e.target.value.toLowerCase().trim();
-        if (searchTerm.length < 2) {
-            searchResultsContainer.innerHTML = '';
-            tutorManagementArea.style.display = 'block';
-            return;
-        }
-        tutorManagementArea.style.display = 'none';
-        const { allStudentsData = [], tutorsByEmail = {} } = window;
-        const results = allStudentsData.filter(student => {
-            const tutor = tutorsByEmail[student.tutorEmail] || { name: 'N/A' };
-            return (
-                student.studentName?.toLowerCase().includes(searchTerm) ||
-                student.parentName?.toLowerCase().includes(searchTerm) ||
-                tutor.name?.toLowerCase().includes(searchTerm)
-            );
-        });
-        if (results.length > 0) {
-            searchResultsContainer.innerHTML = `
-                <h4 class="font-bold mb-2">${results.length} matching student(s) found:</h4>
-                <ul class="space-y-2 border rounded-lg p-2">${results.map(student => {
-                    const tutor = Object.values(window.allTutorsData).find(t => t.email === student.tutorEmail) || { id: '', name: 'Unassigned' };
-                    return `
-                        <li class="flex justify-between items-center bg-gray-50 p-2 rounded-md">
-                            <div>
-                                <p class="font-semibold">${student.studentName} (Parent: ${student.parentName || 'N/A'})</p>
-                                <p class="text-sm text-gray-600">Assigned to: ${tutor.name}</p>
-                            </div>
-                            <div class="space-x-2">
-                                <button class="bg-blue-500 text-white px-3 py-1 rounded hover:bg-blue-600 transition" onclick="showStudentDetailsForAdmin('${student.id}')">View</button>
-                                ${globalSettings.showEditDeleteButtons ? `<button class="bg-green-500 text-white px-3 py-1 rounded hover:bg-green-600 transition" onclick="editStudent('${student.id}')">Edit</button>
-                                <button class="bg-red-500 text-white px-3 py-1 rounded hover:bg-red-600 transition" onclick="deleteStudentForAdmin('${student.id}')">Delete</button>` : ''}
-                            </div>
-                        </li>
-                    `;
-                }).join('')}</ul>
-            `;
+    // Global Search Functionality
+    const globalSearchInput = document.getElementById('global-search-tutors');
+    globalSearchInput.addEventListener('input', async (e) => {
+        const query = e.target.value.trim().toLowerCase();
+        if (query.length > 2) {
+            await performGlobalSearch(query);
         } else {
-            searchResultsContainer.innerHTML = '<p class="text-gray-500">No matching students found.</p>';
+            document.getElementById('global-search-results').innerHTML = '';
         }
     });
 
+    const formContainer = document.getElementById('tutor-student-form-container');
+    const formCancelBtn = document.getElementById('form-cancel-btn');
+    const form = document.getElementById('tutor-student-form');
+
+    formCancelBtn.addEventListener('click', () => {
+        formContainer.classList.add('hidden');
+        form.reset();
+        activeTutorId = null;
+    });
+
+    form.addEventListener('submit', handleTutorStudentFormSubmit);
+
+    document.getElementById('pending-students-container').classList.remove('hidden');
+    renderPendingApprovalsPanel();
+}
+
+async function performGlobalSearch(queryText) {
+    const resultsContainer = document.getElementById('global-search-results');
+    resultsContainer.innerHTML = `<p class="text-gray-500">Searching...</p>`;
+    const tutorManagementArea = document.getElementById('tutor-management-area');
+
+    try {
+        const tutorsRef = collection(db, "tutors");
+        const studentsRef = collection(db, "students");
+
+        const tutorsQuery = query(tutorsRef, where("name", ">=", queryText), where("name", "<=", queryText + '\uf8ff'));
+        const studentsQuery = query(studentsRef, where("studentName", ">=", queryText), where("studentName", "<=", queryText + '\uf8ff'));
+        
+        const [tutorsSnapshot, studentsSnapshot] = await Promise.all([
+            getDocs(tutorsQuery),
+            getDocs(studentsQuery)
+        ]);
+
+        let resultsHtml = '';
+        
+        // Tutor Results
+        tutorsSnapshot.forEach(doc => {
+            const tutor = doc.data();
+            resultsHtml += `
+                <div class="bg-gray-100 p-4 rounded-lg flex justify-between items-center tutor-result" data-tutor-id="${doc.id}">
+                    <div>
+                        <p class="font-bold">${tutor.name} (Tutor)</p>
+                        <p class="text-sm text-gray-600">${tutor.email}</p>
+                    </div>
+                    <button class="view-tutor-btn bg-blue-500 text-white px-3 py-1 rounded hover:bg-blue-600" data-tutor-id="${doc.id}">View Details</button>
+                </div>
+            `;
+        });
+        
+        // Student Results
+        studentsSnapshot.forEach(doc => {
+            const student = doc.data();
+            resultsHtml += `
+                <div class="bg-gray-100 p-4 rounded-lg flex justify-between items-center student-result" data-student-id="${doc.id}" data-tutor-id="${student.tutorEmail}">
+                    <div>
+                        <p class="font-bold">${student.studentName} (Student)</p>
+                        <p class="text-sm text-gray-600">Assigned Tutor: ${student.tutorName || 'N/A'}</p>
+                    </div>
+                    <button class="edit-student-btn bg-yellow-500 text-white px-3 py-1 rounded hover:bg-yellow-600" data-student-id="${doc.id}" data-tutor-email="${student.tutorEmail}">Edit</button>
+                </div>
+            `;
+        });
+
+        resultsContainer.innerHTML = resultsHtml || `<p class="text-gray-500">No matching tutors or students found.</p>`;
+        
+        // Hide the default area and show search results
+        tutorManagementArea.classList.add('hidden');
+
+        // Add event listeners for new buttons
+        document.querySelectorAll('.view-tutor-btn').forEach(button => {
+            button.addEventListener('click', (e) => {
+                const tutorId = e.target.dataset.tutorId;
+                renderSelectedTutorDetails(tutorId);
+            });
+        });
+        document.querySelectorAll('.edit-student-btn').forEach(button => {
+            button.addEventListener('click', async (e) => {
+                const studentId = e.target.dataset.studentId;
+                const tutorEmail = e.target.dataset.tutorEmail;
+                await openTutorStudentForm(studentId, tutorEmail);
+            });
+        });
+
+    } catch (error) {
+        console.error("Error performing global search:", error);
+        resultsContainer.innerHTML = `<p class="text-red-500">Error searching. Please try again.</p>`;
+    }
 }
 
 
@@ -1413,4 +1355,5 @@ onAuthStateChanged(auth, async (user) => {
         logoutBtn.classList.add('hidden');
     }
 });
+
 
