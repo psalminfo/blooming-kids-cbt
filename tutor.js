@@ -18,10 +18,6 @@ onSnapshot(settingsDocRef, (docSnap) => {
         isSummerBreakEnabled = data.isSummerBreakEnabled;
         isBypassApprovalEnabled = data.bypassPendingApproval; // NEW: Update the global setting
 
-        // FIX: The missing lines to update the globalSettings object
-        globalSettings.showEditDeleteButtons = data.showEditDeleteButtons;
-        globalSettings.showStudentFees = data.showStudentFees;
-
         // Re-render the student database if the page is currently active
         const mainContent = document.getElementById('mainContent');
      
@@ -587,7 +583,7 @@ async function renderStudentDatabase(container, tutor) {
             const feeInput = document.getElementById('management-fee-input');
             const newFee = parseFloat(feeInput.value);
             if (!isNaN(newFee) && newFee >= 0) {
-                const tutorRef = doc(db, "tutors", auth.currentUser.email);
+                const tutorRef = doc(db, "tutors", auth.currentUser.uid); // Use UID for security
                 await updateDoc(tutorRef, { managementFee: newFee });
  
                 showCustomAlert('Management fee updated successfully!');
