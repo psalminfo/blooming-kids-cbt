@@ -555,7 +555,7 @@ function getAdminStudentFormFields() {
         ${Array.from({ length: 12 }, (_, i) => `<option value="Grade ${i + 1}">Grade ${i + 1}</option>`).join('')}
         <option value="Pre-College">Pre-College</option>
         <option value="College">College</option>
-        <option value="Adults">Adults</option>
+        <option value="Adults">Adults">Adults</option>
     `;
 
     // Generate Fee Options
@@ -563,7 +563,7 @@ function getAdminStudentFormFields() {
     for (let fee = 20000; fee <= 200000; fee += 5000) {
         feeOptions += `<option value="${fee}">${fee.toLocaleString()}</option>`;
     }
-    
+
     // Define Subjects
     const subjectsByCategory = {
         "Academics": ["Math", "Language Arts", "Geography", "Science", "Biology", "Physics", "Chemistry"],
@@ -595,15 +595,15 @@ async function renderTutorManagementPanel(container) {
         <div class="bg-white p-6 rounded-lg shadow-md mb-6">
             <h2 class="text-2xl font-bold text-green-700 mb-4">Global Settings</h2>
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-6">
-                <label class="flex items-center"><span class="text-gray-700 font-semibold mr-4">Report Submission:</span><label class="relative inline-flex items-center cursor-pointer"><input type="checkbox" id="report-toggle" class="sr-only peer"><div class="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:after:translate-x-full 
+                <label class="flex items-center"><span class="text-gray-700 font-semibold mr-4">Report Submission:</span><label class="relative inline-flex items-center cursor-pointer"><input type="checkbox" id="report-toggle" class="sr-only peer"><div class="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:after:translate-x-full
 peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div><span id="report-status-label" class="ml-3 text-sm font-medium"></span></label></label>
                 <label class="flex items-center"><span class="text-gray-700 font-semibold mr-4">Tutors Can Add Students:</span><label class="relative inline-flex items-center cursor-pointer"><input type="checkbox" id="tutor-add-toggle" class="sr-only peer"><div class="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div><span id="tutor-add-status-label" class="ml-3 text-sm font-medium"></span></label></label>
-                <label class="flex items-center"><span class="text-gray-700 font-semibold mr-4">Enable Summer Break:</span><label class="relative inline-flex items-center cursor-pointer"><input type="checkbox" id="summer-break-toggle" class="sr-only 
+                <label class="flex items-center"><span class="text-gray-700 font-semibold mr-4">Enable Summer Break:</span><label class="relative inline-flex items-center cursor-pointer"><input type="checkbox" id="summer-break-toggle" class="sr-only
 peer"><div class="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div><span id="summer-break-status-label" class="ml-3 text-sm font-medium"></span></label></label>
                 <label class="flex items-center"><span class="text-gray-700 font-semibold mr-4">Show Student Fees:</span><label class="relative inline-flex items-center cursor-pointer"><input type="checkbox" id="show-fees-toggle" class="sr-only peer"><div class="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div><span id="show-fees-status-label" class="ml-3 text-sm font-medium"></span></label></label>
-                <label class="flex items-center"><span class="text-gray-700 font-semibold mr-4">Student Edit/Delete:</span><label class="relative inline-flex 
+                <label class="flex items-center"><span class="text-gray-700 font-semibold mr-4">Student Edit/Delete:</span><label class="relative inline-flex
 items-center cursor-pointer"><input type="checkbox" id="edit-delete-toggle" class="sr-only peer"><div class="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div><span id="edit-delete-status-label" class="ml-3 text-sm font-medium"></span></label></label>
-                <label class="flex items-center"><span class="text-gray-700 font-semibold mr-4">Direct Student Add:</span><label class="relative inline-flex items-center cursor-pointer"><input type="checkbox" id="bypass-approval-toggle" class="sr-only peer"><div class="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div><span id="bypass-approval-status-label" class="ml-3 text-sm font-medium"></span></label></label>
+                <label class="flex items-center"><span class="text-gray-700 font-semibold mr-4">Direct Student Add:</span><label class="relative inline-flex items-center cursor-pointer"><input type="checkbox" id="bypass-approval-toggle" class="sr-only peer"><div class="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border after:rounded-full after:h-5 after-w-5 after:transition-all peer-checked:bg-blue-600"></div><span id="bypass-approval-status-label" class="ml-3 text-sm font-medium"></span></label></label>
             </div>
         </div>
 
@@ -719,8 +719,8 @@ async function setupTutorManagementListeners() {
             document.querySelectorAll('.delete-grade-btn').forEach(btn => btn.addEventListener('click', async e => {
                 await updateDoc(curriculumDocRef, { grades: arrayRemove(e.target.dataset.grade) });
             }));
-            document.querySelectorAll('.delete-subject-btn').forEach(btn => btn.addEventListener('click', async e => {
-                await updateDoc(curriculumDocRef, { subjects: arrayRemove(e.target.dataset.subject) });
+             document.querySelectorAll('.delete-subject-btn').forEach(btn => btn.addEventListener('click', async e => {
+                 await updateDoc(curriculumDocRef, { subjects: arrayRemove(e.target.dataset.subject) });
             }));
         }
     });
@@ -1413,6 +1413,7 @@ onAuthStateChanged(auth, async (user) => {
         logoutBtn.classList.add('hidden');
     }
 });
+
 
 
 
