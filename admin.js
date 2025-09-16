@@ -547,8 +547,6 @@ let globalSettings = {
     showStudentFees: false,
     bypassPendingApproval: false
 };
-let activeTutorId = null; // To keep track of the selected tutor
-
 async function renderTutorManagementPanel(container) {
     container.innerHTML = `
         <div class="bg-white p-6 rounded-lg shadow-md mb-6">
@@ -1509,6 +1507,7 @@ onAuthStateChanged(auth, async (user) => {
         logoutBtn.classList.add('hidden');
     }
 });
+
 
 
 
