@@ -799,7 +799,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     document.getElementById('logoutBtn').addEventListener('click', () => {
         signOut(auth).then(() => {
-            window.location.href = 'login.html';
+            window.location.href = 'tutor-auth.html';
         }).catch(error => {
             console.error("Error signing out:", error);
         });
@@ -817,3 +817,4 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     });
 });
+
