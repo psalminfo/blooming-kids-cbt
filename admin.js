@@ -555,7 +555,7 @@ function getAdminStudentFormFields() {
         ${Array.from({ length: 12 }, (_, i) => `<option value="Grade ${i + 1}">Grade ${i + 1}</option>`).join('')}
         <option value="Pre-College">Pre-College</option>
         <option value="College">College</option>
-        <option value="Adults">Adults">Adults</option>
+        <option value="Adults">Adults</option>
     `;
 
     // Generate Fee Options
@@ -719,8 +719,8 @@ async function setupTutorManagementListeners() {
             document.querySelectorAll('.delete-grade-btn').forEach(btn => btn.addEventListener('click', async e => {
                 await updateDoc(curriculumDocRef, { grades: arrayRemove(e.target.dataset.grade) });
             }));
-             document.querySelectorAll('.delete-subject-btn').forEach(btn => btn.addEventListener('click', async e => {
-                 await updateDoc(curriculumDocRef, { subjects: arrayRemove(e.target.dataset.subject) });
+            document.querySelectorAll('.delete-subject-btn').forEach(btn => btn.addEventListener('click', async e => {
+                await updateDoc(curriculumDocRef, { subjects: arrayRemove(e.target.dataset.subject) });
             }));
         }
     });
@@ -817,6 +817,207 @@ async function setupTutorManagementListeners() {
         }
     });
 
+}
+
+async function renderSelectedTutorDetails(tutorId) {
+    const container = document.getElementById('selected-tutor-details');
+    if (!tutorId || !window.allTutorsData) {
+        container.innerHTML = `<p class="text-gray-500">Please select a tutor to view details.</p>`;
+        return;
+    }
+    const tutor = window.allTutorsData[tutorId];
+    // Check if the showEditDeleteButtons setting is enabled
+    const showEditDelete = window.globalSettings.showEditDeleteButtons;
+
+    onSnapshot(query(collection(db, "students"), where("tutorEmail", "==", tutor.email)), (studentsSnapshot) => {
+        const studentsListHTML = studentsSnapshot.docs.map(doc => {
+            const student = doc.data();
+            const studentId = doc.id;
+            const feeDisplay = window.globalSettings.showStudentFees ? ` - Fee: ₦${student.studentFee.toLocaleString()}` : '';
+            return `
+                <li class="flex justify-between items-center bg-gray-50 p-2 rounded-md" data-student-name="${student.studentName.toLowerCase()}">
+                    <span>${student.studentName} (Grade ${student.grade})${feeDisplay}</span>
+                    <div class="flex items-center space-x-2">
+                        ${showEditDelete ? `
+                            <button class="edit-student-btn text-blue-500 hover:text-blue-700 font-semibold" 
+                                data-student-id="${studentId}" 
+                                data-parent-name="${student.parentName || ''}" 
+                                data-student-name="${student.studentName}" 
+                                data-grade="${student.grade}" 
+                                data-subjects="${(student.subjects || []).join(', ')}" 
+                                data-days="${student.days}" 
+                                data-fee="${student.studentFee}"
+                            >Edit</button>
+                            <button class="delete-student-btn text-red-500 hover:text-red-700 font-semibold" data-student-id="${studentId}">Delete</button>
+                        ` : ''}
+                    </div>
+                </li>
+            `;
+        }).join('');
+        
+        // Render the main tutor details panel
+        container.innerHTML = `
+            <div class="p-4 border rounded-lg shadow-sm bg-blue-50">
+                <div class="flex items-center justify-between mb-4">
+                    <h4 class="font-bold text-xl">${tutor.name} (${studentsSnapshot.size} students)</h4>
+                    <label class="flex items-center space-x-2"><span class="font-semibold">Management Staff:</span><input type="checkbox" id="management-staff-toggle" class="h-5 w-5" ${tutor.isManagementStaff ? 'checked' : ''}></label>
+                </div>
+                <div class="mb-4">
+                    <p><strong>Students Assigned to ${tutor.name}:</strong></p>
+                    <input type="search" id="student-filter-bar" placeholder="Filter this list..." class="w-full p-2 border rounded mt-2 mb-2">
+                    <ul id="students-list-ul" class="space-y-2 mt-2">${studentsListHTML || '<p class="text-gray-500">No students assigned.</p>'}</ul>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 border-t pt-4">
+                    <div class="add-student-form space-y-2">
+                        <h5 class="font-semibold text-gray-700">Add/Edit Student Details:</h5>
+                        <input type="text" id="new-parent-name" class="w-full p-2 border rounded" placeholder="Parent Name">
+                        <input type="text" id="new-student-name" class="w-full p-2 border rounded" placeholder="Student Name">
+                        <select id="new-student-grade" class="w-full p-2 border rounded"><option value="">Select Grade</option>${getAdminStudentFormFields().gradeOptions}</select>
+                        <input type="text" id="new-student-subject" class="w-full p-2 border rounded" placeholder="Subject(s) (e.g., Math, English)">
+                        <select id="new-student-days" class="w-full p-2 border rounded"><option value="">Select Days per Week</option>${Array.from({ length: 7 }, (_, i) => `<option value="${i + 1}">${i + 1}</option>`).join('')}</select>
+                        <input type="number" id="new-student-fee" class="w-full p-2 border rounded" placeholder="Student Fee (₦)">
+                        <button id="add-student-btn" class="bg-green-600 text-white w-full px-4 py-2 rounded hover:bg-green-700">Add Student</button>
+                    </div>
+                    <div class="import-students-form">
+                        <h5 class="font-semibold text-gray-700">Import Students for ${tutor.name}:</h5>
+                        <p class="text-xs text-gray-500 mb-2">Upload a .csv or .xlsx file with columns: <strong>Parent Name, Student Name, Grade, Subjects, Days, Fee</strong></p>
+                        <input type="file" id="student-import-file" class="w-full p-2 border rounded">
+                        <button id="import-students-btn" class="bg-purple-600 text-white w-full px-4 py-2 rounded hover:bg-purple-700 mt-2">Import Students</button>
+                        <div id="import-status" class="mt-2 text-sm text-gray-600"></div>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        // Add event listeners for the new elements
+        document.getElementById('management-staff-toggle').addEventListener('change', async e => {
+            await updateDoc(doc(db, "tutors", tutorId), { isManagementStaff: e.target.checked });
+        });
+        document.getElementById('student-filter-bar').addEventListener('input', e => {
+            const filterTerm = e.target.value.toLowerCase();
+            document.querySelectorAll('#students-list-ul li').forEach(li => {
+                if (li.dataset.studentName.includes(filterTerm)) {
+                    li.style.display = '';
+                } else {
+                    li.style.display = 'none';
+                }
+            });
+        });
+        document.getElementById('add-student-btn').addEventListener('click', () => saveStudent(tutor));
+        document.getElementById('import-students-btn').addEventListener('click', () => handleStudentImport(tutor));
+
+        // Event listeners for Edit and Delete buttons
+        if (showEditDelete) {
+            document.querySelectorAll('.edit-student-btn').forEach(btn => {
+                btn.addEventListener('click', e => editStudent(e.target.dataset.studentId));
+            });
+            document.querySelectorAll('.delete-student-btn').forEach(btn => {
+                btn.addEventListener('click', e => deleteStudentForAdmin(e.target.dataset.studentId));
+            });
+        }
+    });
+}
+
+function resetStudentForm() {
+    const form = document.querySelector('.add-student-form');
+    if (!form) return;
+
+    form.querySelector('#new-parent-name').value = '';
+    form.querySelector('#new-student-name').value = '';
+    form.querySelector('#new-student-grade').value = '';
+    form.querySelector('#new-student-subject').value = '';
+    form.querySelector('#new-student-days').value = '';
+    form.querySelector('#new-student-fee').value = '';
+
+    const actionButton = form.querySelector('#add-student-btn');
+    if (actionButton) {
+        actionButton.textContent = 'Add Student';
+        delete actionButton.dataset.editingId;
+    }
+    const cancelButton = form.querySelector('#cancel-edit-btn');
+    if (cancelButton) {
+        cancelButton.remove();
+    }
+}
+
+async function showStudentDetailsForAdmin(studentId) {
+    const student = window.allStudentsData.find(s => s.id === studentId);
+    if (!student) return;
+    const tutor = window.tutorsByEmail[student.tutorEmail] || { name: 'Unassigned' };
+
+    Swal.fire({
+        title: 'Student Details',
+        html: `
+            <div class="text-left space-y-2">
+                <p><strong>Student Name:</strong> ${student.studentName}</p>
+                <p><strong>Parent Name:</strong> ${student.parentName || 'N/A'}</p>
+                <p><strong>Grade:</strong> ${student.grade}</p>
+                <p><strong>Subjects:</strong> ${student.subjects.join(', ')}</p>
+                <p><strong>Days per Week:</strong> ${student.days}</p>
+                <p><strong>Fee:</strong> ₦${student.studentFee.toLocaleString()}</p>
+                <p><strong>Assigned Tutor:</strong> ${tutor.name}</p>
+                <p><strong>Summer Break:</strong> ${student.summerBreak ? 'Yes' : 'No'}</p>
+            </div>
+        `,
+        showCloseButton: true,
+        showCancelButton: true,
+        confirmButtonText: 'Edit',
+        cancelButtonText: 'Delete'
+    }).then(result => {
+        if (result.isConfirmed) {
+            editStudent(studentId);
+        } else if (result.dismiss === Swal.DismissReason.cancel) {
+            deleteStudentForAdmin(studentId);
+        }
+    });
+}
+
+async function editStudent(studentId) {
+    const student = window.allStudentsData.find(s => s.id === studentId);
+    if (!student) return;
+
+    const form = document.querySelector('.add-student-form');
+    if (form) {
+        form.querySelector('#new-parent-name').value = student.parentName || '';
+        form.querySelector('#new-student-name').value = student.studentName;
+        form.querySelector('#new-student-grade').value = student.grade;
+        form.querySelector('#new-student-subject').value = (student.subjects || []).join(', ');
+        form.querySelector('#new-student-days').value = student.days;
+        form.querySelector('#new-student-fee').value = student.studentFee;
+
+        const actionButton = form.querySelector('#add-student-btn');
+        actionButton.textContent = 'Update Student';
+        actionButton.dataset.editingId = studentId;
+
+        if (!form.querySelector('#cancel-edit-btn')) {
+            const cancelButton = document.createElement('button');
+            cancelButton.id = 'cancel-edit-btn';
+            cancelButton.textContent = 'Cancel';
+            cancelButton.className = 'bg-gray-500 text-white w-full px-4 py-2 rounded hover:bg-gray-600 mt-2';
+            cancelButton.addEventListener('click', resetStudentForm);
+            form.appendChild(cancelButton);
+        }
+    }
+}
+
+async function deleteStudentForAdmin(studentId) {
+    const student = window.allStudentsData.find(s => s.id === studentId);
+    if (!student) return;
+
+    Swal.fire({
+        title: 'Are you sure?',
+        text: `Do you want to delete ${student.studentName}?`,
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#d33',
+        cancelButtonColor: '#3085d6',
+        confirmButtonText: 'Yes, delete it!'
+    }).then(async (result) => {
+        if (result.isConfirmed) {
+            await deleteDoc(doc(db, "students", studentId));
+            Swal.fire('Deleted!', `${student.studentName} has been deleted.`, 'success');
+        }
+    });
 }
 
 
@@ -1413,6 +1614,7 @@ onAuthStateChanged(auth, async (user) => {
         logoutBtn.classList.add('hidden');
     }
 });
+
 
 
 
