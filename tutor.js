@@ -266,8 +266,8 @@ if (isTutorAddEnabled) {
             studentsHTML += `
                 <div class="overflow-x-auto">
                     <table class="min-w-full divide-y divide-gray-200">
-                        <thead><tr><th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Student Name</th><th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th><th class="px-6 py-3 text-left text-xs 
-font-medium text-gray-500 uppercase">Actions</th></tr></thead>
+                        <thead><tr><th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Student Name</th><th class="px-6 py-3 text-left text-xs 
+font-medium text-gray-500 uppercase">Status</th><th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th></tr></thead>
                         <tbody class="bg-white divide-y divide-gray-200">`;
 students.forEach(student => {
                 const isStudentOnBreak = student.summerBreak;
@@ -313,9 +313,6 @@ students.forEach(student => {
                     
                     // NEW: Add Edit/Delete buttons if enabled by admin
                     if (showEditDeleteButtons && !isStudentOnBreak) {
-                        // NOTE: You will 
-need to implement the edit/delete functions yourself. 
-                        // These buttons will appear but won't have functionality yet.
 actionsHTML += `<button class="edit-student-btn-tutor bg-blue-500 text-white px-3 py-1 rounded" data-student-id="${student.id}">Edit</button>`;
                         actionsHTML += `<button class="delete-student-btn-tutor bg-red-500 text-white px-3 py-1 rounded" data-student-id="${student.id}">Delete</button>`;
 }
@@ -525,13 +522,13 @@ document.body.appendChild(alertModal);
                 const parentPhone = document.getElementById('new-parent-phone').value.trim();
                 const studentName = document.getElementById('new-student-name').value.trim();
       
-              const studentGrade = document.getElementById('new-student-grade').value.trim();
+           const studentGrade = document.getElementById('new-student-grade').value.trim();
                 
                 const selectedSubjects = [];
                 document.querySelectorAll('input[name="subjects"]:checked').forEach(checkbox => {
                     selectedSubjects.push(checkbox.value);
               
-    });
+   });
 
                 const studentDays = document.getElementById('new-student-days').value.trim();
                 const studentFee = parseFloat(document.getElementById('new-student-fee').value);
@@ -676,7 +673,7 @@ document.querySelectorAll('.edit-student-btn-tutor').forEach(button => {
                 const tutorRef = doc(db, "tutors", auth.currentUser.uid);
                 await updateDoc(tutorRef, { managementFee: newFee });
       
-              showCustomAlert('Management fee updated successfully!');
+           showCustomAlert('Management fee updated successfully!');
             } else {
                 showCustomAlert('Please enter a valid fee.');
             }
@@ -718,14 +715,14 @@ onAuthStateChanged(auth, async (user) => {
             initializeTutorPanel();
     
         
-          logoutBtn.addEventListener('click', async () => {
+    logoutBtn.addEventListener('click', async () => {
                 await signOut(auth);
                 window.location.href = "tutor-auth.html";
             });
         } else {
             mainContent.innerHTML = `<p class="text-center mt-12 text-red-600">Your account is not registered as a tutor.</p>`;
            
-  logoutBtn.classList.add('hidden');
+   logoutBtn.classList.add('hidden');
         }
     } else {
         window.location.href = "tutor-auth.html";
