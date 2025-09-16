@@ -197,6 +197,152 @@ function cleanGradeString(grade) {
     }
 }
 
+// Function to show the edit student modal
+function showEditStudentModal(student) {
+    // Generate Grade Options with the current grade selected
+    let gradeOptions = `
+        <option value="">Select Grade</option>
+        <option value="Preschool" ${student.grade === 'Preschool' ? 'selected' : ''}>Preschool</option>
+        <option value="Kindergarten" ${student.grade === 'Kindergarten' ? 'selected' : ''}>Kindergarten</option>
+    `;
+    for (let i = 1; i <= 12; i++) {
+        const gradeValue = `Grade ${i}`;
+        gradeOptions += `<option value="${gradeValue}" ${student.grade === gradeValue ? 'selected' : ''}>${gradeValue}</option>`;
+    }
+    gradeOptions += `
+        <option value="Pre-College" ${student.grade === 'Pre-College' ? 'selected' : ''}>Pre-College</option>
+        <option value="College" ${student.grade === 'College' ? 'selected' : ''}>College</option>
+        <option value="Adults" ${student.grade === 'Adults' ? 'selected' : ''}>Adults</option>
+    `;
+
+    // Generate Fee Options with the current fee selected
+    let feeOptions = '<option value="">Select Fee (₦)</option>';
+    for (let fee = 20000; fee <= 200000; fee += 5000) {
+        feeOptions += `<option value="${fee}" ${student.studentFee === fee ? 'selected' : ''}>${fee.toLocaleString()}</option>`;
+    }
+    
+    // Generate Days Options with the current days selected
+    let daysOptions = '<option value="">Select Days per Week</option>';
+    for (let i = 1; i <= 7; i++) {
+        daysOptions += `<option value="${i}" ${student.days == i ? 'selected' : ''}>${i}</option>`;
+    }
+
+    // Define Subjects
+    const subjectsByCategory = {
+        "Academics": ["Math", "Language Arts", "Geography", "Science", "Biology", "Physics", "Chemistry"],
+        "Pre-College Exams": ["SAT", "IGCSE", "A-Levels", "SSCE", "JAMB"],
+        "Languages": ["French", "German", "Spanish", "Yoruba", "Igbo", "Hausa"],
+        "Tech Courses": ["Coding", "Stop motion animation", "YouTube for kids", "Graphic design", "Videography", "Comic/book creation", "Artificial Intelligence", "Chess"],
+        "Support Programs": ["Bible study", "Child counseling programs", "Speech therapy", "Behavioral therapy", "Public speaking", "Adult education", "Communication skills"]
+    };
+
+    let subjectsHTML = `<h4 class="font-semibold text-gray-700 mt-2">Subjects</h4><div id="edit-student-subjects-container" class="space-y-2 border p-3 rounded bg-gray-50 max-h-48 overflow-y-auto">`;
+    for (const category in subjectsByCategory) {
+        subjectsHTML += `
+            <details>
+                <summary class="font-semibold cursor-pointer text-sm">${category}</summary>
+                <div class="pl-4 grid grid-cols-2 sm:grid-cols-3 gap-2 mt-2">
+                    ${subjectsByCategory[category].map(subject => {
+                        const isChecked = student.subjects && student.subjects.includes(subject);
+                        return `<div><label class="text-sm font-normal"><input type="checkbox" name="edit-subjects" value="${subject}" ${isChecked ? 'checked' : ''}> ${subject}</label></div>`;
+                    }).join('')}
+                </div>
+            </details>
+        `;
+    }
+    subjectsHTML += `
+        <div class="font-semibold pt-2 border-t"><label class="text-sm"><input type="checkbox" name="edit-subjects" value="Music" ${student.subjects && student.subjects.includes('Music') ? 'checked' : ''}> Music</label></div>
+    </div>`;
+
+    const editFormHTML = `
+        <h3 class="text-xl font-bold mb-4">Edit Student: ${student.studentName}</h3>
+        <div class="space-y-4">
+            <div>
+                <label class="block font-semibold">Parent Name</label>
+                <input type="text" id="edit-parent-name" class="w-full mt-1 p-2 border rounded" value="${student.parentName || ''}" placeholder="Parent Name">
+            </div>
+            <div>
+                <label class="block font-semibold">Parent Phone Number</label>
+                <input type="tel" id="edit-parent-phone" class="w-full mt-1 p-2 border rounded" value="${student.parentPhone || ''}" placeholder="Parent Phone Number">
+            </div>
+            <div>
+                <label class="block font-semibold">Student Name</label>
+                <input type="text" id="edit-student-name" class="w-full mt-1 p-2 border rounded" value="${student.studentName || ''}" placeholder="Student Name">
+            </div>
+            <div>
+                <label class="block font-semibold">Grade</label>
+                <select id="edit-student-grade" class="w-full mt-1 p-2 border rounded">${gradeOptions}</select>
+            </div>
+            ${subjectsHTML}
+            <div>
+                <label class="block font-semibold">Days per Week</label>
+                <select id="edit-student-days" class="w-full mt-1 p-2 border rounded">${daysOptions}</select>
+            </div>
+            <div>
+                <label class="block font-semibold">Fee (₦)</label>
+                <select id="edit-student-fee" class="w-full mt-1 p-2 border rounded">${feeOptions}</select>
+            </div>
+            <div class="flex justify-end space-x-2 mt-6">
+                <button id="cancel-edit-btn" class="bg-gray-500 text-white px-6 py-2 rounded">Cancel</button>
+                <button id="save-edit-btn" class="bg-green-600 text-white px-6 py-2 rounded" data-student-id="${student.id}" data-collection="${student.collection}">Save Changes</button>
+            </div>
+        </div>`;
+
+    const editModal = document.createElement('div');
+    editModal.className = 'fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex items-center justify-center z-50';
+    editModal.innerHTML = `<div class="relative bg-white p-8 rounded-lg shadow-xl w-full max-w-lg mx-auto">${editFormHTML}</div>`;
+    document.body.appendChild(editModal);
+
+    document.getElementById('cancel-edit-btn').addEventListener('click', () => editModal.remove());
+    document.getElementById('save-edit-btn').addEventListener('click', async (e) => {
+        const studentId = e.target.getAttribute('data-student-id');
+        const collectionName = e.target.getAttribute('data-collection');
+        
+        const parentName = document.getElementById('edit-parent-name').value.trim();
+        const parentPhone = document.getElementById('edit-parent-phone').value.trim();
+        const studentName = document.getElementById('edit-student-name').value.trim();
+        const studentGrade = document.getElementById('edit-student-grade').value.trim();
+        
+        const selectedSubjects = [];
+        document.querySelectorAll('input[name="edit-subjects"]:checked').forEach(checkbox => {
+            selectedSubjects.push(checkbox.value);
+        });
+
+        const studentDays = document.getElementById('edit-student-days').value.trim();
+        const studentFee = parseFloat(document.getElementById('edit-student-fee').value);
+
+        if (!parentName || !studentName || !studentGrade || isNaN(studentFee) || !parentPhone || !studentDays || selectedSubjects.length === 0) {
+            showCustomAlert('Please fill in all parent and student details correctly, including at least one subject.');
+            return;
+        }
+
+        try {
+            const studentData = {
+                parentName: parentName,
+                parentPhone: parentPhone,
+                studentName: studentName,
+                grade: studentGrade,
+                subjects: selectedSubjects,
+                days: studentDays,
+                studentFee: studentFee
+            };
+
+            const studentRef = doc(db, collectionName, studentId);
+            await updateDoc(studentRef, studentData);
+            
+            editModal.remove();
+            showCustomAlert('Student details updated successfully!');
+            
+            // Refresh the student database view
+            const mainContent = document.getElementById('mainContent');
+            renderStudentDatabase(mainContent, window.tutorData);
+        } catch (error) {
+            console.error("Error updating student:", error);
+            showCustomAlert(`An error occurred: ${error.message}`);
+        }
+    });
+}
+
 async function renderStudentDatabase(container, tutor) {
     if (!container) {
         console.error("Container element not found.");
@@ -302,10 +448,8 @@ async function renderStudentDatabase(container, tutor) {
                     
                     // NEW: Add Edit/Delete buttons if enabled by admin
                     if (showEditDeleteButtons && !isStudentOnBreak) {
-                        // NOTE: You will need to implement the edit/delete functions yourself. 
-                        // These buttons will appear but won't have functionality yet.
-                        actionsHTML += `<button class="edit-student-btn-tutor bg-blue-500 text-white px-3 py-1 rounded" data-student-id="${student.id}">Edit</button>`;
-                        actionsHTML += `<button class="delete-student-btn-tutor bg-red-500 text-white px-3 py-1 rounded" data-student-id="${student.id}">Delete</button>`;
+                        actionsHTML += `<button class="edit-student-btn-tutor bg-blue-500 text-white px-3 py-1 rounded" data-student-id="${student.id}" data-collection="${student.collection}">Edit</button>`;
+                        actionsHTML += `<button class="delete-student-btn-tutor bg-red-500 text-white px-3 py-1 rounded" data-student-id="${student.id}" data-collection="${student.collection}">Delete</button>`;
                     }
                 }
                 
@@ -478,17 +622,18 @@ async function renderStudentDatabase(container, tutor) {
         const alertModal = document.createElement('div');
         alertModal.className = 'fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex items-center justify-center z-50';
         alertModal.innerHTML = `
-            <div class="relative bg-white p-8 rounded-lg shadow-xl w-full max-w-sm mx-auto text-center">
-                <p class="text-lg font-semibold mb-4">${message}</p>
-                <button id="close-alert-btn" class="bg-green-600 text-white px-6 py-2 rounded">OK</button>
+            <div class="relative bg-white p-8 rounded-lg shadow-xl w-full max-w-md mx-auto">
+                <p class="mb-4">${message}</p>
+                <button id="alert-ok-btn" class="bg-green-600 text-white px-6 py-2 rounded float-right">OK</button>
             </div>`;
         document.body.appendChild(alertModal);
-        document.getElementById('close-alert-btn').addEventListener('click', () => alertModal.remove());
+        document.getElementById('alert-ok-btn').addEventListener('click', () => alertModal.remove());
     }
 
     function attachEventListeners() {
+        // Add new student
         if (isTutorAddEnabled) {
-            document.getElementById('add-student-btn')?.addEventListener('click', async () => {
+            document.getElementById('add-student-btn').addEventListener('click', async () => {
                 const parentName = document.getElementById('new-parent-name').value.trim();
                 const parentPhone = document.getElementById('new-parent-phone').value.trim();
                 const studentName = document.getElementById('new-student-name').value.trim();
@@ -501,37 +646,32 @@ async function renderStudentDatabase(container, tutor) {
 
                 const studentDays = document.getElementById('new-student-days').value.trim();
                 const studentFee = parseFloat(document.getElementById('new-student-fee').value);
-                const tutorEmail = tutor.email;
 
                 if (!parentName || !studentName || !studentGrade || isNaN(studentFee) || !parentPhone || !studentDays || selectedSubjects.length === 0) {
                     showCustomAlert('Please fill in all parent and student details correctly, including at least one subject.');
                     return;
                 }
 
-                try {
-                    const existingStudentQuery = query(collection(db, "students"), where("tutorEmail", "==", tutorEmail), where("studentName", "==", studentName));
-                    const existingPendingQuery = query(collection(db, "pending_students"), where("tutorEmail", "==", tutorEmail), where("studentName", "==", studentName));
-                    const [existingStudentSnapshot, existingPendingSnapshot] = await Promise.all([getDocs(existingStudentQuery), getDocs(existingPendingQuery)]);
-                    
-                    if (!existingStudentSnapshot.empty || !existingPendingSnapshot.empty) {
-                        showCustomAlert(`A student with the name "${studentName}" has already been added.`);
-                        return;
-                    }
-                    
-                    const studentData = {
-                        parentName: parentName, parentPhone: parentPhone,
-                        studentName: studentName, grade: studentGrade,
-                        subjects: selectedSubjects, days: studentDays,
-                        studentFee: studentFee, tutorEmail: tutorEmail,
-                        summerBreak: false
-                    };
-                    
-                    const collectionName = isBypassApprovalEnabled ? "students" : "pending_students";
-                    await addDoc(collection(db, collectionName), studentData);
+                const studentData = {
+                    parentName: parentName,
+                    parentPhone: parentPhone,
+                    studentName: studentName,
+                    grade: studentGrade,
+                    subjects: selectedSubjects,
+                    days: studentDays,
+                    studentFee: studentFee,
+                    tutorEmail: tutor.email,
+                    tutorName: tutor.name
+                };
 
-                    const message = isBypassApprovalEnabled ? 'Student has been added directly to your list.' : 'Student has been added and is awaiting admin approval.';
-                    showCustomAlert(message);
-                    
+                try {
+                    if (isBypassApprovalEnabled) {
+                        await addDoc(collection(db, "students"), studentData);
+                        showCustomAlert('Student added successfully!');
+                    } else {
+                        await addDoc(collection(db, "pending_students"), studentData);
+                        showCustomAlert('Student added and is pending approval.');
+                    }
                     renderStudentDatabase(container, tutor);
                 } catch (error) {
                     console.error("Error adding student:", error);
@@ -539,88 +679,137 @@ async function renderStudentDatabase(container, tutor) {
                 }
             });
         }
-        
-        document.querySelector('.submit-single-report-btn')?.addEventListener('click', (e) => {
-            const student = students.find(s => s.id === e.target.dataset.studentId);
-            showReportModal(student);
-        });
 
-        document.querySelectorAll('.enter-report-btn').forEach(button => {
-            button.addEventListener('click', (e) => {
-                const student = students.find(s => s.id === e.target.dataset.studentId);
+        // Enter/edit report
+        document.querySelectorAll('.enter-report-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const studentId = btn.getAttribute('data-student-id');
+                const student = students.find(s => s.id === studentId);
                 showReportModal(student);
             });
         });
 
-        document.getElementById('submit-all-reports-btn')?.addEventListener('click', async () => {
-            showAccountDetailsModal(Object.values(savedReports));
+        // Submit single report
+        document.querySelectorAll('.submit-single-report-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const studentId = btn.getAttribute('data-student-id');
+                const student = students.find(s => s.id === studentId);
+                showReportModal(student);
+            });
         });
 
-        document.querySelectorAll('.summer-break-btn').forEach(button => {
-             button.addEventListener('click', async (e) => {
-                 if(confirm("Are you sure you want to mark this student as on summer break?")){
-                     await updateDoc(doc(db, "students", e.target.dataset.studentId), { summerBreak: true });
-                     renderStudentDatabase(container, tutor);
-                }
-             });
-         });
+        // Summer break
+        document.querySelectorAll('.summer-break-btn').forEach(btn => {
+            btn.addEventListener('click', async () => {
+                const studentId = btn.getAttribute('data-student-id');
+                const student = students.find(s => s.id === studentId);
+                const studentRef = doc(db, "students", studentId);
+                await updateDoc(studentRef, { summerBreak: true });
+                showCustomAlert(`${student.studentName} has been marked as on summer break.`);
+                renderStudentDatabase(container, tutor);
+            });
+        });
 
-        document.getElementById('save-management-fee-btn')?.addEventListener('click', async () => {
-            const feeInput = document.getElementById('management-fee-input');
-            const newFee = parseFloat(feeInput.value);
-            if (!isNaN(newFee) && newFee >= 0) {
-                const tutorRef = doc(db, "tutors", auth.currentUser.uid);
+        // Submit all reports
+        const submitAllBtn = document.getElementById('submit-all-reports-btn');
+        if (submitAllBtn) {
+            submitAllBtn.addEventListener('click', () => {
+                const reportsToSubmit = Object.values(savedReports);
+                showAccountDetailsModal(reportsToSubmit);
+            });
+        }
+
+        // Save management fee
+        const saveFeeBtn = document.getElementById('save-management-fee-btn');
+        if (saveFeeBtn) {
+            saveFeeBtn.addEventListener('click', async () => {
+                const newFee = parseFloat(document.getElementById('management-fee-input').value);
+                if (isNaN(newFee) || newFee < 0) {
+                    showCustomAlert("Please enter a valid fee amount.");
+                    return;
+                }
+                const tutorRef = doc(db, "tutors", tutor.id);
                 await updateDoc(tutorRef, { managementFee: newFee });
-                showCustomAlert('Management fee updated successfully!');
-            } else {
-                showCustomAlert('Please enter a valid fee.');
-            }
+                showCustomAlert("Management fee updated successfully.");
+                window.tutorData.managementFee = newFee;
+            });
+        }
+        
+        // NEW: Edit student button
+        document.querySelectorAll('.edit-student-btn-tutor').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const studentId = btn.getAttribute('data-student-id');
+                const collectionName = btn.getAttribute('data-collection');
+                const student = students.find(s => s.id === studentId && s.collection === collectionName);
+                if (student) {
+                    showEditStudentModal(student);
+                }
+            });
+        });
+
+        // NEW: Delete student button
+        document.querySelectorAll('.delete-student-btn-tutor').forEach(btn => {
+            btn.addEventListener('click', async () => {
+                const studentId = btn.getAttribute('data-student-id');
+                const collectionName = btn.getAttribute('data-collection');
+                const student = students.find(s => s.id === studentId && s.collection === collectionName);
+                
+                if (student && confirm(`Are you sure you want to delete ${student.studentName}? This action cannot be undone.`)) {
+                    try {
+                        await deleteDoc(doc(db, collectionName, studentId));
+                        showCustomAlert('Student deleted successfully!');
+                        renderStudentDatabase(container, tutor);
+                    } catch (error) {
+                        console.error("Error deleting student:", error);
+                        showCustomAlert(`An error occurred: ${error.message}`);
+                    }
+                }
+            });
         });
     }
 
     renderUI();
 }
 
-// --- Main App Initialization ---
-function initializeTutorPanel() {
-    const mainContent = document.getElementById('mainContent');
-    const navDashboard = document.getElementById('navDashboard');
-    const navStudentDatabase = document.getElementById('navStudentDatabase');
-
-    function setActiveNav(activeButton) {
-        navDashboard.classList.remove('active');
-        navStudentDatabase.classList.remove('active');
-        activeButton.classList.add('active');
-    }
-
-    navDashboard.addEventListener('click', () => { setActiveNav(navDashboard); renderTutorDashboard(mainContent, window.tutorData); });
-    navStudentDatabase.addEventListener('click', () => { setActiveNav(navStudentDatabase); renderStudentDatabase(mainContent, window.tutorData); });
-
-    // Default to Student Database on load
-    setActiveNav(navStudentDatabase);
-    renderStudentDatabase(mainContent, window.tutorData);
-}
-
-onAuthStateChanged(auth, async (user) => {
-    const mainContent = document.getElementById('mainContent');
-    const logoutBtn = document.getElementById('logoutBtn');
-
-    if (user) {
-         const tutorRef = doc(db, "tutors", user.email);
-        const tutorSnap = await getDoc(tutorRef);
-        if (tutorSnap.exists()) {
-            window.tutorData = tutorSnap.data();
-            initializeTutorPanel();
-    
-            logoutBtn.addEventListener('click', async () => {
-                await signOut(auth);
-                window.location.href = "tutor-auth.html";
-            });
+// ##################################################################
+// # SECTION 3: MAIN APP INITIALIZATION
+// ##################################################################
+document.addEventListener('DOMContentLoaded', async () => {
+    onAuthStateChanged(auth, async (user) => {
+        if (user) {
+            const tutorQuery = query(collection(db, "tutors"), where("email", "==", user.email));
+            const querySnapshot = await getDocs(tutorQuery);
+            if (!querySnapshot.empty) {
+                const tutorDoc = querySnapshot.docs[0];
+                const tutorData = { id: tutorDoc.id, ...tutorDoc.data() };
+                window.tutorData = tutorData;
+                renderTutorDashboard(document.getElementById('mainContent'), tutorData);
+            } else {
+                console.error("No matching tutor found.");
+                document.getElementById('mainContent').innerHTML = `<p class="text-red-500">Error: No tutor profile found for your email.</p>`;
+            }
         } else {
-            mainContent.innerHTML = `<p class="text-center mt-12 text-red-600">Your account is not registered as a tutor.</p>`;
-            logoutBtn.classList.add('hidden');
+            window.location.href = 'login.html';
         }
-    } else {
-        window.location.href = "tutor-auth.html";
-    }
+    });
+
+    document.getElementById('logoutBtn').addEventListener('click', () => {
+        signOut(auth).then(() => {
+            window.location.href = 'login.html';
+        }).catch(error => {
+            console.error("Error signing out:", error);
+        });
+    });
+
+    document.getElementById('navDashboard').addEventListener('click', () => {
+        if (window.tutorData) {
+            renderTutorDashboard(document.getElementById('mainContent'), window.tutorData);
+        }
+    });
+
+    document.getElementById('navStudentDatabase').addEventListener('click', () => {
+        if (window.tutorData) {
+            renderStudentDatabase(document.getElementById('mainContent'), window.tutorData);
+        }
+    });
 });
