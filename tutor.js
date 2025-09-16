@@ -483,7 +483,6 @@ async function renderStudentDatabase(container, tutor) {
                 messageEl.textContent = "Student added to pending list for admin approval.";
             }
             messageEl.style.color = 'green';
-            //document.getElementById('add-student-form').reset(); // Assuming there's a form with this ID
             renderStudentDatabase(document.getElementById('mainContent'), window.tutorData);
         } catch (error) {
             console.error("Error adding student:", error);
