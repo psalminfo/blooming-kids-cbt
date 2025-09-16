@@ -644,7 +644,7 @@ async function setupTutorManagementListeners() {
             tutorsByEmail[tutor.email] = tutor;
             const option = document.createElement('option');
             option.value = doc.id;
-            option.textContent = tutor.name;
+            option.textContent = `${tutor.name} (${tutor.email})`;
             tutorSelect.appendChild(option);
         });
         window.allTutorsData = tutorsData;
@@ -680,33 +680,65 @@ async function setupTutorManagementListeners() {
         }
         
         tutorManagementArea.style.display = 'none';
-        const { allStudentsData = [], tutorsByEmail = {} } = window;
-        const results = allStudentsData.filter(student => {
-            const tutor = tutorsByEmail[student.tutorEmail] || { name: 'N/A' };
+        const { allStudentsData = [], tutorsByEmail = {}, allTutorsData = {} } = window;
+        
+        // Search for students
+        const studentResults = allStudentsData.filter(student => {
+            const tutor = tutorsByEmail[student.tutorEmail] || { name: 'N/A', email: 'N/A' };
             return (
                 student.studentName?.toLowerCase().includes(searchTerm) ||
                 student.parentName?.toLowerCase().includes(searchTerm) ||
-                tutor.name?.toLowerCase().includes(searchTerm)
+                tutor.name?.toLowerCase().includes(searchTerm) ||
+                tutor.email?.toLowerCase().includes(searchTerm)
             );
         });
         
-        if (results.length > 0) {
-            searchResultsContainer.innerHTML = `
-                <h4 class="font-bold mb-2">${results.length} matching student(s) found:</h4>
-                <ul class="space-y-2 border rounded-lg p-2">${results.map(student => {
-                    const tutor = tutorsByEmail[student.tutorEmail] || { id: '', name: 'Unassigned' };
+        // Search for tutors directly
+        const tutorResults = Object.values(allTutorsData).filter(tutor => {
+            return (
+                tutor.name?.toLowerCase().includes(searchTerm) ||
+                tutor.email?.toLowerCase().includes(searchTerm)
+            );
+        });
+        
+        if (studentResults.length > 0 || tutorResults.length > 0) {
+            let html = `<h4 class="font-bold mb-2">Search Results:</h4>`;
+            
+            if (tutorResults.length > 0) {
+                html += `<h5 class="font-semibold mt-4 mb-2">${tutorResults.length} matching tutor(s) found:</h5>
+                        <ul class="space-y-2 border rounded-lg p-2 mb-4">${tutorResults.map(tutor => {
+                    return `<li class="flex justify-between items-center bg-gray-50 p-2 rounded-md">
+                                <div>
+                                    <p class="font-semibold">${tutor.name} (${tutor.email})</p>
+                                </div>
+                                <div class="flex space-x-2">
+                                    <button class="manage-tutor-from-search-btn bg-blue-500 text-white px-3 py-1 rounded-md text-sm hover:bg-blue-600" data-tutor-id="${tutor.id}">Manage</button>
+                                    <button class="delete-tutor-btn bg-red-500 text-white px-3 py-1 rounded-md text-sm hover:bg-red-600" data-tutor-id="${tutor.id}" data-tutor-name="${tutor.name}">Delete</button>
+                                </div>
+                            </li>`
+                }).join('')}</ul>`;
+            }
+            
+            if (studentResults.length > 0) {
+                html += `<h5 class="font-semibold mt-4 mb-2">${studentResults.length} matching student(s) found:</h5>
+                        <ul class="space-y-2 border rounded-lg p-2">${studentResults.map(student => {
+                    const tutor = tutorsByEmail[student.tutorEmail] || { id: '', name: 'Unassigned', email: 'N/A' };
                     return `<li class="flex justify-between items-center bg-gray-50 p-2 rounded-md">
                                 <div>
                                     <p class="font-semibold">${student.studentName} (Parent: ${student.parentName || 'N/A'})</p>
-                                    <p class="text-sm text-gray-600">Assigned to: ${tutor.name}</p>
+                                    <p class="text-sm text-gray-600">Assigned to: ${tutor.name} (${tutor.email})</p>
                                 </div>
                                 <button class="manage-tutor-from-search-btn bg-blue-500 text-white px-3 py-1 rounded-md text-sm hover:bg-blue-600" data-tutor-id="${tutor.id}">Manage Tutor</button>
                             </li>`
                 }).join('')}</ul>`;
+            }
+            
+            searchResultsContainer.innerHTML = html;
         } else {
             searchResultsContainer.innerHTML = `<p class="text-gray-500">No matches found.</p>`;
         }
         
+        // Add event listeners to manage buttons
         searchResultsContainer.querySelectorAll('.manage-tutor-from-search-btn').forEach(btn => {
             btn.addEventListener('click', (e) => {
                 const tutorId = e.currentTarget.dataset.tutorId;
@@ -716,6 +748,38 @@ async function setupTutorManagementListeners() {
                     searchBar.value = '';
                     searchResultsContainer.innerHTML = '';
                     tutorManagementArea.style.display = 'block';
+                }
+            });
+        });
+        
+        // Add event listeners to delete tutor buttons
+        searchResultsContainer.querySelectorAll('.delete-tutor-btn').forEach(btn => {
+            btn.addEventListener('click', async (e) => {
+                const tutorId = e.currentTarget.dataset.tutorId;
+                const tutorName = e.currentTarget.dataset.tutorName;
+                
+                if (confirm(`Are you sure you want to delete tutor "${tutorName}"? This action cannot be undone.`)) {
+                    try {
+                        // First check if this tutor has any students assigned
+                        const studentsQuery = query(collection(db, "students"), where("tutorEmail", "==", allTutorsData[tutorId].email));
+                        const studentsSnapshot = await getDocs(studentsQuery);
+                        
+                        if (!studentsSnapshot.empty) {
+                            alert(`Cannot delete tutor "${tutorName}" because they have ${studentsSnapshot.size} student(s) assigned. Please reassign or delete these students first.`);
+                            return;
+                        }
+                        
+                        // If no students are assigned, proceed with deletion
+                        await deleteDoc(doc(db, "tutors", tutorId));
+                        alert(`Tutor "${tutorName}" has been successfully deleted.`);
+                        
+                        // Clear search results if this tutor was found via search
+                        searchResultsContainer.innerHTML = '';
+                        tutorManagementArea.style.display = 'block';
+                    } catch (error) {
+                        console.error("Error deleting tutor:", error);
+                        alert(`Error deleting tutor: ${error.message}`);
+                    }
                 }
             });
         });
@@ -774,8 +838,14 @@ async function renderSelectedTutorDetails(tutorId) {
         container.innerHTML = `
             <div class="p-4 border rounded-lg shadow-sm bg-blue-50">
                 <div class="flex items-center justify-between mb-4">
-                    <h4 class="font-bold text-xl">${tutor.name} (${studentsSnapshot.size} students)</h4>
-                    <label class="flex items-center space-x-2"><span class="font-semibold">Management Staff:</span><input type="checkbox" id="management-staff-toggle" class="h-5 w-5" ${tutor.isManagementStaff ? 'checked' : ''}></label>
+                    <div>
+                        <h4 class="font-bold text-xl">${tutor.name} (${studentsSnapshot.size} students)</h4>
+                        <p class="text-gray-600">${tutor.email}</p>
+                    </div>
+                    <div class="flex items-center space-x-4">
+                        <label class="flex items-center space-x-2"><span class="font-semibold">Management Staff:</span><input type="checkbox" id="management-staff-toggle" class="h-5 w-5" ${tutor.isManagementStaff ? 'checked' : ''}></label>
+                        <button id="delete-tutor-btn" class="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600">Delete Tutor</button>
+                    </div>
                 </div>
                 <div class="mb-4">
                     <p><strong>Students Assigned to ${tutor.name}:</strong></p>
@@ -805,6 +875,26 @@ async function renderSelectedTutorDetails(tutorId) {
             
         // --- Attach Listeners for the newly created elements ---
         document.getElementById('management-staff-toggle').addEventListener('change', (e) => updateDoc(doc(db, "tutors", tutorId), { isManagementStaff: e.target.checked }));
+
+        // Add delete tutor functionality
+        document.getElementById('delete-tutor-btn').addEventListener('click', async () => {
+            if (studentsSnapshot.size > 0) {
+                alert(`Cannot delete tutor "${tutor.name}" because they have ${studentsSnapshot.size} student(s) assigned. Please reassign or delete these students first.`);
+                return;
+            }
+            
+            if (confirm(`Are you sure you want to delete tutor "${tutor.name}"? This action cannot be undone.`)) {
+                try {
+                    await deleteDoc(doc(db, "tutors", tutorId));
+                    alert(`Tutor "${tutor.name}" has been successfully deleted.`);
+                    document.getElementById('tutor-select').value = '';
+                    container.innerHTML = `<p class="text-gray-500">Please select a tutor to view details.</p>`;
+                } catch (error) {
+                    console.error("Error deleting tutor:", error);
+                    alert(`Error deleting tutor: ${error.message}`);
+                }
+            }
+        });
 
         document.getElementById('student-filter-bar').addEventListener('input', (e) => {
             const searchTerm = e.target.value.toLowerCase();
@@ -1507,6 +1597,7 @@ onAuthStateChanged(auth, async (user) => {
         logoutBtn.classList.add('hidden');
     }
 });
+
 
 
 
