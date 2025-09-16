@@ -580,7 +580,81 @@ async function renderStudentDatabase(container, tutor) {
 
     renderUI();
 }
+ // --- DELETE student ---
+    document.querySelectorAll('.delete-student-btn-tutor').forEach(button => {
+        button.addEventListener('click', async (e) => {
+            const studentId = e.target.dataset.studentId;
+            if (confirm("Are you sure you want to delete this student?")) {
+                try {
+                    await deleteDoc(doc(db, "students", studentId));
+                    showCustomAlert("Student deleted successfully.");
+                    renderStudentDatabase(container, tutor);
+                } catch (error) {
+                    console.error("Error deleting student:", error);
+                    showCustomAlert("Error deleting student. Try again.");
+                }
+            }
+        });
+    });
 
+    // --- EDIT student ---
+    document.querySelectorAll('.edit-student-btn-tutor').forEach(button => {
+        button.addEventListener('click', (e) => {
+            const studentId = e.target.dataset.studentId;
+            const student = students.find(s => s.id === studentId);
+            if (!student) return;
+
+            const modal = document.createElement('div');
+            modal.className = 'fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center z-50 overflow-y-auto';
+            modal.innerHTML = `
+                <div class="bg-white p-6 rounded-lg shadow-xl w-full max-w-md">
+                    <h3 class="text-xl font-bold mb-4">Edit Student: ${student.studentName}</h3>
+                    <input type="text" id="edit-parent-name" class="w-full p-2 border rounded mb-2" value="${student.parentName}">
+                    <input type="tel" id="edit-parent-phone" class="w-full p-2 border rounded mb-2" value="${student.parentPhone}">
+                    <input type="text" id="edit-student-name" class="w-full p-2 border rounded mb-2" value="${student.studentName}">
+                    <input type="text" id="edit-student-grade" class="w-full p-2 border rounded mb-2" value="${student.grade}">
+                    <input type="number" id="edit-student-days" class="w-full p-2 border rounded mb-2" value="${student.days}">
+                    <input type="number" id="edit-student-fee" class="w-full p-2 border rounded mb-2" value="${student.studentFee || 0}">
+                    <textarea id="edit-student-subjects" class="w-full p-2 border rounded mb-2" rows="3">${student.subjects ? student.subjects.join(", ") : ""}</textarea>
+                    <div class="flex justify-end space-x-2 mt-4">
+                        <button id="cancel-edit-btn" class="bg-gray-500 text-white px-4 py-2 rounded">Cancel</button>
+                        <button id="save-edit-btn" class="bg-green-600 text-white px-4 py-2 rounded">Save</button>
+                    </div>
+                </div>
+            `;
+            document.body.appendChild(modal);
+
+            document.getElementById('cancel-edit-btn').addEventListener('click', () => modal.remove());
+
+            document.getElementById('save-edit-btn').addEventListener('click', async () => {
+                const newData = {
+                    parentName: document.getElementById('edit-parent-name').value.trim(),
+                    parentPhone: document.getElementById('edit-parent-phone').value.trim(),
+                    studentName: document.getElementById('edit-student-name').value.trim(),
+                    grade: document.getElementById('edit-student-grade').value.trim(),
+                    days: document.getElementById('edit-student-days').value.trim(),
+                    studentFee: parseFloat(document.getElementById('edit-student-fee').value),
+                    subjects: document.getElementById('edit-student-subjects').value.split(",").map(s => s.trim()).filter(Boolean)
+                };
+
+                if (!newData.parentName || !newData.studentName || !newData.grade || isNaN(newData.studentFee) || !newData.days || newData.subjects.length === 0) {
+                    alert("Please fill in all fields correctly.");
+                    return;
+                }
+
+                try {
+                    await updateDoc(doc(db, "students", studentId), newData);
+                    modal.remove();
+                    showCustomAlert("Student updated successfully.");
+                    renderStudentDatabase(container, tutor);
+                } catch (error) {
+                    console.error("Error updating student:", error);
+                    showCustomAlert("Error updating student. Try again.");
+                }
+            });
+        });
+    });
+}
 // --- Main App Initialization ---
 function initializeTutorPanel() {
     const mainContent = document.getElementById('mainContent');
@@ -624,3 +698,4 @@ onAuthStateChanged(auth, async (user) => {
         window.location.href = "tutor-auth.html";
     }
 });
+
