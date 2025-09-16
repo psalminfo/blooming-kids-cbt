@@ -655,50 +655,62 @@ async function renderTutorManagementPanel(container) {
     setupTutorManagementListeners();
 }
 
+// #### THIS IS THE FIRST CORRECTED FUNCTION ####
 async function setupTutorManagementListeners() {
     // --- GLOBAL SETTINGS LISTENERS ---
     const settingsDocRef = doc(db, "settings", "global_settings");
-    const curriculumDocRef = doc(db, "settings", "curriculum");
 
     onSnapshot(settingsDocRef, (docSnap) => {
         if (docSnap.exists()) {
             const data = docSnap.data();
             globalSettings = data; // Store all settings globally
             
-            ['report', 'tutor-add', 'summer-break'].forEach(type => {
-                const key = `is${capitalize(type.split('-')[0])}${capitalize(type.split('-')[1] || '')}Enabled`;
+            // Standard toggles
+            ['report', 'tutor-add', 'summer-break', 'edit-delete', 'bypass-approval'].forEach(type => {
+                const keyMap = {
+                    'report': 'isReportEnabled',
+                    'tutor-add': 'isTutorAddEnabled',
+                    'summer-break': 'isSummerBreakEnabled',
+                    'edit-delete': 'showEditDeleteButtons',
+                    'bypass-approval': 'bypassPendingApproval'
+                };
+                const key = keyMap[type];
                 const toggle = document.getElementById(`${type}-toggle`);
                 const label = document.getElementById(`${type}-status-label`);
                 if (toggle && label) {
-                    toggle.checked = data[key];
+                    toggle.checked = !!data[key];
                     label.textContent = data[key] ? 'Enabled' : 'Disabled';
                 }
             });
 
+            // CORRECTED: Show Fees toggle now reads from Firestore
             const showFeesToggle = document.getElementById('show-fees-toggle');
             const showFeesLabel = document.getElementById('show-fees-status-label');
             if (showFeesToggle && showFeesLabel) {
-                const initialShowFees = localStorage.getItem('showStudentFees') === 'true';
-                showFeesToggle.checked = initialShowFees;
-                showFeesLabel.textContent = initialShowFees ? 'Visible' : 'Hidden';
-            }
-
-            const editDeleteToggle = document.getElementById('edit-delete-toggle');
-            const editDeleteLabel = document.getElementById('edit-delete-status-label');
-            if (editDeleteToggle && editDeleteLabel) {
-                editDeleteToggle.checked = !!data.showEditDeleteButtons;
-                editDeleteLabel.textContent = data.showEditDeleteButtons ? 'Enabled' : 'Disabled';
-            }
-
-            const bypassApprovalToggle = document.getElementById('bypass-approval-toggle');
-            const bypassApprovalLabel = document.getElementById('bypass-approval-status-label');
-            if (bypassApprovalToggle && bypassApprovalLabel) {
-                bypassApprovalToggle.checked = !!data.bypassPendingApproval;
-                bypassApprovalLabel.textContent = data.bypassPendingApproval ? 'Enabled' : 'Disabled';
+                showFeesToggle.checked = !!data.showStudentFees;
+                showFeesLabel.textContent = data.showStudentFees ? 'Visible' : 'Hidden';
             }
         }
     });
 
+    // --- Event Listeners for Toggles ---
+    document.getElementById('report-toggle')?.addEventListener('change', e => updateDoc(settingsDocRef, { isReportEnabled: e.target.checked }));
+    document.getElementById('tutor-add-toggle')?.addEventListener('change', e => updateDoc(settingsDocRef, { isTutorAddEnabled: e.target.checked }));
+    document.getElementById('summer-break-toggle')?.addEventListener('change', e => updateDoc(settingsDocRef, { isSummerBreakEnabled: e.target.checked }));
+    document.getElementById('edit-delete-toggle')?.addEventListener('change', e => updateDoc(settingsDocRef, { showEditDeleteButtons: e.target.checked }));
+    document.getElementById('bypass-approval-toggle')?.addEventListener('change', e => updateDoc(settingsDocRef, { bypassPendingApproval: e.target.checked }));
+
+    // CORRECTED: Show Student Fees toggle now writes to Firestore instead of localStorage
+    document.getElementById('show-fees-toggle')?.addEventListener('change', (e) => {
+        const isVisible = e.target.checked;
+        updateDoc(settingsDocRef, { showStudentFees: isVisible }); // Save to Firestore
+        if (activeTutorId) {
+            renderSelectedTutorDetails(activeTutorId); // Re-render the view
+        }
+    });
+
+    // --- The rest of the function remains the same ---
+    const curriculumDocRef = doc(db, "settings", "curriculum");
     onSnapshot(curriculumDocRef, (docSnap) => {
         if (docSnap.exists()) {
             const data = docSnap.data();
@@ -708,7 +720,6 @@ async function setupTutorManagementListeners() {
             gradesList.innerHTML = (data.grades || []).map(grade => `<li class="flex justify-between items-center bg-gray-100 p-2 rounded-md">${grade} <button class="delete-grade-btn text-red-500" data-grade="${grade}">✖</button></li>`).join('');
             subjectsList.innerHTML = (data.subjects || []).map(subject => `<li class="flex justify-between items-center bg-gray-100 p-2 rounded-md">${subject} <button class="delete-subject-btn text-red-500" data-subject="${subject}">✖</button></li>`).join('');
             
-            // Add listeners to new delete buttons
             document.querySelectorAll('.delete-grade-btn').forEach(btn => btn.addEventListener('click', async e => {
                 await updateDoc(curriculumDocRef, { grades: arrayRemove(e.target.dataset.grade) });
             }));
@@ -717,25 +728,7 @@ async function setupTutorManagementListeners() {
             }));
         }
     });
-
-    // Toggle listeners
-    document.getElementById('report-toggle').addEventListener('change', e => updateDoc(settingsDocRef, { isReportEnabled: e.target.checked }));
-    document.getElementById('tutor-add-toggle').addEventListener('change', e => updateDoc(settingsDocRef, { isTutorAddEnabled: e.target.checked }));
-    document.getElementById('summer-break-toggle').addEventListener('change', e => updateDoc(settingsDocRef, { isSummerBreakEnabled: e.target.checked }));
-    document.getElementById('edit-delete-toggle')?.addEventListener('change', async (e) => updateDoc(settingsDocRef, { showEditDeleteButtons: e.target.checked }));
-    document.getElementById('bypass-approval-toggle')?.addEventListener('change', async (e) => updateDoc(settingsDocRef, { bypassPendingApproval: e.target.checked }));
-
-    // FIXED: Show Student Fees toggle now re-renders the details view
-    document.getElementById('show-fees-toggle')?.addEventListener('change', (e) => {
-        const isVisible = e.target.checked;
-        localStorage.setItem('showStudentFees', isVisible);
-        document.getElementById('show-fees-status-label').textContent = isVisible ? 'Visible' : 'Hidden';
-        if (activeTutorId) {
-            renderSelectedTutorDetails(activeTutorId);
-        }
-    });
     
-    // Grades and Subjects listeners
     document.getElementById('add-grade-btn').addEventListener('click', async () => {
         const input = document.getElementById('new-grade-input');
         const newGrade = input.value.trim();
@@ -754,7 +747,6 @@ async function setupTutorManagementListeners() {
         }
     });
 
-    // Data fetching for search & management
     const tutorSelect = document.getElementById('tutor-select');
     onSnapshot(collection(db, "tutors"), (snapshot) => {
         const tutorsData = {};
@@ -781,7 +773,6 @@ async function setupTutorManagementListeners() {
         document.getElementById('student-count-badge').textContent = snapshot.size;
     });
 
-    // UI Interaction listeners
     tutorSelect.addEventListener('change', e => {
         activeTutorId = e.target.value;
         renderSelectedTutorDetails(activeTutorId);
@@ -861,6 +852,7 @@ function resetStudentForm() {
     document.getElementById('cancel-edit-btn')?.remove();
 }
 
+// #### THIS IS THE SECOND CORRECTED FUNCTION ####
 async function renderSelectedTutorDetails(tutorId) {
     const container = document.getElementById('selected-tutor-details');
     if (!tutorId || !window.allTutorsData) {
@@ -868,7 +860,9 @@ async function renderSelectedTutorDetails(tutorId) {
         return;
     }
     const tutor = window.allTutorsData[tutorId];
-    const showFees = localStorage.getItem('showStudentFees') === 'true';
+    
+    // CORRECTED: Reads the 'showFees' value from the globalSettings object, which is updated by Firestore
+    const showFees = globalSettings.showStudentFees;
 
     onSnapshot(query(collection(db, "students"), where("tutorEmail", "==", tutor.email)), (studentsSnapshot) => {
         const studentsListHTML = studentsSnapshot.docs.map(doc => {
@@ -876,7 +870,7 @@ async function renderSelectedTutorDetails(tutorId) {
             const studentId = doc.id;
             const feeDisplay = showFees ? ` - Fee: ₦${(student.studentFee || 0).toLocaleString()}` : '';
             
-            // FIXED: Only show edit/delete buttons if the setting is enabled
+            // This correctly uses the globalSettings object for the edit/delete buttons
             const editDeleteButtonsHTML = globalSettings.showEditDeleteButtons ? `
                 <button class="edit-student-btn text-blue-500 hover:text-blue-700 font-semibold" 
                     data-student-id="${studentId}" data-parent-name="${student.parentName || ''}" data-parent-phone="${student.parentPhone || ''}" data-student-name="${student.studentName}"
@@ -981,7 +975,6 @@ async function renderSelectedTutorDetails(tutorId) {
                 document.getElementById('new-student-days').value = data.days;
                 document.getElementById('new-student-fee').value = data.fee;
 
-                // Populate subjects checkboxes
                 const studentSubjects = data.subjects.split(',');
                 document.querySelectorAll('#new-student-subjects-container input[name="subjects"]').forEach(checkbox => {
                     checkbox.checked = studentSubjects.includes(checkbox.value);
@@ -1077,7 +1070,6 @@ async function renderTutorReportsPanel(container) {
     await loadTutorReportsForAdmin();
 }
 
-// ### NEW ### This function now groups reports by tutor with dropdowns and a "Download All" button.
 async function loadTutorReportsForAdmin() {
     const reportsListContainer = document.getElementById('tutor-reports-list');
     onSnapshot(query(collection(db, "tutor_submissions"), orderBy("submittedAt", "desc")), (snapshot) => {
@@ -1136,7 +1128,7 @@ async function loadTutorReportsForAdmin() {
 
         reportsListContainer.querySelectorAll('.download-single-report-btn').forEach(button => {
             button.addEventListener('click', (e) => {
-                e.stopPropagation(); // Prevent the dropdown from closing
+                e.stopPropagation(); 
                 downloadAdminReport(e.target.dataset.reportId);
             });
         });
@@ -1153,7 +1145,6 @@ async function loadTutorReportsForAdmin() {
                 try {
                     const zip = new JSZip();
                     for (const report of reportsToDownload) {
-                        // The 'true' argument tells the function to return the PDF data instead of saving it
                         const pdfBlob = await downloadAdminReport(report.id, true); 
                         if (pdfBlob) {
                             const fileName = `${report.studentName}_${new Date(report.submittedAt.seconds * 1000).toLocaleDateString().replace(/\//g, '-')}.pdf`;
@@ -1176,7 +1167,6 @@ async function loadTutorReportsForAdmin() {
     });
 }
 
-// ### UPDATED ### Now includes Parent Name, new heading, and logo.
 async function downloadAdminReport(reportId, returnBlob = false) {
     try {
         const reportDoc = await getDoc(doc(db, "tutor_submissions", reportId));
@@ -1184,7 +1174,6 @@ async function downloadAdminReport(reportId, returnBlob = false) {
         
         const reportData = reportDoc.data();
         
-        // This is where the parent's email is retrieved
         let parentEmail = 'N/A';
         if (reportData.studentId) {
             const studentDoc = await getDoc(doc(db, "students", reportData.studentId));
@@ -1193,7 +1182,6 @@ async function downloadAdminReport(reportId, returnBlob = false) {
             }
         }
 
-        // Get your logo URL from GitHub (see instructions)
         const logoUrl = "https://github.com/psalminfo/blooming-kids-cbt/blob/main/logo.png";
         
         const reportTemplate = `
@@ -1225,18 +1213,16 @@ async function downloadAdminReport(reportId, returnBlob = false) {
             jsPDF:        { unit: 'in', format: 'letter', orientation: 'portrait' }
         };
 
-        // If the function is asked to return the data (for zipping), it returns a blob.
         if (returnBlob) {
             return await html2pdf().from(reportTemplate).set(opt).outputPdf('blob');
         } else {
-            // Otherwise, it saves the file directly.
             html2pdf().from(reportTemplate).set(opt).save();
         }
 
     } catch (error) {
         console.error("Error generating PDF:", error);
         alert(`Failed to download report: ${error.message}`);
-        return null; // Return null on error
+        return null; 
     }
 }
 
@@ -1280,7 +1266,7 @@ async function renderPayAdvicePanel(container) {
         const startDate = startDateInput.value ? new Date(startDateInput.value) : null;
         const endDate = endDateInput.value ? new Date(endDateInput.value) : null;
         if (startDate && endDate) {
-            endDate.setHours(23, 59, 59, 999); // Ensure end date includes the whole day
+            endDate.setHours(23, 59, 59, 999); 
             loadPayAdviceData(startDate, endDate);
         }
     };
@@ -1293,7 +1279,6 @@ async function loadPayAdviceData(startDate, endDate) {
     const tableBody = document.getElementById('pay-advice-table-body');
     tableBody.innerHTML = `<tr><td colspan="5" class="text-center py-4">Loading pay data...</td></tr>`;
 
-    // 1. Find tutors who submitted reports in the date range
     const startTimestamp = Timestamp.fromDate(startDate);
     const endTimestamp = Timestamp.fromDate(endDate);
     const reportsQuery = query(collection(db, "tutor_submissions"), where("submittedAt", ">=", startTimestamp), where("submittedAt", "<=", endTimestamp));
@@ -1307,7 +1292,6 @@ async function loadPayAdviceData(startDate, endDate) {
         return;
     }
 
-    // 2. Get details for these active tutors and ALL students
     const [tutorsSnapshot, studentsSnapshot] = await Promise.all([
         getDocs(query(collection(db, "tutors"), where("email", "in", activeTutorEmails))),
         getDocs(collection(db, "students"))
@@ -1383,8 +1367,6 @@ async function renderSummerBreakPanel(container) {
 // ##################################################################
 // # SECTION 7: RENDER STAFF PANEL (This is the new section)
 // ##################################################################
-// In your ADMIN.JS file, replace the existing renderStaffPanel with this new version.
-
 async function renderStaffPanel(container) {
     const ROLE_PERMISSIONS = {
         pending: {
@@ -1476,7 +1458,6 @@ async function renderStaffPanel(container) {
     });
 }
 
-// ### NEW HELPER FUNCTION ### This creates the permissions pop-up.
 async function openPermissionsModal(staffId) {
     const staffDoc = await getDoc(doc(db, "staff", staffId));
     if (!staffDoc.exists()) return alert("Staff member not found.");
@@ -1553,52 +1534,6 @@ async function openPermissionsModal(staffId) {
 
 
 // ##################################################################
-// # MAIN APP INITIALIZATION (Updated)
-// ##################################################################
-
-onAuthStateChanged(auth, async (user) => {
-    const mainContent = document.getElementById('main-content');
-    const logoutBtn = document.getElementById('logoutBtn');
-    if (user && user.email === ADMIN_EMAIL) {
-        mainContent.innerHTML = '';
-        const navItems = {
-            navDashboard: renderAdminPanel,
-            navContent: renderContentManagerPanel,
-            navTutorManagement: renderTutorManagementPanel,
-            navPayAdvice: renderPayAdvicePanel,
-            navTutorReports: renderTutorReportsPanel,
-            navSummerBreak: renderSummerBreakPanel,
-            navStaff: renderStaffPanel,
-            navPendingApprovals: renderPendingApprovalsPanel // ### ADD THIS LINE ###
-        };
-
-        const setActiveNav = (activeId) => Object.keys(navItems).forEach(id => {
-            document.getElementById(id)?.classList.toggle('active', id === activeId);
-        });
-
-        Object.entries(navItems).forEach(([id, renderFn]) => {
-            const navElement = document.getElementById(id);
-            if (navElement) {
-                navElement.addEventListener('click', () => {
-                    setActiveNav(id);
-                    renderFn(mainContent);
-                });
-            }
-        });
-
-        // Initial Load
-        setActiveNav('navDashboard');
-        renderAdminPanel(mainContent);
-
-        logoutBtn.addEventListener('click', () => signOut(auth).then(() => window.location.href = "admin-auth.html"));
-
-    } else {
-        mainContent.innerHTML = `<p class="text-center mt-12 text-red-600">You do not have permission to view this page.</p>`;
-        logoutBtn.classList.add('hidden');
-    }
-});
-
-// ##################################################################
 // # SECTION 8: PENDING APPROVALS
 // ##################################################################
 async function renderPendingApprovalsPanel(container) {
@@ -1661,13 +1596,12 @@ async function handleApproval(id, type, status) {
     const docRef = doc(db, collectionName, id);
     await updateDoc(docRef, { [type === 'tutor' ? 'status' : 'approvalStatus']: status });
     alert(`${type.charAt(0).toUpperCase() + type.slice(1)} ${status} successfully.`);
-    // Re-render the panel to show the updated list
     renderPendingApprovalsPanel(document.getElementById('main-content'));
 }
+
 // ##################################################################
 // # MAIN APP INITIALIZATION (Updated)
 // ##################################################################
-
 onAuthStateChanged(auth, async (user) => {
     const mainContent = document.getElementById('main-content');
     const logoutBtn = document.getElementById('logoutBtn');
@@ -1680,6 +1614,7 @@ onAuthStateChanged(auth, async (user) => {
             navPayAdvice: renderPayAdvicePanel,
             navTutorReports: renderTutorReportsPanel,
             navSummerBreak: renderSummerBreakPanel,
+            navStaff: renderStaffPanel,
             navPendingApprovals: renderPendingApprovalsPanel
         };
 
@@ -1708,27 +1643,3 @@ onAuthStateChanged(auth, async (user) => {
         logoutBtn.classList.add('hidden');
     }
 });
-
-onAuthStateChanged(auth, async (user) => {
-    // ...
-    if (user && user.email === ADMIN_EMAIL) {
-        // ...
-        const navItems = {
-            navDashboard: renderAdminPanel,
-            navContent: renderContentManagerPanel,
-            navStaff: renderStaffPanel, // ### ADD THIS LINE ###
-            navTutorManagement: renderTutorManagementPanel,
-            // ... rest of the items
-        };
-        // ...
-    }
-    // ...
-});
-
-
-
-
-
-
-
-
