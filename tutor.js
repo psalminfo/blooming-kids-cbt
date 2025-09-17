@@ -355,24 +355,47 @@ async function renderStudentDatabase(container, tutor) {
 
     let savedReports = {};
 
-    // Fetch both approved and pending students
-    const studentQuery = query(collection(db, "students"), where("tutorEmail", "==", tutor.email));
-    const pendingStudentQuery = query(collection(db, "pending_students"), where("tutorEmail", "==", tutor.email));
+    // MODIFIED: Fetch students by both email AND name to handle old and new records
+    // 1. Query for students where tutorEmail matches
+    const studentQueryByEmail = query(collection(db, "students"), where("tutorEmail", "==", tutor.email));
+    const pendingStudentQueryByEmail = query(collection(db, "pending_students"), where("tutorEmail", "==", tutor.email));
 
-    const [studentsSnapshot, pendingStudentsSnapshot] = await Promise.all([
-        getDocs(studentQuery),
-        getDocs(pendingStudentQuery)
+    // 2. Query for students where tutorName matches (for older records)
+    const studentQueryByName = query(collection(db, "students"), where("tutorName", "==", tutor.name));
+    const pendingStudentQueryByName = query(collection(db, "pending_students"), where("tutorName", "==", tutor.name));
+
+    // 3. Execute all queries and combine results
+    const [
+        studentsSnapshotByEmail,
+        pendingStudentsSnapshotByEmail,
+        studentsSnapshotByName,
+        pendingStudentsSnapshotByName
+    ] = await Promise.all([
+        getDocs(studentQueryByEmail),
+        getDocs(pendingStudentQueryByEmail),
+        getDocs(studentQueryByName),
+        getDocs(pendingStudentQueryByName)
     ]);
-    const approvedStudents = studentsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data(), isPending: false, collection: "students" }));
-    const pendingStudents = pendingStudentsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data(), isPending: true, collection: "pending_students" }));
 
-    let students = [...approvedStudents, ...pendingStudents];
+    // 4. Combine results, using a Map to avoid duplicates by student ID
+    const studentMap = new Map();
+
+    [...studentsSnapshotByEmail.docs, ...studentsSnapshotByName.docs].forEach(doc => {
+        studentMap.set(doc.id, { id: doc.id, ...doc.data(), isPending: false, collection: "students" });
+    });
+
+    [...pendingStudentsSnapshotByEmail.docs, ...pendingStudentsSnapshotByName.docs].forEach(doc => {
+        studentMap.set(doc.id, { id: doc.id, ...doc.data(), isPending: true, collection: "pending_students" });
+    });
+
+    // 5. Convert Map values back to array
+    let students = Array.from(studentMap.values());
 
     // Duplicate Student Cleanup
     const seenStudents = new Set();
     const duplicatesToDelete = [];
     students = students.filter(student => {
-        const studentIdentifier = `${student.studentName}-${student.tutorEmail}`;
+        const studentIdentifier = `${student.studentName}-${student.tutorEmail || student.tutorName}`;
         if (seenStudents.has(studentIdentifier)) {
             duplicatesToDelete.push({ id: student.id, collection: student.collection });
             return false;
@@ -441,7 +464,7 @@ async function renderStudentDatabase(container, tutor) {
                     }
 
                     if (isSubmissionEnabled && !isStudentOnBreak) {
-                        if (approvedStudents.length === 1) {
+                        if (students.filter(s => !s.isPending && !s.summerBreak).length === 1) {
                             actionsHTML += `<button class="submit-single-report-btn bg-green-600 text-white px-3 py-1 rounded" data-student-id="${student.id}">Submit Report</button>`;
                         } else {
                             actionsHTML += `<button class="enter-report-btn bg-green-600 text-white px-3 py-1 rounded" data-student-id="${student.id}">${isReportSaved ? 'Edit Report' : 'Enter Report'}</button>`;
@@ -484,6 +507,7 @@ async function renderStudentDatabase(container, tutor) {
                     </div>`;
             }
 
+            const approvedStudents = students.filter(s => !s.isPending);
             if (approvedStudents.length > 1 && isSubmissionEnabled) {
                 const submittableStudents = approvedStudents.filter(s => !s.summerBreak).length;
                 const allReportsSaved = Object.keys(savedReports).length === submittableStudents;
@@ -501,6 +525,7 @@ async function renderStudentDatabase(container, tutor) {
 
     function showReportModal(student) {
         const existingReport = savedReports[student.id] || {};
+        const approvedStudents = students.filter(s => !s.isPending);
         const isSingleApprovedStudent = approvedStudents.filter(s => !s.summerBreak).length === 1;
         
         const reportFormHTML = `
@@ -781,7 +806,7 @@ async function renderStudentDatabase(container, tutor) {
 document.addEventListener('DOMContentLoaded', async () => {
     onAuthStateChanged(auth, async (user) => {
         if (user) {
-            const tutorQuery = query(collection(db, "tutors"), where("email", "==", user.email.trim()));
+            const tutorQuery = query(collection(db, "tutors"), where("email", "==", user.email));
             const querySnapshot = await getDocs(tutorQuery);
             if (!querySnapshot.empty) {
                 const tutorDoc = querySnapshot.docs[0];
@@ -817,6 +842,3 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     });
 });
-
-
-
