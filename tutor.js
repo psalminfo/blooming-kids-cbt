@@ -781,7 +781,7 @@ async function renderStudentDatabase(container, tutor) {
 document.addEventListener('DOMContentLoaded', async () => {
     onAuthStateChanged(auth, async (user) => {
         if (user) {
-            const tutorQuery = query(collection(db, "tutors"), where("email", "==", user.email));
+            const tutorQuery = query(collection(db, "tutors"), where("email", "==", user.email.trim()));
             const querySnapshot = await getDocs(tutorQuery);
             if (!querySnapshot.empty) {
                 const tutorDoc = querySnapshot.docs[0];
@@ -817,5 +817,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     });
 });
+
 
 
