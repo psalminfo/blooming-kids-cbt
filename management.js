@@ -1,5 +1,5 @@
 import { auth, db } from './firebaseConfig.js';
-import { collection, getDocs, doc, getDoc, where, query, orderBy, Timestamp, writeBatch, updateDoc, deleteDoc, setDoc } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
+import { collection, getDocs, doc, getDoc, where, query, orderBy, Timestamp, writeBatch, updateDoc, deleteDoc, setDoc, addDoc } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
 import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-auth.js";
 import { onSnapshot } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
 
@@ -35,7 +35,7 @@ function convertPayAdviceToCSV(data) {
 // ##################################
 
 // Function to show the add gift modal
-function showAddGiftModal(tutors, payData) {
+function showAddGiftModal(tutors) {
     const tutorOptions = tutors.map(tutor => 
         `<option value="${tutor.email}">${tutor.name} (${tutor.email})</option>`
     ).join('');
@@ -102,7 +102,7 @@ function showAddGiftModal(tutors, payData) {
             // Refresh the pay advice data
             const startDateInput = document.getElementById('start-date');
             const endDateInput = document.getElementById('end-date');
-            if (startDateInput.value && endDateInput.value) {
+            if (startDateInput && startDateInput.value && endDateInput && endDateInput.value) {
                 const startDate = new Date(startDateInput.value);
                 const endDate = new Date(endDateInput.value);
                 endDate.setHours(23, 59, 59, 999);
@@ -247,9 +247,10 @@ function showAssignStudentModal(student = null) {
 
     // Handle tutor selection
     searchResults.addEventListener('click', function(e) {
-        if (e.target.classList.contains('cursor-pointer')) {
-            const tutorEmail = e.target.getAttribute('data-email');
-            const tutorName = e.target.getAttribute('data-name');
+        const target = e.target.closest('[data-email]');
+        if (target) {
+            const tutorEmail = target.getAttribute('data-email');
+            const tutorName = target.getAttribute('data-name');
             
             tutorEmailInput.value = tutorEmail;
             selectedTutorInfo.innerHTML = `<strong>${tutorName}</strong> (${tutorEmail})`;
@@ -290,7 +291,8 @@ function showAssignStudentModal(student = null) {
                     studentFee: Number(document.getElementById('assign-student-fee').value),
                     tutorEmail: tutorEmail,
                     tutorName: allTutors.find(t => t.email === tutorEmail)?.name || "Unknown",
-                    status: 'approved'
+                    status: 'approved',
+                    createdAt: Timestamp.now()
                 };
 
                 await addDoc(collection(db, "students"), studentData);
@@ -719,9 +721,6 @@ async function renderPayAdvicePanel(container) {
                     </tbody>
                 </table>
             </div>
-            <div class="mt-6 flex justify-end">
-                <button id="end-break-btn" class="bg-red-600 text-white px-6 py-2 rounded hover:bg-red-700">End Break</button>
-            </div>
         </div>
     `;
 
@@ -744,8 +743,6 @@ async function renderPayAdvicePanel(container) {
     if (canAddGifts) {
         document.getElementById('add-gift-btn').addEventListener('click', handleAddGift);
     }
-    
-    document.getElementById('end-break-btn').addEventListener('click', handleEndBreak);
 
     // Load initial data
     handleDateChange();
@@ -879,75 +876,69 @@ function handleExportPayAdvice() {
     URL.revokeObjectURL(url);
 }
 
-// NEW: Handle end break button
-async function handleEndBreak() {
-    if (confirm("Are you sure you want to end the break? This will archive the current pay data.")) {
-        try {
-            // Get the current date range
-            const startDate = new Date(document.getElementById('start-date').value);
-            const endDate = new Date(document.getElementById('end-date').value);
-            
-            // Create a record of this pay period
-            const payPeriodData = {
-                startDate: Timestamp.fromDate(startDate),
-                endDate: Timestamp.fromDate(endDate),
-                payData: window.currentPayData || [],
-                processedAt: Timestamp.now()
-            };
-            
-            // Save to the pay history collection
-            await addDoc(collection(db, "payHistory"), payPeriodData);
-            
-            alert("Break ended successfully! Pay data has been archived.");
-            
-        } catch (error) {
-            console.error("Error ending break:", error);
-            alert("Failed to end break. Check the console for details.");
-        }
-    }
-}
-
 // ##################################
-// # MAIN INITIALIZATION
+// # AUTHENTICATION & INITIALIZATION
 // ##################################
 
-// Initialize the management panel
-export function initManagementPanel() {
+document.addEventListener('DOMContentLoaded', function() {
     const mainContent = document.getElementById('main-content');
-    if (!mainContent) return;
-
-    // Listen for auth state changes
-    onAuthStateChanged(auth, (user) => {
+    const logoutBtn = document.getElementById('logoutBtn');
+    
+    if (!mainContent) {
+        console.error("Main content element not found");
+        return;
+    }
+    
+    // Show loading message
+    mainContent.innerHTML = `<p class="text-center text-gray-500 py-10">Checking user permissions...</p>`;
+    
+    onAuthStateChanged(auth, async (user) => {
         if (user) {
-            // User is signed in, check their role
-            const userDocRef = doc(db, "users", user.email);
-            getDoc(userDocRef).then((docSnap) => {
-                if (docSnap.exists()) {
-                    const userData = docSnap.data();
-                    window.userData = userData; // Store for later use
+            try {
+                // Check if user is a staff member
+                const staffDocRef = doc(db, "staff", user.email);
+                const staffDoc = await getDoc(staffDocRef);
+                
+                if (staffDoc.exists()) {
+                    const staffData = staffDoc.data();
+                    window.userData = staffData;
                     
-                    // Check if user has management access
-                    if (userData.role === "management") {
-                        renderManagementPanel(mainContent);
-                    } else {
-                        mainContent.innerHTML = `<p class="text-center text-red-500 py-10">Access denied. Management role required.</p>`;
-                    }
+                    // Update UI with user info
+                    const welcomeMessage = document.getElementById('welcome-message');
+                    const userRole = document.getElementById('user-role');
+                    
+                    if (welcomeMessage) welcomeMessage.textContent = `Welcome, ${staffData.name}`;
+                    if (userRole) userRole.textContent = `Role: ${capitalize(staffData.role)}`;
+                    
+                    // Render the management panel based on permissions
+                    renderManagementPanel(mainContent, staffData);
                 } else {
-                    mainContent.innerHTML = `<p class="text-center text-red-500 py-10">User data not found.</p>`;
+                    mainContent.innerHTML = `<p class="text-center text-red-500 py-10">Access denied. You are not registered as staff.</p>`;
                 }
-            }).catch((error) => {
-                console.error("Error getting user document:", error);
-                mainContent.innerHTML = `<p class="text-center text-red-500 py-10">Error loading user data.</p>`;
-            });
+            } catch (error) {
+                console.error("Error checking user permissions:", error);
+                mainContent.innerHTML = `<p class="text-center text-red-500 py-10">Error checking permissions. Please try again.</p>`;
+            }
         } else {
-            // User is signed out
-            mainContent.innerHTML = `<p class="text-center text-red-500 py-10">Please sign in to access the management panel.</p>`;
+            // User is not signed in, redirect to login
+            window.location.href = "management-auth.html";
         }
     });
-}
+    
+    // Logout button handler
+    if (logoutBtn) {
+        logoutBtn.addEventListener('click', () => {
+            signOut(auth).then(() => {
+                window.location.href = "management-auth.html";
+            }).catch((error) => {
+                console.error("Error signing out:", error);
+            });
+        });
+    }
+});
 
 // Render the management panel with navigation
-function renderManagementPanel(container) {
+function renderManagementPanel(container, staffData) {
     container.innerHTML = `
         <div class="bg-white p-6 rounded-lg shadow-md">
             <h1 class="text-3xl font-bold text-green-700 mb-6">Management Dashboard</h1>
@@ -956,7 +947,6 @@ function renderManagementPanel(container) {
                 <button id="nav-tutor-view" class="px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 font-medium">Tutor & Student List</button>
                 <button id="nav-pay-advice" class="px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 font-medium">Pay Advice</button>
                 <button id="nav-pending-students" class="px-6 py-3 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 font-medium">Pending Students</button>
-                <button id="nav-tutor-requests" class="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium">Tutor Requests</button>
             </div>
             
             <div id="management-content">
@@ -975,10 +965,68 @@ function renderManagementPanel(container) {
     });
     
     document.getElementById('nav-pending-students').addEventListener('click', () => {
-        renderPendingStudentsView(document.getElementById('management-content'));
+        renderPendingApprovalsPanel(document.getElementById('management-content'));
     });
+}
+
+// Render pending approvals panel
+async function renderPendingApprovalsPanel(container) {
+    container.innerHTML = `
+        <div class="bg-white p-6 rounded-lg shadow-md">
+            <h2 class="text-2xl font-bold text-green-700 mb-4">Pending Approvals</h2>
+            <div id="pending-approvals-list" class="space-y-4">
+                <p class="text-center text-gray-500 py-10">Loading pending students...</p>
+            </div>
+        </div>
+    `;
+    loadPendingApprovals();
+}
+
+// Load pending approvals
+async function loadPendingApprovals() {
+    const listContainer = document.getElementById('pending-approvals-list');
     
-    document.getElementById('nav-tutor-requests').addEventListener('click', () => {
-        renderTutorRequestsView(document.getElementById('management-content'));
-    });
+    try {
+        const pendingStudentsSnapshot = await getDocs(collection(db, "pending_students"));
+        
+        if (pendingStudentsSnapshot.empty) {
+            listContainer.innerHTML = `<p class="text-center text-gray-500">No students are awaiting approval.</p>`;
+            return;
+        }
+
+        listContainer.innerHTML = pendingStudentsSnapshot.docs.map(doc => {
+            const student = { id: doc.id, ...doc.data() };
+            const actionButtons = `
+                <button class="edit-pending-btn bg-blue-500 text-white px-3 py-1 text-sm rounded-full" data-student-id="${student.id}">Edit</button>
+                <button class="approve-btn bg-green-600 text-white px-3 py-1 text-sm rounded-full" data-student-id="${student.id}">Approve</button>
+                <button class="reject-btn bg-red-600 text-white px-3 py-1 text-sm rounded-full" data-student-id="${student.id}">Reject</button>
+            `;
+            return `
+                <div class="border p-4 rounded-lg flex justify-between items-center bg-gray-50">
+                    <div>
+                        <p><strong>Student:</strong> ${student.studentName}</p>
+                        <p><strong>Fee:</strong> ₦${(student.studentFee || 0).toFixed(2)}</p>
+                        <p><strong>Submitted by Tutor:</strong> ${student.tutorEmail || 'N/A'}</p>
+                    </div>
+                    <div class="flex items-center space-x-2">
+                        ${actionButtons}
+                    </div>
+                </div>
+            `;
+        }).join('');
+
+        // Event listeners
+        document.querySelectorAll('.edit-pending-btn').forEach(button => {
+            button.addEventListener('click', () => handleEditPendingStudent(button.dataset.studentId));
+        });
+        document.querySelectorAll('.approve-btn').forEach(button => {
+            button.addEventListener('click', () => handleApproveStudent(button.dataset.studentId));
+        });
+        document.querySelectorAll('.reject-btn').forEach(button => {
+            button.addEventListener('click', () => handleRejectStudent(button.dataset.studentId));
+        });
+    } catch (error) {
+        console.error("Error loading pending approvals:", error);
+        listContainer.innerHTML = `<p class="text-center text-red-500">Failed to load pending approvals.</p>`;
+    }
 }
