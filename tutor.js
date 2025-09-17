@@ -152,7 +152,7 @@ function getNewStudentFormFields() {
     
     // Define Subjects
     const subjectsByCategory = {
-        "Academics": ["Math", "Language Arts", "Geography", "Science", "Biology", "Physics", "Chemistry"],
+        "Academics": ["Math", "Language Arts", "Geography", "Science", "Biology", "Physics", "Chemistry", "Microbiology"],
         "Pre-College Exams": ["SAT", "IGCSE", "A-Levels", "SSCE", "JAMB"],
         "Languages": ["French", "German", "Spanish", "Yoruba", "Igbo", "Hausa"],
         "Tech Courses": ["Coding", "Stop motion animation", "YouTube for kids", "Graphic design", "Videography", "Comic/book creation", "Artificial Intelligence", "Chess"],
@@ -223,7 +223,7 @@ function showEditStudentModal(student) {
 
     // Define Subjects
     const subjectsByCategory = {
-        "Academics": ["Math", "Language Arts", "Geography", "Science", "Biology", "Physics", "Chemistry"],
+        "Academics": ["Math", "Language Arts", "Geography", "Science", "Biology", "Physics", "Chemistry", "Microbiology"],
         "Pre-College Exams": ["SAT", "IGCSE", "A-Levels", "SSCE", "JAMB"],
         "Languages": ["French", "German", "Spanish", "Yoruba", "Igbo", "Hausa"],
         "Tech Courses": ["Coding", "Stop motion animation", "YouTube for kids", "Graphic design", "Videography", "Comic/book creation", "Artificial Intelligence", "Chess"],
@@ -817,4 +817,5 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     });
 });
+
 
