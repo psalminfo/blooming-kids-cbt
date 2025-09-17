@@ -714,4 +714,271 @@ async function renderPayAdvicePanel(container) {
                             <th class="px-6 py-3 text-left text-xs font-medium uppercase">Account Name</th>
                         </tr>
                     </thead>
-                    <tbody id="
+                    <tbody id="pay-advice-body" class="bg-white divide-y divide-gray-200">
+                        <tr><td colspan="9" class="px-6 py-4 text-center text-gray-500">Select a date range to view pay advice</td></tr>
+                    </tbody>
+                </table>
+            </div>
+            <div class="mt-6 flex justify-end">
+                <button id="end-break-btn" class="bg-red-600 text-white px-6 py-2 rounded hover:bg-red-700">End Break</button>
+            </div>
+        </div>
+    `;
+
+    // Set default date values (current month)
+    const today = new Date();
+    const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+    const lastDayOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+    
+    document.getElementById('start-date').valueAsDate = firstDayOfMonth;
+    document.getElementById('end-date').valueAsDate = lastDayOfMonth;
+
+    // Add event listeners
+    document.getElementById('start-date').addEventListener('change', handleDateChange);
+    document.getElementById('end-date').addEventListener('change', handleDateChange);
+    
+    if (canExport) {
+        document.getElementById('export-pay-csv-btn').addEventListener('click', handleExportPayAdvice);
+    }
+    
+    if (canAddGifts) {
+        document.getElementById('add-gift-btn').addEventListener('click', handleAddGift);
+    }
+    
+    document.getElementById('end-break-btn').addEventListener('click', handleEndBreak);
+
+    // Load initial data
+    handleDateChange();
+}
+
+// NEW: Handle adding a gift
+async function handleAddGift() {
+    try {
+        const tutorsSnapshot = await getDocs(collection(db, "tutors"));
+        const tutors = tutorsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        
+        showAddGiftModal(tutors);
+    } catch (error) {
+        console.error("Error loading tutors for gift:", error);
+        alert("Failed to load tutors. Check the console for details.");
+    }
+}
+
+// NEW: Handle date change for pay advice
+async function handleDateChange() {
+    const startDateInput = document.getElementById('start-date');
+    const endDateInput = document.getElementById('end-date');
+    
+    if (!startDateInput.value || !endDateInput.value) return;
+    
+    const startDate = new Date(startDateInput.value);
+    const endDate = new Date(endDateInput.value);
+    endDate.setHours(23, 59, 59, 999);
+    
+    await loadPayAdviceData(startDate, endDate);
+}
+
+// UPDATED: Load pay advice data with gift support
+async function loadPayAdviceData(startDate, endDate) {
+    try {
+        // Get all tutors
+        const tutorsSnapshot = await getDocs(query(collection(db, "tutors"), orderBy("name")));
+        const tutors = tutorsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        
+        // Get all students
+        const studentsSnapshot = await getDocs(collection(db, "students"));
+        const students = studentsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        
+        // Get all gifts
+        const tutorEmails = tutors.map(t => t.email);
+        const gifts = await loadGiftsForTutors(tutorEmails);
+        
+        // Filter students by date range
+        const filteredStudents = students.filter(student => {
+            const studentDate = student.createdAt ? student.createdAt.toDate() : new Date();
+            return studentDate >= startDate && studentDate <= endDate;
+        });
+        
+        // Update counts
+        document.getElementById('pay-tutor-count').textContent = tutors.length;
+        document.getElementById('pay-student-count').textContent = filteredStudents.length;
+        
+        // Group students by tutor
+        const studentsByTutor = {};
+        filteredStudents.forEach(student => {
+            if (!studentsByTutor[student.tutorEmail]) {
+                studentsByTutor[student.tutorEmail] = [];
+            }
+            studentsByTutor[student.tutorEmail].push(student);
+        });
+        
+        // Calculate pay for each tutor
+        const payData = tutors.map(tutor => {
+            const tutorStudents = studentsByTutor[tutor.email] || [];
+            const totalStudentFees = tutorStudents.reduce((sum, student) => sum + (student.studentFee || 0), 0);
+            const managementFee = totalStudentFees * 0.1; // 10% management fee
+            const giftAmount = gifts[tutor.email] || 0;
+            const totalPay = totalStudentFees - managementFee + giftAmount;
+            
+            return {
+                tutorName: tutor.name,
+                studentCount: tutorStudents.length,
+                totalStudentFees,
+                managementFee,
+                gifts: giftAmount,
+                totalPay,
+                beneficiaryBank: tutor.beneficiaryBank,
+                beneficiaryAccount: tutor.beneficiaryAccount,
+                beneficiaryName: tutor.beneficiaryName
+            };
+        });
+        
+        // Render the pay advice table
+        const payAdviceBody = document.getElementById('pay-advice-body');
+        payAdviceBody.innerHTML = payData.map(item => `
+            <tr class="hover:bg-gray-50">
+                <td class="px-6 py-4 whitespace-nowrap">${item.tutorName}</td>
+                <td class="px-6 py-4 whitespace-nowrap">${item.studentCount}</td>
+                <td class="px-6 py-4 whitespace-nowrap">₦${item.totalStudentFees.toLocaleString()}</td>
+                <td class="px-6 py-4 whitespace-nowrap">₦${item.managementFee.toLocaleString()}</td>
+                <td class="px-6 py-4 whitespace-nowrap">₦${item.gifts.toLocaleString()}</td>
+                <td class="px-6 py-4 whitespace-nowrap font-bold">₦${item.totalPay.toLocaleString()}</td>
+                <td class="px-6 py-4 whitespace-nowrap">${item.beneficiaryBank || 'N/A'}</td>
+                <td class="px-6 py-4 whitespace-nowrap">${item.beneficiaryAccount || 'N/A'}</td>
+                <td class="px-6 py-4 whitespace-nowrap">${item.beneficiaryName || 'N/A'}</td>
+            </tr>
+        `).join('');
+        
+        // Store the current pay data for export
+        window.currentPayData = payData;
+        
+    } catch (error) {
+        console.error("Error loading pay advice data:", error);
+        document.getElementById('pay-advice-body').innerHTML = `
+            <tr><td colspan="9" class="px-6 py-4 text-center text-red-500">Failed to load pay advice data</td></tr>
+        `;
+    }
+}
+
+// NEW: Handle export pay advice
+function handleExportPayAdvice() {
+    if (!window.currentPayData || window.currentPayData.length === 0) {
+        alert("No data to export. Please select a date range first.");
+        return;
+    }
+    
+    const csvData = convertPayAdviceToCSV(window.currentPayData);
+    const blob = new Blob([csvData], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `pay-advice-${new Date().toISOString().split('T')[0]}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+}
+
+// NEW: Handle end break button
+async function handleEndBreak() {
+    if (confirm("Are you sure you want to end the break? This will archive the current pay data.")) {
+        try {
+            // Get the current date range
+            const startDate = new Date(document.getElementById('start-date').value);
+            const endDate = new Date(document.getElementById('end-date').value);
+            
+            // Create a record of this pay period
+            const payPeriodData = {
+                startDate: Timestamp.fromDate(startDate),
+                endDate: Timestamp.fromDate(endDate),
+                payData: window.currentPayData || [],
+                processedAt: Timestamp.now()
+            };
+            
+            // Save to the pay history collection
+            await addDoc(collection(db, "payHistory"), payPeriodData);
+            
+            alert("Break ended successfully! Pay data has been archived.");
+            
+        } catch (error) {
+            console.error("Error ending break:", error);
+            alert("Failed to end break. Check the console for details.");
+        }
+    }
+}
+
+// ##################################
+// # MAIN INITIALIZATION
+// ##################################
+
+// Initialize the management panel
+export function initManagementPanel() {
+    const mainContent = document.getElementById('main-content');
+    if (!mainContent) return;
+
+    // Listen for auth state changes
+    onAuthStateChanged(auth, (user) => {
+        if (user) {
+            // User is signed in, check their role
+            const userDocRef = doc(db, "users", user.email);
+            getDoc(userDocRef).then((docSnap) => {
+                if (docSnap.exists()) {
+                    const userData = docSnap.data();
+                    window.userData = userData; // Store for later use
+                    
+                    // Check if user has management access
+                    if (userData.role === "management") {
+                        renderManagementPanel(mainContent);
+                    } else {
+                        mainContent.innerHTML = `<p class="text-center text-red-500 py-10">Access denied. Management role required.</p>`;
+                    }
+                } else {
+                    mainContent.innerHTML = `<p class="text-center text-red-500 py-10">User data not found.</p>`;
+                }
+            }).catch((error) => {
+                console.error("Error getting user document:", error);
+                mainContent.innerHTML = `<p class="text-center text-red-500 py-10">Error loading user data.</p>`;
+            });
+        } else {
+            // User is signed out
+            mainContent.innerHTML = `<p class="text-center text-red-500 py-10">Please sign in to access the management panel.</p>`;
+        }
+    });
+}
+
+// Render the management panel with navigation
+function renderManagementPanel(container) {
+    container.innerHTML = `
+        <div class="bg-white p-6 rounded-lg shadow-md">
+            <h1 class="text-3xl font-bold text-green-700 mb-6">Management Dashboard</h1>
+            
+            <div class="flex flex-wrap gap-4 mb-6">
+                <button id="nav-tutor-view" class="px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 font-medium">Tutor & Student List</button>
+                <button id="nav-pay-advice" class="px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 font-medium">Pay Advice</button>
+                <button id="nav-pending-students" class="px-6 py-3 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 font-medium">Pending Students</button>
+                <button id="nav-tutor-requests" class="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium">Tutor Requests</button>
+            </div>
+            
+            <div id="management-content">
+                <p class="text-center text-gray-500 py-10">Select a view from the navigation above.</p>
+            </div>
+        </div>
+    `;
+
+    // Add event listeners for navigation
+    document.getElementById('nav-tutor-view').addEventListener('click', () => {
+        renderManagementTutorView(document.getElementById('management-content'));
+    });
+    
+    document.getElementById('nav-pay-advice').addEventListener('click', () => {
+        renderPayAdvicePanel(document.getElementById('management-content'));
+    });
+    
+    document.getElementById('nav-pending-students').addEventListener('click', () => {
+        renderPendingStudentsView(document.getElementById('management-content'));
+    });
+    
+    document.getElementById('nav-tutor-requests').addEventListener('click', () => {
+        renderTutorRequestsView(document.getElementById('management-content'));
+    });
+}
