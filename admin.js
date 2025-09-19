@@ -856,6 +856,7 @@ async function renderSelectedTutorDetails(tutorId) {
                     <div class="add-student-form space-y-2">
                         <h5 class="font-semibold text-gray-700">Add/Edit Student Details:</h5>
                         <input type="text" id="new-parent-name" class="w-full p-2 border rounded" placeholder="Parent Name">
+                        <input type="text" id="new-parent-name" class="w-full p-2 border rounded" placeholder="Parent Name">
                         <input type="text" id="new-student-name" class="w-full p-2 border rounded" placeholder="Student Name">
                         <select id="new-student-grade" class="w-full p-2 border rounded"><option value="">Select Grade</option>${gradeOptions}</select>
                         <input type="text" id="new-student-subjects" class="w-full p-2 border rounded" placeholder="Subject(s) (e.g., Math, English)">
@@ -1597,6 +1598,7 @@ onAuthStateChanged(auth, async (user) => {
         logoutBtn.classList.add('hidden');
     }
 });
+
 
 
 
