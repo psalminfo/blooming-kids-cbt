@@ -856,7 +856,7 @@ async function renderSelectedTutorDetails(tutorId) {
                     <div class="add-student-form space-y-2">
                         <h5 class="font-semibold text-gray-700">Add/Edit Student Details:</h5>
                         <input type="text" id="new-parent-name" class="w-full p-2 border rounded" placeholder="Parent Name">
-                        <input type="text" id="new-parent-name" class="w-full p-2 border rounded" placeholder="Parent Name">
+                        <input type="text" id="new-parent-name" class="w-full p-2 border rounded" placeholder="Parent Pone No">
                         <input type="text" id="new-student-name" class="w-full p-2 border rounded" placeholder="Student Name">
                         <select id="new-student-grade" class="w-full p-2 border rounded"><option value="">Select Grade</option>${gradeOptions}</select>
                         <input type="text" id="new-student-subjects" class="w-full p-2 border rounded" placeholder="Subject(s) (e.g., Math, English)">
@@ -931,6 +931,7 @@ async function renderSelectedTutorDetails(tutorId) {
             btn.addEventListener('click', (e) => {
                 const data = e.currentTarget.dataset;
                 document.getElementById('new-parent-name').value = data.parentName;
+                document.getElementById('new-parent-phone').value = data.parentphone;
                 document.getElementById('new-student-name').value = data.studentName;
                 document.getElementById('new-student-grade').value = data.grade;
                 document.getElementById('new-student-subjects').value = data.subjects;
@@ -982,6 +983,7 @@ async function handleStudentImport(tutor) {
                 const studentDocRef = doc(collection(db, "students"));
                 const studentData = {
                     parentName: row['Parent Name'] || '',
+                    parentphone: row['Parent Phone']
                     studentName: row['Student Name'],
                     grade: row['Grade'],
                     subjects: (row['Subjects'] || '').toString().split(',').map(s => s.trim()),
@@ -1598,6 +1600,7 @@ onAuthStateChanged(auth, async (user) => {
         logoutBtn.classList.add('hidden');
     }
 });
+
 
 
 
