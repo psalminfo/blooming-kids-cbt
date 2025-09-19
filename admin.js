@@ -856,7 +856,6 @@ async function renderSelectedTutorDetails(tutorId) {
                     <div class="add-student-form space-y-2">
                         <h5 class="font-semibold text-gray-700">Add/Edit Student Details:</h5>
                         <input type="text" id="new-parent-name" class="w-full p-2 border rounded" placeholder="Parent Name">
-                        <input type="text" id="new-parent-phone no" class="w-full p-2 border rounded" placeholder="Parent Phone No">
                         <input type="text" id="new-student-name" class="w-full p-2 border rounded" placeholder="Student Name">
                         <select id="new-student-grade" class="w-full p-2 border rounded"><option value="">Select Grade</option>${gradeOptions}</select>
                         <input type="text" id="new-student-subjects" class="w-full p-2 border rounded" placeholder="Subject(s) (e.g., Math, English)">
@@ -866,7 +865,7 @@ async function renderSelectedTutorDetails(tutorId) {
                     </div>
                     <div class="import-students-form">
                         <h5 class="font-semibold text-gray-700">Import Students for ${tutor.name}:</h5>
-                        <p class="text-xs text-gray-500 mb-2">Upload a .csv or .xlsx file with columns: <strong>Parent Name, Parent Phone No, Student Name, Grade, Subjects, Days, Fee</strong></p>
+                        <p class="text-xs text-gray-500 mb-2">Upload a .csv or .xlsx file with columns: <strong>Parent Name, Student Name, Grade, Subjects, Days, Fee</strong></p>
                         <input type="file" id="student-import-file" class="w-full text-sm border rounded p-1" accept=".csv, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/vnd.ms-excel">
                         <button id="import-students-btn" class="bg-blue-600 text-white w-full px-4 py-2 rounded mt-2 hover:bg-blue-700">Import Students</button>
                         <p id="import-status" class="text-sm mt-2"></p>
@@ -931,7 +930,6 @@ async function renderSelectedTutorDetails(tutorId) {
             btn.addEventListener('click', (e) => {
                 const data = e.currentTarget.dataset;
                 document.getElementById('new-parent-name').value = data.parentName;
-                document.getElementById('new-parent-phone').value = data.parentphone;
                 document.getElementById('new-student-name').value = data.studentName;
                 document.getElementById('new-student-grade').value = data.grade;
                 document.getElementById('new-student-subjects').value = data.subjects;
@@ -983,7 +981,6 @@ async function handleStudentImport(tutor) {
                 const studentDocRef = doc(collection(db, "students"));
                 const studentData = {
                     parentName: row['Parent Name'] || '',
-                    parentphone: row['Parent Phone']
                     studentName: row['Student Name'],
                     grade: row['Grade'],
                     subjects: (row['Subjects'] || '').toString().split(',').map(s => s.trim()),
@@ -1600,11 +1597,6 @@ onAuthStateChanged(auth, async (user) => {
         logoutBtn.classList.add('hidden');
     }
 });
-
-
-
-
-
 
 
 
