@@ -12,38 +12,6 @@ let isBypassApprovalEnabled = false;
 let showStudentFees = false;
 let showEditDeleteButtons = false;
 
-// --- Local Storage Functions for Report Persistence ---
-const getLocalReportsKey = (tutorEmail) => `savedReports_${tutorEmail}`;
-
-function saveReportsToLocalStorage(tutorEmail, reports) {
-    try {
-        const key = getLocalReportsKey(tutorEmail);
-        localStorage.setItem(key, JSON.stringify(reports));
-    } catch (error) {
-        console.warn('Error saving to local storage:', error);
-    }
-}
-
-function loadReportsFromLocalStorage(tutorEmail) {
-    try {
-        const key = getLocalReportsKey(tutorEmail);
-        const saved = localStorage.getItem(key);
-        return saved ? JSON.parse(saved) : {};
-    } catch (error) {
-        console.warn('Error loading from local storage, using empty object:', error);
-        return {};
-    }
-}
-
-function clearAllReportsFromLocalStorage(tutorEmail) {
-    try {
-        const key = getLocalReportsKey(tutorEmail);
-        localStorage.removeItem(key);
-    } catch (error) {
-        console.warn('Error clearing local storage:', error);
-    }
-}
-
 // Listen for changes to the admin settings in real-time
 const settingsDocRef = doc(db, "settings", "global_settings");
 onSnapshot(settingsDocRef, (docSnap) => {
@@ -385,8 +353,7 @@ async function renderStudentDatabase(container, tutor) {
         return;
     }
 
-    // Load saved reports from local storage instead of starting fresh
-    let savedReports = loadReportsFromLocalStorage(tutor.email);
+    let savedReports = {};
 
     // Fetch both approved and pending students
     const studentQuery = query(collection(db, "students"), where("tutorEmail", "==", tutor.email));
@@ -575,8 +542,6 @@ async function renderStudentDatabase(container, tutor) {
                 showAccountDetailsModal([reportData]);
             } else {
                 savedReports[student.id] = reportData;
-                // Save to local storage
-                saveReportsToLocalStorage(tutor.email, savedReports);
                 showCustomAlert(`${student.studentName}'s report has been saved.`);
                 renderUI();
             }
@@ -648,8 +613,6 @@ async function renderStudentDatabase(container, tutor) {
 
         try {
             await batch.commit();
-            // Clear local storage after successful submission
-            clearAllReportsFromLocalStorage(tutor.email);
             showCustomAlert(`Successfully submitted ${reportsArray.length} report(s)!`);
             savedReports = {};
             renderUI();
