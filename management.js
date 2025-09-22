@@ -377,7 +377,7 @@ async function renderPayAdvicePanel(container) {
     endDateInput.addEventListener('change', handleDateChange);
 }
 
-// ### UPDATED FUNCTION ###
+// ### FIXED FUNCTION ###
 async function loadPayAdviceData(startDate, endDate) {
     const tableBody = document.getElementById('pay-advice-table-body');
     if (!tableBody) return;
@@ -397,16 +397,18 @@ async function loadPayAdviceData(startDate, endDate) {
             return;
         }
 
-        // Extract the latest bank details for each tutor from the reports
+        // FIXED: Properly extract bank details from tutor submissions
         const tutorBankDetails = {};
-        reportsSnapshot.forEach(doc => {
+        reportsSnapshot.docs.forEach(doc => {
             const data = doc.data();
-            // We only need one record of bank details per tutor for the period
-            if (!tutorBankDetails[data.tutorEmail]) {
-                 tutorBankDetails[data.tutorEmail] = {
+            const tutorEmail = data.tutorEmail;
+            
+            // Only update if we have valid bank details in this document
+            if (data.beneficiaryBank && data.beneficiaryAccount) {
+                tutorBankDetails[tutorEmail] = {
                     beneficiaryBank: data.beneficiaryBank,
                     beneficiaryAccount: data.beneficiaryAccount,
-                    beneficiaryName: data.beneficiaryName,
+                    beneficiaryName: data.beneficiaryName || 'N/A',
                 };
             }
         });
@@ -426,7 +428,13 @@ async function loadPayAdviceData(startDate, endDate) {
             const totalStudentFees = assignedStudents.reduce((sum, s) => sum + (s.studentFee || 0), 0);
             const managementFee = (tutor.isManagementStaff && tutor.managementFee) ? tutor.managementFee : 0;
             totalStudentCount += assignedStudents.length;
-            const bankDetails = tutorBankDetails[tutor.email] || {};
+            
+            // Get bank details from the tutor submissions, fallback to 'N/A' if not found
+            const bankDetails = tutorBankDetails[tutor.email] || {
+                beneficiaryBank: 'N/A',
+                beneficiaryAccount: 'N/A',
+                beneficiaryName: 'N/A'
+            };
 
             payData.push({
                 tutorName: tutor.name, 
@@ -434,7 +442,7 @@ async function loadPayAdviceData(startDate, endDate) {
                 totalStudentFees: totalStudentFees, 
                 managementFee: managementFee,
                 totalPay: totalStudentFees + managementFee,
-                ...bankDetails // Add bank details to the object
+                ...bankDetails
             });
         });
 
@@ -448,9 +456,9 @@ async function loadPayAdviceData(startDate, endDate) {
                 <td class="px-6 py-4">₦${d.totalStudentFees.toFixed(2)}</td>
                 <td class="px-6 py-4">₦${d.managementFee.toFixed(2)}</td>
                 <td class="px-6 py-4 font-bold">₦${d.totalPay.toFixed(2)}</td>
-                <td class="px-6 py-4">${d.beneficiaryBank || 'N/A'}</td>
-                <td class="px-6 py-4">${d.beneficiaryAccount || 'N/A'}</td>
-                <td class="px-6 py-4">${d.beneficiaryName || 'N/A'}</td>
+                <td class="px-6 py-4">${d.beneficiaryBank}</td>
+                <td class="px-6 py-4">${d.beneficiaryAccount}</td>
+                <td class="px-6 py-4">${d.beneficiaryName}</td>
             </tr>
         `).join('');
         
