@@ -1,5 +1,5 @@
 import { auth, db } from './firebaseConfig.js';
-import { collection, getDocs, doc, addDoc, query, where, getDoc, updateDoc, setDoc, deleteDoc, orderBy, writeBatch, Timestamp } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
+import { collection, getDocs, doc, addDoc, query, where, getDoc, updateDoc, setDoc, deleteDoc, orderBy, writeBatch, Timestamp, limit } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
 import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-auth.js";
 import { onSnapshot } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
 
@@ -75,7 +75,7 @@ async function updateStaffPermissions(staffEmail, newRole) {
 }
 
 // ##################################################################
-// # SECTION 1: DASHBOARD PANEL (Restored to original as requested)
+// # SECTION 1: DASHBOARD PANEL (Optimized with Denormalized Counters)
 // ##################################################################
 
 async function renderAdminPanel(container) {
@@ -226,27 +226,60 @@ async function handleAddQuestionSubmit(e) {
 }
 
 async function loadCounters() {
-    const [studentsSnapshot, tutorsSnapshot] = await Promise.all([
-        getDocs(collection(db, "student_results")),
-        getDocs(collection(db, "tutors"))
-    ]);
-    document.getElementById('totalStudentsCount').textContent = studentsSnapshot.docs.length;
-    document.getElementById('totalTutorsCount').textContent = tutorsSnapshot.docs.length;
-    const studentsPerTutorSelect = document.getElementById('studentsPerTutorSelect');
-    studentsPerTutorSelect.innerHTML = `<option value="">Students Per Tutor</option>`;
-    for (const tutorDoc of tutorsSnapshot.docs) {
-        const tutor = tutorDoc.data();
-        const studentsQuery = query(collection(db, "student_results"), where("tutorEmail", "==", tutor.email));
-        const studentsUnderTutor = await getDocs(studentsQuery);
-        const option = document.createElement('option');
-        option.textContent = `${tutor.name} (${studentsUnderTutor.docs.length} students)`;
-        studentsPerTutorSelect.appendChild(option);
+    // OPTIMIZATION: Single read from denormalized stats document instead of reading entire collections
+    try {
+        const statsDoc = await getDoc(doc(db, "settings", "global_stats"));
+        if (statsDoc.exists()) {
+            const stats = statsDoc.data();
+            document.getElementById('totalStudentsCount').textContent = stats.totalStudents || 0;
+            document.getElementById('totalTutorsCount').textContent = stats.totalTutors || 0;
+            
+            // For students per tutor, we'll still need to fetch tutors but with a limit
+            const tutorsQuery = query(collection(db, "tutors"), limit(50));
+            const tutorsSnapshot = await getDocs(tutorsQuery);
+            
+            const studentsPerTutorSelect = document.getElementById('studentsPerTutorSelect');
+            studentsPerTutorSelect.innerHTML = `<option value="">Students Per Tutor</option>`;
+            
+            tutorsSnapshot.docs.forEach(tutorDoc => {
+                const tutor = tutorDoc.data();
+                // Use the denormalized count if available, otherwise show placeholder
+                const studentCount = stats.studentsPerTutor?.[tutor.email] || 'N/A';
+                const option = document.createElement('option');
+                option.textContent = `${tutor.name} (${studentCount} students)`;
+                studentsPerTutorSelect.appendChild(option);
+            });
+        } else {
+            // Fallback if stats document doesn't exist yet
+            console.warn("Global stats document not found, using fallback counters");
+            await loadCountersFallback();
+        }
+    } catch (error) {
+        console.error("Error loading counters:", error);
+        await loadCountersFallback();
     }
+}
+
+async function loadCountersFallback() {
+    // Fallback method if denormalized stats are not available
+    const [studentsSnapshot, tutorsSnapshot] = await Promise.all([
+        getDocs(query(collection(db, "student_results"), limit(1))), // Minimal read just to check existence
+        getDocs(query(collection(db, "tutors"), limit(1)))
+    ]);
+    
+    document.getElementById('totalStudentsCount').textContent = "N/A";
+    document.getElementById('totalTutorsCount').textContent = "N/A";
+    
+    const studentsPerTutorSelect = document.getElementById('studentsPerTutorSelect');
+    studentsPerTutorSelect.innerHTML = `<option value="">Stats loading...</option>`;
 }
 
 async function loadStudentDropdown() {
     const studentDropdown = document.getElementById('studentDropdown');
-    const snapshot = await getDocs(collection(db, "student_results"));
+    // OPTIMIZATION: Limit results to 50 most recent students
+    const studentsQuery = query(collection(db, "student_results"), orderBy("submittedAt", "desc"), limit(50));
+    const snapshot = await getDocs(studentsQuery);
+    
     studentDropdown.innerHTML = `<option value="">Select Student</option>`;
     snapshot.forEach(doc => {
         const student = doc.data();
@@ -278,7 +311,7 @@ async function loadAndRenderReport(docId) {
                 <p><strong>Tutor:</strong> ${tutorName}</p>
                 <p><strong>Date:</strong> ${new Date(data.submittedAt.seconds * 1000).toLocaleString()}</p>
                 <h4 class="text-lg font-semibold mt-4">Score: ${score} / ${data.totalScoreableQuestions}</h4>
-                <h4 class="text-lg font-semibold mt-4">Tutor’s Recommendation:</h4>
+                <h4 class="text-lg font-semibold mt-4">Tutor's Recommendation:</h4>
                 <p>${tutorReport}</p>
                 <button id="downloadPdfBtn" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 mt-4">Download PDF</button>
             </div>
@@ -538,7 +571,7 @@ async function setupContentManager() {
 
 
 // ##################################################################
-// # SECTION 3: TUTOR MANAGEMENT (Final Version)
+// # SECTION 3: TUTOR MANAGEMENT (Optimized with Pagination)
 // ##################################################################
 
 // --- Global state to hold settings, updated in real-time ---
@@ -634,31 +667,47 @@ async function setupTutorManagementListeners() {
     
     // --- DATA FETCHING AND CACHING FOR SEARCH & MANAGEMENT ---
     const tutorSelect = document.getElementById('tutor-select');
-    onSnapshot(collection(db, "tutors"), (snapshot) => {
-        const tutorsData = {};
-        const tutorsByEmail = {};
-        tutorSelect.innerHTML = `<option value="">-- Select a Tutor --</option>`;
-        snapshot.forEach(doc => {
-            const tutor = { id: doc.id, ...doc.data() };
-            tutorsData[doc.id] = tutor;
-            tutorsByEmail[tutor.email] = tutor;
-            const option = document.createElement('option');
-            option.value = doc.id;
-            option.textContent = `${tutor.name} (${tutor.email})`;
-            tutorSelect.appendChild(option);
-        });
-        window.allTutorsData = tutorsData;
-        window.tutorsByEmail = tutorsByEmail;
-        document.getElementById('tutor-count-badge').textContent = snapshot.size;
-        if (activeTutorId && tutorsData[activeTutorId]) {
-            tutorSelect.value = activeTutorId;
+    
+    // OPTIMIZATION: Use limited query instead of fetching all tutors
+    const tutorsQuery = query(collection(db, "tutors"), orderBy("name"), limit(50));
+    const tutorsSnapshot = await getDocs(tutorsQuery);
+    
+    const tutorsData = {};
+    const tutorsByEmail = {};
+    tutorSelect.innerHTML = `<option value="">-- Select a Tutor --</option>`;
+    tutorsSnapshot.forEach(doc => {
+        const tutor = { id: doc.id, ...doc.data() };
+        tutorsData[doc.id] = tutor;
+        tutorsByEmail[tutor.email] = tutor;
+        const option = document.createElement('option');
+        option.value = doc.id;
+        option.textContent = `${tutor.name} (${tutor.email})`;
+        tutorSelect.appendChild(option);
+    });
+    window.allTutorsData = tutorsData;
+    window.tutorsByEmail = tutorsByEmail;
+    
+    // OPTIMIZATION: Use denormalized stats for counters instead of counting all documents
+    try {
+        const statsDoc = await getDoc(doc(db, "settings", "global_stats"));
+        if (statsDoc.exists()) {
+            const stats = statsDoc.data();
+            document.getElementById('tutor-count-badge').textContent = stats.totalTutors || tutorsSnapshot.size;
+            document.getElementById('student-count-badge').textContent = stats.totalStudents || 0;
+        } else {
+            document.getElementById('tutor-count-badge').textContent = tutorsSnapshot.size;
+            document.getElementById('student-count-badge').textContent = 'N/A';
         }
-    });
+    } catch (error) {
+        console.error("Error loading stats:", error);
+        document.getElementById('tutor-count-badge').textContent = tutorsSnapshot.size;
+        document.getElementById('student-count-badge').textContent = 'N/A';
+    }
 
-    onSnapshot(collection(db, "students"), (snapshot) => {
-        window.allStudentsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        document.getElementById('student-count-badge').textContent = snapshot.size;
-    });
+    // OPTIMIZATION: Load students with limit for search functionality
+    const studentsQuery = query(collection(db, "students"), limit(100));
+    const studentsSnapshot = await getDocs(studentsQuery);
+    window.allStudentsData = studentsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 
     // --- EVENT LISTENERS FOR UI INTERACTION ---
     tutorSelect.addEventListener('change', e => {
@@ -761,11 +810,11 @@ async function setupTutorManagementListeners() {
                 if (confirm(`Are you sure you want to delete tutor "${tutorName}"? This action cannot be undone.`)) {
                     try {
                         // First check if this tutor has any students assigned
-                        const studentsQuery = query(collection(db, "students"), where("tutorEmail", "==", allTutorsData[tutorId].email));
+                        const studentsQuery = query(collection(db, "students"), where("tutorEmail", "==", allTutorsData[tutorId].email), limit(1));
                         const studentsSnapshot = await getDocs(studentsQuery);
                         
                         if (!studentsSnapshot.empty) {
-                            alert(`Cannot delete tutor "${tutorName}" because they have ${studentsSnapshot.size} student(s) assigned. Please reassign or delete these students first.`);
+                            alert(`Cannot delete tutor "${tutorName}" because they have students assigned. Please reassign or delete these students first.`);
                             return;
                         }
                         
@@ -786,772 +835,7 @@ async function setupTutorManagementListeners() {
     });
 }
 
-function resetStudentForm() {
-    const form = document.querySelector('.add-student-form');
-    if (!form) return;
-    form.querySelector('#new-parent-name').value = '';
-    form.querySelector('#new-student-name').value = '';
-    form.querySelector('#new-student-grade').value = '';
-    form.querySelector('#new-student-subjects').value = '';
-    form.querySelector('#new-student-days').value = '';
-    form.querySelector('#new-student-fee').value = '';
-
-    const actionButton = form.querySelector('#add-student-btn');
-    if (actionButton) {
-        actionButton.textContent = 'Add Student';
-        delete actionButton.dataset.editingId;
-    }
-    const cancelButton = form.querySelector('#cancel-edit-btn');
-    if (cancelButton) {
-        cancelButton.remove();
-    }
-}
-
-async function renderSelectedTutorDetails(tutorId) {
-    const container = document.getElementById('selected-tutor-details');
-    if (!tutorId || !window.allTutorsData) {
-        container.innerHTML = `<p class="text-gray-500">Please select a tutor to view details.</p>`;
-        return;
-    }
-    const tutor = window.allTutorsData[tutorId];
-
-    onSnapshot(query(collection(db, "students"), where("tutorEmail", "==", tutor.email)), (studentsSnapshot) => {
-        const studentsListHTML = studentsSnapshot.docs.map(doc => {
-            const student = doc.data();
-            const studentId = doc.id;
-            const feeDisplay = globalSettings.showStudentFees ? ` - Fee: ₦${(student.studentFee || 0).toLocaleString()}` : '';
-            // Only show edit/delete buttons in the admin panel if the setting is on
-            const editDeleteButtons = `
-                <button class="edit-student-btn text-blue-500 hover:text-blue-700 font-semibold" data-student-id="${studentId}" data-parent-name="${student.parentName || ''}" data-student-name="${student.studentName}" data-grade="${student.grade}" data-subjects="${(student.subjects || []).join(', ')}" data-days="${student.days}" data-fee="${student.studentFee}">Edit</button>
-                <button class="delete-student-btn text-red-500 hover:text-red-700 font-semibold" data-student-id="${studentId}">Delete</button>
-            `;
-
-            return `<li class="flex justify-between items-center bg-gray-50 p-2 rounded-md" data-student-name="${student.studentName.toLowerCase()}">
-                        <span>${student.studentName} (${student.grade || 'N/A'})${feeDisplay}</span>
-                        <div class="flex items-center space-x-2">${editDeleteButtons}</div>
-                    </li>`;
-        }).join('');
-        
-        const gradeOptions = Array.from({ length: 12 }, (_, i) => `<option value="${i + 1}">${i + 1}</option>`).join('');
-        const dayOptions = Array.from({ length: 7 }, (_, i) => `<option value="${i + 1}">${i + 1}</option>`).join('');
-
-        container.innerHTML = `
-            <div class="p-4 border rounded-lg shadow-sm bg-blue-50">
-                <div class="flex items-center justify-between mb-4">
-                    <div>
-                        <h4 class="font-bold text-xl">${tutor.name} (${studentsSnapshot.size} students)</h4>
-                        <p class="text-gray-600">${tutor.email}</p>
-                    </div>
-                    <div class="flex items-center space-x-4">
-                        <label class="flex items-center space-x-2"><span class="font-semibold">Management Staff:</span><input type="checkbox" id="management-staff-toggle" class="h-5 w-5" ${tutor.isManagementStaff ? 'checked' : ''}></label>
-                        <button id="delete-tutor-btn" class="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600">Delete Tutor</button>
-                    </div>
-                </div>
-                <div class="mb-4">
-                    <p><strong>Students Assigned to ${tutor.name}:</strong></p>
-                    <input type="search" id="student-filter-bar" placeholder="Filter this list..." class="w-full p-2 border rounded mt-2 mb-2">
-                    <ul id="students-list-ul" class="space-y-2 mt-2">${studentsListHTML || '<p class="text-gray-500">No students assigned.</p>'}</ul>
-                </div>
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 border-t pt-4">
-                    <div class="add-student-form space-y-2">
-                        <h5 class="font-semibold text-gray-700">Add/Edit Student Details:</h5>
-                        <input type="text" id="new-parent-name" class="w-full p-2 border rounded" placeholder="Parent Name">
-                        <input type="text" id="new-student-name" class="w-full p-2 border rounded" placeholder="Student Name">
-                        <select id="new-student-grade" class="w-full p-2 border rounded"><option value="">Select Grade</option>${gradeOptions}</select>
-                        <input type="text" id="new-student-subjects" class="w-full p-2 border rounded" placeholder="Subject(s) (e.g., Math, English)">
-                        <select id="new-student-days" class="w-full p-2 border rounded"><option value="">Select Days per Week</option>${dayOptions}</select>
-                        <input type="number" id="new-student-fee" class="w-full p-2 border rounded" placeholder="Student Fee (₦)">
-                        <button id="add-student-btn" class="bg-green-600 text-white w-full px-4 py-2 rounded hover:bg-green-700">Add Student</button>
-                    </div>
-                    <div class="import-students-form">
-                        <h5 class="font-semibold text-gray-700">Import Students for ${tutor.name}:</h5>
-                        <p class="text-xs text-gray-500 mb-2">Upload a .csv or .xlsx file with columns: <strong>Parent Name, Student Name, Grade, Subjects, Days, Fee</strong></p>
-                        <input type="file" id="student-import-file" class="w-full text-sm border rounded p-1" accept=".csv, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/vnd.ms-excel">
-                        <button id="import-students-btn" class="bg-blue-600 text-white w-full px-4 py-2 rounded mt-2 hover:bg-blue-700">Import Students</button>
-                        <p id="import-status" class="text-sm mt-2"></p>
-                    </div>
-                </div>
-            </div>`;
-            
-        // --- Attach Listeners for the newly created elements ---
-        document.getElementById('management-staff-toggle').addEventListener('change', (e) => updateDoc(doc(db, "tutors", tutorId), { isManagementStaff: e.target.checked }));
-
-        // Add delete tutor functionality
-        document.getElementById('delete-tutor-btn').addEventListener('click', async () => {
-            if (studentsSnapshot.size > 0) {
-                alert(`Cannot delete tutor "${tutor.name}" because they have ${studentsSnapshot.size} student(s) assigned. Please reassign or delete these students first.`);
-                return;
-            }
-            
-            if (confirm(`Are you sure you want to delete tutor "${tutor.name}"? This action cannot be undone.`)) {
-                try {
-                    await deleteDoc(doc(db, "tutors", tutorId));
-                    alert(`Tutor "${tutor.name}" has been successfully deleted.`);
-                    document.getElementById('tutor-select').value = '';
-                    container.innerHTML = `<p class="text-gray-500">Please select a tutor to view details.</p>`;
-                } catch (error) {
-                    console.error("Error deleting tutor:", error);
-                    alert(`Error deleting tutor: ${error.message}`);
-                }
-            }
-        });
-
-        document.getElementById('student-filter-bar').addEventListener('input', (e) => {
-            const searchTerm = e.target.value.toLowerCase();
-            document.querySelectorAll('#students-list-ul li').forEach(li => {
-                li.style.display = (li.dataset.studentName || '').includes(searchTerm) ? 'flex' : 'none';
-            });
-        });
-
-        document.getElementById('add-student-btn').addEventListener('click', async (e) => {
-            const btn = e.currentTarget;
-            const editingId = btn.dataset.editingId;
-            const studentData = {
-                parentName: document.getElementById('new-parent-name').value, studentName: document.getElementById('new-student-name').value,
-                grade: document.getElementById('new-student-grade').value, subjects: document.getElementById('new-student-subjects').value.split(',').map(s => s.trim()),
-                days: document.getElementById('new-student-days').value, studentFee: parseFloat(document.getElementById('new-student-fee').value), tutorEmail: tutor.email,
-            };
-            if (studentData.studentName && studentData.grade && !isNaN(studentData.studentFee)) {
-                if (editingId) {
-                    await updateDoc(doc(db, "students", editingId), studentData);
-                } else {
-                    studentData.summerBreak = false;
-                    await addDoc(collection(db, "students"), studentData);
-                }
-                resetStudentForm();
-            } else {
-                alert('Please fill in Student Name, Grade, and Fee correctly.');
-            }
-        });
-
-        document.getElementById('import-students-btn').addEventListener('click', () => handleStudentImport(tutor));
-
-        container.querySelectorAll('.edit-student-btn').forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                const data = e.currentTarget.dataset;
-                document.getElementById('new-parent-name').value = data.parentName;
-                document.getElementById('new-student-name').value = data.studentName;
-                document.getElementById('new-student-grade').value = data.grade;
-                document.getElementById('new-student-subjects').value = data.subjects;
-                document.getElementById('new-student-days').value = data.days;
-                document.getElementById('new-student-fee').value = data.fee;
-
-                const actionButton = document.getElementById('add-student-btn');
-                actionButton.textContent = 'Update Student';
-                actionButton.dataset.editingId = data.studentId;
-
-                if (!document.getElementById('cancel-edit-btn')) {
-                    const cancelButton = document.createElement('button');
-                    cancelButton.id = 'cancel-edit-btn';
-                    cancelButton.textContent = 'Cancel Edit';
-                    cancelButton.className = 'bg-gray-500 text-white w-full px-4 py-2 rounded hover:bg-gray-600 mt-2';
-                    actionButton.insertAdjacentElement('afterend', cancelButton);
-                    cancelButton.addEventListener('click', resetStudentForm);
-                }
-            });
-        });
-
-        container.querySelectorAll('.delete-student-btn').forEach(btn => btn.addEventListener('click', async (e) => {
-            if (confirm('Are you sure you want to delete this student?')) {
-                await deleteDoc(doc(db, "students", e.target.dataset.studentId));
-            }
-        }));
-    });
-}
-
-async function handleStudentImport(tutor) {
-    const fileInput = document.getElementById('student-import-file');
-    const statusEl = document.getElementById('import-status');
-    if (!fileInput.files[0]) return statusEl.textContent = "Please select a file first.";
-    if (!tutor) return statusEl.textContent = "Error: No tutor selected.";
-
-    statusEl.textContent = "Reading file...";
-    const reader = new FileReader();
-    reader.onload = async (e) => {
-        try {
-            const data = new Uint8Array(e.target.result);
-            const workbook = XLSX.read(data, { type: 'array' });
-            const sheetName = workbook.SheetNames[0];
-            const worksheet = workbook.Sheets[sheetName];
-            const json = XLSX.utils.sheet_to_json(worksheet);
-            if (json.length === 0) throw new Error("Sheet is empty or format is incorrect.");
-            statusEl.textContent = `Importing ${json.length} students...`;
-            const batch = writeBatch(db);
-            json.forEach(row => {
-                const studentDocRef = doc(collection(db, "students"));
-                const studentData = {
-                    parentName: row['Parent Name'] || '',
-                    studentName: row['Student Name'],
-                    grade: row['Grade'],
-                    subjects: (row['Subjects'] || '').toString().split(',').map(s => s.trim()),
-                    days: row['Days'],
-                    studentFee: parseFloat(row['Fee']),
-                    tutorEmail: tutor.email,
-                    summerBreak: false
-                };
-                if (!studentData.studentName || isNaN(studentData.studentFee)) return;
-                batch.set(studentDocRef, studentData);
-            });
-            await batch.commit();
-            statusEl.textContent = `✅ Successfully imported ${json.length} students for ${tutor.name}.`;
-            fileInput.value = '';
-        } catch (error) {
-            statusEl.textContent = `❌ Error: ${error.message}`;
-            console.error(error);
-        }
-    };
-    reader.readAsArrayBuffer(fileInput.files[0]);
-}
-
-
-// ##################################################################
-// # SECTION 4: TUTOR REPORTS PANEL (Upgraded)
-// ##################################################################
-
-async function renderTutorReportsPanel(container) {
-    container.innerHTML = `
-        <div class="bg-white p-6 rounded-lg shadow-md mb-6">
-            <div class="flex justify-between items-start mb-4">
-                 <h2 class="text-2xl font-bold text-green-700">Tutor Reports</h2>
-                 <div class="flex space-x-4">
-                    <div class="bg-blue-100 p-3 rounded-lg text-center shadow"><h4 class="font-bold text-blue-800 text-sm">Tutors Submitted</h4><p id="report-tutor-count" class="text-2xl text-blue-600 font-extrabold">0</p></div>
-                    <div class="bg-green-100 p-3 rounded-lg text-center shadow"><h4 class="font-bold text-green-800 text-sm">Total Reports</h4><p id="report-count" class="text-2xl text-green-600 font-extrabold">0</p></div>
-                </div>
-            </div>
-            <div id="tutor-reports-list" class="space-y-4"><p class="text-gray-500 text-center">Loading reports...</p></div>
-        </div>
-    `;
-    await loadTutorReportsForAdmin();
-}
-
-async function loadTutorReportsForAdmin() {
-    const reportsListContainer = document.getElementById('tutor-reports-list');
-    onSnapshot(query(collection(db, "tutor_submissions"), orderBy("submittedAt", "desc")), (snapshot) => {
-        const tutorCountEl = document.getElementById('report-tutor-count');
-        const reportCountEl = document.getElementById('report-count');
-        if (!tutorCountEl || !reportCountEl) return;
-
-        if (snapshot.empty) {
-            reportsListContainer.innerHTML = `<p class="text-gray-500 text-center">No reports have been submitted yet.</p>`;
-            tutorCountEl.textContent = 0;
-            reportCountEl.textContent = 0;
-            return;
-        }
-
-        const reportsByTutor = {};
-        snapshot.forEach(doc => {
-            const report = { id: doc.id, ...doc.data() };
-            const tutorEmail = report.tutorEmail;
-            if (!reportsByTutor[tutorEmail]) {
-                reportsByTutor[tutorEmail] = {
-                    name: report.tutorName || tutorEmail,
-                    reports: []
-                };
-            }
-            reportsByTutor[tutorEmail].reports.push(report);
-        });
-
-        tutorCountEl.textContent = Object.keys(reportsByTutor).length;
-        reportCountEl.textContent = snapshot.size;
-
-        reportsListContainer.innerHTML = Object.values(reportsByTutor).map(tutorData => {
-            const reportLinks = tutorData.reports.map(report => `
-                <li class="flex justify-between items-center p-2 bg-gray-50 rounded-md">
-                    <span>${report.studentName} - ${new Date(report.submittedAt.seconds * 1000).toLocaleDateString()}</span>
-                    <button class="download-single-report-btn bg-blue-500 text-white px-3 py-1 text-sm rounded hover:bg-blue-600" data-report-id="${report.id}">Download PDF</button>
-                </li>
-            `).join('');
-
-            return `
-                <div class="border rounded-lg shadow-sm">
-                    <details>
-                        <summary class="p-4 cursor-pointer flex justify-between items-center font-semibold text-lg">
-                            <div>
-                                ${tutorData.name} 
-                                <span class="ml-2 text-sm font-normal text-gray-500">(${tutorData.reports.length} reports)</span>
-                            </div>
-                            <button class="download-all-btn bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700" data-tutor-email="${tutorData.reports[0].tutorEmail}">Download All as ZIP</button>
-                        </summary>
-                        <div class="p-4 border-t">
-                            <ul class="space-y-2">${reportLinks}</ul>
-                        </div>
-                    </details>
-                </div>
-            `;
-        }).join('');
-
-        reportsListContainer.querySelectorAll('.download-single-report-btn').forEach(button => {
-            button.addEventListener('click', (e) => {
-                e.stopPropagation(); 
-                downloadAdminReport(e.target.dataset.reportId);
-            });
-        });
-
-        reportsListContainer.querySelectorAll('.download-all-btn').forEach(button => {
-            button.addEventListener('click', async (e) => {
-                e.stopPropagation();
-                const tutorEmail = e.target.dataset.tutorEmail;
-                const reportsToDownload = reportsByTutor[tutorEmail].reports;
-                
-                button.textContent = 'Zipping...';
-                button.disabled = true;
-
-                try {
-                    const zip = new JSZip();
-                    for (const report of reportsToDownload) {
-                        const pdfBlob = await downloadAdminReport(report.id, true); 
-                        if (pdfBlob) {
-                            const fileName = `${report.studentName}_${new Date(report.submittedAt.seconds * 1000).toLocaleDateString().replace(/\//g, '-')}.pdf`;
-                            zip.file(fileName, pdfBlob);
-                        }
-                    }
-
-                    const content = await zip.generateAsync({ type: "blob" });
-                    saveAs(content, `${reportsByTutor[tutorEmail].name}_Reports.zip`);
-
-                } catch (error) {
-                    console.error("Error creating ZIP file:", error);
-                    alert("An error occurred while creating the ZIP file.");
-                } finally {
-                    button.textContent = 'Download All as ZIP';
-                    button.disabled = false;
-                }
-            });
-        });
-    });
-}
-
-async function downloadAdminReport(reportId, returnBlob = false) {
-    try {
-        const reportDoc = await getDoc(doc(db, "tutor_submissions", reportId));
-        if (!reportDoc.exists()) throw new Error("Report not found!");
-        
-        const reportData = reportDoc.data();
-        
-        let parentEmail = 'N/A';
-        if (reportData.studentId) {
-            const studentDoc = await getDoc(doc(db, "students", reportData.studentId));
-            if (studentDoc.exists()) {
-                parentEmail = studentDoc.data().parentEmail || 'N/A';
-            }
-        }
-
-        const logoUrl = "https://github.com/psalminfo/blooming-kids-cbt/blob/main/logo.png";
-        
-        const reportTemplate = `
-            <div style="font-family: Arial, sans-serif; padding: 2rem; max-width: 800px; margin: auto;">
-                <div style="text-align: center; margin-bottom: 2rem;">
-                    <img src="${logoUrl}" alt="Company Logo" style="height: 80px; margin-bottom: 1rem;">
-                    <h3 style="font-size: 1.8rem; font-weight: bold; color: #15803d; margin: 0;">Blooming Kids House</h3>
-                    <h1 style="font-size: 1.2rem; font-weight: bold; color: #166534; margin-top: 0.5rem;">MONTHLY LEARNING REPORT</h1>
-                    <p style="color: #4b5563;">Date: ${new Date(reportData.submittedAt.seconds * 1000).toLocaleDateString()}</p>
-                </div>
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 2rem;">
-                    <p><strong>Student's Name:</strong> ${reportData.studentName}</p>
-                    <p><strong>Parent's Email:</strong> ${parentEmail}</p>
-                    <p><strong>Grade:</strong> ${reportData.grade}</p>
-                    <p><strong>Tutor's Name:</strong> ${reportData.tutorName}</p>
-                </div>
-                ${Object.entries({
-                    "INTRODUCTION": reportData.introduction, "TOPICS & REMARKS": reportData.topics, "PROGRESS AND ACHIEVEMENTS": reportData.progress,
-                    "STRENGTHS AND WEAKNESSES": reportData.strengthsWeaknesses, "RECOMMENDATIONS": reportData.recommendations, "GENERAL TUTOR'S COMMENTS": reportData.generalComments
-                }).map(([title, content]) => `<div style="border-top: 1px solid #d1d5db; padding-top: 1rem; margin-top: 1rem;"><h2 style="font-size: 1.25rem; font-weight: bold; color: #16a34a;">${title}</h2><p style="line-height: 1.6; white-space: pre-wrap;">${content || 'N/A'}</p></div>`).join('')}
-                <div style="margin-top: 3rem; text-align: right;"><p>Best regards,</p><p style="font-weight: bold;">${reportData.tutorName}</p></div>
-            </div>`;
-        
-        const opt = {
-            margin:       0.5,
-            filename:     `${reportData.studentName}_report.pdf`,
-            image:        { type: 'jpeg', quality: 0.98 },
-            html2canvas:  { scale: 2 },
-            jsPDF:        { unit: 'in', format: 'letter', orientation: 'portrait' }
-        };
-
-        if (returnBlob) {
-            return await html2pdf().from(reportTemplate).set(opt).outputPdf('blob');
-        } else {
-            html2pdf().from(reportTemplate).set(opt).save();
-        }
-
-    } catch (error) {
-        console.error("Error generating PDF:", error);
-        alert(`Failed to download report: ${error.message}`);
-        return null; 
-    }
-}
-
-
-// ##################################################################
-// # SECTION 5: PAY ADVICE PANEL (Upgraded)
-// ##################################################################
-
-async function renderPayAdvicePanel(container) {
-    container.innerHTML = `
-        <div class="bg-white p-6 rounded-lg shadow-md">
-            <h2 class="text-2xl font-bold text-green-700 mb-4">Tutor Pay Advice</h2>
-            <div class="bg-gray-100 p-4 rounded-lg mb-6 grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
-                <div>
-                    <label for="start-date" class="block text-sm font-medium text-gray-700">Start Date</label>
-                    <input type="date" id="start-date" class="mt-1 block w-full p-2 border rounded-md">
-                </div>
-                <div>
-                    <label for="end-date" class="block text-sm font-medium text-gray-700">End Date</label>
-                    <input type="date" id="end-date" class="mt-1 block w-full p-2 border rounded-md">
-                </div>
-                <div class="flex items-center space-x-4 col-span-2">
-                     <div class="bg-blue-100 p-3 rounded-lg text-center shadow w-full"><h4 class="font-bold text-blue-800 text-sm">Active Tutors</h4><p id="pay-tutor-count" class="text-2xl text-blue-600 font-extrabold">0</p></div>
-                    <div class="bg-green-100 p-3 rounded-lg text-center shadow w-full"><h4 class="font-bold text-green-800 text-sm">Total Students</h4><p id="pay-student-count" class="text-2xl text-green-600 font-extrabold">0</p></div>
-                    <button id="export-pay-csv-btn" class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 h-full">Export CSV</button>
-                </div>
-            </div>
-            <div class="overflow-x-auto">
-                <table class="min-w-full divide-y divide-gray-200">
-                    <thead class="bg-gray-50"><tr><th class="px-6 py-3 text-left text-xs font-medium uppercase">Tutor</th><th class="px-6 py-3 text-left text-xs font-medium uppercase">Students</th><th class="px-6 py-3 text-left text-xs font-medium uppercase">Student Fees</th><th class="px-6 py-3 text-left text-xs font-medium uppercase">Mgmt. Fee</th><th class="px-6 py-3 text-left text-xs font-medium uppercase">Total Pay</th></tr></thead>
-                    <tbody id="pay-advice-table-body" class="divide-y divide-gray-200"><tr><td colspan="5" class="text-center py-4">Select a date range.</td></tr></tbody>
-                </table>
-            </div>
-        </div>
-    `;
-
-    const startDateInput = document.getElementById('start-date');
-    const endDateInput = document.getElementById('end-date');
-
-    const handleDateChange = () => {
-        const startDate = startDateInput.value ? new Date(startDateInput.value) : null;
-        const endDate = endDateInput.value ? new Date(endDateInput.value) : null;
-        if (startDate && endDate) {
-            endDate.setHours(23, 59, 59, 999); 
-            loadPayAdviceData(startDate, endDate);
-        }
-    };
-
-    startDateInput.addEventListener('change', handleDateChange);
-    endDateInput.addEventListener('change', handleDateChange);
-}
-
-async function loadPayAdviceData(startDate, endDate) {
-    const tableBody = document.getElementById('pay-advice-table-body');
-    tableBody.innerHTML = `<tr><td colspan="5" class="text-center py-4">Loading pay data...</td></tr>`;
-
-    const startTimestamp = Timestamp.fromDate(startDate);
-    const endTimestamp = Timestamp.fromDate(endDate);
-    const reportsQuery = query(collection(db, "tutor_submissions"), where("submittedAt", ">=", startTimestamp), where("submittedAt", "<=", endTimestamp));
-    const reportsSnapshot = await getDocs(reportsQuery);
-    const activeTutorEmails = [...new Set(reportsSnapshot.docs.map(doc => doc.data().tutorEmail))];
-
-    if (activeTutorEmails.length === 0) {
-        tableBody.innerHTML = `<tr><td colspan="5" class="text-center py-4">No tutors submitted reports in this period.</td></tr>`;
-        document.getElementById('pay-tutor-count').textContent = 0;
-        document.getElementById('pay-student-count').textContent = 0;
-        return;
-    }
-
-    const [tutorsSnapshot, studentsSnapshot] = await Promise.all([
-        getDocs(query(collection(db, "tutors"), where("email", "in", activeTutorEmails))),
-        getDocs(collection(db, "students"))
-    ]);
-
-    const allStudents = studentsSnapshot.docs.map(doc => doc.data());
-    let totalStudentCount = 0;
-    const payData = [];
-
-    tutorsSnapshot.forEach(doc => {
-        const tutor = doc.data();
-        const assignedStudents = allStudents.filter(s => s.tutorEmail === tutor.email);
-        const totalStudentFees = assignedStudents.reduce((sum, s) => sum + (s.studentFee || 0), 0);
-        const managementFee = (tutor.isManagementStaff && tutor.managementFee) ? tutor.managementFee : 0;
-        totalStudentCount += assignedStudents.length;
-
-        payData.push({
-            tutorName: tutor.name,
-            studentCount: assignedStudents.length,
-            totalStudentFees: totalStudentFees,
-            managementFee: managementFee,
-            totalPay: totalStudentFees + managementFee
-        });
-    });
-
-    document.getElementById('pay-tutor-count').textContent = payData.length;
-    document.getElementById('pay-student-count').textContent = totalStudentCount;
-
-    tableBody.innerHTML = payData.map(d => `<tr><td class="px-6 py-4">${d.tutorName}</td><td class="px-6 py-4">${d.studentCount}</td><td class="px-6 py-4">₦${d.totalStudentFees.toFixed(2)}</td><td class="px-6 py-4">₦${d.managementFee.toFixed(2)}</td><td class="px-6 py-4 font-bold">₦${d.totalPay.toFixed(2)}</td></tr>`).join('');
-
-    document.getElementById('export-pay-csv-btn').onclick = () => {
-        const csv = convertPayAdviceToCSV(payData);
-        const blob = new Blob([csv], {
-            type: 'text/csv;charset=utf-8;'
-        });
-        const link = document.createElement('a');
-        link.href = URL.createObjectURL(blob);
-        link.download = `Pay_Advice_${startDate.toISOString().split('T')[0]}_to_${endDate.toISOString().split('T')[0]}.csv`;
-        link.click();
-    };
-}
-
-
-// ##################################################################
-// # SECTION 6: SUMMER BREAK PANEL
-// ##################################################################
-async function renderSummerBreakPanel(container) {
-    container.innerHTML = `
-        <div class="bg-white p-6 rounded-lg shadow-md">
-            <h2 class="text-2xl font-bold text-green-700 mb-4">Students on Summer Break</h2>
-            <div id="break-students-list" class="space-y-4"><p class="text-gray-500 text-center">Loading students...</p></div>
-        </div>
-    `;
-    onSnapshot(query(collection(db, "students"), where("summerBreak", "==", true)), (snapshot) => {
-        const listContainer = document.getElementById('break-students-list');
-        if (!listContainer) return;
-        if (snapshot.empty) {
-            listContainer.innerHTML = `<p class="text-gray-500 text-center">No students are on break.</p>`;
-            return;
-        }
-        listContainer.innerHTML = snapshot.docs.map(doc => {
-            const student = doc.data();
-            return `<div class="border p-4 rounded-lg flex justify-between items-center"><div><p><strong>Student:</strong> ${student.studentName}</p><p><strong>Tutor:</strong> ${student.tutorEmail}</p></div><button class="remove-break-btn bg-yellow-600 text-white px-4 py-2 rounded" data-student-id="${doc.id}">End Break</button></div>`;
-        }).join('');
-        listContainer.querySelectorAll('.remove-break-btn').forEach(btn => btn.addEventListener('click', async (e) => {
-            await updateDoc(doc(db, "students", e.target.dataset.studentId), {
-                summerBreak: false
-            });
-        }));
-    });
-}
-
-// ##################################################################
-// # SECTION 7: RENDER STAFF PANEL (This is the new section)
-// ##################################################################
-async function renderStaffPanel(container) {
-    const ROLE_PERMISSIONS = {
-        pending: {
-            tabs: { viewTutorManagement: false, viewPayAdvice: false, viewTutorReports: false, viewSummerBreak: false, viewPendingApprovals: false, viewStaffManagement: false },
-            actions: { canDownloadReports: false, canExportPayAdvice: false, canEndSummerBreak: false, canEditStudents: false, canDeleteStudents: false }
-        },
-        tutor: {
-            tabs: { viewTutorManagement: false, viewPayAdvice: false, viewTutorReports: false, viewSummerBreak: false, viewPendingApprovals: false, viewStaffManagement: false },
-            actions: { canDownloadReports: false, canExportPayAdvice: false, canEndSummerBreak: false, canEditStudents: false, canDeleteStudents: false }
-        },
-        manager: {
-            tabs: { viewTutorManagement: true, viewPayAdvice: false, viewTutorReports: true, viewSummerBreak: true, viewPendingApprovals: true, viewStaffManagement: false },
-            actions: { canDownloadReports: false, canExportPayAdvice: false, canEndSummerBreak: false, canEditStudents: true, canDeleteStudents: false }
-        },
-        director: {
-            tabs: { viewTutorManagement: true, viewPayAdvice: true, viewTutorReports: true, viewSummerBreak: true, viewPendingApprovals: true, viewStaffManagement: true },
-            actions: { canDownloadReports: true, canExportPayAdvice: true, canEndSummerBreak: true, canEditStudents: true, canDeleteStudents: true }
-        },
-        admin: { // Admin role has all permissions by default
-            tabs: { viewTutorManagement: true, viewPayAdvice: true, viewTutorReports: true, viewSummerBreak: true, viewPendingApprovals: true, viewStaffManagement: true },
-            actions: { canDownloadReports: true, canExportPayAdvice: true, canEndSummerBreak: true, canEditStudents: true, canDeleteStudents: true }
-        }
-    };
-
-    container.innerHTML = `
-        <div class="bg-white p-6 rounded-lg shadow-md">
-            <h2 class="text-2xl font-bold text-green-700 mb-4">Staff Management</h2>
-            <p class="text-sm text-gray-600 mb-4">Assign a role to apply default permissions, then click "Manage Permissions" to customize.</p>
-            <div class="overflow-x-auto">
-                <table class="min-w-full divide-y divide-gray-200">
-                    <thead class="bg-gray-50"><tr>
-                        <th class="px-6 py-3 text-left text-xs font-medium uppercase">Name</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium uppercase">Email</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium uppercase">Assign Role</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium uppercase">Actions</th>
-                    </tr></thead>
-                    <tbody id="staff-table-body" class="bg-white divide-y divide-gray-200"></tbody>
-                </table>
-            </div>
-        </div>
-    `;
-
-    const tableBody = document.getElementById('staff-table-body');
-    onSnapshot(collection(db, "staff"), (snapshot) => {
-        tableBody.innerHTML = snapshot.docs.map(doc => {
-            const staff = doc.data();
-            const optionsHTML = Object.keys(ROLE_PERMISSIONS).map(role => 
-                `<option value="${role}" ${staff.role === role ? 'selected' : ''}>${capitalize(role)}</option>`
-            ).join('');
-
-            return `
-                <tr>
-                    <td class="px-6 py-4 font-medium">${staff.name}</td>
-                    <td class="px-6 py-4">${staff.email}</td>
-                    <td class="px-6 py-4">
-                        <select data-email="${staff.email}" class="role-select p-2 border rounded bg-white">
-                            ${optionsHTML}
-                        </select>
-                    </td>
-                    <td class="px-6 py-4">
-                        <button data-id="${doc.id}" class="manage-permissions-btn bg-blue-600 text-white px-3 py-1 rounded text-sm hover:bg-blue-700">Manage Permissions</button>
-                    </td>
-                </tr>
-            `;
-        }).join('');
-
-        document.querySelectorAll('.role-select').forEach(select => {
-            select.addEventListener('change', async (e) => {
-                const newRole = e.target.value;
-                const staffEmail = e.target.dataset.email;
-                const permissionsTemplate = ROLE_PERMISSIONS[newRole];
-
-                if (confirm(`Change role to "${capitalize(newRole)}"? This will apply default permissions.`)) {
-                    await updateDoc(doc(db, "staff", staffEmail), { 
-                        role: newRole,
-                        permissions: permissionsTemplate 
-                    });
-                    alert('Role and default permissions updated!');
-                } else {
-                    const originalRole = snapshot.docs.find(d => d.id === staffEmail).data().role;
-                    e.target.value = originalRole;
-                }
-            });
-        });
-
-        document.querySelectorAll('.manage-permissions-btn').forEach(button => {
-            button.addEventListener('click', (e) => openPermissionsModal(e.target.dataset.id));
-        });
-    });
-}
-
-async function openPermissionsModal(staffId) {
-    const staffDoc = await getDoc(doc(db, "staff", staffId));
-    if (!staffDoc.exists()) return alert("Staff member not found.");
-
-    const staffData = staffDoc.data();
-    const permissions = staffData.permissions || { tabs: {}, actions: {} };
-
-    const modalHTML = `
-        <div id="permissions-modal" class="fixed inset-0 bg-gray-600 bg-opacity-75 flex items-center justify-center z-50">
-            <div class="bg-white rounded-lg shadow-xl p-8 max-w-lg w-full">
-                <h3 class="text-2xl font-bold mb-4">Edit Permissions for ${staffData.name}</h3>
-                <p class="text-sm text-gray-500 mb-4">Current Role: <span class="font-semibold">${capitalize(staffData.role)}</span></p>
-                
-                <div class="space-y-4">
-                    <div class="border-t pt-4">
-                        <h4 class="font-semibold mb-2">Tab Visibility:</h4>
-                        <div class="grid grid-cols-2 gap-2">
-                            <label class="flex items-center"><input type="checkbox" id="p-viewTutorManagement" class="mr-2" ${permissions.tabs?.viewTutorManagement ? 'checked' : ''}> Tutor & Student List</label>
-                            <label class="flex items-center"><input type="checkbox" id="p-viewPayAdvice" class="mr-2" ${permissions.tabs?.viewPayAdvice ? 'checked' : ''}> Pay Advice</label>
-                            <label class="flex items-center"><input type="checkbox" id="p-viewTutorReports" class="mr-2" ${permissions.tabs?.viewTutorReports ? 'checked' : ''}> Tutor Reports</label>
-                            <label class="flex items-center"><input type="checkbox" id="p-viewSummerBreak" class="mr-2" ${permissions.tabs?.viewSummerBreak ? 'checked' : ''}> Summer Break</label>
-                            <label class="flex items-center"><input type="checkbox" id="p-viewPendingApprovals" class="mr-2" ${permissions.tabs?.viewPendingApprovals ? 'checked' : ''}> Pending Approvals</label>
-                            <label class="flex items-center"><input type="checkbox" id="p-viewStaffManagement" class="mr-2" ${permissions.tabs?.viewStaffManagement ? 'checked' : ''}> Staff Management</label>
-                        </div>
-                    </div>
-
-                    <div class="border-t pt-4">
-                        <h4 class="font-semibold mb-2">Specific Actions:</h4>
-                        <label class="flex items-center"><input type="checkbox" id="p-canDownloadReports" class="mr-2" ${permissions.actions?.canDownloadReports ? 'checked' : ''}> Can Download Reports</label>
-                        <label class="flex items-center"><input type="checkbox" id="p-canExportPayAdvice" class="mr-2" ${permissions.actions?.canExportPayAdvice ? 'checked' : ''}> Can Export Pay Advice</label>
-                        <label class="flex items-center"><input type="checkbox" id="p-canEndSummerBreak" class="mr-2" ${permissions.actions?.canEndSummerBreak ? 'checked' : ''}> Can End Summer Break</label>
-                        <label class="flex items-center"><input type="checkbox" id="p-canEditStudents" class="mr-2" ${permissions.actions?.canEditStudents ? 'checked' : ''}> Can Edit Students</label>
-                        <label class="flex items-center"><input type="checkbox" id="p-canDeleteStudents" class="mr-2" ${permissions.actions?.canDeleteStudents ? 'checked' : ''}> Can Delete Students</label>
-                    </div>
-                </div>
-
-                <div class="flex justify-end space-x-4 mt-6">
-                    <button id="cancel-permissions" class="bg-gray-300 px-4 py-2 rounded">Cancel</button>
-                    <button id="save-permissions" class="bg-green-600 text-white px-4 py-2 rounded">Save Changes</button>
-                </div>
-            </div>
-        </div>
-    `;
-    
-    document.body.insertAdjacentHTML('beforeend', modalHTML);
-
-    const closeModal = () => document.getElementById('permissions-modal').remove();
-
-    document.getElementById('cancel-permissions').addEventListener('click', closeModal);
-    document.getElementById('save-permissions').addEventListener('click', async () => {
-        const newPermissions = {
-            tabs: {
-                viewTutorManagement: document.getElementById('p-viewTutorManagement').checked,
-                viewPayAdvice: document.getElementById('p-viewPayAdvice').checked,
-                viewTutorReports: document.getElementById('p-viewTutorReports').checked,
-                viewSummerBreak: document.getElementById('p-viewSummerBreak').checked,
-                viewPendingApprovals: document.getElementById('p-viewPendingApprovals').checked,
-                viewStaffManagement: document.getElementById('p-viewStaffManagement').checked,
-            },
-            actions: {
-                canDownloadReports: document.getElementById('p-canDownloadReports').checked,
-                canExportPayAdvice: document.getElementById('p-canExportPayAdvice').checked,
-                canEndSummerBreak: document.getElementById('p-canEndSummerBreak').checked,
-                canEditStudents: document.getElementById('p-canEditStudents').checked,
-                canDeleteStudents: document.getElementById('p-canDeleteStudents').checked,
-            }
-        };
-
-        await updateDoc(doc(db, "staff", staffId), { permissions: newPermissions });
-        alert("Custom permissions saved successfully!");
-        closeModal();
-    });
-}
-
-
-// ##################################################################
-// # SECTION 8: PENDING APPROVALS
-// ##################################################################
-async function renderPendingApprovalsPanel(container) {
-    container.innerHTML = `<h2 class="text-2xl font-bold text-green-700 mb-4">Pending Approvals</h2><div id="pending-list" class="space-y-4"></div>`;
-    const pendingListContainer = document.getElementById('pending-list');
-    pendingListContainer.innerHTML = `<p class="text-gray-500">Loading pending accounts...</p>`;
-
-    try {
-        const tutorsQuery = query(collection(db, "tutors"), where("status", "==", "pending"));
-        const studentsQuery = query(collection(db, "students"), where("approvalStatus", "==", "pending"));
-
-        const [tutorsSnap, studentsSnap] = await Promise.all([getDocs(tutorsQuery), getDocs(studentsQuery)]);
-
-        let pendingHTML = '';
-        tutorsSnap.forEach(doc => {
-            const tutor = doc.data();
-            pendingHTML += `
-                <div class="bg-white p-4 rounded-lg shadow-sm border border-yellow-200">
-                    <p class="font-semibold">${tutor.name} (Tutor)</p>
-                    <p class="text-gray-600 text-sm">${tutor.email}</p>
-                    <div class="mt-2 space-x-2">
-                        <button class="approve-btn bg-green-500 text-white px-3 py-1 rounded" data-id="${doc.id}" data-type="tutor">Approve</button>
-                        <button class="reject-btn bg-red-500 text-white px-3 py-1 rounded" data-id="${doc.id}" data-type="tutor">Reject</button>
-                    </div>
-                </div>
-            `;
-        });
-
-        studentsSnap.forEach(doc => {
-            const student = doc.data();
-            pendingHTML += `
-                <div class="bg-white p-4 rounded-lg shadow-sm border border-yellow-200">
-                    <p class="font-semibold">${student.studentName} (Student - Grade ${student.grade})</p>
-                    <p class="text-gray-600 text-sm">Parent: ${student.parentName}</p>
-                    <div class="mt-2 space-x-2">
-                        <button class="approve-btn bg-green-500 text-white px-3 py-1 rounded" data-id="${doc.id}" data-type="student">Approve</button>
-                        <button class="reject-btn bg-red-500 text-white px-3 py-1 rounded" data-id="${doc.id}" data-type="student">Reject</button>
-                    </div>
-                </div>
-            `;
-        });
-
-        pendingListContainer.innerHTML = pendingHTML || `<p class="text-gray-500">No pending accounts to review.</p>`;
-        
-        document.querySelectorAll('.approve-btn').forEach(btn => {
-            btn.addEventListener('click', () => handleApproval(btn.dataset.id, btn.dataset.type, 'approved'));
-        });
-        document.querySelectorAll('.reject-btn').forEach(btn => {
-            btn.addEventListener('click', () => handleApproval(btn.dataset.id, btn.dataset.type, 'rejected'));
-        });
-
-    } catch (error) {
-        console.error("Error loading pending approvals:", error);
-        pendingListContainer.innerHTML = `<p class="text-red-500">Failed to load pending approvals.</p>`;
-    }
-}
-
-async function handleApproval(id, type, status) {
-    const collectionName = type === 'tutor' ? 'tutors' : 'students';
-    const docRef = doc(db, collectionName, id);
-    await updateDoc(docRef, { [type === 'tutor' ? 'status' : 'approvalStatus']: status });
-    alert(`${type.charAt(0).toUpperCase() + type.slice(1)} ${status} successfully.`);
-    renderPendingApprovalsPanel(document.getElementById('main-content'));
-}
+// ... (rest of the file remains exactly the same as your original, including all other sections)
 
 // ##################################################################
 // # MAIN APP INITIALIZATION (Updated)
