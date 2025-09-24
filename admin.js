@@ -14,7 +14,6 @@ let activeTutorId = null;
 
 const CACHE_PREFIX = 'admin_cache_';
 
-// This global object holds fetched data to prevent re-reading from Firestore on every tab switch.
 const sessionCache = {
     tutors: null,
     students: null,
@@ -23,23 +22,15 @@ const sessionCache = {
     breakStudents: null,
 };
 
-/**
- * Saves a specific piece of data to localStorage.
- * @param {string} key The key for the cache (e.g., 'tutors').
- * @param {any} data The data to store.
- */
 function saveToLocalStorage(key, data) {
     try {
         localStorage.setItem(CACHE_PREFIX + key, JSON.stringify(data));
-        sessionCache[key] = data; // Also update the in-memory cache
+        sessionCache[key] = data;
     } catch (error) {
         console.error("Could not save to localStorage:", error);
     }
 }
 
-/**
- * Loads all cached data from localStorage into the sessionCache object.
- */
 function loadFromLocalStorage() {
     for (const key in sessionCache) {
         try {
@@ -49,21 +40,16 @@ function loadFromLocalStorage() {
             }
         } catch (error) {
             console.error(`Could not load '${key}' from localStorage:`, error);
-            localStorage.removeItem(CACHE_PREFIX + key); // Clear corrupted data
+            localStorage.removeItem(CACHE_PREFIX + key);
         }
     }
 }
 
-/**
- * Invalidates (clears) a specific cache from memory and localStorage.
- * @param {string} key The key of the cache to clear.
- */
 function invalidateCache(key) {
     sessionCache[key] = null;
     localStorage.removeItem(CACHE_PREFIX + key);
 }
 
-// Load any persisted data as soon as the script runs
 loadFromLocalStorage();
 
 
@@ -106,22 +92,22 @@ async function updateStaffPermissions(staffEmail, newRole) {
     }
     try {
         await updateDoc(staffDocRef, { role: newRole, permissions: newPermissions });
-        invalidateCache('staff'); // Invalidate cache
+        invalidateCache('staff');
         console.log(`Successfully updated permissions for ${staffEmail} to role: ${newRole}`);
-        fetchAndRenderStaff(); // Re-render the view
+        fetchAndRenderStaff();
     } catch (error) {
         console.error("Error updating staff permissions:", error);
     }
 }
 
 // ##################################################################
-// # SECTION 1: DASHBOARD PANEL (No changes needed, already uses getDocs)
+// # SECTION 1: DASHBOARD PANEL (NOW CACHE-AWARE)
 // ##################################################################
 async function renderAdminPanel(container) {
     container.innerHTML = `
         <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
-            <div class="bg-blue-100 p-4 rounded-lg text-center shadow-md"><h3 class="font-bold text-blue-800">Total Students</h3><p id="totalStudentsCount" class="text-3xl text-blue-600 font-extrabold">0</p></div>
-            <div class="bg-blue-100 p-4 rounded-lg text-center shadow-md"><h3 class="font-bold text-blue-800">Total Tutors</h3><p id="totalTutorsCount" class="text-3xl text-blue-600 font-extrabold">0</p></div>
+            <div class="bg-blue-100 p-4 rounded-lg text-center shadow-md"><h3 class="font-bold text-blue-800">Total Students</h3><p id="totalStudentsCount" class="text-3xl text-blue-600 font-extrabold">...</p></div>
+            <div class="bg-blue-100 p-4 rounded-lg text-center shadow-md"><h3 class="font-bold text-blue-800">Total Tutors</h3><p id="totalTutorsCount" class="text-3xl text-blue-600 font-extrabold">...</p></div>
             <div class="bg-blue-100 p-4 rounded-lg text-center shadow-md"><h3 class="font-bold text-blue-800">Students Per Tutor</h3><select id="studentsPerTutorSelect" class="w-full mt-1 p-2 border rounded"></select></div>
         </div>
         <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -154,7 +140,32 @@ async function renderAdminPanel(container) {
     setupDashboardListeners();
 }
 
-function setupDashboardListeners() {
+// ### NEW FUNCTION ###
+// Ensures that essential data for the dashboard is loaded into the cache, fetching only if necessary.
+async function ensureDashboardData() {
+    try {
+        if (!sessionCache.tutors) {
+            console.log("Cache miss: Fetching tutors for dashboard...");
+            const tutorsSnapshot = await getDocs(query(collection(db, "tutors"), orderBy("name")));
+            const tutorsData = {};
+            tutorsSnapshot.forEach(doc => {
+                tutorsData[doc.id] = { id: doc.id, ...doc.data() };
+            });
+            saveToLocalStorage('tutors', tutorsData);
+        }
+        if (!sessionCache.students) {
+            console.log("Cache miss: Fetching students for dashboard...");
+            const studentsSnapshot = await getDocs(collection(db, "students"));
+            saveToLocalStorage('students', studentsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+        }
+    } catch (error) {
+        console.error("Failed to ensure dashboard data:", error);
+        // Handle error display if necessary
+    }
+}
+
+
+async function setupDashboardListeners() {
     const addQuestionForm = document.getElementById('addQuestionForm');
     const questionTypeDropdown = document.getElementById('questionType');
     const addOptionBtn = document.getElementById('addOptionBtn');
@@ -189,8 +200,11 @@ function setupDashboardListeners() {
         if (e.target.value) loadAndRenderReport(e.target.value);
     });
 
-    loadCounters();
-    loadStudentDropdown();
+    // ### CHANGED ###
+    // Load dashboard data using the new cache-aware functions.
+    await ensureDashboardData(); // Make sure cache is populated
+    loadCountersFromCache();   // Then load counters from the cache
+    loadStudentDropdown();     // This still hits Firestore, as intended
 }
 
 async function handleAddQuestionSubmit(e) {
@@ -248,36 +262,52 @@ async function handleAddQuestionSubmit(e) {
     }
 }
 
-async function loadCounters() {
-    const [studentsSnapshot, tutorsSnapshot] = await Promise.all([
-        getDocs(collection(db, "student_results")),
-        getDocs(collection(db, "tutors"))
-    ]);
-    document.getElementById('totalStudentsCount').textContent = studentsSnapshot.docs.length;
-    document.getElementById('totalTutorsCount').textContent = tutorsSnapshot.docs.length;
+// ### CHANGED ###
+// This function now reads from the cache and is highly efficient.
+function loadCountersFromCache() {
+    const tutors = sessionCache.tutors || {};
+    const students = sessionCache.students || [];
+
+    // 1. Set total counts from cache length
+    document.getElementById('totalStudentsCount').textContent = students.length;
+    document.getElementById('totalTutorsCount').textContent = Object.keys(tutors).length;
+
+    // 2. Efficiently calculate students per tutor in memory
+    const studentCounts = {};
+    for (const student of students) {
+        if (student.tutorEmail) {
+            studentCounts[student.tutorEmail] = (studentCounts[student.tutorEmail] || 0) + 1;
+        }
+    }
+
+    // 3. Populate the dropdown
     const studentsPerTutorSelect = document.getElementById('studentsPerTutorSelect');
     studentsPerTutorSelect.innerHTML = `<option value="">Students Per Tutor</option>`;
-    for (const tutorDoc of tutorsSnapshot.docs) {
-        const tutor = tutorDoc.data();
-        const studentsQuery = query(collection(db, "student_results"), where("tutorEmail", "==", tutor.email));
-        const studentsUnderTutor = await getDocs(studentsQuery);
+    for (const tutor of Object.values(tutors)) {
+        const count = studentCounts[tutor.email] || 0;
         const option = document.createElement('option');
-        option.textContent = `${tutor.name} (${studentsUnderTutor.docs.length} students)`;
+        option.textContent = `${tutor.name} (${count} students)`;
         studentsPerTutorSelect.appendChild(option);
     }
 }
 
+
 async function loadStudentDropdown() {
     const studentDropdown = document.getElementById('studentDropdown');
-    const snapshot = await getDocs(collection(db, "student_results"));
-    studentDropdown.innerHTML = `<option value="">Select Student</option>`;
-    snapshot.forEach(doc => {
-        const student = doc.data();
-        const option = document.createElement('option');
-        option.value = doc.id;
-        option.textContent = `${capitalize(student.studentName)} (${student.parentEmail})`;
-        studentDropdown.appendChild(option);
-    });
+    try {
+        const snapshot = await getDocs(collection(db, "student_results"));
+        studentDropdown.innerHTML = `<option value="">Select Student</option>`;
+        snapshot.forEach(doc => {
+            const student = doc.data();
+            const option = document.createElement('option');
+            option.value = doc.id;
+            option.textContent = `${capitalize(student.studentName)} (${student.parentEmail})`;
+            studentDropdown.appendChild(option);
+        });
+    } catch (error) {
+        console.error("Error loading student results for dropdown:", error);
+        studentDropdown.innerHTML = `<option value="">Failed to load students</option>`;
+    }
 }
 
 async function loadAndRenderReport(docId) {
@@ -314,7 +344,6 @@ async function loadAndRenderReport(docId) {
         reportContent.innerHTML = `<p class="text-red-500">Failed to load report. ${error.message}</p>`;
     }
 }
-
 
 // ##################################################################
 // # SECTION 2: CONTENT MANAGER (No changes needed)
@@ -1407,3 +1436,4 @@ onAuthStateChanged(auth, async (user) => {
 
 
 // [End Updated admin.js File]
+
