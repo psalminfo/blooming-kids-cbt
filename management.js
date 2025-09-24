@@ -516,15 +516,38 @@ async function loadPayAdviceData(startDate, endDate) {
                 };
             }
         });
+        
+        // ### FIXED SECTION ###
+        // Firestore 'in' queries are limited to 30 values. This function fetches tutors by chunking the email list.
+        const fetchTutorsInChunks = async (emails) => {
+            if (emails.length === 0) return [];
+            const chunks = [];
+            for (let i = 0; i < emails.length; i += 30) {
+                chunks.push(emails.slice(i, i + 30));
+            }
 
-        const [tutorsSnapshot, studentsSnapshot] = await Promise.all([
-            getDocs(query(collection(db, "tutors"), where("email", "in", activeTutorEmails))),
+            const queryPromises = chunks.map(chunk =>
+                getDocs(query(collection(db, "tutors"), where("email", "in", chunk)))
+            );
+
+            const querySnapshots = await Promise.all(queryPromises);
+            // Combine the docs from all snapshot results into a single array
+            return querySnapshots.flatMap(snapshot => snapshot.docs);
+        };
+
+        // Fetch both tutors (in chunks) and all students concurrently.
+        const [tutorDocs, studentsSnapshot] = await Promise.all([
+            fetchTutorsInChunks(activeTutorEmails),
             getDocs(collection(db, "students"))
         ]);
+        // ### END FIXED SECTION ###
+
         const allStudents = studentsSnapshot.docs.map(doc => doc.data());
         let totalStudentCount = 0;
         const payData = [];
-        tutorsSnapshot.forEach(doc => {
+        
+        // Iterate over the combined array of tutor documents
+        tutorDocs.forEach(doc => {
             const tutor = doc.data();
             const assignedStudents = allStudents.filter(s => s.tutorEmail === tutor.email);
             const totalStudentFees = assignedStudents.reduce((sum, s) => sum + (s.studentFee || 0), 0);
