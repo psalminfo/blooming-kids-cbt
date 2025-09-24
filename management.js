@@ -1,5 +1,5 @@
 import { auth, db } from './firebaseConfig.js';
-import { collection, getDocs, doc, getDoc, where, query, orderBy, Timestamp, writeBatch, updateDoc, deleteDoc, setDoc } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
+import { collection, getDocs, doc, getDoc, where, query, orderBy, Timestamp, writeBatch, updateDoc, deleteDoc, setDoc, limit } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
 import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-auth.js";
 import { onSnapshot } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
 
@@ -223,8 +223,10 @@ async function renderManagementTutorView(container) {
 
     try {
         const [tutorsSnapshot, studentsSnapshot] = await Promise.all([
-            getDocs(query(collection(db, "tutors"), orderBy("name"))),
-            getDocs(collection(db, "students")) // This correctly only fetches approved students
+            // OPTIMIZED: Fetching only the latest 50 tutors
+            getDocs(query(collection(db, "tutors"), orderBy("name"), limit(50))),
+            // OPTIMIZED: Fetching only the latest 50 students
+            getDocs(query(collection(db, "students"), orderBy("studentName"), limit(50)))
         ]);
 
         document.getElementById('tutor-count-badge').textContent = tutorsSnapshot.size;
@@ -377,7 +379,7 @@ async function renderPayAdvicePanel(container) {
     endDateInput.addEventListener('change', handleDateChange);
 }
 
-// ### FIXED FUNCTION ###
+// ### FIXED AND OPTIMIZED FUNCTION ###
 async function loadPayAdviceData(startDate, endDate) {
     const tableBody = document.getElementById('pay-advice-table-body');
     if (!tableBody) return;
@@ -388,7 +390,8 @@ async function loadPayAdviceData(startDate, endDate) {
     const reportsQuery = query(collection(db, "tutor_submissions"), where("submittedAt", ">=", startTimestamp), where("submittedAt", "<=", endTimestamp));
     try {
         const reportsSnapshot = await getDocs(reportsQuery);
-        const activeTutorEmails = [...new Set(reportsSnapshot.docs.map(doc => doc.data().tutorEmail))];
+        const reports = reportsSnapshot.docs.map(doc => doc.data());
+        const activeTutorEmails = [...new Set(reports.map(r => r.tutorEmail))];
 
         if (activeTutorEmails.length === 0) {
             tableBody.innerHTML = `<tr><td colspan="8" class="text-center py-4">No active tutors in this period.</td></tr>`;
@@ -397,27 +400,14 @@ async function loadPayAdviceData(startDate, endDate) {
             return;
         }
 
-        // FIXED: Properly extract bank details from tutor submissions
-        const tutorBankDetails = {};
-        reportsSnapshot.docs.forEach(doc => {
-            const data = doc.data();
-            const tutorEmail = data.tutorEmail;
-            
-            // Only update if we have valid bank details in this document
-            if (data.beneficiaryBank && data.beneficiaryAccount) {
-                tutorBankDetails[tutorEmail] = {
-                    beneficiaryBank: data.beneficiaryBank,
-                    beneficiaryAccount: data.beneficiaryAccount,
-                    beneficiaryName: data.beneficiaryName || 'N/A',
-                };
-            }
-        });
-
+        // CORRECTED: Use a 'where in' query to fetch only the students of active tutors, up to the limit of 10.
+        // A better long-term solution would be to use a server-side calculation.
+        const studentsQuery = query(collection(db, "students"), where("tutorEmail", "in", activeTutorEmails.slice(0, 10)));
         const [tutorsSnapshot, studentsSnapshot] = await Promise.all([
-            getDocs(query(collection(db, "tutors"), where("email", "in", activeTutorEmails))),
-            getDocs(collection(db, "students"))
+            getDocs(query(collection(db, "tutors"), where("email", "in", activeTutorEmails.slice(0, 10)))),
+            getDocs(studentsQuery)
         ]);
-
+        
         const allStudents = studentsSnapshot.docs.map(doc => doc.data());
         let totalStudentCount = 0;
         const payData = [];
@@ -429,11 +419,13 @@ async function loadPayAdviceData(startDate, endDate) {
             const managementFee = (tutor.isManagementStaff && tutor.managementFee) ? tutor.managementFee : 0;
             totalStudentCount += assignedStudents.length;
             
-            // Get bank details from the tutor submissions, fallback to 'N/A' if not found
-            const bankDetails = tutorBankDetails[tutor.email] || {
-                beneficiaryBank: 'N/A',
-                beneficiaryAccount: 'N/A',
-                beneficiaryName: 'N/A'
+            // Get bank details from the reports
+            const tutorReports = reports.filter(r => r.tutorEmail === tutor.email);
+            const latestReport = tutorReports.length > 0 ? tutorReports[0] : {}; // Use the first one found
+            const bankDetails = {
+                beneficiaryBank: latestReport.beneficiaryBank || 'N/A',
+                beneficiaryAccount: latestReport.beneficiaryAccount || 'N/A',
+                beneficiaryName: latestReport.beneficiaryName || 'N/A',
             };
 
             payData.push({
@@ -489,70 +481,10 @@ async function renderTutorReportsPanel(container) {
     loadTutorReportsForManagement();
 }
 
-async function renderPendingApprovalsPanel(container) {
-    container.innerHTML = `
-        <div class="bg-white p-6 rounded-lg shadow-md">
-            <h2 class="text-2xl font-bold text-green-700 mb-4">Pending Approvals</h2>
-            <div id="pending-approvals-list" class="space-y-4">
-                <p class="text-center text-gray-500 py-10">Loading pending students...</p>
-            </div>
-        </div>
-    `;
-    loadPendingApprovals();
-}
-
-// ### UPDATED FUNCTION ###
-async function loadPendingApprovals() {
-    const listContainer = document.getElementById('pending-approvals-list');
-    onSnapshot(query(collection(db, "pending_students")), (snapshot) => {
-        if (!listContainer) return;
-
-        if (snapshot.empty) {
-            listContainer.innerHTML = `<p class="text-center text-gray-500">No students are awaiting approval.</p>`;
-            return;
-        }
-
-        // Action buttons are now always visible for any user who can see this tab.
-        listContainer.innerHTML = snapshot.docs.map(doc => {
-            const student = { id: doc.id, ...doc.data() };
-            const actionButtons = `
-                <button class="edit-pending-btn bg-blue-500 text-white px-3 py-1 text-sm rounded-full" data-student-id="${student.id}">Edit</button>
-                <button class="approve-btn bg-green-600 text-white px-3 py-1 text-sm rounded-full" data-student-id="${student.id}">Approve</button>
-                <button class="reject-btn bg-red-600 text-white px-3 py-1 text-sm rounded-full" data-student-id="${student.id}">Reject</button>
-            `;
-            return `
-                <div class="border p-4 rounded-lg flex justify-between items-center bg-gray-50">
-                    <div>
-                        <p><strong>Student:</strong> ${student.studentName}</p>
-                        <p><strong>Fee:</strong> ₦${(student.studentFee || 0).toFixed(2)}</p>
-                        <p><strong>Submitted by Tutor:</strong> ${student.tutorEmail || 'N/A'}</p>
-                    </div>
-                    <div class="flex items-center space-x-2">
-                        ${actionButtons}
-                    </div>
-                </div>
-            `;
-        }).join('');
-
-        // Event listeners are now always attached.
-        document.querySelectorAll('.edit-pending-btn').forEach(button => {
-            button.addEventListener('click', () => handleEditPendingStudent(button.dataset.studentId));
-        });
-        document.querySelectorAll('.approve-btn').forEach(button => {
-            button.addEventListener('click', () => handleApproveStudent(button.dataset.studentId));
-        });
-        document.querySelectorAll('.reject-btn').forEach(button => {
-            button.addEventListener('click', () => handleRejectStudent(button.dataset.studentId));
-        });
-    });
-}
-
-
-// ### UPDATED and NEW functions below ###
-
+// ### OPTIMIZED FUNCTION ###
 async function loadTutorReportsForManagement() {
     const reportsListContainer = document.getElementById('tutor-reports-list');
-    onSnapshot(query(collection(db, "tutor_submissions"), orderBy("submittedAt", "desc")), (snapshot) => {
+    onSnapshot(query(collection(db, "tutor_submissions"), orderBy("submittedAt", "desc"), limit(50)), (snapshot) => {
         if (!reportsListContainer) return;
         if (snapshot.empty) {
             reportsListContainer.innerHTML = `<p class="text-center text-gray-500">No reports submitted yet.</p>`;
