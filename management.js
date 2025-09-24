@@ -19,7 +19,6 @@ async function fetchTutorsByEmails(emails) {
     return allTutors;
 }
 
-
 // ##################################
 // # SESSION CACHE & STATE (NOW PERSISTENT)
 // ##################################
@@ -995,4 +994,3 @@ onAuthStateChanged(auth, async (user) => {
 
 
 // [End Updated management.js File]
-
