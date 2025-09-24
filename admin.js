@@ -861,7 +861,7 @@ function renderSelectedTutorDetailsFromCache(tutorId) {
  
                  <div class="import-students-form">
                     <h5 class="font-semibold text-gray-700">Import Students for ${tutor.name}:</h5>
-                    <p class="text-xs text-gray-500 mb-2">Upload a .csv or .xlsx file with columns: <strong>Parent Name, Parent phone No, Student Name, Grade, Subjects, Days, Fee</strong></p>
+                    <p class="text-xs text-gray-500 mb-2">Upload a .csv or .xlsx file with columns: <strong>parentName, parentPhone, studentName, grade, subjects, days, studentFee</strong></p>
                     <input type="file" id="student-import-file" class="w-full text-sm border rounded p-1" accept=".csv, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/vnd.ms-excel">
            
                   <button id="import-students-btn" class="bg-blue-600 text-white w-full px-4 py-2 rounded mt-2 hover:bg-blue-700">Import Students</button>
@@ -1455,6 +1455,7 @@ onAuthStateChanged(auth, async (user) => {
 
 
 // [End Updated admin.js File]
+
 
 
 
