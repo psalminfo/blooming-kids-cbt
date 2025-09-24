@@ -1,13 +1,17 @@
+// [Begin Updated management.js File]
+
 import { auth, db } from './firebaseConfig.js';
 import { collection, getDocs, doc, getDoc, where, query, orderBy, Timestamp, writeBatch, updateDoc, deleteDoc, setDoc } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
 import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-auth.js";
 import { onSnapshot } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
 
 // ##################################
-// # SESSION CACHE & STATE
+// # SESSION CACHE & STATE (NOW PERSISTENT)
 // ##################################
 
-// Session-level cache to hold fetched data and reduce Firestore reads.
+const CACHE_PREFIX = 'management_cache_';
+
+// The in-memory cache that will be populated from localStorage on load.
 const sessionCache = {
     tutors: null,
     students: null,
@@ -15,6 +19,51 @@ const sessionCache = {
     reports: null,
     breakStudents: null,
 };
+
+/**
+ * Saves a specific piece of data to localStorage.
+ * @param {string} key The key for the cache (e.g., 'tutors').
+ * @param {any} data The data to store.
+ */
+function saveToLocalStorage(key, data) {
+    try {
+        localStorage.setItem(CACHE_PREFIX + key, JSON.stringify(data));
+        sessionCache[key] = data; // Also update the in-memory cache
+    } catch (error) {
+        console.error("Could not save to localStorage:", error);
+    }
+}
+
+/**
+ * Loads all cached data from localStorage into the sessionCache object.
+ */
+function loadFromLocalStorage() {
+    for (const key in sessionCache) {
+        try {
+            const storedData = localStorage.getItem(CACHE_PREFIX + key);
+            if (storedData) {
+                sessionCache[key] = JSON.parse(storedData);
+            }
+        } catch (error) {
+            console.error(`Could not load '${key}' from localStorage:`, error);
+            localStorage.removeItem(CACHE_PREFIX + key); // Clear corrupted data
+        }
+    }
+}
+
+/**
+ * Invalidates (clears) a specific cache from memory and localStorage.
+ * @param {string} key The key of the cache to clear.
+ */
+function invalidateCache(key) {
+    sessionCache[key] = null;
+    localStorage.removeItem(CACHE_PREFIX + key);
+}
+
+
+// Load any persisted data as soon as the script runs
+loadFromLocalStorage();
+
 
 // Session-level state for the Pay Advice gift feature.
 let payAdviceGifts = {};
@@ -132,10 +181,10 @@ function showEditStudentModal(studentId, studentData, collectionName) {
             document.getElementById('edit-modal').remove();
             // Invalidate cache and re-render the relevant view
             if (targetCollection === 'students') {
-                sessionCache.students = null;
+                invalidateCache('students');
                 renderManagementTutorView(document.getElementById('main-content'));
             } else {
-                sessionCache.pendingStudents = null;
+                invalidateCache('pendingStudents');
                 renderPendingApprovalsPanel(document.getElementById('main-content'));
             }
         } catch (error) {
@@ -150,7 +199,7 @@ async function handleDeleteStudent(studentId) {
         try {
             await deleteDoc(doc(db, "students", studentId));
             alert("Student deleted successfully!");
-            sessionCache.students = null; // Invalidate cache
+            invalidateCache('students'); // Invalidate cache
             renderManagementTutorView(document.getElementById('main-content')); // Rerender
         } catch (error) {
             console.error("Error removing student: ", error);
@@ -175,8 +224,8 @@ async function handleApproveStudent(studentId) {
             batch.delete(studentRef);
             await batch.commit();
             alert("Student approved successfully!");
-            sessionCache.pendingStudents = null; // Invalidate cache
-            sessionCache.students = null;
+            invalidateCache('pendingStudents'); // Invalidate cache
+            invalidateCache('students');
             fetchAndRenderPendingApprovals(); // Re-fetch and render the current panel
         } catch (error) {
             console.error("Error approving student: ", error);
@@ -190,7 +239,7 @@ async function handleRejectStudent(studentId) {
         try {
             await deleteDoc(doc(db, "pending_students", studentId));
             alert("Student rejected successfully!");
-            sessionCache.pendingStudents = null; // Invalidate cache
+            invalidateCache('pendingStudents'); // Invalidate cache
             fetchAndRenderPendingApprovals(); // Re-fetch and render
         } catch (error) {
             console.error("Error rejecting student: ", error);
@@ -215,7 +264,7 @@ async function renderManagementTutorView(container) {
                     <button id="refresh-directory-btn" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Refresh</button>
                 </div>
             </div>
-             <div class="flex space-x-4 mb-4">
+            <div class="flex space-x-4 mb-4">
                 <div class="bg-green-100 p-3 rounded-lg text-center shadow w-full">
                     <h4 class="font-bold text-green-800 text-sm">Total Tutors</h4>
                     <p id="tutor-count-badge" class="text-2xl font-extrabold">0</p>
@@ -237,19 +286,21 @@ async function renderManagementTutorView(container) {
 
 async function fetchAndRenderDirectory(forceRefresh = false) {
     if (forceRefresh) {
-        sessionCache.tutors = null;
-        sessionCache.students = null;
+        invalidateCache('tutors');
+        invalidateCache('students');
     }
 
     try {
+        // If cache is empty, fetch from server. Otherwise, the existing cache (from localStorage) will be used.
         if (!sessionCache.tutors || !sessionCache.students) {
             document.getElementById('directory-list').innerHTML = `<p class="text-center text-gray-500 py-10">Fetching data from server...</p>`;
             const [tutorsSnapshot, studentsSnapshot] = await Promise.all([
                 getDocs(query(collection(db, "tutors"), orderBy("name"))),
                 getDocs(collection(db, "students"))
             ]);
-            sessionCache.tutors = tutorsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-            sessionCache.students = studentsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            // Save newly fetched data to localStorage
+            saveToLocalStorage('tutors', tutorsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+            saveToLocalStorage('students', studentsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
         }
         renderDirectoryFromCache();
     } catch (error) {
@@ -264,8 +315,12 @@ function renderDirectoryFromCache(searchTerm = '') {
     const directoryList = document.getElementById('directory-list');
     if (!directoryList) return;
 
-    const lowerCaseSearchTerm = searchTerm.toLowerCase();
+    if (tutors.length === 0 && students.length === 0) {
+        directoryList.innerHTML = `<p class="text-center text-gray-500 py-10">No directory data found. Click Refresh to fetch from the server.</p>`;
+        return;
+    }
 
+    const lowerCaseSearchTerm = searchTerm.toLowerCase();
     const studentsByTutor = {};
     students.forEach(student => {
         if (!studentsByTutor[student.tutorEmail]) {
@@ -400,7 +455,6 @@ async function renderPayAdvicePanel(container) {
             </div>
         </div>
     `;
-
     const startDateInput = document.getElementById('start-date');
     const endDateInput = document.getElementById('end-date');
     const handleDateChange = () => {
@@ -467,11 +521,9 @@ async function loadPayAdviceData(startDate, endDate) {
             getDocs(query(collection(db, "tutors"), where("email", "in", activeTutorEmails))),
             getDocs(collection(db, "students"))
         ]);
-
         const allStudents = studentsSnapshot.docs.map(doc => doc.data());
         let totalStudentCount = 0;
         const payData = [];
-
         tutorsSnapshot.forEach(doc => {
             const tutor = doc.data();
             const assignedStudents = allStudents.filter(s => s.tutorEmail === tutor.email);
@@ -490,7 +542,6 @@ async function loadPayAdviceData(startDate, endDate) {
                 ...bankDetails
             });
         });
-        
         currentPayData = payData; // Store for reuse
         document.getElementById('pay-tutor-count').textContent = payData.length;
         document.getElementById('pay-student-count').textContent = totalStudentCount;
@@ -524,7 +575,6 @@ function renderPayAdviceTable() {
             </tr>
         `;
     }).join('');
-
     document.querySelectorAll('.add-gift-btn').forEach(button => {
         button.addEventListener('click', (e) => {
             const tutorEmail = e.target.dataset.tutorEmail;
@@ -570,14 +620,14 @@ async function renderTutorReportsPanel(container) {
 }
 
 async function fetchAndRenderTutorReports(forceRefresh = false) {
-    if (forceRefresh) sessionCache.reports = null;
+    if (forceRefresh) invalidateCache('reports');
     const reportsListContainer = document.getElementById('tutor-reports-list');
     
     try {
         if (!sessionCache.reports) {
             reportsListContainer.innerHTML = `<p class="text-center text-gray-500 py-10">Fetching reports from server...</p>`;
             const snapshot = await getDocs(query(collection(db, "tutor_submissions"), orderBy("submittedAt", "desc")));
-            sessionCache.reports = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            saveToLocalStorage('reports', snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
         }
         renderTutorReportsFromCache();
     } catch(error) {
@@ -592,7 +642,7 @@ function renderTutorReportsFromCache() {
     if (!reportsListContainer) return;
 
     if (reports.length === 0) {
-        reportsListContainer.innerHTML = `<p class="text-center text-gray-500">No reports submitted yet.</p>`;
+        reportsListContainer.innerHTML = `<p class="text-center text-gray-500">No reports found. Click Refresh to fetch from server.</p>`;
         return;
     }
     
@@ -604,7 +654,6 @@ function renderTutorReportsFromCache() {
         reportsByTutor[report.tutorEmail].reports.push(report);
     });
 
-    // Update counters
     document.getElementById('report-tutor-count').textContent = Object.keys(reportsByTutor).length;
     document.getElementById('report-total-count').textContent = reports.length;
 
@@ -657,14 +706,14 @@ async function renderPendingApprovalsPanel(container) {
 }
 
 async function fetchAndRenderPendingApprovals(forceRefresh = false) {
-    if (forceRefresh) sessionCache.pendingStudents = null;
+    if (forceRefresh) invalidateCache('pendingStudents');
     const listContainer = document.getElementById('pending-approvals-list');
     
     try {
         if (!sessionCache.pendingStudents) {
             listContainer.innerHTML = `<p class="text-center text-gray-500 py-10">Fetching pending students...</p>`;
             const snapshot = await getDocs(query(collection(db, "pending_students")));
-            sessionCache.pendingStudents = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            saveToLocalStorage('pendingStudents', snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
         }
         renderPendingApprovalsFromCache();
     } catch(error) {
@@ -697,7 +746,6 @@ function renderPendingApprovalsFromCache() {
             </div>
         </div>
     `).join('');
-
     document.querySelectorAll('.edit-pending-btn').forEach(button => button.addEventListener('click', () => handleEditPendingStudent(button.dataset.studentId)));
     document.querySelectorAll('.approve-btn').forEach(button => button.addEventListener('click', () => handleApproveStudent(button.dataset.studentId)));
     document.querySelectorAll('.reject-btn').forEach(button => button.addEventListener('click', () => handleRejectStudent(button.dataset.studentId)));
@@ -723,14 +771,14 @@ async function renderSummerBreakPanel(container) {
 }
 
 async function fetchAndRenderBreakStudents(forceRefresh = false) {
-    if (forceRefresh) sessionCache.breakStudents = null;
+    if (forceRefresh) invalidateCache('breakStudents');
     const listContainer = document.getElementById('break-students-list');
 
     try {
         if (!sessionCache.breakStudents) {
             listContainer.innerHTML = `<p class="text-center text-gray-500 py-10">Fetching student break status...</p>`;
             const snapshot = await getDocs(query(collection(db, "students"), where("summerBreak", "==", true)));
-            sessionCache.breakStudents = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            saveToLocalStorage('breakStudents', snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
         }
         renderBreakStudentsFromCache();
     } catch(error) {
@@ -745,7 +793,6 @@ function renderBreakStudentsFromCache() {
     if (!listContainer) return;
 
     const canEndBreak = window.userData.permissions?.actions?.canEndBreak === true;
-
     if (breakStudents.length === 0) {
         listContainer.innerHTML = `<p class="text-center text-gray-500">No students are on break.</p>`;
         return;
@@ -762,13 +809,12 @@ function renderBreakStudentsFromCache() {
                     <p><strong>Tutor:</strong> ${student.tutorEmail}</p>
                 </div>
                 <div class="flex items-center space-x-2">
-                     <span class="text-yellow-600 font-semibold px-3 py-1 bg-yellow-100 rounded-full text-sm">On Break</span>
+                    <span class="text-yellow-600 font-semibold px-3 py-1 bg-yellow-100 rounded-full text-sm">On Break</span>
                      ${endBreakButton}
                 </div>
             </div>
         `;
     }).join('');
-
     if (canEndBreak) {
         document.querySelectorAll('.end-break-btn').forEach(button => {
             button.addEventListener('click', async (e) => {
@@ -778,7 +824,7 @@ function renderBreakStudentsFromCache() {
                         await updateDoc(doc(db, "students", studentId), { summerBreak: false, lastBreakEnd: Timestamp.now() });
                         document.getElementById('break-status-message').textContent = `Break ended successfully.`;
                         document.getElementById('break-status-message').className = 'text-center font-semibold mb-4 text-green-600';
-                        sessionCache.breakStudents = null; // Invalidate cache
+                        invalidateCache('breakStudents'); // Invalidate cache
                         fetchAndRenderBreakStudents(); // Re-render list
                     } catch (error) {
                         console.error("Error ending summer break:", error);
@@ -803,7 +849,6 @@ async function generateReportHTML(reportId) {
     
     const logoUrl = "https://raw.githubusercontent.com/psalminfo/blooming-kids-cbt/main/logo.png";
     const reportTemplate = `<div style="font-family: Arial, sans-serif; padding: 2rem; max-width: 800px; margin: auto;"><div style="text-align: center; margin-bottom: 2rem;"><img src="${logoUrl}" alt="Company Logo" style="height: 80px;"><h3 style="font-size: 1.8rem; font-weight: bold; color: #15803d; margin: 0;">Blooming Kids House</h3><h1 style="font-size: 1.2rem; font-weight: bold; color: #166534;">MONTHLY LEARNING REPORT</h1><p>Date: ${new Date(reportData.submittedAt.seconds * 1000).toLocaleDateString()}</p></div><div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 2rem;"><p><strong>Student's Name:</strong> ${reportData.studentName}</p><p><strong>Parent's Name:</strong> ${reportData.parentName || 'N/A'}</p><p><strong>Parent's Phone:</strong> ${reportData.parentPhone || 'N/A'}</p><p><strong>Grade:</strong> ${reportData.grade}</p><p><strong>Tutor's Name:</strong> ${reportData.tutorName}</p></div>${Object.entries({"INTRODUCTION": reportData.introduction, "TOPICS & REMARKS": reportData.topics, "PROGRESS & ACHIEVEMENTS": reportData.progress, "STRENGTHS AND WEAKNESSES": reportData.strengthsWeaknesses, "RECOMMENDATIONS": reportData.recommendations, "GENERAL TUTOR'S COMMENTS": reportData.generalComments}).map(([title, content]) => `<div style="border-top: 1px solid #d1d5db; padding-top: 1rem; margin-top: 1rem;"><h2 style="font-size: 1.25rem; font-weight: bold; color: #16a34a;">${title}</h2><p style="line-height: 1.6; white-space: pre-wrap;">${content || 'N/A'}</p></div>`).join('')}<div style="margin-top: 3rem; text-align: right;"><p>Best regards,</p><p style="font-weight: bold;">${reportData.tutorName}</p></div></div>`;
-
     return { html: reportTemplate, reportData: reportData };
 }
 
@@ -928,8 +973,10 @@ onAuthStateChanged(auth, async (user) => {
         }
 
         if(logoutBtn) logoutBtn.addEventListener('click', () => signOut(auth).then(() => window.location.href = "management-auth.html"));
-
     } else {
         window.location.href = "management-auth.html";
     }
 });
+
+
+// [End Updated management.js File]
