@@ -1,3 +1,4 @@
+
 // [Begin Updated admin.js File]
 
 import { auth, db } from './firebaseConfig.js';
@@ -1149,6 +1150,38 @@ async function downloadAdminReport(reportId, returnBlob = false) {
 }
 
 
+// ##################################################################
+// # SECTION 5: PAY ADVICE PANEL (No changes needed)
+// ##################################################################
+
+async function renderPayAdvicePanel(container) {
+    container.innerHTML = `
+        <div class="bg-white p-6 rounded-lg shadow-md">
+            <h2 class="text-2xl font-bold text-green-700 mb-4">Tutor Pay Advice</h2>
+           
+             <div class="bg-gray-100 p-4 rounded-lg mb-6 grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+                <div><label for="start-date" class="block text-sm font-medium text-gray-700">Start Date</label><input type="date" id="start-date" class="mt-1 block w-full p-2 border rounded-md"></div>
+                <div><label for="end-date" class="block text-sm font-medium text-gray-700">End Date</label><input type="date" id="end-date" class="mt-1 block w-full p-2 border rounded-md"></div>
+                <div class="flex items-center space-x-4 col-span-2"><div class="bg-blue-100 p-3 rounded-lg text-center shadow w-full"><h4 class="font-bold text-blue-800 text-sm">Active Tutors</h4><p id="pay-tutor-count" class="text-2xl text-blue-600 font-extrabold">0</p></div><div class="bg-green-100 p-3 rounded-lg text-center shadow w-full"><h4 class="font-bold text-green-800 text-sm">Total Students</h4><p id="pay-student-count" class="text-2xl text-green-600 font-extrabold">0</p></div><button id="export-pay-csv-btn" class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 h-full">Export CSV</button></div>
+            </div>
+            <div class="overflow-x-auto"><table class="min-w-full divide-y divide-gray-200"><thead class="bg-gray-50"><tr><th class="px-6 py-3 text-left text-xs font-medium uppercase">Tutor</th><th class="px-6 py-3 text-left text-xs font-medium uppercase">Students</th><th class="px-6 py-3 text-left text-xs font-medium uppercase">Student Fees</th><th class="px-6 py-3 text-left text-xs font-medium uppercase">Mgmt. Fee</th><th class="px-6 py-3 text-left text-xs font-medium uppercase">Total Pay</th></tr></thead><tbody id="pay-advice-table-body" class="divide-y divide-gray-200"><tr><td colspan="5" class="text-center py-4">Select a date range.</td></tr></tbody></table></div>
+        </div>
+    `;
+    const startDateInput = document.getElementById('start-date');
+    const endDateInput = document.getElementById('end-date');
+    const handleDateChange = () => {
+        const startDate = startDateInput.value ?
+        new Date(startDateInput.value) : null;
+        const endDate = endDateInput.value ? new Date(endDateInput.value) : null;
+        if (startDate && endDate) {
+            endDate.setHours(23, 59, 59, 999);
+            loadPayAdviceData(startDate, endDate);
+        }
+    };
+    startDateInput.addEventListener('change', handleDateChange);
+    endDateInput.addEventListener('change', handleDateChange);
+}
+
 async function loadPayAdviceData(startDate, endDate) {
     const tableBody = document.getElementById('pay-advice-table-body');
     tableBody.innerHTML = `<tr><td colspan="5" class="text-center py-4">Loading pay data...</td></tr>`;
@@ -1157,51 +1190,27 @@ async function loadPayAdviceData(startDate, endDate) {
     const reportsQuery = query(collection(db, "tutor_submissions"), where("submittedAt", ">=", startTimestamp), where("submittedAt", "<=", endTimestamp));
     const reportsSnapshot = await getDocs(reportsQuery);
     const activeTutorEmails = [...new Set(reportsSnapshot.docs.map(doc => doc.data().tutorEmail))];
-    
     if (activeTutorEmails.length === 0) {
         tableBody.innerHTML = `<tr><td colspan="5" class="text-center py-4">No tutors submitted reports in this period.</td></tr>`;
         document.getElementById('pay-tutor-count').textContent = 0;
         document.getElementById('pay-student-count').textContent = 0;
         return;
     }
-
-    // FIX: Handle more than 30 tutors by getting all tutors and filtering in memory
-    let allTutors = [];
-    if (activeTutorEmails.length <= 30) {
-        // Use IN query if 30 or fewer tutors
-        const tutorsSnapshot = await getDocs(query(collection(db, "tutors"), where("email", "in", activeTutorEmails)));
-        allTutors = tutorsSnapshot.docs.map(doc => doc.data());
-    } else {
-        // Get all tutors and filter in memory if more than 30
-        const tutorsSnapshot = await getDocs(collection(db, "tutors"));
-        const activeTutorEmailsSet = new Set(activeTutorEmails);
-        allTutors = tutorsSnapshot.docs.map(doc => doc.data()).filter(tutor => activeTutorEmailsSet.has(tutor.email));
-    }
-
-    const studentsSnapshot = await getDocs(collection(db, "students"));
+    const [tutorsSnapshot, studentsSnapshot] = await Promise.all([ getDocs(query(collection(db, "tutors"), where("email", "in", activeTutorEmails))), getDocs(collection(db, "students")) ]);
     const allStudents = studentsSnapshot.docs.map(doc => doc.data());
-    
     let totalStudentCount = 0;
     const payData = [];
-    
-    allTutors.forEach(tutor => {
+    tutorsSnapshot.forEach(doc => {
+        const tutor = doc.data();
         const assignedStudents = allStudents.filter(s => s.tutorEmail === tutor.email);
         const totalStudentFees = assignedStudents.reduce((sum, s) => sum + (s.studentFee || 0), 0);
         const managementFee = (tutor.isManagementStaff && tutor.managementFee) ? tutor.managementFee : 0;
         totalStudentCount += assignedStudents.length;
-        payData.push({ 
-            tutorName: tutor.name, 
-            studentCount: assignedStudents.length, 
-            totalStudentFees: totalStudentFees, 
-            managementFee: managementFee, 
-            totalPay: totalStudentFees + managementFee 
-        });
+        payData.push({ tutorName: tutor.name, studentCount: assignedStudents.length, totalStudentFees: totalStudentFees, managementFee: managementFee, totalPay: totalStudentFees + managementFee });
     });
-    
     document.getElementById('pay-tutor-count').textContent = payData.length;
     document.getElementById('pay-student-count').textContent = totalStudentCount;
     tableBody.innerHTML = payData.map(d => `<tr><td class="px-6 py-4">${d.tutorName}</td><td class="px-6 py-4">${d.studentCount}</td><td class="px-6 py-4">₦${d.totalStudentFees.toFixed(2)}</td><td class="px-6 py-4">₦${d.managementFee.toFixed(2)}</td><td class="px-6 py-4 font-bold">₦${d.totalPay.toFixed(2)}</td></tr>`).join('');
-    
     document.getElementById('export-pay-csv-btn').onclick = () => {
         const csv = convertPayAdviceToCSV(payData);
         const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
@@ -1447,7 +1456,6 @@ onAuthStateChanged(auth, async (user) => {
 
 
 // [End Updated admin.js File]
-
 
 
 
