@@ -493,7 +493,6 @@ async function loadPayAdviceData(startDate, endDate) {
     const startTimestamp = Timestamp.fromDate(startDate);
     const endTimestamp = Timestamp.fromDate(endDate);
     const reportsQuery = query(collection(db, "tutor_submissions"), where("submittedAt", ">=", startTimestamp), where("submittedAt", "<=", endTimestamp));
-    
     try {
         const reportsSnapshot = await getDocs(reportsQuery);
         const activeTutorEmails = [...new Set(reportsSnapshot.docs.map(doc => doc.data().tutorEmail))];
@@ -518,25 +517,15 @@ async function loadPayAdviceData(startDate, endDate) {
             }
         });
 
-        // FIX: Handle more than 30 tutors by getting all tutors and filtering in memory
-        let allTutors = [];
-        if (activeTutorEmails.length <= 30) {
-            // Use IN query if 30 or fewer tutors
-            const tutorsSnapshot = await getDocs(query(collection(db, "tutors"), where("email", "in", activeTutorEmails)));
-            allTutors = tutorsSnapshot.docs.map(doc => doc.data());
-        } else {
-            // Get all tutors and filter in memory if more than 30
-            const tutorsSnapshot = await getDocs(collection(db, "tutors"));
-            const activeTutorEmailsSet = new Set(activeTutorEmails);
-            allTutors = tutorsSnapshot.docs.map(doc => doc.data()).filter(tutor => activeTutorEmailsSet.has(tutor.email));
-        }
-
-        const studentsSnapshot = await getDocs(collection(db, "students"));
+        const [tutorsSnapshot, studentsSnapshot] = await Promise.all([
+            getDocs(query(collection(db, "tutors"), where("email", "in", activeTutorEmails))),
+            getDocs(collection(db, "students"))
+        ]);
         const allStudents = studentsSnapshot.docs.map(doc => doc.data());
         let totalStudentCount = 0;
         const payData = [];
-        
-        allTutors.forEach(tutor => {
+        tutorsSnapshot.forEach(doc => {
+            const tutor = doc.data();
             const assignedStudents = allStudents.filter(s => s.tutorEmail === tutor.email);
             const totalStudentFees = assignedStudents.reduce((sum, s) => sum + (s.studentFee || 0), 0);
             const managementFee = (tutor.isManagementStaff && tutor.managementFee) ? tutor.managementFee : 0;
@@ -553,7 +542,6 @@ async function loadPayAdviceData(startDate, endDate) {
                 ...bankDetails
             });
         });
-        
         currentPayData = payData; // Store for reuse
         document.getElementById('pay-tutor-count').textContent = payData.length;
         document.getElementById('pay-student-count').textContent = totalStudentCount;
@@ -564,6 +552,141 @@ async function loadPayAdviceData(startDate, endDate) {
         tableBody.innerHTML = `<tr><td colspan="8" class="text-center py-4 text-red-500">Failed to load data.</td></tr>`;
     }
 }
+
+function renderPayAdviceTable() {
+    const tableBody = document.getElementById('pay-advice-table-body');
+    if (!tableBody) return;
+    
+    tableBody.innerHTML = currentPayData.map(d => {
+        const giftAmount = payAdviceGifts[d.tutorEmail] || 0;
+        const finalPay = d.totalPay + giftAmount;
+        return `
+            <tr>
+                <td class="px-6 py-4">${d.tutorName}</td>
+                <td class="px-6 py-4">${d.studentCount}</td>
+                <td class="px-6 py-4">₦${d.totalStudentFees.toFixed(2)}</td>
+                <td class="px-6 py-4">₦${d.managementFee.toFixed(2)}</td>
+                <td class="px-6 py-4">₦${d.totalPay.toFixed(2)}</td>
+                <td class="px-6 py-4 text-blue-600 font-bold">₦${giftAmount.toFixed(2)}</td>
+                <td class="px-6 py-4 font-bold">₦${finalPay.toFixed(2)}</td>
+                <td class="px-6 py-4">
+                    <button class="add-gift-btn bg-blue-500 text-white px-3 py-1 rounded text-xs" data-tutor-email="${d.tutorEmail}">Add Gift</button>
+                </td>
+            </tr>
+        `;
+    }).join('');
+    document.querySelectorAll('.add-gift-btn').forEach(button => {
+        button.addEventListener('click', (e) => {
+            const tutorEmail = e.target.dataset.tutorEmail;
+            const currentGift = payAdviceGifts[tutorEmail] || 0;
+            const giftInput = prompt(`Enter gift amount for this tutor:`, currentGift);
+            if (giftInput !== null) {
+                const giftAmount = parseFloat(giftInput);
+                if (!isNaN(giftAmount) && giftAmount >= 0) {
+                    payAdviceGifts[tutorEmail] = giftAmount;
+                    renderPayAdviceTable(); // Re-render the table with the new gift
+                } else {
+                    alert("Please enter a valid, non-negative number.");
+                }
+            }
+        });
+    });
+}
+
+
+// --- Tutor Reports Panel ---
+async function renderTutorReportsPanel(container) {
+    container.innerHTML = `
+        <div class="bg-white p-6 rounded-lg shadow-md mb-6">
+            <div class="flex justify-between items-center mb-4 flex-wrap gap-4">
+                <h2 class="text-2xl font-bold text-green-700">Tutor Reports</h2>
+                <button id="refresh-reports-btn" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Refresh</button>
+            </div>
+            <div class="flex space-x-4 mb-4">
+                <div class="bg-green-100 p-3 rounded-lg text-center shadow w-full">
+                    <h4 class="font-bold text-green-800 text-sm">Unique Tutors Submitted</h4>
+                    <p id="report-tutor-count" class="text-2xl font-extrabold">0</p>
+                </div>
+                <div class="bg-yellow-100 p-3 rounded-lg text-center shadow w-full">
+                    <h4 class="font-bold text-yellow-800 text-sm">Total Reports Submitted</h4>
+                    <p id="report-total-count" class="text-2xl font-extrabold">0</p>
+                </div>
+            </div>
+            <div id="tutor-reports-list" class="space-y-4"><p class="text-center">Loading reports...</p></div>
+        </div>
+    `;
+    document.getElementById('refresh-reports-btn').addEventListener('click', () => fetchAndRenderTutorReports(true));
+    fetchAndRenderTutorReports();
+}
+
+async function fetchAndRenderTutorReports(forceRefresh = false) {
+    if (forceRefresh) invalidateCache('reports');
+    const reportsListContainer = document.getElementById('tutor-reports-list');
+    
+    try {
+        if (!sessionCache.reports) {
+            reportsListContainer.innerHTML = `<p class="text-center text-gray-500 py-10">Fetching reports from server...</p>`;
+            const snapshot = await getDocs(query(collection(db, "tutor_submissions"), orderBy("submittedAt", "desc")));
+            saveToLocalStorage('reports', snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+        }
+        renderTutorReportsFromCache();
+    } catch(error) {
+        console.error("Error fetching reports:", error);
+        reportsListContainer.innerHTML = `<p class="text-center text-red-500 py-10">Failed to load reports.</p>`;
+    }
+}
+
+function renderTutorReportsFromCache() {
+    const reports = sessionCache.reports || [];
+    const reportsListContainer = document.getElementById('tutor-reports-list');
+    if (!reportsListContainer) return;
+
+    if (reports.length === 0) {
+        reportsListContainer.innerHTML = `<p class="text-center text-gray-500">No reports found. Click Refresh to fetch from server.</p>`;
+        return;
+    }
+    
+    const reportsByTutor = {};
+    reports.forEach(report => {
+        if (!reportsByTutor[report.tutorEmail]) {
+            reportsByTutor[report.tutorEmail] = { name: report.tutorName || report.tutorEmail, reports: [] };
+        }
+        reportsByTutor[report.tutorEmail].reports.push(report);
+    });
+
+    document.getElementById('report-tutor-count').textContent = Object.keys(reportsByTutor).length;
+    document.getElementById('report-total-count').textContent = reports.length;
+
+    const canDownload = window.userData.permissions?.actions?.canDownloadReports === true;
+    reportsListContainer.innerHTML = Object.values(reportsByTutor).map(tutorData => {
+        const reportLinks = tutorData.reports.map(report => {
+            const buttonHTML = canDownload
+                ? `<button class="download-report-btn bg-green-500 text-white px-3 py-1 text-sm rounded" data-report-id="${report.id}">Download</button>`
+                : `<button class="view-report-btn bg-gray-500 text-white px-3 py-1 text-sm rounded" data-report-id="${report.id}">View</button>`;
+            return `<li class="flex justify-between items-center p-2 bg-gray-50 rounded">${report.studentName}<span>${buttonHTML}</span></li>`;
+        }).join('');
+        
+        const zipButtonHTML = canDownload
+            ? `<div class="p-4 border-t"><button class="zip-reports-btn bg-blue-600 text-white px-4 py-2 text-sm rounded w-full hover:bg-blue-700" data-tutor-email="${tutorData.reports[0].tutorEmail}">Zip & Download All Reports</button></div>`
+            : '';
+
+        return `<details class="border rounded-lg">
+                    <summary class="p-4 cursor-pointer font-semibold">${tutorData.name} (${tutorData.reports.length} reports)</summary>
+                    <div class="p-4 border-t"><ul class="space-y-2">${reportLinks}</ul></div>
+                    ${zipButtonHTML}
+                </details>`;
+    }).join('');
+
+    document.querySelectorAll('.download-report-btn').forEach(button => button.addEventListener('click', (e) => { e.stopPropagation(); viewReportInNewTab(e.target.dataset.reportId, true); }));
+    document.querySelectorAll('.view-report-btn').forEach(button => button.addEventListener('click', (e) => { e.stopPropagation(); viewReportInNewTab(e.target.dataset.reportId, false); }));
+    document.querySelectorAll('.zip-reports-btn').forEach(button => button.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        const tutorEmail = e.target.dataset.tutorEmail;
+        const tutorData = reportsByTutor[tutorEmail];
+        if (tutorData) await zipAndDownloadTutorReports(tutorData.reports, tutorData.name, e.target);
+    }));
+}
+
 
 // --- Pending Approvals Panel ---
 async function renderPendingApprovalsPanel(container) {
@@ -857,4 +980,3 @@ onAuthStateChanged(auth, async (user) => {
 
 
 // [End Updated management.js File]
-
