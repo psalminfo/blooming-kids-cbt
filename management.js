@@ -18,12 +18,7 @@ async function fetchTutorsByEmails(emails) {
     }
     return allTutors;
 }
-// [Begin Updated management.js File]
 
-import { auth, db } from './firebaseConfig.js';
-import { collection, getDocs, doc, getDoc, where, query, orderBy, Timestamp, writeBatch, updateDoc, deleteDoc, setDoc } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
-import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-auth.js";
-import { onSnapshot } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
 
 // ##################################
 // # SESSION CACHE & STATE (NOW PERSISTENT)
@@ -1000,3 +995,4 @@ onAuthStateChanged(auth, async (user) => {
 
 
 // [End Updated management.js File]
+
