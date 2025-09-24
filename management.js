@@ -1,23 +1,9 @@
+// [Begin Updated management.js File]
+
 import { auth, db } from './firebaseConfig.js';
-import { collection, getDocs, doc, updateDoc, addDoc, deleteDoc, query, where, orderBy, serverTimestamp } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
+import { collection, getDocs, doc, getDoc, where, query, orderBy, Timestamp, writeBatch, updateDoc, deleteDoc, setDoc } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
 import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-auth.js";
-
-// Utility function: split array into chunks of 30 for Firestore 'in' queries
-async function fetchTutorsByEmails(emails) {
-    const chunks = [];
-    for (let i = 0; i < emails.length; i += 30) {
-        chunks.push(emails.slice(i, i + 30));
-    }
-
-    let allTutors = [];
-    for (const chunk of chunks) {
-        const snapshot = await getDocs(
-            query(collection(db, "tutors"), where("email", "in", chunk))
-        );
-        allTutors = allTutors.concat(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-    }
-    return allTutors;
-}
+import { onSnapshot } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
 
 // ##################################
 // # SESSION CACHE & STATE (NOW PERSISTENT)
@@ -532,7 +518,7 @@ async function loadPayAdviceData(startDate, endDate) {
         });
 
         const [tutorsSnapshot, studentsSnapshot] = await Promise.all([
-            fetchTutorsByEmails(activeTutorEmails),
+            getDocs(query(collection(db, "tutors"), where("email", "in", activeTutorEmails))),
             getDocs(collection(db, "students"))
         ]);
         const allStudents = studentsSnapshot.docs.map(doc => doc.data());
