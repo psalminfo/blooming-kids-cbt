@@ -1,4 +1,3 @@
-
 // [Begin Updated admin.js File]
 
 import { auth, db } from './firebaseConfig.js';
@@ -1151,7 +1150,7 @@ async function downloadAdminReport(reportId, returnBlob = false) {
 
 
 // ##################################################################
-// # SECTION 5: PAY ADVICE PANEL (No changes needed)
+// # SECTION 5: PAY ADVICE PANEL (CORRECTED)
 // ##################################################################
 
 async function renderPayAdvicePanel(container) {
@@ -1185,40 +1184,71 @@ async function renderPayAdvicePanel(container) {
 async function loadPayAdviceData(startDate, endDate) {
     const tableBody = document.getElementById('pay-advice-table-body');
     tableBody.innerHTML = `<tr><td colspan="5" class="text-center py-4">Loading pay data...</td></tr>`;
-    const startTimestamp = Timestamp.fromDate(startDate);
-    const endTimestamp = Timestamp.fromDate(endDate);
-    const reportsQuery = query(collection(db, "tutor_submissions"), where("submittedAt", ">=", startTimestamp), where("submittedAt", "<=", endTimestamp));
-    const reportsSnapshot = await getDocs(reportsQuery);
-    const activeTutorEmails = [...new Set(reportsSnapshot.docs.map(doc => doc.data().tutorEmail))];
-    if (activeTutorEmails.length === 0) {
-        tableBody.innerHTML = `<tr><td colspan="5" class="text-center py-4">No tutors submitted reports in this period.</td></tr>`;
-        document.getElementById('pay-tutor-count').textContent = 0;
-        document.getElementById('pay-student-count').textContent = 0;
-        return;
+
+    try {
+        const startTimestamp = Timestamp.fromDate(startDate);
+        const endTimestamp = Timestamp.fromDate(endDate);
+        const reportsQuery = query(collection(db, "tutor_submissions"), where("submittedAt", ">=", startTimestamp), where("submittedAt", "<=", endTimestamp));
+        const reportsSnapshot = await getDocs(reportsQuery);
+        const activeTutorEmails = [...new Set(reportsSnapshot.docs.map(doc => doc.data().tutorEmail))];
+
+        if (activeTutorEmails.length === 0) {
+            tableBody.innerHTML = `<tr><td colspan="5" class="text-center py-4">No tutors submitted reports in this period.</td></tr>`;
+            document.getElementById('pay-tutor-count').textContent = 0;
+            document.getElementById('pay-student-count').textContent = 0;
+            return;
+        }
+
+        // ### FIXED SECTION ###
+        // Firestore 'in' queries are limited to 30 values. This function fetches tutors by chunking the email list.
+        const fetchTutorsInChunks = async (emails) => {
+            if (emails.length === 0) return [];
+            const chunks = [];
+            for (let i = 0; i < emails.length; i += 30) {
+                chunks.push(emails.slice(i, i + 30));
+            }
+            const queryPromises = chunks.map(chunk =>
+                getDocs(query(collection(db, "tutors"), where("email", "in", chunk)))
+            );
+            const querySnapshots = await Promise.all(queryPromises);
+            return querySnapshots.flatMap(snapshot => snapshot.docs); // Combine docs from all snapshots
+        };
+
+        // Fetch both tutors (in chunks) and all students concurrently.
+        const [tutorDocs, studentsSnapshot] = await Promise.all([
+            fetchTutorsInChunks(activeTutorEmails),
+            getDocs(collection(db, "students"))
+        ]);
+        // ### END FIXED SECTION ###
+
+        const allStudents = studentsSnapshot.docs.map(doc => doc.data());
+        let totalStudentCount = 0;
+        const payData = [];
+        tutorDocs.forEach(doc => { // Iterate over the combined array of tutor documents
+            const tutor = doc.data();
+            const assignedStudents = allStudents.filter(s => s.tutorEmail === tutor.email);
+            const totalStudentFees = assignedStudents.reduce((sum, s) => sum + (s.studentFee || 0), 0);
+            const managementFee = (tutor.isManagementStaff && tutor.managementFee) ? tutor.managementFee : 0;
+            totalStudentCount += assignedStudents.length;
+            payData.push({ tutorName: tutor.name, studentCount: assignedStudents.length, totalStudentFees: totalStudentFees, managementFee: managementFee, totalPay: totalStudentFees + managementFee });
+        });
+
+        document.getElementById('pay-tutor-count').textContent = payData.length;
+        document.getElementById('pay-student-count').textContent = totalStudentCount;
+        tableBody.innerHTML = payData.map(d => `<tr><td class="px-6 py-4">${d.tutorName}</td><td class="px-6 py-4">${d.studentCount}</td><td class="px-6 py-4">₦${d.totalStudentFees.toFixed(2)}</td><td class="px-6 py-4">₦${d.managementFee.toFixed(2)}</td><td class="px-6 py-4 font-bold">₦${d.totalPay.toFixed(2)}</td></tr>`).join('');
+        
+        document.getElementById('export-pay-csv-btn').onclick = () => {
+            const csv = convertPayAdviceToCSV(payData);
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = `Pay_Advice_${startDate.toISOString().split('T')[0]}_to_${endDate.toISOString().split('T')[0]}.csv`;
+            link.click();
+        };
+    } catch (error) {
+        console.error("Error loading pay advice data:", error);
+        tableBody.innerHTML = `<tr><td colspan="5" class="text-center py-4 text-red-500">Failed to load pay data. Check console.</td></tr>`;
     }
-    const [tutorsSnapshot, studentsSnapshot] = await Promise.all([ getDocs(query(collection(db, "tutors"), where("email", "in", activeTutorEmails))), getDocs(collection(db, "students")) ]);
-    const allStudents = studentsSnapshot.docs.map(doc => doc.data());
-    let totalStudentCount = 0;
-    const payData = [];
-    tutorsSnapshot.forEach(doc => {
-        const tutor = doc.data();
-        const assignedStudents = allStudents.filter(s => s.tutorEmail === tutor.email);
-        const totalStudentFees = assignedStudents.reduce((sum, s) => sum + (s.studentFee || 0), 0);
-        const managementFee = (tutor.isManagementStaff && tutor.managementFee) ? tutor.managementFee : 0;
-        totalStudentCount += assignedStudents.length;
-        payData.push({ tutorName: tutor.name, studentCount: assignedStudents.length, totalStudentFees: totalStudentFees, managementFee: managementFee, totalPay: totalStudentFees + managementFee });
-    });
-    document.getElementById('pay-tutor-count').textContent = payData.length;
-    document.getElementById('pay-student-count').textContent = totalStudentCount;
-    tableBody.innerHTML = payData.map(d => `<tr><td class="px-6 py-4">${d.tutorName}</td><td class="px-6 py-4">${d.studentCount}</td><td class="px-6 py-4">₦${d.totalStudentFees.toFixed(2)}</td><td class="px-6 py-4">₦${d.managementFee.toFixed(2)}</td><td class="px-6 py-4 font-bold">₦${d.totalPay.toFixed(2)}</td></tr>`).join('');
-    document.getElementById('export-pay-csv-btn').onclick = () => {
-        const csv = convertPayAdviceToCSV(payData);
-        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-        const link = document.createElement('a');
-        link.href = URL.createObjectURL(blob);
-        link.download = `Pay_Advice_${startDate.toISOString().split('T')[0]}_to_${endDate.toISOString().split('T')[0]}.csv`;
-        link.click();
-    };
 }
 
 
@@ -1456,7 +1486,3 @@ onAuthStateChanged(auth, async (user) => {
 
 
 // [End Updated admin.js File]
-
-
-
-
