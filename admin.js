@@ -803,6 +803,7 @@ function resetStudentForm() {
     const form = document.querySelector('.add-student-form');
     if (!form) return;
     form.querySelector('#new-parent-name').value = '';
+    form.querySelector('#new-parent-phone').value = '';
     form.querySelector('#new-student-name').value = '';
     form.querySelector('#new-student-grade').value = '';
     form.querySelector('#new-student-subjects').value = '';
@@ -831,7 +832,7 @@ function renderSelectedTutorDetailsFromCache(tutorId) {
     const studentsListHTML = assignedStudents.map(student => {
         const feeDisplay = globalSettings.showStudentFees ? ` - Fee: ₦${(student.studentFee || 0).toLocaleString()}` : '';
         const editDeleteButtons = `
-            <button class="edit-student-btn text-blue-500 hover:text-blue-700 font-semibold" data-student-id="${student.id}" data-parent-name="${student.parentName || ''}" data-student-name="${student.studentName}" data-grade="${student.grade}" data-subjects="${(student.subjects || []).join(', ')}" data-days="${student.days}" data-fee="${student.studentFee}">Edit</button>
+            <button class="edit-student-btn text-blue-500 hover:text-blue-700 font-semibold" data-student-id="${student.id}" data-parent-name="${student.parentName || ''}" data-parent-phone="${student.parentPhone || ''}" data-student-name="${student.studentName}" data-grade="${student.grade}" data-subjects="${(student.subjects || []).join(', ')}" data-days="${student.days}" data-fee="${student.studentFee}">Edit</button>
             <button class="delete-student-btn text-red-500 hover:text-red-700 font-semibold" data-student-id="${student.id}">Delete</button>
         `;
         return `<li class="flex justify-between items-center bg-gray-50 p-2 rounded-md" data-student-name="${student.studentName.toLowerCase()}"><span>${student.studentName} (${student.grade || 'N/A'})${feeDisplay}</span><div class="flex items-center space-x-2">${editDeleteButtons}</div></li>`;
@@ -848,16 +849,23 @@ function renderSelectedTutorDetailsFromCache(tutorId) {
             <div class="grid grid-cols-1 md:grid-cols-2 gap-6 border-t pt-4">
                 <div class="add-student-form space-y-2">
                     <h5 class="font-semibold text-gray-700">Add/Edit Student Details:</h5>
-                    <input type="text" id="new-parent-name" class="w-full p-2 border rounded" placeholder="Parent Name"><input type="text" id="new-student-name" class="w-full p-2 border rounded" placeholder="Student Name"><select id="new-student-grade" class="w-full p-2 border rounded"><option value="">Select Grade</option>${gradeOptions}</select>
-                    <input type="text" id="new-student-subjects" class="w-full p-2 border rounded" placeholder="Subject(s) (e.g., Math, English)"><select id="new-student-days" class="w-full p-2 border rounded"><option value="">Select Days per Week</option>${dayOptions}</select>
-                    <input type="number" id="new-student-fee" class="w-full p-2 border rounded" placeholder="Student Fee (₦)"><button id="add-student-btn" class="bg-green-600 text-white w-full px-4 py-2 rounded hover:bg-green-700">Add Student</button>
+                    <input type="text" id="new-parent-name" class="w-full p-2 border rounded" placeholder="Parent Name">
+                    <input type="text" id="new-parent-phone" class="w-full p-2 border rounded" placeholder="Parent Phone Number">
+                    <input type="text" id="new-student-name" class="w-full p-2 border rounded" placeholder="Student Name">
+                    <select id="new-student-grade" class="w-full p-2 border rounded"><option value="">Select Grade</option>${gradeOptions}</select>
+                    <input type="text" id="new-student-subjects" class="w-full p-2 border rounded" placeholder="Subject(s) (e.g., Math, English)">
+                    <select id="new-student-days" class="w-full p-2 border rounded"><option value="">Select Days per Week</option>${dayOptions}</select>
+                    <input type="number" id="new-student-fee" class="w-full p-2 border rounded" placeholder="Student Fee (₦)">
+                    <button id="add-student-btn" class="bg-green-600 text-white w-full px-4 py-2 rounded hover:bg-green-700">Add Student</button>
                 </div>
  
                  <div class="import-students-form">
-                    <h5 class="font-semibold text-gray-700">Import Students for ${tutor.name}:</h5><p class="text-xs text-gray-500 mb-2">Upload a .csv or .xlsx file with columns: <strong>Parent Name, Student Name, Grade, Subjects, Days, Fee</strong></p>
+                    <h5 class="font-semibold text-gray-700">Import Students for ${tutor.name}:</h5>
+                    <p class="text-xs text-gray-500 mb-2">Upload a .csv or .xlsx file with columns: <strong>Parent Name, Parent phone No, Student Name, Grade, Subjects, Days, Fee</strong></p>
                     <input type="file" id="student-import-file" class="w-full text-sm border rounded p-1" accept=".csv, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/vnd.ms-excel">
            
-                  <button id="import-students-btn" class="bg-blue-600 text-white w-full px-4 py-2 rounded mt-2 hover:bg-blue-700">Import Students</button><p id="import-status" class="text-sm mt-2"></p>
+                  <button id="import-students-btn" class="bg-blue-600 text-white w-full px-4 py-2 rounded mt-2 hover:bg-blue-700">Import Students</button>
+                  <p id="import-status" class="text-sm mt-2"></p>
                 </div>
             </div>
         </div>`;
@@ -889,9 +897,14 @@ function renderSelectedTutorDetailsFromCache(tutorId) {
         const btn = e.currentTarget;
         const editingId = btn.dataset.editingId;
         const studentData = {
-            parentName: document.getElementById('new-parent-name').value, studentName: document.getElementById('new-student-name').value,
-            grade: document.getElementById('new-student-grade').value, subjects: document.getElementById('new-student-subjects').value.split(',').map(s => s.trim()),
-            days: document.getElementById('new-student-days').value, studentFee: parseFloat(document.getElementById('new-student-fee').value), tutorEmail: tutor.email,
+            parentName: document.getElementById('new-parent-name').value,
+            parentPhone: document.getElementById('new-parent-phone').value,
+            studentName: document.getElementById('new-student-name').value,
+            grade: document.getElementById('new-student-grade').value,
+            subjects: document.getElementById('new-student-subjects').value.split(',').map(s => s.trim()),
+            days: document.getElementById('new-student-days').value,
+            studentFee: parseFloat(document.getElementById('new-student-fee').value),
+            tutorEmail: tutor.email,
         };
       
          if (studentData.studentName && studentData.grade && !isNaN(studentData.studentFee)) {
@@ -915,6 +928,7 @@ function renderSelectedTutorDetailsFromCache(tutorId) {
         btn.addEventListener('click', (e) => {
             const data = e.currentTarget.dataset;
             document.getElementById('new-parent-name').value = data.parentName;
+            document.getElementById('new-parent-phone').value = data.parentPhone || '';
             document.getElementById('new-student-name').value = data.studentName;
             document.getElementById('new-student-grade').value = data.grade;
             document.getElementById('new-student-subjects').value = data.subjects;
@@ -966,10 +980,15 @@ async function handleStudentImport(tutor) {
             json.forEach(row => {
                 const studentDocRef = doc(collection(db, "students"));
                 const studentData = {
-                    parentName: row['Parent Name'] || '', studentName: row['Student Name'], grade: row['Grade'],
+                    parentName: row['Parent Name'] || '',
+                    parentPhone: row['Parent phone No'] || '',
+                    studentName: row['Student Name'],
+                    grade: row['Grade'],
                     subjects: (row['Subjects'] || '').toString().split(',').map(s => s.trim()), 
                     days: row['Days'],
-                    studentFee: parseFloat(row['Fee']), tutorEmail: tutor.email, summerBreak: false
+                    studentFee: parseFloat(row['Fee']),
+                    tutorEmail: tutor.email,
+                    summerBreak: false
                 };
                 if (!studentData.studentName || isNaN(studentData.studentFee)) return;
                 batch.set(studentDocRef, studentData);
@@ -1436,4 +1455,5 @@ onAuthStateChanged(auth, async (user) => {
 
 
 // [End Updated admin.js File]
+
 
