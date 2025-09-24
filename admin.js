@@ -980,15 +980,15 @@ async function handleStudentImport(tutor) {
             json.forEach(row => {
                 const studentDocRef = doc(collection(db, "students"));
                 const studentData = {
-                    parentName: row['Parent Name'] || '',
-                    parentPhone: row['Parent phone No'] || '',
-                    studentName: row['Student Name'],
-                    grade: row['Grade'],
-                    subjects: (row['Subjects'] || '').toString().split(',').map(s => s.trim()), 
-                    days: row['Days'],
-                    studentFee: parseFloat(row['Fee']),
-                    tutorEmail: tutor.email,
-                    summerBreak: false
+                    parentName: row['parentName'] || '',
+    parentPhone: row['parentPhone'] || '',
+    studentName: row['studentName'],
+    grade: row['grade'],
+    subjects: (row['subjects'] || '').toString().split(',').map(s => s.trim()), 
+    days: row['days'],
+    studentFee: parseFloat(row['studentFee']),
+    tutorEmail: tutor.email,
+    summerBreak: false
                 };
                 if (!studentData.studentName || isNaN(studentData.studentFee)) return;
                 batch.set(studentDocRef, studentData);
@@ -1455,5 +1455,6 @@ onAuthStateChanged(auth, async (user) => {
 
 
 // [End Updated admin.js File]
+
 
 
