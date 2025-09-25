@@ -865,7 +865,7 @@ function renderBreakStudentsFromCache() {
 // # REPORT GENERATION & ZIPPING
 // ##################################
 
-// ##### UPDATED/IMPROVED FUNCTION #####
+// ##### CORRECTED AND FINALIZED FUNCTION #####
 async function generateReportHTML(reportId) {
     const reportDoc = await getDoc(doc(db, "tutor_submissions", reportId));
     if (!reportDoc.exists()) throw new Error("Report not found!");
@@ -883,7 +883,9 @@ async function generateReportHTML(reportId) {
 
     // Generate the HTML for each section, ensuring "N/A" for empty content
     const sectionsHTML = Object.entries(reportSections).map(([title, content]) => {
-        const displayContent = (content && content.trim() !== '') ? content.replace(/\n/g, '<br>') : 'N/A';
+        // Sanitize content to prevent HTML injection and format newlines
+        const sanitizedContent = content ? String(content).replace(/</g, "&lt;").replace(/>/g, "&gt;") : '';
+        const displayContent = (sanitizedContent && sanitizedContent.trim() !== '') ? sanitizedContent.replace(/\n/g, '<br>') : 'N/A';
         return `
             <div class="report-section">
                 <h2>${title}</h2>
@@ -961,7 +963,7 @@ async function generateReportHTML(reportId) {
     return { html: reportTemplate, reportData: reportData };
 }
 
-// ##### UPDATED/IMPROVED FUNCTION #####
+
 async function viewReportInNewTab(reportId, shouldDownload = false) {
     try {
         const { html, reportData } = await generateReportHTML(reportId);
@@ -1105,3 +1107,4 @@ onAuthStateChanged(auth, async (user) => {
 
 
 // [End Updated management.js File]
+
