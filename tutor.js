@@ -392,10 +392,26 @@ async function renderStudentDatabase(container, tutor) {
     const studentQuery = query(collection(db, "students"), where("tutorEmail", "==", tutor.email));
     const pendingStudentQuery = query(collection(db, "pending_students"), where("tutorEmail", "==", tutor.email));
 
-    const [studentsSnapshot, pendingStudentsSnapshot] = await Promise.all([
+    // NEW: Fetch reports submitted in the current month to block re-submission
+    const now = new Date();
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
+
+    const submissionsQuery = query(
+        collection(db, "tutor_submissions"),
+        where("tutorEmail", "==", tutor.email),
+        where("submittedAt", ">=", startOfMonth),
+        where("submittedAt", "<=", endOfMonth)
+    );
+
+    const [studentsSnapshot, pendingStudentsSnapshot, submissionsSnapshot] = await Promise.all([
         getDocs(studentQuery),
-        getDocs(pendingStudentQuery)
+        getDocs(pendingStudentQuery),
+        getDocs(submissionsQuery)
     ]);
+
+    const submittedStudentIds = new Set(submissionsSnapshot.docs.map(doc => doc.data().studentId));
+    
     const approvedStudents = studentsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data(), isPending: false, collection: "students" }));
     const pendingStudents = pendingStudentsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data(), isPending: true, collection: "pending_students" }));
 
@@ -451,6 +467,7 @@ async function renderStudentDatabase(container, tutor) {
             students.forEach(student => {
                 const isStudentOnBreak = student.summerBreak;
                 const isReportSaved = savedReports[student.id];
+                const hasSubmittedThisMonth = submittedStudentIds.has(student.id);
 
                 // NEW: Check global settings to show fees
                 const feeDisplay = showStudentFees ? `<div class="text-xs text-gray-500">Fee: ₦${(student.studentFee || 0).toLocaleString()}</div>` : '';
@@ -464,7 +481,11 @@ async function renderStudentDatabase(container, tutor) {
                 if (student.isPending) {
                     statusHTML = `<span class="status-indicator text-yellow-600 font-semibold">Awaiting Approval</span>`;
                     actionsHTML = `<span class="text-gray-400">No actions available</span>`;
-                } else {
+                } else if (hasSubmittedThisMonth) {
+                    statusHTML = `<span class="status-indicator text-blue-600 font-semibold">Report Submitted</span>`;
+                    actionsHTML = `<span class="text-gray-400">Submitted this month</span>`;
+                }
+                else {
                     statusHTML = `<span class="status-indicator ${isReportSaved ? 'text-green-600 font-semibold' : 'text-gray-500'}">${isReportSaved ? 'Report Saved' : 'Pending Report'}</span>`;
 
                     if (isSummerBreakEnabled && !isStudentOnBreak) {
@@ -518,8 +539,9 @@ async function renderStudentDatabase(container, tutor) {
             }
 
             if (approvedStudents.length > 1 && isSubmissionEnabled) {
-                const submittableStudents = approvedStudents.filter(s => !s.summerBreak).length;
-                const allReportsSaved = Object.keys(savedReports).length === submittableStudents;
+                const submittableStudents = approvedStudents.filter(s => !s.summerBreak && !submittedStudentIds.has(s.id)).length;
+                const allReportsSaved = Object.keys(savedReports).length >= submittableStudents && submittableStudents > 0;
+                
                 studentsHTML += `
                     <div class="mt-6 text-right">
                         <button id="submit-all-reports-btn" class="bg-green-700 text-white px-6 py-3 rounded-lg font-bold ${!allReportsSaved ? 'opacity-50 cursor-not-allowed' : 'hover:bg-green-800'}" ${!allReportsSaved ? 'disabled' : ''}>
@@ -709,7 +731,8 @@ async function renderStudentDatabase(container, tutor) {
             clearAllReportsFromLocalStorage(tutor.email);
             showCustomAlert(`Successfully submitted ${reportsArray.length} report(s)!`);
             savedReports = {};
-            renderUI();
+            // RE-RENDER THE UI to reflect the new "Submitted" status immediately.
+            renderStudentDatabase(container, tutor); 
         } catch (error) {
             console.error("Error submitting reports:", error);
             showCustomAlert(`Error: ${error.message}`);
@@ -911,3 +934,4 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     });
 });
+
