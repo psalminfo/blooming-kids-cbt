@@ -186,7 +186,7 @@ function getNewStudentFormFields() {
     const subjectsByCategory = {
         "Academics": ["Math", "Language Arts", "Geography", "Science", "Biology", "Physics", "Chemistry", "Microbiology"],
         "Pre-College Exams": ["SAT", "IGCSE", "A-Levels", "SSCE", "JAMB"],
-        "Languages": ["French", "German", "Spanish", "Yoruba", "Igbo", "Hausa"],
+        "Languages": ["French", "German", "Spanish", "Yoruba", "Igbo", "Hausa", "Arabic"],
         "Tech Courses": ["Coding", "Stop motion animation", "YouTube for kids", "Graphic design", "Videography", "Comic/book creation", "Artificial Intelligence", "Chess"],
         "Support Programs": ["Bible study", "Child counseling programs", "Speech therapy", "Behavioral therapy", "Public speaking", "Adult education", "Communication skills"]
     };
@@ -257,7 +257,7 @@ function showEditStudentModal(student) {
     const subjectsByCategory = {
         "Academics": ["Math", "Language Arts", "Geography", "Science", "Biology", "Physics", "Chemistry", "Microbiology"],
         "Pre-College Exams": ["SAT", "IGCSE", "A-Levels", "SSCE", "JAMB"],
-        "Languages": ["French", "German", "Spanish", "Yoruba", "Igbo", "Hausa"],
+        "Languages": ["French", "German", "Spanish", "Yoruba", "Igbo", "Hausa", "Arabic"],
         "Tech Courses": ["Coding", "Stop motion animation", "YouTube for kids", "Graphic design", "Videography", "Comic/book creation", "Artificial Intelligence", "Chess"],
         "Support Programs": ["Bible study", "Child counseling programs", "Speech therapy", "Behavioral therapy", "Public speaking", "Adult education", "Communication skills"]
     };
@@ -571,14 +571,71 @@ async function renderStudentDatabase(container, tutor) {
 
             reportModal.remove();
 
+            // MODIFICATION: Instead of proceeding directly, show the fee confirmation modal.
+            showFeeConfirmationModal(student, reportData);
+        });
+    }
+
+    // NEW FUNCTION: Fee confirmation modal
+    function showFeeConfirmationModal(student, reportData) {
+        const feeConfirmationHTML = `
+            <h3 class="text-xl font-bold mb-4">Confirm Fee for ${student.studentName}</h3>
+            <p class="text-sm text-gray-600 mb-4">Please verify the monthly fee for this student before saving the report. You can make corrections if needed.</p>
+            <div class="space-y-4">
+                <div>
+                    <label class="block font-semibold">Current Fee (₦)</label>
+                    <input type="number" id="confirm-student-fee" class="w-full mt-1 p-2 border rounded" 
+                           value="${student.studentFee || 0}" 
+                           placeholder="Enter fee amount">
+                </div>
+                <div class="flex justify-end space-x-2 mt-6">
+                    <button id="cancel-fee-confirm-btn" class="bg-gray-500 text-white px-6 py-2 rounded">Cancel</button>
+                    <button id="confirm-fee-btn" class="bg-green-600 text-white px-6 py-2 rounded">Confirm Fee & Save</button>
+                </div>
+            </div>`;
+
+        const feeModal = document.createElement('div');
+        feeModal.className = 'fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex items-center justify-center z-50';
+        feeModal.innerHTML = `<div class="relative bg-white p-8 rounded-lg shadow-xl w-full max-w-lg mx-auto">${feeConfirmationHTML}</div>`;
+        document.body.appendChild(feeModal);
+
+        const isSingleApprovedStudent = approvedStudents.filter(s => !s.summerBreak).length === 1;
+
+        document.getElementById('cancel-fee-confirm-btn').addEventListener('click', () => feeModal.remove());
+        document.getElementById('confirm-fee-btn').addEventListener('click', async () => {
+            const newFeeValue = document.getElementById('confirm-student-fee').value;
+            const newFee = parseFloat(newFeeValue);
+
+            if (isNaN(newFee) || newFee < 0) {
+                showCustomAlert('Please enter a valid, non-negative fee amount.');
+                return;
+            }
+
+            // Check if the fee has changed
+            if (newFee !== student.studentFee) {
+                try {
+                    // Update the student's document in Firestore
+                    const studentRef = doc(db, student.collection, student.id);
+                    await updateDoc(studentRef, { studentFee: newFee });
+                    // Also update the local student object to reflect the change immediately
+                    student.studentFee = newFee; 
+                    showCustomAlert('Student fee has been updated successfully!');
+                } catch (error) {
+                    console.error("Error updating student fee:", error);
+                    showCustomAlert(`Failed to update fee: ${error.message}`);
+                }
+            }
+
+            feeModal.remove();
+
+            // Now, continue with the original logic from the report modal's listener
             if (isSingleApprovedStudent) {
                 showAccountDetailsModal([reportData]);
             } else {
                 savedReports[student.id] = reportData;
-                // Save to local storage
                 saveReportsToLocalStorage(tutor.email, savedReports);
                 showCustomAlert(`${student.studentName}'s report has been saved.`);
-                renderUI();
+                renderUI(); // Re-render to show updated status and possibly new fee if displayed
             }
         });
     }
