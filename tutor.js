@@ -385,36 +385,17 @@ async function renderStudentDatabase(container, tutor) {
         return;
     }
 
+    // Load saved reports from local storage instead of starting fresh
     let savedReports = loadReportsFromLocalStorage(tutor.email);
 
-    // Fetch students
+    // Fetch both approved and pending students
     const studentQuery = query(collection(db, "students"), where("tutorEmail", "==", tutor.email));
     const pendingStudentQuery = query(collection(db, "pending_students"), where("tutorEmail", "==", tutor.email));
-    
-    // --- START: MODIFICATION FOR REPORT STATUS ---
-    // Get start and end of the current month to check for submissions
-    const now = new Date();
-    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-    const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
 
-    // Query for reports submitted by this tutor within the current month
-    const submissionsThisMonthQuery = query(
-        collection(db, "tutor_submissions"),
-        where("tutorEmail", "==", tutor.email),
-        where("submittedAt", ">=", startOfMonth),
-        where("submittedAt", "<=", endOfMonth)
-    );
-
-    const [studentsSnapshot, pendingStudentsSnapshot, submissionsSnapshot] = await Promise.all([
+    const [studentsSnapshot, pendingStudentsSnapshot] = await Promise.all([
         getDocs(studentQuery),
-        getDocs(pendingStudentQuery),
-        getDocs(submissionsThisMonthQuery) // Fetch submissions concurrently
+        getDocs(pendingStudentQuery)
     ]);
-
-    // Create a Set of student IDs for whom reports have been sent this month
-    const submittedStudentIds = new Set(submissionsSnapshot.docs.map(doc => doc.data().studentId));
-    // --- END: MODIFICATION FOR REPORT STATUS ---
-
     const approvedStudents = studentsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data(), isPending: false, collection: "students" }));
     const pendingStudents = pendingStudentsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data(), isPending: true, collection: "pending_students" }));
 
@@ -468,12 +449,10 @@ async function renderStudentDatabase(container, tutor) {
                         <tbody class="bg-white divide-y divide-gray-200">`;
             
             students.forEach(student => {
-                // --- START: MODIFICATION FOR REPORT STATUS ---
-                const hasSubmittedThisMonth = submittedStudentIds.has(student.id);
-                // --- END: MODIFICATION FOR REPORT STATUS ---
                 const isStudentOnBreak = student.summerBreak;
                 const isReportSaved = savedReports[student.id];
 
+                // NEW: Check global settings to show fees
                 const feeDisplay = showStudentFees ? `<div class="text-xs text-gray-500">Fee: ₦${(student.studentFee || 0).toLocaleString()}</div>` : '';
                 
                 let statusHTML = '';
@@ -485,11 +464,6 @@ async function renderStudentDatabase(container, tutor) {
                 if (student.isPending) {
                     statusHTML = `<span class="status-indicator text-yellow-600 font-semibold">Awaiting Approval</span>`;
                     actionsHTML = `<span class="text-gray-400">No actions available</span>`;
-                // --- START: MODIFICATION FOR REPORT STATUS ---
-                } else if (hasSubmittedThisMonth) {
-                    statusHTML = `<span class="status-indicator text-blue-600 font-semibold">Report Sent</span>`;
-                    actionsHTML = `<span class="text-gray-400">Submitted this month</span>`;
-                // --- END: MODIFICATION FOR REPORT STATUS ---
                 } else {
                     statusHTML = `<span class="status-indicator ${isReportSaved ? 'text-green-600 font-semibold' : 'text-gray-500'}">${isReportSaved ? 'Report Saved' : 'Pending Report'}</span>`;
 
@@ -509,6 +483,7 @@ async function renderStudentDatabase(container, tutor) {
                         actionsHTML += `<span class="text-gray-400">Submission Disabled</span>`;
                     }
                     
+                    // NEW: Add Edit/Delete buttons if enabled by admin
                     if (showEditDeleteButtons && !isStudentOnBreak) {
                         actionsHTML += `<button class="edit-student-btn-tutor bg-blue-500 text-white px-3 py-1 rounded" data-student-id="${student.id}" data-collection="${student.collection}">Edit</button>`;
                         actionsHTML += `<button class="delete-student-btn-tutor bg-red-500 text-white px-3 py-1 rounded" data-student-id="${student.id}" data-collection="${student.collection}">Delete</button>`;
@@ -541,23 +516,17 @@ async function renderStudentDatabase(container, tutor) {
                         </div>
                     </div>`;
             }
-            
-            // --- START: MODIFICATION FOR SUBMIT ALL BUTTON LOGIC ---
+
             if (approvedStudents.length > 1 && isSubmissionEnabled) {
-                // Only count students who haven't had a report submitted this month and are not on break
-                const submittableStudents = approvedStudents.filter(s => !s.summerBreak && !submittedStudentIds.has(s.id)).length;
-                const allReportsSaved = Object.keys(savedReports).length === submittableStudents && submittableStudents > 0;
-                
-                if (submittableStudents > 0) { // Only show the button if there are reports left to submit
-                    studentsHTML += `
-                        <div class="mt-6 text-right">
-                            <button id="submit-all-reports-btn" class="bg-green-700 text-white px-6 py-3 rounded-lg font-bold ${!allReportsSaved ? 'opacity-50 cursor-not-allowed' : 'hover:bg-green-800'}" ${!allReportsSaved ? 'disabled' : ''}>
-                                Submit All Reports
-                            </button>
-                        </div>`;
-                }
+                const submittableStudents = approvedStudents.filter(s => !s.summerBreak).length;
+                const allReportsSaved = Object.keys(savedReports).length === submittableStudents;
+                studentsHTML += `
+                    <div class="mt-6 text-right">
+                        <button id="submit-all-reports-btn" class="bg-green-700 text-white px-6 py-3 rounded-lg font-bold ${!allReportsSaved ? 'opacity-50 cursor-not-allowed' : 'hover:bg-green-800'}" ${!allReportsSaved ? 'disabled' : ''}>
+                            Submit All Reports
+                        </button>
+                    </div>`;
             }
-            // --- END: MODIFICATION FOR SUBMIT ALL BUTTON LOGIC ---
         }
         container.innerHTML = `<div id="student-list-view" class="bg-white p-6 rounded-lg shadow-md">${studentsHTML}</div>`;
         attachEventListeners();
@@ -565,7 +534,7 @@ async function renderStudentDatabase(container, tutor) {
 
     function showReportModal(student) {
         const existingReport = savedReports[student.id] || {};
-        const isSingleApprovedStudent = approvedStudents.filter(s => !s.summerBreak && !submittedStudentIds.has(s.id)).length === 1;
+        const isSingleApprovedStudent = approvedStudents.filter(s => !s.summerBreak).length === 1;
         
         const reportFormHTML = `
             <h3 class="text-xl font-bold mb-4">Monthly Report for ${student.studentName}</h3>
@@ -601,10 +570,13 @@ async function renderStudentDatabase(container, tutor) {
             };
 
             reportModal.remove();
+
+            // MODIFICATION: Instead of proceeding directly, show the fee confirmation modal.
             showFeeConfirmationModal(student, reportData);
         });
     }
 
+    // NEW FUNCTION: Fee confirmation modal
     function showFeeConfirmationModal(student, reportData) {
         const feeConfirmationHTML = `
             <h3 class="text-xl font-bold mb-4">Confirm Fee for ${student.studentName}</h3>
@@ -627,7 +599,7 @@ async function renderStudentDatabase(container, tutor) {
         feeModal.innerHTML = `<div class="relative bg-white p-8 rounded-lg shadow-xl w-full max-w-lg mx-auto">${feeConfirmationHTML}</div>`;
         document.body.appendChild(feeModal);
 
-        const isSingleApprovedStudent = approvedStudents.filter(s => !s.summerBreak && !submittedStudentIds.has(s.id)).length === 1;
+        const isSingleApprovedStudent = approvedStudents.filter(s => !s.summerBreak).length === 1;
 
         document.getElementById('cancel-fee-confirm-btn').addEventListener('click', () => feeModal.remove());
         document.getElementById('confirm-fee-btn').addEventListener('click', async () => {
@@ -639,10 +611,13 @@ async function renderStudentDatabase(container, tutor) {
                 return;
             }
 
+            // Check if the fee has changed
             if (newFee !== student.studentFee) {
                 try {
+                    // Update the student's document in Firestore
                     const studentRef = doc(db, student.collection, student.id);
                     await updateDoc(studentRef, { studentFee: newFee });
+                    // Also update the local student object to reflect the change immediately
                     student.studentFee = newFee; 
                     showCustomAlert('Student fee has been updated successfully!');
                 } catch (error) {
@@ -653,13 +628,14 @@ async function renderStudentDatabase(container, tutor) {
 
             feeModal.remove();
 
+            // Now, continue with the original logic from the report modal's listener
             if (isSingleApprovedStudent) {
                 showAccountDetailsModal([reportData]);
             } else {
                 savedReports[student.id] = reportData;
                 saveReportsToLocalStorage(tutor.email, savedReports);
                 showCustomAlert(`${student.studentName}'s report has been saved.`);
-                renderUI(); 
+                renderUI(); // Re-render to show updated status and possibly new fee if displayed
             }
         });
     }
@@ -729,13 +705,11 @@ async function renderStudentDatabase(container, tutor) {
 
         try {
             await batch.commit();
+            // Clear local storage after successful submission
             clearAllReportsFromLocalStorage(tutor.email);
             showCustomAlert(`Successfully submitted ${reportsArray.length} report(s)!`);
-            // --- START: MODIFICATION ---
-            // Instead of just clearing local state, we re-run the main render function
-            // to fetch the new submission status from Firestore and update the UI correctly.
-            await renderStudentDatabase(container, tutor);
-            // --- END: MODIFICATION ---
+            savedReports = {};
+            renderUI();
         } catch (error) {
             console.error("Error submitting reports:", error);
             showCustomAlert(`Error: ${error.message}`);
@@ -755,6 +729,7 @@ async function renderStudentDatabase(container, tutor) {
     }
 
     function attachEventListeners() {
+        // Add new student
         if (isTutorAddEnabled) {
             document.getElementById('add-student-btn').addEventListener('click', async () => {
                 const parentName = document.getElementById('new-parent-name').value.trim();
@@ -803,6 +778,7 @@ async function renderStudentDatabase(container, tutor) {
             });
         }
 
+        // Enter/edit report
         document.querySelectorAll('.enter-report-btn').forEach(btn => {
             btn.addEventListener('click', () => {
                 const studentId = btn.getAttribute('data-student-id');
@@ -811,6 +787,7 @@ async function renderStudentDatabase(container, tutor) {
             });
         });
 
+        // Submit single report
         document.querySelectorAll('.submit-single-report-btn').forEach(btn => {
             btn.addEventListener('click', () => {
                 const studentId = btn.getAttribute('data-student-id');
@@ -819,6 +796,7 @@ async function renderStudentDatabase(container, tutor) {
             });
         });
 
+        // Summer break
         document.querySelectorAll('.summer-break-btn').forEach(btn => {
             btn.addEventListener('click', async () => {
                 const studentId = btn.getAttribute('data-student-id');
@@ -830,6 +808,7 @@ async function renderStudentDatabase(container, tutor) {
             });
         });
 
+        // Submit all reports
         const submitAllBtn = document.getElementById('submit-all-reports-btn');
         if (submitAllBtn) {
             submitAllBtn.addEventListener('click', () => {
@@ -838,6 +817,7 @@ async function renderStudentDatabase(container, tutor) {
             });
         }
 
+        // Save management fee
         const saveFeeBtn = document.getElementById('save-management-fee-btn');
         if (saveFeeBtn) {
             saveFeeBtn.addEventListener('click', async () => {
@@ -853,6 +833,7 @@ async function renderStudentDatabase(container, tutor) {
             });
         }
         
+        // NEW: Edit student button
         document.querySelectorAll('.edit-student-btn-tutor').forEach(btn => {
             btn.addEventListener('click', () => {
                 const studentId = btn.getAttribute('data-student-id');
@@ -864,6 +845,7 @@ async function renderStudentDatabase(container, tutor) {
             });
         });
 
+        // NEW: Delete student button
         document.querySelectorAll('.delete-student-btn-tutor').forEach(btn => {
             btn.addEventListener('click', async () => {
                 const studentId = btn.getAttribute('data-student-id');
