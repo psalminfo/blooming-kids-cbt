@@ -865,24 +865,119 @@ function renderBreakStudentsFromCache() {
 // # REPORT GENERATION & ZIPPING
 // ##################################
 
+// ##### UPDATED/IMPROVED FUNCTION #####
 async function generateReportHTML(reportId) {
     const reportDoc = await getDoc(doc(db, "tutor_submissions", reportId));
     if (!reportDoc.exists()) throw new Error("Report not found!");
     const reportData = reportDoc.data();
-    
+
+    // Define the sections to be displayed in the report
+    const reportSections = {
+        "INTRODUCTION": reportData.introduction,
+        "TOPICS & REMARKS": reportData.topics,
+        "PROGRESS & ACHIEVEMENTS": reportData.progress,
+        "STRENGTHS AND WEAKNESSES": reportData.strengthsWeaknesses,
+        "RECOMMENDATIONS": reportData.recommendations,
+        "GENERAL TUTOR'S COMMENTS": reportData.generalComments
+    };
+
+    // Generate the HTML for each section, ensuring "N/A" for empty content
+    const sectionsHTML = Object.entries(reportSections).map(([title, content]) => {
+        const displayContent = (content && content.trim() !== '') ? content.replace(/\n/g, '<br>') : 'N/A';
+        return `
+            <div class="report-section">
+                <h2>${title}</h2>
+                <p>${displayContent}</p>
+            </div>
+        `;
+    }).join('');
+
     const logoUrl = "https://res.cloudinary.com/dy2hxcyaf/image/upload/v1757700806/newbhlogo_umwqzy.svg";
-    const reportTemplate = `<div style="font-family: Arial, sans-serif; padding: 2rem; max-width: 800px; margin: auto;"><div style="text-align: center; margin-bottom: 2rem;"><img src="${logoUrl}" alt="Company Logo" style="height: 80px;"><h3 style="font-size: 1.8rem; font-weight: bold; color: #15803d; margin: 0;">Blooming Kids House</h3><h1 style="font-size: 1.2rem; font-weight: bold; color: #166534;">MONTHLY LEARNING REPORT</h1><p>Date: ${new Date(reportData.submittedAt.seconds * 1000).toLocaleDateString()}</p></div><div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 2rem;"><p><strong>Student's Name:</strong> ${reportData.studentName}</p><p><strong>Parent's Name:</strong> ${reportData.parentName || 'N/A'}</p><p><strong>Parent's Phone:</strong> ${reportData.parentPhone || 'N/A'}</p><p><strong>Grade:</strong> ${reportData.grade}</p><p><strong>Tutor's Name:</strong> ${reportData.tutorName}</p></div>${Object.entries({"INTRODUCTION": reportData.introduction, "TOPICS & REMARKS": reportData.topics, "PROGRESS & ACHIEVEMENTS": reportData.progress, "STRENGTHS AND WEAKNESSES": reportData.strengthsWeaknesses, "RECOMMENDATIONS": reportData.recommendations, "GENERAL TUTOR'S COMMENTS": reportData.generalComments}).map(([title, content]) => `<div style="border-top: 1px solid #d1d5db; padding-top: 1rem; margin-top: 1rem;"><h2 style="font-size: 1.25rem; font-weight: bold; color: #16a34a;">${title}</h2><p style="line-height: 1.6; white-space: pre-wrap;">${content || 'N/A'}</p></div>`).join('')}<div style="margin-top: 3rem; text-align: right;"><p>Best regards,</p><p style="font-weight: bold;">${reportData.tutorName}</p></div></div>`;
+    const reportTemplate = `
+        <html>
+        <head>
+            <style>
+                body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; color: #333; }
+                .report-container { max-width: 800px; margin: auto; padding: 20px; }
+                .header { text-align: center; margin-bottom: 40px; }
+                .header img { height: 80px; }
+                .header h1 { color: #166534; margin: 0; font-size: 24px; }
+                .header h2 { color: #15803d; margin: 10px 0; font-size: 28px; }
+                .header p { margin: 5px 0; color: #555; }
+                .student-info { 
+                    display: grid; 
+                    grid-template-columns: 1fr 1fr; 
+                    gap: 10px 20px; 
+                    margin-bottom: 30px; 
+                    background-color: #f9f9f9;
+                    border: 1px solid #eee;
+                    padding: 15px;
+                    border-radius: 8px;
+                }
+                .student-info p { margin: 5px 0; }
+                .report-section {
+                    page-break-inside: avoid; /* CRITICAL: Prevents section from splitting across pages */
+                    margin-bottom: 20px;
+                    border: 1px solid #e5e7eb;
+                    padding: 15px;
+                    border-radius: 8px;
+                }
+                .report-section h2 { 
+                    font-size: 18px; 
+                    font-weight: bold; 
+                    color: #16a34a; 
+                    margin-top: 0; 
+                    padding-bottom: 8px;
+                    border-bottom: 2px solid #d1fae5;
+                }
+                .report-section p { line-height: 1.6; white-space: pre-wrap; margin-top: 0; }
+                .footer { text-align: right; margin-top: 40px; }
+            </style>
+        </head>
+        <body>
+            <div class="report-container">
+                <div class="header">
+                    <img src="${logoUrl}" alt="Company Logo">
+                    <h2>Blooming Kids House</h2>
+                    <h1>MONTHLY LEARNING REPORT</h1>
+                    <p>Date: ${new Date(reportData.submittedAt.seconds * 1000).toLocaleDateString()}</p>
+                </div>
+                <div class="student-info">
+                    <p><strong>Student's Name:</strong> ${reportData.studentName || 'N/A'}</p>
+                    <p><strong>Parent's Name:</strong> ${reportData.parentName || 'N/A'}</p>
+                    <p><strong>Parent's Phone:</strong> ${reportData.parentPhone || 'N/A'}</p>
+                    <p><strong>Grade:</strong> ${reportData.grade || 'N/A'}</p>
+                    <p><strong>Tutor's Name:</strong> ${reportData.tutorName || 'N/A'}</p>
+                </div>
+                ${sectionsHTML}
+                <div class="footer">
+                    <p>Best regards,</p>
+                    <p><strong>${reportData.tutorName || 'N/A'}</strong></p>
+                </div>
+            </div>
+        </body>
+        </html>
+    `;
     return { html: reportTemplate, reportData: reportData };
 }
 
+// ##### UPDATED/IMPROVED FUNCTION #####
 async function viewReportInNewTab(reportId, shouldDownload = false) {
     try {
         const { html, reportData } = await generateReportHTML(reportId);
+
         if (shouldDownload) {
-            html2pdf().from(html).save(`${reportData.studentName}_report.pdf`);
+             const options = {
+                margin:       0.5,
+                filename:     `${reportData.studentName}_report.pdf`,
+                image:        { type: 'jpeg', quality: 0.98 },
+                html2canvas:  { scale: 2, useCORS: true },
+                jsPDF:        { unit: 'in', format: 'letter', orientation: 'portrait' }
+            };
+            html2pdf().from(html).set(options).save();
         } else {
             const newWindow = window.open();
-            newWindow.document.write(`<html><head><title>${reportData.studentName} Report</title></head><body>${html}</body></html>`);
+            newWindow.document.write(html);
             newWindow.document.close();
         }
     } catch (error) {
@@ -890,6 +985,7 @@ async function viewReportInNewTab(reportId, shouldDownload = false) {
         alert(`Error: ${error.message}`);
     }
 }
+
 
 async function zipAndDownloadTutorReports(reports, tutorName, buttonElement) {
     const originalButtonText = buttonElement.textContent;
@@ -901,7 +997,13 @@ async function zipAndDownloadTutorReports(reports, tutorName, buttonElement) {
         let filesGenerated = 0;
         const reportGenerationPromises = reports.map(async (report) => {
             const { html, reportData } = await generateReportHTML(report.id);
-            const pdfBlob = await html2pdf().from(html).output('blob');
+            // Use the same improved options for consistency
+            const options = {
+                image:        { type: 'jpeg', quality: 0.98 },
+                html2canvas:  { scale: 2, useCORS: true },
+                jsPDF:        { unit: 'in', format: 'letter', orientation: 'portrait' }
+            };
+            const pdfBlob = await html2pdf().from(html).set(options).output('blob');
             filesGenerated++;
             buttonElement.textContent = `Zipping... (${Math.round((filesGenerated / reports.length) * 100)}%)`;
             return { name: `${reportData.studentName}_Report_${report.id.substring(0,5)}.pdf`, blob: pdfBlob };
@@ -1003,4 +1105,3 @@ onAuthStateChanged(auth, async (user) => {
 
 
 // [End Updated management.js File]
-
