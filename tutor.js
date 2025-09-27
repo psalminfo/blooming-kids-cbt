@@ -187,7 +187,7 @@ function getNewStudentFormFields() {
         "Academics": ["Math", "Language Arts", "Geography", "Science", "Biology", "Physics", "Chemistry", "Microbiology"],
         "Pre-College Exams": ["SAT", "IGCSE", "A-Levels", "SSCE", "JAMB"],
         "Languages": ["French", "German", "Spanish", "Yoruba", "Igbo", "Hausa", "Arabic"],
-        "Tech Courses": ["Coding", "Stop motion animation", "YouTube for kids", "Graphic design", "Videography", "Comic/book creation", "Artificial Intelligence", "Chess"],
+        "Tech Courses": ["Coding", "Stop motion animation", "Computer Appreciation", "Animation", "YouTube for kids", "Graphic design", "Videography", "Comic/book creation", "Artificial Intelligence", "Chess"],
         "Support Programs": ["Bible study", "Child counseling programs", "Speech therapy", "Behavioral therapy", "Public speaking", "Adult education", "Communication skills"]
     };
 
@@ -258,7 +258,7 @@ function showEditStudentModal(student) {
         "Academics": ["Math", "Language Arts", "Geography", "Science", "Biology", "Physics", "Chemistry", "Microbiology"],
         "Pre-College Exams": ["SAT", "IGCSE", "A-Levels", "SSCE", "JAMB"],
         "Languages": ["French", "German", "Spanish", "Yoruba", "Igbo", "Hausa", "Arabic"],
-        "Tech Courses": ["Coding", "Stop motion animation", "YouTube for kids", "Graphic design", "Videography", "Comic/book creation", "Artificial Intelligence", "Chess"],
+        "Tech Courses": ["Coding", "Stop motion animation",  "Computer Appreciation", "Animation", "YouTube for kids", "Graphic design", "Videography", "Comic/book creation", "Artificial Intelligence", "Chess"],
         "Support Programs": ["Bible study", "Child counseling programs", "Speech therapy", "Behavioral therapy", "Public speaking", "Adult education", "Communication skills"]
     };
 
@@ -919,3 +919,4 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     });
 });
+
