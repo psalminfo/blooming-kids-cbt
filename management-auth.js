@@ -1,5 +1,5 @@
 import { auth, db } from './firebaseConfig.js';
-import { createUserWithEmailAndPassword, signInWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-auth.js";
+import { createUserWithEmailAndPassword, signInWithEmailAndPassword, sendPasswordResetEmail } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-auth.js";
 import { doc, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
 
 const signupBtn = document.getElementById('signup-btn');
@@ -54,6 +54,7 @@ signinBtn.addEventListener('click', async () => {
     const email = document.getElementById('signin-email').value;
     const password = document.getElementById('signin-password').value;
     errorMessage.textContent = '';
+    errorMessage.className = 'text-red-500 text-center mt-4'; // Reset class
 
     try {
         await signInWithEmailAndPassword(auth, email, password);
@@ -69,3 +70,33 @@ signinBtn.addEventListener('click', async () => {
         errorMessage.textContent = error.message;
     }
 });
+
+// Forgot Password Handler
+const forgotPasswordLink = document.getElementById('forgot-password-link');
+
+forgotPasswordLink.addEventListener('click', async (e) => {
+    e.preventDefault(); // Prevent the link from navigating
+    const email = document.getElementById('signin-email').value;
+
+    if (!email) {
+        const emailFromPrompt = prompt("Please enter your email address to reset your password:");
+        if (emailFromPrompt) {
+            await handlePasswordReset(emailFromPrompt);
+        }
+        return;
+    }
+    
+    await handlePasswordReset(email);
+});
+
+async function handlePasswordReset(email) {
+    errorMessage.textContent = '';
+    try {
+        await sendPasswordResetEmail(auth, email);
+        errorMessage.textContent = 'Password reset email sent! Check your inbox (and spam folder).';
+        errorMessage.className = 'text-green-600 text-center mt-4';
+    } catch (error) {
+        errorMessage.textContent = error.message;
+        errorMessage.className = 'text-red-500 text-center mt-4';
+    }
+}
