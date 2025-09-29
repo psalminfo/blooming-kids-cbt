@@ -24,10 +24,13 @@
                 <h2 class="text-xl font-semibold mb-4">Sign In</h2>
                 <input type="email" id="signin-email" placeholder="Email Address" class="w-full p-2 mb-4 border rounded">
                 <input type="password" id="signin-password" placeholder="Password" class="w-full p-2 mb-4 border rounded">
+                <div class="text-right mb-4">
+                    <a href="#" id="forgot-password-link" class="text-sm text-blue-600 hover:underline">Forgot Password?</a>
+                </div>
                 <button id="signin-btn" class="w-full bg-blue-600 text-white p-2 rounded hover:bg-blue-700">Sign In</button>
                 <p class="text-center mt-4 text-sm">Don't have an account? <a href="#" id="show-signup" class="text-blue-600 hover:underline">Sign Up</a></p>
             </div>
-            <p id="error-message" class="text-red-500 text-center mt-4"></p>
+            <p id="error-message" class="text-center mt-4"></p>
         </div>
     </div>
     <script type="module" src="management-auth.js"></script>
