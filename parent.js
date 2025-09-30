@@ -172,38 +172,60 @@ async function loadReport() {
                 const tutorReport = creativeWritingAnswer?.tutorReport || 'Pending review.';
 
                 const assessmentBlock = `
-                    <div class="border rounded-lg shadow mb-8 p-4 bg-white" id="assessment-block-${assessmentIndex}">
-                        <h2 class="text-xl font-bold mb-2">Assessment Report - ${fullName}</h2>
-                        <p><strong>Parent Phone:</strong> ${parentPhone}</p>
-                        <p><strong>Grade:</strong> ${session[0].grade}</p>
-                        <p><strong>Tutor:</strong> ${tutorName || 'N/A'}</p>
-                        <p><strong>Location:</strong> ${studentCountry || 'N/A'}</p>
-                        <p><strong>Assessment Date:</strong> ${formattedDate}</p>
+                    <div class="border rounded-lg shadow mb-8 p-6 bg-white" id="assessment-block-${assessmentIndex}">
+                        <!-- Logo Header -->
+                        <div class="text-center mb-6 border-b pb-4">
+                            <img src="https://res.cloudinary.com/dy2hxcyaf/image/upload/v1757700806/newbhlogo_umwqzy.svg" 
+                                 alt="Blooming Kids House Logo" 
+                                 class="h-16 w-auto mx-auto mb-3">
+                            <h2 class="text-2xl font-bold text-green-800">Assessment Report</h2>
+                            <p class="text-gray-600">Date: ${formattedDate}</p>
+                        </div>
+
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6 bg-green-50 p-4 rounded-lg">
+                            <div>
+                                <p><strong>Student's Name:</strong> ${fullName}</p>
+                                <p><strong>Parent's Phone:</strong> ${parentPhone}</p>
+                                <p><strong>Grade:</strong> ${session[0].grade}</p>
+                            </div>
+                            <div>
+                                <p><strong>Tutor:</strong> ${tutorName || 'N/A'}</p>
+                                <p><strong>Location:</strong> ${studentCountry || 'N/A'}</p>
+                            </div>
+                        </div>
                         
-                        <h3 class="text-lg font-semibold mt-4 mb-2">Performance Summary</h3>
+                        <h3 class="text-lg font-semibold mt-4 mb-2 text-green-700">Performance Summary</h3>
                         <table class="w-full text-sm mb-4 border border-collapse">
                             <thead class="bg-gray-100"><tr><th class="border px-2 py-1 text-left">Subject</th><th class="border px-2 py-1 text-center">Score</th></tr></thead>
                             <tbody>${tableRows}</tbody>
                         </table>
                         
-                        <h3 class="text-lg font-semibold mt-4 mb-2">Knowledge & Skill Analysis</h3>
+                        <h3 class="text-lg font-semibold mt-4 mb-2 text-green-700">Knowledge & Skill Analysis</h3>
                         <table class="w-full text-sm mb-4 border border-collapse">
                             <thead class="bg-gray-100"><tr><th class="border px-2 py-1 text-left">Subject</th><th class="border px-2 py-1 text-left">Topics Covered</th></tr></thead>
                             <tbody>${topicsTableRows}</tbody>
                         </table>
                         
-                        <h3 class="text-lg font-semibold mt-4 mb-2">Tutor's Recommendation</h3>
-                        <p class="mb-2">${recommendation}</p>
+                        <h3 class="text-lg font-semibold mt-4 mb-2 text-green-700">Tutor's Recommendation</h3>
+                        <p class="mb-2 text-gray-700 leading-relaxed">${recommendation}</p>
 
                         ${creativeWritingAnswer ? `
-                        <h3 class="text-lg font-semibold mt-4 mb-2">Creative Writing Feedback</h3>
-                        <p class="mb-2"><strong>Tutor's Report:</strong> ${tutorReport}</p>
+                        <h3 class="text-lg font-semibold mt-4 mb-2 text-green-700">Creative Writing Feedback</h3>
+                        <p class="mb-2 text-gray-700"><strong>Tutor's Report:</strong> ${tutorReport}</p>
                         ` : ''}
 
                         <canvas id="chart-${assessmentIndex}" class="w-full h-48 mb-4"></canvas>
-                        <h3 class="text-lg font-semibold mb-1">Director's Message</h3>
-                        <p class="italic text-sm">At Blooming Kids House, we are committed to helping every child succeed. We believe that with personalized support from our tutors, ${fullName} will unlock their full potential. Keep up the great work!<br/>– Mrs. Yinka Isikalu, Director</p>
-                        <div class="mt-4"><button onclick="downloadSessionReport(${assessmentIndex}, '${fullName}', 'assessment')" class="btn-yellow px-4 py-2 rounded">Download Assessment PDF</button></div>
+                        
+                        <div class="bg-yellow-50 p-4 rounded-lg mt-6">
+                            <h3 class="text-lg font-semibold mb-1 text-green-700">Director's Message</h3>
+                            <p class="italic text-sm text-gray-700">At Blooming Kids House, we are committed to helping every child succeed. We believe that with personalized support from our tutors, ${fullName} will unlock their full potential. Keep up the great work!<br/>– Mrs. Yinka Isikalu, Director</p>
+                        </div>
+                        
+                        <div class="mt-6 text-center">
+                            <button onclick="downloadSessionReport(${assessmentIndex}, '${fullName}', 'assessment')" class="bg-green-600 text-white px-6 py-2 rounded-lg font-semibold btn-glow hover:bg-green-700 transition-all duration-200">
+                                Download Assessment PDF
+                            </button>
+                        </div>
                     </div>
                 `;
 
@@ -253,12 +275,16 @@ async function loadReport() {
                 session.forEach((monthlyReport, reportIndex) => {
                     const monthlyBlock = `
                         <div class="border rounded-lg shadow mb-8 p-6 bg-white" id="monthly-block-${monthlyIndex}">
-                            <div class="text-center mb-6">
-                                <h2 class="text-2xl font-bold text-green-800 mb-2">MONTHLY LEARNING REPORT</h2>
+                            <!-- Logo Header -->
+                            <div class="text-center mb-6 border-b pb-4">
+                                <img src="https://res.cloudinary.com/dy2hxcyaf/image/upload/v1757700806/newbhlogo_umwqzy.svg" 
+                                     alt="Blooming Kids House Logo" 
+                                     class="h-16 w-auto mx-auto mb-3">
+                                <h2 class="text-2xl font-bold text-green-800">MONTHLY LEARNING REPORT</h2>
                                 <p class="text-gray-600">Date: ${formattedDate}</p>
                             </div>
                             
-                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6 bg-gray-50 p-4 rounded-lg">
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6 bg-green-50 p-4 rounded-lg">
                                 <div>
                                     <p><strong>Student's Name:</strong> ${monthlyReport.studentName || 'N/A'}</p>
                                     <p><strong>Parent's Name:</strong> ${monthlyReport.parentName || 'N/A'}</p>
@@ -318,7 +344,9 @@ async function loadReport() {
                             </div>
 
                             <div class="mt-6 text-center">
-                                <button onclick="downloadMonthlyReport(${monthlyIndex}, '${fullName}')" class="btn-yellow px-6 py-2 rounded font-semibold">Download Monthly Report PDF</button>
+                                <button onclick="downloadMonthlyReport(${monthlyIndex}, '${fullName}')" class="bg-green-600 text-white px-6 py-2 rounded-lg font-semibold btn-glow hover:bg-green-700 transition-all duration-200">
+                                    Download Monthly Report PDF
+                                </button>
                             </div>
                         </div>
                     `;
