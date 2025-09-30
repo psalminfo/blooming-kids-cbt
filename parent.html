@@ -19,6 +19,7 @@
             background-size: 400% 400%;
             animation: gradient 15s ease infinite;
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            min-height: 100vh;
         }
         @keyframes gradient {
             0% { background-position: 0% 50%; }
@@ -46,67 +47,81 @@
         .hidden { display: none; }
     </style>
 </head>
-<body class="min-h-screen flex flex-col items-center justify-center p-4">
+<body class="flex flex-col items-center p-4">
     <!-- Main Container -->
-    <div class="w-full max-w-md">
+    <div class="w-full max-w-6xl">
         <!-- Logo Header -->
         <div class="text-center mb-8">
             <img src="https://res.cloudinary.com/dy2hxcyaf/image/upload/v1757700806/newbhlogo_umwqzy.svg" 
                  alt="Blooming Kids House Logo" 
-                 class="h-24 w-auto mx-auto logo-glow mb-4">
+                 class="h-20 w-auto mx-auto logo-glow mb-4">
             <h1 class="text-4xl font-bold text-green-800 mb-2">Parent Portal</h1>
             <p class="text-green-600 text-lg">View Your Child's Progress Reports</p>
         </div>
 
-        <!-- Login Card -->
-        <div class="bg-white rounded-2xl card-glow p-8">
+        <!-- Input Area -->
+        <div id="inputArea" class="bg-white rounded-2xl card-glow p-8 mb-8">
             <h2 class="text-2xl font-bold text-gray-800 mb-6 text-center">Enter Student Details</h2>
             
-            <form id="parent-login-form">
-                <div class="space-y-4">
-                    <div>
-                        <label for="studentName" class="block text-sm font-medium text-gray-700 mb-2">
-                            Student Full Name
-                        </label>
-                        <input id="studentName" 
-                               type="text" 
-                               placeholder="Enter student's full name"
-                               class="w-full px-4 py-3 border border-gray-300 rounded-xl input-focus focus:outline-none transition-all duration-200"
-                               required>
-                    </div>
-                    
-                    <div>
-                        <label for="parentPhone" class="block text-sm font-medium text-gray-700 mb-2">
-                            Parent Phone Number
-                        </label>
-                        <input id="parentPhone" 
-                               type="tel" 
-                               placeholder="Enter your phone number"
-                               class="w-full px-4 py-3 border border-gray-300 rounded-xl input-focus focus:outline-none transition-all duration-200"
-                               required>
-                    </div>
-                    
-                    <button type="submit" 
-                            class="w-full bg-green-600 text-white py-3 rounded-xl font-semibold btn-glow hover:bg-green-700 transition-all duration-200">
-                        View Reports
-                    </button>
+            <div class="space-y-4">
+                <div>
+                    <label for="studentName" class="block text-sm font-medium text-gray-700 mb-2">
+                        Student Full Name
+                    </label>
+                    <input id="studentName" 
+                           type="text" 
+                           placeholder="Enter student's full name"
+                           class="w-full px-4 py-3 border border-gray-300 rounded-xl input-focus focus:outline-none transition-all duration-200"
+                           required>
                 </div>
-            </form>
+                
+                <div>
+                    <label for="parentPhone" class="block text-sm font-medium text-gray-700 mb-2">
+                        Parent Phone Number
+                    </label>
+                    <input id="parentPhone" 
+                           type="tel" 
+                           placeholder="Enter your phone number"
+                           class="w-full px-4 py-3 border border-gray-300 rounded-xl input-focus focus:outline-none transition-all duration-200"
+                           required>
+                </div>
+                
+                <button id="generateBtn" 
+                        class="w-full bg-green-600 text-white py-3 rounded-xl font-semibold btn-glow hover:bg-green-700 transition-all duration-200">
+                    Generate Report
+                </button>
+            </div>
+            
+            <div id="loader" class="hidden text-center mt-4">
+                <p class="text-green-600 font-semibold">Generating report... Please wait.</p>
+            </div>
             
             <div class="mt-6 text-center">
                 <p class="text-sm text-gray-500">
-                    Enter your child's name and your phone number to access their reports
+                    Enter your child's name and your phone number to access their assessment and progress reports
                 </p>
             </div>
         </div>
 
+        <!-- Report Area -->
+        <div id="reportArea" class="hidden">
+            <div id="reportContent" class="space-y-6"></div>
+        </div>
+
+        <!-- Logout Area -->
+        <div class="flex justify-end mt-6 hidden" id="logoutArea">
+            <button onclick="logout()" class="bg-red-500 text-white px-6 py-2 rounded-lg font-semibold hover:bg-red-600 transition-all duration-200">
+                Logout
+            </button>
+        </div>
+
         <!-- Footer -->
-        <div class="text-center mt-8">
+        <div class="text-center mt-12">
             <p class="text-green-800 font-semibold">BLOOMING KIDS HOUSE</p>
             <p class="text-green-600 text-sm">Where Every Child Blossoms</p>
         </div>
     </div>
 
-    <script src="parent-login.js"></script>
+    <script src="parent.js"></script>
 </body>
 </html>
