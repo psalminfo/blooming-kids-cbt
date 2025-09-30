@@ -62,18 +62,17 @@ function generateTemplatedRecommendation(studentName, tutorName, results) {
     return praiseClause + improvementClause + closingStatement;
 }
 
-
 async function loadReport() {
     const studentName = document.getElementById("studentName").value.trim().toLowerCase();
-    const parentEmail = document.getElementById("parentEmail").value.trim();
+    const parentPhone = document.getElementById("parentPhone").value.trim();
 
     const reportArea = document.getElementById("reportArea");
     const reportContent = document.getElementById("reportContent");
     const loader = document.getElementById("loader");
     const generateBtn = document.getElementById("generateBtn");
 
-    if (!studentName || !parentEmail) {
-        alert("Please enter both the student's full name and the parent's email.");
+    if (!studentName || !parentPhone) {
+        alert("Please enter both the student's full name and the parent's phone number.");
         return;
     }
 
@@ -82,29 +81,53 @@ async function loadReport() {
     generateBtn.textContent = "Generating...";
 
     try {
-        const querySnapshot = await db.collection("student_results").where("parentEmail", "==", parentEmail).get();
+        // Fetch assessment reports from student_results collection
+        const assessmentQuery = await db.collection("student_results")
+            .where("parentPhone", "==", parentPhone)
+            .get();
+
+        // Fetch monthly reports from tutor_submissions collection
+        const monthlyQuery = await db.collection("tutor_submissions")
+            .where("parentPhone", "==", parentPhone)
+            .get();
 
         const studentResults = [];
-        querySnapshot.forEach((doc) => {
+        const monthlyReports = [];
+
+        // Process assessment reports
+        assessmentQuery.forEach((doc) => {
             const data = doc.data();
             if (data.studentName && data.studentName.toLowerCase() === studentName) {
                 studentResults.push({ ...data,
-                    timestamp: data.submittedAt?.seconds || Date.now() / 1000
+                    timestamp: data.submittedAt?.seconds || Date.now() / 1000,
+                    type: 'assessment'
                 });
             }
         });
 
-        if (studentResults.length === 0) {
-            alert("No records found. Please check the name and email.");
+        // Process monthly reports
+        monthlyQuery.forEach((doc) => {
+            const data = doc.data();
+            if (data.studentName && data.studentName.toLowerCase() === studentName) {
+                monthlyReports.push({ ...data,
+                    timestamp: data.submittedAt?.seconds || Date.now() / 1000,
+                    type: 'monthly'
+                });
+            }
+        });
+
+        if (studentResults.length === 0 && monthlyReports.length === 0) {
+            alert("No records found. Please check the name and phone number.");
             loader.classList.add("hidden");
             generateBtn.disabled = false;
             generateBtn.textContent = "Generate Report";
             return;
         }
 
+        // Combine and group all reports by session/date
+        const allReports = [...studentResults, ...monthlyReports];
         const grouped = {};
-        studentResults.forEach((result) => {
-            // FIX: Group by date instead of by hour (86400 seconds in a day)
+        allReports.forEach((result) => {
             const sessionKey = Math.floor(result.timestamp / 86400); 
             if (!grouped[sessionKey]) grouped[sessionKey] = [];
             grouped[sessionKey].push(result);
@@ -131,32 +154,28 @@ async function loadReport() {
                 }
             }
 
-            const results = session.map(testResult => {
-                const topics = [...new Set(testResult.answers?.map(a => a.topic).filter(t => t))] || [];
-                return {
-                    subject: testResult.subject,
-                    correct: testResult.score !== undefined ? testResult.score : 0,
-                    total: testResult.totalScoreableQuestions !== undefined ? testResult.totalScoreableQuestions : 0,
-                    topics: topics,
-                };
-            });
+            // Separate assessment results and monthly reports
+            const assessmentResults = session.filter(r => r.type === 'assessment');
+            const monthlyReports = session.filter(r => r.type === 'monthly');
 
-            const tableRows = results.map(res => `<tr><td class="border px-2 py-1">${res.subject.toUpperCase()}</td><td class="border px-2 py-1 text-center">${res.correct} / ${res.total}</td></tr>`).join("");
-            const topicsTableRows = results.map(res => `<tr><td class="border px-2 py-1 font-semibold">${res.subject.toUpperCase()}</td><td class="border px-2 py-1">${res.topics.join(', ') || 'N/A'}</td></tr>`).join("");
+            // Generate assessment results table if available
+            let assessmentHTML = '';
+            if (assessmentResults.length > 0) {
+                const results = assessmentResults.map(testResult => {
+                    const topics = [...new Set(testResult.answers?.map(a => a.topic).filter(t => t))] || [];
+                    return {
+                        subject: testResult.subject,
+                        correct: testResult.score !== undefined ? testResult.score : 0,
+                        total: testResult.totalScoreableQuestions !== undefined ? testResult.totalScoreableQuestions : 0,
+                        topics: topics,
+                    };
+                });
 
-            const recommendation = generateTemplatedRecommendation(fullName, tutorName, results);
-            const creativeWritingAnswer = session[0].answers.find(a => a.type === 'creative-writing');
-            const tutorReport = creativeWritingAnswer?.tutorReport || 'Pending review.';
+                const tableRows = results.map(res => `<tr><td class="border px-2 py-1">${res.subject.toUpperCase()}</td><td class="border px-2 py-1 text-center">${res.correct} / ${res.total}</td></tr>`).join("");
+                const topicsTableRows = results.map(res => `<tr><td class="border px-2 py-1 font-semibold">${res.subject.toUpperCase()}</td><td class="border px-2 py-1">${res.topics.join(', ') || 'N/A'}</td></tr>`).join("");
 
-            const fullBlock = `
-                <div class="border rounded-lg shadow mb-8 p-4 bg-white" id="report-block-${blockIndex}">
-                    <h2 class="text-xl font-bold mb-2">Student Name: ${fullName}</h2>
-                    <p><strong>Parent Email:</strong> ${parentEmail}</p>
-                    <p><strong>Grade:</strong> ${session[0].grade}</p>
-                    <p><strong>Tutor:</strong> ${tutorName || 'N/A'}</p>
-                    <p><strong>Location:</strong> ${studentCountry || 'N/A'}</p>
-                    <p><strong>Session Date:</strong> ${formattedDate}</p>
-                    <h3 class="text-lg font-semibold mt-4 mb-2">Performance Summary</h3>
+                assessmentHTML = `
+                    <h3 class="text-lg font-semibold mt-4 mb-2">Assessment Performance Summary</h3>
                     <table class="w-full text-sm mb-4 border border-collapse">
                         <thead class="bg-gray-100"><tr><th class="border px-2 py-1 text-left">Subject</th><th class="border px-2 py-1 text-center">Score</th></tr></thead>
                         <tbody>${tableRows}</tbody>
@@ -166,15 +185,64 @@ async function loadReport() {
                         <thead class="bg-gray-100"><tr><th class="border px-2 py-1 text-left">Subject</th><th class="border px-2 py-1 text-left">Topics Covered</th></tr></thead>
                         <tbody>${topicsTableRows}</tbody>
                     </table>
+                `;
+            }
+
+            // Generate monthly reports if available
+            let monthlyHTML = '';
+            if (monthlyReports.length > 0) {
+                monthlyReports.forEach(monthlyReport => {
+                    monthlyHTML += `
+                        <div class="border rounded-lg p-4 mb-4 bg-green-50">
+                            <h3 class="text-lg font-semibold mb-3 text-green-800">Monthly Progress Report</h3>
+                            ${monthlyReport.introduction ? `<div class="mb-3"><strong>Introduction:</strong><p class="mt-1">${monthlyReport.introduction}</p></div>` : ''}
+                            ${monthlyReport.topics ? `<div class="mb-3"><strong>Topics & Remarks:</strong><p class="mt-1">${monthlyReport.topics}</p></div>` : ''}
+                            ${monthlyReport.progress ? `<div class="mb-3"><strong>Progress & Achievements:</strong><p class="mt-1">${monthlyReport.progress}</p></div>` : ''}
+                            ${monthlyReport.strengthsWeaknesses ? `<div class="mb-3"><strong>Strengths & Weaknesses:</strong><p class="mt-1">${monthlyReport.strengthsWeaknesses}</p></div>` : ''}
+                            ${monthlyReport.recommendations ? `<div class="mb-3"><strong>Recommendations:</strong><p class="mt-1">${monthlyReport.recommendations}</p></div>` : ''}
+                            ${monthlyReport.generalComments ? `<div class="mb-3"><strong>General Comments:</strong><p class="mt-1">${monthlyReport.generalComments}</p></div>` : ''}
+                        </div>
+                    `;
+                });
+            }
+
+            const recommendation = assessmentResults.length > 0 ? 
+                generateTemplatedRecommendation(fullName, tutorName, assessmentResults.map(res => {
+                    const topics = [...new Set(res.answers?.map(a => a.topic).filter(t => t))] || [];
+                    return {
+                        subject: res.subject,
+                        correct: res.score !== undefined ? res.score : 0,
+                        total: res.totalScoreableQuestions !== undefined ? res.totalScoreableQuestions : 0,
+                        topics: topics,
+                    };
+                })) : 
+                "Based on the monthly progress reports, your child is making excellent progress with personalized tutoring support.";
+
+            const creativeWritingAnswer = session[0].answers?.find(a => a.type === 'creative-writing');
+            const tutorReport = creativeWritingAnswer?.tutorReport || 'Pending review.';
+
+            const fullBlock = `
+                <div class="border rounded-lg shadow mb-8 p-4 bg-white" id="report-block-${blockIndex}">
+                    <h2 class="text-xl font-bold mb-2">Student Name: ${fullName}</h2>
+                    <p><strong>Parent Phone:</strong> ${parentPhone}</p>
+                    <p><strong>Grade:</strong> ${session[0].grade}</p>
+                    <p><strong>Tutor:</strong> ${tutorName || 'N/A'}</p>
+                    <p><strong>Location:</strong> ${studentCountry || 'N/A'}</p>
+                    <p><strong>Session Date:</strong> ${formattedDate}</p>
                     
-                    <h3 class="text-lg font-semibold mt-4 mb-2">Tutor’s Recommendation</h3>
+                    ${assessmentHTML}
+                    ${monthlyHTML}
+                    
+                    <h3 class="text-lg font-semibold mt-4 mb-2">Tutor's Recommendation</h3>
                     <p class="mb-2">${recommendation}</p>
 
+                    ${creativeWritingAnswer ? `
                     <h3 class="text-lg font-semibold mt-4 mb-2">Creative Writing Feedback</h3>
                     <p class="mb-2"><strong>Tutor's Report:</strong> ${tutorReport}</p>
+                    ` : ''}
 
-                    <canvas id="chart-${blockIndex}" class="w-full h-48 mb-4"></canvas>
-                    <h3 class="text-lg font-semibold mb-1">Director’s Message</h3>
+                    <canvas id="chart-${blockIndex}" class="w-full h-48 mb-4 ${assessmentResults.length === 0 ? 'hidden' : ''}"></canvas>
+                    <h3 class="text-lg font-semibold mb-1">Director's Message</h3>
                     <p class="italic text-sm">At Blooming Kids House, we are committed to helping every child succeed. We believe that with personalized support from our tutors, ${fullName} will unlock their full potential. Keep up the great work!<br/>– Mrs. Yinka Isikalu, Director</p>
                     <div class="mt-4"><button onclick="downloadSessionReport(${blockIndex}, '${fullName}')" class="btn-yellow px-4 py-2 rounded">Download Session PDF</button></div>
                 </div>
@@ -182,23 +250,34 @@ async function loadReport() {
 
             reportContent.innerHTML += fullBlock;
 
-            const ctx = document.getElementById(`chart-${blockIndex}`).getContext('2d');
-            const subjectLabels = results.map(r => r.subject.toUpperCase());
-            const correctScores = results.map(s => s.correct);
-            const incorrectScores = results.map(s => s.total - s.correct);
+            // Only create chart if there are assessment results
+            if (assessmentResults.length > 0) {
+                const ctx = document.getElementById(`chart-${blockIndex}`).getContext('2d');
+                const results = assessmentResults.map(testResult => {
+                    return {
+                        subject: testResult.subject,
+                        correct: testResult.score !== undefined ? testResult.score : 0,
+                        total: testResult.totalScoreableQuestions !== undefined ? testResult.totalScoreableQuestions : 0,
+                    };
+                });
 
-            new Chart(ctx, {
-                type: 'bar',
-                data: {
-                    labels: subjectLabels,
-                    datasets: [{ label: 'Correct Answers', data: correctScores, backgroundColor: '#4CAF50' }, { label: 'Incorrect/Unanswered', data: incorrectScores, backgroundColor: '#FFCD56' }]
-                },
-                options: {
-                    responsive: true,
-                    scales: { x: { stacked: true }, y: { stacked: true, beginAtZero: true } },
-                    plugins: { title: { display: true, text: 'Score Distribution by Subject' } }
-                }
-            });
+                const subjectLabels = results.map(r => r.subject.toUpperCase());
+                const correctScores = results.map(s => s.correct);
+                const incorrectScores = results.map(s => s.total - s.correct);
+
+                new Chart(ctx, {
+                    type: 'bar',
+                    data: {
+                        labels: subjectLabels,
+                        datasets: [{ label: 'Correct Answers', data: correctScores, backgroundColor: '#4CAF50' }, { label: 'Incorrect/Unanswered', data: incorrectScores, backgroundColor: '#FFCD56' }]
+                    },
+                    options: {
+                        responsive: true,
+                        scales: { x: { stacked: true }, y: { stacked: true, beginAtZero: true } },
+                        plugins: { title: { display: true, text: 'Score Distribution by Subject' } }
+                    }
+                });
+            }
 
             blockIndex++;
         }
