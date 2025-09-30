@@ -222,7 +222,7 @@ async function loadReport() {
                         </div>
                         
                         <div class="mt-6 text-center">
-                            <button onclick="downloadSessionReport(${assessmentIndex}, '${fullName}', 'assessment')" class="bg-green-600 text-white px-6 py-2 rounded-lg font-semibold btn-glow hover:bg-green-700 transition-all duration-200">
+                            <button onclick="downloadSessionReport(${assessmentIndex}, '${fullName}', 'assessment')" class="bg-green-600 text-white px-6 py-2 rounded-lg font-semibold hover:bg-green-700 transition-all duration-200">
                                 Download Assessment PDF
                             </button>
                         </div>
@@ -344,7 +344,7 @@ async function loadReport() {
                             </div>
 
                             <div class="mt-6 text-center">
-                                <button onclick="downloadMonthlyReport(${monthlyIndex}, '${fullName}')" class="bg-green-600 text-white px-6 py-2 rounded-lg font-semibold btn-glow hover:bg-green-700 transition-all duration-200">
+                                <button onclick="downloadMonthlyReport(${monthlyIndex}, '${fullName}')" class="bg-green-600 text-white px-6 py-2 rounded-lg font-semibold hover:bg-green-700 transition-all duration-200">
                                     Download Monthly Report PDF
                                 </button>
                             </div>
@@ -387,4 +387,17 @@ function logout() {
     window.location.href = "parent.html";
 }
 
-document.getElementById("generateBtn").addEventListener("click", loadReport);
+// Initialize the page
+document.addEventListener('DOMContentLoaded', function() {
+    // Check if we have URL parameters (coming from login)
+    const urlParams = new URLSearchParams(window.location.search);
+    const studentFromUrl = urlParams.get('student');
+    const phoneFromUrl = urlParams.get('phone');
+    
+    if (studentFromUrl && phoneFromUrl) {
+        document.getElementById('studentName').value = studentFromUrl;
+        document.getElementById('parentPhone').value = phoneFromUrl;
+    }
+    
+    document.getElementById("generateBtn").addEventListener("click", loadReport);
+});
