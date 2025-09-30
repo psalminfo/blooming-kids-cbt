@@ -26,14 +26,14 @@
 </head>
 <body class="min-h-screen flex flex-col items-center p-4">
     <header class="w-full text-center py-4 bg-blooming-green text-white text-2xl font-bold">
-        BLOOMING KIDS HOUSE ASSESSMENT REPORT
+        BLOOMING KIDS HOUSE REPORT
     </header>
 
     <main class="w-full max-w-2xl mt-6">
         <div id="inputArea" class="bg-white shadow p-4 rounded mb-4">
             <h2 class="text-xl font-semibold mb-2">Enter Student Details</h2>
             <input id="studentName" type="text" placeholder="Student Full Name" class="w-full mb-2 p-2 border rounded" />
-            <input id="parentEmail" type="email" placeholder="Parent Email" class="w-full mb-4 p-2 border rounded" />
+            <input id="parentPhone" type="tel" placeholder="Parent Phone Number" class="w-full mb-4 p-2 border rounded" />
             <button id="generateBtn" onclick="loadReport()" class="w-full py-2 px-4 btn-yellow font-bold rounded">Generate Report</button>
             <p id="loader" class="text-center mt-4 font-semibold text-gray-600 hidden">Generating... Please wait.</p>
         </div>
