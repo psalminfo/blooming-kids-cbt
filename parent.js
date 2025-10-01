@@ -10,11 +10,85 @@ firebase.initializeApp({
 
 const db = firebase.firestore();
 
-// Phone number normalization function - removes all non-digit characters
+// Comprehensive phone number normalization function for all countries
 function normalizePhoneNumber(phone) {
-    if (!phone) return '';
-    // Remove all non-digit characters: +, -, (, ), spaces, etc.
-    return phone.replace(/\D/g, '');
+    if (!phone || typeof phone !== 'string') return '';
+    
+    console.log("Original phone input:", phone);
+    
+    // Remove all non-digit characters except leading +
+    let cleaned = phone.replace(/[^\d+]/g, '');
+    
+    // If it starts with +, keep it for country code detection
+    let hasPlus = cleaned.startsWith('+');
+    let digits = cleaned.replace('+', '');
+    
+    console.log("After cleaning:", digits, "hasPlus:", hasPlus);
+    
+    // If empty after cleaning, return empty
+    if (!digits) return '';
+    
+    // Handle common country codes
+    if (hasPlus) {
+        // Number has explicit country code, keep as is (just digits)
+        console.log("Has country code, normalized:", digits);
+        return digits;
+    } else {
+        // No country code specified - handle common patterns
+        if (digits.length === 10) {
+            // Assume US/Canada number without country code
+            let usNumber = '1' + digits;
+            console.log("10-digit US number assumed, normalized:", usNumber);
+            return usNumber;
+        } else if (digits.length === 11 && digits.startsWith('1')) {
+            // US/Canada number with leading 1
+            console.log("11-digit US number, normalized:", digits);
+            return digits;
+        } else if (digits.length === 9 || digits.length === 10) {
+            // Could be various international numbers without country code
+            // We'll search with multiple variations
+            console.log("International number without country code, keeping as:", digits);
+            return digits;
+        } else {
+            // Return as-is for other formats
+            console.log("Other format, keeping as:", digits);
+            return digits;
+        }
+    }
+}
+
+// Function to generate multiple search variations for a phone number
+function generatePhoneSearchVariations(phone) {
+    const variations = new Set();
+    
+    if (!phone) return Array.from(variations);
+    
+    // Always include the original input
+    variations.add(phone.trim());
+    
+    // Get normalized version
+    const normalized = normalizePhoneNumber(phone);
+    variations.add(normalized);
+    
+    // Generate common formatting variations
+    const digitsOnly = phone.replace(/\D/g, '');
+    variations.add(digitsOnly);
+    
+    // For US numbers, try with and without 1
+    if (digitsOnly.length === 11 && digitsOnly.startsWith('1')) {
+        variations.add(digitsOnly.substring(1)); // Without leading 1
+    } else if (digitsOnly.length === 10) {
+        variations.add('1' + digitsOnly); // With leading 1
+    }
+    
+    // Try with country code variations
+    if (digitsOnly.length === 10) {
+        variations.add('1' + digitsOnly); // US
+        variations.add('+1' + digitsOnly); // US with +
+    }
+    
+    console.log("Phone search variations:", Array.from(variations));
+    return Array.from(variations).filter(v => v && v.length > 0);
 }
 
 function capitalize(str) {
@@ -83,11 +157,12 @@ async function loadReport() {
         return;
     }
 
-    // Normalize the phone number - remove all formatting
-    const normalizedPhone = normalizePhoneNumber(parentPhone);
-    console.log("Original phone:", parentPhone, "Normalized:", normalizedPhone);
+    console.log("Searching for student:", studentName, "with phone:", parentPhone);
 
-    if (!normalizedPhone) {
+    // Generate multiple phone number variations to search with
+    const phoneVariations = generatePhoneSearchVariations(parentPhone);
+    
+    if (phoneVariations.length === 0) {
         alert("Please enter a valid phone number.");
         return;
     }
@@ -97,83 +172,70 @@ async function loadReport() {
     generateBtn.textContent = "Generating...";
 
     try {
-        // Fetch assessment reports from student_results collection
-        const assessmentQuery = await db.collection("student_results")
-            .where("parentPhone", "==", parentPhone)
-            .get();
-
-        // Also try with normalized phone number for assessment reports
-        const assessmentQueryNormalized = await db.collection("student_results")
-            .where("parentPhone", "==", normalizedPhone)
-            .get();
-
-        // Fetch monthly reports from tutor_submissions collection
-        const monthlyQuery = await db.collection("tutor_submissions")
-            .where("parentPhone", "==", parentPhone)
-            .get();
-
-        // Also try with normalized phone number for monthly reports
-        const monthlyQueryNormalized = await db.collection("tutor_submissions")
-            .where("parentPhone", "==", normalizedPhone)
-            .get();
-
         const studentResults = [];
         const monthlyReports = [];
 
-        // Process assessment reports (original format)
-        assessmentQuery.forEach((doc) => {
-            const data = doc.data();
-            if (data.studentName && data.studentName.toLowerCase() === studentName) {
-                studentResults.push({ ...data,
-                    timestamp: data.submittedAt?.seconds || Date.now() / 1000,
-                    type: 'assessment'
+        // Search through all phone number variations
+        for (const phoneVar of phoneVariations) {
+            console.log("Searching with phone variation:", phoneVar);
+            
+            try {
+                // Fetch assessment reports with this phone variation
+                const assessmentQuery = await db.collection("student_results")
+                    .where("parentPhone", "==", phoneVar)
+                    .get();
+
+                // Fetch monthly reports with this phone variation
+                const monthlyQuery = await db.collection("tutor_submissions")
+                    .where("parentPhone", "==", phoneVar)
+                    .get();
+
+                // Process assessment reports
+                assessmentQuery.forEach((doc) => {
+                    const data = doc.data();
+                    if (data.studentName && data.studentName.toLowerCase() === studentName) {
+                        // Check if we already have this record to avoid duplicates
+                        const existing = studentResults.find(r => r.id === doc.id);
+                        if (!existing) {
+                            studentResults.push({ 
+                                id: doc.id,
+                                ...data,
+                                timestamp: data.submittedAt?.seconds || Date.now() / 1000,
+                                type: 'assessment'
+                            });
+                            console.log("Found assessment report:", data.studentName, "with phone:", data.parentPhone);
+                        }
+                    }
                 });
-            }
-        });
 
-        // Process assessment reports (normalized format)
-        assessmentQueryNormalized.forEach((doc) => {
-            const data = doc.data();
-            if (data.studentName && data.studentName.toLowerCase() === studentName) {
-                // Check if we already have this record to avoid duplicates
-                const existing = studentResults.find(r => r.id === doc.id);
-                if (!existing) {
-                    studentResults.push({ ...data,
-                        timestamp: data.submittedAt?.seconds || Date.now() / 1000,
-                        type: 'assessment'
-                    });
-                }
-            }
-        });
-
-        // Process monthly reports (original format)
-        monthlyQuery.forEach((doc) => {
-            const data = doc.data();
-            if (data.studentName && data.studentName.toLowerCase() === studentName) {
-                monthlyReports.push({ ...data,
-                    timestamp: data.submittedAt?.seconds || Date.now() / 1000,
-                    type: 'monthly'
+                // Process monthly reports
+                monthlyQuery.forEach((doc) => {
+                    const data = doc.data();
+                    if (data.studentName && data.studentName.toLowerCase() === studentName) {
+                        // Check if we already have this record to avoid duplicates
+                        const existing = monthlyReports.find(r => r.id === doc.id);
+                        if (!existing) {
+                            monthlyReports.push({ 
+                                id: doc.id,
+                                ...data,
+                                timestamp: data.submittedAt?.seconds || Date.now() / 1000,
+                                type: 'monthly'
+                            });
+                            console.log("Found monthly report:", data.studentName, "with phone:", data.parentPhone);
+                        }
+                    }
                 });
+            } catch (error) {
+                console.log("Error searching with variation", phoneVar, error);
+                // Continue with other variations
             }
-        });
+        }
 
-        // Process monthly reports (normalized format)
-        monthlyQueryNormalized.forEach((doc) => {
-            const data = doc.data();
-            if (data.studentName && data.studentName.toLowerCase() === studentName) {
-                // Check if we already have this record to avoid duplicates
-                const existing = monthlyReports.find(r => r.id === doc.id);
-                if (!existing) {
-                    monthlyReports.push({ ...data,
-                        timestamp: data.submittedAt?.seconds || Date.now() / 1000,
-                        type: 'monthly'
-                    });
-                }
-            }
-        });
+        console.log("Total assessment reports found:", studentResults.length);
+        console.log("Total monthly reports found:", monthlyReports.length);
 
         if (studentResults.length === 0 && monthlyReports.length === 0) {
-            alert("No records found. Please check the student name and phone number.");
+            alert("No records found. Please check:\n• Student name spelling\n• Phone number format\n• Make sure both name and phone match exactly");
             loader.classList.add("hidden");
             generateBtn.disabled = false;
             generateBtn.textContent = "Generate Report";
