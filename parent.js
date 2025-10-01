@@ -10,98 +10,6 @@ firebase.initializeApp({
 
 const db = firebase.firestore();
 
-// Universal phone number normalization - works for all countries
-function normalizePhoneNumber(phone) {
-    if (!phone || typeof phone !== 'string') return '';
-    
-    // Remove ALL non-digit characters (+, -, (, ), spaces, etc.)
-    const digitsOnly = phone.replace(/\D/g, '');
-    
-    return digitsOnly;
-}
-
-// Generate all possible phone number variations for searching
-function generatePhoneSearchVariations(phone) {
-    const variations = new Set();
-    
-    if (!phone) return Array.from(variations);
-    
-    const trimmedPhone = phone.trim();
-    
-    // 1. Original input exactly as entered
-    variations.add(trimmedPhone);
-    
-    // 2. Remove all spaces but keep other characters
-    const noSpaces = trimmedPhone.replace(/\s/g, '');
-    variations.add(noSpaces);
-    
-    // 3. Digits only (completely clean)
-    const digitsOnly = normalizePhoneNumber(trimmedPhone);
-    variations.add(digitsOnly);
-    
-    // 4. Try with plus prefix
-    if (digitsOnly && !trimmedPhone.startsWith('+')) {
-        variations.add('+' + digitsOnly);
-    }
-    
-    // 5. Try without plus if it was there
-    if (trimmedPhone.startsWith('+')) {
-        variations.add(trimmedPhone.substring(1)); // Remove +
-        variations.add(digitsOnly); // Already added, but ensure it's there
-    }
-    
-    // 6. Common formatting variations for international numbers
-    if (digitsOnly.length > 0) {
-        // Try with spaces every 2-4 digits (common formatting)
-        if (digitsOnly.length >= 10) {
-            // Format as +XX XXX XXX XXXX or similar
-            variations.add('+' + digitsOnly);
-            variations.add('+' + digitsOnly.substring(0, 2) + ' ' + digitsOnly.substring(2));
-            variations.add('+' + digitsOnly.substring(0, 2) + ' ' + digitsOnly.substring(2, 5) + ' ' + digitsOnly.substring(5));
-        }
-        
-        // Try with dashes
-        if (digitsOnly.length >= 10) {
-            variations.add('+' + digitsOnly.substring(0, 2) + '-' + digitsOnly.substring(2));
-        }
-        
-        // Try with parentheses for area codes (common in many countries)
-        if (digitsOnly.length >= 7) {
-            variations.add('+' + digitsOnly.substring(0, 2) + ' (' + digitsOnly.substring(2, 5) + ') ' + digitsOnly.substring(5));
-        }
-    }
-    
-    // 7. Also search with the exact opposite of what was entered
-    // If they entered with country code, try without and vice versa
-    if (trimmedPhone.startsWith('+') && digitsOnly.length > 2) {
-        // Try without country code (last 10 digits for mobile numbers)
-        if (digitsOnly.length >= 10) {
-            variations.add(digitsOnly.substring(digitsOnly.length - 10));
-        }
-        // Try with just the local number (last 9-11 digits)
-        if (digitsOnly.length >= 9) {
-            variations.add(digitsOnly.substring(digitsOnly.length - 9));
-        }
-    } else if (!trimmedPhone.startsWith('+') && digitsOnly.length >= 10) {
-        // If they entered without country code, try with common country codes
-        // Try with +1 (US/Canada)
-        variations.add('+1' + digitsOnly);
-        variations.add('+1 ' + digitsOnly);
-        // Try with +44 (UK)
-        variations.add('+44' + digitsOnly);
-        variations.add('+44 ' + digitsOnly);
-        // Try with +234 (Nigeria)
-        variations.add('+234' + digitsOnly);
-        variations.add('+234 ' + digitsOnly);
-        // Try with +91 (India)
-        variations.add('+91' + digitsOnly);
-        variations.add('+91 ' + digitsOnly);
-    }
-    
-    console.log("Phone search variations generated:", Array.from(variations));
-    return Array.from(variations).filter(v => v && v.length > 3); // Filter out too short variations
-}
-
 function capitalize(str) {
     if (!str) return "";
     return str.replace(/\b\w/g, l => l.toUpperCase());
@@ -155,7 +63,7 @@ function generateTemplatedRecommendation(studentName, tutorName, results) {
 }
 
 async function loadReport() {
-    const studentName = document.getElementById("studentName").value.trim().toLowerCase();
+    const studentName = document.getElementById("studentName").value.trim();
     const parentPhone = document.getElementById("parentPhone").value.trim();
 
     const reportArea = document.getElementById("reportArea");
@@ -163,90 +71,111 @@ async function loadReport() {
     const loader = document.getElementById("loader");
     const generateBtn = document.getElementById("generateBtn");
 
-    if (!studentName || !parentPhone) {
-        alert("Please enter both the student's full name and the parent's phone number.");
+    if (!studentName) {
+        alert("Please enter the student's full name.");
         return;
     }
 
-    console.log("Searching for student:", studentName, "with phone:", parentPhone);
-
-    // Generate multiple phone number variations to search with
-    const phoneVariations = generatePhoneSearchVariations(parentPhone);
-    
-    if (phoneVariations.length === 0) {
-        alert("Please enter a valid phone number.");
-        return;
-    }
+    console.log("Searching for student:", studentName, "Phone provided:", parentPhone ? "Yes" : "No");
 
     loader.classList.remove("hidden");
     generateBtn.disabled = true;
     generateBtn.textContent = "Generating...";
 
     try {
+        // PRIMARY SEARCH: Get ALL students with matching name (case insensitive)
+        const allStudentsSnapshot = await db.collection("students").get();
+        const matchingStudents = [];
+        
+        allStudentsSnapshot.forEach(doc => {
+            const studentData = doc.data();
+            if (studentData.studentName && studentData.studentName.toLowerCase() === studentName.toLowerCase()) {
+                matchingStudents.push({
+                    id: doc.id,
+                    ...studentData,
+                    collection: "students"
+                });
+            }
+        });
+
+        console.log(`Found ${matchingStudents.length} students with name: ${studentName}`);
+
+        if (matchingStudents.length === 0) {
+            alert(`No student found with name: ${studentName}\n\nPlease check:\n• Spelling of the name\n• Capitalization\n• Make sure it matches exactly how it was registered`);
+            loader.classList.add("hidden");
+            generateBtn.disabled = false;
+            generateBtn.textContent = "Generate Report";
+            return;
+        }
+
+        // If phone number is provided, filter students by phone
+        let filteredStudents = matchingStudents;
+        if (parentPhone) {
+            const normalizedSearchPhone = parentPhone.replace(/\D/g, '');
+            filteredStudents = matchingStudents.filter(student => {
+                if (!student.parentPhone) return false;
+                const normalizedStudentPhone = student.parentPhone.replace(/\D/g, '');
+                return normalizedStudentPhone.includes(normalizedSearchPhone) || 
+                       normalizedSearchPhone.includes(normalizedStudentPhone);
+            });
+            console.log(`After phone filter: ${filteredStudents.length} students remain`);
+        }
+
+        if (filteredStudents.length === 0) {
+            if (parentPhone) {
+                alert(`Found student "${studentName}" but no matching phone number.\n\nPlease:\n• Check the phone number\n• Or try without phone number to see all reports for this student`);
+            } else {
+                alert(`No student found with name: ${studentName}`);
+            }
+            loader.classList.add("hidden");
+            generateBtn.disabled = false;
+            generateBtn.textContent = "Generate Report";
+            return;
+        }
+
+        // Get reports for the filtered students
         const studentResults = [];
         const monthlyReports = [];
 
-        // Search through all phone number variations
-        for (const phoneVar of phoneVariations) {
-            console.log("Searching with phone variation:", phoneVar);
-            
-            try {
-                // Fetch assessment reports with this phone variation
-                const assessmentQuery = await db.collection("student_results")
-                    .where("parentPhone", "==", phoneVar)
-                    .get();
-
-                // Fetch monthly reports with this phone variation
-                const monthlyQuery = await db.collection("tutor_submissions")
-                    .where("parentPhone", "==", phoneVar)
-                    .get();
-
-                // Process assessment reports
-                assessmentQuery.forEach((doc) => {
-                    const data = doc.data();
-                    if (data.studentName && data.studentName.toLowerCase() === studentName) {
-                        // Check if we already have this record to avoid duplicates
-                        const existing = studentResults.find(r => r.id === doc.id);
-                        if (!existing) {
-                            studentResults.push({ 
-                                id: doc.id,
-                                ...data,
-                                timestamp: data.submittedAt?.seconds || Date.now() / 1000,
-                                type: 'assessment'
-                            });
-                            console.log("✓ Found assessment report:", data.studentName, "with stored phone:", data.parentPhone);
-                        }
-                    }
+        // Get assessment reports
+        const assessmentQuery = await db.collection("student_results").get();
+        assessmentQuery.forEach(doc => {
+            const data = doc.data();
+            const matchingStudent = filteredStudents.find(s => 
+                s.studentName.toLowerCase() === data.studentName?.toLowerCase()
+            );
+            if (matchingStudent) {
+                studentResults.push({ 
+                    id: doc.id,
+                    ...data,
+                    timestamp: data.submittedAt?.seconds || Date.now() / 1000,
+                    type: 'assessment'
                 });
-
-                // Process monthly reports
-                monthlyQuery.forEach((doc) => {
-                    const data = doc.data();
-                    if (data.studentName && data.studentName.toLowerCase() === studentName) {
-                        // Check if we already have this record to avoid duplicates
-                        const existing = monthlyReports.find(r => r.id === doc.id);
-                        if (!existing) {
-                            monthlyReports.push({ 
-                                id: doc.id,
-                                ...data,
-                                timestamp: data.submittedAt?.seconds || Date.now() / 1000,
-                                type: 'monthly'
-                            });
-                            console.log("✓ Found monthly report:", data.studentName, "with stored phone:", data.parentPhone);
-                        }
-                    }
-                });
-            } catch (error) {
-                console.log("Error searching with variation", phoneVar, error);
-                // Continue with other variations
             }
-        }
+        });
 
-        console.log("Total assessment reports found:", studentResults.length);
-        console.log("Total monthly reports found:", monthlyReports.length);
+        // Get monthly reports
+        const monthlyQuery = await db.collection("tutor_submissions").get();
+        monthlyQuery.forEach(doc => {
+            const data = doc.data();
+            const matchingStudent = filteredStudents.find(s => 
+                s.studentName.toLowerCase() === data.studentName?.toLowerCase()
+            );
+            if (matchingStudent) {
+                monthlyReports.push({ 
+                    id: doc.id,
+                    ...data,
+                    timestamp: data.submittedAt?.seconds || Date.now() / 1000,
+                    type: 'monthly'
+                });
+            }
+        });
+
+        console.log("Assessment reports found:", studentResults.length);
+        console.log("Monthly reports found:", monthlyReports.length);
 
         if (studentResults.length === 0 && monthlyReports.length === 0) {
-            alert("No records found. Please check:\n• Student name spelling\n• Phone number format\n• Make sure both name and phone match exactly\n\nTry entering the phone number exactly as you provided it to the tutor.");
+            alert(`No reports found for student: ${studentName}\n\nReports may not have been submitted yet.`);
             loader.classList.add("hidden");
             generateBtn.disabled = false;
             generateBtn.textContent = "Generate Report";
@@ -255,7 +184,7 @@ async function loadReport() {
 
         reportContent.innerHTML = "";
         
-        // Display Assessment Reports (Original Design)
+        // Display Assessment Reports
         if (studentResults.length > 0) {
             const groupedAssessments = {};
             studentResults.forEach((result) => {
@@ -314,7 +243,7 @@ async function loadReport() {
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6 bg-green-50 p-4 rounded-lg">
                             <div>
                                 <p><strong>Student's Name:</strong> ${fullName}</p>
-                                <p><strong>Parent's Phone:</strong> ${parentPhone}</p>
+                                <p><strong>Parent's Phone:</strong> ${session[0].parentPhone || 'N/A'}</p>
                                 <p><strong>Grade:</strong> ${session[0].grade}</p>
                             </div>
                             <div>
@@ -383,7 +312,7 @@ async function loadReport() {
             }
         }
 
-        // Display Monthly Reports (Professional Design)
+        // Display Monthly Reports
         if (monthlyReports.length > 0) {
             const groupedMonthly = {};
             monthlyReports.forEach((result) => {
