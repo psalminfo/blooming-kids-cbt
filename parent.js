@@ -10,6 +10,13 @@ firebase.initializeApp({
 
 const db = firebase.firestore();
 
+// Phone number normalization function - removes all non-digit characters
+function normalizePhoneNumber(phone) {
+    if (!phone) return '';
+    // Remove all non-digit characters: +, -, (, ), spaces, etc.
+    return phone.replace(/\D/g, '');
+}
+
 function capitalize(str) {
     if (!str) return "";
     return str.replace(/\b\w/g, l => l.toUpperCase());
@@ -76,6 +83,15 @@ async function loadReport() {
         return;
     }
 
+    // Normalize the phone number - remove all formatting
+    const normalizedPhone = normalizePhoneNumber(parentPhone);
+    console.log("Original phone:", parentPhone, "Normalized:", normalizedPhone);
+
+    if (!normalizedPhone) {
+        alert("Please enter a valid phone number.");
+        return;
+    }
+
     loader.classList.remove("hidden");
     generateBtn.disabled = true;
     generateBtn.textContent = "Generating...";
@@ -86,15 +102,25 @@ async function loadReport() {
             .where("parentPhone", "==", parentPhone)
             .get();
 
+        // Also try with normalized phone number for assessment reports
+        const assessmentQueryNormalized = await db.collection("student_results")
+            .where("parentPhone", "==", normalizedPhone)
+            .get();
+
         // Fetch monthly reports from tutor_submissions collection
         const monthlyQuery = await db.collection("tutor_submissions")
             .where("parentPhone", "==", parentPhone)
             .get();
 
+        // Also try with normalized phone number for monthly reports
+        const monthlyQueryNormalized = await db.collection("tutor_submissions")
+            .where("parentPhone", "==", normalizedPhone)
+            .get();
+
         const studentResults = [];
         const monthlyReports = [];
 
-        // Process assessment reports
+        // Process assessment reports (original format)
         assessmentQuery.forEach((doc) => {
             const data = doc.data();
             if (data.studentName && data.studentName.toLowerCase() === studentName) {
@@ -105,7 +131,22 @@ async function loadReport() {
             }
         });
 
-        // Process monthly reports
+        // Process assessment reports (normalized format)
+        assessmentQueryNormalized.forEach((doc) => {
+            const data = doc.data();
+            if (data.studentName && data.studentName.toLowerCase() === studentName) {
+                // Check if we already have this record to avoid duplicates
+                const existing = studentResults.find(r => r.id === doc.id);
+                if (!existing) {
+                    studentResults.push({ ...data,
+                        timestamp: data.submittedAt?.seconds || Date.now() / 1000,
+                        type: 'assessment'
+                    });
+                }
+            }
+        });
+
+        // Process monthly reports (original format)
         monthlyQuery.forEach((doc) => {
             const data = doc.data();
             if (data.studentName && data.studentName.toLowerCase() === studentName) {
@@ -116,8 +157,23 @@ async function loadReport() {
             }
         });
 
+        // Process monthly reports (normalized format)
+        monthlyQueryNormalized.forEach((doc) => {
+            const data = doc.data();
+            if (data.studentName && data.studentName.toLowerCase() === studentName) {
+                // Check if we already have this record to avoid duplicates
+                const existing = monthlyReports.find(r => r.id === doc.id);
+                if (!existing) {
+                    monthlyReports.push({ ...data,
+                        timestamp: data.submittedAt?.seconds || Date.now() / 1000,
+                        type: 'monthly'
+                    });
+                }
+            }
+        });
+
         if (studentResults.length === 0 && monthlyReports.length === 0) {
-            alert("No records found. Please check the name and phone number.");
+            alert("No records found. Please check the student name and phone number.");
             loader.classList.add("hidden");
             generateBtn.disabled = false;
             generateBtn.textContent = "Generate Report";
