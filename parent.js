@@ -71,69 +71,58 @@ async function loadReport() {
     const loader = document.getElementById("loader");
     const generateBtn = document.getElementById("generateBtn");
 
-    if (!studentName) {
-        alert("Please enter the student's full name.");
+    if (!studentName || !parentPhone) {
+        alert("Please enter both the student's full name and the parent's phone number.");
         return;
     }
 
-    console.log("Searching for student:", studentName, "Phone provided:", parentPhone ? "Yes" : "No");
+    console.log("Searching for student:", studentName, "with phone:", parentPhone);
 
     loader.classList.remove("hidden");
     generateBtn.disabled = true;
     generateBtn.textContent = "Generating...";
 
     try {
-        // PRIMARY SEARCH: Get ALL students with matching name (case insensitive)
+        // STRICT MATCHING: BOTH NAME AND PHONE MUST MATCH (partial digit matching)
+        const normalizedSearchPhone = parentPhone.replace(/\D/g, '');
+        
+        // Get ALL students and filter by BOTH name and phone (partial digit comparison)
         const allStudentsSnapshot = await db.collection("students").get();
         const matchingStudents = [];
         
         allStudentsSnapshot.forEach(doc => {
             const studentData = doc.data();
-            if (studentData.studentName && studentData.studentName.toLowerCase() === studentName.toLowerCase()) {
+            const nameMatches = studentData.studentName && 
+                               studentData.studentName.toLowerCase() === studentName.toLowerCase();
+            
+            // PARTIAL DIGIT-BASED PHONE MATCHING (works for all countries)
+            const studentPhoneDigits = studentData.parentPhone ? studentData.parentPhone.replace(/\D/g, '') : '';
+            const searchPhoneDigits = normalizedSearchPhone;
+            const phoneMatches = studentPhoneDigits && searchPhoneDigits && 
+                                (studentPhoneDigits.includes(searchPhoneDigits) || 
+                                 searchPhoneDigits.includes(studentPhoneDigits));
+            
+            if (nameMatches && phoneMatches) {
                 matchingStudents.push({
                     id: doc.id,
                     ...studentData,
                     collection: "students"
                 });
+                console.log("✓ Found matching student:", studentData.studentName, "Stored phone:", studentData.parentPhone, "Digits:", studentPhoneDigits);
             }
         });
 
-        console.log(`Found ${matchingStudents.length} students with name: ${studentName}`);
+        console.log(`Found ${matchingStudents.length} students with name: ${studentName} AND phone: ${parentPhone}`);
 
         if (matchingStudents.length === 0) {
-            alert(`No student found with name: ${studentName}\n\nPlease check:\n• Spelling of the name\n• Capitalization\n• Make sure it matches exactly how it was registered`);
+            alert(`No student found with name: ${studentName} and phone number: ${parentPhone}\n\nPlease check:\n• Spelling of the name\n• Phone number\n• Make sure both match exactly how they were registered`);
             loader.classList.add("hidden");
             generateBtn.disabled = false;
             generateBtn.textContent = "Generate Report";
             return;
         }
 
-        // If phone number is provided, filter students by phone
-        let filteredStudents = matchingStudents;
-        if (parentPhone) {
-            const normalizedSearchPhone = parentPhone.replace(/\D/g, '');
-            filteredStudents = matchingStudents.filter(student => {
-                if (!student.parentPhone) return false;
-                const normalizedStudentPhone = student.parentPhone.replace(/\D/g, '');
-                return normalizedStudentPhone.includes(normalizedSearchPhone) || 
-                       normalizedSearchPhone.includes(normalizedStudentPhone);
-            });
-            console.log(`After phone filter: ${filteredStudents.length} students remain`);
-        }
-
-        if (filteredStudents.length === 0) {
-            if (parentPhone) {
-                alert(`Found student "${studentName}" but no matching phone number.\n\nPlease:\n• Check the phone number\n• Or try without phone number to see all reports for this student`);
-            } else {
-                alert(`No student found with name: ${studentName}`);
-            }
-            loader.classList.add("hidden");
-            generateBtn.disabled = false;
-            generateBtn.textContent = "Generate Report";
-            return;
-        }
-
-        // Get reports for the filtered students
+        // Get reports for the matching students
         const studentResults = [];
         const monthlyReports = [];
 
@@ -141,7 +130,7 @@ async function loadReport() {
         const assessmentQuery = await db.collection("student_results").get();
         assessmentQuery.forEach(doc => {
             const data = doc.data();
-            const matchingStudent = filteredStudents.find(s => 
+            const matchingStudent = matchingStudents.find(s => 
                 s.studentName.toLowerCase() === data.studentName?.toLowerCase()
             );
             if (matchingStudent) {
@@ -158,7 +147,7 @@ async function loadReport() {
         const monthlyQuery = await db.collection("tutor_submissions").get();
         monthlyQuery.forEach(doc => {
             const data = doc.data();
-            const matchingStudent = filteredStudents.find(s => 
+            const matchingStudent = matchingStudents.find(s => 
                 s.studentName.toLowerCase() === data.studentName?.toLowerCase()
             );
             if (matchingStudent) {
