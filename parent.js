@@ -10,85 +10,96 @@ firebase.initializeApp({
 
 const db = firebase.firestore();
 
-// Comprehensive phone number normalization function for all countries
+// Universal phone number normalization - works for all countries
 function normalizePhoneNumber(phone) {
     if (!phone || typeof phone !== 'string') return '';
     
-    console.log("Original phone input:", phone);
+    // Remove ALL non-digit characters (+, -, (, ), spaces, etc.)
+    const digitsOnly = phone.replace(/\D/g, '');
     
-    // Remove all non-digit characters except leading +
-    let cleaned = phone.replace(/[^\d+]/g, '');
-    
-    // If it starts with +, keep it for country code detection
-    let hasPlus = cleaned.startsWith('+');
-    let digits = cleaned.replace('+', '');
-    
-    console.log("After cleaning:", digits, "hasPlus:", hasPlus);
-    
-    // If empty after cleaning, return empty
-    if (!digits) return '';
-    
-    // Handle common country codes
-    if (hasPlus) {
-        // Number has explicit country code, keep as is (just digits)
-        console.log("Has country code, normalized:", digits);
-        return digits;
-    } else {
-        // No country code specified - handle common patterns
-        if (digits.length === 10) {
-            // Assume US/Canada number without country code
-            let usNumber = '1' + digits;
-            console.log("10-digit US number assumed, normalized:", usNumber);
-            return usNumber;
-        } else if (digits.length === 11 && digits.startsWith('1')) {
-            // US/Canada number with leading 1
-            console.log("11-digit US number, normalized:", digits);
-            return digits;
-        } else if (digits.length === 9 || digits.length === 10) {
-            // Could be various international numbers without country code
-            // We'll search with multiple variations
-            console.log("International number without country code, keeping as:", digits);
-            return digits;
-        } else {
-            // Return as-is for other formats
-            console.log("Other format, keeping as:", digits);
-            return digits;
-        }
-    }
+    return digitsOnly;
 }
 
-// Function to generate multiple search variations for a phone number
+// Generate all possible phone number variations for searching
 function generatePhoneSearchVariations(phone) {
     const variations = new Set();
     
     if (!phone) return Array.from(variations);
     
-    // Always include the original input
-    variations.add(phone.trim());
+    const trimmedPhone = phone.trim();
     
-    // Get normalized version
-    const normalized = normalizePhoneNumber(phone);
-    variations.add(normalized);
+    // 1. Original input exactly as entered
+    variations.add(trimmedPhone);
     
-    // Generate common formatting variations
-    const digitsOnly = phone.replace(/\D/g, '');
+    // 2. Remove all spaces but keep other characters
+    const noSpaces = trimmedPhone.replace(/\s/g, '');
+    variations.add(noSpaces);
+    
+    // 3. Digits only (completely clean)
+    const digitsOnly = normalizePhoneNumber(trimmedPhone);
     variations.add(digitsOnly);
     
-    // For US numbers, try with and without 1
-    if (digitsOnly.length === 11 && digitsOnly.startsWith('1')) {
-        variations.add(digitsOnly.substring(1)); // Without leading 1
-    } else if (digitsOnly.length === 10) {
-        variations.add('1' + digitsOnly); // With leading 1
+    // 4. Try with plus prefix
+    if (digitsOnly && !trimmedPhone.startsWith('+')) {
+        variations.add('+' + digitsOnly);
     }
     
-    // Try with country code variations
-    if (digitsOnly.length === 10) {
-        variations.add('1' + digitsOnly); // US
-        variations.add('+1' + digitsOnly); // US with +
+    // 5. Try without plus if it was there
+    if (trimmedPhone.startsWith('+')) {
+        variations.add(trimmedPhone.substring(1)); // Remove +
+        variations.add(digitsOnly); // Already added, but ensure it's there
     }
     
-    console.log("Phone search variations:", Array.from(variations));
-    return Array.from(variations).filter(v => v && v.length > 0);
+    // 6. Common formatting variations for international numbers
+    if (digitsOnly.length > 0) {
+        // Try with spaces every 2-4 digits (common formatting)
+        if (digitsOnly.length >= 10) {
+            // Format as +XX XXX XXX XXXX or similar
+            variations.add('+' + digitsOnly);
+            variations.add('+' + digitsOnly.substring(0, 2) + ' ' + digitsOnly.substring(2));
+            variations.add('+' + digitsOnly.substring(0, 2) + ' ' + digitsOnly.substring(2, 5) + ' ' + digitsOnly.substring(5));
+        }
+        
+        // Try with dashes
+        if (digitsOnly.length >= 10) {
+            variations.add('+' + digitsOnly.substring(0, 2) + '-' + digitsOnly.substring(2));
+        }
+        
+        // Try with parentheses for area codes (common in many countries)
+        if (digitsOnly.length >= 7) {
+            variations.add('+' + digitsOnly.substring(0, 2) + ' (' + digitsOnly.substring(2, 5) + ') ' + digitsOnly.substring(5));
+        }
+    }
+    
+    // 7. Also search with the exact opposite of what was entered
+    // If they entered with country code, try without and vice versa
+    if (trimmedPhone.startsWith('+') && digitsOnly.length > 2) {
+        // Try without country code (last 10 digits for mobile numbers)
+        if (digitsOnly.length >= 10) {
+            variations.add(digitsOnly.substring(digitsOnly.length - 10));
+        }
+        // Try with just the local number (last 9-11 digits)
+        if (digitsOnly.length >= 9) {
+            variations.add(digitsOnly.substring(digitsOnly.length - 9));
+        }
+    } else if (!trimmedPhone.startsWith('+') && digitsOnly.length >= 10) {
+        // If they entered without country code, try with common country codes
+        // Try with +1 (US/Canada)
+        variations.add('+1' + digitsOnly);
+        variations.add('+1 ' + digitsOnly);
+        // Try with +44 (UK)
+        variations.add('+44' + digitsOnly);
+        variations.add('+44 ' + digitsOnly);
+        // Try with +234 (Nigeria)
+        variations.add('+234' + digitsOnly);
+        variations.add('+234 ' + digitsOnly);
+        // Try with +91 (India)
+        variations.add('+91' + digitsOnly);
+        variations.add('+91 ' + digitsOnly);
+    }
+    
+    console.log("Phone search variations generated:", Array.from(variations));
+    return Array.from(variations).filter(v => v && v.length > 3); // Filter out too short variations
 }
 
 function capitalize(str) {
@@ -203,7 +214,7 @@ async function loadReport() {
                                 timestamp: data.submittedAt?.seconds || Date.now() / 1000,
                                 type: 'assessment'
                             });
-                            console.log("Found assessment report:", data.studentName, "with phone:", data.parentPhone);
+                            console.log("✓ Found assessment report:", data.studentName, "with stored phone:", data.parentPhone);
                         }
                     }
                 });
@@ -221,7 +232,7 @@ async function loadReport() {
                                 timestamp: data.submittedAt?.seconds || Date.now() / 1000,
                                 type: 'monthly'
                             });
-                            console.log("Found monthly report:", data.studentName, "with phone:", data.parentPhone);
+                            console.log("✓ Found monthly report:", data.studentName, "with stored phone:", data.parentPhone);
                         }
                     }
                 });
@@ -235,7 +246,7 @@ async function loadReport() {
         console.log("Total monthly reports found:", monthlyReports.length);
 
         if (studentResults.length === 0 && monthlyReports.length === 0) {
-            alert("No records found. Please check:\n• Student name spelling\n• Phone number format\n• Make sure both name and phone match exactly");
+            alert("No records found. Please check:\n• Student name spelling\n• Phone number format\n• Make sure both name and phone match exactly\n\nTry entering the phone number exactly as you provided it to the tutor.");
             loader.classList.add("hidden");
             generateBtn.disabled = false;
             generateBtn.textContent = "Generate Report";
