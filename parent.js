@@ -76,8 +76,6 @@ async function loadReport() {
         return;
     }
 
-    console.log("Searching for student:", studentName, "with phone:", parentPhone);
-
     loader.classList.remove("hidden");
     generateBtn.disabled = true;
     generateBtn.textContent = "Generating...";
@@ -95,24 +93,23 @@ async function loadReport() {
             const nameMatches = studentData.studentName && 
                                studentData.studentName.toLowerCase() === studentName.toLowerCase();
             
-            // PARTIAL DIGIT-BASED PHONE MATCHING (works for all countries)
-            const studentPhoneDigits = studentData.parentPhone ? studentData.parentPhone.replace(/\D/g, '') : '';
-            const searchPhoneDigits = normalizedSearchPhone;
-            const phoneMatches = studentPhoneDigits && searchPhoneDigits && 
-                                (studentPhoneDigits.includes(searchPhoneDigits) || 
-                                 searchPhoneDigits.includes(studentPhoneDigits));
-            
-            if (nameMatches && phoneMatches) {
-                matchingStudents.push({
-                    id: doc.id,
-                    ...studentData,
-                    collection: "students"
-                });
-                console.log("✓ Found matching student:", studentData.studentName, "Stored phone:", studentData.parentPhone, "Digits:", studentPhoneDigits);
+            if (nameMatches) {
+                // PARTIAL DIGIT-BASED PHONE MATCHING (works for all countries)
+                const studentPhoneDigits = studentData.parentPhone ? studentData.parentPhone.replace(/\D/g, '') : '';
+                
+                const phoneMatches = studentPhoneDigits && normalizedSearchPhone && 
+                                    (studentPhoneDigits.includes(normalizedSearchPhone) || 
+                                     normalizedSearchPhone.includes(studentPhoneDigits));
+                
+                if (phoneMatches) {
+                    matchingStudents.push({
+                        id: doc.id,
+                        ...studentData,
+                        collection: "students"
+                    });
+                }
             }
         });
-
-        console.log(`Found ${matchingStudents.length} students with name: ${studentName} AND phone: ${parentPhone}`);
 
         if (matchingStudents.length === 0) {
             alert(`No student found with name: ${studentName} and phone number: ${parentPhone}\n\nPlease check:\n• Spelling of the name\n• Phone number\n• Make sure both match exactly how they were registered`);
@@ -160,9 +157,6 @@ async function loadReport() {
             }
         });
 
-        console.log("Assessment reports found:", studentResults.length);
-        console.log("Monthly reports found:", monthlyReports.length);
-
         if (studentResults.length === 0 && monthlyReports.length === 0) {
             alert(`No reports found for student: ${studentName}\n\nReports may not have been submitted yet.`);
             loader.classList.add("hidden");
@@ -195,9 +189,13 @@ async function loadReport() {
 
                 let tutorName = 'N/A';
                 if (tutorEmail && tutorEmail !== 'N/A') {
-                    const tutorDoc = await db.collection("tutors").doc(tutorEmail).get();
-                    if (tutorDoc.exists) {
-                        tutorName = tutorDoc.data().name;
+                    try {
+                        const tutorDoc = await db.collection("tutors").doc(tutorEmail).get();
+                        if (tutorDoc.exists) {
+                            tutorName = tutorDoc.data().name;
+                        }
+                    } catch (error) {
+                        // Silent fail - tutor name will remain 'N/A'
                     }
                 }
 
@@ -261,7 +259,9 @@ async function loadReport() {
                         <p class="mb-2 text-gray-700"><strong>Tutor's Report:</strong> ${tutorReport}</p>
                         ` : ''}
 
+                        ${results.length > 0 ? `
                         <canvas id="chart-${assessmentIndex}" class="w-full h-48 mb-4"></canvas>
+                        ` : ''}
                         
                         <div class="bg-yellow-50 p-4 rounded-lg mt-6">
                             <h3 class="text-lg font-semibold mb-1 text-green-700">Director's Message</h3>
@@ -278,24 +278,28 @@ async function loadReport() {
 
                 reportContent.innerHTML += assessmentBlock;
 
-                // Create chart for assessment results
-                const ctx = document.getElementById(`chart-${assessmentIndex}`).getContext('2d');
-                const subjectLabels = results.map(r => r.subject.toUpperCase());
-                const correctScores = results.map(s => s.correct);
-                const incorrectScores = results.map(s => s.total - s.correct);
+                // Create chart for assessment results only if there are results
+                if (results.length > 0) {
+                    const ctx = document.getElementById(`chart-${assessmentIndex}`);
+                    if (ctx) {
+                        const subjectLabels = results.map(r => r.subject.toUpperCase());
+                        const correctScores = results.map(s => s.correct);
+                        const incorrectScores = results.map(s => s.total - s.correct);
 
-                new Chart(ctx, {
-                    type: 'bar',
-                    data: {
-                        labels: subjectLabels,
-                        datasets: [{ label: 'Correct Answers', data: correctScores, backgroundColor: '#4CAF50' }, { label: 'Incorrect/Unanswered', data: incorrectScores, backgroundColor: '#FFCD56' }]
-                    },
-                    options: {
-                        responsive: true,
-                        scales: { x: { stacked: true }, y: { stacked: true, beginAtZero: true } },
-                        plugins: { title: { display: true, text: 'Score Distribution by Subject' } }
+                        new Chart(ctx, {
+                            type: 'bar',
+                            data: {
+                                labels: subjectLabels,
+                                datasets: [{ label: 'Correct Answers', data: correctScores, backgroundColor: '#4CAF50' }, { label: 'Incorrect/Unanswered', data: incorrectScores, backgroundColor: '#FFCD56' }]
+                            },
+                            options: {
+                                responsive: true,
+                                scales: { x: { stacked: true }, y: { stacked: true, beginAtZero: true } },
+                                plugins: { title: { display: true, text: 'Score Distribution by Subject' } }
+                            }
+                        });
                     }
-                });
+                }
 
                 assessmentIndex++;
             }
@@ -409,8 +413,7 @@ async function loadReport() {
         document.getElementById("logoutArea").style.display = "flex";
 
     } catch (error) {
-        console.error("Error generating report: ", error);
-        alert("A critical error occurred while generating the report.");
+        alert("Sorry, there was an error generating the report. Please try again.");
     } finally {
         loader.classList.add("hidden");
         generateBtn.disabled = false;
