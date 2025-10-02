@@ -94,27 +94,37 @@ async function loadReport() {
     generateBtn.textContent = "Generating...";
 
     try {
-        // STRICT MATCHING: BOTH NAME AND PHONE MUST MATCH (partial digit matching)
+        // STRICT MATCHING: PHONE NUMBER IS PRIMARY, THEN FILTER BY NAME
         const normalizedSearchPhone = parentPhone.replace(/\D/g, '');
         
-        // Get ALL students and filter by BOTH name and phone (partial digit comparison)
+        if (normalizedSearchPhone.length < 7) {
+            alert("Please enter a valid phone number with at least 7 digits.");
+            loader.classList.add("hidden");
+            generateBtn.disabled = false;
+            generateBtn.textContent = "Generate Report";
+            return;
+        }
+
+        // Get ALL students and filter by PHONE FIRST (partial digit comparison)
         const allStudentsSnapshot = await db.collection("students").get();
         const matchingStudents = [];
         
         allStudentsSnapshot.forEach(doc => {
             const studentData = doc.data();
-            const nameMatches = studentData.studentName && 
-                               studentData.studentName.toLowerCase() === studentName.toLowerCase();
             
-            if (nameMatches) {
-                // PARTIAL DIGIT-BASED PHONE MATCHING (works for all countries)
-                const studentPhoneDigits = studentData.parentPhone ? studentData.parentPhone.replace(/\D/g, '') : '';
+            // PHONE NUMBER MATCHING (primary criteria)
+            const studentPhoneDigits = studentData.parentPhone ? studentData.parentPhone.replace(/\D/g, '') : '';
+            
+            const phoneMatches = studentPhoneDigits && normalizedSearchPhone && 
+                                (studentPhoneDigits.includes(normalizedSearchPhone) || 
+                                 normalizedSearchPhone.includes(studentPhoneDigits));
+            
+            if (phoneMatches) {
+                // THEN FILTER BY NAME (secondary criteria)
+                const nameMatches = studentData.studentName && 
+                                   studentData.studentName.toLowerCase() === studentName.toLowerCase();
                 
-                const phoneMatches = studentPhoneDigits && normalizedSearchPhone && 
-                                    (studentPhoneDigits.includes(normalizedSearchPhone) || 
-                                     normalizedSearchPhone.includes(studentPhoneDigits));
-                
-                if (phoneMatches) {
+                if (nameMatches) {
                     matchingStudents.push({
                         id: doc.id,
                         ...studentData,
@@ -125,7 +135,39 @@ async function loadReport() {
         });
 
         if (matchingStudents.length === 0) {
-            alert(`No student found with name: ${studentName} and phone number: ${parentPhone}\n\nPlease check:\n• Spelling of the name\n• Phone number\n• Make sure both match exactly how they were registered`);
+            // More specific error messages
+            const allStudentsWithSamePhone = [];
+            const allStudentsWithSameName = [];
+            
+            allStudentsSnapshot.forEach(doc => {
+                const studentData = doc.data();
+                const studentPhoneDigits = studentData.parentPhone ? studentData.parentPhone.replace(/\D/g, '') : '';
+                const phoneMatches = studentPhoneDigits && normalizedSearchPhone && 
+                                    (studentPhoneDigits.includes(normalizedSearchPhone) || 
+                                     normalizedSearchPhone.includes(studentPhoneDigits));
+                
+                const nameMatches = studentData.studentName && 
+                                   studentData.studentName.toLowerCase() === studentName.toLowerCase();
+                
+                if (phoneMatches) {
+                    allStudentsWithSamePhone.push(studentData.studentName);
+                }
+                if (nameMatches) {
+                    allStudentsWithSameName.push(studentData.parentPhone);
+                }
+            });
+
+            let errorMessage = `No student found with name: ${studentName} and phone number: ${parentPhone}\n\nPlease check:\n• Spelling of the name\n• Phone number\n• Make sure both match exactly how they were registered`;
+            
+            if (allStudentsWithSamePhone.length > 0) {
+                errorMessage += `\n\nStudents registered with this phone number:\n• ${allStudentsWithSamePhone.join('\n• ')}`;
+            }
+            
+            if (allStudentsWithSameName.length > 0) {
+                errorMessage += `\n\nPhone numbers registered for this student:\n• ${allStudentsWithSameName.join('\n• ')}`;
+            }
+
+            alert(errorMessage);
             loader.classList.add("hidden");
             generateBtn.disabled = false;
             generateBtn.textContent = "Generate Report";
@@ -426,6 +468,7 @@ async function loadReport() {
         document.getElementById("logoutArea").style.display = "flex";
 
     } catch (error) {
+        console.error("Error generating report:", error);
         alert("Sorry, there was an error generating the report. Please try again.");
     } finally {
         loader.classList.add("hidden");
