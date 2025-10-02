@@ -387,7 +387,7 @@ function getNewStudentFormFields() {
 
     // Generate Fee Options
     let feeOptions = '<option value="">Select Fee (₦)</option>';
-    for (let fee = 20000; fee <= 200000; fee += 5000) {
+    for (let fee = 10000; fee <= 200000; fee += 5000) {
         feeOptions += `<option value="${fee}">${fee.toLocaleString()}</option>`;
     }
     
@@ -1187,4 +1187,5 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     });
 });
+
 
