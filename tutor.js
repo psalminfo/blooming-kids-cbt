@@ -1067,16 +1067,20 @@ async function renderStudentDatabase(container, tutor) {
             });
         });
 
-        document.querySelectorAll('.summer-break-btn').forEach(btn => {
-            btn.addEventListener('click', async () => {
-                const studentId = btn.getAttribute('data-student-id');
-                const student = students.find(s => s.id === studentId);
-                const studentRef = doc(db, "students", studentId);
-                await updateDoc(studentRef, { summerBreak: true });
-                showCustomAlert(`${student.studentName} has been marked as on summer break.`);
-                renderStudentDatabase(container, tutor);
-            });
-        });
+       document.querySelectorAll('.summer-break-btn').forEach(btn => {
+    btn.addEventListener('click', async () => {
+        const studentId = btn.getAttribute('data-student-id');
+        const student = students.find(s => s.id === studentId);
+        
+        // Add confirmation dialog
+        if (confirm(`Are you sure you want to put ${student.studentName} on summer break?`)) {
+            const studentRef = doc(db, "students", studentId);
+            await updateDoc(studentRef, { summerBreak: true });
+            showCustomAlert(`${student.studentName} has been marked as on summer break.`);
+            renderStudentDatabase(container, tutor);
+        }
+    });
+});
 
         const submitAllBtn = document.getElementById('submit-all-reports-btn');
         if (submitAllBtn) {
@@ -1183,3 +1187,4 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     });
 });
+
