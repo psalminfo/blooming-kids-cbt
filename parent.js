@@ -350,42 +350,42 @@ async function loadReport() {
                             ${monthlyReport.introduction ? `
                             <div class="mb-6">
                                 <h3 class="text-lg font-semibold text-green-700 mb-2 border-b pb-1">INTRODUCTION</h3>
-                                <p class="text-gray-700 leading-relaxed">${monthlyReport.introduction}</p>
+                                <p class="text-gray-700 leading-relaxed preserve-whitespace">${monthlyReport.introduction}</p>
                             </div>
                             ` : ''}
 
                             ${monthlyReport.topics ? `
                             <div class="mb-6">
                                 <h3 class="text-lg font-semibold text-green-700 mb-2 border-b pb-1">TOPICS & REMARKS</h3>
-                                <p class="text-gray-700 leading-relaxed">${monthlyReport.topics}</p>
+                                <p class="text-gray-700 leading-relaxed preserve-whitespace">${monthlyReport.topics}</p>
                             </div>
                             ` : ''}
 
                             ${monthlyReport.progress ? `
                             <div class="mb-6">
                                 <h3 class="text-lg font-semibold text-green-700 mb-2 border-b pb-1">PROGRESS & ACHIEVEMENTS</h3>
-                                <p class="text-gray-700 leading-relaxed">${monthlyReport.progress}</p>
+                                <p class="text-gray-700 leading-relaxed preserve-whitespace">${monthlyReport.progress}</p>
                             </div>
                             ` : ''}
 
                             ${monthlyReport.strengthsWeaknesses ? `
                             <div class="mb-6">
                                 <h3 class="text-lg font-semibold text-green-700 mb-2 border-b pb-1">STRENGTHS AND WEAKNESSES</h3>
-                                <p class="text-gray-700 leading-relaxed">${monthlyReport.strengthsWeaknesses}</p>
+                                <p class="text-gray-700 leading-relaxed preserve-whitespace">${monthlyReport.strengthsWeaknesses}</p>
                             </div>
                             ` : ''}
 
                             ${monthlyReport.recommendations ? `
                             <div class="mb-6">
                                 <h3 class="text-lg font-semibold text-green-700 mb-2 border-b pb-1">RECOMMENDATIONS</h3>
-                                <p class="text-gray-700 leading-relaxed">${monthlyReport.recommendations}</p>
+                                <p class="text-gray-700 leading-relaxed preserve-whitespace">${monthlyReport.recommendations}</p>
                             </div>
                             ` : ''}
 
                             ${monthlyReport.generalComments ? `
                             <div class="mb-6">
                                 <h3 class="text-lg font-semibold text-green-700 mb-2 border-b pb-1">GENERAL TUTOR'S COMMENTS</h3>
-                                <p class="text-gray-700 leading-relaxed">${monthlyReport.generalComments}</p>
+                                <p class="text-gray-700 leading-relaxed preserve-whitespace">${monthlyReport.generalComments}</p>
                             </div>
                             ` : ''}
 
