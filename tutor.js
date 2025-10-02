@@ -12,6 +12,101 @@ let isBypassApprovalEnabled = false;
 let showStudentFees = false;
 let showEditDeleteButtons = false;
 
+// --- Pay Scheme Configuration ---
+const PAY_SCHEMES = {
+    NEW_TUTOR: {
+        academic: {
+            "Preschool-Grade 2": {2: 50000, 3: 60000, 5: 100000},
+            "Grade 3-8": {2: 60000, 3: 70000, 5: 110000},
+            "Subject Teachers": {1: 30000, 2: 60000, 3: 70000}
+        },
+        specialized: {
+            individual: {
+                "Music": 30000,
+                "Native Language": 20000,
+                "Foreign Language": 25000,
+                "Coding": 30000,
+                "Chess": 25000,
+                "Public Speaking": 25000,
+                "English Proficiency": 25000,
+                "Counseling Programs": 25000
+            },
+            group: {
+                "Music": 25000,
+                "Native Language": 20000,
+                "Foreign Language": 20000,
+                "Chess": 20000,
+                "Public Speaking": 20000,
+                "English Proficiency": 20000,
+                "Counseling Programs": 20000
+            }
+        }
+    },
+    OLD_TUTOR: {
+        academic: {
+            "Preschool-Grade 2": {2: 60000, 3: 70000, 5: 110000},
+            "Grade 3-8": {2: 70000, 3: 80000, 5: 120000},
+            "Subject Teachers": {1: 35000, 2: 70000, 3: 90000}
+        },
+        specialized: {
+            individual: {
+                "Music": 35000,
+                "Native Language": 25000,
+                "Foreign Language": 30000,
+                "Coding": 35000,
+                "Chess": 30000,
+                "Public Speaking": 30000,
+                "English Proficiency": 30000,
+                "Counseling Programs": 30000
+            },
+            group: {
+                "Music": 25000,
+                "Native Language": 20000,
+                "Foreign Language": 20000,
+                "Chess": 20000,
+                "Public Speaking": 20000,
+                "English Proficiency": 20000,
+                "Counseling Programs": 20000
+            }
+        }
+    },
+    MANAGEMENT: {
+        academic: {
+            "Preschool-Grade 2": {2: 70000, 3: 85000, 5: 120000},
+            "Grade 3-8": {2: 80000, 3: 90000, 5: 130000},
+            "Subject Teachers": {1: 40000, 2: 80000, 3: 100000}
+        },
+        specialized: {
+            individual: {
+                "Music": 40000,
+                "Native Language": 30000,
+                "Foreign Language": 35000,
+                "Coding": 40000,
+                "Chess": 35000,
+                "Public Speaking": 35000,
+                "English Proficiency": 35000,
+                "Counseling Programs": 35000
+            },
+            group: {
+                "Music": 25000,
+                "Native Language": 20000,
+                "Foreign Language": 20000,
+                "Chess": 20000,
+                "Public Speaking": 20000,
+                "English Proficiency": 20000,
+                "Counseling Programs": 20000
+            }
+        }
+    }
+};
+
+// --- Subject Categorization ---
+const SUBJECT_CATEGORIES = {
+    "Native Language": ["Yoruba", "Igbo", "Hausa"],
+    "Foreign Language": ["French", "German", "Spanish", "Arabic"],
+    "Specialized": ["Music", "Coding", "Chess", "Public Speaking", "English Proficiency", "Counseling Programs"]
+};
+
 // --- Local Storage Functions for Report Persistence ---
 const getLocalReportsKey = (tutorEmail) => `savedReports_${tutorEmail}`;
 
@@ -42,6 +137,120 @@ function clearAllReportsFromLocalStorage(tutorEmail) {
     } catch (error) {
         console.warn('Error clearing local storage:', error);
     }
+}
+
+// --- Employment Date Functions ---
+function shouldShowEmploymentPopup(tutor) {
+    // Don't show if already has employment date
+    if (tutor.employmentDate) return false;
+    
+    // Show on first login each month until they provide it
+    const lastPopupShown = localStorage.getItem(`employmentPopup_${tutor.email}`);
+    const currentMonth = new Date().toISOString().slice(0, 7); // YYYY-MM
+    
+    return !lastPopupShown || lastPopupShown !== currentMonth;
+}
+
+function showEmploymentDatePopup(tutor) {
+    const popupHTML = `
+        <div class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex items-center justify-center z-50">
+            <div class="relative bg-white p-8 rounded-lg shadow-xl w-full max-w-md mx-auto">
+                <h3 class="text-xl font-bold mb-4">Employment Information</h3>
+                <p class="text-sm text-gray-600 mb-4">Please provide your employment start date to help us calculate your payments accurately.</p>
+                <div class="space-y-4">
+                    <div>
+                        <label class="block font-semibold">Month & Year of Employment</label>
+                        <input type="month" id="employment-date" class="w-full mt-1 p-2 border rounded" 
+                               max="${new Date().toISOString().slice(0, 7)}">
+                    </div>
+                    <div class="flex justify-end space-x-2 mt-6">
+                        <button id="save-employment-btn" class="bg-green-600 text-white px-6 py-2 rounded">Save</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    const popup = document.createElement('div');
+    popup.innerHTML = popupHTML;
+    document.body.appendChild(popup);
+
+    document.getElementById('save-employment-btn').addEventListener('click', async () => {
+        const employmentDate = document.getElementById('employment-date').value;
+        if (!employmentDate) {
+            showCustomAlert('Please select your employment month and year.');
+            return;
+        }
+
+        try {
+            const tutorRef = doc(db, "tutors", tutor.id);
+            await updateDoc(tutorRef, { employmentDate: employmentDate });
+            localStorage.setItem(`employmentPopup_${tutor.email}`, new Date().toISOString().slice(0, 7));
+            popup.remove();
+            showCustomAlert('Employment date saved successfully!');
+            window.tutorData.employmentDate = employmentDate;
+        } catch (error) {
+            console.error("Error saving employment date:", error);
+            showCustomAlert('Error saving employment date. Please try again.');
+        }
+    });
+}
+
+function getTutorPayScheme(tutor) {
+    if (tutor.isManagementStaff) return PAY_SCHEMES.MANAGEMENT;
+    
+    if (!tutor.employmentDate) return PAY_SCHEMES.NEW_TUTOR;
+    
+    const employmentDate = new Date(tutor.employmentDate + '-01');
+    const currentDate = new Date();
+    const monthsDiff = (currentDate.getFullYear() - employmentDate.getFullYear()) * 12 + 
+                      (currentDate.getMonth() - employmentDate.getMonth());
+    
+    return monthsDiff >= 12 ? PAY_SCHEMES.OLD_TUTOR : PAY_SCHEMES.NEW_TUTOR;
+}
+
+function calculateSuggestedFee(student, payScheme) {
+    const grade = student.grade;
+    const days = parseInt(student.days) || 0;
+    const subjects = student.subjects || [];
+    
+    // Check for specialized subjects first
+    const specializedSubject = findSpecializedSubject(subjects);
+    if (specializedSubject) {
+        const isGroupClass = student.groupClass || false;
+        const feeType = isGroupClass ? 'group' : 'individual';
+        return payScheme.specialized[feeType][specializedSubject.category] || 0;
+    }
+    
+    // Handle academic subjects
+    let gradeCategory = "Grade 3-8"; // Default
+    
+    if (grade === "Preschool" || grade === "Kindergarten" || grade.includes("Grade 1") || grade.includes("Grade 2")) {
+        gradeCategory = "Preschool-Grade 2";
+    } else if (parseInt(grade.replace('Grade ', '')) >= 9) {
+        return 0; // Manual entry for Grade 9+
+    }
+    
+    // Check if it's subject teaching (Math, English, Science for higher grades)
+    const isSubjectTeacher = subjects.some(subj => ["Math", "English", "Science"].includes(subj)) && 
+                            parseInt(grade.replace('Grade ', '')) >= 5;
+    
+    if (isSubjectTeacher) {
+        return payScheme.academic["Subject Teachers"][days] || 0;
+    } else {
+        return payScheme.academic[gradeCategory][days] || 0;
+    }
+}
+
+function findSpecializedSubject(subjects) {
+    for (const [category, subjectList] of Object.entries(SUBJECT_CATEGORIES)) {
+        for (const subject of subjects) {
+            if (subjectList.includes(subject)) {
+                return { category, subject };
+            }
+        }
+    }
+    return null;
 }
 
 // Listen for changes to the admin settings in real-time
@@ -188,7 +397,7 @@ function getNewStudentFormFields() {
         "Pre-College Exams": ["SAT", "IGCSE", "A-Levels", "SSCE", "JAMB"],
         "Languages": ["French", "German", "Spanish", "Yoruba", "Igbo", "Hausa", "Arabic"],
         "Tech Courses": ["Coding", "Stop motion animation", "Computer Appreciation", "Digital Entrepeneurship", "Animation", "YouTube for kids", "Graphic design", "Videography", "Comic/book creation", "Artificial Intelligence", "Chess"],
-        "Support Programs": ["Bible study", "Child counseling programs", "Speech therapy", "Behavioral therapy", "Public speaking", "Adult education", "Communication skills"]
+        "Support Programs": ["Bible study", "Counseling Programs", "Speech therapy", "Behavioral therapy", "Public speaking", "Adult education", "Communication skills", "English Proficiency"]
     };
 
     let subjectsHTML = `<h4 class="font-semibold text-gray-700 mt-2">Subjects</h4><div id="new-student-subjects-container" class="space-y-2 border p-3 rounded bg-gray-50 max-h-48 overflow-y-auto">`;
@@ -216,6 +425,12 @@ function getNewStudentFormFields() {
             <option value="">Select Days per Week</option>
             ${Array.from({ length: 7 }, (_, i) => `<option value="${i + 1}">${i + 1}</option>`).join('')}
         </select>
+        <div id="group-class-container" class="hidden">
+            <label class="flex items-center space-x-2 mt-2">
+                <input type="checkbox" id="new-student-group-class" class="rounded">
+                <span class="text-sm font-semibold">Group Class</span>
+            </label>
+        </div>
         <select id="new-student-fee" class="w-full mt-1 p-2 border rounded">${feeOptions}</select>
     `;
 }
@@ -259,7 +474,7 @@ function showEditStudentModal(student) {
         "Pre-College Exams": ["SAT", "IGCSE", "A-Levels", "SSCE", "JAMB"],
         "Languages": ["French", "German", "Spanish", "Yoruba", "Igbo", "Hausa", "Arabic"],
         "Tech Courses": ["Coding", "Stop motion animation",  "Computer Appreciation", "Digital Entrepeneurship", "Animation", "YouTube for kids", "Graphic design", "Videography", "Comic/book creation", "Artificial Intelligence", "Chess"],
-        "Support Programs": ["Bible study", "Child counseling programs", "Speech therapy", "Behavioral therapy", "Public speaking", "Adult education", "Communication skills"]
+        "Support Programs": ["Bible study", "Counseling Programs", "Speech therapy", "Behavioral therapy", "Public speaking", "Adult education", "Communication skills", "English Proficiency"]
     };
 
     let subjectsHTML = `<h4 class="font-semibold text-gray-700 mt-2">Subjects</h4><div id="edit-student-subjects-container" class="space-y-2 border p-3 rounded bg-gray-50 max-h-48 overflow-y-auto">`;
@@ -304,6 +519,12 @@ function showEditStudentModal(student) {
                 <label class="block font-semibold">Days per Week</label>
                 <select id="edit-student-days" class="w-full mt-1 p-2 border rounded">${daysOptions}</select>
             </div>
+            <div id="edit-group-class-container" class="${findSpecializedSubject(student.subjects || []) ? '' : 'hidden'}">
+                <label class="flex items-center space-x-2">
+                    <input type="checkbox" id="edit-student-group-class" class="rounded" ${student.groupClass ? 'checked' : ''}>
+                    <span class="text-sm font-semibold">Group Class</span>
+                </label>
+            </div>
             <div>
                 <label class="block font-semibold">Fee (₦)</label>
                 <input type="text" id="edit-student-fee" class="w-full mt-1 p-2 border rounded" 
@@ -337,6 +558,7 @@ function showEditStudentModal(student) {
         });
 
         const studentDays = document.getElementById('edit-student-days').value.trim();
+        const groupClass = document.getElementById('edit-student-group-class') ? document.getElementById('edit-student-group-class').checked : false;
         
         // Parse the fee value (remove commas and convert to number)
         const feeValue = document.getElementById('edit-student-fee').value.trim();
@@ -362,6 +584,11 @@ function showEditStudentModal(student) {
                 days: studentDays,
                 studentFee: studentFee
             };
+
+            // Add group class field if it exists in the form
+            if (document.getElementById('edit-student-group-class')) {
+                studentData.groupClass = groupClass;
+            }
 
             const studentRef = doc(db, collectionName, studentId);
             await updateDoc(studentRef, studentData);
@@ -745,6 +972,22 @@ async function renderStudentDatabase(container, tutor) {
     }
 
     function attachEventListeners() {
+        // Group class toggle functionality for new student form
+        const subjectsContainer = document.getElementById('new-student-subjects-container');
+        const groupClassContainer = document.getElementById('group-class-container');
+        
+        if (subjectsContainer && groupClassContainer) {
+            subjectsContainer.addEventListener('change', (e) => {
+                if (e.target.type === 'checkbox' && e.target.checked) {
+                    const subject = e.target.value;
+                    const hasSpecializedSubject = findSpecializedSubject([subject]);
+                    if (hasSpecializedSubject) {
+                        groupClassContainer.classList.remove('hidden');
+                    }
+                }
+            });
+        }
+
         if (isTutorAddEnabled) {
             document.getElementById('add-student-btn').addEventListener('click', async () => {
                 const parentName = document.getElementById('new-parent-name').value.trim();
@@ -758,12 +1001,22 @@ async function renderStudentDatabase(container, tutor) {
                 });
 
                 const studentDays = document.getElementById('new-student-days').value.trim();
+                const groupClass = document.getElementById('new-student-group-class') ? document.getElementById('new-student-group-class').checked : false;
                 const studentFee = parseFloat(document.getElementById('new-student-fee').value);
 
                 if (!parentName || !studentName || !studentGrade || isNaN(studentFee) || !parentPhone || !studentDays || selectedSubjects.length === 0) {
                     showCustomAlert('Please fill in all parent and student details correctly, including at least one subject.');
                     return;
                 }
+
+                // Calculate suggested fee based on pay scheme
+                const payScheme = getTutorPayScheme(tutor);
+                const suggestedFee = calculateSuggestedFee({
+                    grade: studentGrade,
+                    days: studentDays,
+                    subjects: selectedSubjects,
+                    groupClass: groupClass
+                }, payScheme);
 
                 const studentData = {
                     parentName: parentName,
@@ -772,10 +1025,15 @@ async function renderStudentDatabase(container, tutor) {
                     grade: studentGrade,
                     subjects: selectedSubjects,
                     days: studentDays,
-                    studentFee: studentFee,
+                    studentFee: suggestedFee > 0 ? suggestedFee : studentFee,
                     tutorEmail: tutor.email,
                     tutorName: tutor.name
                 };
+
+                // Add group class field if applicable
+                if (findSpecializedSubject(selectedSubjects)) {
+                    studentData.groupClass = groupClass;
+                }
 
                 try {
                     if (isBypassApprovalEnabled) {
@@ -889,6 +1147,12 @@ document.addEventListener('DOMContentLoaded', async () => {
                 const tutorDoc = querySnapshot.docs[0];
                 const tutorData = { id: tutorDoc.id, ...tutorDoc.data() };
                 window.tutorData = tutorData;
+                
+                // Show employment date popup if needed
+                if (shouldShowEmploymentPopup(tutorData)) {
+                    showEmploymentDatePopup(tutorData);
+                }
+                
                 renderTutorDashboard(document.getElementById('mainContent'), tutorData);
             } else {
                 console.error("No matching tutor found.");
@@ -919,5 +1183,3 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     });
 });
-
-
