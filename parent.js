@@ -155,7 +155,7 @@ async function loadReport() {
             return;
         }
 
-        // Get reports for the matching students
+        // Get reports for the matching students - NOW FILTERING BY BOTH NAME AND PHONE
         const studentResults = [];
         const monthlyReports = [];
 
@@ -163,10 +163,15 @@ async function loadReport() {
         const assessmentQuery = await db.collection("student_results").get();
         assessmentQuery.forEach(doc => {
             const data = doc.data();
-            const matchingStudent = matchingStudents.find(s => 
-                s.studentName.toLowerCase() === data.studentName?.toLowerCase()
-            );
-            if (matchingStudent) {
+            
+            // Check both name AND phone match for reports
+            const nameMatches = data.studentName && data.studentName.toLowerCase() === studentName.toLowerCase();
+            const reportPhoneDigits = data.parentPhone ? data.parentPhone.replace(/\D/g, '') : '';
+            const phoneMatches = reportPhoneDigits && normalizedSearchPhone && 
+                               (reportPhoneDigits.includes(normalizedSearchPhone) || 
+                                normalizedSearchPhone.includes(reportPhoneDigits));
+            
+            if (nameMatches && phoneMatches) {
                 studentResults.push({ 
                     id: doc.id,
                     ...data,
@@ -180,10 +185,15 @@ async function loadReport() {
         const monthlyQuery = await db.collection("tutor_submissions").get();
         monthlyQuery.forEach(doc => {
             const data = doc.data();
-            const matchingStudent = matchingStudents.find(s => 
-                s.studentName.toLowerCase() === data.studentName?.toLowerCase()
-            );
-            if (matchingStudent) {
+            
+            // Check both name AND phone match for reports
+            const nameMatches = data.studentName && data.studentName.toLowerCase() === studentName.toLowerCase();
+            const reportPhoneDigits = data.parentPhone ? data.parentPhone.replace(/\D/g, '') : '';
+            const phoneMatches = reportPhoneDigits && normalizedSearchPhone && 
+                               (reportPhoneDigits.includes(normalizedSearchPhone) || 
+                                normalizedSearchPhone.includes(reportPhoneDigits));
+            
+            if (nameMatches && phoneMatches) {
                 monthlyReports.push({ 
                     id: doc.id,
                     ...data,
