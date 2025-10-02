@@ -63,6 +63,19 @@ function generateTemplatedRecommendation(studentName, tutorName, results) {
 }
 
 async function loadReport() {
+    // Add CSS for preserving whitespace dynamically
+    if (!document.querySelector('#whitespace-style')) {
+        const style = document.createElement('style');
+        style.id = 'whitespace-style';
+        style.textContent = `
+            .preserve-whitespace {
+                white-space: pre-line !important;
+                line-height: 1.6 !important;
+            }
+        `;
+        document.head.appendChild(style);
+    }
+
     const studentName = document.getElementById("studentName").value.trim();
     const parentPhone = document.getElementById("parentPhone").value.trim();
 
