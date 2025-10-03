@@ -94,27 +94,24 @@ async function loadReport() {
     generateBtn.textContent = "Generating...";
 
     try {
-        // STRICT MATCHING: NAME IS PRIMARY, THEN STRICT PHONE VERIFICATION
+        // STRICT MATCHING: BOTH NAME AND PHONE MUST MATCH (EXACT digit matching)
         const normalizedSearchPhone = parentPhone.replace(/\D/g, '');
         
-        // Get ALL students and filter by NAME FIRST (your original system)
+        // Get ALL students and filter by BOTH name and phone (EXACT digit comparison)
         const allStudentsSnapshot = await db.collection("students").get();
         const matchingStudents = [];
         
         allStudentsSnapshot.forEach(doc => {
             const studentData = doc.data();
-            
-            // NAME MATCHING (primary criteria - your original system)
             const nameMatches = studentData.studentName && 
                                studentData.studentName.toLowerCase() === studentName.toLowerCase();
             
             if (nameMatches) {
-                // STRICT PHONE VERIFICATION (security filter)
+                // EXACT DIGIT-BASED PHONE MATCHING (works for all countries)
                 const studentPhoneDigits = studentData.parentPhone ? studentData.parentPhone.replace(/\D/g, '') : '';
                 
                 const phoneMatches = studentPhoneDigits && normalizedSearchPhone && 
-                                    (studentPhoneDigits.includes(normalizedSearchPhone) || 
-                                     normalizedSearchPhone.includes(studentPhoneDigits));
+                                    studentPhoneDigits === normalizedSearchPhone;
                 
                 if (phoneMatches) {
                     matchingStudents.push({
@@ -127,28 +124,7 @@ async function loadReport() {
         });
 
         if (matchingStudents.length === 0) {
-            // Check if name exists but phone doesn't match
-            const studentsWithSameName = [];
-            allStudentsSnapshot.forEach(doc => {
-                const studentData = doc.data();
-                if (studentData.studentName && studentData.studentName.toLowerCase() === studentName.toLowerCase()) {
-                    studentsWithSameName.push(studentData.parentPhone || 'No phone registered');
-                }
-            });
-
-            let errorMessage = `No student found with name: ${studentName} and phone number: ${parentPhone}`;
-            
-            if (studentsWithSameName.length > 0) {
-                errorMessage += `\n\nFound student(s) with this name but different phone number(s):\n`;
-                studentsWithSameName.forEach(phone => {
-                    errorMessage += `• ${phone}\n`;
-                });
-                errorMessage += `\nPlease check your phone number entry.`;
-            } else {
-                errorMessage += `\n\nPlease check:\n• Spelling of the name\n• Phone number\n• Make sure both match exactly how they were registered`;
-            }
-
-            alert(errorMessage);
+            alert(`No student found with name: ${studentName} and phone number: ${parentPhone}\n\nPlease check:\n• Spelling of the name\n• Phone number\n• Make sure both match exactly how they were registered`);
             loader.classList.add("hidden");
             generateBtn.disabled = false;
             generateBtn.textContent = "Generate Report";
