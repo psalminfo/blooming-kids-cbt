@@ -16,36 +16,6 @@ function capitalize(str) {
 }
 
 /**
- * Checks if two names match flexibly - case insensitive and allows for extra names
- * @param {string} searchName The name the parent entered
- * @param {string} storedName The name stored in the database
- * @returns {boolean} True if names match flexibly
- */
-function flexibleNameMatch(searchName, storedName) {
-    if (!searchName || !storedName) return false;
-    
-    // Convert to lowercase for case-insensitive comparison
-    const searchLower = searchName.toLowerCase().trim();
-    const storedLower = storedName.toLowerCase().trim();
-    
-    // Exact match
-    if (searchLower === storedLower) return true;
-    
-    // If stored name contains the search name (tutor added extra names)
-    if (storedLower.includes(searchLower)) return true;
-    
-    // If search name contains the stored name (parent entered full name)
-    if (searchLower.includes(storedLower)) return true;
-    
-    // Split into parts and check if any part matches
-    const searchParts = searchLower.split(/\s+/).filter(part => part.length > 1);
-    const storedParts = storedLower.split(/\s+/).filter(part => part.length > 1);
-    
-    // Check if any name part from search exists in stored name
-    return searchParts.some(part => storedParts.includes(part));
-}
-
-/**
  * Generates a unique, personalized recommendation using a smart template.
  * It summarizes performance instead of just listing topics.
  * @param {string} studentName The name of the student.
@@ -124,123 +94,116 @@ async function loadReport() {
     generateBtn.textContent = "Generating...";
 
     try {
-        // STRICT MATCHING: PHONE IS PRIMARY, NAMES ARE FLEXIBLE
+        // STRICT MATCHING: NAME IS PRIMARY, THEN STRICT PHONE VERIFICATION
         const normalizedSearchPhone = parentPhone.replace(/\D/g, '');
         const last10SearchDigits = normalizedSearchPhone.slice(-10); // Get last 10 digits only
         
-        // Get ALL students and check for phone matches FIRST
+        // Get ALL students and filter by NAME FIRST (your original system)
         const allStudentsSnapshot = await db.collection("students").get();
-        const phoneMatchedStudents = [];
+        const matchingStudents = [];
         
-        // First pass: find all students with matching phone number
         allStudentsSnapshot.forEach(doc => {
             const studentData = doc.data();
             
-            // PHONE IS PRIMARY - Check phone first
-            const studentPhoneDigits = studentData.parentPhone ? studentData.parentPhone.replace(/\D/g, '') : '';
-            const last10StudentDigits = studentPhoneDigits.slice(-10);
+            // NAME MATCHING (primary criteria - your original system)
+            const nameMatches = studentData.studentName && 
+                               studentData.studentName.toLowerCase() === studentName.toLowerCase();
             
-            const phoneMatches = last10StudentDigits && last10SearchDigits && 
-                                last10StudentDigits === last10SearchDigits;
+            if (nameMatches) {
+                // STRICT PHONE VERIFICATION - Compare last 10 digits only
+                const studentPhoneDigits = studentData.parentPhone ? studentData.parentPhone.replace(/\D/g, '') : '';
+                const last10StudentDigits = studentPhoneDigits.slice(-10); // Get last 10 digits only
+                
+                const phoneMatches = last10StudentDigits && last10SearchDigits && 
+                                    last10StudentDigits === last10SearchDigits;
+                
+                if (phoneMatches) {
+                    matchingStudents.push({
+                        id: doc.id,
+                        ...studentData,
+                        collection: "students"
+                    });
+                }
+            }
+        });
+
+        if (matchingStudents.length === 0) {
+            // Check if name exists but phone doesn't match
+            const studentsWithSameName = [];
+            allStudentsSnapshot.forEach(doc => {
+                const studentData = doc.data();
+                if (studentData.studentName && studentData.studentName.toLowerCase() === studentName.toLowerCase()) {
+                    const studentPhoneDigits = studentData.parentPhone ? studentData.parentPhone.replace(/\D/g, '') : '';
+                    const last10StudentDigits = studentPhoneDigits.slice(-10);
+                    studentsWithSameName.push(last10StudentDigits || 'No phone registered');
+                }
+            });
+
+            let errorMessage = `No student found with name: ${studentName} and phone number: ${parentPhone}`;
             
-            if (phoneMatches) {
-                phoneMatchedStudents.push({
+            if (studentsWithSameName.length > 0) {
+                errorMessage += `\n\nFound student(s) with this name but different phone number(s):\n`;
+                studentsWithSameName.forEach(phone => {
+                    errorMessage += `• ${phone}\n`;
+                });
+                errorMessage += `\nPlease check your phone number entry.`;
+            } else {
+                errorMessage += `\n\nPlease check:\n• Spelling of the name\n• Phone number\n• Make sure both match exactly how they were registered`;
+            }
+
+            alert(errorMessage);
+            loader.classList.add("hidden");
+            generateBtn.disabled = false;
+            generateBtn.textContent = "Generate Report";
+            return;
+        }
+
+        // Get reports for ONLY the matching student (not all students with same name)
+        const studentResults = [];
+        const monthlyReports = [];
+
+        // Get assessment reports - ONLY for the specific matched student
+        const assessmentQuery = await db.collection("student_results").get();
+        assessmentQuery.forEach(doc => {
+            const data = doc.data();
+            // Only include reports for the specific matched student
+            const isExactMatch = matchingStudents.some(s => 
+                s.studentName.toLowerCase() === data.studentName?.toLowerCase() &&
+                s.parentPhone && data.parentPhone &&
+                s.parentPhone.replace(/\D/g, '').slice(-10) === data.parentPhone.replace(/\D/g, '').slice(-10)
+            );
+            if (isExactMatch) {
+                studentResults.push({ 
                     id: doc.id,
-                    ...studentData,
-                    collection: "students"
+                    ...data,
+                    timestamp: data.submittedAt?.seconds || Date.now() / 1000,
+                    type: 'assessment'
                 });
             }
         });
 
-        if (phoneMatchedStudents.length === 0) {
-            // No students found with this phone number
-            let errorMessage = `No student found with phone number: ${parentPhone}\n\nPlease check:\n• Phone number format\n• Make sure it matches exactly how it was registered`;
-            alert(errorMessage);
-            loader.classList.add("hidden");
-            generateBtn.disabled = false;
-            generateBtn.textContent = "Generate Report";
-            return;
-        }
-
-        // Second pass: check name matching among phone-matched students
-        const matchingStudents = phoneMatchedStudents.filter(student => {
-            return flexibleNameMatch(studentName, student.studentName);
-        });
-
-        if (matchingStudents.length === 0) {
-            // Phone matches but name doesn't
-            const studentNames = phoneMatchedStudents.map(s => s.studentName || 'No name');
-            let errorMessage = `Phone number matches but name '${studentName}' doesn't match.\n\nStudents with this phone number:\n`;
-            studentNames.forEach(name => {
-                errorMessage += `• ${name}\n`;
-            });
-            errorMessage += `\nPlease check the student name and try again.`;
-            
-            alert(errorMessage);
-            loader.classList.add("hidden");
-            generateBtn.disabled = false;
-            generateBtn.textContent = "Generate Report";
-            return;
-        }
-
-        // Get reports for ANY student with matching phone number and flexible name matching
-        const studentResults = [];
-        const monthlyReports = [];
-
-        // Get ALL assessment reports and filter by PHONE (primary) and flexible name matching
-        const assessmentQuery = await db.collection("student_results").get();
-        assessmentQuery.forEach(doc => {
-            const data = doc.data();
-            
-            // PHONE IS PRIMARY - Check phone first
-            const reportPhoneDigits = data.parentPhone ? data.parentPhone.replace(/\D/g, '') : '';
-            const last10ReportDigits = reportPhoneDigits.slice(-10);
-            
-            const phoneMatches = last10ReportDigits && last10SearchDigits && last10ReportDigits === last10SearchDigits;
-            
-            if (phoneMatches && data.studentName) {
-                // If phone matches, check names flexibly
-                const nameMatches = flexibleNameMatch(studentName, data.studentName);
-                
-                if (nameMatches) {
-                    studentResults.push({ 
-                        id: doc.id,
-                        ...data,
-                        timestamp: data.submittedAt?.seconds || Date.now() / 1000,
-                        type: 'assessment'
-                    });
-                }
-            }
-        });
-
-        // Get ALL monthly reports and filter by PHONE (primary) and flexible name matching
+        // Get monthly reports - ONLY for the specific matched student
         const monthlyQuery = await db.collection("tutor_submissions").get();
         monthlyQuery.forEach(doc => {
             const data = doc.data();
-            
-            // PHONE IS PRIMARY - Check phone first
-            const reportPhoneDigits = data.parentPhone ? data.parentPhone.replace(/\D/g, '') : '';
-            const last10ReportDigits = reportPhoneDigits.slice(-10);
-            
-            const phoneMatches = last10ReportDigits && last10SearchDigits && last10ReportDigits === last10SearchDigits;
-            
-            if (phoneMatches && data.studentName) {
-                // If phone matches, check names flexibly
-                const nameMatches = flexibleNameMatch(studentName, data.studentName);
-                
-                if (nameMatches) {
-                    monthlyReports.push({ 
-                        id: doc.id,
-                        ...data,
-                        timestamp: data.submittedAt?.seconds || Date.now() / 1000,
-                        type: 'monthly'
-                    });
-                }
+            // Only include reports for the specific matched student
+            const isExactMatch = matchingStudents.some(s => 
+                s.studentName.toLowerCase() === data.studentName?.toLowerCase() &&
+                s.parentPhone && data.parentPhone &&
+                s.parentPhone.replace(/\D/g, '').slice(-10) === data.parentPhone.replace(/\D/g, '').slice(-10)
+            );
+            if (isExactMatch) {
+                monthlyReports.push({ 
+                    id: doc.id,
+                    ...data,
+                    timestamp: data.submittedAt?.seconds || Date.now() / 1000,
+                    type: 'monthly'
+                });
             }
         });
 
         if (studentResults.length === 0 && monthlyReports.length === 0) {
-            alert(`No reports found for: ${studentName}\n\nReports may not have been submitted yet.`);
+            alert(`No reports found for student: ${studentName}\n\nReports may not have been submitted yet.`);
             loader.classList.add("hidden");
             generateBtn.disabled = false;
             generateBtn.textContent = "Generate Report";
@@ -495,7 +458,6 @@ async function loadReport() {
         document.getElementById("logoutArea").style.display = "flex";
 
     } catch (error) {
-        console.error("Report generation error:", error);
         alert("Sorry, there was an error generating the report. Please try again.");
     } finally {
         loader.classList.add("hidden");
