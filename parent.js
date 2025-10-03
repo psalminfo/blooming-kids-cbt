@@ -7,6 +7,7 @@ firebase.initializeApp({
     messagingSenderId: "238975054977",
     appId: "1:238975054977:web:87c70b4db044998a204980"
 });
+
 const db = firebase.firestore();
 
 function capitalize(str) {
@@ -40,23 +41,24 @@ function generateTemplatedRecommendation(studentName, tutorName, results) {
 
     let praiseClause = "";
     if (uniqueStrengths.length > 2) {
-        praiseClause = `It was great to see ${studentName} demonstrate a solid understanding of several key concepts, particularly in areas like ${uniqueStrengths[0]} and ${uniqueStrengths[1]}.`;
+        praiseClause = `It was great to see ${studentName} demonstrate a solid understanding of several key concepts, particularly in areas like ${uniqueStrengths[0]} and ${uniqueStrengths[1]}. `;
     } else if (uniqueStrengths.length > 0) {
-        praiseClause = `${studentName} showed strong potential, especially in the topic of ${uniqueStrengths.join(', ')}.`;
+        praiseClause = `${studentName} showed strong potential, especially in the topic of ${uniqueStrengths.join(', ')}. `;
     } else {
-        praiseClause = `${studentName} has put in a commendable effort on this initial assessment.`;
+        praiseClause = `${studentName} has put in a commendable effort on this initial assessment. `;
     }
 
     let improvementClause = "";
     if (uniqueWeaknesses.length > 2) {
-        improvementClause = `Our next step will be to focus on building more confidence in a few areas, such as ${uniqueWeaknesses[0]} and ${uniqueWeaknesses[1]}.`;
+        improvementClause = `Our next step will be to focus on building more confidence in a few areas, such as ${uniqueWeaknesses[0]} and ${uniqueWeaknesses[1]}. `;
     } else if (uniqueWeaknesses.length > 0) {
-        improvementClause = `To continue this positive progress, our focus will be on the topic of ${uniqueWeaknesses.join(', ')}.`;
+        improvementClause = `To continue this positive progress, our focus will be on the topic of ${uniqueWeaknesses.join(', ')}. `;
     } else {
         improvementClause = "We will continue to build on these fantastic results and explore more advanced topics. ";
     }
 
     const closingStatement = `With personalized support from their tutor, ${tutorName}, at Blooming Kids House, we are very confident that ${studentName} will master these skills and unlock their full potential.`;
+
     return praiseClause + improvementClause + closingStatement;
 }
 
@@ -90,9 +92,11 @@ async function loadReport() {
     loader.classList.remove("hidden");
     generateBtn.disabled = true;
     generateBtn.textContent = "Generating...";
+
     try {
         // STRICT MATCHING: NAME IS PRIMARY, THEN STRICT PHONE VERIFICATION
         const normalizedSearchPhone = parentPhone.replace(/\D/g, '');
+        
         // Get ALL students and filter by NAME FIRST (your original system)
         const allStudentsSnapshot = await db.collection("students").get();
         const matchingStudents = [];
@@ -102,16 +106,16 @@ async function loadReport() {
             
             // NAME MATCHING (primary criteria - your original system)
             const nameMatches = studentData.studentName && 
-                studentData.studentName.toLowerCase() === studentName.toLowerCase();
+                               studentData.studentName.toLowerCase() === studentName.toLowerCase();
             
             if (nameMatches) {
                 // STRICT PHONE VERIFICATION (security filter)
                 const studentPhoneDigits = studentData.parentPhone ? studentData.parentPhone.replace(/\D/g, '') : '';
                 
-                // MODIFIED: Enforce strict equality for phone numbers to prevent partial/incorrect matches.
                 const phoneMatches = studentPhoneDigits && normalizedSearchPhone && 
-                                     (studentPhoneDigits === normalizedSearchPhone);
-            
+                                    (studentPhoneDigits.includes(normalizedSearchPhone) || 
+                                     normalizedSearchPhone.includes(studentPhoneDigits));
+                
                 if (phoneMatches) {
                     matchingStudents.push({
                         id: doc.id,
@@ -121,6 +125,7 @@ async function loadReport() {
                 }
             }
         });
+
         if (matchingStudents.length === 0) {
             // Check if name exists but phone doesn't match
             const studentsWithSameName = [];
@@ -130,10 +135,15 @@ async function loadReport() {
                     studentsWithSameName.push(studentData.parentPhone || 'No phone registered');
                 }
             });
+
             let errorMessage = `No student found with name: ${studentName} and phone number: ${parentPhone}`;
+            
             if (studentsWithSameName.length > 0) {
-                errorMessage += `\n\nFound student(s) with this name but a different phone number was provided.\n`;
-                errorMessage += `\nPlease check your phone number entry and ensure it matches the one used during registration.`;
+                errorMessage += `\n\nFound student(s) with this name but different phone number(s):\n`;
+                studentsWithSameName.forEach(phone => {
+                    errorMessage += `• ${phone}\n`;
+                });
+                errorMessage += `\nPlease check your phone number entry.`;
             } else {
                 errorMessage += `\n\nPlease check:\n• Spelling of the name\n• Phone number\n• Make sure both match exactly how they were registered`;
             }
@@ -157,7 +167,7 @@ async function loadReport() {
                 s.studentName.toLowerCase() === data.studentName?.toLowerCase()
             );
             if (matchingStudent) {
-                studentResults.push({
+                studentResults.push({ 
                     id: doc.id,
                     ...data,
                     timestamp: data.submittedAt?.seconds || Date.now() / 1000,
@@ -165,6 +175,7 @@ async function loadReport() {
                 });
             }
         });
+
         // Get monthly reports
         const monthlyQuery = await db.collection("tutor_submissions").get();
         monthlyQuery.forEach(doc => {
@@ -173,7 +184,7 @@ async function loadReport() {
                 s.studentName.toLowerCase() === data.studentName?.toLowerCase()
             );
             if (matchingStudent) {
-                monthlyReports.push({
+                monthlyReports.push({ 
                     id: doc.id,
                     ...data,
                     timestamp: data.submittedAt?.seconds || Date.now() / 1000,
@@ -181,6 +192,7 @@ async function loadReport() {
                 });
             }
         });
+
         if (studentResults.length === 0 && monthlyReports.length === 0) {
             alert(`No reports found for student: ${studentName}\n\nReports may not have been submitted yet.`);
             loader.classList.add("hidden");
@@ -190,14 +202,16 @@ async function loadReport() {
         }
 
         reportContent.innerHTML = "";
+        
         // Display Assessment Reports
         if (studentResults.length > 0) {
             const groupedAssessments = {};
             studentResults.forEach((result) => {
-                const sessionKey = Math.floor(result.timestamp / 86400);
+                const sessionKey = Math.floor(result.timestamp / 86400); 
                 if (!groupedAssessments[sessionKey]) groupedAssessments[sessionKey] = [];
                 groupedAssessments[sessionKey].push(result);
             });
+
             let assessmentIndex = 0;
             for (const key in groupedAssessments) {
                 const session = groupedAssessments[key];
@@ -208,6 +222,7 @@ async function loadReport() {
                     dateStyle: 'long',
                     timeStyle: 'short'
                 });
+
                 let tutorName = 'N/A';
                 if (tutorEmail && tutorEmail !== 'N/A') {
                     try {
@@ -229,14 +244,17 @@ async function loadReport() {
                         topics: topics,
                     };
                 });
+
                 const tableRows = results.map(res => `<tr><td class="border px-2 py-1">${res.subject.toUpperCase()}</td><td class="border px-2 py-1 text-center">${res.correct} / ${res.total}</td></tr>`).join("");
                 const topicsTableRows = results.map(res => `<tr><td class="border px-2 py-1 font-semibold">${res.subject.toUpperCase()}</td><td class="border px-2 py-1">${res.topics.join(', ') || 'N/A'}</td></tr>`).join("");
+
                 const recommendation = generateTemplatedRecommendation(fullName, tutorName, results);
                 const creativeWritingAnswer = session[0].answers?.find(a => a.type === 'creative-writing');
                 const tutorReport = creativeWritingAnswer?.tutorReport || 'Pending review.';
 
                 const assessmentBlock = `
                     <div class="border rounded-lg shadow mb-8 p-6 bg-white" id="assessment-block-${assessmentIndex}">
+                        <!-- Logo Header -->
                         <div class="text-center mb-6 border-b pb-4">
                             <img src="https://res.cloudinary.com/dy2hxcyaf/image/upload/v1757700806/newbhlogo_umwqzy.svg" 
                                  alt="Blooming Kids House Logo" 
@@ -277,16 +295,13 @@ async function loadReport() {
                         <p class="mb-2 text-gray-700"><strong>Tutor's Report:</strong> ${tutorReport}</p>
                         ` : ''}
 
-                        ${results.length > 0 ?
-                        `
+                        ${results.length > 0 ? `
                         <canvas id="chart-${assessmentIndex}" class="w-full h-48 mb-4"></canvas>
                         ` : ''}
                         
                         <div class="bg-yellow-50 p-4 rounded-lg mt-6">
                             <h3 class="text-lg font-semibold mb-1 text-green-700">Director's Message</h3>
-                            <p class="italic text-sm text-gray-700">At Blooming Kids House, we are committed to helping every child succeed.
-                            We believe that with personalized support from our tutors, ${fullName} will unlock their full potential.
-                            Keep up the great work!<br/>– Mrs. Yinka Isikalu, Director</p>
+                            <p class="italic text-sm text-gray-700">At Blooming Kids House, we are committed to helping every child succeed. We believe that with personalized support from our tutors, ${fullName} will unlock their full potential. Keep up the great work!<br/>– Mrs. Yinka Isikalu, Director</p>
                         </div>
                         
                         <div class="mt-6 text-center">
@@ -296,6 +311,7 @@ async function loadReport() {
                         </div>
                     </div>
                 `;
+
                 reportContent.innerHTML += assessmentBlock;
 
                 // Create chart for assessment results only if there are results
@@ -305,6 +321,7 @@ async function loadReport() {
                         const subjectLabels = results.map(r => r.subject.toUpperCase());
                         const correctScores = results.map(s => s.correct);
                         const incorrectScores = results.map(s => s.total - s.correct);
+
                         new Chart(ctx, {
                             type: 'bar',
                             data: {
@@ -328,10 +345,11 @@ async function loadReport() {
         if (monthlyReports.length > 0) {
             const groupedMonthly = {};
             monthlyReports.forEach((result) => {
-                const sessionKey = Math.floor(result.timestamp / 86400);
+                const sessionKey = Math.floor(result.timestamp / 86400); 
                 if (!groupedMonthly[sessionKey]) groupedMonthly[sessionKey] = [];
                 groupedMonthly[sessionKey].push(result);
             });
+
             let monthlyIndex = 0;
             for (const key in groupedMonthly) {
                 const session = groupedMonthly[key];
@@ -340,9 +358,11 @@ async function loadReport() {
                     dateStyle: 'long',
                     timeStyle: 'short'
                 });
+
                 session.forEach((monthlyReport, reportIndex) => {
                     const monthlyBlock = `
                         <div class="border rounded-lg shadow mb-8 p-6 bg-white" id="monthly-block-${monthlyIndex}">
+                            <!-- Logo Header -->
                             <div class="text-center mb-6 border-b pb-4">
                                 <img src="https://res.cloudinary.com/dy2hxcyaf/image/upload/v1757700806/newbhlogo_umwqzy.svg" 
                                      alt="Blooming Kids House Logo" 
@@ -417,6 +437,7 @@ async function loadReport() {
                             </div>
                         </div>
                     `;
+
                     reportContent.innerHTML += monthlyBlock;
                     monthlyIndex++;
                 });
