@@ -158,18 +158,21 @@ async function loadReport() {
             return;
         }
 
-        // Get reports for the matching students
+        // Get reports for ONLY the matching student (not all students with same name)
         const studentResults = [];
         const monthlyReports = [];
 
-        // Get assessment reports
+        // Get assessment reports - ONLY for the specific matched student
         const assessmentQuery = await db.collection("student_results").get();
         assessmentQuery.forEach(doc => {
             const data = doc.data();
-            const matchingStudent = matchingStudents.find(s => 
-                s.studentName.toLowerCase() === data.studentName?.toLowerCase()
+            // Only include reports for the specific matched student
+            const isExactMatch = matchingStudents.some(s => 
+                s.studentName.toLowerCase() === data.studentName?.toLowerCase() &&
+                s.parentPhone && data.parentPhone &&
+                s.parentPhone.replace(/\D/g, '').slice(-10) === data.parentPhone.replace(/\D/g, '').slice(-10)
             );
-            if (matchingStudent) {
+            if (isExactMatch) {
                 studentResults.push({ 
                     id: doc.id,
                     ...data,
@@ -179,14 +182,17 @@ async function loadReport() {
             }
         });
 
-        // Get monthly reports
+        // Get monthly reports - ONLY for the specific matched student
         const monthlyQuery = await db.collection("tutor_submissions").get();
         monthlyQuery.forEach(doc => {
             const data = doc.data();
-            const matchingStudent = matchingStudents.find(s => 
-                s.studentName.toLowerCase() === data.studentName?.toLowerCase()
+            // Only include reports for the specific matched student
+            const isExactMatch = matchingStudents.some(s => 
+                s.studentName.toLowerCase() === data.studentName?.toLowerCase() &&
+                s.parentPhone && data.parentPhone &&
+                s.parentPhone.replace(/\D/g, '').slice(-10) === data.parentPhone.replace(/\D/g, '').slice(-10)
             );
-            if (matchingStudent) {
+            if (isExactMatch) {
                 monthlyReports.push({ 
                     id: doc.id,
                     ...data,
