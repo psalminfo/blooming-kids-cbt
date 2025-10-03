@@ -1,4 +1,3 @@
-```javascript
 // Firebase config for the 'bloomingkidsassessment' project
 firebase.initializeApp({
     apiKey: "AIzaSyD1lJhsWMMs_qerLBSzk7wKhjLyI_11RJg",
@@ -490,4 +489,3 @@ document.addEventListener('DOMContentLoaded', function() {
     
     document.getElementById("generateBtn").addEventListener("click", loadReport);
 });
-```
