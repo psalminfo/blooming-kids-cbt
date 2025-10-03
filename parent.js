@@ -16,6 +16,29 @@ function capitalize(str) {
 }
 
 /**
+ * Checks if two names match flexibly - at least one name part should match
+ * @param {string} name1 First name to compare
+ * @param {string} name2 Second name to compare  
+ * @returns {boolean} True if at least one name part matches
+ */
+function flexibleNameMatch(name1, name2) {
+    if (!name1 || !name2) return false;
+    
+    const name1Parts = name1.toLowerCase().split(/\s+/).filter(part => part.length > 1);
+    const name2Parts = name2.toLowerCase().split(/\s+/).filter(part => part.length > 1);
+    
+    // If either name has only one part, do exact match
+    if (name1Parts.length === 1 && name2Parts.length === 1) {
+        return name1Parts[0] === name2Parts[0];
+    }
+    
+    // Check if at least one name part matches
+    return name1Parts.some(part1 => 
+        name2Parts.some(part2 => part1 === part2)
+    );
+}
+
+/**
  * Generates a unique, personalized recommendation using a smart template.
  * It summarizes performance instead of just listing topics.
  * @param {string} studentName The name of the student.
@@ -94,30 +117,29 @@ async function loadReport() {
     generateBtn.textContent = "Generating...";
 
     try {
-        // STRICT MATCHING: NAME IS PRIMARY, THEN STRICT PHONE VERIFICATION
+        // STRICT MATCHING: PHONE IS PRIMARY, NAMES ARE FLEXIBLE
         const normalizedSearchPhone = parentPhone.replace(/\D/g, '');
         const last10SearchDigits = normalizedSearchPhone.slice(-10); // Get last 10 digits only
         
-        // Get ALL students and filter by NAME FIRST (your original system)
+        // Get ALL students and check for phone matches FIRST
         const allStudentsSnapshot = await db.collection("students").get();
         const matchingStudents = [];
         
         allStudentsSnapshot.forEach(doc => {
             const studentData = doc.data();
             
-            // NAME MATCHING (primary criteria - your original system)
-            const nameMatches = studentData.studentName && 
-                               studentData.studentName.toLowerCase() === studentName.toLowerCase();
+            // PHONE IS PRIMARY - Check phone first
+            const studentPhoneDigits = studentData.parentPhone ? studentData.parentPhone.replace(/\D/g, '') : '';
+            const last10StudentDigits = studentPhoneDigits.slice(-10);
             
-            if (nameMatches) {
-                // STRICT PHONE VERIFICATION - Compare last 10 digits only
-                const studentPhoneDigits = studentData.parentPhone ? studentData.parentPhone.replace(/\D/g, '') : '';
-                const last10StudentDigits = studentPhoneDigits.slice(-10); // Get last 10 digits only
+            const phoneMatches = last10StudentDigits && last10SearchDigits && 
+                                last10StudentDigits === last10SearchDigits;
+            
+            if (phoneMatches) {
+                // If phone matches, check names flexibly
+                const nameMatches = flexibleNameMatch(studentData.studentName, studentName);
                 
-                const phoneMatches = last10StudentDigits && last10SearchDigits && 
-                                    last10StudentDigits === last10SearchDigits;
-                
-                if (phoneMatches) {
+                if (nameMatches) {
                     matchingStudents.push({
                         id: doc.id,
                         ...studentData,
@@ -128,27 +150,28 @@ async function loadReport() {
         });
 
         if (matchingStudents.length === 0) {
-            // Check if name exists but phone doesn't match
-            const studentsWithSameName = [];
+            // Check if phone exists but name doesn't match
+            const studentsWithSamePhone = [];
             allStudentsSnapshot.forEach(doc => {
                 const studentData = doc.data();
-                if (studentData.studentName && studentData.studentName.toLowerCase() === studentName.toLowerCase()) {
-                    const studentPhoneDigits = studentData.parentPhone ? studentData.parentPhone.replace(/\D/g, '') : '';
-                    const last10StudentDigits = studentPhoneDigits.slice(-10);
-                    studentsWithSameName.push(last10StudentDigits || 'No phone registered');
+                const studentPhoneDigits = studentData.parentPhone ? studentData.parentPhone.replace(/\D/g, '') : '';
+                const last10StudentDigits = studentPhoneDigits.slice(-10);
+                
+                if (last10StudentDigits && last10SearchDigits && last10StudentDigits === last10SearchDigits) {
+                    studentsWithSamePhone.push(studentData.studentName || 'No name registered');
                 }
             });
 
             let errorMessage = `No student found with name: ${studentName} and phone number: ${parentPhone}`;
             
-            if (studentsWithSameName.length > 0) {
-                errorMessage += `\n\nFound student(s) with this name but different phone number(s):\n`;
-                studentsWithSameName.forEach(phone => {
-                    errorMessage += `• ${phone}\n`;
+            if (studentsWithSamePhone.length > 0) {
+                errorMessage += `\n\nFound student(s) with this phone number but different name(s):\n`;
+                studentsWithSamePhone.forEach(name => {
+                    errorMessage += `• ${name}\n`;
                 });
-                errorMessage += `\nPlease check your phone number entry.`;
+                errorMessage += `\nPlease check the student name entry.`;
             } else {
-                errorMessage += `\n\nPlease check:\n• Spelling of the name\n• Phone number\n• Make sure both match exactly how they were registered`;
+                errorMessage += `\n\nPlease check:\n• Spelling of the name\n• Phone number\n• Make sure both match how they were registered`;
             }
 
             alert(errorMessage);
@@ -158,55 +181,59 @@ async function loadReport() {
             return;
         }
 
-        // Get reports for ONLY the matching student (not all students with same name)
+        // Get reports for ANY student with matching phone number
         const studentResults = [];
         const monthlyReports = [];
 
-        // OPTIMIZED QUERY: Get assessment reports using Firestore query instead of getting all
-        const assessmentQuery = await db.collection("student_results")
-            .where("studentName", "==", studentName)
-            .get();
-
+        // Get ALL assessment reports and filter by PHONE (primary) and flexible name matching
+        const assessmentQuery = await db.collection("student_results").get();
         assessmentQuery.forEach(doc => {
             const data = doc.data();
             
-            // Check phone number in the REPORT against the searched phone
+            // PHONE IS PRIMARY - Check phone first
             const reportPhoneDigits = data.parentPhone ? data.parentPhone.replace(/\D/g, '') : '';
             const last10ReportDigits = reportPhoneDigits.slice(-10);
             
             const phoneMatches = last10ReportDigits && last10SearchDigits && last10ReportDigits === last10SearchDigits;
             
             if (phoneMatches) {
-                studentResults.push({ 
-                    id: doc.id,
-                    ...data,
-                    timestamp: data.submittedAt?.seconds || Date.now() / 1000,
-                    type: 'assessment'
-                });
+                // If phone matches, check names flexibly
+                const nameMatches = flexibleNameMatch(data.studentName, studentName);
+                
+                if (nameMatches) {
+                    studentResults.push({ 
+                        id: doc.id,
+                        ...data,
+                        timestamp: data.submittedAt?.seconds || Date.now() / 1000,
+                        type: 'assessment'
+                    });
+                }
             }
         });
 
-        // OPTIMIZED QUERY: Get monthly reports using Firestore query instead of getting all
-        const monthlyQuery = await db.collection("tutor_submissions")
-            .where("studentName", "==", studentName)
-            .get();
-
+        // Get ALL monthly reports and filter by PHONE (primary) and flexible name matching
+        const monthlyQuery = await db.collection("tutor_submissions").get();
         monthlyQuery.forEach(doc => {
             const data = doc.data();
             
-            // Check phone number in the REPORT against the searched phone
+            // PHONE IS PRIMARY - Check phone first
             const reportPhoneDigits = data.parentPhone ? data.parentPhone.replace(/\D/g, '') : '';
             const last10ReportDigits = reportPhoneDigits.slice(-10);
             
             const phoneMatches = last10ReportDigits && last10SearchDigits && last10ReportDigits === last10SearchDigits;
             
             if (phoneMatches) {
-                monthlyReports.push({ 
-                    id: doc.id,
-                    ...data,
-                    timestamp: data.submittedAt?.seconds || Date.now() / 1000,
-                    type: 'monthly'
-                });
+                // If phone matches, check names flexibly
+                const nameMatches = flexibleNameMatch(data.studentName, studentName);
+                
+                if (nameMatches) {
+                    monthlyReports.push({ 
+                        id: doc.id,
+                        ...data,
+                        timestamp: data.submittedAt?.seconds || Date.now() / 1000,
+                        type: 'monthly'
+                    });
+                }
             }
         });
 
