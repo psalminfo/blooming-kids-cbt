@@ -166,13 +166,15 @@ async function loadReport() {
         const assessmentQuery = await db.collection("student_results").get();
         assessmentQuery.forEach(doc => {
             const data = doc.data();
-            // Only include reports for the specific matched student
-            const isExactMatch = matchingStudents.some(s => 
-                s.studentName.toLowerCase() === data.studentName?.toLowerCase() &&
-                s.parentPhone && data.parentPhone &&
-                s.parentPhone.replace(/\D/g, '').slice(-10) === data.parentPhone.replace(/\D/g, '').slice(-10)
-            );
-            if (isExactMatch) {
+            
+            // CRITICAL FIX: Check phone number in the REPORT against the searched phone
+            const reportPhoneDigits = data.parentPhone ? data.parentPhone.replace(/\D/g, '') : '';
+            const last10ReportDigits = reportPhoneDigits.slice(-10);
+            
+            const nameMatches = data.studentName && data.studentName.toLowerCase() === studentName.toLowerCase();
+            const phoneMatches = last10ReportDigits && last10SearchDigits && last10ReportDigits === last10SearchDigits;
+            
+            if (nameMatches && phoneMatches) {
                 studentResults.push({ 
                     id: doc.id,
                     ...data,
@@ -186,13 +188,15 @@ async function loadReport() {
         const monthlyQuery = await db.collection("tutor_submissions").get();
         monthlyQuery.forEach(doc => {
             const data = doc.data();
-            // Only include reports for the specific matched student
-            const isExactMatch = matchingStudents.some(s => 
-                s.studentName.toLowerCase() === data.studentName?.toLowerCase() &&
-                s.parentPhone && data.parentPhone &&
-                s.parentPhone.replace(/\D/g, '').slice(-10) === data.parentPhone.replace(/\D/g, '').slice(-10)
-            );
-            if (isExactMatch) {
+            
+            // CRITICAL FIX: Check phone number in the REPORT against the searched phone
+            const reportPhoneDigits = data.parentPhone ? data.parentPhone.replace(/\D/g, '') : '';
+            const last10ReportDigits = reportPhoneDigits.slice(-10);
+            
+            const nameMatches = data.studentName && data.studentName.toLowerCase() === studentName.toLowerCase();
+            const phoneMatches = last10ReportDigits && last10SearchDigits && last10ReportDigits === last10SearchDigits;
+            
+            if (nameMatches && phoneMatches) {
                 monthlyReports.push({ 
                     id: doc.id,
                     ...data,
