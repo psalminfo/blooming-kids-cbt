@@ -1,3 +1,4 @@
+```javascript
 // Firebase config for the 'bloomingkidsassessment' project
 firebase.initializeApp({
     apiKey: "AIzaSyD1lJhsWMMs_qerLBSzk7wKhjLyI_11RJg",
@@ -94,24 +95,27 @@ async function loadReport() {
     generateBtn.textContent = "Generating...";
 
     try {
-        // STRICT MATCHING: BOTH NAME AND PHONE MUST MATCH (EXACT digit matching)
+        // STRICT MATCHING: NAME IS PRIMARY, THEN STRICT PHONE VERIFICATION
         const normalizedSearchPhone = parentPhone.replace(/\D/g, '');
         
-        // Get ALL students and filter by BOTH name and phone (EXACT digit comparison)
+        // Get ALL students and filter by NAME FIRST (your original system)
         const allStudentsSnapshot = await db.collection("students").get();
         const matchingStudents = [];
         
         allStudentsSnapshot.forEach(doc => {
             const studentData = doc.data();
+            
+            // NAME MATCHING (primary criteria - your original system)
             const nameMatches = studentData.studentName && 
                                studentData.studentName.toLowerCase() === studentName.toLowerCase();
             
             if (nameMatches) {
-                // EXACT DIGIT-BASED PHONE MATCHING (works for all countries)
+                // STRICT PHONE VERIFICATION (security filter)
                 const studentPhoneDigits = studentData.parentPhone ? studentData.parentPhone.replace(/\D/g, '') : '';
                 
                 const phoneMatches = studentPhoneDigits && normalizedSearchPhone && 
-                                    studentPhoneDigits === normalizedSearchPhone;
+                                    (studentPhoneDigits.includes(normalizedSearchPhone) || 
+                                     normalizedSearchPhone.includes(studentPhoneDigits));
                 
                 if (phoneMatches) {
                     matchingStudents.push({
@@ -124,7 +128,28 @@ async function loadReport() {
         });
 
         if (matchingStudents.length === 0) {
-            alert(`No student found with name: ${studentName} and phone number: ${parentPhone}\n\nPlease check:\n• Spelling of the name\n• Phone number\n• Make sure both match exactly how they were registered`);
+            // Check if name exists but phone doesn't match
+            const studentsWithSameName = [];
+            allStudentsSnapshot.forEach(doc => {
+                const studentData = doc.data();
+                if (studentData.studentName && studentData.studentName.toLowerCase() === studentName.toLowerCase()) {
+                    studentsWithSameName.push(studentData.parentPhone || 'No phone registered');
+                }
+            });
+
+            let errorMessage = `No student found with name: ${studentName} and phone number: ${parentPhone}`;
+            
+            if (studentsWithSameName.length > 0) {
+                errorMessage += `\n\nFound student(s) with this name but different phone number(s):\n`;
+                studentsWithSameName.forEach(phone => {
+                    errorMessage += `• ${phone}\n`;
+                });
+                errorMessage += `\nPlease check your phone number entry.`;
+            } else {
+                errorMessage += `\n\nPlease check:\n• Spelling of the name\n• Phone number\n• Make sure both match exactly how they were registered`;
+            }
+
+            alert(errorMessage);
             loader.classList.add("hidden");
             generateBtn.disabled = false;
             generateBtn.textContent = "Generate Report";
@@ -459,7 +484,10 @@ document.addEventListener('DOMContentLoaded', function() {
     if (studentFromUrl && phoneFromUrl) {
         document.getElementById('studentName').value = studentFromUrl;
         document.getElementById('parentPhone').value = phoneFromUrl;
+        // Auto-generate report when parameters are present
+        setTimeout(loadReport, 500);
     }
     
     document.getElementById("generateBtn").addEventListener("click", loadReport);
 });
+```
