@@ -62,6 +62,38 @@ function generateTemplatedRecommendation(studentName, tutorName, results) {
     return praiseClause + improvementClause + closingStatement;
 }
 
+/**
+ * Checks if the search name matches the stored name, allowing for extra names added by tutors
+ * @param {string} storedName The name stored in the database
+ * @param {string} searchName The name entered by the parent
+ * @returns {boolean} True if names match (case insensitive and allows extra names)
+ */
+function nameMatches(storedName, searchName) {
+    if (!storedName || !searchName) return false;
+    
+    const storedLower = storedName.toLowerCase().trim();
+    const searchLower = searchName.toLowerCase().trim();
+    
+    // Exact match
+    if (storedLower === searchLower) return true;
+    
+    // If stored name contains the search name (tutor added extra names)
+    if (storedLower.includes(searchLower)) return true;
+    
+    // If search name contains the stored name (parent entered full name but stored has partial)
+    if (searchLower.includes(storedLower)) return true;
+    
+    // Split into words and check if all search words are in stored name
+    const searchWords = searchLower.split(/\s+/).filter(word => word.length > 1);
+    const storedWords = storedLower.split(/\s+/);
+    
+    if (searchWords.length > 0) {
+        return searchWords.every(word => storedWords.some(storedWord => storedWord.includes(word)));
+    }
+    
+    return false;
+}
+
 async function loadReport() {
     // Add CSS for preserving whitespace dynamically
     if (!document.querySelector('#whitespace-style')) {
@@ -105,11 +137,11 @@ async function loadReport() {
         allStudentsSnapshot.forEach(doc => {
             const studentData = doc.data();
             
-            // NAME MATCHING (primary criteria - your original system)
-            const nameMatches = studentData.studentName && 
-                               studentData.studentName.toLowerCase() === studentName.toLowerCase();
+            // FLEXIBLE NAME MATCHING (primary criteria - case insensitive and allows extra names)
+            const nameMatchesResult = studentData.studentName && 
+                                   nameMatches(studentData.studentName, studentName);
             
-            if (nameMatches) {
+            if (nameMatchesResult) {
                 // STRICT PHONE VERIFICATION - Compare last 10 digits only
                 const studentPhoneDigits = studentData.parentPhone ? studentData.parentPhone.replace(/\D/g, '') : '';
                 const last10StudentDigits = studentPhoneDigits.slice(-10); // Get last 10 digits only
@@ -132,19 +164,22 @@ async function loadReport() {
             const studentsWithSameName = [];
             allStudentsSnapshot.forEach(doc => {
                 const studentData = doc.data();
-                if (studentData.studentName && studentData.studentName.toLowerCase() === studentName.toLowerCase()) {
+                if (studentData.studentName && nameMatches(studentData.studentName, studentName)) {
                     const studentPhoneDigits = studentData.parentPhone ? studentData.parentPhone.replace(/\D/g, '') : '';
                     const last10StudentDigits = studentPhoneDigits.slice(-10);
-                    studentsWithSameName.push(last10StudentDigits || 'No phone registered');
+                    studentsWithSameName.push({
+                        name: studentData.studentName,
+                        phone: last10StudentDigits || 'No phone registered'
+                    });
                 }
             });
 
             let errorMessage = `No student found with name: ${studentName} and phone number: ${parentPhone}`;
             
             if (studentsWithSameName.length > 0) {
-                errorMessage += `\n\nFound student(s) with this name but different phone number(s):\n`;
-                studentsWithSameName.forEach(phone => {
-                    errorMessage += `• ${phone}\n`;
+                errorMessage += `\n\nFound student(s) with similar name but different phone number(s):\n`;
+                studentsWithSameName.forEach(student => {
+                    errorMessage += `• Name: "${student.name}", Phone: ${student.phone}\n`;
                 });
                 errorMessage += `\nPlease check your phone number entry.`;
             } else {
@@ -168,7 +203,7 @@ async function loadReport() {
             const data = doc.data();
             // Only include reports for the specific matched student
             const isExactMatch = matchingStudents.some(s => 
-                s.studentName.toLowerCase() === data.studentName?.toLowerCase() &&
+                nameMatches(s.studentName, data.studentName) &&
                 s.parentPhone && data.parentPhone &&
                 s.parentPhone.replace(/\D/g, '').slice(-10) === data.parentPhone.replace(/\D/g, '').slice(-10)
             );
@@ -188,7 +223,7 @@ async function loadReport() {
             const data = doc.data();
             // Only include reports for the specific matched student
             const isExactMatch = matchingStudents.some(s => 
-                s.studentName.toLowerCase() === data.studentName?.toLowerCase() &&
+                nameMatches(s.studentName, data.studentName) &&
                 s.parentPhone && data.parentPhone &&
                 s.parentPhone.replace(/\D/g, '').slice(-10) === data.parentPhone.replace(/\D/g, '').slice(-10)
             );
