@@ -94,7 +94,7 @@ async function loadReport() {
     generateBtn.textContent = "Generating...";
 
     try {
-        // STRICT MATCHING: NAME IS PRIMARY, THEN EXACT PHONE VERIFICATION
+        // STRICT MATCHING: NAME IS PRIMARY, THEN STRICT PHONE VERIFICATION
         const normalizedSearchPhone = parentPhone.replace(/\D/g, '');
         
         // Get ALL students and filter by NAME FIRST (your original system)
@@ -109,11 +109,12 @@ async function loadReport() {
                                studentData.studentName.toLowerCase() === studentName.toLowerCase();
             
             if (nameMatches) {
-                // EXACT PHONE VERIFICATION (security filter)
+                // STRICT PHONE VERIFICATION (security filter)
                 const studentPhoneDigits = studentData.parentPhone ? studentData.parentPhone.replace(/\D/g, '') : '';
                 
                 const phoneMatches = studentPhoneDigits && normalizedSearchPhone && 
-                                    studentPhoneDigits === normalizedSearchPhone;
+                                    (studentPhoneDigits.includes(normalizedSearchPhone) || 
+                                     normalizedSearchPhone.includes(studentPhoneDigits));
                 
                 if (phoneMatches) {
                     matchingStudents.push({
@@ -154,7 +155,7 @@ async function loadReport() {
             return;
         }
 
-        // Get reports for the matching students - NOW FILTERING BY BOTH NAME AND EXACT PHONE
+        // Get reports for the matching students
         const studentResults = [];
         const monthlyReports = [];
 
@@ -162,14 +163,10 @@ async function loadReport() {
         const assessmentQuery = await db.collection("student_results").get();
         assessmentQuery.forEach(doc => {
             const data = doc.data();
-            
-            // Check both name AND exact phone match for reports
-            const nameMatches = data.studentName && data.studentName.toLowerCase() === studentName.toLowerCase();
-            const reportPhoneDigits = data.parentPhone ? data.parentPhone.replace(/\D/g, '') : '';
-            const phoneMatches = reportPhoneDigits && normalizedSearchPhone && 
-                               reportPhoneDigits === normalizedSearchPhone;
-            
-            if (nameMatches && phoneMatches) {
+            const matchingStudent = matchingStudents.find(s => 
+                s.studentName.toLowerCase() === data.studentName?.toLowerCase()
+            );
+            if (matchingStudent) {
                 studentResults.push({ 
                     id: doc.id,
                     ...data,
@@ -183,14 +180,10 @@ async function loadReport() {
         const monthlyQuery = await db.collection("tutor_submissions").get();
         monthlyQuery.forEach(doc => {
             const data = doc.data();
-            
-            // Check both name AND exact phone match for reports
-            const nameMatches = data.studentName && data.studentName.toLowerCase() === studentName.toLowerCase();
-            const reportPhoneDigits = data.parentPhone ? data.parentPhone.replace(/\D/g, '') : '';
-            const phoneMatches = reportPhoneDigits && normalizedSearchPhone && 
-                               reportPhoneDigits === normalizedSearchPhone;
-            
-            if (nameMatches && phoneMatches) {
+            const matchingStudent = matchingStudents.find(s => 
+                s.studentName.toLowerCase() === data.studentName?.toLowerCase()
+            );
+            if (matchingStudent) {
                 monthlyReports.push({ 
                     id: doc.id,
                     ...data,
