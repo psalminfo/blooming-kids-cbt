@@ -16,26 +16,33 @@ function capitalize(str) {
 }
 
 /**
- * Checks if two names match flexibly - at least one name part should match
- * @param {string} name1 First name to compare
- * @param {string} name2 Second name to compare  
- * @returns {boolean} True if at least one name part matches
+ * Checks if two names match flexibly - case insensitive and allows for extra names
+ * @param {string} searchName The name the parent entered
+ * @param {string} storedName The name stored in the database
+ * @returns {boolean} True if names match flexibly
  */
-function flexibleNameMatch(name1, name2) {
-    if (!name1 || !name2) return false;
+function flexibleNameMatch(searchName, storedName) {
+    if (!searchName || !storedName) return false;
     
-    const name1Parts = name1.toLowerCase().split(/\s+/).filter(part => part.length > 1);
-    const name2Parts = name2.toLowerCase().split(/\s+/).filter(part => part.length > 1);
+    // Convert to lowercase for case-insensitive comparison
+    const searchLower = searchName.toLowerCase().trim();
+    const storedLower = storedName.toLowerCase().trim();
     
-    // If either name has only one part, do exact match
-    if (name1Parts.length === 1 && name2Parts.length === 1) {
-        return name1Parts[0] === name2Parts[0];
-    }
+    // Exact match
+    if (searchLower === storedLower) return true;
     
-    // Check if at least one name part matches
-    return name1Parts.some(part1 => 
-        name2Parts.some(part2 => part1 === part2)
-    );
+    // If stored name contains the search name (tutor added extra names)
+    if (storedLower.includes(searchLower)) return true;
+    
+    // If search name contains the stored name (parent entered full name)
+    if (searchLower.includes(storedLower)) return true;
+    
+    // Split into parts and check if any part matches
+    const searchParts = searchLower.split(/\s+/).filter(part => part.length > 1);
+    const storedParts = storedLower.split(/\s+/).filter(part => part.length > 1);
+    
+    // Check if any name part from search exists in stored name
+    return searchParts.some(part => storedParts.includes(part));
 }
 
 /**
@@ -123,8 +130,9 @@ async function loadReport() {
         
         // Get ALL students and check for phone matches FIRST
         const allStudentsSnapshot = await db.collection("students").get();
-        const matchingStudents = [];
+        const phoneMatchedStudents = [];
         
+        // First pass: find all students with matching phone number
         allStudentsSnapshot.forEach(doc => {
             const studentData = doc.data();
             
@@ -136,44 +144,17 @@ async function loadReport() {
                                 last10StudentDigits === last10SearchDigits;
             
             if (phoneMatches) {
-                // If phone matches, check names flexibly
-                const nameMatches = flexibleNameMatch(studentData.studentName, studentName);
-                
-                if (nameMatches) {
-                    matchingStudents.push({
-                        id: doc.id,
-                        ...studentData,
-                        collection: "students"
-                    });
-                }
+                phoneMatchedStudents.push({
+                    id: doc.id,
+                    ...studentData,
+                    collection: "students"
+                });
             }
         });
 
-        if (matchingStudents.length === 0) {
-            // Check if phone exists but name doesn't match
-            const studentsWithSamePhone = [];
-            allStudentsSnapshot.forEach(doc => {
-                const studentData = doc.data();
-                const studentPhoneDigits = studentData.parentPhone ? studentData.parentPhone.replace(/\D/g, '') : '';
-                const last10StudentDigits = studentPhoneDigits.slice(-10);
-                
-                if (last10StudentDigits && last10SearchDigits && last10StudentDigits === last10SearchDigits) {
-                    studentsWithSamePhone.push(studentData.studentName || 'No name registered');
-                }
-            });
-
-            let errorMessage = `No student found with name: ${studentName} and phone number: ${parentPhone}`;
-            
-            if (studentsWithSamePhone.length > 0) {
-                errorMessage += `\n\nFound student(s) with this phone number but different name(s):\n`;
-                studentsWithSamePhone.forEach(name => {
-                    errorMessage += `• ${name}\n`;
-                });
-                errorMessage += `\nPlease check the student name entry.`;
-            } else {
-                errorMessage += `\n\nPlease check:\n• Spelling of the name\n• Phone number\n• Make sure both match how they were registered`;
-            }
-
+        if (phoneMatchedStudents.length === 0) {
+            // No students found with this phone number
+            let errorMessage = `No student found with phone number: ${parentPhone}\n\nPlease check:\n• Phone number format\n• Make sure it matches exactly how it was registered`;
             alert(errorMessage);
             loader.classList.add("hidden");
             generateBtn.disabled = false;
@@ -181,7 +162,28 @@ async function loadReport() {
             return;
         }
 
-        // Get reports for ANY student with matching phone number
+        // Second pass: check name matching among phone-matched students
+        const matchingStudents = phoneMatchedStudents.filter(student => {
+            return flexibleNameMatch(studentName, student.studentName);
+        });
+
+        if (matchingStudents.length === 0) {
+            // Phone matches but name doesn't
+            const studentNames = phoneMatchedStudents.map(s => s.studentName || 'No name');
+            let errorMessage = `Phone number matches but name '${studentName}' doesn't match.\n\nStudents with this phone number:\n`;
+            studentNames.forEach(name => {
+                errorMessage += `• ${name}\n`;
+            });
+            errorMessage += `\nPlease check the student name and try again.`;
+            
+            alert(errorMessage);
+            loader.classList.add("hidden");
+            generateBtn.disabled = false;
+            generateBtn.textContent = "Generate Report";
+            return;
+        }
+
+        // Get reports for ANY student with matching phone number and flexible name matching
         const studentResults = [];
         const monthlyReports = [];
 
@@ -196,9 +198,9 @@ async function loadReport() {
             
             const phoneMatches = last10ReportDigits && last10SearchDigits && last10ReportDigits === last10SearchDigits;
             
-            if (phoneMatches) {
+            if (phoneMatches && data.studentName) {
                 // If phone matches, check names flexibly
-                const nameMatches = flexibleNameMatch(data.studentName, studentName);
+                const nameMatches = flexibleNameMatch(studentName, data.studentName);
                 
                 if (nameMatches) {
                     studentResults.push({ 
@@ -222,9 +224,9 @@ async function loadReport() {
             
             const phoneMatches = last10ReportDigits && last10SearchDigits && last10ReportDigits === last10SearchDigits;
             
-            if (phoneMatches) {
+            if (phoneMatches && data.studentName) {
                 // If phone matches, check names flexibly
-                const nameMatches = flexibleNameMatch(data.studentName, studentName);
+                const nameMatches = flexibleNameMatch(studentName, data.studentName);
                 
                 if (nameMatches) {
                     monthlyReports.push({ 
@@ -238,7 +240,7 @@ async function loadReport() {
         });
 
         if (studentResults.length === 0 && monthlyReports.length === 0) {
-            alert(`No reports found for student: ${studentName}\n\nReports may not have been submitted yet.`);
+            alert(`No reports found for: ${studentName}\n\nReports may not have been submitted yet.`);
             loader.classList.add("hidden");
             generateBtn.disabled = false;
             generateBtn.textContent = "Generate Report";
@@ -493,6 +495,7 @@ async function loadReport() {
         document.getElementById("logoutArea").style.display = "flex";
 
     } catch (error) {
+        console.error("Report generation error:", error);
         alert("Sorry, there was an error generating the report. Please try again.");
     } finally {
         loader.classList.add("hidden");
