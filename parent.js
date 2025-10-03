@@ -94,8 +94,9 @@ async function loadReport() {
     generateBtn.textContent = "Generating...";
 
     try {
-        // STRICT MATCHING: NAME IS PRIMARY, THEN STRICT PHONE VERIFICATION (last 10 digits only)
-        const normalizedSearchPhone = parentPhone.replace(/\D/g, '').slice(-10);
+        // STRICT MATCHING: NAME IS PRIMARY, THEN STRICT PHONE VERIFICATION
+        const normalizedSearchPhone = parentPhone.replace(/\D/g, '');
+        const last10SearchDigits = normalizedSearchPhone.slice(-10); // Get last 10 digits only
         
         // Get ALL students and filter by NAME FIRST (your original system)
         const allStudentsSnapshot = await db.collection("students").get();
@@ -109,11 +110,12 @@ async function loadReport() {
                                studentData.studentName.toLowerCase() === studentName.toLowerCase();
             
             if (nameMatches) {
-                // STRICT PHONE VERIFICATION (last 10 digits only)
-                const studentPhoneDigits = studentData.parentPhone ? studentData.parentPhone.replace(/\D/g, '').slice(-10) : '';
+                // STRICT PHONE VERIFICATION - Compare last 10 digits only
+                const studentPhoneDigits = studentData.parentPhone ? studentData.parentPhone.replace(/\D/g, '') : '';
+                const last10StudentDigits = studentPhoneDigits.slice(-10); // Get last 10 digits only
                 
-                const phoneMatches = studentPhoneDigits && normalizedSearchPhone && 
-                                     studentPhoneDigits === normalizedSearchPhone;
+                const phoneMatches = last10StudentDigits && last10SearchDigits && 
+                                    last10StudentDigits === last10SearchDigits;
                 
                 if (phoneMatches) {
                     matchingStudents.push({
@@ -131,7 +133,9 @@ async function loadReport() {
             allStudentsSnapshot.forEach(doc => {
                 const studentData = doc.data();
                 if (studentData.studentName && studentData.studentName.toLowerCase() === studentName.toLowerCase()) {
-                    studentsWithSameName.push(studentData.parentPhone || 'No phone registered');
+                    const studentPhoneDigits = studentData.parentPhone ? studentData.parentPhone.replace(/\D/g, '') : '';
+                    const last10StudentDigits = studentPhoneDigits.slice(-10);
+                    studentsWithSameName.push(last10StudentDigits || 'No phone registered');
                 }
             });
 
@@ -142,7 +146,7 @@ async function loadReport() {
                 studentsWithSameName.forEach(phone => {
                     errorMessage += `• ${phone}\n`;
                 });
-                errorMessage += `\nPlease check your phone number entry (must match last 10 digits).`;
+                errorMessage += `\nPlease check your phone number entry.`;
             } else {
                 errorMessage += `\n\nPlease check:\n• Spelling of the name\n• Phone number\n• Make sure both match exactly how they were registered`;
             }
@@ -380,119 +384,109 @@ async function loadReport() {
                                     <p><strong>Grade:</strong> ${monthlyReport.grade || 'N/A'}</p>
                                     <p><strong>Tutor's Name:</strong> ${monthlyReport.tutorName || 'N/A'}</p>
                                 </div>
-                            </div
-```
+                            </div>
 
+                            ${monthlyReport.introduction ? `
+                            <div class="mb-6">
+                                <h3 class="text-lg font-semibold text-green-700 mb-2 border-b pb-1">INTRODUCTION</h3>
+                                <p class="text-gray-700 leading-relaxed preserve-whitespace">${monthlyReport.introduction}</p>
+                            </div>
+                            ` : ''}
 
->
+                            ${monthlyReport.topics ? `
+                            <div class="mb-6">
+                                <h3 class="text-lg font-semibold text-green-700 mb-2 border-b pb-1">TOPICS & REMARKS</h3>
+                                <p class="text-gray-700 leading-relaxed preserve-whitespace">${monthlyReport.topics}</p>
+                            </div>
+                            ` : ''}
 
-```
-                        ${monthlyReport.introduction ? `
-                        <div class="mb-6">
-                            <h3 class="text-lg font-semibold text-green-700 mb-2 border-b pb-1">INTRODUCTION</h3>
-                            <p class="text-gray-700 leading-relaxed preserve-whitespace">${monthlyReport.introduction}</p>
+                            ${monthlyReport.progress ? `
+                            <div class="mb-6">
+                                <h3 class="text-lg font-semibold text-green-700 mb-2 border-b pb-1">PROGRESS & ACHIEVEMENTS</h3>
+                                <p class="text-gray-700 leading-relaxed preserve-whitespace">${monthlyReport.progress}</p>
+                            </div>
+                            ` : ''}
+
+                            ${monthlyReport.strengthsWeaknesses ? `
+                            <div class="mb-6">
+                                <h3 class="text-lg font-semibold text-green-700 mb-2 border-b pb-1">STRENGTHS AND WEAKNESSES</h3>
+                                <p class="text-gray-700 leading-relaxed preserve-whitespace">${monthlyReport.strengthsWeaknesses}</p>
+                            </div>
+                            ` : ''}
+
+                            ${monthlyReport.recommendations ? `
+                            <div class="mb-6">
+                                <h3 class="text-lg font-semibold text-green-700 mb-2 border-b pb-1">RECOMMENDATIONS</h3>
+                                <p class="text-gray-700 leading-relaxed preserve-whitespace">${monthlyReport.recommendations}</p>
+                            </div>
+                            ` : ''}
+
+                            ${monthlyReport.generalComments ? `
+                            <div class="mb-6">
+                                <h3 class="text-lg font-semibold text-green-700 mb-2 border-b pb-1">GENERAL TUTOR'S COMMENTS</h3>
+                                <p class="text-gray-700 leading-relaxed preserve-whitespace">${monthlyReport.generalComments}</p>
+                            </div>
+                            ` : ''}
+
+                            <div class="text-right mt-8 pt-4 border-t">
+                                <p class="text-gray-600">Best regards,</p>
+                                <p class="font-semibold text-green-800">${monthlyReport.tutorName || 'N/A'}</p>
+                            </div>
+
+                            <div class="mt-6 text-center">
+                                <button onclick="downloadMonthlyReport(${monthlyIndex}, '${fullName}')" class="bg-green-600 text-white px-6 py-2 rounded-lg font-semibold hover:bg-green-700 transition-all duration-200">
+                                    Download Monthly Report PDF
+                                </button>
+                            </div>
                         </div>
-                        ` : ''}
+                    `;
 
-                        ${monthlyReport.topics ? `
-                        <div class="mb-6">
-                            <h3 class="text-lg font-semibold text-green-700 mb-2 border-b pb-1">TOPICS & REMARKS</h3>
-                            <p class="text-gray-700 leading-relaxed preserve-whitespace">${monthlyReport.topics}</p>
-                        </div>
-                        ` : ''}
-
-                        ${monthlyReport.progress ? `
-                        <div class="mb-6">
-                            <h3 class="text-lg font-semibold text-green-700 mb-2 border-b pb-1">PROGRESS & ACHIEVEMENTS</h3>
-                            <p class="text-gray-700 leading-relaxed preserve-whitespace">${monthlyReport.progress}</p>
-                        </div>
-                        ` : ''}
-
-                        ${monthlyReport.strengthsWeaknesses ? `
-                        <div class="mb-6">
-                            <h3 class="text-lg font-semibold text-green-700 mb-2 border-b pb-1">STRENGTHS AND WEAKNESSES</h3>
-                            <p class="text-gray-700 leading-relaxed preserve-whitespace">${monthlyReport.strengthsWeaknesses}</p>
-                        </div>
-                        ` : ''}
-
-                        ${monthlyReport.recommendations ? `
-                        <div class="mb-6">
-                            <h3 class="text-lg font-semibold text-green-700 mb-2 border-b pb-1">RECOMMENDATIONS</h3>
-                            <p class="text-gray-700 leading-relaxed preserve-whitespace">${monthlyReport.recommendations}</p>
-                        </div>
-                        ` : ''}
-
-                        ${monthlyReport.generalComments ? `
-                        <div class="mb-6">
-                            <h3 class="text-lg font-semibold text-green-700 mb-2 border-b pb-1">GENERAL TUTOR'S COMMENTS</h3>
-                            <p class="text-gray-700 leading-relaxed preserve-whitespace">${monthlyReport.generalComments}</p>
-                        </div>
-                        ` : ''}
-
-                        <div class="text-right mt-8 pt-4 border-t">
-                            <p class="text-gray-600">Best regards,</p>
-                            <p class="font-semibold text-green-800">${monthlyReport.tutorName || 'N/A'}</p>
-                        </div>
-
-                        <div class="mt-6 text-center">
-                            <button onclick="downloadMonthlyReport(${monthlyIndex}, '${fullName}')" class="bg-green-600 text-white px-6 py-2 rounded-lg font-semibold hover:bg-green-700 transition-all duration-200">
-                                Download Monthly Report PDF
-                            </button>
-                        </div>
-                    </div>
-                `;
-
-                reportContent.innerHTML += monthlyBlock;
-                monthlyIndex++;
-            });
+                    reportContent.innerHTML += monthlyBlock;
+                    monthlyIndex++;
+                });
+            }
         }
+
+        document.getElementById("inputArea").classList.add("hidden");
+        reportArea.classList.remove("hidden");
+        document.getElementById("logoutArea").style.display = "flex";
+
+    } catch (error) {
+        alert("Sorry, there was an error generating the report. Please try again.");
+    } finally {
+        loader.classList.add("hidden");
+        generateBtn.disabled = false;
+        generateBtn.textContent = "Generate Report";
     }
-
-    document.getElementById("inputArea").classList.add("hidden");
-    reportArea.classList.remove("hidden");
-    document.getElementById("logoutArea").style.display = "flex";
-
-} catch (error) {
-    alert("Sorry, there was an error generating the report. Please try again.");
-} finally {
-    loader.classList.add("hidden");
-    generateBtn.disabled = false;
-    generateBtn.textContent = "Generate Report";
-}
-```
-
 }
 
 function downloadSessionReport(index, studentName, type) {
-const element = document.getElementById(`${type}-block-${index}`);
-const safeStudentName = studentName.replace(/ /g, '_');
-const fileName = `${type === 'assessment' ? 'Assessment' : 'Monthly'}_Report_${safeStudentName}.pdf`;
-const opt = { margin: 0.5, filename: fileName, image: { type: 'jpeg', quality: 0.98 }, html2canvas: { scale: 2, useCORS: true }, jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' } };
-html2pdf().from(element).set(opt).save();
+    const element = document.getElementById(`${type}-block-${index}`);
+    const safeStudentName = studentName.replace(/ /g, '_');
+    const fileName = `${type === 'assessment' ? 'Assessment' : 'Monthly'}_Report_${safeStudentName}.pdf`;
+    const opt = { margin: 0.5, filename: fileName, image: { type: 'jpeg', quality: 0.98 }, html2canvas: { scale: 2, useCORS: true }, jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' } };
+    html2pdf().from(element).set(opt).save();
 }
 
 function downloadMonthlyReport(index, studentName) {
-downloadSessionReport(index, studentName, 'monthly');
+    downloadSessionReport(index, studentName, 'monthly');
 }
 
 function logout() {
-window.location.href = "parent.html";
+    window.location.href = "parent.html";
 }
 
 // Initialize the page
 document.addEventListener('DOMContentLoaded', function() {
-// Check if we have URL parameters (coming from login)
-const urlParams = new URLSearchParams(window.location.search);
-const studentFromUrl = urlParams.get('student');
-const phoneFromUrl = urlParams.get('phone');
-
-```
-if (studentFromUrl && phoneFromUrl) {
-    document.getElementById('studentName').value = studentFromUrl;
-    document.getElementById('parentPhone').value = phoneFromUrl;
-}
-
-document.getElementById("generateBtn").addEventListener("click", loadReport);
-```
-
+    // Check if we have URL parameters (coming from login)
+    const urlParams = new URLSearchParams(window.location.search);
+    const studentFromUrl = urlParams.get('student');
+    const phoneFromUrl = urlParams.get('phone');
+    
+    if (studentFromUrl && phoneFromUrl) {
+        document.getElementById('studentName').value = studentFromUrl;
+        document.getElementById('parentPhone').value = phoneFromUrl;
+    }
+    
+    document.getElementById("generateBtn").addEventListener("click", loadReport);
 });
