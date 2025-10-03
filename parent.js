@@ -162,17 +162,21 @@ async function loadReport() {
         const studentResults = [];
         const monthlyReports = [];
 
-        // Get assessment reports - ONLY for the specific matched student
-        const assessmentQuery = await db.collection("student_results").get();
+        // OPTIMIZED QUERY: Get assessment reports using Firestore query instead of getting all
+        const assessmentQuery = await db.collection("student_results")
+            .where("studentName", "==", studentName)
+            .get();
+
         assessmentQuery.forEach(doc => {
             const data = doc.data();
-            // Only include reports for the specific matched student
-            const isExactMatch = matchingStudents.some(s => 
-                s.studentName.toLowerCase() === data.studentName?.toLowerCase() &&
-                s.parentPhone && data.parentPhone &&
-                s.parentPhone.replace(/\D/g, '').slice(-10) === data.parentPhone.replace(/\D/g, '').slice(-10)
-            );
-            if (isExactMatch) {
+            
+            // Check phone number in the REPORT against the searched phone
+            const reportPhoneDigits = data.parentPhone ? data.parentPhone.replace(/\D/g, '') : '';
+            const last10ReportDigits = reportPhoneDigits.slice(-10);
+            
+            const phoneMatches = last10ReportDigits && last10SearchDigits && last10ReportDigits === last10SearchDigits;
+            
+            if (phoneMatches) {
                 studentResults.push({ 
                     id: doc.id,
                     ...data,
@@ -182,17 +186,21 @@ async function loadReport() {
             }
         });
 
-        // Get monthly reports - ONLY for the specific matched student
-        const monthlyQuery = await db.collection("tutor_submissions").get();
+        // OPTIMIZED QUERY: Get monthly reports using Firestore query instead of getting all
+        const monthlyQuery = await db.collection("tutor_submissions")
+            .where("studentName", "==", studentName)
+            .get();
+
         monthlyQuery.forEach(doc => {
             const data = doc.data();
-            // Only include reports for the specific matched student
-            const isExactMatch = matchingStudents.some(s => 
-                s.studentName.toLowerCase() === data.studentName?.toLowerCase() &&
-                s.parentPhone && data.parentPhone &&
-                s.parentPhone.replace(/\D/g, '').slice(-10) === data.parentPhone.replace(/\D/g, '').slice(-10)
-            );
-            if (isExactMatch) {
+            
+            // Check phone number in the REPORT against the searched phone
+            const reportPhoneDigits = data.parentPhone ? data.parentPhone.replace(/\D/g, '') : '';
+            const last10ReportDigits = reportPhoneDigits.slice(-10);
+            
+            const phoneMatches = last10ReportDigits && last10SearchDigits && last10ReportDigits === last10SearchDigits;
+            
+            if (phoneMatches) {
                 monthlyReports.push({ 
                     id: doc.id,
                     ...data,
