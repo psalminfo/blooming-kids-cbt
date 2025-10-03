@@ -113,7 +113,6 @@ async function loadReport() {
                 const studentPhoneDigits = studentData.parentPhone ? studentData.parentPhone.replace(/\D/g, '') : '';
                 
                 const phoneMatches = studentPhoneDigits && normalizedSearchPhone && 
-                                    (studentPhoneDigits.includes(normalizedSearchPhone) || 
                                      normalizedSearchPhone.includes(studentPhoneDigits));
                 
                 if (phoneMatches) {
@@ -487,3 +486,4 @@ document.addEventListener('DOMContentLoaded', function() {
     
     document.getElementById("generateBtn").addEventListener("click", loadReport);
 });
+
