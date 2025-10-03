@@ -198,43 +198,36 @@ async function loadReport() {
         const monthlyReports = [];
 
         // Get assessment reports - ONLY for the specific matched student
-        const assessmentQuery = await db.collection("student_results").get();
+        const matchedStudent = matchingStudents[0]; // Use the first matched student
+        const assessmentQuery = await db.collection("student_results")
+            .where("studentName", "==", matchedStudent.studentName)
+            .where("parentPhone", "==", matchedStudent.parentPhone)
+            .get();
+        
         assessmentQuery.forEach(doc => {
             const data = doc.data();
-            // Only include reports for the specific matched student
-            const isExactMatch = matchingStudents.some(s => 
-                nameMatches(s.studentName, data.studentName) &&
-                s.parentPhone && data.parentPhone &&
-                s.parentPhone.replace(/\D/g, '').slice(-10) === data.parentPhone.replace(/\D/g, '').slice(-10)
-            );
-            if (isExactMatch) {
-                studentResults.push({ 
-                    id: doc.id,
-                    ...data,
-                    timestamp: data.submittedAt?.seconds || Date.now() / 1000,
-                    type: 'assessment'
-                });
-            }
+            studentResults.push({ 
+                id: doc.id,
+                ...data,
+                timestamp: data.submittedAt?.seconds || Date.now() / 1000,
+                type: 'assessment'
+            });
         });
 
         // Get monthly reports - ONLY for the specific matched student
-        const monthlyQuery = await db.collection("tutor_submissions").get();
+        const monthlyQuery = await db.collection("tutor_submissions")
+            .where("studentName", "==", matchedStudent.studentName)
+            .where("parentPhone", "==", matchedStudent.parentPhone)
+            .get();
+        
         monthlyQuery.forEach(doc => {
             const data = doc.data();
-            // Only include reports for the specific matched student
-            const isExactMatch = matchingStudents.some(s => 
-                nameMatches(s.studentName, data.studentName) &&
-                s.parentPhone && data.parentPhone &&
-                s.parentPhone.replace(/\D/g, '').slice(-10) === data.parentPhone.replace(/\D/g, '').slice(-10)
-            );
-            if (isExactMatch) {
-                monthlyReports.push({ 
-                    id: doc.id,
-                    ...data,
-                    timestamp: data.submittedAt?.seconds || Date.now() / 1000,
-                    type: 'monthly'
-                });
-            }
+            monthlyReports.push({ 
+                id: doc.id,
+                ...data,
+                timestamp: data.submittedAt?.seconds || Date.now() / 1000,
+                type: 'monthly'
+            });
         });
 
         if (studentResults.length === 0 && monthlyReports.length === 0) {
@@ -246,6 +239,24 @@ async function loadReport() {
         }
 
         reportContent.innerHTML = "";
+        
+        // Pre-fetch tutor names for all assessment reports to reduce individual reads
+        const tutorEmails = [...new Set(studentResults.map(result => result.tutorEmail).filter(email => email && email !== 'N/A'))];
+        const tutorMap = new Map();
+        
+        if (tutorEmails.length > 0) {
+            const tutorPromises = tutorEmails.map(async (email) => {
+                try {
+                    const tutorDoc = await db.collection("tutors").doc(email).get();
+                    if (tutorDoc.exists) {
+                        tutorMap.set(email, tutorDoc.data().name);
+                    }
+                } catch (error) {
+                    // Silent fail - tutor name will remain 'N/A'
+                }
+            });
+            await Promise.all(tutorPromises);
+        }
         
         // Display Assessment Reports
         if (studentResults.length > 0) {
@@ -269,14 +280,7 @@ async function loadReport() {
 
                 let tutorName = 'N/A';
                 if (tutorEmail && tutorEmail !== 'N/A') {
-                    try {
-                        const tutorDoc = await db.collection("tutors").doc(tutorEmail).get();
-                        if (tutorDoc.exists) {
-                            tutorName = tutorDoc.data().name;
-                        }
-                    } catch (error) {
-                        // Silent fail - tutor name will remain 'N/A'
-                    }
+                    tutorName = tutorMap.get(tutorEmail) || 'N/A';
                 }
 
                 const results = session.map(testResult => {
