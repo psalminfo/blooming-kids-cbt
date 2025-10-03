@@ -193,37 +193,21 @@ async function loadReport() {
             return;
         }
 
-        // Get reports for ALL students with matching phone number (NEW FEATURE)
+        // Get reports for ONLY the matching student (not all students with same name)
         const studentResults = [];
         const monthlyReports = [];
 
-        // Get ALL students with same phone number (NEW FEATURE)
-        const allStudentsWithSamePhone = [];
-        allStudentsSnapshot.forEach(doc => {
-            const studentData = doc.data();
-            const studentPhoneDigits = studentData.parentPhone ? studentData.parentPhone.replace(/\D/g, '') : '';
-            const last10StudentDigits = studentPhoneDigits.slice(-10);
-            
-            if (last10StudentDigits && last10SearchDigits && last10StudentDigits === last10SearchDigits) {
-                allStudentsWithSamePhone.push({
-                    id: doc.id,
-                    ...studentData,
-                    collection: "students"
-                });
-            }
-        });
-
-        // Get assessment reports for ALL students with same phone number (NEW FEATURE)
+        // Get assessment reports - ONLY for the specific matched student
         const assessmentQuery = await db.collection("student_results").get();
         assessmentQuery.forEach(doc => {
             const data = doc.data();
-            // Check if this report belongs to any student with the same phone number
-            const belongsToSamePhoneStudent = allStudentsWithSamePhone.some(student => 
-                nameMatches(student.studentName, data.studentName) &&
-                student.parentPhone && data.parentPhone &&
-                student.parentPhone.replace(/\D/g, '').slice(-10) === data.parentPhone.replace(/\D/g, '').slice(-10)
+            // Only include reports for the specific matched student
+            const isExactMatch = matchingStudents.some(s => 
+                nameMatches(s.studentName, data.studentName) &&
+                s.parentPhone && data.parentPhone &&
+                s.parentPhone.replace(/\D/g, '').slice(-10) === data.parentPhone.replace(/\D/g, '').slice(-10)
             );
-            if (belongsToSamePhoneStudent) {
+            if (isExactMatch) {
                 studentResults.push({ 
                     id: doc.id,
                     ...data,
@@ -233,17 +217,17 @@ async function loadReport() {
             }
         });
 
-        // Get monthly reports for ALL students with same phone number (NEW FEATURE)
+        // Get monthly reports - ONLY for the specific matched student
         const monthlyQuery = await db.collection("tutor_submissions").get();
         monthlyQuery.forEach(doc => {
             const data = doc.data();
-            // Check if this report belongs to any student with the same phone number
-            const belongsToSamePhoneStudent = allStudentsWithSamePhone.some(student => 
-                nameMatches(student.studentName, data.studentName) &&
-                student.parentPhone && data.parentPhone &&
-                student.parentPhone.replace(/\D/g, '').slice(-10) === data.parentPhone.replace(/\D/g, '').slice(-10)
+            // Only include reports for the specific matched student
+            const isExactMatch = matchingStudents.some(s => 
+                nameMatches(s.studentName, data.studentName) &&
+                s.parentPhone && data.parentPhone &&
+                s.parentPhone.replace(/\D/g, '').slice(-10) === data.parentPhone.replace(/\D/g, '').slice(-10)
             );
-            if (belongsToSamePhoneStudent) {
+            if (isExactMatch) {
                 monthlyReports.push({ 
                     id: doc.id,
                     ...data,
@@ -262,24 +246,6 @@ async function loadReport() {
         }
 
         reportContent.innerHTML = "";
-        
-        // Pre-fetch tutor names for all assessment reports to reduce individual reads
-        const tutorEmails = [...new Set(studentResults.map(result => result.tutorEmail).filter(email => email && email !== 'N/A'))];
-        const tutorMap = new Map();
-        
-        if (tutorEmails.length > 0) {
-            const tutorPromises = tutorEmails.map(async (email) => {
-                try {
-                    const tutorDoc = await db.collection("tutors").doc(email).get();
-                    if (tutorDoc.exists) {
-                        tutorMap.set(email, tutorDoc.data().name);
-                    }
-                } catch (error) {
-                    // Silent fail - tutor name will remain 'N/A'
-                }
-            });
-            await Promise.all(tutorPromises);
-        }
         
         // Display Assessment Reports
         if (studentResults.length > 0) {
@@ -303,7 +269,14 @@ async function loadReport() {
 
                 let tutorName = 'N/A';
                 if (tutorEmail && tutorEmail !== 'N/A') {
-                    tutorName = tutorMap.get(tutorEmail) || 'N/A';
+                    try {
+                        const tutorDoc = await db.collection("tutors").doc(tutorEmail).get();
+                        if (tutorDoc.exists) {
+                            tutorName = tutorDoc.data().name;
+                        }
+                    } catch (error) {
+                        // Silent fail - tutor name will remain 'N/A'
+                    }
                 }
 
                 const results = session.map(testResult => {
