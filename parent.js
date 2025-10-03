@@ -1,3 +1,4 @@
+```javascript
 // Firebase config for the 'bloomingkidsassessment' project
 firebase.initializeApp({
     apiKey: "AIzaSyD1lJhsWMMs_qerLBSzk7wKhjLyI_11RJg",
@@ -126,25 +127,29 @@ async function loadReport() {
     generateBtn.textContent = "Generating...";
 
     try {
-        // STRICT MATCHING: NAME IS PRIMARY, THEN STRICT PHONE VERIFICATION
+        // OPTIMIZED QUERY: Find student by phone number first (indexed field)
         const normalizedSearchPhone = parentPhone.replace(/\D/g, '');
-        const last10SearchDigits = normalizedSearchPhone.slice(-10); // Get last 10 digits only
+        const last10SearchDigits = normalizedSearchPhone.slice(-10);
         
-        // Get ALL students and filter by NAME FIRST (your original system)
-        const allStudentsSnapshot = await db.collection("students").get();
+        // Query students by phone number (indexed) instead of getting all
+        const studentsQuery = await db.collection("students")
+            .where("parentPhone", ">=", last10SearchDigits)
+            .where("parentPhone", "<=", last10SearchDigits + '\uf8ff')
+            .get();
+
         const matchingStudents = [];
         
-        allStudentsSnapshot.forEach(doc => {
+        studentsQuery.forEach(doc => {
             const studentData = doc.data();
             
-            // FLEXIBLE NAME MATCHING (primary criteria - case insensitive and allows extra names)
+            // FLEXIBLE NAME MATCHING with phone pre-filtered
             const nameMatchesResult = studentData.studentName && 
                                    nameMatches(studentData.studentName, studentName);
             
             if (nameMatchesResult) {
-                // STRICT PHONE VERIFICATION - Compare last 10 digits only
+                // Additional phone verification
                 const studentPhoneDigits = studentData.parentPhone ? studentData.parentPhone.replace(/\D/g, '') : '';
-                const last10StudentDigits = studentPhoneDigits.slice(-10); // Get last 10 digits only
+                const last10StudentDigits = studentPhoneDigits.slice(-10);
                 
                 const phoneMatches = last10StudentDigits && last10SearchDigits && 
                                     last10StudentDigits === last10SearchDigits;
@@ -160,14 +165,19 @@ async function loadReport() {
         });
 
         if (matchingStudents.length === 0) {
-            // Check if name exists but phone doesn't match
-            const studentsWithSameName = [];
-            allStudentsSnapshot.forEach(doc => {
+            // Check if name exists but phone doesn't match by querying name range
+            const nameQuery = await db.collection("students")
+                .where("studentName", ">=", studentName.toLowerCase())
+                .where("studentName", "<=", studentName.toLowerCase() + '\uf8ff')
+                .get();
+
+            const studentsWithSimilarName = [];
+            nameQuery.forEach(doc => {
                 const studentData = doc.data();
-                if (studentData.studentName && nameMatches(studentData.studentName, studentName)) {
+                if (nameMatches(studentData.studentName, studentName)) {
                     const studentPhoneDigits = studentData.parentPhone ? studentData.parentPhone.replace(/\D/g, '') : '';
                     const last10StudentDigits = studentPhoneDigits.slice(-10);
-                    studentsWithSameName.push({
+                    studentsWithSimilarName.push({
                         name: studentData.studentName,
                         phone: last10StudentDigits || 'No phone registered'
                     });
@@ -176,9 +186,9 @@ async function loadReport() {
 
             let errorMessage = `No student found with name: ${studentName} and phone number: ${parentPhone}`;
             
-            if (studentsWithSameName.length > 0) {
+            if (studentsWithSimilarName.length > 0) {
                 errorMessage += `\n\nFound student(s) with similar name but different phone number(s):\n`;
-                studentsWithSameName.forEach(student => {
+                studentsWithSimilarName.forEach(student => {
                     errorMessage += `• Name: "${student.name}", Phone: ${student.phone}\n`;
                 });
                 errorMessage += `\nPlease check your phone number entry.`;
@@ -193,49 +203,99 @@ async function loadReport() {
             return;
         }
 
-        // Get reports for ONLY the matching student (not all students with same name)
+        // Get reports for ONLY the matching student using optimized queries
         const studentResults = [];
         const monthlyReports = [];
 
-        // Get assessment reports - ONLY for the specific matched student
-        const assessmentQuery = await db.collection("student_results").get();
-        assessmentQuery.forEach(doc => {
-            const data = doc.data();
-            // Only include reports for the specific matched student
-            const isExactMatch = matchingStudents.some(s => 
-                nameMatches(s.studentName, data.studentName) &&
-                s.parentPhone && data.parentPhone &&
-                s.parentPhone.replace(/\D/g, '').slice(-10) === data.parentPhone.replace(/\D/g, '').slice(-10)
-            );
-            if (isExactMatch) {
+        // Get student IDs for querying
+        const studentIds = matchingStudents.map(s => s.id);
+        const studentNames = matchingStudents.map(s => s.studentName.toLowerCase());
+
+        // OPTIMIZED: Query assessment reports only for matching students
+        if (studentIds.length > 0) {
+            // Try querying by studentId first (most efficient if available)
+            const assessmentQueryById = await db.collection("student_results")
+                .where("studentId", "in", studentIds.slice(0, 10)) // Firestore limit: 10 items in 'in' query
+                .get();
+            
+            assessmentQueryById.forEach(doc => {
+                const data = doc.data();
                 studentResults.push({ 
                     id: doc.id,
                     ...data,
                     timestamp: data.submittedAt?.seconds || Date.now() / 1000,
                     type: 'assessment'
                 });
-            }
-        });
+            });
 
-        // Get monthly reports - ONLY for the specific matched student
-        const monthlyQuery = await db.collection("tutor_submissions").get();
-        monthlyQuery.forEach(doc => {
-            const data = doc.data();
-            // Only include reports for the specific matched student
-            const isExactMatch = matchingStudents.some(s => 
-                nameMatches(s.studentName, data.studentName) &&
-                s.parentPhone && data.parentPhone &&
-                s.parentPhone.replace(/\D/g, '').slice(-10) === data.parentPhone.replace(/\D/g, '').slice(-10)
-            );
-            if (isExactMatch) {
+            // Also query by name for any reports that might not have studentId
+            for (const name of studentNames) {
+                const assessmentQueryByName = await db.collection("student_results")
+                    .where("studentName", ">=", name)
+                    .where("studentName", "<=", name + '\uf8ff')
+                    .get();
+                
+                assessmentQueryByName.forEach(doc => {
+                    const data = doc.data();
+                    // Verify phone match and avoid duplicates
+                    const dataPhoneDigits = data.parentPhone ? data.parentPhone.replace(/\D/g, '') : '';
+                    const last10DataDigits = dataPhoneDigits.slice(-10);
+                    const isExactMatch = last10DataDigits === last10SearchDigits;
+                    
+                    if (isExactMatch && !studentResults.some(r => r.id === doc.id)) {
+                        studentResults.push({ 
+                            id: doc.id,
+                            ...data,
+                            timestamp: data.submittedAt?.seconds || Date.now() / 1000,
+                            type: 'assessment'
+                        });
+                    }
+                });
+            }
+        }
+
+        // OPTIMIZED: Query monthly reports only for matching students
+        if (studentIds.length > 0) {
+            // Try querying by studentId first
+            const monthlyQueryById = await db.collection("tutor_submissions")
+                .where("studentId", "in", studentIds.slice(0, 10))
+                .get();
+            
+            monthlyQueryById.forEach(doc => {
+                const data = doc.data();
                 monthlyReports.push({ 
                     id: doc.id,
                     ...data,
                     timestamp: data.submittedAt?.seconds || Date.now() / 1000,
                     type: 'monthly'
                 });
+            });
+
+            // Also query by name for any reports that might not have studentId
+            for (const name of studentNames) {
+                const monthlyQueryByName = await db.collection("tutor_submissions")
+                    .where("studentName", ">=", name)
+                    .where("studentName", "<=", name + '\uf8ff')
+                    .get();
+                
+                monthlyQueryByName.forEach(doc => {
+                    const data = doc.data();
+                    // Verify phone match and avoid duplicates
+                    const dataPhoneDigits = data.parentPhone ? data.parentPhone.replace(/\D/g, '') : '';
+                    const last10DataDigits = dataPhoneDigits.slice(-10);
+                    const isExactMatch = last10DataDigits === last10SearchDigits;
+                    
+                    if (isExactMatch && !monthlyReports.some(r => r.id === doc.id)) {
+                        monthlyReports.push({ 
+                            id: doc.id,
+                            ...data,
+                            timestamp: data.submittedAt?.seconds || Date.now() / 1000,
+                            type: 'monthly'
+                        });
+                    }
+                });
             }
-        });
+        }
 
         if (studentResults.length === 0 && monthlyReports.length === 0) {
             alert(`No reports found for student: ${studentName}\n\nReports may not have been submitted yet.`);
@@ -531,3 +591,4 @@ document.addEventListener('DOMContentLoaded', function() {
     
     document.getElementById("generateBtn").addEventListener("click", loadReport);
 });
+```
