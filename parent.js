@@ -1,265 +1,3 @@
-// ==================== COMPLETE READS REDUCTION + CACHE LAYER ====================
-// PLACE THIS AT THE VERY TOP - ABOVE FIREBASE CODE
-// This does BOTH reads reduction AND caching
-
-const OPTIMIZATION_CONFIG = {
-    ENABLED: true,
-    CACHE_DURATION: 14 * 24 * 60 * 60 * 1000, // 14 days
-    CACHE_PREFIX: 'bh_optimized_'
-};
-
-// Phone-first query optimizer
-class ReadsReducer {
-    constructor() {
-        console.log('🔥 Reads Reducer - Phone-First Filtering Enabled');
-        this.overrideFirestoreQueries();
-    }
-
-    getCurrentSearchPhone() {
-        try {
-            // Get from URL
-            const urlParams = new URLSearchParams(window.location.search);
-            const phoneFromUrl = urlParams.get('phone');
-            if (phoneFromUrl) return phoneFromUrl.replace(/\D/g, '').slice(-10);
-            
-            // Get from form
-            const phoneInput = document.getElementById('parentPhone');
-            if (phoneInput && phoneInput.value) {
-                return phoneInput.value.replace(/\D/g, '').slice(-10);
-            }
-        } catch (e) {
-            console.warn('Could not get search phone:', e);
-        }
-        return null;
-    }
-
-    async optimizedGet(collectionRef, originalGet, options) {
-        const searchPhone = this.getCurrentSearchPhone();
-        const collectionName = collectionRef.path;
-        
-        if (!searchPhone) {
-            return originalGet.call(collectionRef, options);
-        }
-
-        console.log(`📱 Applying phone-first filtering to: ${collectionName}`);
-
-        // Get all documents but filter by phone CLIENT-SIDE
-        const allDocs = await originalGet.call(collectionRef, options);
-        const filteredDocs = [];
-        
-        allDocs.forEach(doc => {
-            const data = doc.data();
-            const docPhone = data.parentPhone ? data.parentPhone.replace(/\D/g, '').slice(-10) : '';
-            
-            if (docPhone === searchPhone) {
-                filteredDocs.push({
-                    id: doc.id,
-                    data: doc.data(),
-                    exists: true
-                });
-            }
-        });
-
-        console.log(`📊 ${collectionName}: ${allDocs.size} -> ${filteredDocs.length} documents after phone filtering`);
-        
-        return this.createMockSnapshot(filteredDocs);
-    }
-
-    createMockSnapshot(docsArray) {
-        return {
-            forEach: (callback) => {
-                docsArray.forEach(doc => {
-                    callback({
-                        id: doc.id,
-                        data: () => doc.data,
-                        exists: true
-                    });
-                });
-            },
-            docs: docsArray.map(doc => ({
-                id: doc.id,
-                data: () => doc.data,
-                exists: true
-            })),
-            empty: docsArray.length === 0,
-            size: docsArray.length
-        };
-    }
-
-    overrideFirestoreQueries() {
-        const originalGet = firebase.firestore.CollectionReference.prototype.get;
-        const self = this;
-        
-        firebase.firestore.CollectionReference.prototype.get = function(options) {
-            // Apply to main collections only (students, student_results, tutor_submissions)
-            const mainCollections = ['students', 'student_results', 'tutor_submissions'];
-            
-            if (mainCollections.includes(this.path)) {
-                return self.optimizedGet(this, originalGet, options);
-            }
-            
-            // For other collections (tutors, etc), use original
-            return originalGet.call(this, options);
-        };
-
-        console.log('✅ Firestore queries optimized for reads reduction');
-    }
-}
-
-// Search result cache
-class SearchCache {
-    constructor() {
-        console.log('💾 Search Cache - 14 Day Caching Enabled');
-        this.overrideLoadReport();
-    }
-
-    getCacheKey(studentName, parentPhone) {
-        const normalizedPhone = parentPhone.replace(/\D/g, '').slice(-10);
-        const normalizedName = studentName.toLowerCase().trim().replace(/\s+/g, '_');
-        return `${OPTIMIZATION_CONFIG.CACHE_PREFIX}${normalizedPhone}_${normalizedName}`;
-    }
-
-    isCacheValid(timestamp) {
-        return Date.now() - timestamp < OPTIMIZATION_CONFIG.CACHE_DURATION;
-    }
-
-    getCachedSearch(studentName, parentPhone) {
-        if (!OPTIMIZATION_CONFIG.ENABLED) return null;
-        
-        try {
-            const cacheKey = this.getCacheKey(studentName, parentPhone);
-            const cached = localStorage.getItem(cacheKey);
-            
-            if (cached) {
-                const data = JSON.parse(cached);
-                if (this.isCacheValid(data.timestamp)) {
-                    console.log('💾 Returning cached search results');
-                    return data;
-                } else {
-                    localStorage.removeItem(cacheKey);
-                }
-            }
-        } catch (e) {
-            console.warn('Cache read failed:', e);
-        }
-        return null;
-    }
-
-    cacheCurrentSearch(studentName, parentPhone) {
-        if (!OPTIMIZATION_CONFIG.ENABLED) return;
-        
-        try {
-            const reportContent = document.getElementById("reportContent");
-            if (!reportContent || !reportContent.innerHTML) return;
-
-            const cacheKey = this.getCacheKey(studentName, parentPhone);
-            const cacheData = {
-                html: reportContent.innerHTML,
-                timestamp: Date.now(),
-                cachedAt: new Date().toLocaleString()
-            };
-
-            localStorage.setItem(cacheKey, JSON.stringify(cacheData));
-            console.log('💾 Search results cached for 14 days');
-        } catch (e) {
-            console.warn('Cache write failed:', e);
-        }
-    }
-
-    displayCachedResults(cachedData) {
-        const reportArea = document.getElementById("reportArea");
-        const reportContent = document.getElementById("reportContent");
-        const loader = document.getElementById("loader");
-        const generateBtn = document.getElementById("generateBtn");
-
-        // Reset UI
-        if (loader) loader.classList.add("hidden");
-        if (generateBtn) {
-            generateBtn.disabled = false;
-            generateBtn.textContent = "Generate Report";
-        }
-
-        // Display cached content
-        if (reportContent) {
-            reportContent.innerHTML = cachedData.html;
-        }
-
-        // Show report area
-        const inputArea = document.getElementById("inputArea");
-        const logoutArea = document.getElementById("logoutArea");
-        
-        if (inputArea) inputArea.classList.add("hidden");
-        if (reportArea) reportArea.classList.remove("hidden");
-        if (logoutArea) logoutArea.style.display = "flex";
-    }
-
-    overrideLoadReport() {
-        const originalLoadReport = window.loadReport;
-        
-        if (!originalLoadReport) {
-            console.warn('loadReport not found yet');
-            return;
-        }
-
-        window.loadReport = async function() {
-            const studentName = document.getElementById("studentName").value.trim();
-            const parentPhone = document.getElementById("parentPhone").value.trim();
-
-            if (!studentName || !parentPhone) {
-                alert("Please enter both the student's full name and the parent's phone number.");
-                return;
-            }
-
-            // Check cache first
-            const cached = window.searchCache.getCachedSearch(studentName, parentPhone);
-            if (cached) {
-                console.log('🚀 Loading from cache - 0 Firebase reads');
-                window.searchCache.displayCachedResults(cached);
-                return;
-            }
-
-            // No cache - do optimized search (with reads reduction)
-            console.log('🔄 Fresh optimized search - reduced Firebase reads');
-            
-            try {
-                await originalLoadReport.call(this);
-                
-                // Cache results after successful search
-                setTimeout(() => {
-                    window.searchCache.cacheCurrentSearch(studentName, parentPhone);
-                }, 2000);
-                
-            } catch (error) {
-                console.error('Search failed:', error);
-                throw error;
-            }
-        };
-
-        console.log('✅ loadReport optimized with caching');
-    }
-
-    clearCache() {
-        Object.keys(localStorage)
-            .filter(key => key.startsWith(OPTIMIZATION_CONFIG.CACHE_PREFIX))
-            .forEach(key => localStorage.removeItem(key));
-        console.log('🗑️ All optimization cache cleared');
-    }
-}
-
-// Initialize both systems
-document.addEventListener('DOMContentLoaded', function() {
-    // 1. First: Reduce reads with phone-first filtering
-    window.readsReducer = new ReadsReducer();
-    
-    // 2. Second: Cache the optimized results
-    window.searchCache = new SearchCache();
-    
-    // Global commands
-    window.clearOptimizationCache = () => window.searchCache.clearCache();
-});
-
-console.log('🚀 COMPLETE Optimization Layer - Reads Reduction + 14 Day Cache');
-// ==================== END COMPLETE OPTIMIZATION LAYER ====================
 // Firebase config for the 'bloomingkidsassessment' project
 firebase.initializeApp({
     apiKey: "AIzaSyD1lJhsWMMs_qerLBSzk7wKhjLyI_11RJg",
@@ -382,72 +120,66 @@ async function loadReport() {
         alert("Please enter both the student's full name and the parent's phone number.");
         return;
     }
+    
+    // **NEW**: Caching logic starts here
+    const CACHE_KEY = `report_${parentPhone}_${studentName.toLowerCase().replace(/\s/g, '')}`;
+    const CACHE_DURATION_MS = 14 * 24 * 60 * 60 * 1000; // 14 days
+
+    try {
+        const cachedData = localStorage.getItem(CACHE_KEY);
+        if (cachedData) {
+            const { timestamp, html } = JSON.parse(cachedData);
+            if (Date.now() - timestamp < CACHE_DURATION_MS) {
+                console.log("Loading report from cache.");
+                reportContent.innerHTML = html;
+                document.getElementById("inputArea").classList.add("hidden");
+                reportArea.classList.remove("hidden");
+                document.getElementById("logoutArea").style.display = "flex";
+                
+                // Re-initialize charts if any exist from cached HTML
+                // Note: Chart.js needs to be re-run on cached content. 
+                // This simplified version assumes the visual HTML is sufficient for cached views.
+                // For fully interactive charts on cached data, a more complex re-initialization would be needed.
+                return; 
+            }
+        }
+    } catch (e) {
+        console.error("Could not read from cache:", e);
+    }
+    // Caching logic ends here
 
     loader.classList.remove("hidden");
     generateBtn.disabled = true;
     generateBtn.textContent = "Generating...";
 
     try {
-        // STRICT MATCHING: NAME IS PRIMARY, THEN STRICT PHONE VERIFICATION
-        const normalizedSearchPhone = parentPhone.replace(/\D/g, '');
-        const last10SearchDigits = normalizedSearchPhone.slice(-10); // Get last 10 digits only
+        // **OPTIMIZED**: Query by phone number first
+        const studentsQuery = await db.collection("students")
+                                      .where("parentPhone", "==", parentPhone)
+                                      .get();
         
-        // Get ALL students and filter by NAME FIRST (your original system)
-        const allStudentsSnapshot = await db.collection("students").get();
-        const matchingStudents = [];
-        
-        allStudentsSnapshot.forEach(doc => {
-            const studentData = doc.data();
-            
-            // FLEXIBLE NAME MATCHING (primary criteria - case insensitive and allows extra names)
-            const nameMatchesResult = studentData.studentName && 
-                                   nameMatches(studentData.studentName, studentName);
-            
-            if (nameMatchesResult) {
-                // STRICT PHONE VERIFICATION - Compare last 10 digits only
-                const studentPhoneDigits = studentData.parentPhone ? studentData.parentPhone.replace(/\D/g, '') : '';
-                const last10StudentDigits = studentPhoneDigits.slice(-10); // Get last 10 digits only
-                
-                const phoneMatches = last10StudentDigits && last10SearchDigits && 
-                                    last10StudentDigits === last10SearchDigits;
-                
-                if (phoneMatches) {
-                    matchingStudents.push({
-                        id: doc.id,
-                        ...studentData,
-                        collection: "students"
-                    });
-                }
-            }
+        let potentialStudents = [];
+        studentsQuery.forEach(doc => {
+            potentialStudents.push(doc.data());
         });
 
+        if (potentialStudents.length === 0) {
+            alert(`No student records found for the phone number: ${parentPhone}.\n\nPlease check the number or contact support if the issue persists.`);
+            loader.classList.add("hidden");
+            generateBtn.disabled = false;
+            generateBtn.textContent = "Generate Report";
+            return;
+        }
+
+        // Now, filter the small list of students by the entered name
+        const matchingStudents = potentialStudents.filter(student => nameMatches(student.studentName, studentName));
+
         if (matchingStudents.length === 0) {
-            // Check if name exists but phone doesn't match
-            const studentsWithSameName = [];
-            allStudentsSnapshot.forEach(doc => {
-                const studentData = doc.data();
-                if (studentData.studentName && nameMatches(studentData.studentName, studentName)) {
-                    const studentPhoneDigits = studentData.parentPhone ? studentData.parentPhone.replace(/\D/g, '') : '';
-                    const last10StudentDigits = studentPhoneDigits.slice(-10);
-                    studentsWithSameName.push({
-                        name: studentData.studentName,
-                        phone: last10StudentDigits || 'No phone registered'
-                    });
-                }
+            let errorMessage = `We found records for phone number ${parentPhone}, but none matched the student name "${studentName}".\n\nRegistered names for this number are:\n`;
+            potentialStudents.forEach(student => {
+                errorMessage += `• ${student.studentName}\n`;
             });
-
-            let errorMessage = `No student found with name: ${studentName} and phone number: ${parentPhone}`;
-            
-            if (studentsWithSameName.length > 0) {
-                errorMessage += `\n\nFound student(s) with similar name but different phone number(s):\n`;
-                studentsWithSameName.forEach(student => {
-                    errorMessage += `• Name: "${student.name}", Phone: ${student.phone}\n`;
-                });
-                errorMessage += `\nPlease check your phone number entry.`;
-            } else {
-                errorMessage += `\n\nPlease check:\n• Spelling of the name\n• Phone number\n• Make sure both match exactly how they were registered`;
-            }
-
+            errorMessage += `\nPlease check the spelling of the student's name.`;
             alert(errorMessage);
             loader.classList.add("hidden");
             generateBtn.disabled = false;
@@ -455,21 +187,19 @@ async function loadReport() {
             return;
         }
 
-        // Get reports for ONLY the matching student (not all students with same name)
+        // **OPTIMIZED**: Fetch reports only for the specified phone number
         const studentResults = [];
         const monthlyReports = [];
+        const matchedStudentName = matchingStudents[0].studentName; // Use the primary matched name for report filtering
 
-        // Get assessment reports - ONLY for the specific matched student
-        const assessmentQuery = await db.collection("student_results").get();
+        // Get assessment reports
+        const assessmentQuery = await db.collection("student_results")
+                                        .where("parentPhone", "==", parentPhone)
+                                        .get();
         assessmentQuery.forEach(doc => {
             const data = doc.data();
-            // Only include reports for the specific matched student
-            const isExactMatch = matchingStudents.some(s => 
-                nameMatches(s.studentName, data.studentName) &&
-                s.parentPhone && data.parentPhone &&
-                s.parentPhone.replace(/\D/g, '').slice(-10) === data.parentPhone.replace(/\D/g, '').slice(-10)
-            );
-            if (isExactMatch) {
+            // Further filter by name to handle multiple children with same phone
+            if (nameMatches(data.studentName, matchedStudentName)) {
                 studentResults.push({ 
                     id: doc.id,
                     ...data,
@@ -479,17 +209,14 @@ async function loadReport() {
             }
         });
 
-        // Get monthly reports - ONLY for the specific matched student
-        const monthlyQuery = await db.collection("tutor_submissions").get();
+        // Get monthly reports
+        const monthlyQuery = await db.collection("tutor_submissions")
+                                     .where("parentPhone", "==", parentPhone)
+                                     .get();
         monthlyQuery.forEach(doc => {
             const data = doc.data();
-            // Only include reports for the specific matched student
-            const isExactMatch = matchingStudents.some(s => 
-                nameMatches(s.studentName, data.studentName) &&
-                s.parentPhone && data.parentPhone &&
-                s.parentPhone.replace(/\D/g, '').slice(-10) === data.parentPhone.replace(/\D/g, '').slice(-10)
-            );
-            if (isExactMatch) {
+            // Further filter by name
+            if (nameMatches(data.studentName, matchedStudentName)) {
                 monthlyReports.push({ 
                     id: doc.id,
                     ...data,
@@ -509,7 +236,7 @@ async function loadReport() {
 
         reportContent.innerHTML = "";
         
-        // Display Assessment Reports
+        // Display Assessment Reports (Logic remains unchanged)
         if (studentResults.length > 0) {
             const groupedAssessments = {};
             studentResults.forEach((result) => {
@@ -560,7 +287,6 @@ async function loadReport() {
 
                 const assessmentBlock = `
                     <div class="border rounded-lg shadow mb-8 p-6 bg-white" id="assessment-block-${assessmentIndex}">
-                        <!-- Logo Header -->
                         <div class="text-center mb-6 border-b pb-4">
                             <img src="https://res.cloudinary.com/dy2hxcyaf/image/upload/v1757700806/newbhlogo_umwqzy.svg" 
                                  alt="Blooming Kids House Logo" 
@@ -647,7 +373,7 @@ async function loadReport() {
             }
         }
 
-        // Display Monthly Reports
+        // Display Monthly Reports (Logic remains unchanged)
         if (monthlyReports.length > 0) {
             const groupedMonthly = {};
             monthlyReports.forEach((result) => {
@@ -668,7 +394,6 @@ async function loadReport() {
                 session.forEach((monthlyReport, reportIndex) => {
                     const monthlyBlock = `
                         <div class="border rounded-lg shadow mb-8 p-6 bg-white" id="monthly-block-${monthlyIndex}">
-                            <!-- Logo Header -->
                             <div class="text-center mb-6 border-b pb-4">
                                 <img src="https://res.cloudinary.com/dy2hxcyaf/image/upload/v1757700806/newbhlogo_umwqzy.svg" 
                                      alt="Blooming Kids House Logo" 
@@ -750,11 +475,24 @@ async function loadReport() {
             }
         }
 
+        // **NEW**: Save the generated report to the cache
+        try {
+            const cachePayload = {
+                timestamp: Date.now(),
+                html: reportContent.innerHTML
+            };
+            localStorage.setItem(CACHE_KEY, JSON.stringify(cachePayload));
+            console.log("Report has been cached.");
+        } catch (e) {
+            console.error("Could not write to cache:", e);
+        }
+
         document.getElementById("inputArea").classList.add("hidden");
         reportArea.classList.remove("hidden");
         document.getElementById("logoutArea").style.display = "flex";
 
     } catch (error) {
+        console.error("Error generating report:", error); // Log the full error for debugging
         alert("Sorry, there was an error generating the report. Please try again.");
     } finally {
         loader.classList.add("hidden");
@@ -776,6 +514,13 @@ function downloadMonthlyReport(index, studentName) {
 }
 
 function logout() {
+    // **NEW**: Clear cache on logout if desired, to ensure fresh data on next login
+    // This is optional. You can remove the loop if you want cache to persist across logouts.
+    Object.keys(localStorage).forEach(key => {
+        if (key.startsWith('report_')) {
+            localStorage.removeItem(key);
+        }
+    });
     window.location.href = "parent.html";
 }
 
@@ -793,5 +538,3 @@ document.addEventListener('DOMContentLoaded', function() {
     
     document.getElementById("generateBtn").addEventListener("click", loadReport);
 });
-
-
