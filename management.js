@@ -1,7 +1,7 @@
 // [Begin Updated management.js File]
 
 import { auth, db } from './firebaseConfig.js';
-import { collection, getDocs, doc, getDoc, where, query, orderBy, Timestamp, writeBatch, updateDoc, deleteDoc, setDoc, addDoc } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
+import { collection, getDocs, doc, getDoc, where, query, orderBy, Timestamp, writeBatch, updateDoc, deleteDoc, setDoc } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
 import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-auth.js";
 import { onSnapshot } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
 
@@ -260,9 +260,8 @@ async function renderManagementTutorView(container) {
             <div class="flex justify-between items-center mb-4 flex-wrap gap-4">
                 <h2 class="text-2xl font-bold text-green-700">Tutor & Student Directory</h2>
                 <div class="flex items-center gap-4">
-                    <input type="search" id="directory-search" placeholder="Search Tutors, Students, Parents, Phone..." class="p-2 border rounded-md w-64">
+                    <input type="search" id="directory-search" placeholder="Search Tutors, Students, Parents..." class="p-2 border rounded-md w-64">
                     <button id="refresh-directory-btn" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Refresh</button>
-                    <button id="add-student-btn" class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700">Add New Student</button>
                 </div>
             </div>
             <div class="flex space-x-4 mb-4">
@@ -282,7 +281,6 @@ async function renderManagementTutorView(container) {
     `;
     document.getElementById('refresh-directory-btn').addEventListener('click', () => fetchAndRenderDirectory(true));
     document.getElementById('directory-search').addEventListener('input', (e) => renderDirectoryFromCache(e.target.value));
-    document.getElementById('add-student-btn').addEventListener('click', showAddStudentModal);
     fetchAndRenderDirectory();
 }
 
@@ -333,12 +331,10 @@ function renderDirectoryFromCache(searchTerm = '') {
 
     const filteredTutors = tutors.filter(tutor => {
         const assignedStudents = studentsByTutor[tutor.email] || [];
-        const tutorMatch = tutor.name.toLowerCase().includes(lowerCaseSearchTerm) || 
-                          tutor.email.toLowerCase().includes(lowerCaseSearchTerm);
+        const tutorMatch = tutor.name.toLowerCase().includes(lowerCaseSearchTerm);
         const studentMatch = assignedStudents.some(s => 
             s.studentName.toLowerCase().includes(lowerCaseSearchTerm) ||
-            (s.parentName && s.parentName.toLowerCase().includes(lowerCaseSearchTerm)) ||
-            (s.parentPhone && s.parentPhone.toLowerCase().includes(lowerCaseSearchTerm))
+            (s.parentName && s.parentName.toLowerCase().includes(lowerCaseSearchTerm))
         );
         return tutorMatch || studentMatch;
     });
@@ -360,10 +356,8 @@ function renderDirectoryFromCache(searchTerm = '') {
             .filter(s => 
                 searchTerm === '' || // show all students if no search term
                 tutor.name.toLowerCase().includes(lowerCaseSearchTerm) || // show all if tutor name matches
-                tutor.email.toLowerCase().includes(lowerCaseSearchTerm) ||
                 s.studentName.toLowerCase().includes(lowerCaseSearchTerm) ||
-                (s.parentName && s.parentName.toLowerCase().includes(lowerCaseSearchTerm)) ||
-                (s.parentPhone && s.parentPhone.toLowerCase().includes(lowerCaseSearchTerm))
+                (s.parentName && s.parentName.toLowerCase().includes(lowerCaseSearchTerm))
             );
 
         const studentsTableRows = assignedStudents
@@ -420,106 +414,6 @@ function renderDirectoryFromCache(searchTerm = '') {
     }
 }
 
-// Function to show add student modal with tutor assignment
-async function showAddStudentModal() {
-    // Fetch tutors for the dropdown
-    const tutorsSnapshot = await getDocs(query(collection(db, "tutors"), orderBy("name")));
-    const tutors = tutorsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-    
-    const tutorOptions = tutors.map(tutor => 
-        `<option value="${tutor.email}">${tutor.name} (${tutor.email})</option>`
-    ).join('');
-
-    const modalHtml = `
-        <div id="add-student-modal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-center justify-center">
-            <div class="relative p-8 bg-white w-96 max-w-lg rounded-lg shadow-xl">
-                <button class="absolute top-2 right-2 text-gray-500 hover:text-gray-800 text-2xl font-bold" onclick="document.getElementById('add-student-modal').remove()">&times;</button>
-                <h3 class="text-xl font-bold mb-4">Add New Student</h3>
-                <form id="add-student-form">
-                    <div class="mb-2">
-                        <label class="block text-sm font-medium">Student Name</label>
-                        <input type="text" id="add-studentName" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2" required>
-                    </div>
-                    <div class="mb-2">
-                        <label class="block text-sm font-medium">Student Grade</label>
-                        <input type="text" id="add-grade" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2" required>
-                    </div>
-                    <div class="mb-2">
-                        <label class="block text-sm font-medium">Days/Week</label>
-                        <input type="number" id="add-days" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2" min="1" max="7" required>
-                    </div>
-                    <div class="mb-2">
-                        <label class="block text-sm font-medium">Subjects (comma-separated)</label>
-                        <input type="text" id="add-subjects" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2" placeholder="Math, English, Science" required>
-                    </div>
-                    <div class="mb-2">
-                        <label class="block text-sm font-medium">Parent Name</label>
-                        <input type="text" id="add-parentName" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2" required>
-                    </div>
-                    <div class="mb-2">
-                        <label class="block text-sm font-medium">Parent Phone</label>
-                        <input type="text" id="add-parentPhone" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2" required>
-                    </div>
-                    <div class="mb-2">
-                        <label class="block text-sm font-medium">Student Fee (₦)</label>
-                        <input type="number" id="add-studentFee" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2" required>
-                    </div>
-                    <div class="mb-4">
-                        <label class="block text-sm font-medium">Assign to Tutor</label>
-                        <select id="add-tutorEmail" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2" required>
-                            <option value="">Select Tutor</option>
-                            ${tutorOptions}
-                        </select>
-                    </div>
-                    <div class="flex justify-end mt-4">
-                        <button type="button" onclick="document.getElementById('add-student-modal').remove()" class="mr-2 px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300">Cancel</button>
-                        <button type="submit" class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700">Add Student</button>
-                    </div>
-                </form>
-            </div>
-        </div>
-    `;
-    document.body.insertAdjacentHTML('beforeend', modalHtml);
-    
-    document.getElementById('add-student-form').addEventListener('submit', async (e) => {
-        e.preventDefault();
-        const form = e.target;
-        
-        // Get selected tutor info
-        const selectedTutorEmail = form.elements['add-tutorEmail'].value;
-        const selectedTutor = tutors.find(t => t.email === selectedTutorEmail);
-        
-        if (!selectedTutor) {
-            alert("Please select a tutor");
-            return;
-        }
-
-        const studentData = {
-            studentName: form.elements['add-studentName'].value,
-            grade: form.elements['add-grade'].value,
-            days: form.elements['add-days'].value,
-            subjects: form.elements['add-subjects'].value.split(',').map(s => s.trim()).filter(s => s),
-            parentName: form.elements['add-parentName'].value,
-            parentPhone: form.elements['add-parentPhone'].value,
-            studentFee: Number(form.elements['add-studentFee'].value) || 0,
-            tutorEmail: selectedTutorEmail,
-            tutorName: selectedTutor.name,
-            status: 'approved'
-        };
-
-        try {
-            await addDoc(collection(db, "students"), studentData);
-            alert("Student added successfully and assigned to tutor!");
-            document.getElementById('add-student-modal').remove();
-            // Invalidate cache and refresh view
-            invalidateCache('students');
-            renderManagementTutorView(document.getElementById('main-content'));
-        } catch (error) {
-            console.error("Error adding student: ", error);
-            alert("Failed to add student. Check the console for details.");
-        }
-    });
-}
 
 // --- Pay Advice Panel ---
 async function renderPayAdvicePanel(container) {
@@ -678,404 +572,539 @@ async function loadPayAdviceData(startDate, endDate) {
 
     } catch (error) {
         console.error("Error loading pay advice data:", error);
-        tableBody.innerHTML = `<tr><td colspan="8" class="text-center py-4 text-red-500">Failed to load pay data.</td></tr>`;
+        tableBody.innerHTML = `<tr><td colspan="8" class="text-center py-4 text-red-500">Failed to load data.</td></tr>`;
     }
 }
 
 function renderPayAdviceTable() {
     const tableBody = document.getElementById('pay-advice-table-body');
     if (!tableBody) return;
-    if (currentPayData.length === 0) {
-        tableBody.innerHTML = `<tr><td colspan="8" class="text-center py-4">No data to display.</td></tr>`;
-        return;
-    }
-
-    tableBody.innerHTML = currentPayData.map(item => {
-        const giftAmount = payAdviceGifts[item.tutorEmail] || 0;
-        const finalPay = item.totalPay + giftAmount;
+    
+    tableBody.innerHTML = currentPayData.map(d => {
+        const giftAmount = payAdviceGifts[d.tutorEmail] || 0;
+        const finalPay = d.totalPay + giftAmount;
         return `
-            <tr class="hover:bg-gray-50">
-                <td class="px-6 py-4 whitespace-nowrap">
-                    <div class="font-medium">${item.tutorName}</div>
-                    <div class="text-xs text-gray-500">${item.beneficiaryBank || 'N/A'}</div>
-                    <div class="text-xs text-gray-500">${item.beneficiaryAccount || 'N/A'}</div>
-                    <div class="text-xs text-gray-500">${item.beneficiaryName || 'N/A'}</div>
-                </td>
-                <td class="px-6 py-4 whitespace-nowrap">${item.studentCount}</td>
-                <td class="px-6 py-4 whitespace-nowrap">₦${item.totalStudentFees.toFixed(2)}</td>
-                <td class="px-6 py-4 whitespace-nowrap">₦${item.managementFee.toFixed(2)}</td>
-                <td class="px-6 py-4 whitespace-nowrap">₦${item.totalPay.toFixed(2)}</td>
-                <td class="px-6 py-4 whitespace-nowrap">
-                    <input type="number" class="w-24 p-1 border rounded gift-input" data-tutor-email="${item.tutorEmail}" value="${giftAmount}" min="0">
-                </td>
-                <td class="px-6 py-4 whitespace-nowrap">₦${finalPay.toFixed(2)}</td>
-                <td class="px-6 py-4 whitespace-nowrap">
-                    <button class="bg-blue-500 text-white px-3 py-1 rounded text-xs gift-apply-btn" data-tutor-email="${item.tutorEmail}">Apply Gift</button>
+            <tr>
+                <td class="px-6 py-4">${d.tutorName}</td>
+                <td class="px-6 py-4">${d.studentCount}</td>
+                <td class="px-6 py-4">₦${d.totalStudentFees.toFixed(2)}</td>
+                <td class="px-6 py-4">₦${d.managementFee.toFixed(2)}</td>
+                <td class="px-6 py-4">₦${d.totalPay.toFixed(2)}</td>
+                <td class="px-6 py-4 text-blue-600 font-bold">₦${giftAmount.toFixed(2)}</td>
+                <td class="px-6 py-4 font-bold">₦${finalPay.toFixed(2)}</td>
+                <td class="px-6 py-4">
+                    <button class="add-gift-btn bg-blue-500 text-white px-3 py-1 rounded text-xs" data-tutor-email="${d.tutorEmail}">Add Gift</button>
                 </td>
             </tr>
         `;
     }).join('');
-
-    document.querySelectorAll('.gift-apply-btn').forEach(button => {
-        button.addEventListener('click', () => {
-            const tutorEmail = button.dataset.tutorEmail;
-            const input = document.querySelector(`.gift-input[data-tutor-email="${tutorEmail}"]`);
-            const giftValue = Number(input.value) || 0;
-            payAdviceGifts[tutorEmail] = giftValue;
-            renderPayAdviceTable(); // Re-render to update final pay
+    document.querySelectorAll('.add-gift-btn').forEach(button => {
+        button.addEventListener('click', (e) => {
+            const tutorEmail = e.target.dataset.tutorEmail;
+            const currentGift = payAdviceGifts[tutorEmail] || 0;
+            const giftInput = prompt(`Enter gift amount for this tutor:`, currentGift);
+            if (giftInput !== null) {
+                const giftAmount = parseFloat(giftInput);
+                if (!isNaN(giftAmount) && giftAmount >= 0) {
+                    payAdviceGifts[tutorEmail] = giftAmount;
+                    renderPayAdviceTable(); // Re-render the table with the new gift
+                } else {
+                    alert("Please enter a valid, non-negative number.");
+                }
+            }
         });
     });
 }
+
+
+// --- Tutor Reports Panel ---
+async function renderTutorReportsPanel(container) {
+    container.innerHTML = `
+        <div class="bg-white p-6 rounded-lg shadow-md mb-6">
+            <div class="flex justify-between items-center mb-4 flex-wrap gap-4">
+                <h2 class="text-2xl font-bold text-green-700">Tutor Reports</h2>
+                <button id="refresh-reports-btn" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Refresh</button>
+            </div>
+            <div class="flex space-x-4 mb-4">
+                <div class="bg-green-100 p-3 rounded-lg text-center shadow w-full">
+                    <h4 class="font-bold text-green-800 text-sm">Unique Tutors Submitted</h4>
+                    <p id="report-tutor-count" class="text-2xl font-extrabold">0</p>
+                </div>
+                <div class="bg-yellow-100 p-3 rounded-lg text-center shadow w-full">
+                    <h4 class="font-bold text-yellow-800 text-sm">Total Reports Submitted</h4>
+                    <p id="report-total-count" class="text-2xl font-extrabold">0</p>
+                </div>
+            </div>
+            <div id="tutor-reports-list" class="space-y-4"><p class="text-center">Loading reports...</p></div>
+        </div>
+    `;
+    document.getElementById('refresh-reports-btn').addEventListener('click', () => fetchAndRenderTutorReports(true));
+    fetchAndRenderTutorReports();
+}
+
+async function fetchAndRenderTutorReports(forceRefresh = false) {
+    if (forceRefresh) invalidateCache('reports');
+    const reportsListContainer = document.getElementById('tutor-reports-list');
+    
+    try {
+        if (!sessionCache.reports) {
+            reportsListContainer.innerHTML = `<p class="text-center text-gray-500 py-10">Fetching reports from server...</p>`;
+            const snapshot = await getDocs(query(collection(db, "tutor_submissions"), orderBy("submittedAt", "desc")));
+            saveToLocalStorage('reports', snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+        }
+        renderTutorReportsFromCache();
+    } catch(error) {
+        console.error("Error fetching reports:", error);
+        reportsListContainer.innerHTML = `<p class="text-center text-red-500 py-10">Failed to load reports.</p>`;
+    }
+}
+
+function renderTutorReportsFromCache() {
+    const reports = sessionCache.reports || [];
+    const reportsListContainer = document.getElementById('tutor-reports-list');
+    if (!reportsListContainer) return;
+
+    if (reports.length === 0) {
+        reportsListContainer.innerHTML = `<p class="text-center text-gray-500">No reports found. Click Refresh to fetch from server.</p>`;
+        return;
+    }
+    
+    const reportsByTutor = {};
+    reports.forEach(report => {
+        if (!reportsByTutor[report.tutorEmail]) {
+            reportsByTutor[report.tutorEmail] = { name: report.tutorName || report.tutorEmail, reports: [] };
+        }
+        reportsByTutor[report.tutorEmail].reports.push(report);
+    });
+
+    document.getElementById('report-tutor-count').textContent = Object.keys(reportsByTutor).length;
+    document.getElementById('report-total-count').textContent = reports.length;
+
+    const canDownload = window.userData.permissions?.actions?.canDownloadReports === true;
+    reportsListContainer.innerHTML = Object.values(reportsByTutor).map(tutorData => {
+        const reportLinks = tutorData.reports.map(report => {
+            const buttonHTML = canDownload
+                ? `<button class="download-report-btn bg-green-500 text-white px-3 py-1 text-sm rounded" data-report-id="${report.id}">Download</button>`
+                : `<button class="view-report-btn bg-gray-500 text-white px-3 py-1 text-sm rounded" data-report-id="${report.id}">View</button>`;
+            return `<li class="flex justify-between items-center p-2 bg-gray-50 rounded">${report.studentName}<span>${buttonHTML}</span></li>`;
+        }).join('');
+        
+        const zipButtonHTML = canDownload
+            ? `<div class="p-4 border-t"><button class="zip-reports-btn bg-blue-600 text-white px-4 py-2 text-sm rounded w-full hover:bg-blue-700" data-tutor-email="${tutorData.reports[0].tutorEmail}">Zip & Download All Reports</button></div>`
+            : '';
+
+        return `<details class="border rounded-lg">
+                    <summary class="p-4 cursor-pointer font-semibold">${tutorData.name} (${tutorData.reports.length} reports)</summary>
+                    <div class="p-4 border-t"><ul class="space-y-2">${reportLinks}</ul></div>
+                    ${zipButtonHTML}
+                </details>`;
+    }).join('');
+
+    document.querySelectorAll('.download-report-btn').forEach(button => button.addEventListener('click', (e) => { e.stopPropagation(); viewReportInNewTab(e.target.dataset.reportId, true); }));
+    document.querySelectorAll('.view-report-btn').forEach(button => button.addEventListener('click', (e) => { e.stopPropagation(); viewReportInNewTab(e.target.dataset.reportId, false); }));
+    document.querySelectorAll('.zip-reports-btn').forEach(button => button.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        const tutorEmail = e.target.dataset.tutorEmail;
+        const tutorData = reportsByTutor[tutorEmail];
+        if (tutorData) await zipAndDownloadTutorReports(tutorData.reports, tutorData.name, e.target);
+    }));
+}
+
 
 // --- Pending Approvals Panel ---
 async function renderPendingApprovalsPanel(container) {
     container.innerHTML = `
         <div class="bg-white p-6 rounded-lg shadow-md">
-            <h2 class="text-2xl font-bold text-green-700 mb-4">Pending Student Approvals</h2>
             <div class="flex justify-between items-center mb-4">
-                <p class="text-gray-600">Approve or reject students added by tutors.</p>
+                <h2 class="text-2xl font-bold text-green-700">Pending Approvals</h2>
                 <button id="refresh-pending-btn" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Refresh</button>
             </div>
             <div id="pending-approvals-list" class="space-y-4">
-                <p class="text-center text-gray-500 py-10">Loading pending approvals...</p>
+                <p class="text-center text-gray-500 py-10">Loading pending students...</p>
             </div>
         </div>
     `;
-    document.getElementById('refresh-pending-btn').addEventListener('click', fetchAndRenderPendingApprovals);
+    document.getElementById('refresh-pending-btn').addEventListener('click', () => fetchAndRenderPendingApprovals(true));
     fetchAndRenderPendingApprovals();
 }
 
 async function fetchAndRenderPendingApprovals(forceRefresh = false) {
-    if (forceRefresh) {
-        invalidateCache('pendingStudents');
-    }
-    const container = document.getElementById('pending-approvals-list');
-    if (!container) return;
-
+    if (forceRefresh) invalidateCache('pendingStudents');
+    const listContainer = document.getElementById('pending-approvals-list');
+    
     try {
         if (!sessionCache.pendingStudents) {
-            container.innerHTML = `<p class="text-center text-gray-500 py-10">Fetching pending students...</p>`;
-            const pendingSnapshot = await getDocs(collection(db, "pending_students"));
-            saveToLocalStorage('pendingStudents', pendingSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+            listContainer.innerHTML = `<p class="text-center text-gray-500 py-10">Fetching pending students...</p>`;
+            const snapshot = await getDocs(query(collection(db, "pending_students")));
+            saveToLocalStorage('pendingStudents', snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
         }
         renderPendingApprovalsFromCache();
-    } catch (error) {
-        console.error("Error fetching pending approvals:", error);
-        container.innerHTML = `<p class="text-center text-red-500 py-10">Failed to load pending approvals.</p>`;
+    } catch(error) {
+        console.error("Error fetching pending students:", error);
+        listContainer.innerHTML = `<p class="text-center text-red-500 py-10">Failed to load data.</p>`;
     }
 }
 
 function renderPendingApprovalsFromCache() {
-    const container = document.getElementById('pending-approvals-list');
     const pendingStudents = sessionCache.pendingStudents || [];
+    const listContainer = document.getElementById('pending-approvals-list');
+    if (!listContainer) return;
+
     if (pendingStudents.length === 0) {
-        container.innerHTML = `<p class="text-center text-gray-500 py-10">No pending students for approval.</p>`;
+        listContainer.innerHTML = `<p class="text-center text-gray-500">No students are awaiting approval.</p>`;
         return;
     }
 
-    const canApproveStudents = window.userData.permissions?.actions?.canApproveStudents === true;
-    const canRejectStudents = window.userData.permissions?.actions?.canRejectStudents === true;
-
-    container.innerHTML = pendingStudents.map(student => {
-        const subjects = student.subjects && Array.isArray(student.subjects) ? student.subjects.join(', ') : 'N/A';
-        return `
-            <div class="border rounded-lg p-4 shadow-sm bg-yellow-50">
-                <div class="flex justify-between items-start">
-                    <div>
-                        <h3 class="font-bold text-lg">${student.studentName}</h3>
-                        <p class="text-sm text-gray-600">Grade: ${student.grade} | Days/Week: ${student.days}</p>
-                        <p class="text-sm text-gray-600">Subjects: ${subjects}</p>
-                        <p class="text-sm text-gray-600">Parent: ${student.parentName || 'N/A'} (${student.parentPhone || 'N/A'})</p>
-                        <p class="text-sm text-gray-600">Fee: ₦${(student.studentFee || 0).toFixed(2)}</p>
-                        <p class="text-sm text-gray-600">Tutor: ${student.tutorName} (${student.tutorEmail})</p>
-                    </div>
-                    <div class="flex space-x-2">
-                        ${canApproveStudents ? `<button class="approve-student-btn bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700" data-student-id="${student.id}">Approve</button>` : ''}
-                        ${canRejectStudents ? `<button class="reject-student-btn bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700" data-student-id="${student.id}">Reject</button>` : ''}
-                        <button class="edit-pending-student-btn bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700" data-student-id="${student.id}">Edit</button>
-                    </div>
-                </div>
+    listContainer.innerHTML = pendingStudents.map(student => `
+        <div class="border p-4 rounded-lg flex justify-between items-center bg-gray-50">
+            <div>
+                <p><strong>Student:</strong> ${student.studentName}</p>
+                <p><strong>Fee:</strong> ₦${(student.studentFee || 0).toFixed(2)}</p>
+                <p><strong>Submitted by Tutor:</strong> ${student.tutorEmail || 'N/A'}</p>
             </div>
-        `;
-    }).join('');
-
-    if (canApproveStudents) {
-        document.querySelectorAll('.approve-student-btn').forEach(button => button.addEventListener('click', () => handleApproveStudent(button.dataset.studentId)));
-    }
-    if (canRejectStudents) {
-        document.querySelectorAll('.reject-student-btn').forEach(button => button.addEventListener('click', () => handleRejectStudent(button.dataset.studentId)));
-    }
-    document.querySelectorAll('.edit-pending-student-btn').forEach(button => button.addEventListener('click', () => handleEditPendingStudent(button.dataset.studentId)));
-}
-
-// --- Reports Panel ---
-async function renderReportsPanel(container) {
-    container.innerHTML = `
-        <div class="bg-white p-6 rounded-lg shadow-md">
-            <h2 class="text-2xl font-bold text-green-700 mb-4">Tutor Reports</h2>
-            <div class="bg-green-50 p-4 rounded-lg mb-6">
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div>
-                        <label for="reports-start-date" class="block text-sm font-medium">Start Date</label>
-                        <input type="date" id="reports-start-date" class="mt-1 block w-full p-2 border rounded-md">
-                    </div>
-                    <div>
-                        <label for="reports-end-date" class="block text-sm font-medium">End Date</label>
-                        <input type="date" id="reports-end-date" class="mt-1 block w-full p-2 border rounded-md">
-                    </div>
-                    <div class="flex items-end">
-                        <button id="fetch-reports-btn" class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 w-full">Fetch Reports</button>
-                    </div>
-                </div>
-            </div>
-            <div id="reports-list" class="space-y-4">
-                <p class="text-center text-gray-500 py-10">Select a date range and click "Fetch Reports".</p>
+            <div class="flex items-center space-x-2">
+                <button class="edit-pending-btn bg-blue-500 text-white px-3 py-1 text-sm rounded-full" data-student-id="${student.id}">Edit</button>
+                <button class="approve-btn bg-green-600 text-white px-3 py-1 text-sm rounded-full" data-student-id="${student.id}">Approve</button>
+                <button class="reject-btn bg-red-600 text-white px-3 py-1 text-sm rounded-full" data-student-id="${student.id}">Reject</button>
             </div>
         </div>
-    `;
-    document.getElementById('fetch-reports-btn').addEventListener('click', fetchReports);
+    `).join('');
+    document.querySelectorAll('.edit-pending-btn').forEach(button => button.addEventListener('click', () => handleEditPendingStudent(button.dataset.studentId)));
+    document.querySelectorAll('.approve-btn').forEach(button => button.addEventListener('click', () => handleApproveStudent(button.dataset.studentId)));
+    document.querySelectorAll('.reject-btn').forEach(button => button.addEventListener('click', () => handleRejectStudent(button.dataset.studentId)));
 }
 
-async function fetchReports() {
-    const startDateInput = document.getElementById('reports-start-date');
-    const endDateInput = document.getElementById('reports-end-date');
-    const reportsList = document.getElementById('reports-list');
-    if (!startDateInput.value || !endDateInput.value) {
-        alert("Please select both start and end dates.");
-        return;
-    }
-    const startDate = new Date(startDateInput.value);
-    const endDate = new Date(endDateInput.value);
-    endDate.setHours(23, 59, 59, 999);
-    const startTimestamp = Timestamp.fromDate(startDate);
-    const endTimestamp = Timestamp.fromDate(endDate);
 
-    reportsList.innerHTML = `<p class="text-center text-gray-500 py-10">Loading reports...</p>`;
-    try {
-        const reportsQuery = query(collection(db, "tutor_submissions"), where("submittedAt", ">=", startTimestamp), where("submittedAt", "<=", endTimestamp));
-        const reportsSnapshot = await getDocs(reportsQuery);
-        const reportsData = reportsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        if (reportsData.length === 0) {
-            reportsList.innerHTML = `<p class="text-center text-gray-500 py-10">No reports found for the selected period.</p>`;
-            return;
-        }
-        renderReportsList(reportsData);
-    } catch (error) {
-        console.error("Error fetching reports:", error);
-        reportsList.innerHTML = `<p class="text-center text-red-500 py-10">Failed to load reports.</p>`;
-    }
-}
-
-function renderReportsList(reports) {
-    const reportsList = document.getElementById('reports-list');
-    reportsList.innerHTML = reports.map(report => {
-        const submittedAt = report.submittedAt?.toDate?.() || new Date();
-        return `
-            <div class="border rounded-lg p-4 shadow-sm">
-                <div class="flex justify-between items-start">
-                    <div>
-                        <h3 class="font-bold text-lg">${report.tutorName}</h3>
-                        <p class="text-sm text-gray-600">Submitted: ${submittedAt.toLocaleString()}</p>
-                        <p class="text-sm text-gray-600">Student: ${report.studentName} (${report.grade})</p>
-                        <p class="text-sm text-gray-600">Topics Covered: ${report.topicsCovered || 'N/A'}</p>
-                        <p class="text-sm text-gray-600">Homework Assigned: ${report.homeworkAssigned || 'N/A'}</p>
-                        <p class="text-sm text-gray-600">Behavior: ${report.behavior || 'N/A'}</p>
-                        <p class="text-sm text-gray-600">Areas of Difficulty: ${report.areasOfDifficulty || 'N/A'}</p>
-                        <p class="text-sm text-gray-600">Test Scores: ${report.testScores || 'N/A'}</p>
-                    </div>
-                </div>
-            </div>
-        `;
-    }).join('');
-}
-
-// --- Break Students Panel ---
-async function renderBreakStudentsPanel(container) {
+// --- Summer Break Panel ---
+async function renderSummerBreakPanel(container) {
     container.innerHTML = `
         <div class="bg-white p-6 rounded-lg shadow-md">
-            <h2 class="text-2xl font-bold text-green-700 mb-4">Break Students</h2>
             <div class="flex justify-between items-center mb-4">
-                <p class="text-gray-600">Manage students on break.</p>
+                <h2 class="text-2xl font-bold text-green-700">Students on Summer Break</h2>
                 <button id="refresh-break-btn" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Refresh</button>
             </div>
+            <div id="break-status-message" class="text-center font-semibold mb-4 hidden"></div>
             <div id="break-students-list" class="space-y-4">
-                <p class="text-center text-gray-500 py-10">Loading break students...</p>
+                <p class="text-center">Loading...</p>
             </div>
         </div>
     `;
-    document.getElementById('refresh-break-btn').addEventListener('click', fetchAndRenderBreakStudents);
+    document.getElementById('refresh-break-btn').addEventListener('click', () => fetchAndRenderBreakStudents(true));
     fetchAndRenderBreakStudents();
 }
 
 async function fetchAndRenderBreakStudents(forceRefresh = false) {
-    if (forceRefresh) {
-        invalidateCache('breakStudents');
-    }
-    const container = document.getElementById('break-students-list');
-    if (!container) return;
+    if (forceRefresh) invalidateCache('breakStudents');
+    const listContainer = document.getElementById('break-students-list');
 
     try {
         if (!sessionCache.breakStudents) {
-            container.innerHTML = `<p class="text-center text-gray-500 py-10">Fetching break students...</p>`;
-            const breakSnapshot = await getDocs(collection(db, "break_students"));
-            saveToLocalStorage('breakStudents', breakSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+            listContainer.innerHTML = `<p class="text-center text-gray-500 py-10">Fetching student break status...</p>`;
+            const snapshot = await getDocs(query(collection(db, "students"), where("summerBreak", "==", true)));
+            saveToLocalStorage('breakStudents', snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
         }
         renderBreakStudentsFromCache();
-    } catch (error) {
+    } catch(error) {
         console.error("Error fetching break students:", error);
-        container.innerHTML = `<p class="text-center text-red-500 py-10">Failed to load break students.</p>`;
+        listContainer.innerHTML = `<p class="text-center text-red-500 py-10">Failed to load data.</p>`;
     }
 }
 
 function renderBreakStudentsFromCache() {
-    const container = document.getElementById('break-students-list');
     const breakStudents = sessionCache.breakStudents || [];
+    const listContainer = document.getElementById('break-students-list');
+    if (!listContainer) return;
+
+    const canEndBreak = window.userData.permissions?.actions?.canEndBreak === true;
     if (breakStudents.length === 0) {
-        container.innerHTML = `<p class="text-center text-gray-500 py-10">No students on break.</p>`;
+        listContainer.innerHTML = `<p class="text-center text-gray-500">No students are on break.</p>`;
         return;
     }
-
-    container.innerHTML = breakStudents.map(student => {
-        const subjects = student.subjects && Array.isArray(student.subjects) ? student.subjects.join(', ') : 'N/A';
+    
+    listContainer.innerHTML = breakStudents.map(student => {
+        const endBreakButton = canEndBreak 
+            ? `<button class="end-break-btn bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700 transition-colors" data-student-id="${student.id}">End Break</button>`
+            : '';
         return `
-            <div class="border rounded-lg p-4 shadow-sm bg-red-50">
-                <div class="flex justify-between items-start">
-                    <div>
-                        <h3 class="font-bold text-lg">${student.studentName}</h3>
-                        <p class="text-sm text-gray-600">Grade: ${student.grade} | Days/Week: ${student.days}</p>
-                        <p class="text-sm text-gray-600">Subjects: ${subjects}</p>
-                        <p class="text-sm text-gray-600">Parent: ${student.parentName || 'N/A'} (${student.parentPhone || 'N/A'})</p>
-                        <p class="text-sm text-gray-600">Fee: ₦${(student.studentFee || 0).toFixed(2)}</p>
-                        <p class="text-sm text-gray-600">Tutor: ${student.tutorName} (${student.tutorEmail})</p>
-                    </div>
-                    <div class="flex space-x-2">
-                        <button class="edit-break-student-btn bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700" data-student-id="${student.id}">Edit</button>
-                    </div>
+            <div class="border p-4 rounded-lg flex justify-between items-center bg-gray-50">
+                <div>
+                    <p><strong>Student:</strong> ${student.studentName}</p>
+                    <p><strong>Tutor:</strong> ${student.tutorEmail}</p>
+                </div>
+                <div class="flex items-center space-x-2">
+                    <span class="text-yellow-600 font-semibold px-3 py-1 bg-yellow-100 rounded-full text-sm">On Break</span>
+                     ${endBreakButton}
                 </div>
             </div>
         `;
     }).join('');
-
-    document.querySelectorAll('.edit-break-student-btn').forEach(button => {
-        button.addEventListener('click', () => {
-            // Implement edit functionality for break students if needed
-            alert("Edit functionality for break students coming soon!");
+    if (canEndBreak) {
+        document.querySelectorAll('.end-break-btn').forEach(button => {
+            button.addEventListener('click', async (e) => {
+                const studentId = e.target.dataset.studentId;
+                if (confirm("Are you sure you want to end the summer break for this student?")) {
+                    try {
+                        await updateDoc(doc(db, "students", studentId), { summerBreak: false, lastBreakEnd: Timestamp.now() });
+                        document.getElementById('break-status-message').textContent = `Break ended successfully.`;
+                        document.getElementById('break-status-message').className = 'text-center font-semibold mb-4 text-green-600';
+                        invalidateCache('breakStudents'); // Invalidate cache
+                        fetchAndRenderBreakStudents(); // Re-render list
+                    } catch (error) {
+                        console.error("Error ending summer break:", error);
+                        document.getElementById('break-status-message').textContent = "Failed to end summer break.";
+                        document.getElementById('break-status-message').className = 'text-center font-semibold mb-4 text-red-600';
+                    }
+                }
+            });
         });
-    });
+    }
 }
 
+
 // ##################################
-// # MAIN MANAGEMENT DASHBOARD
+// # REPORT GENERATION & ZIPPING
 // ##################################
 
-function renderManagementDashboard(container) {
-    const userData = window.userData;
-    const permissions = userData.permissions || {};
-    const panels = permissions.panels || {};
+// ##### CORRECTED AND FINALIZED FUNCTION #####
+async function generateReportHTML(reportId) {
+    const reportDoc = await getDoc(doc(db, "tutor_submissions", reportId));
+    if (!reportDoc.exists()) throw new Error("Report not found!");
+    const reportData = reportDoc.data();
 
-    container.innerHTML = `
-        <div class="bg-white p-6 rounded-lg shadow-md">
-            <div class="flex justify-between items-center mb-6">
-                <h1 class="text-3xl font-bold text-green-700">Management Dashboard</h1>
-                <div class="flex items-center space-x-4">
-                    <span class="text-gray-700">Welcome, ${userData.name || 'User'}!</span>
-                    <button id="logout-btn" class="bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700">Logout</button>
+    // Define the sections to be displayed in the report
+    const reportSections = {
+        "INTRODUCTION": reportData.introduction,
+        "TOPICS & REMARKS": reportData.topics,
+        "PROGRESS & ACHIEVEMENTS": reportData.progress,
+        "STRENGTHS AND WEAKNESSES": reportData.strengthsWeaknesses,
+        "RECOMMENDATIONS": reportData.recommendations,
+        "GENERAL TUTOR'S COMMENTS": reportData.generalComments
+    };
+
+    // Generate the HTML for each section, ensuring "N/A" for empty content
+    const sectionsHTML = Object.entries(reportSections).map(([title, content]) => {
+        // Sanitize content to prevent HTML injection and format newlines
+        const sanitizedContent = content ? String(content).replace(/</g, "&lt;").replace(/>/g, "&gt;") : '';
+        const displayContent = (sanitizedContent && sanitizedContent.trim() !== '') ? sanitizedContent.replace(/\n/g, '<br>') : 'N/A';
+        return `
+            <div class="report-section">
+                <h2>${title}</h2>
+                <p>${displayContent}</p>
+            </div>
+        `;
+    }).join('');
+
+    const logoUrl = "https://res.cloudinary.com/dy2hxcyaf/image/upload/v1757700806/newbhlogo_umwqzy.svg";
+    const reportTemplate = `
+        <html>
+        <head>
+            <style>
+                body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; color: #333; }
+                .report-container { max-width: 800px; margin: auto; padding: 20px; }
+                .header { text-align: center; margin-bottom: 40px; }
+                .header img { height: 80px; }
+                .header h1 { color: #166534; margin: 0; font-size: 24px; }
+                .header h2 { color: #15803d; margin: 10px 0; font-size: 28px; }
+                .header p { margin: 5px 0; color: #555; }
+                .student-info { 
+                    display: grid; 
+                    grid-template-columns: 1fr 1fr; 
+                    gap: 10px 20px; 
+                    margin-bottom: 30px; 
+                    background-color: #f9f9f9;
+                    border: 1px solid #eee;
+                    padding: 15px;
+                    border-radius: 8px;
+                }
+                .student-info p { margin: 5px 0; }
+                .report-section {
+                    page-break-inside: avoid; /* CRITICAL: Prevents section from splitting across pages */
+                    margin-bottom: 20px;
+                    border: 1px solid #e5e7eb;
+                    padding: 15px;
+                    border-radius: 8px;
+                }
+                .report-section h2 { 
+                    font-size: 18px; 
+                    font-weight: bold; 
+                    color: #16a34a; 
+                    margin-top: 0; 
+                    padding-bottom: 8px;
+                    border-bottom: 2px solid #d1fae5;
+                }
+                .report-section p { line-height: 1.6; white-space: pre-wrap; margin-top: 0; }
+                .footer { text-align: right; margin-top: 40px; }
+            </style>
+        </head>
+        <body>
+            <div class="report-container">
+                <div class="header">
+                    <img src="${logoUrl}" alt="Company Logo">
+                    <h2>Blooming Kids House</h2>
+                    <h1>MONTHLY LEARNING REPORT</h1>
+                    <p>Date: ${new Date(reportData.submittedAt.seconds * 1000).toLocaleDateString()}</p>
+                </div>
+                <div class="student-info">
+                    <p><strong>Student's Name:</strong> ${reportData.studentName || 'N/A'}</p>
+                    <p><strong>Parent's Name:</strong> ${reportData.parentName || 'N/A'}</p>
+                    <p><strong>Parent's Phone:</strong> ${reportData.parentPhone || 'N/A'}</p>
+                    <p><strong>Grade:</strong> ${reportData.grade || 'N/A'}</p>
+                    <p><strong>Tutor's Name:</strong> ${reportData.tutorName || 'N/A'}</p>
+                </div>
+                ${sectionsHTML}
+                <div class="footer">
+                    <p>Best regards,</p>
+                    <p><strong>${reportData.tutorName || 'N/A'}</strong></p>
                 </div>
             </div>
-
-            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
-                ${panels.tutorDirectory ? `<div class="bg-gradient-to-r from-green-400 to-green-600 p-4 rounded-lg shadow text-white cursor-pointer hover:shadow-lg transition-shadow duration-300" data-panel="tutorDirectory">
-                    <h3 class="text-xl font-bold">Tutor & Student Directory</h3>
-                    <p class="text-sm">View and manage all tutors and students</p>
-                </div>` : ''}
-                ${panels.payAdvice ? `<div class="bg-gradient-to-r from-blue-400 to-blue-600 p-4 rounded-lg shadow text-white cursor-pointer hover:shadow-lg transition-shadow duration-300" data-panel="payAdvice">
-                    <h3 class="text-xl font-bold">Pay Advice</h3>
-                    <p class="text-sm">Generate and manage tutor payments</p>
-                </div>` : ''}
-                ${panels.pendingApprovals ? `<div class="bg-gradient-to-r from-yellow-400 to-yellow-600 p-4 rounded-lg shadow text-white cursor-pointer hover:shadow-lg transition-shadow duration-300" data-panel="pendingApprovals">
-                    <h3 class="text-xl font-bold">Pending Approvals</h3>
-                    <p class="text-sm">Approve or reject student requests</p>
-                </div>` : ''}
-                ${panels.reports ? `<div class="bg-gradient-to-r from-purple-400 to-purple-600 p-4 rounded-lg shadow text-white cursor-pointer hover:shadow-lg transition-shadow duration-300" data-panel="reports">
-                    <h3 class="text-xl font-bold">Reports</h3>
-                    <p class="text-sm">View tutor reports and submissions</p>
-                </div>` : ''}
-                ${panels.breakStudents ? `<div class="bg-gradient-to-r from-red-400 to-red-600 p-4 rounded-lg shadow text-white cursor-pointer hover:shadow-lg transition-shadow duration-300" data-panel="breakStudents">
-                    <h3 class="text-xl font-bold">Break Students</h3>
-                    <p class="text-sm">Manage students on break</p>
-                </div>` : ''}
-            </div>
-
-            <div id="main-content">
-                <div class="text-center py-10 text-gray-500">
-                    <p>Select a panel from above to get started.</p>
-                </div>
-            </div>
-        </div>
+        </body>
+        </html>
     `;
-
-    // Add event listeners to panel cards
-    if (panels.tutorDirectory) {
-        document.querySelector('[data-panel="tutorDirectory"]').addEventListener('click', () => renderManagementTutorView(document.getElementById('main-content')));
-    }
-    if (panels.payAdvice) {
-        document.querySelector('[data-panel="payAdvice"]').addEventListener('click', () => renderPayAdvicePanel(document.getElementById('main-content')));
-    }
-    if (panels.pendingApprovals) {
-        document.querySelector('[data-panel="pendingApprovals"]').addEventListener('click', () => renderPendingApprovalsPanel(document.getElementById('main-content')));
-    }
-    if (panels.reports) {
-        document.querySelector('[data-panel="reports"]').addEventListener('click', () => renderReportsPanel(document.getElementById('main-content')));
-    }
-    if (panels.breakStudents) {
-        document.querySelector('[data-panel="breakStudents"]').addEventListener('click', () => renderBreakStudentsPanel(document.getElementById('main-content')));
-    }
-
-    // Logout handler
-    document.getElementById('logout-btn').addEventListener('click', () => {
-        signOut(auth).then(() => {
-            window.location.href = 'login.html';
-        }).catch((error) => {
-            console.error("Logout error:", error);
-        });
-    });
+    return { html: reportTemplate, reportData: reportData };
 }
+
+
+async function viewReportInNewTab(reportId, shouldDownload = false) {
+    try {
+        const { html, reportData } = await generateReportHTML(reportId);
+
+        if (shouldDownload) {
+             const options = {
+                margin:       0.5,
+                filename:     `${reportData.studentName}_report.pdf`,
+                image:        { type: 'jpeg', quality: 0.98 },
+                html2canvas:  { scale: 2, useCORS: true },
+                jsPDF:        { unit: 'in', format: 'letter', orientation: 'portrait' }
+            };
+            html2pdf().from(html).set(options).save();
+        } else {
+            const newWindow = window.open();
+            newWindow.document.write(html);
+            newWindow.document.close();
+        }
+    } catch (error) {
+        console.error("Error viewing/downloading report:", error);
+        alert(`Error: ${error.message}`);
+    }
+}
+
+
+async function zipAndDownloadTutorReports(reports, tutorName, buttonElement) {
+    const originalButtonText = buttonElement.textContent;
+    buttonElement.textContent = 'Zipping... (0%)';
+    buttonElement.disabled = true;
+
+    try {
+        const zip = new JSZip();
+        let filesGenerated = 0;
+        const reportGenerationPromises = reports.map(async (report) => {
+            const { html, reportData } = await generateReportHTML(report.id);
+            // Use the same improved options for consistency
+            const options = {
+                image:        { type: 'jpeg', quality: 0.98 },
+                html2canvas:  { scale: 2, useCORS: true },
+                jsPDF:        { unit: 'in', format: 'letter', orientation: 'portrait' }
+            };
+            const pdfBlob = await html2pdf().from(html).set(options).output('blob');
+            filesGenerated++;
+            buttonElement.textContent = `Zipping... (${Math.round((filesGenerated / reports.length) * 100)}%)`;
+            return { name: `${reportData.studentName}_Report_${report.id.substring(0,5)}.pdf`, blob: pdfBlob };
+        });
+        const generatedPdfs = await Promise.all(reportGenerationPromises);
+        generatedPdfs.forEach(pdf => zip.file(pdf.name, pdf.blob));
+        const zipBlob = await zip.generateAsync({ type: "blob" });
+        saveAs(zipBlob, `${tutorName}_All_Reports.zip`);
+    } catch (error) {
+        console.error("Error creating zip file:", error);
+        alert("Failed to create zip file. See console for details.");
+    } finally {
+        buttonElement.textContent = originalButtonText;
+        buttonElement.disabled = false;
+    }
+}
+
 
 // ##################################
 // # AUTHENTICATION & INITIALIZATION
 // ##################################
 
 onAuthStateChanged(auth, async (user) => {
+    const mainContent = document.getElementById('main-content');
+    const logoutBtn = document.getElementById('logoutBtn');
     if (user) {
-        try {
-            const userDoc = await getDoc(doc(db, "users", user.uid));
-            if (userDoc.exists()) {
-                const userData = userDoc.data();
-                if (userData.role === 'management') {
-                    window.userData = userData;
-                    renderManagementDashboard(document.getElementById('app'));
-                } else {
-                    alert("Access denied. Management role required.");
-                    signOut(auth).then(() => {
-                        window.location.href = 'login.html';
+        const staffDocRef = doc(db, "staff", user.email);
+        onSnapshot(staffDocRef, (docSnap) => {
+            if (docSnap.exists() && docSnap.data().role !== 'pending') {
+                const staffData = docSnap.data();
+                window.userData = staffData;
+                
+                document.getElementById('welcome-message').textContent = `Welcome, ${staffData.name}`;
+                document.getElementById('user-role').textContent = `Role: ${capitalize(staffData.role)}`;
+
+                const allNavItems = {
+                    navTutorManagement: { fn: renderManagementTutorView, perm: 'viewTutorManagement' },
+                    navPayAdvice: { fn: renderPayAdvicePanel, perm: 'viewPayAdvice' },
+                    navTutorReports: { fn: renderTutorReportsPanel, perm: 'viewTutorReports' },
+                    navSummerBreak: { fn: renderSummerBreakPanel, perm: 'viewSummerBreak' },
+                    navPendingApprovals: { fn: renderPendingApprovalsPanel, perm: 'viewPendingApprovals' }
+                };
+
+                const navContainer = document.querySelector('nav');
+                const originalNavButtons = {};
+                if(navContainer) {
+                    navContainer.querySelectorAll('.nav-btn').forEach(btn => originalNavButtons[btn.id] = btn.textContent);
+                    navContainer.innerHTML = '';
+                    let firstVisibleTab = null;
+
+                    Object.entries(allNavItems).forEach(([id, item]) => {
+                        if (window.userData.permissions?.tabs?.[item.perm]) {
+                            if (!firstVisibleTab) firstVisibleTab = id;
+                            const button = document.createElement('button');
+                            button.id = id;
+                            button.className = 'nav-btn text-lg font-semibold text-gray-500 hover:text-green-700';
+                            button.textContent = originalNavButtons[id];
+                            navContainer.appendChild(button);
+                            
+                            button.addEventListener('click', () => {
+                                document.querySelectorAll('.nav-btn').forEach(btn => btn.classList.remove('active'));
+                                button.classList.add('active');
+                                item.fn(mainContent);
+                            });
+                        }
                     });
+
+                    if (firstVisibleTab) {
+                        const activeNav = document.querySelector('.nav-btn.active');
+                        const activeNavId = activeNav?.id;
+                        if (!activeNav || !document.getElementById(activeNavId)) {
+                            document.getElementById(firstVisibleTab).click();
+                        } else {
+                            const currentItem = allNavItems[activeNavId];
+                            if(currentItem) currentItem.fn(mainContent);
+                        }
+                    } else {
+                        if (mainContent) mainContent.innerHTML = `<p class="text-center">You have no permissions assigned.</p>`;
+                    }
                 }
             } else {
-                alert("User data not found.");
-                signOut(auth).then(() => {
-                    window.location.href = 'login.html';
-                });
+                if (document.getElementById('welcome-message')) document.getElementById('welcome-message').textContent = `Hello, ${docSnap.data()?.name}`;
+                if (document.getElementById('user-role')) document.getElementById('user-role').textContent = 'Status: Pending Approval';
+                if (mainContent) mainContent.innerHTML = `<p class="text-center mt-12 text-yellow-600 font-semibold">Your account is awaiting approval.</p>`;
             }
-        } catch (error) {
-            console.error("Error fetching user data:", error);
-            alert("Error fetching user data.");
-            signOut(auth).then(() => {
-                window.location.href = 'login.html';
-            });
+        });
+
+        const staffDocSnap = await getDoc(staffDocRef);
+        if (!staffDocSnap.exists()) {
+            if (mainContent) mainContent.innerHTML = `<p class="text-center mt-12 text-red-600">Account not registered in staff directory.</p>`;
+            if (logoutBtn) logoutBtn.classList.add('hidden');
         }
+
+        if(logoutBtn) logoutBtn.addEventListener('click', () => signOut(auth).then(() => window.location.href = "management-auth.html"));
     } else {
-        window.location.href = 'login.html';
+        window.location.href = "management-auth.html";
     }
 });
 
+
 // [End Updated management.js File]
+
