@@ -1,7 +1,7 @@
 // [Begin Updated management.js File]
 
 import { auth, db } from './firebaseConfig.js';
-import { collection, getDocs, doc, getDoc, where, query, orderBy, Timestamp, writeBatch, updateDoc, deleteDoc, setDoc } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
+import { collection, getDocs, doc, getDoc, where, query, orderBy, Timestamp, writeBatch, updateDoc, deleteDoc, setDoc, addDoc } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
 import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-auth.js";
 import { onSnapshot } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
 
@@ -44,7 +44,8 @@ function loadFromLocalStorage() {
             if (storedData) {
                 sessionCache[key] = JSON.parse(storedData);
             }
-        } catch (error) {
+        } catch (error)
+        {
             console.error(`Could not load '${key}' from localStorage:`, error);
             localStorage.removeItem(CACHE_PREFIX + key); // Clear corrupted data
         }
@@ -75,7 +76,60 @@ function capitalize(str) {
     return str.replace(/\b\w/g, l => l.toUpperCase());
 }
 
-// ### UPDATED FUNCTION ###
+// ### START: LOGIC PORTED FROM TUTOR.JS FOR FEE CALCULATION ###
+
+const PAY_SCHEMES = {
+    NEW_TUTOR: { academic: { "Preschool-Grade 2": { 2: 50000, 3: 60000, 5: 100000 }, "Grade 3-8": { 2: 60000, 3: 70000, 5: 110000 }, "Subject Teachers": { 1: 30000, 2: 60000, 3: 70000 } }, specialized: { individual: { "Music": 30000, "Native Language": 20000, "Foreign Language": 25000, "Coding": 30000, "Chess": 25000, "Public Speaking": 25000, "English Proficiency": 25000, "Counseling Programs": 25000 }, group: { "Music": 25000, "Native Language": 20000, "Foreign Language": 20000, "Chess": 20000, "Public Speaking": 20000, "English Proficiency": 20000, "Counseling Programs": 20000 } } },
+    OLD_TUTOR: { academic: { "Preschool-Grade 2": { 2: 60000, 3: 70000, 5: 110000 }, "Grade 3-8": { 2: 70000, 3: 80000, 5: 120000 }, "Subject Teachers": { 1: 35000, 2: 70000, 3: 90000 } }, specialized: { individual: { "Music": 35000, "Native Language": 25000, "Foreign Language": 30000, "Coding": 35000, "Chess": 30000, "Public Speaking": 30000, "English Proficiency": 30000, "Counseling Programs": 30000 }, group: { "Music": 25000, "Native Language": 20000, "Foreign Language": 20000, "Chess": 20000, "Public Speaking": 20000, "English Proficiency": 20000, "Counseling Programs": 20000 } } },
+    MANAGEMENT: { academic: { "Preschool-Grade 2": { 2: 70000, 3: 85000, 5: 120000 }, "Grade 3-8": { 2: 80000, 3: 90000, 5: 130000 }, "Subject Teachers": { 1: 40000, 2: 80000, 3: 100000 } }, specialized: { individual: { "Music": 40000, "Native Language": 30000, "Foreign Language": 35000, "Coding": 40000, "Chess": 35000, "Public Speaking": 35000, "English Proficiency": 35000, "Counseling Programs": 35000 }, group: { "Music": 25000, "Native Language": 20000, "Foreign Language": 20000, "Chess": 20000, "Public Speaking": 20000, "English Proficiency": 20000, "Counseling Programs": 20000 } } }
+};
+
+const SUBJECT_CATEGORIES = {
+    "Native Language": ["Yoruba", "Igbo", "Hausa"],
+    "Foreign Language": ["French", "German", "Spanish", "Arabic"],
+    "Specialized": ["Music", "Coding", "Chess", "Public Speaking", "English Proficiency", "Counseling Programs"]
+};
+
+function getTutorPayScheme(tutor) {
+    if (tutor.isManagementStaff) return PAY_SCHEMES.MANAGEMENT;
+    if (!tutor.employmentDate) return PAY_SCHEMES.NEW_TUTOR;
+    const employmentDate = new Date(tutor.employmentDate + '-01');
+    const currentDate = new Date();
+    const monthsDiff = (currentDate.getFullYear() - employmentDate.getFullYear()) * 12 + (currentDate.getMonth() - employmentDate.getMonth());
+    return monthsDiff >= 12 ? PAY_SCHEMES.OLD_TUTOR : PAY_SCHEMES.NEW_TUTOR;
+}
+
+function findSpecializedSubject(subjects) {
+    for (const [category, subjectList] of Object.entries(SUBJECT_CATEGORIES)) {
+        for (const subject of subjects) {
+            if (subjectList.includes(subject)) return { category, subject };
+        }
+    }
+    return null;
+}
+
+function calculateSuggestedFee(student, payScheme) {
+    const grade = student.grade;
+    const days = parseInt(student.days) || 0;
+    const subjects = student.subjects || [];
+    const specializedSubject = findSpecializedSubject(subjects);
+    if (specializedSubject) {
+        const isGroupClass = student.groupClass || false;
+        const feeType = isGroupClass ? 'group' : 'individual';
+        return payScheme.specialized[feeType][specializedSubject.category] || 0;
+    }
+    let gradeCategory = "Grade 3-8";
+    if (grade === "Preschool" || grade === "Kindergarten" || grade.includes("Grade 1") || grade.includes("Grade 2")) {
+        gradeCategory = "Preschool-Grade 2";
+    } else if (parseInt(grade.replace('Grade ', '')) >= 9) {
+        return 0;
+    }
+    const isSubjectTeacher = subjects.some(subj => ["Math", "English", "Science"].includes(subj)) && parseInt(grade.replace('Grade ', '')) >= 5;
+    return isSubjectTeacher ? payScheme.academic["Subject Teachers"][days] || 0 : payScheme.academic[gradeCategory][days] || 0;
+}
+// ### END: LOGIC PORTED FROM TUTOR.JS ###
+
+
 // Utility function to convert data to CSV, now includes gift and final pay details
 function convertPayAdviceToCSV(data) {
     const header = [
@@ -255,12 +309,14 @@ async function handleRejectStudent(studentId) {
 
 // --- Tutor & Student Directory Panel ---
 async function renderManagementTutorView(container) {
+    const canAssignStudents = window.userData.permissions?.actions?.canAssignStudents === true;
     container.innerHTML = `
         <div class="bg-white p-6 rounded-lg shadow-md">
             <div class="flex justify-between items-center mb-4 flex-wrap gap-4">
                 <h2 class="text-2xl font-bold text-green-700">Tutor & Student Directory</h2>
                 <div class="flex items-center gap-4">
-                    <input type="search" id="directory-search" placeholder="Search Tutors, Students, Parents..." class="p-2 border rounded-md w-64">
+                    <input type="search" id="directory-search" placeholder="Search Tutors, Students, Parents, Phone..." class="p-2 border rounded-md w-64">
+                    ${canAssignStudents ? `<button id="assign-student-btn" class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700">Assign New Student</button>` : ''}
                     <button id="refresh-directory-btn" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Refresh</button>
                 </div>
             </div>
@@ -281,6 +337,9 @@ async function renderManagementTutorView(container) {
     `;
     document.getElementById('refresh-directory-btn').addEventListener('click', () => fetchAndRenderDirectory(true));
     document.getElementById('directory-search').addEventListener('input', (e) => renderDirectoryFromCache(e.target.value));
+    if (canAssignStudents) {
+        document.getElementById('assign-student-btn').addEventListener('click', showAssignStudentModal);
+    }
     fetchAndRenderDirectory();
 }
 
@@ -332,9 +391,11 @@ function renderDirectoryFromCache(searchTerm = '') {
     const filteredTutors = tutors.filter(tutor => {
         const assignedStudents = studentsByTutor[tutor.email] || [];
         const tutorMatch = tutor.name.toLowerCase().includes(lowerCaseSearchTerm);
-        const studentMatch = assignedStudents.some(s => 
+        // ### MODIFIED SECTION: Enhanced search logic ###
+        const studentMatch = assignedStudents.some(s =>
             s.studentName.toLowerCase().includes(lowerCaseSearchTerm) ||
-            (s.parentName && s.parentName.toLowerCase().includes(lowerCaseSearchTerm))
+            (s.parentName && s.parentName.toLowerCase().includes(lowerCaseSearchTerm)) ||
+            (s.parentPhone && s.parentPhone.includes(searchTerm)) // Phone search doesn't need to be lowercase
         );
         return tutorMatch || studentMatch;
     });
@@ -353,11 +414,13 @@ function renderDirectoryFromCache(searchTerm = '') {
 
     directoryList.innerHTML = filteredTutors.map(tutor => {
         const assignedStudents = (studentsByTutor[tutor.email] || [])
-            .filter(s => 
+            // ### MODIFIED SECTION: Enhanced filter for which students to show under a tutor ###
+            .filter(s =>
                 searchTerm === '' || // show all students if no search term
                 tutor.name.toLowerCase().includes(lowerCaseSearchTerm) || // show all if tutor name matches
                 s.studentName.toLowerCase().includes(lowerCaseSearchTerm) ||
-                (s.parentName && s.parentName.toLowerCase().includes(lowerCaseSearchTerm))
+                (s.parentName && s.parentName.toLowerCase().includes(lowerCaseSearchTerm)) ||
+                (s.parentPhone && s.parentPhone.includes(searchTerm))
             );
 
         const studentsTableRows = assignedStudents
@@ -412,6 +475,125 @@ function renderDirectoryFromCache(searchTerm = '') {
     if (canDeleteStudents) {
         document.querySelectorAll('.delete-student-btn').forEach(button => button.addEventListener('click', () => handleDeleteStudent(button.dataset.studentId)));
     }
+}
+
+
+// ### NEW FUNCTION: Show Assign Student Modal ###
+function showAssignStudentModal() {
+    const tutors = sessionCache.tutors || [];
+    if (tutors.length === 0) {
+        alert("Tutor list is not available. Please refresh the directory and try again.");
+        return;
+    }
+
+    const tutorOptions = tutors.map(tutor => `<option value="${tutor.email}">${tutor.name} (${tutor.email})</option>`).join('');
+    const gradeOptions = `
+        <option value="">Select Grade</option><option value="Preschool">Preschool</option><option value="Kindergarten">Kindergarten</option>
+        ${Array.from({ length: 12 }, (_, i) => `<option value="Grade ${i + 1}">Grade ${i + 1}</option>`).join('')}
+        <option value="Pre-College">Pre-College</option><option value="College">College</option><option value="Adults">Adults</option>
+    `;
+    const daysOptions = Array.from({ length: 7 }, (_, i) => `<option value="${i + 1}">${i + 1}</option>`).join('');
+
+    const subjectsByCategory = {
+        "Academics": ["Math", "Language Arts", "Geography", "Science", "Biology", "Physics", "Chemistry", "Microbiology"],
+        "Pre-College Exams": ["SAT", "IGCSE", "A-Levels", "SSCE", "JAMB"],
+        "Languages": ["French", "German", "Spanish", "Yoruba", "Igbo", "Hausa", "Arabic"],
+        "Tech Courses": ["Coding", "Stop motion animation", "Computer Appreciation", "Digital Entrepeneurship", "Animation", "YouTube for kids", "Graphic design", "Videography", "Comic/book creation", "Artificial Intelligence", "Chess"],
+        "Support Programs": ["Bible study", "Counseling Programs", "Speech therapy", "Behavioral therapy", "Public speaking", "Adult education", "Communication skills", "English Proficiency"]
+    };
+
+    let subjectsHTML = `<h4 class="font-semibold text-gray-700 mt-2">Subjects</h4><div id="assign-subjects-container" class="space-y-2 border p-3 rounded bg-gray-50 max-h-48 overflow-y-auto">`;
+    for (const category in subjectsByCategory) {
+        subjectsHTML += `<details><summary class="font-semibold cursor-pointer text-sm">${category}</summary><div class="pl-4 grid grid-cols-2 sm:grid-cols-3 gap-2 mt-2">
+            ${subjectsByCategory[category].map(subject => `<div><label class="text-sm font-normal"><input type="checkbox" name="assign-subjects" value="${subject}"> ${subject}</label></div>`).join('')}
+        </div></details>`;
+    }
+    subjectsHTML += `<div class="font-semibold pt-2 border-t"><label class="text-sm"><input type="checkbox" name="assign-subjects" value="Music"> Music</label></div></div>`;
+
+    const modalHtml = `
+        <div id="assign-modal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-center justify-center">
+            <div class="relative p-8 bg-white w-full max-w-2xl rounded-lg shadow-xl">
+                <button class="absolute top-2 right-2 text-gray-500 hover:text-gray-800 text-2xl font-bold" onclick="document.getElementById('assign-modal').remove()">&times;</button>
+                <h3 class="text-xl font-bold mb-4">Assign New Student</h3>
+                <form id="assign-student-form" class="space-y-3">
+                    <div><label class="block text-sm font-medium">Assign to Tutor</label><select id="assign-tutor-select" class="mt-1 block w-full p-2 border rounded-md">${tutorOptions}</select></div>
+                    <div><label class="block text-sm font-medium">Parent Name</label><input type="text" id="assign-parentName" class="mt-1 block w-full p-2 border rounded-md"></div>
+                    <div><label class="block text-sm font-medium">Parent Phone</label><input type="tel" id="assign-parentPhone" class="mt-1 block w-full p-2 border rounded-md"></div>
+                    <div><label class="block text-sm font-medium">Student Name</label><input type="text" id="assign-studentName" class="mt-1 block w-full p-2 border rounded-md"></div>
+                    <div><label class="block text-sm font-medium">Grade</label><select id="assign-grade" class="mt-1 block w-full p-2 border rounded-md">${gradeOptions}</select></div>
+                    ${subjectsHTML}
+                    <div><label class="block text-sm font-medium">Days per Week</label><select id="assign-days" class="mt-1 block w-full p-2 border rounded-md"><option value="">Select Days</option>${daysOptions}</select></div>
+                    <div id="assign-group-class-container" class="hidden"><label class="flex items-center space-x-2"><input type="checkbox" id="assign-group-class" class="rounded"><span class="text-sm font-semibold">Group Class</span></label></div>
+                    <div><label class="block text-sm font-medium">Student Fee (₦)</label><input type="number" id="assign-studentFee" placeholder="Auto-calculated or enter manually" class="mt-1 block w-full p-2 border rounded-md"></div>
+                    <div class="flex justify-end mt-4">
+                        <button type="button" onclick="document.getElementById('assign-modal').remove()" class="mr-2 px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300">Cancel</button>
+                        <button type="submit" class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700">Assign Student</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    `;
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+
+    const updateFee = () => {
+        const selectedTutorEmail = document.getElementById('assign-tutor-select').value;
+        const tutor = tutors.find(t => t.email === selectedTutorEmail);
+        const grade = document.getElementById('assign-grade').value;
+        const days = document.getElementById('assign-days').value;
+        const groupClass = document.getElementById('assign-group-class').checked;
+        const subjects = Array.from(document.querySelectorAll('input[name="assign-subjects"]:checked')).map(cb => cb.value);
+        if (tutor && grade && days && subjects.length > 0) {
+            const payScheme = getTutorPayScheme(tutor);
+            const fee = calculateSuggestedFee({ grade, days, subjects, groupClass }, payScheme);
+            if (fee > 0) document.getElementById('assign-studentFee').value = fee;
+        }
+    };
+
+    document.getElementById('assign-subjects-container').addEventListener('change', () => {
+        const subjects = Array.from(document.querySelectorAll('input[name="assign-subjects"]:checked')).map(cb => cb.value);
+        document.getElementById('assign-group-class-container').classList.toggle('hidden', !findSpecializedSubject(subjects));
+        updateFee();
+    });
+
+    ['assign-tutor-select', 'assign-grade', 'assign-days', 'assign-group-class'].forEach(id => {
+        document.getElementById(id).addEventListener('change', updateFee);
+    });
+
+    document.getElementById('assign-student-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const tutorEmail = document.getElementById('assign-tutor-select').value;
+        const selectedTutor = tutors.find(t => t.email === tutorEmail);
+        const studentData = {
+            tutorEmail: tutorEmail,
+            tutorName: selectedTutor.name,
+            parentName: document.getElementById('assign-parentName').value.trim(),
+            parentPhone: document.getElementById('assign-parentPhone').value.trim(),
+            studentName: document.getElementById('assign-studentName').value.trim(),
+            grade: document.getElementById('assign-grade').value,
+            days: document.getElementById('assign-days').value,
+            subjects: Array.from(document.querySelectorAll('input[name="assign-subjects"]:checked')).map(cb => cb.value),
+            groupClass: document.getElementById('assign-group-class').checked,
+            studentFee: Number(document.getElementById('assign-studentFee').value) || 0,
+            status: 'approved',
+            summerBreak: false,
+        };
+
+        if (!studentData.tutorEmail || !studentData.parentName || !studentData.studentName || !studentData.grade || !studentData.days || studentData.subjects.length === 0) {
+            alert("Please fill out all fields, including at least one subject.");
+            return;
+        }
+
+        try {
+            await addDoc(collection(db, "students"), studentData);
+            alert(`Student "${studentData.studentName}" assigned to ${studentData.tutorName} successfully!`);
+            document.getElementById('assign-modal').remove();
+            invalidateCache('students');
+            fetchAndRenderDirectory();
+        } catch (error) {
+            console.error("Error assigning student: ", error);
+            alert("Failed to assign student. Check the console for details.");
+        }
+    });
 }
 
 
@@ -1107,4 +1289,3 @@ onAuthStateChanged(auth, async (user) => {
 
 
 // [End Updated management.js File]
-
