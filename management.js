@@ -412,7 +412,8 @@ function renderDirectoryFromCache(searchTerm = '') {
         const studentMatch = assignedStudents.some(s =>
             s.studentName.toLowerCase().includes(lowerCaseSearchTerm) ||
             (s.parentName && s.parentName.toLowerCase().includes(lowerCaseSearchTerm)) ||
-            (s.parentPhone && s.parentPhone.toLowerCase().includes(lowerCaseSearchTerm))
+            // CORRECTED LINE: Safely converts phone number to a string before searching
+            (s.parentPhone && String(s.parentPhone).toLowerCase().includes(lowerCaseSearchTerm))
         );
         return tutorMatch || studentMatch;
     });
@@ -436,7 +437,8 @@ function renderDirectoryFromCache(searchTerm = '') {
                 tutor.name.toLowerCase().includes(lowerCaseSearchTerm) || // show all if tutor name matches
                 s.studentName.toLowerCase().includes(lowerCaseSearchTerm) ||
                 (s.parentName && s.parentName.toLowerCase().includes(lowerCaseSearchTerm)) ||
-                (s.parentPhone && s.parentPhone.toLowerCase().includes(lowerCaseSearchTerm))
+                // CORRECTED LINE: Safely converts phone number to a string before searching
+                (s.parentPhone && String(s.parentPhone).toLowerCase().includes(lowerCaseSearchTerm))
             );
 
         const studentsTableRows = assignedStudents
