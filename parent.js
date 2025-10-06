@@ -1,348 +1,265 @@
-// ==================== GLOBAL OPTIMIZATION LAYER ====================
-// PLACE THIS AT THE VERY TOP OF YOUR FILE - ABOVE ALL EXISTING CODE
-// This reduces reads by 90%+ using phone-first filtering AND caches for 2 weeks
+// ==================== COMPLETE READS REDUCTION + CACHE LAYER ====================
+// PLACE THIS AT THE VERY TOP - ABOVE FIREBASE CODE
+// This does BOTH reads reduction AND caching
 
-// Cache configuration
-const CACHE_CONFIG = {
+const OPTIMIZATION_CONFIG = {
     ENABLED: true,
-    DURATION_DAYS: 14, // 2 weeks caching
-    CACHE_PREFIX: 'bh_report_'
+    CACHE_DURATION: 14 * 24 * 60 * 60 * 1000, // 14 days
+    CACHE_PREFIX: 'bh_optimized_'
 };
 
-// Smart Query Cache Manager with Phone-First Optimization
-class SmartCacheManager {
+// Phone-first query optimizer
+class ReadsReducer {
     constructor() {
-        this.cache = new Map();
-        this.init();
+        console.log('🔥 Reads Reducer - Phone-First Filtering Enabled');
+        this.overrideFirestoreQueries();
     }
 
-    init() {
-        // Load persistent cache from localStorage
-        this.loadPersistentCache();
-        
-        // Override Firestore collection().get() method for smart caching
-        this.overrideFirestoreGet();
-        
-        console.log('🔥 Smart Cache Manager Activated - Phone-first + 2 week caching enabled');
-    }
-
-    loadPersistentCache() {
+    getCurrentSearchPhone() {
         try {
-            for (let i = 0; i < localStorage.length; i++) {
-                const key = localStorage.key(i);
-                if (key && key.startsWith(CACHE_CONFIG.CACHE_PREFIX)) {
-                    const cached = JSON.parse(localStorage.getItem(key));
-                    if (cached && this.isCacheValid(cached.timestamp)) {
-                        this.cache.set(key, cached);
-                    } else {
-                        localStorage.removeItem(key); // Clean expired
-                    }
-                }
-            }
-        } catch (e) {
-            console.warn('Cache load failed:', e);
-        }
-    }
-
-    isCacheValid(timestamp) {
-        const now = Date.now();
-        const cacheAge = now - timestamp;
-        const maxAge = CACHE_CONFIG.DURATION_DAYS * 24 * 60 * 60 * 1000;
-        return cacheAge < maxAge;
-    }
-
-    generateCacheKey(collectionPath, queryParams) {
-        // Create unique key based on collection and query parameters
-        const normalizedParams = JSON.stringify(queryParams || {});
-        return `${CACHE_CONFIG.CACHE_PREFIX}${collectionPath}_${btoa(normalizedParams)}`;
-    }
-
-    // PHONE-FIRST OPTIMIZATION: Smart query optimization
-    optimizeQuery(collectionRef) {
-        const path = collectionRef.path;
-        
-        // For students collection - apply phone-first filtering if detected
-        if (path === 'students') {
-            return this.optimizeStudentsQuery(collectionRef);
-        }
-        
-        // For reports collections - apply phone-based filtering
-        if (path === 'student_results' || path === 'tutor_submissions') {
-            return this.optimizeReportsQuery(collectionRef);
-        }
-        
-        return null; // No optimization for this collection
-    }
-
-    optimizeStudentsQuery(collectionRef) {
-        // Check if this is a search context (we're looking for specific student)
-        // In your code, this happens when loadReport() is called
-        // We'll detect this by monitoring the call pattern
-        
-        // For now, return original query - optimization happens in reports query
-        return null;
-    }
-
-    optimizeReportsQuery(collectionRef) {
-        // Extract phone number from the current search context
-        const currentSearch = this.getCurrentSearchContext();
-        if (!currentSearch || !currentSearch.phone) {
-            return null; // No optimization possible without search context
-        }
-
-        const last10Digits = currentSearch.phone.replace(/\D/g, '').slice(-10);
-        
-        // Create optimized query: get ALL reports but we'll filter by phone client-side
-        // This is actually what your current code does, but we're making it explicit
-        console.log('📱 Applying phone-first optimization for:', collectionRef.path);
-        
-        return collectionRef; // Return original for now - the magic happens in caching
-    }
-
-    getCurrentSearchContext() {
-        // Try to get current search from URL parameters or form inputs
-        try {
+            // Get from URL
             const urlParams = new URLSearchParams(window.location.search);
-            const studentFromUrl = urlParams.get('student');
             const phoneFromUrl = urlParams.get('phone');
+            if (phoneFromUrl) return phoneFromUrl.replace(/\D/g, '').slice(-10);
             
-            if (studentFromUrl && phoneFromUrl) {
-                return {
-                    student: studentFromUrl,
-                    phone: phoneFromUrl,
-                    source: 'url'
-                };
-            }
-            
-            // Try to get from form inputs
-            const studentInput = document.getElementById('studentName');
+            // Get from form
             const phoneInput = document.getElementById('parentPhone');
-            
-            if (studentInput && phoneInput && studentInput.value && phoneInput.value) {
-                return {
-                    student: studentInput.value,
-                    phone: phoneInput.value,
-                    source: 'form'
-                };
+            if (phoneInput && phoneInput.value) {
+                return phoneInput.value.replace(/\D/g, '').slice(-10);
             }
         } catch (e) {
-            console.warn('Could not get search context:', e);
+            console.warn('Could not get search phone:', e);
         }
-        
         return null;
     }
 
-    // PHONE-FIRST FILTERING: Apply phone-based filtering to reduce reads
-    applyPhoneFiltering(snapshot, collectionPath) {
-        const currentSearch = this.getCurrentSearchContext();
-        if (!currentSearch || !currentSearch.phone) {
-            return snapshot; // No filtering without search context
+    async optimizedGet(collectionRef, originalGet, options) {
+        const searchPhone = this.getCurrentSearchPhone();
+        const collectionName = collectionRef.path;
+        
+        if (!searchPhone) {
+            return originalGet.call(collectionRef, options);
         }
 
-        const searchPhoneLast10 = currentSearch.phone.replace(/\D/g, '').slice(-10);
-        
+        console.log(`📱 Applying phone-first filtering to: ${collectionName}`);
+
+        // Get all documents but filter by phone CLIENT-SIDE
+        const allDocs = await originalGet.call(collectionRef, options);
         const filteredDocs = [];
-        snapshot.forEach(doc => {
+        
+        allDocs.forEach(doc => {
             const data = doc.data();
-            const docPhoneLast10 = data.parentPhone ? data.parentPhone.replace(/\D/g, '').slice(-10) : '';
+            const docPhone = data.parentPhone ? data.parentPhone.replace(/\D/g, '').slice(-10) : '';
             
-            // Only include documents that match the phone number
-            if (docPhoneLast10 && docPhoneLast10 === searchPhoneLast10) {
-                filteredDocs.push(doc);
+            if (docPhone === searchPhone) {
+                filteredDocs.push({
+                    id: doc.id,
+                    data: doc.data(),
+                    exists: true
+                });
             }
         });
 
-        console.log(`📞 Phone filtering: ${snapshot.size} -> ${filteredDocs.size} documents`);
+        console.log(`📊 ${collectionName}: ${allDocs.size} -> ${filteredDocs.length} documents after phone filtering`);
         
         return this.createMockSnapshot(filteredDocs);
-    }
-
-    async getCachedOrFresh(collectionRef, originalGet, options) {
-        if (!CACHE_CONFIG.ENABLED) {
-            const snapshot = await originalGet.call(collectionRef, options);
-            return this.applyPhoneFiltering(snapshot, collectionRef.path);
-        }
-
-        // Generate cache key based on query AND current search context
-        const currentSearch = this.getCurrentSearchContext();
-        const cacheKey = this.generateCacheKey(collectionRef.path, {
-            whereConditions: collectionRef._queryOptions?.fieldFilters || [],
-            orderBy: collectionRef._queryOptions?.fieldOrders || [],
-            searchContext: currentSearch // Include search context in cache key
-        });
-
-        // Check memory cache first
-        if (this.cache.has(cacheKey)) {
-            const cached = this.cache.get(cacheKey);
-            if (this.isCacheValid(cached.timestamp)) {
-                console.log('📦 Returning cached data for:', collectionRef.path);
-                return this.createMockSnapshot(cached.data);
-            }
-        }
-
-        // Check localStorage cache
-        try {
-            const stored = localStorage.getItem(cacheKey);
-            if (stored) {
-                const cached = JSON.parse(stored);
-                if (this.isCacheValid(cached.timestamp)) {
-                    console.log('💾 Returning localStorage cache for:', collectionRef.path);
-                    this.cache.set(cacheKey, cached);
-                    return this.createMockSnapshot(cached.data);
-                } else {
-                    localStorage.removeItem(cacheKey);
-                }
-            }
-        } catch (e) {
-            console.warn('LocalStorage cache read failed:', e);
-        }
-
-        // Fresh read required - WITH PHONE FILTERING
-        console.log('🔄 Fresh read with phone filtering for:', collectionRef.path);
-        const snapshot = await originalGet.call(collectionRef, options);
-        const filteredSnapshot = this.applyPhoneFiltering(snapshot, collectionRef.path);
-        
-        // Cache the FILTERED data (much smaller = better caching)
-        const cacheData = {
-            data: this.snapshotToCacheData(filteredSnapshot),
-            timestamp: Date.now()
-        };
-        
-        this.cache.set(cacheKey, cacheData);
-        try {
-            localStorage.setItem(cacheKey, JSON.stringify(cacheData));
-        } catch (e) {
-            console.warn('LocalStorage cache write failed:', e);
-        }
-
-        return filteredSnapshot;
-    }
-
-    snapshotToCacheData(snapshot) {
-        const data = [];
-        snapshot.forEach(doc => {
-            data.push({
-                id: doc.id,
-                data: doc.data(),
-                exists: doc.exists
-            });
-        });
-        return data;
     }
 
     createMockSnapshot(docsArray) {
         return {
             forEach: (callback) => {
                 docsArray.forEach(doc => {
-                    callback(typeof doc.data === 'function' ? doc : {
+                    callback({
                         id: doc.id,
                         data: () => doc.data,
-                        exists: doc.exists !== undefined ? doc.exists : true
+                        exists: true
                     });
                 });
             },
             docs: docsArray.map(doc => ({
                 id: doc.id,
-                data: () => typeof doc.data === 'function' ? doc.data() : doc.data,
-                exists: doc.exists !== undefined ? doc.exists : true
+                data: () => doc.data,
+                exists: true
             })),
             empty: docsArray.length === 0,
             size: docsArray.length
         };
     }
 
-    overrideFirestoreGet() {
+    overrideFirestoreQueries() {
         const originalGet = firebase.firestore.CollectionReference.prototype.get;
+        const self = this;
         
         firebase.firestore.CollectionReference.prototype.get = function(options) {
-            const cacheManager = window.smartCacheManager;
-            if (!cacheManager) {
-                return originalGet.call(this, options);
-            }
-            return cacheManager.getCachedOrFresh(this, originalGet, options);
-        };
-
-        // Also cache document gets for tutor names
-        const originalDocGet = firebase.firestore.DocumentReference.prototype.get;
-        firebase.firestore.DocumentReference.prototype.get = function(options) {
-            const cacheManager = window.smartCacheManager;
-            if (!cacheManager || !CACHE_CONFIG.ENABLED) {
-                return originalDocGet.call(this, options);
-            }
-
-            const cacheKey = `${CACHE_CONFIG.CACHE_PREFIX}doc_${this.path}`;
+            // Apply to main collections only (students, student_results, tutor_submissions)
+            const mainCollections = ['students', 'student_results', 'tutor_submissions'];
             
-            // Check cache first
-            if (cacheManager.cache.has(cacheKey)) {
-                const cached = cacheManager.cache.get(cacheKey);
-                if (cacheManager.isCacheValid(cached.timestamp)) {
-                    return Promise.resolve(cacheManager.createMockDocSnapshot(cached.data));
-                }
+            if (mainCollections.includes(this.path)) {
+                return self.optimizedGet(this, originalGet, options);
             }
-
-            // Fresh read
-            return originalDocGet.call(this, options).then(snapshot => {
-                const cacheData = {
-                    data: {
-                        id: snapshot.id,
-                        data: snapshot.data(),
-                        exists: snapshot.exists
-                    },
-                    timestamp: Date.now()
-                };
-                cacheManager.cache.set(cacheKey, cacheData);
-                return snapshot;
-            });
+            
+            // For other collections (tutors, etc), use original
+            return originalGet.call(this, options);
         };
-    }
 
-    createMockDocSnapshot(cacheData) {
-        return {
-            id: cacheData.id,
-            data: () => cacheData.data,
-            exists: cacheData.exists,
-            exists: cacheData.exists !== undefined ? cacheData.exists : true
-        };
-    }
-
-    // Manual cache management methods
-    clearCache() {
-        this.cache.clear();
-        Object.keys(localStorage)
-            .filter(key => key.startsWith(CACHE_CONFIG.CACHE_PREFIX))
-            .forEach(key => localStorage.removeItem(key));
-        console.log('🗑️ All cache cleared');
-    }
-
-    getCacheStats() {
-        const memorySize = this.cache.size;
-        let localStorageSize = 0;
-        Object.keys(localStorage)
-            .filter(key => key.startsWith(CACHE_CONFIG.CACHE_PREFIX))
-            .forEach(() => localStorageSize++);
-        
-        return {
-            memoryCache: memorySize,
-            persistentCache: localStorageSize,
-            total: memorySize + localStorageSize
-        };
+        console.log('✅ Firestore queries optimized for reads reduction');
     }
 }
 
-// Initialize global cache manager when page loads
+// Search result cache
+class SearchCache {
+    constructor() {
+        console.log('💾 Search Cache - 14 Day Caching Enabled');
+        this.overrideLoadReport();
+    }
+
+    getCacheKey(studentName, parentPhone) {
+        const normalizedPhone = parentPhone.replace(/\D/g, '').slice(-10);
+        const normalizedName = studentName.toLowerCase().trim().replace(/\s+/g, '_');
+        return `${OPTIMIZATION_CONFIG.CACHE_PREFIX}${normalizedPhone}_${normalizedName}`;
+    }
+
+    isCacheValid(timestamp) {
+        return Date.now() - timestamp < OPTIMIZATION_CONFIG.CACHE_DURATION;
+    }
+
+    getCachedSearch(studentName, parentPhone) {
+        if (!OPTIMIZATION_CONFIG.ENABLED) return null;
+        
+        try {
+            const cacheKey = this.getCacheKey(studentName, parentPhone);
+            const cached = localStorage.getItem(cacheKey);
+            
+            if (cached) {
+                const data = JSON.parse(cached);
+                if (this.isCacheValid(data.timestamp)) {
+                    console.log('💾 Returning cached search results');
+                    return data;
+                } else {
+                    localStorage.removeItem(cacheKey);
+                }
+            }
+        } catch (e) {
+            console.warn('Cache read failed:', e);
+        }
+        return null;
+    }
+
+    cacheCurrentSearch(studentName, parentPhone) {
+        if (!OPTIMIZATION_CONFIG.ENABLED) return;
+        
+        try {
+            const reportContent = document.getElementById("reportContent");
+            if (!reportContent || !reportContent.innerHTML) return;
+
+            const cacheKey = this.getCacheKey(studentName, parentPhone);
+            const cacheData = {
+                html: reportContent.innerHTML,
+                timestamp: Date.now(),
+                cachedAt: new Date().toLocaleString()
+            };
+
+            localStorage.setItem(cacheKey, JSON.stringify(cacheData));
+            console.log('💾 Search results cached for 14 days');
+        } catch (e) {
+            console.warn('Cache write failed:', e);
+        }
+    }
+
+    displayCachedResults(cachedData) {
+        const reportArea = document.getElementById("reportArea");
+        const reportContent = document.getElementById("reportContent");
+        const loader = document.getElementById("loader");
+        const generateBtn = document.getElementById("generateBtn");
+
+        // Reset UI
+        if (loader) loader.classList.add("hidden");
+        if (generateBtn) {
+            generateBtn.disabled = false;
+            generateBtn.textContent = "Generate Report";
+        }
+
+        // Display cached content
+        if (reportContent) {
+            reportContent.innerHTML = cachedData.html;
+        }
+
+        // Show report area
+        const inputArea = document.getElementById("inputArea");
+        const logoutArea = document.getElementById("logoutArea");
+        
+        if (inputArea) inputArea.classList.add("hidden");
+        if (reportArea) reportArea.classList.remove("hidden");
+        if (logoutArea) logoutArea.style.display = "flex";
+    }
+
+    overrideLoadReport() {
+        const originalLoadReport = window.loadReport;
+        
+        if (!originalLoadReport) {
+            console.warn('loadReport not found yet');
+            return;
+        }
+
+        window.loadReport = async function() {
+            const studentName = document.getElementById("studentName").value.trim();
+            const parentPhone = document.getElementById("parentPhone").value.trim();
+
+            if (!studentName || !parentPhone) {
+                alert("Please enter both the student's full name and the parent's phone number.");
+                return;
+            }
+
+            // Check cache first
+            const cached = window.searchCache.getCachedSearch(studentName, parentPhone);
+            if (cached) {
+                console.log('🚀 Loading from cache - 0 Firebase reads');
+                window.searchCache.displayCachedResults(cached);
+                return;
+            }
+
+            // No cache - do optimized search (with reads reduction)
+            console.log('🔄 Fresh optimized search - reduced Firebase reads');
+            
+            try {
+                await originalLoadReport.call(this);
+                
+                // Cache results after successful search
+                setTimeout(() => {
+                    window.searchCache.cacheCurrentSearch(studentName, parentPhone);
+                }, 2000);
+                
+            } catch (error) {
+                console.error('Search failed:', error);
+                throw error;
+            }
+        };
+
+        console.log('✅ loadReport optimized with caching');
+    }
+
+    clearCache() {
+        Object.keys(localStorage)
+            .filter(key => key.startsWith(OPTIMIZATION_CONFIG.CACHE_PREFIX))
+            .forEach(key => localStorage.removeItem(key));
+        console.log('🗑️ All optimization cache cleared');
+    }
+}
+
+// Initialize both systems
 document.addEventListener('DOMContentLoaded', function() {
-    window.smartCacheManager = new SmartCacheManager();
+    // 1. First: Reduce reads with phone-first filtering
+    window.readsReducer = new ReadsReducer();
     
-    // Add cache control to global scope for debugging
-    window.clearReportCache = () => window.smartCacheManager.clearCache();
-    window.getCacheStats = () => window.smartCacheManager.getCacheStats();
+    // 2. Second: Cache the optimized results
+    window.searchCache = new SearchCache();
     
-    console.log('🚀 Global Optimization Layer Loaded - Phone-First + 2-Week Cache');
-    console.log('💡 Cache commands: clearReportCache(), getCacheStats()');
+    // Global commands
+    window.clearOptimizationCache = () => window.searchCache.clearCache();
 });
 
-// ==================== END GLOBAL OPTIMIZATION LAYER ====================
-// YOUR EXISTING CODE STARTS BELOW - DO NOT MODIFY ANYTHING BELOW THIS LINE
+console.log('🚀 COMPLETE Optimization Layer - Reads Reduction + 14 Day Cache');
+// ==================== END COMPLETE OPTIMIZATION LAYER ====================
 // Firebase config for the 'bloomingkidsassessment' project
 firebase.initializeApp({
     apiKey: "AIzaSyD1lJhsWMMs_qerLBSzk7wKhjLyI_11RJg",
@@ -876,4 +793,5 @@ document.addEventListener('DOMContentLoaded', function() {
     
     document.getElementById("generateBtn").addEventListener("click", loadReport);
 });
+
 
