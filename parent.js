@@ -109,44 +109,16 @@ async function loadReport() {
     }
 
     const studentName = document.getElementById("studentName").value.trim();
-    const parentPhoneInput = document.getElementById("parentPhone").value.trim();
+    const parentPhone = document.getElementById("parentPhone").value.trim();
 
     const reportArea = document.getElementById("reportArea");
     const reportContent = document.getElementById("reportContent");
     const loader = document.getElementById("loader");
     const generateBtn = document.getElementById("generateBtn");
 
-    if (!studentName || !parentPhoneInput) {
+    if (!studentName || !parentPhone) {
         alert("Please enter both the student's full name and the parent's phone number.");
         return;
-    }
-    
-    // Normalize the parent's phone input to the last 10 digits
-    const normalizedSearchPhone = parentPhoneInput.replace(/\D/g, '').slice(-10);
-
-    if (normalizedSearchPhone.length < 10) {
-        alert("Please enter a valid phone number with at least 10 digits.");
-        return;
-    }
-
-    const CACHE_KEY = `report_${normalizedSearchPhone}_${studentName.toLowerCase().replace(/\s/g, '')}`;
-    const CACHE_DURATION_MS = 14 * 24 * 60 * 60 * 1000; // 14 days
-
-    try {
-        const cachedData = localStorage.getItem(CACHE_KEY);
-        if (cachedData) {
-            const { timestamp, html } = JSON.parse(cachedData);
-            if (Date.now() - timestamp < CACHE_DURATION_MS) {
-                console.log("Loading report from cache.");
-                reportContent.innerHTML = html;
-                document.getElementById("inputArea").classList.add("hidden");
-                reportArea.classList.remove("hidden");
-                document.getElementById("logoutArea").style.display = "flex";
-                return; 
-            }
-        }
-    } catch (e) {
-        console.error("Could not read from cache:", e);
     }
 
     loader.classList.remove("hidden");
@@ -154,32 +126,66 @@ async function loadReport() {
     generateBtn.textContent = "Generating...";
 
     try {
-        // Query by the new 'normalizedPhone' field
-        const studentsQuery = await db.collection("students")
-                                      .where("normalizedPhone", "==", normalizedSearchPhone)
-                                      .get();
+        // STRICT MATCHING: NAME IS PRIMARY, THEN STRICT PHONE VERIFICATION
+        const normalizedSearchPhone = parentPhone.replace(/\D/g, '');
+        const last10SearchDigits = normalizedSearchPhone.slice(-10); // Get last 10 digits only
         
-        let potentialStudents = [];
-        studentsQuery.forEach(doc => {
-            potentialStudents.push(doc.data());
+        // Get ALL students and filter by NAME FIRST (your original system)
+        const allStudentsSnapshot = await db.collection("students").get();
+        const matchingStudents = [];
+        
+        allStudentsSnapshot.forEach(doc => {
+            const studentData = doc.data();
+            
+            // FLEXIBLE NAME MATCHING (primary criteria - case insensitive and allows extra names)
+            const nameMatchesResult = studentData.studentName && 
+                                   nameMatches(studentData.studentName, studentName);
+            
+            if (nameMatchesResult) {
+                // STRICT PHONE VERIFICATION - Compare last 10 digits only
+                const studentPhoneDigits = studentData.parentPhone ? studentData.parentPhone.replace(/\D/g, '') : '';
+                const last10StudentDigits = studentPhoneDigits.slice(-10); // Get last 10 digits only
+                
+                const phoneMatches = last10StudentDigits && last10SearchDigits && 
+                                    last10StudentDigits === last10SearchDigits;
+                
+                if (phoneMatches) {
+                    matchingStudents.push({
+                        id: doc.id,
+                        ...studentData,
+                        collection: "students"
+                    });
+                }
+            }
         });
 
-        if (potentialStudents.length === 0) {
-            alert(`No student records found for the phone number provided.\n\nPlease check the number or contact support if the issue persists.`);
-            loader.classList.add("hidden");
-            generateBtn.disabled = false;
-            generateBtn.textContent = "Generate Report";
-            return;
-        }
-
-        const matchingStudents = potentialStudents.filter(student => nameMatches(student.studentName, studentName));
-
         if (matchingStudents.length === 0) {
-            let errorMessage = `We found records for this phone number, but none matched the student name "${studentName}".\n\nRegistered names for this number are:\n`;
-            potentialStudents.forEach(student => {
-                errorMessage += `• ${student.studentName}\n`;
+            // Check if name exists but phone doesn't match
+            const studentsWithSameName = [];
+            allStudentsSnapshot.forEach(doc => {
+                const studentData = doc.data();
+                if (studentData.studentName && nameMatches(studentData.studentName, studentName)) {
+                    const studentPhoneDigits = studentData.parentPhone ? studentData.parentPhone.replace(/\D/g, '') : '';
+                    const last10StudentDigits = studentPhoneDigits.slice(-10);
+                    studentsWithSameName.push({
+                        name: studentData.studentName,
+                        phone: last10StudentDigits || 'No phone registered'
+                    });
+                }
             });
-            errorMessage += `\nPlease check the spelling of the student's name.`;
+
+            let errorMessage = `No student found with name: ${studentName} and phone number: ${parentPhone}`;
+            
+            if (studentsWithSameName.length > 0) {
+                errorMessage += `\n\nFound student(s) with similar name but different phone number(s):\n`;
+                studentsWithSameName.forEach(student => {
+                    errorMessage += `• Name: "${student.name}", Phone: ${student.phone}\n`;
+                });
+                errorMessage += `\nPlease check your phone number entry.`;
+            } else {
+                errorMessage += `\n\nPlease check:\n• Spelling of the name\n• Phone number\n• Make sure both match exactly how they were registered`;
+            }
+
             alert(errorMessage);
             loader.classList.add("hidden");
             generateBtn.disabled = false;
@@ -187,17 +193,21 @@ async function loadReport() {
             return;
         }
 
+        // Get reports for ONLY the matching student (not all students with same name)
         const studentResults = [];
         const monthlyReports = [];
-        const matchedStudentName = matchingStudents[0].studentName;
 
-        // Fetch reports using the 'normalizedPhone' field
-        const assessmentQuery = await db.collection("student_results")
-                                        .where("normalizedPhone", "==", normalizedSearchPhone)
-                                        .get();
+        // Get assessment reports - ONLY for the specific matched student
+        const assessmentQuery = await db.collection("student_results").get();
         assessmentQuery.forEach(doc => {
             const data = doc.data();
-            if (nameMatches(data.studentName, matchedStudentName)) {
+            // Only include reports for the specific matched student
+            const isExactMatch = matchingStudents.some(s => 
+                nameMatches(s.studentName, data.studentName) &&
+                s.parentPhone && data.parentPhone &&
+                s.parentPhone.replace(/\D/g, '').slice(-10) === data.parentPhone.replace(/\D/g, '').slice(-10)
+            );
+            if (isExactMatch) {
                 studentResults.push({ 
                     id: doc.id,
                     ...data,
@@ -207,12 +217,17 @@ async function loadReport() {
             }
         });
 
-        const monthlyQuery = await db.collection("tutor_submissions")
-                                     .where("normalizedPhone", "==", normalizedSearchPhone)
-                                     .get();
+        // Get monthly reports - ONLY for the specific matched student
+        const monthlyQuery = await db.collection("tutor_submissions").get();
         monthlyQuery.forEach(doc => {
             const data = doc.data();
-            if (nameMatches(data.studentName, matchedStudentName)) {
+            // Only include reports for the specific matched student
+            const isExactMatch = matchingStudents.some(s => 
+                nameMatches(s.studentName, data.studentName) &&
+                s.parentPhone && data.parentPhone &&
+                s.parentPhone.replace(/\D/g, '').slice(-10) === data.parentPhone.replace(/\D/g, '').slice(-10)
+            );
+            if (isExactMatch) {
                 monthlyReports.push({ 
                     id: doc.id,
                     ...data,
@@ -232,6 +247,7 @@ async function loadReport() {
 
         reportContent.innerHTML = "";
         
+        // Display Assessment Reports
         if (studentResults.length > 0) {
             const groupedAssessments = {};
             studentResults.forEach((result) => {
@@ -259,7 +275,7 @@ async function loadReport() {
                             tutorName = tutorDoc.data().name;
                         }
                     } catch (error) {
-                        // Silent fail
+                        // Silent fail - tutor name will remain 'N/A'
                     }
                 }
 
@@ -282,34 +298,56 @@ async function loadReport() {
 
                 const assessmentBlock = `
                     <div class="border rounded-lg shadow mb-8 p-6 bg-white" id="assessment-block-${assessmentIndex}">
+                        <!-- Logo Header -->
                         <div class="text-center mb-6 border-b pb-4">
                             <img src="https://res.cloudinary.com/dy2hxcyaf/image/upload/v1757700806/newbhlogo_umwqzy.svg" 
-                                 alt="Blooming Kids House Logo" class="h-16 w-auto mx-auto mb-3">
+                                 alt="Blooming Kids House Logo" 
+                                 class="h-16 w-auto mx-auto mb-3">
                             <h2 class="text-2xl font-bold text-green-800">Assessment Report</h2>
                             <p class="text-gray-600">Date: ${formattedDate}</p>
                         </div>
+
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6 bg-green-50 p-4 rounded-lg">
-                            <div><p><strong>Student's Name:</strong> ${fullName}</p><p><strong>Parent's Phone:</strong> ${session[0].parentPhone || 'N/A'}</p><p><strong>Grade:</strong> ${session[0].grade}</p></div>
-                            <div><p><strong>Tutor:</strong> ${tutorName || 'N/A'}</p><p><strong>Location:</strong> ${studentCountry || 'N/A'}</p></div>
+                            <div>
+                                <p><strong>Student's Name:</strong> ${fullName}</p>
+                                <p><strong>Parent's Phone:</strong> ${session[0].parentPhone || 'N/A'}</p>
+                                <p><strong>Grade:</strong> ${session[0].grade}</p>
+                            </div>
+                            <div>
+                                <p><strong>Tutor:</strong> ${tutorName || 'N/A'}</p>
+                                <p><strong>Location:</strong> ${studentCountry || 'N/A'}</p>
+                            </div>
                         </div>
+                        
                         <h3 class="text-lg font-semibold mt-4 mb-2 text-green-700">Performance Summary</h3>
                         <table class="w-full text-sm mb-4 border border-collapse">
                             <thead class="bg-gray-100"><tr><th class="border px-2 py-1 text-left">Subject</th><th class="border px-2 py-1 text-center">Score</th></tr></thead>
                             <tbody>${tableRows}</tbody>
                         </table>
+                        
                         <h3 class="text-lg font-semibold mt-4 mb-2 text-green-700">Knowledge & Skill Analysis</h3>
                         <table class="w-full text-sm mb-4 border border-collapse">
                             <thead class="bg-gray-100"><tr><th class="border px-2 py-1 text-left">Subject</th><th class="border px-2 py-1 text-left">Topics Covered</th></tr></thead>
                             <tbody>${topicsTableRows}</tbody>
                         </table>
+                        
                         <h3 class="text-lg font-semibold mt-4 mb-2 text-green-700">Tutor's Recommendation</h3>
                         <p class="mb-2 text-gray-700 leading-relaxed">${recommendation}</p>
-                        ${creativeWritingAnswer ? `<h3 class="text-lg font-semibold mt-4 mb-2 text-green-700">Creative Writing Feedback</h3><p class="mb-2 text-gray-700"><strong>Tutor's Report:</strong> ${tutorReport}</p>` : ''}
-                        ${results.length > 0 ? `<canvas id="chart-${assessmentIndex}" class="w-full h-48 mb-4"></canvas>` : ''}
+
+                        ${creativeWritingAnswer ? `
+                        <h3 class="text-lg font-semibold mt-4 mb-2 text-green-700">Creative Writing Feedback</h3>
+                        <p class="mb-2 text-gray-700"><strong>Tutor's Report:</strong> ${tutorReport}</p>
+                        ` : ''}
+
+                        ${results.length > 0 ? `
+                        <canvas id="chart-${assessmentIndex}" class="w-full h-48 mb-4"></canvas>
+                        ` : ''}
+                        
                         <div class="bg-yellow-50 p-4 rounded-lg mt-6">
                             <h3 class="text-lg font-semibold mb-1 text-green-700">Director's Message</h3>
                             <p class="italic text-sm text-gray-700">At Blooming Kids House, we are committed to helping every child succeed. We believe that with personalized support from our tutors, ${fullName} will unlock their full potential. Keep up the great work!<br/>– Mrs. Yinka Isikalu, Director</p>
                         </div>
+                        
                         <div class="mt-6 text-center">
                             <button onclick="downloadSessionReport(${assessmentIndex}, '${fullName}', 'assessment')" class="bg-green-600 text-white px-6 py-2 rounded-lg font-semibold hover:bg-green-700 transition-all duration-200">
                                 Download Assessment PDF
@@ -317,8 +355,10 @@ async function loadReport() {
                         </div>
                     </div>
                 `;
+
                 reportContent.innerHTML += assessmentBlock;
 
+                // Create chart for assessment results only if there are results
                 if (results.length > 0) {
                     const ctx = document.getElementById(`chart-${assessmentIndex}`);
                     if (ctx) {
@@ -332,14 +372,20 @@ async function loadReport() {
                                 labels: subjectLabels,
                                 datasets: [{ label: 'Correct Answers', data: correctScores, backgroundColor: '#4CAF50' }, { label: 'Incorrect/Unanswered', data: incorrectScores, backgroundColor: '#FFCD56' }]
                             },
-                            options: { responsive: true, scales: { x: { stacked: true }, y: { stacked: true, beginAtZero: true } }, plugins: { title: { display: true, text: 'Score Distribution by Subject' } } }
+                            options: {
+                                responsive: true,
+                                scales: { x: { stacked: true }, y: { stacked: true, beginAtZero: true } },
+                                plugins: { title: { display: true, text: 'Score Distribution by Subject' } }
+                            }
                         });
                     }
                 }
+
                 assessmentIndex++;
             }
         }
 
+        // Display Monthly Reports
         if (monthlyReports.length > 0) {
             const groupedMonthly = {};
             monthlyReports.forEach((result) => {
@@ -352,42 +398,94 @@ async function loadReport() {
             for (const key in groupedMonthly) {
                 const session = groupedMonthly[key];
                 const fullName = capitalize(session[0].studentName);
-                const formattedDate = new Date(session[0].timestamp * 1000).toLocaleString('en-US', { dateStyle: 'long', timeStyle: 'short' });
+                const formattedDate = new Date(session[0].timestamp * 1000).toLocaleString('en-US', {
+                    dateStyle: 'long',
+                    timeStyle: 'short'
+                });
 
-                session.forEach((monthlyReport) => {
+                session.forEach((monthlyReport, reportIndex) => {
                     const monthlyBlock = `
                         <div class="border rounded-lg shadow mb-8 p-6 bg-white" id="monthly-block-${monthlyIndex}">
+                            <!-- Logo Header -->
                             <div class="text-center mb-6 border-b pb-4">
-                                <img src="https://res.cloudinary.com/dy2hxcyaf/image/upload/v1757700806/newbhlogo_umwqzy.svg" alt="Blooming Kids House Logo" class="h-16 w-auto mx-auto mb-3">
+                                <img src="https://res.cloudinary.com/dy2hxcyaf/image/upload/v1757700806/newbhlogo_umwqzy.svg" 
+                                     alt="Blooming Kids House Logo" 
+                                     class="h-16 w-auto mx-auto mb-3">
                                 <h2 class="text-2xl font-bold text-green-800">MONTHLY LEARNING REPORT</h2>
                                 <p class="text-gray-600">Date: ${formattedDate}</p>
                             </div>
+                            
                             <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6 bg-green-50 p-4 rounded-lg">
-                                <div><p><strong>Student's Name:</strong> ${monthlyReport.studentName || 'N/A'}</p><p><strong>Parent's Name:</strong> ${monthlyReport.parentName || 'N/A'}</p><p><strong>Parent's Phone:</strong> ${monthlyReport.parentPhone || 'N/A'}</p></div>
-                                <div><p><strong>Grade:</strong> ${monthlyReport.grade || 'N/A'}</p><p><strong>Tutor's Name:</strong> ${monthlyReport.tutorName || 'N/A'}</p></div>
+                                <div>
+                                    <p><strong>Student's Name:</strong> ${monthlyReport.studentName || 'N/A'}</p>
+                                    <p><strong>Parent's Name:</strong> ${monthlyReport.parentName || 'N/A'}</p>
+                                    <p><strong>Parent's Phone:</strong> ${monthlyReport.parentPhone || 'N/A'}</p>
+                                </div>
+                                <div>
+                                    <p><strong>Grade:</strong> ${monthlyReport.grade || 'N/A'}</p>
+                                    <p><strong>Tutor's Name:</strong> ${monthlyReport.tutorName || 'N/A'}</p>
+                                </div>
                             </div>
-                            ${monthlyReport.introduction ? `<div class="mb-6"><h3 class="text-lg font-semibold text-green-700 mb-2 border-b pb-1">INTRODUCTION</h3><p class="text-gray-700 leading-relaxed preserve-whitespace">${monthlyReport.introduction}</p></div>` : ''}
-                            ${monthlyReport.topics ? `<div class="mb-6"><h3 class="text-lg font-semibold text-green-700 mb-2 border-b pb-1">TOPICS & REMARKS</h3><p class="text-gray-700 leading-relaxed preserve-whitespace">${monthlyReport.topics}</p></div>` : ''}
-                            ${monthlyReport.progress ? `<div class="mb-6"><h3 class="text-lg font-semibold text-green-700 mb-2 border-b pb-1">PROGRESS & ACHIEVEMENTS</h3><p class="text-gray-700 leading-relaxed preserve-whitespace">${monthlyReport.progress}</p></div>` : ''}
-                            ${monthlyReport.strengthsWeaknesses ? `<div class="mb-6"><h3 class="text-lg font-semibold text-green-700 mb-2 border-b pb-1">STRENGTHS AND WEAKNESSES</h3><p class="text-gray-700 leading-relaxed preserve-whitespace">${monthlyReport.strengthsWeaknesses}</p></div>` : ''}
-                            ${monthlyReport.recommendations ? `<div class="mb-6"><h3 class="text-lg font-semibold text-green-700 mb-2 border-b pb-1">RECOMMENDATIONS</h3><p class="text-gray-700 leading-relaxed preserve-whitespace">${monthlyReport.recommendations}</p></div>` : ''}
-                            ${monthlyReport.generalComments ? `<div class="mb-6"><h3 class="text-lg font-semibold text-green-700 mb-2 border-b pb-1">GENERAL TUTOR'S COMMENTS</h3><p class="text-gray-700 leading-relaxed preserve-whitespace">${monthlyReport.generalComments}</p></div>` : ''}
-                            <div class="text-right mt-8 pt-4 border-t"><p class="text-gray-600">Best regards,</p><p class="font-semibold text-green-800">${monthlyReport.tutorName || 'N/A'}</p></div>
-                            <div class="mt-6 text-center"><button onclick="downloadMonthlyReport(${monthlyIndex}, '${fullName}')" class="bg-green-600 text-white px-6 py-2 rounded-lg font-semibold hover:bg-green-700 transition-all duration-200">Download Monthly Report PDF</button></div>
+
+                            ${monthlyReport.introduction ? `
+                            <div class="mb-6">
+                                <h3 class="text-lg font-semibold text-green-700 mb-2 border-b pb-1">INTRODUCTION</h3>
+                                <p class="text-gray-700 leading-relaxed preserve-whitespace">${monthlyReport.introduction}</p>
+                            </div>
+                            ` : ''}
+
+                            ${monthlyReport.topics ? `
+                            <div class="mb-6">
+                                <h3 class="text-lg font-semibold text-green-700 mb-2 border-b pb-1">TOPICS & REMARKS</h3>
+                                <p class="text-gray-700 leading-relaxed preserve-whitespace">${monthlyReport.topics}</p>
+                            </div>
+                            ` : ''}
+
+                            ${monthlyReport.progress ? `
+                            <div class="mb-6">
+                                <h3 class="text-lg font-semibold text-green-700 mb-2 border-b pb-1">PROGRESS & ACHIEVEMENTS</h3>
+                                <p class="text-gray-700 leading-relaxed preserve-whitespace">${monthlyReport.progress}</p>
+                            </div>
+                            ` : ''}
+
+                            ${monthlyReport.strengthsWeaknesses ? `
+                            <div class="mb-6">
+                                <h3 class="text-lg font-semibold text-green-700 mb-2 border-b pb-1">STRENGTHS AND WEAKNESSES</h3>
+                                <p class="text-gray-700 leading-relaxed preserve-whitespace">${monthlyReport.strengthsWeaknesses}</p>
+                            </div>
+                            ` : ''}
+
+                            ${monthlyReport.recommendations ? `
+                            <div class="mb-6">
+                                <h3 class="text-lg font-semibold text-green-700 mb-2 border-b pb-1">RECOMMENDATIONS</h3>
+                                <p class="text-gray-700 leading-relaxed preserve-whitespace">${monthlyReport.recommendations}</p>
+                            </div>
+                            ` : ''}
+
+                            ${monthlyReport.generalComments ? `
+                            <div class="mb-6">
+                                <h3 class="text-lg font-semibold text-green-700 mb-2 border-b pb-1">GENERAL TUTOR'S COMMENTS</h3>
+                                <p class="text-gray-700 leading-relaxed preserve-whitespace">${monthlyReport.generalComments}</p>
+                            </div>
+                            ` : ''}
+
+                            <div class="text-right mt-8 pt-4 border-t">
+                                <p class="text-gray-600">Best regards,</p>
+                                <p class="font-semibold text-green-800">${monthlyReport.tutorName || 'N/A'}</p>
+                            </div>
+
+                            <div class="mt-6 text-center">
+                                <button onclick="downloadMonthlyReport(${monthlyIndex}, '${fullName}')" class="bg-green-600 text-white px-6 py-2 rounded-lg font-semibold hover:bg-green-700 transition-all duration-200">
+                                    Download Monthly Report PDF
+                                </button>
+                            </div>
                         </div>
                     `;
+
                     reportContent.innerHTML += monthlyBlock;
                     monthlyIndex++;
                 });
             }
-        }
-        
-        try {
-            const cachePayload = { timestamp: Date.now(), html: reportContent.innerHTML };
-            localStorage.setItem(CACHE_KEY, JSON.stringify(cachePayload));
-            console.log("Report has been cached.");
-        } catch (e) {
-            console.error("Could not write to cache:", e);
         }
 
         document.getElementById("inputArea").classList.add("hidden");
@@ -395,7 +493,6 @@ async function loadReport() {
         document.getElementById("logoutArea").style.display = "flex";
 
     } catch (error) {
-        console.error("Error generating report:", error);
         alert("Sorry, there was an error generating the report. Please try again.");
     } finally {
         loader.classList.add("hidden");
@@ -417,15 +514,12 @@ function downloadMonthlyReport(index, studentName) {
 }
 
 function logout() {
-    Object.keys(localStorage).forEach(key => {
-        if (key.startsWith('report_')) {
-            localStorage.removeItem(key);
-        }
-    });
     window.location.href = "parent.html";
 }
 
+// Initialize the page
 document.addEventListener('DOMContentLoaded', function() {
+    // Check if we have URL parameters (coming from login)
     const urlParams = new URLSearchParams(window.location.search);
     const studentFromUrl = urlParams.get('student');
     const phoneFromUrl = urlParams.get('phone');
