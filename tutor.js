@@ -582,7 +582,9 @@ function showEditStudentModal(student) {
                 grade: studentGrade,
                 subjects: selectedSubjects,
                 days: studentDays,
-                studentFee: studentFee
+                studentFee: studentFee,
+                // ** THIS IS THE ONLY CHANGE IN THIS FUNCTION **
+                normalizedPhone: parentPhone.replace(/\D/g, '').slice(-10) 
             };
 
             // Add group class field if it exists in the form
@@ -1027,7 +1029,9 @@ async function renderStudentDatabase(container, tutor) {
                     days: studentDays,
                     studentFee: suggestedFee > 0 ? suggestedFee : studentFee,
                     tutorEmail: tutor.email,
-                    tutorName: tutor.name
+                    tutorName: tutor.name,
+                    // ** THIS IS THE ONLY CHANGE IN THIS FUNCTION **
+                    normalizedPhone: parentPhone.replace(/\D/g, '').slice(-10) 
                 };
 
                 // Add group class field if applicable
@@ -1187,6 +1191,3 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     });
 });
-
-
-
