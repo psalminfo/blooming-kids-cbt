@@ -121,93 +121,56 @@ async function loadReport() {
         return;
     }
 
+    // --- CACHE IMPLEMENTATION ---
+    const cacheKey = `reportCache_${studentName.toLowerCase()}_${parentPhone}`;
+    const twoWeeksInMillis = 14 * 24 * 60 * 60 * 1000;
+    try {
+        const cachedItem = localStorage.getItem(cacheKey);
+        if (cachedItem) {
+            const { timestamp, html, chartConfigs } = JSON.parse(cachedItem);
+            if (Date.now() - timestamp < twoWeeksInMillis) {
+                console.log("Loading report from cache.");
+                reportContent.innerHTML = html;
+                
+                // Re-initialize charts from cached configuration
+                if (chartConfigs && chartConfigs.length > 0) {
+                    setTimeout(() => { // Use timeout to ensure DOM is fully rendered
+                         chartConfigs.forEach(chart => {
+                            const ctx = document.getElementById(chart.canvasId);
+                            if (ctx) new Chart(ctx, chart.config);
+                        });
+                    }, 0);
+                }
+
+                document.getElementById("inputArea").classList.add("hidden");
+                reportArea.classList.remove("hidden");
+                document.getElementById("logoutArea").style.display = "flex";
+                return; // Stop execution since we loaded from cache
+            }
+        }
+    } catch (e) {
+        console.error("Could not read from cache:", e);
+        localStorage.removeItem(cacheKey); // Clear corrupted cache
+    }
+    // --- END CACHE IMPLEMENTATION ---
+
     loader.classList.remove("hidden");
     generateBtn.disabled = true;
     generateBtn.textContent = "Generating...";
 
     try {
-        // STRICT MATCHING: NAME IS PRIMARY, THEN STRICT PHONE VERIFICATION
-        const normalizedSearchPhone = parentPhone.replace(/\D/g, '');
-        const last10SearchDigits = normalizedSearchPhone.slice(-10); // Get last 10 digits only
+        // --- HIGHLY OPTIMIZED READS ---
+        // Query collections using the parent's phone number, which is a much smaller index.
+        const assessmentQuery = db.collection("student_results").where("parentPhone", "==", parentPhone).get();
+        const monthlyQuery = db.collection("tutor_submissions").where("parentPhone", "==", parentPhone).get();
         
-        // Get ALL students and filter by NAME FIRST (your original system)
-        const allStudentsSnapshot = await db.collection("students").get();
-        const matchingStudents = [];
-        
-        allStudentsSnapshot.forEach(doc => {
-            const studentData = doc.data();
-            
-            // FLEXIBLE NAME MATCHING (primary criteria - case insensitive and allows extra names)
-            const nameMatchesResult = studentData.studentName && 
-                                   nameMatches(studentData.studentName, studentName);
-            
-            if (nameMatchesResult) {
-                // STRICT PHONE VERIFICATION - Compare last 10 digits only
-                const studentPhoneDigits = studentData.parentPhone ? studentData.parentPhone.replace(/\D/g, '') : '';
-                const last10StudentDigits = studentPhoneDigits.slice(-10); // Get last 10 digits only
-                
-                const phoneMatches = last10StudentDigits && last10SearchDigits && 
-                                    last10StudentDigits === last10SearchDigits;
-                
-                if (phoneMatches) {
-                    matchingStudents.push({
-                        id: doc.id,
-                        ...studentData,
-                        collection: "students"
-                    });
-                }
-            }
-        });
+        const [assessmentSnapshot, monthlySnapshot] = await Promise.all([assessmentQuery, monthlyQuery]);
 
-        if (matchingStudents.length === 0) {
-            // Check if name exists but phone doesn't match
-            const studentsWithSameName = [];
-            allStudentsSnapshot.forEach(doc => {
-                const studentData = doc.data();
-                if (studentData.studentName && nameMatches(studentData.studentName, studentName)) {
-                    const studentPhoneDigits = studentData.parentPhone ? studentData.parentPhone.replace(/\D/g, '') : '';
-                    const last10StudentDigits = studentPhoneDigits.slice(-10);
-                    studentsWithSameName.push({
-                        name: studentData.studentName,
-                        phone: last10StudentDigits || 'No phone registered'
-                    });
-                }
-            });
-
-            let errorMessage = `No student found with name: ${studentName} and phone number: ${parentPhone}`;
-            
-            if (studentsWithSameName.length > 0) {
-                errorMessage += `\n\nFound student(s) with similar name but different phone number(s):\n`;
-                studentsWithSameName.forEach(student => {
-                    errorMessage += `• Name: "${student.name}", Phone: ${student.phone}\n`;
-                });
-                errorMessage += `\nPlease check your phone number entry.`;
-            } else {
-                errorMessage += `\n\nPlease check:\n• Spelling of the name\n• Phone number\n• Make sure both match exactly how they were registered`;
-            }
-
-            alert(errorMessage);
-            loader.classList.add("hidden");
-            generateBtn.disabled = false;
-            generateBtn.textContent = "Generate Report";
-            return;
-        }
-
-        // Get reports for ONLY the matching student (not all students with same name)
+        // Filter the small result set by name on the client-side
         const studentResults = [];
-        const monthlyReports = [];
-
-        // Get assessment reports - ONLY for the specific matched student
-        const assessmentQuery = await db.collection("student_results").get();
-        assessmentQuery.forEach(doc => {
+        assessmentSnapshot.forEach(doc => {
             const data = doc.data();
-            // Only include reports for the specific matched student
-            const isExactMatch = matchingStudents.some(s => 
-                nameMatches(s.studentName, data.studentName) &&
-                s.parentPhone && data.parentPhone &&
-                s.parentPhone.replace(/\D/g, '').slice(-10) === data.parentPhone.replace(/\D/g, '').slice(-10)
-            );
-            if (isExactMatch) {
+            if (nameMatches(data.studentName, studentName)) {
                 studentResults.push({ 
                     id: doc.id,
                     ...data,
@@ -217,17 +180,10 @@ async function loadReport() {
             }
         });
 
-        // Get monthly reports - ONLY for the specific matched student
-        const monthlyQuery = await db.collection("tutor_submissions").get();
-        monthlyQuery.forEach(doc => {
+        const monthlyReports = [];
+        monthlySnapshot.forEach(doc => {
             const data = doc.data();
-            // Only include reports for the specific matched student
-            const isExactMatch = matchingStudents.some(s => 
-                nameMatches(s.studentName, data.studentName) &&
-                s.parentPhone && data.parentPhone &&
-                s.parentPhone.replace(/\D/g, '').slice(-10) === data.parentPhone.replace(/\D/g, '').slice(-10)
-            );
-            if (isExactMatch) {
+            if (nameMatches(data.studentName, studentName)) {
                 monthlyReports.push({ 
                     id: doc.id,
                     ...data,
@@ -238,15 +194,26 @@ async function loadReport() {
         });
 
         if (studentResults.length === 0 && monthlyReports.length === 0) {
-            alert(`No reports found for student: ${studentName}\n\nReports may not have been submitted yet.`);
+            let errorMessage = `No reports found for student: ${studentName} with phone number: ${parentPhone}.`;
+            if (assessmentSnapshot.empty && monthlySnapshot.empty) {
+                errorMessage += `\n\nPlease check:\n• The phone number is correct.\n• Reports have been submitted for this student.`;
+            } else {
+                // We found reports for the phone number, but the student name didn't match.
+                const foundNames = new Set();
+                assessmentSnapshot.forEach(doc => foundNames.add(doc.data().studentName));
+                monthlySnapshot.forEach(doc => foundNames.add(doc.data().studentName));
+                errorMessage += `\n\nWe found reports for this phone number, but under different student name(s):\n• "${[...foundNames].join('"\n• "')}"\n\nPlease check the spelling of the student's name.`;
+            }
+            alert(errorMessage);
             loader.classList.add("hidden");
             generateBtn.disabled = false;
             generateBtn.textContent = "Generate Report";
             return;
         }
-
-        reportContent.innerHTML = "";
         
+        reportContent.innerHTML = "";
+        const chartConfigsToCache = []; // To store chart data for caching
+
         // Display Assessment Reports
         if (studentResults.length > 0) {
             const groupedAssessments = {};
@@ -298,7 +265,6 @@ async function loadReport() {
 
                 const assessmentBlock = `
                     <div class="border rounded-lg shadow mb-8 p-6 bg-white" id="assessment-block-${assessmentIndex}">
-                        <!-- Logo Header -->
                         <div class="text-center mb-6 border-b pb-4">
                             <img src="https://res.cloudinary.com/dy2hxcyaf/image/upload/v1757700806/newbhlogo_umwqzy.svg" 
                                  alt="Blooming Kids House Logo" 
@@ -358,33 +324,32 @@ async function loadReport() {
 
                 reportContent.innerHTML += assessmentBlock;
 
-                // Create chart for assessment results only if there are results
                 if (results.length > 0) {
                     const ctx = document.getElementById(`chart-${assessmentIndex}`);
                     if (ctx) {
-                        const subjectLabels = results.map(r => r.subject.toUpperCase());
-                        const correctScores = results.map(s => s.correct);
-                        const incorrectScores = results.map(s => s.total - s.correct);
-
-                        new Chart(ctx, {
+                        const chartConfig = {
                             type: 'bar',
                             data: {
-                                labels: subjectLabels,
-                                datasets: [{ label: 'Correct Answers', data: correctScores, backgroundColor: '#4CAF50' }, { label: 'Incorrect/Unanswered', data: incorrectScores, backgroundColor: '#FFCD56' }]
+                                labels: results.map(r => r.subject.toUpperCase()),
+                                datasets: [
+                                    { label: 'Correct Answers', data: results.map(s => s.correct), backgroundColor: '#4CAF50' }, 
+                                    { label: 'Incorrect/Unanswered', data: results.map(s => s.total - s.correct), backgroundColor: '#FFCD56' }
+                                ]
                             },
                             options: {
                                 responsive: true,
                                 scales: { x: { stacked: true }, y: { stacked: true, beginAtZero: true } },
                                 plugins: { title: { display: true, text: 'Score Distribution by Subject' } }
                             }
-                        });
+                        };
+                        new Chart(ctx, chartConfig);
+                        chartConfigsToCache.push({ canvasId: `chart-${assessmentIndex}`, config: chartConfig });
                     }
                 }
-
                 assessmentIndex++;
             }
         }
-
+        
         // Display Monthly Reports
         if (monthlyReports.length > 0) {
             const groupedMonthly = {};
@@ -406,7 +371,6 @@ async function loadReport() {
                 session.forEach((monthlyReport, reportIndex) => {
                     const monthlyBlock = `
                         <div class="border rounded-lg shadow mb-8 p-6 bg-white" id="monthly-block-${monthlyIndex}">
-                            <!-- Logo Header -->
                             <div class="text-center mb-6 border-b pb-4">
                                 <img src="https://res.cloudinary.com/dy2hxcyaf/image/upload/v1757700806/newbhlogo_umwqzy.svg" 
                                      alt="Blooming Kids House Logo" 
@@ -481,18 +445,32 @@ async function loadReport() {
                             </div>
                         </div>
                     `;
-
                     reportContent.innerHTML += monthlyBlock;
                     monthlyIndex++;
                 });
             }
         }
+        
+        // --- CACHE SAVING LOGIC ---
+        try {
+            const dataToCache = {
+                timestamp: Date.now(),
+                html: reportContent.innerHTML,
+                chartConfigs: chartConfigsToCache
+            };
+            localStorage.setItem(cacheKey, JSON.stringify(dataToCache));
+            console.log("Report data cached successfully.");
+        } catch (e) {
+            console.error("Could not write to cache:", e);
+        }
+        // --- END CACHE SAVING ---
 
         document.getElementById("inputArea").classList.add("hidden");
         reportArea.classList.remove("hidden");
         document.getElementById("logoutArea").style.display = "flex";
 
     } catch (error) {
+        console.error("Error generating report:", error);
         alert("Sorry, there was an error generating the report. Please try again.");
     } finally {
         loader.classList.add("hidden");
