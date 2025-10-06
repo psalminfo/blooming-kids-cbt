@@ -1,3 +1,4 @@
+
 import { auth, db } from './firebaseConfig.js';
 import { collection, getDocs, doc, updateDoc, getDoc, where, query, addDoc, writeBatch, deleteDoc } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
 import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-auth.js";
@@ -582,9 +583,7 @@ function showEditStudentModal(student) {
                 grade: studentGrade,
                 subjects: selectedSubjects,
                 days: studentDays,
-                studentFee: studentFee,
-                // ** THIS IS THE ONLY CHANGE IN THIS FUNCTION **
-                normalizedPhone: parentPhone.replace(/\D/g, '').slice(-10) 
+                studentFee: studentFee
             };
 
             // Add group class field if it exists in the form
@@ -1029,9 +1028,7 @@ async function renderStudentDatabase(container, tutor) {
                     days: studentDays,
                     studentFee: suggestedFee > 0 ? suggestedFee : studentFee,
                     tutorEmail: tutor.email,
-                    tutorName: tutor.name,
-                    // ** THIS IS THE ONLY CHANGE IN THIS FUNCTION **
-                    normalizedPhone: parentPhone.replace(/\D/g, '').slice(-10) 
+                    tutorName: tutor.name
                 };
 
                 // Add group class field if applicable
@@ -1191,3 +1188,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     });
 });
+
+
+
