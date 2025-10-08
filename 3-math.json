@@ -1,434 +1,333 @@
 {
-  "questions": [
+  "tests": [
     {
-      "topic": "Number Comparison",
-      "question": "Which comparison is true?",
-      "type": "multiple-choice",
-      "location": "USA",
-      "options": [
-        "68 > 649",
-        "571 > 582",
-        "730 < 806",
-        "709 < 692"
-      ],
-      "correct_answer": "730 < 806",
-      "image_url": null,
-      "image_position": "after"
-    },
-    {
-      "topic": "Multiplication",
-      "question": "Haruko did 9 sit-ups in P.E. class. The number of sit-ups Tom did can be represented by the expression 2 × 9. Which statement is true?",
-      "type": "multiple-choice",
-      "location": "USA",
-      "options": [
-        "Tom did 2 times as many sit-ups as Haruko.",
-        "Haruko did 2 times as many sit-ups as Tom.",
-        "Tom did 2 more sit-ups than Haruko.",
-        "Haruko did 2 more sit-ups than Tom."
-      ],
-      "correct_answer": "Tom did 2 times as many sit-ups as Haruko.",
-      "image_url": null,
-      "image_position": "after"
-    },
-    {
-      "topic": "Fractions",
-      "question": "A student measured the lengths of two worms. Worm S was 1/2 foot long. Worm T was 2/2 foot long. Which statement is true?",
-      "type": "multiple-choice",
-      "location": "USA",
-      "options": [
-        "The length of Worm S is greater than the length of Worm T.",
-        "The length of Worm T is greater than the length of Worm S.",
-        "The length of Worm S is equal to the length of Worm T.",
-        "There is not enough information to compare the lengths of the worms."
-      ],
-      "correct_answer": "The length of Worm T is greater than the length of Worm S.",
-      "image_url": null,
-      "image_position": "after"
-    },
-    {
-      "topic": "Labor and Income",
-      "question": "Trey is describing his labor and income. Which statement could be a description of both labor and income for Trey?",
-      "type": "multiple-choice",
-      "location": "USA",
-      "options": [
-        "Trey does volunteer work at a hospital.",
-        "Trey pays a company to repair his roof.",
-        "Trey takes $25 out of his bank account and spends the money at a store.",
-        "Trey takes dogs for a walk after school and earns $25."
-      ],
-      "correct_answer": "Trey takes dogs for a walk after school and earns $25.",
-      "image_url": null,
-      "image_position": "after"
-    },
-    {
-      "topic": "Area Calculation",
-      "question": "The rectangular floor of Ms. Ragan’s closet is completely covered with carpet squares. Each carpet square covers 1 square foot of the floor. There are 4 rows, and each row has 16 carpet squares. What is the area of the floor of this closet in square feet?",
-      "type": "griddable",
-      "location": "USA",
-      "options": null,
-      "correct_answer": "64",
-      "image_url": null,
-      "image_position": "after"
-    },
-    {
-      "topic": "Multiplication Methods",
-      "question": "Gia lists some different methods she thinks she can use to solve the multiplication problem 7 × 11 = ? Which answer choice is NOT a correct method for Gia to use?",
-      "type": "multiple-choice",
-      "location": "USA",
-      "options": [
-        "Using a number line from 0 to 80.",
-        "Counting by 11s: 11, 22, 33, 44, 55, 66, 77.",
-        "Counting by 7s: 7, 18, 29, 40, 51, 62, 73.",
-        "Using repeated addition."
-      ],
-      "correct_answer": "Counting by 7s: 7, 18, 29, 40, 51, 62, 73.",
-      "image_url": null,
-      "image_position": "after"
-    },
-    {
-      "topic": "Shapes",
-      "question": "A group of figures is shown. Which word best describes all the figures in the group?",
-      "type": "multiple-choice",
-      "location": "USA",
-      "options": [
-        "Rectangle",
-        "Rhombus",
-        "Trapezoid",
-        "Parallelogram"
-      ],
-      "correct_answer": "Parallelogram",
-      "image_url": null,
-      "image_position": "after"
-    },
-    {
-      "topic": "Number Relationships",
-      "question": "The table shows the numbers of tomato plants and spinach plants in five different gardens. Based on the relationship shown in the table, which statement is true?",
-      "type": "multiple-choice",
-      "location": "USA",
-      "options": [
-        "There are 9 more spinach plants than tomato plants in each garden.",
-        "There are 9 fewer spinach plants than tomato plants in each garden.",
-        "There are 8 more spinach plants than tomato plants in each garden.",
-        "There are 8 fewer spinach plants than tomato plants in each garden."
-      ],
-      "correct_answer": "There are 9 more spinach plants than tomato plants in each garden.",
-      "image_url": null,
-      "image_position": "after"
-    },
-    {
-      "topic": "Fractions",
-      "question": "The picture shows 8 seats in a movie theater. Children are sitting in a fraction of the seats. Which expression is equivalent to the fraction of the seats that have children sitting in them?",
-      "type": "multiple-choice",
-      "location": "USA",
-      "options": [
-        "1/8 + 1/8 + 1/8 + 1/8 + 1/8 + 1/8 + 1/8",
-        "1/3 + 1/3 + 1/3",
-        "3/8 + 3/8 + 3/8 + 3/8 + 3/8 + 3/8 + 3/8",
-        "1/8 + 1/8 + 1/8"
-      ],
-      "correct_answer": "1/8 + 1/8 + 1/8",
-      "image_url": null,
-      "image_position": "after"
-    },
-    {
-      "topic": "Division",
-      "question": "Which number sentence can be used to find the number that goes in the box: 12 ÷ 2 = □?",
-      "type": "multiple-choice",
-      "location": "USA",
-      "options": [
-        "2 + 12 = 14",
-        "6 × 2 = 12",
-        "12 × 2 = 24",
-        "2 + 10 = 12"
-      ],
-      "correct_answer": "6 × 2 = 12",
-      "image_url": null,
-      "image_position": "after"
-    },
-    {
-      "topic": "Number Order",
-      "question": "Which list shows the numbers in order from greatest to least value?",
-      "type": "multiple-choice",
-      "location": "USA",
-      "options": [
-        "38,945; 9,052; 9,181",
-        "6,912; 29,013; 34,987",
-        "58,702; 50,716; 581",
-        "6,092; 60,019; 5,005"
-      ],
-      "correct_answer": "6,912; 29,013; 34,987",
-      "image_url": null,
-      "image_position": "after"
-    },
-    {
-      "topic": "Multiplication",
-      "question": "Gerardo bought 3 packages of mint gum and 2 packages of bubble gum. Each package had 8 pieces of gum. How many pieces of gum did Gerardo buy?",
-      "type": "multiple-choice",
-      "location": "USA",
-      "options": [
-        "26",
-        "40",
-        "12",
-        "48"
-      ],
-      "correct_answer": "40",
-      "image_url": null,
-      "image_position": "after"
-    },
-    {
-      "topic": "Place Value",
-      "question": "The expanded form of a number is shown: 90,000 + 200 + 40 + 1. What is the standard form of this number?",
-      "type": "multiple-choice",
-      "location": "USA",
-      "options": [
-        "9,241",
-        "92,041",
-        "90,241",
-        "90,421"
-      ],
-      "correct_answer": "90,241",
-      "image_url": null,
-      "image_position": "after"
-    },
-    {
-      "topic": "Division",
-      "question": "Serafina put a total of 42 cupcakes into packages. She put 6 cupcakes into each package. What is the total number of packages Serafina used for these cupcakes?",
-      "type": "griddable",
-      "location": "USA",
-      "options": null,
-      "correct_answer": "7",
-      "image_url": null,
-      "image_position": "after"
-    },
-    {
-      "topic": "Odd Numbers",
-      "question": "Which number is odd?",
-      "type": "multiple-choice",
-      "location": "USA",
-      "options": [
-        "205",
-        "350",
-        "168",
-        "514"
-      ],
-      "correct_answer": "205",
-      "image_url": null,
-      "image_position": "after"
-    },
-    {
-      "topic": "Money Calculation",
-      "question": "Freddie had $256 in his bank account. On Monday he put $50 more into his account. On Tuesday he took out $87 to buy a bicycle. Which equation can be used to find the amount of money Freddie had in his bank account after he took out money on Tuesday?",
-      "type": "multiple-choice",
-      "location": "USA",
-      "options": [
-        "256 – 50 – 87 =",
-        "256 + 50 + 87 =",
-        "250 – 50 + 87 =",
-        "256 + 50 – 87 ="
-      ],
-      "correct_answer": "256 + 50 – 87 =",
-      "image_url": null,
-      "image_position": "after"
-    },
-    {
-      "topic": "Fractions",
-      "question": "Brandon drew two congruent squares. He divided one square into 2 congruent triangular parts and the other into 2 congruent rectangular parts. Which statement is true?",
-      "type": "multiple-choice",
-      "location": "USA",
-      "options": [
-        "Each triangular part and each rectangular part represents 1/2 the area of one square.",
-        "Each triangular part has an area that is greater than the area of each rectangular part.",
-        "Each triangular part and each rectangular part represents 1/4 the area of one square.",
-        "Each rectangular part has an area that is greater than the area of each triangular part."
-      ],
-      "correct_answer": "Each triangular part and each rectangular part represents 1/2 the area of one square.",
-      "image_url": null,
-      "image_position": "after"
-    },
-    {
-      "topic": "Time Calculation",
-      "question": "Felix spent 19 minutes swimming, 21 minutes riding his bike, and 30 minutes running in a race. What was the total amount of time Felix spent swimming, riding his bike, and running in this race?",
-      "type": "multiple-choice",
-      "location": "USA",
-      "options": [
-        "1 hour 20 minutes",
-        "40 minutes",
-        "1 hour 10 minutes",
-        "1 hour"
-      ],
-      "correct_answer": "1 hour 10 minutes",
-      "image_url": null,
-      "image_position": "after"
-    },
-    {
-      "topic": "Number Patterns",
-      "question": "There are 8 oranges in each bag for sale at a store. Which table shows the relationship between the number of bags and the number of oranges in the bags?",
-      "type": "multiple-choice",
-      "location": "USA",
-      "options": [
-        "2 bags: 8 oranges; 3 bags: 16 oranges; 4 bags: 24 oranges; 5 bags: 32 oranges",
-        "2 bags: 16 oranges; 3 bags: 24 oranges; 4 bags: 32 oranges; 5 bags: 40 oranges",
-        "2 bags: 10 oranges; 3 bags: 11 oranges; 4 bags: 12 oranges; 5 bags: 13 oranges",
-        "2 bags: 16 oranges; 3 bags: 32 oranges; 4 bags: 64 oranges; 5 bags: 128 oranges"
-      ],
-      "correct_answer": "2 bags: 16 oranges; 3 bags: 24 oranges; 4 bags: 32 oranges; 5 bags: 40 oranges",
-      "image_url": null,
-      "image_position": "after"
-    },
-    {
-      "topic": "Division",
-      "question": "Stacy used 21 feet of ribbon to make bows. She used 3 feet of ribbon for each bow. Which equation can be used to find the number of bows Stacy made with this ribbon?",
-      "type": "multiple-choice",
-      "location": "USA",
-      "options": [
-        "21 × 3 = 63",
-        "21 ÷ 3 = 7",
-        "21 + 3 = 24",
-        "21 - 3 = 18"
-      ],
-      "correct_answer": "21 ÷ 3 = 7",
-      "image_url": null,
-      "image_position": "after"
-    },
-    {
-      "topic": "Fractions",
-      "question": "Which comparison and explanation are true?",
-      "type": "multiple-choice",
-      "location": "USA",
-      "options": [
-        "5/6 < 5/8, because eighths are larger than sixths",
-        "5/6 < 5/8, because sixths are larger than eighths",
-        "5/6 > 5/8, because eighths are larger than sixths",
-        "5/6 > 5/8, because sixths are larger than eighths"
-      ],
-      "correct_answer": "5/6 > 5/8, because sixths are larger than eighths",
-      "image_url": null,
-      "image_position": "after"
-    },
-    {
-      "topic": "Perimeter",
-      "question": "Gina’s journal has a square cover with a side length of 24 cm. What is the perimeter of the cover of Gina’s journal in centimeters?",
-      "type": "griddable",
-      "location": "USA",
-      "options": null,
-      "correct_answer": "96",
-      "image_url": null,
-      "image_position": "after"
-    },
-    {
-      "topic": "Addition",
-      "question": "Roger has two boxes of nails. One box has 438 nails, and the other box has 375 nails. How many nails does Roger have in these two boxes?",
-      "type": "multiple-choice",
-      "location": "USA",
-      "options": [
-        "813",
-        "703",
-        "814",
-        "713"
-      ],
-      "correct_answer": "813",
-      "image_url": null,
-      "image_position": "after"
-    },
-    {
-      "topic": "Division",
-      "question": "A group of 27 students played a game with hoops. An equal number of the students shared each hoop. How many students shared each hoop?",
-      "type": "multiple-choice",
-      "location": "USA",
-      "options": [
-        "3",
-        "18",
-        "9",
-        "36"
-      ],
-      "correct_answer": "9",
-      "image_url": null,
-      "image_position": "after"
-    },
-    {
-      "topic": "Equivalent Fractions",
-      "question": "Point P on the number line represents two equivalent fractions. Which two equivalent fractions can point P represent?",
-      "type": "multiple-choice",
-      "location": "USA",
-      "options": [
-        "1/4 and 1/8",
-        "1/3 and 2/6",
-        "1/4 and 2/8",
-        "1/4 and 3/4"
-      ],
-      "correct_answer": "1/4 and 2/8",
-      "image_url": null,
-      "image_position": "after"
-    },
-    {
-      "topic": "Multiplication",
-      "question": "There are 6 photographs on each page of an album. How many photographs are on 9 pages of the album?",
-      "type": "multiple-choice",
-      "location": "USA",
-      "options": [
-        "48",
-        "45",
-        "15",
-        "54"
-      ],
-      "correct_answer": "54",
-      "image_url": null,
-      "image_position": "after"
-    },
-    {
-      "topic": "Money Calculation",
-      "question": "The table shows the amount of money four people gave a cashier and the change they received. Based on the relationship shown, which statement is true?",
-      "type": "multiple-choice",
-      "location": "USA",
-      "options": [
-        "A drink costs 52 cents, because the amount given minus 52 equals the change.",
-        "A drink costs 52 cents, because the amount given plus 52 equals the change.",
-        "A drink costs 48 cents, because the amount given minus 48 equals the change.",
-        "A drink costs 48 cents, because the amount given plus 48 equals the change."
-      ],
-      "correct_answer": "A drink costs 52 cents, because the amount given minus 52 equals the change.",
-      "image_url": null,
-      "image_position": "after"
-    },
-    {
-      "topic": "Payment Calculation",
-      "question": "Ms. Patterson works for a company. Which factor would most likely affect the amount of money Ms. Patterson gets paid by the company?",
-      "type": "multiple-choice",
-      "location": "USA",
-      "options": [
-        "The amount of money Ms. Patterson has to pay in bills",
-        "The size of Ms. Patterson’s family",
-        "The amount of money Ms. Patterson saves every month",
-        "The work experience Ms. Patterson has"
-      ],
-      "correct_answer": "The work experience Ms. Patterson has",
-      "image_url": null,
-      "image_position": "after"
-    },
-    {
-      "topic": "Weight Difference",
-      "question": "Samantha’s ice chest weighed 83 pounds. Gordon’s weighed 28 pounds, and Diego’s weighed 37 pounds. What was the difference in pounds between the weight of Samantha’s ice chest and the combined weight of Gordon’s and Diego’s ice chests?",
-      "type": "griddable",
-      "location": "USA",
-      "options": null,
-      "correct_answer": "18",
-      "image_url": null,
-      "image_position": "after"
-    },
-    {
-      "topic": "Grouping Figures",
-      "question": "The figures shown can be sorted into groups. Which list shows a correct way to group these figures?",
-      "type": "multiple-choice",
-      "location": "USA",
-      "options": [
-        "1 triangle, 3 quadrilaterals, and 1 pentagon",
-        "1 triangle and 4 quadrilaterals",
-        "1 triangle, 3 quadrilaterals, and 1 hexagon",
-        "1 triangle, 2 quadrilaterals, and 2 pentagons"
-      ],
-      "correct_answer": "1 triangle, 3 quadrilaterals, and 1 pentagon",
-      "image_url": null,
-      "image_position": "after"
+      "id": "staar_grade_3_math_2018",
+      "subject": "Mathematics",
+      "grade": "3",
+      "year": "2018",
+      "defaultQuestionType": "multiple-choice",
+      "questions": [
+        {
+          "questionId": "staar3_2018_q1",
+          "question": "Nina works for a restaurant. The restaurant pays her every week for the work she does. Some weeks she works more hours than other weeks. Which statement is most likely true?",
+          "options": [
+            "When Nina works fewer hours, she earns more income from the restaurant.",
+            "When Nina works more hours, she earns more income from the restaurant.",
+            "When Nina works more hours, the restaurant gets less labor from her.",
+            "When Nina works fewer hours, the restaurant gets more labor from her."
+          ],
+          "correctAnswer": "B",
+          "topic": "Income and Hours Worked"
+        },
+        {
+          "questionId": "staar3_2018_q2",
+          "question": "A band plays 8 songs at every show. Last year the band had 8 shows. Which model can be used to find the number of songs the band played at shows last year?",
+          "options": ["F", "G", "H", "J"],
+          "correctAnswer": "F",
+          "topic": "Multiplication Models",
+          "imageRequired": true
+        },
+        {
+          "questionId": "staar3_2018_q3",
+          "question": "Gretchen made this table to show the side lengths and perimeters of three figures. What mistake, if any, did Gretchen make?",
+          "options": [
+            "The perimeter of the rectangle should be 24 yards.",
+            "The perimeter of the square should be 36 yards.",
+            "The perimeter of the triangle should be 20 yards.",
+            "Gretchen did not make any mistakes in the table."
+          ],
+          "correctAnswer": "A",
+          "topic": "Perimeter"
+        },
+        {
+          "questionId": "staar3_2018_q4",
+          "question": "Which of these models represent the same number?",
+          "options": [
+            "Model X and Model Y, because 20 ones is equivalent to 20 tens.",
+            "Model X and Model Z, because 20 ones is equivalent to 2 hundreds.",
+            "Model Y and Model Z, because 20 tens is equivalent to 2 hundreds.",
+            "None of these"
+          ],
+          "correctAnswer": "H",
+          "topic": "Place Value",
+          "imageRequired": true
+        },
+        {
+          "questionId": "staar3_2018_q5",
+          "question": "Lin has a total of 36 sodas in packs. There are 6 sodas in each pack. How many packs of sodas does Lin have?",
+          "options": [],
+          "correctAnswer": "6",
+          "topic": "Division",
+          "questionType": "griddable"
+        },
+        {
+          "questionId": "staar3_2018_q6",
+          "question": "The number lines model two different fractions. Which comparison of these fractions is true?",
+          "options": [
+            "1/2 > 1/1",
+            "2/8 > 1/8",
+            "1/8 = 2/8",
+            "2/8 < 1/8"
+          ],
+          "correctAnswer": "G",
+          "topic": "Fractions",
+          "imageRequired": true
+        },
+        {
+          "questionId": "staar3_2018_q7",
+          "question": "The table shows the relationship between the number of toy airplanes made in a factory and the number of batteries needed for the airplanes. Based on the relationship shown in the table, which statement is true?",
+          "options": [
+            "The number of batteries is equal to the number of toy airplanes times 3.",
+            "The number of batteries is equal to the number of toy airplanes times 2.",
+            "The number of batteries is equal to the number of toy airplanes times 6.",
+            "The number of batteries is equal to the number of toy airplanes times 5."
+          ],
+          "correctAnswer": "A",
+          "topic": "Patterns and Relationships"
+        },
+        {
+          "questionId": "staar3_2018_q8",
+          "question": "Four fraction models are shown. Which two models are shaded to show equivalent fractions?",
+          "options": [
+            "Models 1 and 2",
+            "Models 1 and 3",
+            "Models 2 and 4",
+            "Models 2 and 3"
+          ],
+          "correctAnswer": "G",
+          "topic": "Equivalent Fractions",
+          "imageRequired": true
+        },
+        {
+          "questionId": "staar3_2018_q9",
+          "question": "The figures shown can be sorted into groups. Which list shows a correct way to group the figures?",
+          "options": [
+            "2 prisms, 1 cone, 2 cylinders, and 1 pyramid",
+            "3 prisms, 1 cone, and 2 cylinders",
+            "2 prisms, 2 cylinders, 1 sphere, and 1 cube",
+            "3 prisms, 1 cylinder, and 2 cones"
+          ],
+          "correctAnswer": "B",
+          "topic": "3D Shapes",
+          "imageRequired": true
+        },
+        {
+          "questionId": "staar3_2018_q10",
+          "question": "What number goes in the □ to make the equation true? □ ÷ 11 = 9",
+          "options": ["99", "91", "20", "2"],
+          "correctAnswer": "F",
+          "topic": "Division"
+        },
+        {
+          "questionId": "staar3_2018_q11",
+          "question": "The list shows the number of ribbons of each color that a school ordered for a science fair: 12 blue, 18 red, 36 green, 60 purple. Which pictograph best represents the information in the list?",
+          "options": ["Each symbol means 4 ribbons", "Each symbol means 6 ribbons", "Each symbol means 9 ribbons", "Each symbol means 12 ribbons"],
+          "correctAnswer": "B",
+          "topic": "Pictographs",
+          "imageRequired": true
+        },
+        {
+          "questionId": "staar3_2018_q12",
+          "question": "Tyrese had 572 baseball cards. He sold some of the baseball cards and then had 98 baseball cards left. Which equation could NOT be used to find the number of baseball cards Tyrese sold?",
+          "options": [
+            "572 - □ = 98",
+            "572 - 98 = □",
+            "98 + □ = 572",
+            "98 + 572 = □"
+          ],
+          "correctAnswer": "J",
+          "topic": "Equations"
+        },
+        {
+          "questionId": "staar3_2018_q13",
+          "question": "A rectangular business card is shown. Use the ruler provided to measure the length and width of the business card to the nearest centimeter. Which measurement is closest to the perimeter of the business card in centimeters?",
+          "options": ["14 cm", "28 cm", "45 cm", "32 cm"],
+          "correctAnswer": "B",
+          "topic": "Perimeter",
+          "imageRequired": true
+        },
+        {
+          "questionId": "staar3_2018_q14",
+          "question": "There are 297 peach trees on a farm. There are 615 peach trees on a different farm. What is the difference between the numbers of peach trees on these farms?",
+          "options": [],
+          "correctAnswer": "318",
+          "topic": "Subtraction",
+          "questionType": "griddable"
+        },
+        {
+          "questionId": "staar3_2018_q15",
+          "question": "The picture represents the trophies 3 brothers have on a shelf. Each brother won the same number of trophies. What fraction of the trophies did each brother win?",
+          "options": ["2/3", "2/6", "3/6", "3/3"],
+          "correctAnswer": "B",
+          "topic": "Fractions",
+          "imageRequired": true
+        },
+        {
+          "questionId": "staar3_2018_q16",
+          "question": "A group of 64 children and 24 adults will travel to a zoo in vans. There will be 8 people in each van. How many vans will be needed to take the group to the zoo?",
+          "options": ["11", "80", "8", "5"],
+          "correctAnswer": "F",
+          "topic": "Division"
+        },
+        {
+          "questionId": "staar3_2018_q17",
+          "question": "A container of liquid laundry detergent at a grocery store is marked with the volume of detergent inside. Which unit of measurement could be marked on the container?",
+          "options": ["Kilograms", "Meters", "Pounds", "Liters"],
+          "correctAnswer": "D",
+          "topic": "Measurement"
+        },
+        {
+          "questionId": "staar3_2018_q18",
+          "question": "A store is having a sale on books. The sale price of each book is $6 less than the regular price. Which table shows prices of different books at this store?",
+          "options": ["F", "G", "H", "J"],
+          "correctAnswer": "G",
+          "topic": "Patterns",
+          "imageRequired": true
+        },
+        {
+          "questionId": "staar3_2018_q19",
+          "question": "Dominique put figures into groups based on certain attributes. Sometimes she put figures into more than one group. Which statement is true?",
+          "options": [
+            "A square could be put into all the groups.",
+            "A triangle could be put into all the groups.",
+            "A rectangle could be put into Groups 1 and 2 only.",
+            "A pentagon could be put into Group 1 only."
+          ],
+          "correctAnswer": "A",
+          "topic": "Geometric Attributes"
+        },
+        {
+          "questionId": "staar3_2018_q20",
+          "question": "Hakeem received 13 phone calls on Tuesday. This expression can be used to show the number of phone calls he received on Saturday: 13 × 4. Which statement is true?",
+          "options": [
+            "Hakeem received 4 more phone calls on Saturday than he received on Tuesday.",
+            "Hakeem received 4 more phone calls on Tuesday than he received on Saturday.",
+            "Hakeem received 4 times as many phone calls on Saturday as he received on Tuesday.",
+            "Hakeem received 4 times as many phone calls on Tuesday as he received on Saturday."
+          ],
+          "correctAnswer": "H",
+          "topic": "Multiplication"
+        },
+        {
+          "questionId": "staar3_2018_q21",
+          "question": "The expanded notation of a number is shown: (9 × 10,000) + (4 × 100) + (1 × 10). What is the standard form of this number?",
+          "options": ["9,410", "94,010", "90,401", "90,410"],
+          "correctAnswer": "D",
+          "topic": "Place Value"
+        },
+        {
+          "questionId": "staar3_2018_q22",
+          "question": "Noah has 48 cookies. The model represents what he did with the cookies. Based on the model, which of these could explain what Noah did with the cookies?",
+          "options": [
+            "He put (48 ÷ 8) cookies into each of 8 bags and ate (2 × 6) of the cookies.",
+            "He put (48 ÷ 6) cookies into each of 8 bags and ate (2 × 8) of the cookies.",
+            "He put (48 – 6) cookies into each of 8 bags and ate (2 × 6) of the cookies.",
+            "He put (48 × 6) cookies into each of 8 bags and ate (2 + 6) of the cookies."
+          ],
+          "correctAnswer": "F",
+          "topic": "Division",
+          "imageRequired": true
+        },
+        {
+          "questionId": "staar3_2018_q23",
+          "question": "There are 4 books on a shelf. In the model the shaded books represent nonfiction books. Which expression represents the fraction of the books on the shelf that are nonfiction?",
+          "options": [
+            "1/4 + 1/4 + 1/4 + 1/4",
+            "1/4 + 1/4 + 1/4",
+            "1/3 + 1/3 + 1/3",
+            "3/1 + 3/1 + 3/1"
+          ],
+          "correctAnswer": "B",
+          "topic": "Fractions",
+          "imageRequired": true
+        },
+        {
+          "questionId": "staar3_2018_q24",
+          "question": "The frequency table shows the number of points scored by each player on a basketball team during a game. What is the combined number of points scored by Stephen, Alfred, Pete, and Wesley?",
+          "options": [],
+          "correctAnswer": "37",
+          "topic": "Data Analysis",
+          "questionType": "griddable",
+          "imageRequired": true
+        },
+        {
+          "questionId": "staar3_2018_q25",
+          "question": "The model shown can represent two number sentences. Which two number sentences can the model represent?",
+          "options": [
+            "3 × 3 = □ and 3 + 3 = □",
+            "3 × 2 = □ and 3 + 3 = □",
+            "2 × 3 = □ and 2 × 2 × 2 = □",
+            "3 + 3 + 3 = □ and 2 + 2 + 2 = □"
+          ],
+          "correctAnswer": "B",
+          "topic": "Multiplication",
+          "imageRequired": true
+        },
+        {
+          "questionId": "staar3_2018_q26",
+          "question": "Kaliani drew four congruent squares. She shaded the same fraction of each square. This is one of Kaliani's squares. Which square CANNOT be another one of Kaliani's squares?",
+          "options": ["F", "G", "H", "J"],
+          "correctAnswer": "J",
+          "topic": "Fractions",
+          "imageRequired": true
+        },
+        {
+          "questionId": "staar3_2018_q27",
+          "question": "Elisha listed the amounts she paid for guitar lessons for three months: February: $78, March: $90, April: $156. What is the amount Elisha paid for guitar lessons for these three months?",
+          "options": ["$314", "$324", "$114", "$325"],
+          "correctAnswer": "B",
+          "topic": "Addition"
+        },
+        {
+          "questionId": "staar3_2018_q28",
+          "question": "The models shown are the same size and are each divided into equal-size parts. The models are shaded to represent two fractions. Which statement is true?",
+          "options": [
+            "2/3 > 2/4, because thirds are larger than fourths.",
+            "2/3 = 2/4, because each model has 2 parts shaded.",
+            "1/3 < 1/4, because 3 is less than 4.",
+            "1/3 = 1/4, because each model shows 1 whole."
+          ],
+          "correctAnswer": "F",
+          "topic": "Fractions",
+          "imageRequired": true
+        },
+        {
+          "questionId": "staar3_2018_q29",
+          "question": "The picture shows the coins that are in a piggy bank. Which dot plot represents the value in cents of each coin in the piggy bank?",
+          "options": ["A", "B", "C", "D"],
+          "correctAnswer": "C",
+          "topic": "Data Analysis",
+          "imageRequired": true
+        },
+        {
+          "questionId": "staar3_2018_q30",
+          "question": "There are a total of 294 restaurants in a city. Of these restaurants, 196 are along the highways, and 49 are downtown. The rest of the restaurants are in shopping malls. Which model can be used to find the number of restaurants in the city that are in shopping malls?",
+          "options": ["F", "G", "H", "J"],
+          "correctAnswer": "G",
+          "topic": "Problem Solving",
+          "imageRequired": true
+        },
+        {
+          "questionId": "staar3_2018_q31",
+          "question": "The table shows the weights of four elephants. Which comparison of these weights is true?",
+          "options": [
+            "The weight of Elephant R < the weight of Elephant T",
+            "The weight of Elephant U > the weight of Elephant T",
+            "The weight of Elephant S = the weight of Elephant U",
+            "The weight of Elephant S < the weight of Elephant T"
+          ],
+          "correctAnswer": "A",
+          "topic": "Comparison"
+        },
+        {
+          "questionId": "staar3_2018_q32",
+          "question": "Maria put cloth squares together to make a blanket. The blanket is modeled by this rectangle. What is the area of the blanket in square feet?",
+          "options": ["17 square feet", "34 square feet", "72 square feet", "63 square feet"],
+          "correctAnswer": "H",
+          "topic": "Area",
+          "imageRequired": true
+        }
+      ]
     }
   ]
 }
