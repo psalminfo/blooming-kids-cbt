@@ -9,7 +9,6 @@
 
     <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-firestore-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-auth-compat.js"></script>
 
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.9.2/html2pdf.bundle.min.js"></script>
@@ -46,14 +45,6 @@
             border-color: #10b981;
         }
         .hidden { display: none; }
-        .tab-active {
-            background-color: #059669;
-            color: white;
-        }
-        .tab-inactive {
-            background-color: #d1fae5;
-            color: #065f46;
-        }
     </style>
 </head>
 <body class="flex flex-col items-center p-4">
@@ -65,175 +56,63 @@
                  alt="Blooming Kids House Logo" 
                  class="h-20 w-auto mx-auto logo-glow mb-4">
             <h1 class="text-4xl font-bold text-green-800 mb-2">Parent Portal</h1>
-            <p class="text-green-600 text-lg">Secure Access to Your Children's Progress Reports</p>
+            <p class="text-green-600 text-lg">View Your Child's Progress Reports</p>
         </div>
 
-        <!-- Authentication Area -->
-        <div id="authArea" class="bg-white rounded-2xl card-glow p-8 mb-8">
-            <!-- Tab Navigation -->
-            <div class="flex mb-6 rounded-xl overflow-hidden border border-green-200">
-                <button id="signInTab" class="flex-1 py-3 font-semibold tab-active transition-all duration-200">
-                    Sign In
-                </button>
-                <button id="signUpTab" class="flex-1 py-3 font-semibold tab-inactive transition-all duration-200">
-                    Sign Up
-                </button>
-            </div>
-
-            <!-- Sign In Form -->
-            <div id="signInForm">
-                <h2 class="text-2xl font-bold text-gray-800 mb-6 text-center">Welcome Back</h2>
-                
-                <div class="space-y-4">
-                    <div>
-                        <label for="loginIdentifier" class="block text-sm font-medium text-gray-700 mb-2">
-                            Phone Number or Email
-                        </label>
-                        <input id="loginIdentifier" 
-                               type="text" 
-                               placeholder="Enter your phone number or email"
-                               class="w-full px-4 py-3 border border-gray-300 rounded-xl input-focus focus:outline-none transition-all duration-200"
-                               required>
-                    </div>
-                    
-                    <div>
-                        <label for="loginPassword" class="block text-sm font-medium text-gray-700 mb-2">
-                            Password
-                        </label>
-                        <input id="loginPassword" 
-                               type="password" 
-                               placeholder="Enter your password"
-                               class="w-full px-4 py-3 border border-gray-300 rounded-xl input-focus focus:outline-none transition-all duration-200"
-                               required>
-                    </div>
-                    
-                    <button id="signInBtn" 
-                            class="w-full bg-green-600 text-white py-3 rounded-xl font-semibold btn-glow hover:bg-green-700 transition-all duration-200">
-                        Sign In
-                    </button>
-
-                    <div class="text-center">
-                        <button id="forgotPasswordBtn" class="text-green-600 hover:text-green-800 text-sm transition-colors duration-200">
-                            Forgot Password?
-                        </button>
-                    </div>
+        <!-- Input Area -->
+        <div id="inputArea" class="bg-white rounded-2xl card-glow p-8 mb-8">
+            <h2 class="text-2xl font-bold text-gray-800 mb-6 text-center">Enter Student Details</h2>
+            
+            <div class="space-y-4">
+                <div>
+                    <label for="studentName" class="block text-sm font-medium text-gray-700 mb-2">
+                        Student Full Name
+                    </label>
+                    <input id="studentName" 
+                           type="text" 
+                           placeholder="Enter student's full name"
+                           class="w-full px-4 py-3 border border-gray-300 rounded-xl input-focus focus:outline-none transition-all duration-200"
+                           required>
                 </div>
-            </div>
-
-            <!-- Sign Up Form -->
-            <div id="signUpForm" class="hidden">
-                <h2 class="text-2xl font-bold text-gray-800 mb-6 text-center">Create Account</h2>
                 
-                <div class="space-y-4">
-                    <div>
-                        <label for="signupPhone" class="block text-sm font-medium text-gray-700 mb-2">
-                            Phone Number
-                        </label>
-                        <input id="signupPhone" 
-                               type="tel" 
-                               placeholder="Enter your phone number (any format)"
-                               class="w-full px-4 py-3 border border-gray-300 rounded-xl input-focus focus:outline-none transition-all duration-200"
-                               required>
-                    </div>
-                    
-                    <div>
-                        <label for="signupEmail" class="block text-sm font-medium text-gray-700 mb-2">
-                            Email Address
-                        </label>
-                        <input id="signupEmail" 
-                               type="email" 
-                               placeholder="Enter your email address"
-                               class="w-full px-4 py-3 border border-gray-300 rounded-xl input-focus focus:outline-none transition-all duration-200"
-                               required>
-                    </div>
-                    
-                    <div>
-                        <label for="signupPassword" class="block text-sm font-medium text-gray-700 mb-2">
-                            Password
-                        </label>
-                        <input id="signupPassword" 
-                               type="password" 
-                               placeholder="Minimum 6 characters"
-                               class="w-full px-4 py-3 border border-gray-300 rounded-xl input-focus focus:outline-none transition-all duration-200"
-                               required minlength="6">
-                    </div>
-                    
-                    <div>
-                        <label for="signupConfirmPassword" class="block text-sm font-medium text-gray-700 mb-2">
-                            Confirm Password
-                        </label>
-                        <input id="signupConfirmPassword" 
-                               type="password" 
-                               placeholder="Confirm your password"
-                               class="w-full px-4 py-3 border border-gray-300 rounded-xl input-focus focus:outline-none transition-all duration-200"
-                               required minlength="6">
-                    </div>
-                    
-                    <button id="signUpBtn" 
-                            class="w-full bg-green-600 text-white py-3 rounded-xl font-semibold btn-glow hover:bg-green-700 transition-all duration-200">
-                        Create Account
-                    </button>
+                <div>
+                    <label for="parentPhone" class="block text-sm font-medium text-gray-700 mb-2">
+                        Parent Phone Number
+                    </label>
+                    <input id="parentPhone" 
+                           type="tel" 
+                           placeholder="Enter your phone number (any format)"
+                           class="w-full px-4 py-3 border border-gray-300 rounded-xl input-focus focus:outline-none transition-all duration-200"
+                           required>
                 </div>
+                
+                <button id="generateBtn" 
+                        class="w-full bg-green-600 text-white py-3 rounded-xl font-semibold btn-glow hover:bg-green-700 transition-all duration-200">
+                    Generate Report
+                </button>
             </div>
             
-            <div id="authLoader" class="hidden text-center mt-4">
-                <p class="text-green-600 font-semibold">Processing... Please wait.</p>
+            <div id="loader" class="hidden text-center mt-4">
+                <p class="text-green-600 font-semibold">Generating report... Please wait.</p>
             </div>
             
             <div class="mt-6 text-center">
                 <p class="text-sm text-gray-500">
-                    Secure access to all your children's progress reports
+                    Enter your child's name and your phone number in any format
                 </p>
             </div>
         </div>
 
         <!-- Report Area -->
         <div id="reportArea" class="hidden">
-            <div class="flex justify-between items-center mb-6">
-                <h2 class="text-2xl font-bold text-green-800">Your Children's Reports</h2>
-                <div class="flex gap-2">
-                    <button onclick="logout()" class="bg-red-500 text-white px-6 py-2 rounded-lg font-semibold hover:bg-red-600 transition-all duration-200">
-                        Logout
-                    </button>
-                </div>
-            </div>
             <div id="reportContent" class="space-y-6"></div>
         </div>
 
-        <!-- Password Reset Modal -->
-        <div id="passwordResetModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden z-50">
-            <div class="bg-white rounded-2xl p-8 max-w-md w-full mx-4 card-glow">
-                <h3 class="text-2xl font-bold text-gray-800 mb-4 text-center">Reset Password</h3>
-                <p class="text-gray-600 mb-4 text-center">Enter your email address to receive a password reset link.</p>
-                
-                <div class="space-y-4">
-                    <div>
-                        <label for="resetEmail" class="block text-sm font-medium text-gray-700 mb-2">
-                            Email Address
-                        </label>
-                        <input id="resetEmail" 
-                               type="email" 
-                               placeholder="Enter your registered email"
-                               class="w-full px-4 py-3 border border-gray-300 rounded-xl input-focus focus:outline-none transition-all duration-200"
-                               required>
-                    </div>
-                    
-                    <div class="flex gap-2">
-                        <button id="sendResetBtn" 
-                                class="flex-1 bg-green-600 text-white py-3 rounded-xl font-semibold btn-glow hover:bg-green-700 transition-all duration-200">
-                            Send Reset Link
-                        </button>
-                        <button id="cancelResetBtn" 
-                                class="flex-1 bg-gray-500 text-white py-3 rounded-xl font-semibold hover:bg-gray-600 transition-all duration-200">
-                            Cancel
-                        </button>
-                    </div>
-                </div>
-                
-                <div id="resetLoader" class="hidden text-center mt-4">
-                    <p class="text-green-600 font-semibold">Sending reset link...</p>
-                </div>
-            </div>
+        <!-- Logout Area -->
+        <div class="flex justify-end mt-6 hidden" id="logoutArea">
+            <button onclick="logout()" class="bg-red-500 text-white px-6 py-2 rounded-lg font-semibold hover:bg-red-600 transition-all duration-200">
+                Logout
+            </button>
         </div>
 
         <!-- Footer -->
