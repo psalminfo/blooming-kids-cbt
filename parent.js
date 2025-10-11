@@ -1,8 +1,6 @@
-// --- FIREBASE INITIALIZATION & SETUP ---
-
 // Firebase config for the 'bloomingkidsassessment' project
+// Uses Firebase V9 Compatibility for simple CDN loading
 firebase.initializeApp({
-    // IMPORTANT: DO NOT expose a real API key here. I'm using the placeholder key from the original file.
     apiKey: "AIzaSyD1lJhsWMMs_qerLBSzk7wKhjLyI_11RJg",
     authDomain: "bloomingkidsassessment.firebaseapp.com",
     projectId: "bloomingkidsassessment",
@@ -12,43 +10,16 @@ firebase.initializeApp({
 });
 
 const db = firebase.firestore();
-const auth = firebase.auth();
 
 // Constants
-const PARENT_USERS_COLLECTION = "parent_users";
 const REPORTS_COLLECTION = "student_results";
 const MONTHLY_REPORTS_COLLECTION = "tutor_submissions";
-const REQUESTS_COLLECTION = "parent_requests"; // New collection for feedback/requests
 
 // --- UTILITY FUNCTIONS ---
 
 /**
- * Custom Toast/Message Handler (Replaces alert())
- * @param {string} message The message to display.
- * @param {string} type 'success' or 'error'
- * @param {string} containerId ID of the element to show the message in.
+ * Capitalizes the first letter of every word in a string.
  */
-function showToast(message, type = 'error', containerId = 'messageContainer') {
-    const container = document.getElementById(containerId);
-    if (!container) {
-        console.error("Message container not found:", containerId);
-        return;
-    }
-    
-    container.textContent = message;
-    container.classList.remove('hidden', 'bg-red-100', 'text-red-700', 'bg-green-100', 'text-green-700', 'bg-blue-100', 'text-blue-700');
-    
-    if (type === 'success') {
-        container.classList.add('bg-green-100', 'text-green-700');
-    } else if (type === 'error') {
-        container.classList.add('bg-red-100', 'text-red-700');
-    } else if (type === 'info') {
-        container.classList.add('bg-blue-100', 'text-blue-700');
-    }
-    
-    setTimeout(() => container.classList.add('hidden'), 5000);
-}
-
 function capitalize(str) {
     if (!str) return "";
     return str.replace(/\b\w/g, l => l.toUpperCase());
@@ -56,7 +27,8 @@ function capitalize(str) {
 
 /**
  * Normalizes the phone number: strips non-digits and returns the last 10 digits.
- * This is crucial for matching existing reports, as requested.
+ * This is crucial for matching records in the database, regardless of the input format.
+ * This ensures the phone number works exactly as intended by the original system.
  * @param {string} rawPhone The raw phone number input.
  * @returns {string} The normalized 10-digit string.
  */
@@ -66,309 +38,45 @@ function normalizePhone(rawPhone) {
 }
 
 /**
- * Determines if the login identifier is likely an email or a phone number.
- * @param {string} identifier
- * @returns {'email' | 'phone'}
+ * Custom Toast/Message Handler (Replaces alert() and window.alert())
  */
-function getIdentifierType(identifier) {
-    return identifier.includes('@') ? 'email' : 'phone';
-}
-
-// --- AUTHENTICATION & USER MANAGEMENT ---
-
-/**
- * Stores the user's profile in Firestore after successful sign-up.
- * Stores the raw phone number exactly as entered for reference.
- */
-async function storeUserProfile(user, rawPhone, normalizedPhone, email) {
-    try {
-        await db.collection(PARENT_USERS_COLLECTION).doc(user.uid).set({
-            email: email,
-            rawPhone: rawPhone, // Store raw phone as requested
-            normalizedPhone: normalizedPhone,
-            createdAt: firebase.firestore.FieldValue.serverTimestamp()
-        });
-    } catch (error) {
-        console.error("Error storing user profile in Firestore:", error);
+function showToast(message, type = 'error', containerId = 'messageContainer') {
+    const container = document.getElementById(containerId);
+    if (!container) return;
+    
+    container.textContent = message;
+    container.classList.remove('hidden', 'bg-red-500', 'bg-green-600', 'bg-yellow-500', 'text-white');
+    
+    if (type === 'success') {
+        container.classList.add('bg-green-600', 'text-white');
+    } else if (type === 'error') {
+        container.classList.add('bg-red-500', 'text-white');
+    } else if (type === 'info') {
+        container.classList.add('bg-yellow-500', 'text-white');
     }
-}
 
-/**
- * Fetches the normalized phone number for the currently authenticated user.
- */
-async function getNormalizedPhoneForUser(uid) {
-    try {
-        const doc = await db.collection(PARENT_USERS_COLLECTION).doc(uid).get();
-        if (doc.exists) {
-            return doc.data().normalizedPhone;
-        }
-        return null;
-    } catch (error) {
-        console.error("Error fetching user profile:", error);
-        return null;
-    }
-}
-
-
-// --- UI FLOW CONTROLS ---
-
-function switchTab(tab) {
-    const signInForm = document.getElementById('signInForm');
-    const signUpForm = document.getElementById('signUpForm');
-    const signInTabBtn = document.getElementById('signInTab');
-    const signUpTabBtn = document.getElementById('signUpTab');
-
-    signInForm.classList.add('hidden');
-    signUpForm.classList.add('hidden');
-    signInTabBtn.classList.remove('tab-active');
-    signUpTabBtn.classList.remove('tab-active');
-
-    if (tab === 'signIn') {
-        signInForm.classList.remove('hidden');
-        signInTabBtn.classList.add('tab-active');
-    } else {
-        signUpForm.classList.remove('hidden');
-        signUpTabBtn.classList.add('tab-active');
-    }
-    // Clear any previous authentication messages
-    document.getElementById('messageContainer').classList.add('hidden');
+    container.classList.remove('opacity-0');
+    container.classList.add('opacity-100');
+    
+    setTimeout(() => {
+        container.classList.remove('opacity-100');
+        container.classList.add('opacity-0');
+        setTimeout(() => container.classList.add('hidden'), 500); // Hide after fade
+    }, 5000);
 }
 
 /**
- * Switches between the Reports and Feedback tabs in the dashboard.
- * @param {string} tab 'reports' or 'feedback'
+ * Checks if the search name matches the stored name, allowing for slight variations.
  */
-function switchDashboardTab(tab) {
-    const reportsContent = document.getElementById('reportsContent');
-    const feedbackContent = document.getElementById('feedbackContent');
-    const reportsTabBtn = document.getElementById('reportsTabBtn');
-    const feedbackTabBtn = document.getElementById('feedbackTabBtn');
-
-    reportsContent.classList.add('hidden');
-    feedbackContent.classList.add('hidden');
-    reportsTabBtn.classList.remove('tab-active');
-    feedbackTabBtn.classList.remove('tab-active');
-
-    if (tab === 'reports') {
-        reportsContent.classList.remove('hidden');
-        reportsTabBtn.classList.add('tab-active');
-    } else {
-        feedbackContent.classList.remove('hidden');
-        feedbackTabBtn.classList.add('tab-active');
-    }
-}
-
-function showForgotPasswordModal(event) {
-    event.preventDefault();
-    document.getElementById('forgotPasswordModal').classList.remove('hidden');
-    document.getElementById('resetMessageContainer').classList.add('hidden');
-}
-
-function hideForgotPasswordModal() {
-    document.getElementById('forgotPasswordModal').classList.add('hidden');
-    document.getElementById('resetEmail').value = '';
-}
-
-function setProcessingState(isProcessing, btnId) {
-    const btn = document.getElementById(btnId);
-    const loader = document.getElementById('loader');
+function nameMatches(storedName, searchName) {
+    if (!storedName || !searchName) return false;
     
-    if (isProcessing) {
-        btn.disabled = true;
-        btn.textContent = "Processing...";
-        loader.classList.remove('hidden');
-    } else {
-        btn.disabled = false;
-        loader.classList.add('hidden');
-        if (btnId === 'loginBtn') btn.textContent = "Sign In";
-        if (btnId === 'signUpBtn') btn.textContent = "Sign Up";
-        if (btnId === 'resetBtn') btn.textContent = "Send Reset Link";
-        if (btnId === 'sendRequestBtn') btn.textContent = "Send Request";
-    }
-}
-
-// --- AUTHENTICATION HANDLERS ---
-
-document.getElementById('signUpForm').addEventListener('submit', async (e) => {
-    e.preventDefault();
-    setProcessingState(true, 'signUpBtn');
-
-    const rawPhone = document.getElementById('signupPhone').value.trim();
-    const email = document.getElementById('signupEmail').value.trim();
-    const password = document.getElementById('signupPassword').value;
-    const confirmPassword = document.getElementById('signupConfirmPassword').value;
-    const normalizedPhone = normalizePhone(rawPhone);
-
-    if (password !== confirmPassword) {
-        showToast("Passwords do not match.", 'error');
-        setProcessingState(false, 'signUpBtn');
-        return;
-    }
-    if (password.length < 6) {
-        showToast("Password must be at least 6 characters.", 'error');
-        setProcessingState(false, 'signUpBtn');
-        return;
-    }
-    if (normalizedPhone.length < 10) {
-        showToast("Please enter a valid phone number (at least 10 digits).", 'error');
-        setProcessingState(false, 'signUpBtn');
-        return;
-    }
-
-    try {
-        const userCredential = await auth.createUserWithEmailAndPassword(email, password);
-        await storeUserProfile(userCredential.user, rawPhone, normalizedPhone, email);
-        showToast("Sign up successful! You are now logged in.", 'success');
-    } catch (error) {
-        console.error("Sign Up Error:", error);
-        let message = "Sign up failed. Please check your email format or if the email is already in use.";
-        if (error.code === 'auth/email-already-in-use') {
-             message = "This email is already registered. Please sign in or use password recovery.";
-        }
-        showToast(message, 'error');
-    } finally {
-        setProcessingState(false, 'signUpBtn');
-    }
-});
-
-document.getElementById('signInForm').addEventListener('submit', async (e) => {
-    e.preventDefault();
-    setProcessingState(true, 'loginBtn');
-
-    const identifier = document.getElementById('loginIdentifier').value.trim();
-    const password = document.getElementById('loginPassword').value;
+    const storedLower = storedName.toLowerCase().trim();
+    const searchLower = searchName.toLowerCase().trim();
     
-    const identifierType = getIdentifierType(identifier);
-
-    try {
-        let userEmail = '';
-
-        if (identifierType === 'email') {
-            userEmail = identifier;
-        } else {
-            // Find user email by normalized phone number (required for phone number sign-in)
-            const normalizedPhone = normalizePhone(identifier);
-            if (normalizedPhone.length < 10) {
-                showToast("Please enter a valid phone number or email.", 'error');
-                setProcessingState(false, 'loginBtn');
-                return;
-            }
-
-            const userQuery = await db.collection(PARENT_USERS_COLLECTION)
-                                      .where("normalizedPhone", "==", normalizedPhone)
-                                      .limit(1).get();
-
-            if (userQuery.empty) {
-                showToast("No account found matching this phone number. Please sign up.", 'error');
-                setProcessingState(false, 'loginBtn');
-                return;
-            }
-            
-            userEmail = userQuery.docs[0].data().email;
-        }
-
-        // Use the determined email for Firebase Auth login
-        await auth.signInWithEmailAndPassword(userEmail, password);
-        showToast("Sign in successful!", 'success');
-
-    } catch (error) {
-        console.error("Sign In Error:", error);
-        let message = "Sign in failed. Invalid phone/email or password.";
-        if (error.code === 'auth/wrong-password' || error.code === 'auth/user-not-found') {
-            message = "Invalid login credentials. Please check your phone/email and password.";
-        }
-        showToast(message, 'error');
-    } finally {
-        setProcessingState(false, 'loginBtn');
-    }
-});
-
-document.getElementById('forgotPasswordForm').addEventListener('submit', async (e) => {
-    e.preventDefault();
-    setProcessingState(true, 'resetBtn');
-
-    const email = document.getElementById('resetEmail').value.trim();
-    const resetMessageContainer = document.getElementById('resetMessageContainer');
-    resetMessageContainer.classList.add('hidden');
-
-    const actionCodeSettings = {
-        url: window.location.href, 
-        handleCodeInApp: true
-    };
-    
-    try {
-        await auth.sendPasswordResetEmail(email, actionCodeSettings);
-        
-        resetMessageContainer.classList.remove('hidden', 'bg-red-100', 'text-red-700');
-        resetMessageContainer.classList.add('bg-green-100', 'text-green-700');
-        resetMessageContainer.innerHTML = `
-            <p class="font-semibold">BKH says... Password reset email sent!</p>
-            <p>Check your inbox for a link to reset your password for ${email}.</p>
-        `;
-    } catch (error) {
-        console.error("Password Reset Error:", error);
-        
-        resetMessageContainer.classList.remove('hidden', 'bg-green-100', 'text-green-700');
-        resetMessageContainer.classList.add('bg-red-100', 'text-red-700');
-        resetMessageContainer.innerHTML = `
-            <p class="font-semibold">BKH says... Recovery failed.</p>
-            <p>Could not send password reset to ${email}. Please check the email address or sign up if you don't have an account.</p>
-        `;
-    } finally {
-        setProcessingState(false, 'resetBtn');
-    }
-});
-
-
-document.getElementById('sendRequestBtn').addEventListener('click', async () => {
-    const message = document.getElementById('requestMessage').value.trim();
-    const uid = auth.currentUser?.uid;
-    const toastContainer = document.getElementById('requestMessageToast');
-
-    if (!uid) {
-        showToast("You must be logged in to send a request.", 'error', 'requestMessageToast');
-        return;
-    }
-    if (!message) {
-        showToast("Request message cannot be empty.", 'error', 'requestMessageToast');
-        return;
-    }
-    setProcessingState(true, 'sendRequestBtn');
-
-    try {
-        const userProfile = (await db.collection(PARENT_USERS_COLLECTION).doc(uid).get()).data();
-
-        await db.collection(REQUESTS_COLLECTION).add({
-            userId: uid,
-            email: userProfile?.email || 'N/A',
-            phone: userProfile?.rawPhone || 'N/A',
-            message: message,
-            timestamp: firebase.firestore.FieldValue.serverTimestamp(),
-            status: 'new'
-        });
-
-        document.getElementById('requestMessage').value = '';
-        showToast("BKH says... Request sent successfully! We will get back to you soon.", 'success', 'requestMessageToast');
-    } catch (error) {
-        console.error("Error sending request:", error);
-        showToast("BKH says... Failed to send request. Please try again.", 'error', 'requestMessageToast');
-    } finally {
-        setProcessingState(false, 'sendRequestBtn');
-    }
-});
-
-
-function logout() {
-    auth.signOut().then(() => {
-        // Redirect or refresh the page to show the login screen
-        window.location.reload(); 
-    }).catch((error) => {
-        console.error("Logout Error:", error);
-        showToast("Logout failed. Please try again.", 'error');
-    });
+    // Check if the search name is a subset or superset of the stored name
+    return storedLower.includes(searchLower) || searchLower.includes(storedLower);
 }
-
-// --- REPORT LOGIC (PRESERVED) ---
 
 /**
  * Generates a unique, personalized recommendation using a smart template.
@@ -412,21 +120,38 @@ function generateTemplatedRecommendation(studentName, tutorName, results) {
     return praiseClause + improvementClause + closingStatement;
 }
 
+// --- CORE REPORT LOGIC ---
+
 /**
- * Loads ALL children's reports associated with the authenticated parent's
- * normalized phone number.
- * @returns {Promise<{parentName: string, latestFeedback: string} | null>}
+ * Loads ALL children's reports associated with the provided normalized phone number.
+ * This is the main function triggered by the user's form submission.
  */
-async function loadAllChildrenReports(normalizedPhone) {
-    const dashboardArea = document.getElementById("dashboardArea");
-    const reportsContent = document.getElementById("reportsContent");
-    const latestFeedbackContainer = document.getElementById("latestFeedbackContainer");
+async function loadReports(event) {
+    event.preventDefault(); // Stop form submission
+    
+    const studentName = document.getElementById('studentName').value.trim();
+    const rawPhone = document.getElementById('parentPhone').value.trim();
+    const normalizedPhone = normalizePhone(rawPhone);
+
+    const reportContent = document.getElementById("reportContent");
+    const reportArea = document.getElementById("reportArea");
+    const inputArea = document.getElementById("inputArea");
+    const welcomeMessage = document.getElementById('welcomeMessage');
     const loader = document.getElementById("loader");
+    const generateBtn = document.getElementById('generateBtn');
+
+    reportContent.innerHTML = ''; 
+    document.getElementById('messageContainer').classList.add('hidden'); // Clear previous messages
+
+    if (!studentName || normalizedPhone.length < 10) {
+        showToast("Please enter the student's name and a valid 10-digit phone number.", 'error');
+        return;
+    }
 
     loader.classList.remove("hidden");
-    reportsContent.innerHTML = ''; 
-    latestFeedbackContainer.innerHTML = `<p class="italic text-gray-500">Loading latest message...</p>`;
-
+    generateBtn.disabled = true;
+    generateBtn.textContent = "Loading Reports...";
+    
     // Add CSS for preserving whitespace dynamically (Important for report formatting)
     if (!document.querySelector('#whitespace-style')) {
         const style = document.createElement('style');
@@ -439,23 +164,22 @@ async function loadAllChildrenReports(normalizedPhone) {
         `;
         document.head.appendChild(style);
     }
-
-    // --- CACHE IMPLEMENTATION (Updated for Auth) ---
-    const cacheKey = `reportCache_auth_${normalizedPhone}`;
-    const twoWeeksInMillis = 14 * 24 * 60 * 60 * 1000;
     
+    // --- CACHE IMPLEMENTATION (for faster subsequent loads) ---
+    const cacheKey = `reportCache_${studentName.toLowerCase()}_${normalizedPhone}`;
+    const twoWeeksInMillis = 14 * 24 * 60 * 60 * 1000;
     try {
         const cachedItem = localStorage.getItem(cacheKey);
         if (cachedItem) {
-            const { timestamp, html, chartConfigs, parentName, latestFeedback } = JSON.parse(cachedItem);
+            const { timestamp, html, chartConfigs, parentName } = JSON.parse(cachedItem);
             if (Date.now() - timestamp < twoWeeksInMillis) {
                 console.log("Loading report from cache.");
-                
-                reportsContent.innerHTML = html;
-                latestFeedbackContainer.innerHTML = `<p class="leading-relaxed preserve-whitespace">${latestFeedback || 'No general comments found in the latest monthly report.'}</p>`;
-                
+                reportContent.innerHTML = html;
+                welcomeMessage.textContent = `Welcome Back, ${parentName}!`;
+
                 // Re-initialize charts from cached configuration
                 if (chartConfigs && chartConfigs.length > 0) {
+                    // Use setTimeout to ensure DOM elements exist before initialization
                     setTimeout(() => { 
                          chartConfigs.forEach(chart => {
                             const ctx = document.getElementById(chart.canvasId);
@@ -463,10 +187,14 @@ async function loadAllChildrenReports(normalizedPhone) {
                         });
                     }, 0);
                 }
+
+                inputArea.classList.add("hidden");
+                reportArea.classList.remove("hidden");
                 loader.classList.add("hidden");
-                dashboardArea.classList.remove("hidden");
-                
-                return { parentName, latestFeedback }; // Return cached data
+                generateBtn.disabled = false;
+                generateBtn.textContent = "Generate Report";
+                showToast("Reports loaded from cache!", 'info');
+                return; 
             }
         }
     } catch (e) {
@@ -475,9 +203,9 @@ async function loadAllChildrenReports(normalizedPhone) {
     }
     // --- END CACHE IMPLEMENTATION ---
 
+
     try {
-        // --- HIGHLY OPTIMIZED READS (Using normalizedPhone for backward compatibility) ---
-        
+        // Step 1: Query both collections concurrently using the normalized phone number
         const assessmentQuery = db.collection(REPORTS_COLLECTION)
             .where("parentPhone", "==", normalizedPhone).get();
         
@@ -486,72 +214,66 @@ async function loadAllChildrenReports(normalizedPhone) {
         
         const [assessmentSnapshot, monthlySnapshot] = await Promise.all([assessmentQuery, monthlyQuery]);
 
+        // Step 2: Filter results by name on the client-side
         const studentResults = [];
         assessmentSnapshot.forEach(doc => {
-            studentResults.push({ 
-                id: doc.id,
-                ...doc.data(),
-                timestamp: doc.data().submittedAt?.seconds || Date.now() / 1000,
-                type: 'assessment'
-            });
+            const data = doc.data();
+            if (nameMatches(data.studentName, studentName)) {
+                studentResults.push({ 
+                    id: doc.id,
+                    ...data,
+                    timestamp: data.submittedAt?.seconds || Date.now() / 1000,
+                    type: 'assessment'
+                });
+            }
         });
 
         const monthlyReports = [];
         monthlySnapshot.forEach(doc => {
-            monthlyReports.push({ 
-                id: doc.id,
-                ...doc.data(),
-                timestamp: doc.data().submittedAt?.seconds || Date.now() / 1000,
-                type: 'monthly'
-            });
+            const data = doc.data();
+            if (nameMatches(data.studentName, studentName)) {
+                monthlyReports.push({ 
+                    id: doc.id,
+                    ...data,
+                    timestamp: data.submittedAt?.seconds || Date.now() / 1000,
+                    type: 'monthly'
+                });
+            }
         });
 
+        // Step 3: Combine and sort all reports by timestamp (most recent first)
         const allReports = [...studentResults, ...monthlyReports].sort((a, b) => b.timestamp - a.timestamp);
         
-        let parentName = '';
-        let latestFeedback = '';
-        let latestMonthlyReportTimestamp = 0;
-        const chartConfigsToCache = [];
-        let reportHtml = '';
-        
         if (allReports.length === 0) {
-            reportsContent.innerHTML = `
-                <div class="bg-yellow-100 border-l-4 border-yellow-500 text-yellow-700 p-4 rounded-lg" role="alert">
-                    <p class="font-bold">No Reports Found</p>
-                    <p>We couldn't find any reports linked to your phone number. Please contact support to confirm your phone number and account setup.</p>
-                </div>
-            `;
-            latestFeedbackContainer.innerHTML = `<p class="text-gray-500">No monthly reports available to display tutor's message.</p>`;
-            loader.classList.add("hidden");
-            dashboardArea.classList.remove("hidden");
-            return { parentName: 'Parent', latestFeedback: latestFeedback }; // Return default if no reports found
+            showToast(`No reports found for ${studentName} with that phone number.`, 'info');
+            return;
         }
 
-        // Extract Parent Name (from most recent report, for the welcome message)
-        // This is crucial for fixing the welcome message.
-        parentName = allReports.find(r => r.parentName)?.parentName || 'Parent';
-
-        // Iterate through all reports to generate HTML and find latest feedback
-        let reportIndex = 0;
+        // --- Core Logic: Extract Parent Name from the first available report (as requested) ---
+        const firstReport = allReports[0];
+        const extractedParentName = firstReport.parentName ? capitalize(firstReport.parentName) : 'Valued Parent'; 
         
+        // Update the Welcome message using the name found in the report
+        welcomeMessage.textContent = `Welcome Back, ${extractedParentName}!`;
+        // --- End Name Extraction Logic ---
+
+        // Step 4: Iterate through all reports to generate HTML
+        const chartConfigsToCache = [];
+        let reportHtml = '';
+        let reportIndex = 0; // Use a single index for both types
+
         for (const report of allReports) {
             const fullName = capitalize(report.studentName);
             const formattedDate = new Date(report.timestamp * 1000).toLocaleString('en-US', {
                 dateStyle: 'long',
                 timeStyle: 'short'
             });
+            
+            const currentId = `${report.type}-block-${reportIndex}`;
 
             if (report.type === 'monthly') {
-                // Track latest monthly report for feedback tab
-                if (report.timestamp > latestMonthlyReportTimestamp) {
-                    latestMonthlyReportTimestamp = report.timestamp;
-                    // The last message is the General Tutor's Comments
-                    latestFeedback = report.generalComments || 'No general comments found in the latest monthly report.';
-                }
-
-                // Monthly Report Generation (Preserved)
+                // Monthly Report Generation
                 const monthlyReport = report;
-                const currentId = `monthly-block-${reportIndex}`;
                 
                 const block = `
                     <div class="border rounded-xl shadow mb-8 p-6 bg-white transition-shadow duration-300 hover:shadow-lg" id="${currentId}">
@@ -632,21 +354,22 @@ async function loadAllChildrenReports(normalizedPhone) {
                 reportHtml += block;
 
             } else if (report.type === 'assessment') {
-                // Assessment Report Generation (Preserved)
+                // Assessment Report Generation
                 const session = [report];
                 const tutorEmail = report.tutorEmail || 'N/A';
                 const studentCountry = report.studentCountry || 'N/A';
-                let tutorName = 'N/A';
                 
-                if (tutorEmail && tutorEmail !== 'N/A') {
+                // Tutor name handling (prioritize name in report, fall back to email lookup)
+                let tutorName = report.tutorName || 'N/A'; 
+                if (tutorEmail && tutorEmail !== 'N/A' && tutorName === 'N/A') {
                     try {
-                        // Fetch tutor name from the 'tutors' collection using their email
                         const tutorDoc = await db.collection("tutors").doc(tutorEmail).get();
                         if (tutorDoc.exists) {
                             tutorName = tutorDoc.data().name;
                         }
-                    } catch (error) { /* Silent fail */ }
+                    } catch (error) { /* Silent fail on lookup */ }
                 }
+
 
                 const results = session.map(testResult => {
                     const topics = [...new Set(testResult.answers?.map(a => a.topic).filter(t => t))] || [];
@@ -665,8 +388,6 @@ async function loadAllChildrenReports(normalizedPhone) {
                 const creativeWritingAnswer = session[0].answers?.find(a => a.type === 'creative-writing');
                 const tutorReport = creativeWritingAnswer?.tutorReport || 'Pending review.';
                 
-                const currentId = `assessment-block-${reportIndex}`;
-
                 const block = `
                     <div class="border rounded-xl shadow mb-8 p-6 bg-white transition-shadow duration-300 hover:shadow-lg" id="${currentId}">
                         <div class="text-center mb-6 border-b pb-4">
@@ -728,7 +449,7 @@ async function loadAllChildrenReports(normalizedPhone) {
 
                 reportHtml += block;
                 
-                // Chart generation (Preserved)
+                // Chart generation
                 if (results.length > 0) {
                     const chartConfig = {
                         type: 'bar',
@@ -745,71 +466,59 @@ async function loadAllChildrenReports(normalizedPhone) {
                             plugins: { title: { display: true, text: 'Score Distribution by Subject' } }
                         }
                     };
-                    // Push config to cache array (charts will be initialized later in the DOMContentLoaded/cache load)
+                    
                     chartConfigsToCache.push({ canvasId: `chart-${reportIndex}`, config: chartConfig });
+                    // Initialize Chart after HTML is inserted
+                    setTimeout(() => {
+                        const ctx = document.getElementById(`chart-${reportIndex}`);
+                        if (ctx) new Chart(ctx, chartConfig);
+                    }, 0); 
                 }
             }
             reportIndex++;
         }
         
-        // Finalize HTML and Feedback
-        reportsContent.innerHTML = reportHtml;
-        latestFeedbackContainer.innerHTML = `<p class="leading-relaxed preserve-whitespace">${latestFeedback || 'No general comments found in the latest monthly report.'}</p>`;
-        
-        // Initialize Charts only after HTML is inserted
-        setTimeout(() => {
-            chartConfigsToCache.forEach(chart => {
-                const ctx = document.getElementById(chart.canvasId);
-                if (ctx) new Chart(ctx, chart.config);
-            });
-        }, 0); // Allow browser to render canvas elements
+        // Finalize HTML
+        reportContent.innerHTML = reportHtml;
 
-        // --- CACHE SAVING LOGIC ---
+        // Save to cache after successful retrieval
         try {
             const dataToCache = {
                 timestamp: Date.now(),
-                html: reportHtml,
+                html: reportContent.innerHTML,
                 chartConfigs: chartConfigsToCache,
-                parentName: parentName,
-                latestFeedback: latestFeedback
+                parentName: extractedParentName
             };
             localStorage.setItem(cacheKey, JSON.stringify(dataToCache));
             console.log("Report data cached successfully.");
         } catch (e) {
             console.error("Could not write to cache:", e);
         }
-        // --- END CACHE SAVING ---
 
-        // Show the dashboard and default to Reports tab
-        loader.classList.add("hidden");
-        dashboardArea.classList.remove("hidden");
-        switchDashboardTab('reports');
-
-        return { parentName, latestFeedback };
+        // Show the report area
+        inputArea.classList.add("hidden");
+        reportArea.classList.remove("hidden");
+        showToast("Reports loaded successfully!", 'success');
 
     } catch (error) {
-        console.error("CRITICAL ERROR loading reports for authenticated user:", error);
-        reportsContent.innerHTML = `
-            <div class="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 rounded-lg" role="alert">
-                <p class="font-bold">CRITICAL ERROR Loading Reports</p>
-                <p>Sorry, there was a critical error loading the reports. Please ensure your phone number is correctly linked in our records, or contact BKH support. Error details: ${error.message}</p>
-            </div>
-        `;
+        console.error("CRITICAL ERROR loading reports:", error);
+        showToast(`An error occurred while loading reports: ${error.message}.`, 'error');
+    } finally {
         loader.classList.add("hidden");
-        dashboardArea.classList.remove("hidden");
-        return null;
-    } 
+        generateBtn.disabled = false;
+        generateBtn.textContent = "Generate Report";
+    }
 }
 
-// --- PDF DOWNLOAD (PRESERVED) ---
-
+/**
+ * PDF Download functionality.
+ */
 function downloadSessionReport(index, studentName, type) {
     const elementId = `${type}-block-${index}`;
     const element = document.getElementById(elementId);
     
     if (!element) {
-        console.error("Element not found for PDF download:", elementId);
-        showToast("Error: Could not find report content to download.", 'error', 'messageContainer');
+        showToast("Error: Could not find report content to download.", 'error');
         return;
     }
 
@@ -818,7 +527,6 @@ function downloadSessionReport(index, studentName, type) {
     charts.forEach(canvas => canvas.style.display = 'none');
 
     const safeStudentName = studentName.replace(/ /g, '_');
-    // Using index in filename ensures uniqueness if multiple reports exist for the same student/type
     const fileName = `${type === 'assessment' ? 'Assessment' : 'Monthly'}_Report_${safeStudentName}_${index}.pdf`; 
     
     const opt = { 
@@ -835,56 +543,26 @@ function downloadSessionReport(index, studentName, type) {
     });
 }
 
-// --- AUTH STATE LISTENER (MAIN ENTRY POINT) ---
-
-auth.onAuthStateChanged(async (user) => {
-    const authArea = document.getElementById('authArea');
-    const dashboardArea = document.getElementById('dashboardArea');
-    const logoutArea = document.getElementById('logoutArea');
-    const welcomeMessage = document.getElementById('welcomeMessage');
-
-    if (user) {
-        authArea.classList.add('hidden');
-        logoutArea.classList.remove('hidden');
-        dashboardArea.classList.add('hidden');
-
-        const normalizedPhone = await getNormalizedPhoneForUser(user.uid);
-        
-        if (normalizedPhone) {
-            // Load reports and get derived parent name and feedback
-            const reportData = await loadAllChildrenReports(normalizedPhone);
-
-            if (reportData) {
-                // Set the welcome message using the parentName from the report data
-                welcomeMessage.textContent = `Welcome Back, ${reportData.parentName || 'Parent'}!`;
-                dashboardArea.classList.remove('hidden');
-            } else {
-                 // Error handled inside loadAllChildrenReports, but show loading status
-                 welcomeMessage.textContent = `Welcome Back! Login successful, checking reports...`;
-                 dashboardArea.classList.remove('hidden');
-            }
-        } else {
-            showToast("Account profile missing phone number. Please sign up again or contact BKH support.", 'error');
-            auth.signOut(); 
-        }
-    } else {
-        authArea.classList.remove('hidden');
-        logoutArea.classList.add('hidden');
-        dashboardArea.classList.add('hidden');
-        welcomeMessage.textContent = "Secure Access to Your Child's Progress Reports";
-    }
-});
+/**
+ * Function to handle page refresh/return to the input form.
+ */
+function logout() {
+    window.location.reload(); 
+}
 
 // --- INITIALIZE PAGE ---
 
 document.addEventListener('DOMContentLoaded', function() {
-    switchTab('signIn');
+    document.getElementById('generateBtn').addEventListener('click', loadReports);
     
+    // Create a container for messages (replacing alert())
+    const messageDiv = document.createElement('div');
+    messageDiv.id = 'messageContainer';
+    messageDiv.className = 'hidden fixed top-4 right-4 p-4 rounded-xl shadow-xl text-white font-semibold z-50 transition-opacity duration-500 opacity-0';
+    document.body.appendChild(messageDiv);
+
     // Expose functions globally for HTML buttons/events 
-    window.switchTab = switchTab;
-    window.switchDashboardTab = switchDashboardTab;
-    window.logout = logout;
+    window.loadReports = loadReports;
     window.downloadSessionReport = downloadSessionReport;
-    window.showForgotPasswordModal = showForgotPasswordModal;
-    window.hideForgotPasswordModal = hideForgotPasswordModal;
+    window.logout = logout;
 });
