@@ -9,6 +9,24 @@ firebase.initializeApp({
 });
 
 const db = firebase.firestore();
+const auth = firebase.auth();
+
+// Normalize phone number to last 10 digits
+function normalizePhone(phone) {
+    if (!phone) return "";
+    // Remove all non-digit characters
+    const digitsOnly = phone.replace(/\D/g, "");
+    // Return last 10 digits
+    return digitsOnly.slice(-10);
+}
+
+// Check if user is logged in on page load
+auth.onAuthStateChanged((user) => {
+    if (user) {
+        // User is signed in, load reports automatically
+        loadReportsForUser(user);
+    }
+});
 
 function capitalize(str) {
     if (!str) return "";
@@ -94,7 +112,276 @@ function nameMatches(storedName, searchName) {
     return false;
 }
 
-async function loadReport() {
+// Authentication Functions
+function showTab(tabName) {
+    const signInTab = document.getElementById('signInTab');
+    const signUpTab = document.getElementById('signUpTab');
+    const signInForm = document.getElementById('signInForm');
+    const signUpForm = document.getElementById('signUpForm');
+    
+    if (tabName === 'signIn') {
+        signInTab.classList.remove('tab-inactive');
+        signInTab.classList.add('tab-active');
+        signUpTab.classList.remove('tab-active');
+        signUpTab.classList.add('tab-inactive');
+        signInForm.classList.remove('hidden');
+        signUpForm.classList.add('hidden');
+    } else {
+        signUpTab.classList.remove('tab-inactive');
+        signUpTab.classList.add('tab-active');
+        signInTab.classList.remove('tab-active');
+        signInTab.classList.add('tab-inactive');
+        signUpForm.classList.remove('hidden');
+        signInForm.classList.add('hidden');
+    }
+    
+    // Clear all error messages
+    clearAllErrors();
+}
+
+function clearAllErrors() {
+    const errorElements = document.querySelectorAll('.error-message');
+    errorElements.forEach(el => {
+        el.classList.add('hidden');
+        el.textContent = '';
+    });
+}
+
+function showError(elementId, message) {
+    const element = document.getElementById(elementId);
+    element.textContent = message;
+    element.classList.remove('hidden');
+}
+
+function validateSignUpForm() {
+    clearAllErrors();
+    let isValid = true;
+    
+    const phone = document.getElementById('signUpPhone').value.trim();
+    const email = document.getElementById('signUpEmail').value.trim();
+    const password = document.getElementById('signUpPassword').value;
+    const confirmPassword = document.getElementById('signUpConfirmPassword').value;
+    
+    if (!phone) {
+        showError('signUpPhoneError', 'Phone number is required');
+        isValid = false;
+    } else if (phone.replace(/\D/g, '').length < 10) {
+        showError('signUpPhoneError', 'Please enter a valid phone number');
+        isValid = false;
+    }
+    
+    if (!email) {
+        showError('signUpEmailError', 'Email address is required');
+        isValid = false;
+    } else if (!/^\S+@\S+\.\S+$/.test(email)) {
+        showError('signUpEmailError', 'Please enter a valid email address');
+        isValid = false;
+    }
+    
+    if (!password) {
+        showError('signUpPasswordError', 'Password is required');
+        isValid = false;
+    } else if (password.length < 6) {
+        showError('signUpPasswordError', 'Password must be at least 6 characters');
+        isValid = false;
+    }
+    
+    if (!confirmPassword) {
+        showError('signUpConfirmPasswordError', 'Please confirm your password');
+        isValid = false;
+    } else if (password !== confirmPassword) {
+        showError('signUpConfirmPasswordError', 'Passwords do not match');
+        isValid = false;
+    }
+    
+    return isValid;
+}
+
+function validateSignInForm() {
+    clearAllErrors();
+    let isValid = true;
+    
+    const identifier = document.getElementById('signInIdentifier').value.trim();
+    const password = document.getElementById('signInPassword').value;
+    
+    if (!identifier) {
+        showError('signInIdentifierError', 'Phone number or email is required');
+        isValid = false;
+    }
+    
+    if (!password) {
+        showError('signInPasswordError', 'Password is required');
+        isValid = false;
+    }
+    
+    return isValid;
+}
+
+async function signUp() {
+    if (!validateSignUpForm()) return;
+    
+    const phone = document.getElementById('signUpPhone').value.trim();
+    const email = document.getElementById('signUpEmail').value.trim();
+    const password = document.getElementById('signUpPassword').value;
+    
+    const authLoader = document.getElementById('authLoader');
+    const signUpBtn = document.getElementById('signUpBtn');
+    
+    authLoader.classList.remove('hidden');
+    signUpBtn.disabled = true;
+    signUpBtn.textContent = 'Creating Account...';
+    
+    try {
+        // Create user with email and password
+        const userCredential = await auth.createUserWithEmailAndPassword(email, password);
+        const user = userCredential.user;
+        
+        // Store phone number in user profile
+        await user.updateProfile({
+            displayName: phone
+        });
+        
+        // Create user document in Firestore
+        await db.collection('parents').doc(user.uid).set({
+            phone: phone,
+            email: email,
+            normalizedPhone: normalizePhone(phone),
+            createdAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+        
+        // Success - user will be automatically redirected by auth state change
+        console.log('User created successfully');
+        
+    } catch (error) {
+        console.error('Error creating account:', error);
+        let errorMessage = 'An error occurred during sign up. Please try again.';
+        
+        if (error.code === 'auth/email-already-in-use') {
+            errorMessage = 'This email address is already in use. Please sign in instead.';
+        } else if (error.code === 'auth/weak-password') {
+            errorMessage = 'Password is too weak. Please use a stronger password.';
+        } else if (error.code === 'auth/invalid-email') {
+            errorMessage = 'Invalid email address. Please check your email.';
+        }
+        
+        alert(`BKH says: ${errorMessage}`);
+    } finally {
+        authLoader.classList.add('hidden');
+        signUpBtn.disabled = false;
+        signUpBtn.textContent = 'Create Account';
+    }
+}
+
+async function signIn() {
+    if (!validateSignInForm()) return;
+    
+    const identifier = document.getElementById('signInIdentifier').value.trim();
+    const password = document.getElementById('signInPassword').value;
+    
+    const authLoader = document.getElementById('authLoader');
+    const signInBtn = document.getElementById('signInBtn');
+    
+    authLoader.classList.remove('hidden');
+    signInBtn.disabled = true;
+    signInBtn.textContent = 'Signing In...';
+    
+    try {
+        // Check if identifier is email or phone
+        let emailToUse = identifier;
+        
+        // If identifier looks like a phone number (contains mostly digits)
+        if (/^\d+$/.test(identifier.replace(/\D/g, ''))) {
+            // It's a phone number, we need to find the associated email
+            const normalizedPhone = normalizePhone(identifier);
+            const parentQuery = await db.collection('parents')
+                .where('normalizedPhone', '==', normalizedPhone)
+                .limit(1)
+                .get();
+            
+            if (parentQuery.empty) {
+                throw new Error('No account found with this phone number');
+            }
+            
+            const parentData = parentQuery.docs[0].data();
+            emailToUse = parentData.email;
+        }
+        
+        // Sign in with email and password
+        await auth.signInWithEmailAndPassword(emailToUse, password);
+        
+        // Success - user will be automatically redirected by auth state change
+        
+    } catch (error) {
+        console.error('Error signing in:', error);
+        let errorMessage = 'An error occurred during sign in. Please try again.';
+        
+        if (error.code === 'auth/user-not-found' || error.message === 'No account found with this phone number') {
+            errorMessage = 'No account found with these credentials. Please check your details or sign up.';
+        } else if (error.code === 'auth/wrong-password') {
+            errorMessage = 'Incorrect password. Please try again.';
+        } else if (error.code === 'auth/invalid-email') {
+            errorMessage = 'Invalid email address. Please check your email.';
+        }
+        
+        alert(`BKH says: ${errorMessage}`);
+    } finally {
+        authLoader.classList.add('hidden');
+        signInBtn.disabled = false;
+        signInBtn.textContent = 'Sign In';
+    }
+}
+
+async function forgotPassword() {
+    const email = document.getElementById('resetEmail').value.trim();
+    const resetEmailError = document.getElementById('resetEmailError');
+    const resetLoader = document.getElementById('resetLoader');
+    const sendResetBtn = document.getElementById('sendResetBtn');
+    
+    if (!email) {
+        resetEmailError.textContent = 'Email address is required';
+        resetEmailError.classList.remove('hidden');
+        return;
+    }
+    
+    if (!/^\S+@\S+\.\S+$/.test(email)) {
+        resetEmailError.textContent = 'Please enter a valid email address';
+        resetEmailError.classList.remove('hidden');
+        return;
+    }
+    
+    resetLoader.classList.remove('hidden');
+    sendResetBtn.disabled = true;
+    
+    try {
+        await auth.sendPasswordResetEmail(email);
+        alert('BKH says: Password reset email sent! Please check your inbox.');
+        closeForgotPasswordModal();
+    } catch (error) {
+        console.error('Error sending password reset:', error);
+        let errorMessage = 'An error occurred. Please try again.';
+        
+        if (error.code === 'auth/user-not-found') {
+            errorMessage = 'No account found with this email address.';
+        }
+        
+        alert(`BKH says: ${errorMessage}`);
+    } finally {
+        resetLoader.classList.add('hidden');
+        sendResetBtn.disabled = false;
+    }
+}
+
+function showForgotPasswordModal() {
+    document.getElementById('forgotPasswordModal').classList.remove('hidden');
+    document.getElementById('resetEmail').value = '';
+    document.getElementById('resetEmailError').classList.add('hidden');
+}
+
+function closeForgotPasswordModal() {
+    document.getElementById('forgotPasswordModal').classList.add('hidden');
+}
+
+async function loadReportsForUser(user) {
     // Add CSS for preserving whitespace dynamically
     if (!document.querySelector('#whitespace-style')) {
         const style = document.createElement('style');
@@ -108,21 +395,30 @@ async function loadReport() {
         document.head.appendChild(style);
     }
 
-    const studentName = document.getElementById("studentName").value.trim();
-    const parentPhone = document.getElementById("parentPhone").value.trim();
-
     const reportArea = document.getElementById("reportArea");
     const reportContent = document.getElementById("reportContent");
-    const loader = document.getElementById("loader");
-    const generateBtn = document.getElementById("generateBtn");
+    const authArea = document.getElementById("authArea");
+    const logoutArea = document.getElementById("logoutArea");
 
-    if (!studentName || !parentPhone) {
-        alert("Please enter both the student's full name and the parent's phone number.");
+    // Get user's phone number from Firestore
+    let userPhone = "";
+    try {
+        const parentDoc = await db.collection('parents').doc(user.uid).get();
+        if (parentDoc.exists) {
+            userPhone = parentDoc.data().normalizedPhone;
+        }
+    } catch (error) {
+        console.error("Error fetching user data:", error);
+    }
+
+    if (!userPhone) {
+        alert("BKH says: Unable to retrieve your account information. Please try logging in again.");
+        logout();
         return;
     }
 
     // --- CACHE IMPLEMENTATION ---
-    const cacheKey = `reportCache_${studentName.toLowerCase()}_${parentPhone}`;
+    const cacheKey = `reportCache_${user.uid}`;
     const twoWeeksInMillis = 14 * 24 * 60 * 60 * 1000;
     try {
         const cachedItem = localStorage.getItem(cacheKey);
@@ -142,9 +438,9 @@ async function loadReport() {
                     }, 0);
                 }
 
-                document.getElementById("inputArea").classList.add("hidden");
+                authArea.classList.add("hidden");
                 reportArea.classList.remove("hidden");
-                document.getElementById("logoutArea").style.display = "flex";
+                logoutArea.style.display = "flex";
                 return; // Stop execution since we loaded from cache
             }
         }
@@ -154,60 +450,39 @@ async function loadReport() {
     }
     // --- END CACHE IMPLEMENTATION ---
 
-    loader.classList.remove("hidden");
-    generateBtn.disabled = true;
-    generateBtn.textContent = "Generating...";
-
     try {
         // --- HIGHLY OPTIMIZED READS ---
-        // Query collections using the parent's phone number, which is a much smaller index.
-        const assessmentQuery = db.collection("student_results").where("parentPhone", "==", parentPhone).get();
-        const monthlyQuery = db.collection("tutor_submissions").where("parentPhone", "==", parentPhone).get();
+        // Query collections using the parent's normalized phone number
+        const assessmentQuery = db.collection("student_results").where("parentPhone", "==", userPhone).get();
+        const monthlyQuery = db.collection("tutor_submissions").where("parentPhone", "==", userPhone).get();
         
         const [assessmentSnapshot, monthlySnapshot] = await Promise.all([assessmentQuery, monthlyQuery]);
 
-        // Filter the small result set by name on the client-side
+        // Get all student results for this parent
         const studentResults = [];
         assessmentSnapshot.forEach(doc => {
             const data = doc.data();
-            if (nameMatches(data.studentName, studentName)) {
-                studentResults.push({ 
-                    id: doc.id,
-                    ...data,
-                    timestamp: data.submittedAt?.seconds || Date.now() / 1000,
-                    type: 'assessment'
-                });
-            }
+            studentResults.push({ 
+                id: doc.id,
+                ...data,
+                timestamp: data.submittedAt?.seconds || Date.now() / 1000,
+                type: 'assessment'
+            });
         });
 
         const monthlyReports = [];
         monthlySnapshot.forEach(doc => {
             const data = doc.data();
-            if (nameMatches(data.studentName, studentName)) {
-                monthlyReports.push({ 
-                    id: doc.id,
-                    ...data,
-                    timestamp: data.submittedAt?.seconds || Date.now() / 1000,
-                    type: 'monthly'
-                });
-            }
+            monthlyReports.push({ 
+                id: doc.id,
+                ...data,
+                timestamp: data.submittedAt?.seconds || Date.now() / 1000,
+                type: 'monthly'
+            });
         });
 
         if (studentResults.length === 0 && monthlyReports.length === 0) {
-            let errorMessage = `No reports found for student: ${studentName} with phone number: ${parentPhone}.`;
-            if (assessmentSnapshot.empty && monthlySnapshot.empty) {
-                errorMessage += `\n\nPlease check:\n• The phone number is correct.\n• Reports have been submitted for this student.`;
-            } else {
-                // We found reports for the phone number, but the student name didn't match.
-                const foundNames = new Set();
-                assessmentSnapshot.forEach(doc => foundNames.add(doc.data().studentName));
-                monthlySnapshot.forEach(doc => foundNames.add(doc.data().studentName));
-                errorMessage += `\n\nWe found reports for this phone number, but under different student name(s):\n• "${[...foundNames].join('"\n• "')}"\n\nPlease check the spelling of the student's name.`;
-            }
-            alert(errorMessage);
-            loader.classList.add("hidden");
-            generateBtn.disabled = false;
-            generateBtn.textContent = "Generate Report";
+            alert("BKH says: No reports found for your account. Reports will appear here once they are submitted by your child's tutor.");
             return;
         }
         
@@ -311,12 +586,13 @@ async function loadReport() {
                         
                         <div class="bg-yellow-50 p-4 rounded-lg mt-6">
                             <h3 class="text-lg font-semibold mb-1 text-green-700">Director's Message</h3>
-                            <p class="italic text-sm text-gray-700">At Blooming Kids House, we are committed to helping every child succeed. We believe that with personalized support from our tutors, ${fullName} will unlock their full potential. Keep up the great work!<br/>– Mrs. Yinka Isikalu, Director</p>
+                            <p class="italic text-sm text-gray-700">At Blooming Kids House, we are committed to nurturing your child's potential through personalized learning. This report reflects their current progress and provides a roadmap for future growth. We look forward to continuing this educational journey together.</p>
                         </div>
                         
                         <div class="mt-6 text-center">
-                            <button onclick="downloadSessionReport(${assessmentIndex}, '${fullName}', 'assessment')" class="bg-green-600 text-white px-6 py-2 rounded-lg font-semibold hover:bg-green-700 transition-all duration-200">
-                                Download Assessment PDF
+                            <button onclick="downloadPDF('assessment-block-${assessmentIndex}')" 
+                                    class="bg-green-600 text-white px-6 py-2 rounded-lg font-semibold hover:bg-green-700 transition-all duration-200">
+                                Download PDF Report
                             </button>
                         </div>
                     </div>
@@ -324,188 +600,204 @@ async function loadReport() {
 
                 reportContent.innerHTML += assessmentBlock;
 
+                // Initialize chart for this assessment
                 if (results.length > 0) {
-                    const ctx = document.getElementById(`chart-${assessmentIndex}`);
-                    if (ctx) {
-                        const chartConfig = {
-                            type: 'bar',
-                            data: {
-                                labels: results.map(r => r.subject.toUpperCase()),
-                                datasets: [
-                                    { label: 'Correct Answers', data: results.map(s => s.correct), backgroundColor: '#4CAF50' }, 
-                                    { label: 'Incorrect/Unanswered', data: results.map(s => s.total - s.correct), backgroundColor: '#FFCD56' }
-                                ]
-                            },
-                            options: {
-                                responsive: true,
-                                scales: { x: { stacked: true }, y: { stacked: true, beginAtZero: true } },
-                                plugins: { title: { display: true, text: 'Score Distribution by Subject' } }
-                            }
-                        };
-                        new Chart(ctx, chartConfig);
-                        chartConfigsToCache.push({ canvasId: `chart-${assessmentIndex}`, config: chartConfig });
-                    }
+                    setTimeout(() => {
+                        const ctx = document.getElementById(`chart-${assessmentIndex}`);
+                        if (ctx) {
+                            const chartConfig = {
+                                type: 'bar',
+                                data: {
+                                    labels: results.map(r => r.subject.toUpperCase()),
+                                    datasets: [{
+                                        label: 'Score',
+                                        data: results.map(r => r.total > 0 ? Math.round((r.correct / r.total) * 100) : 0),
+                                        backgroundColor: '#10b981',
+                                        borderColor: '#047857',
+                                        borderWidth: 1
+                                    }]
+                                },
+                                options: {
+                                    responsive: true,
+                                    maintainAspectRatio: false,
+                                    scales: {
+                                        y: {
+                                            beginAtZero: true,
+                                            max: 100,
+                                            title: { display: true, text: 'Percentage (%)' }
+                                        }
+                                    },
+                                    plugins: {
+                                        title: { display: true, text: 'Subject Performance' },
+                                        legend: { display: false }
+                                    }
+                                }
+                            };
+                            new Chart(ctx, chartConfig);
+                            chartConfigsToCache.push({ canvasId: `chart-${assessmentIndex}`, config: chartConfig });
+                        }
+                    }, 0);
                 }
+
                 assessmentIndex++;
             }
         }
-        
+
         // Display Monthly Reports
         if (monthlyReports.length > 0) {
-            const groupedMonthly = {};
-            monthlyReports.forEach((result) => {
-                const sessionKey = Math.floor(result.timestamp / 86400); 
-                if (!groupedMonthly[sessionKey]) groupedMonthly[sessionKey] = [];
-                groupedMonthly[sessionKey].push(result);
-            });
-
-            let monthlyIndex = 0;
-            for (const key in groupedMonthly) {
-                const session = groupedMonthly[key];
-                const fullName = capitalize(session[0].studentName);
-                const formattedDate = new Date(session[0].timestamp * 1000).toLocaleString('en-US', {
+            monthlyReports.forEach((report, index) => {
+                const fullName = capitalize(report.studentName);
+                const formattedDate = new Date(report.timestamp * 1000).toLocaleString('en-US', {
                     dateStyle: 'long',
                     timeStyle: 'short'
                 });
 
-                session.forEach((monthlyReport, reportIndex) => {
-                    const monthlyBlock = `
-                        <div class="border rounded-lg shadow mb-8 p-6 bg-white" id="monthly-block-${monthlyIndex}">
-                            <div class="text-center mb-6 border-b pb-4">
-                                <img src="https://res.cloudinary.com/dy2hxcyaf/image/upload/v1757700806/newbhlogo_umwqzy.svg" 
-                                     alt="Blooming Kids House Logo" 
-                                     class="h-16 w-auto mx-auto mb-3">
-                                <h2 class="text-2xl font-bold text-green-800">MONTHLY LEARNING REPORT</h2>
-                                <p class="text-gray-600">Date: ${formattedDate}</p>
-                            </div>
-                            
-                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6 bg-green-50 p-4 rounded-lg">
-                                <div>
-                                    <p><strong>Student's Name:</strong> ${monthlyReport.studentName || 'N/A'}</p>
-                                    <p><strong>Parent's Name:</strong> ${monthlyReport.parentName || 'N/A'}</p>
-                                    <p><strong>Parent's Phone:</strong> ${monthlyReport.parentPhone || 'N/A'}</p>
-                                </div>
-                                <div>
-                                    <p><strong>Grade:</strong> ${monthlyReport.grade || 'N/A'}</p>
-                                    <p><strong>Tutor's Name:</strong> ${monthlyReport.tutorName || 'N/A'}</p>
-                                </div>
-                            </div>
+                const monthlyBlock = `
+                    <div class="border rounded-lg shadow mb-8 p-6 bg-white" id="monthly-block-${index}">
+                        <div class="text-center mb-6 border-b pb-4">
+                            <img src="https://res.cloudinary.com/dy2hxcyaf/image/upload/v1757700806/newbhlogo_umwqzy.svg" 
+                                 alt="Blooming Kids House Logo" 
+                                 class="h-16 w-auto mx-auto mb-3">
+                            <h2 class="text-2xl font-bold text-green-800">Monthly Progress Report</h2>
+                            <p class="text-gray-600">Date: ${formattedDate}</p>
+                        </div>
 
-                            ${monthlyReport.introduction ? `
-                            <div class="mb-6">
-                                <h3 class="text-lg font-semibold text-green-700 mb-2 border-b pb-1">INTRODUCTION</h3>
-                                <p class="text-gray-700 leading-relaxed preserve-whitespace">${monthlyReport.introduction}</p>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6 bg-green-50 p-4 rounded-lg">
+                            <div>
+                                <p><strong>Student's Name:</strong> ${fullName}</p>
+                                <p><strong>Parent's Phone:</strong> ${report.parentPhone || 'N/A'}</p>
+                                <p><strong>Grade:</strong> ${report.grade || 'N/A'}</p>
                             </div>
-                            ` : ''}
-
-                            ${monthlyReport.topics ? `
-                            <div class="mb-6">
-                                <h3 class="text-lg font-semibold text-green-700 mb-2 border-b pb-1">TOPICS & REMARKS</h3>
-                                <p class="text-gray-700 leading-relaxed preserve-whitespace">${monthlyReport.topics}</p>
-                            </div>
-                            ` : ''}
-
-                            ${monthlyReport.progress ? `
-                            <div class="mb-6">
-                                <h3 class="text-lg font-semibold text-green-700 mb-2 border-b pb-1">PROGRESS & ACHIEVEMENTS</h3>
-                                <p class="text-gray-700 leading-relaxed preserve-whitespace">${monthlyReport.progress}</p>
-                            </div>
-                            ` : ''}
-
-                            ${monthlyReport.strengthsWeaknesses ? `
-                            <div class="mb-6">
-                                <h3 class="text-lg font-semibold text-green-700 mb-2 border-b pb-1">STRENGTHS AND WEAKNESSES</h3>
-                                <p class="text-gray-700 leading-relaxed preserve-whitespace">${monthlyReport.strengthsWeaknesses}</p>
-                            </div>
-                            ` : ''}
-
-                            ${monthlyReport.recommendations ? `
-                            <div class="mb-6">
-                                <h3 class="text-lg font-semibold text-green-700 mb-2 border-b pb-1">RECOMMENDATIONS</h3>
-                                <p class="text-gray-700 leading-relaxed preserve-whitespace">${monthlyReport.recommendations}</p>
-                            </div>
-                            ` : ''}
-
-                            ${monthlyReport.generalComments ? `
-                            <div class="mb-6">
-                                <h3 class="text-lg font-semibold text-green-700 mb-2 border-b pb-1">GENERAL TUTOR'S COMMENTS</h3>
-                                <p class="text-gray-700 leading-relaxed preserve-whitespace">${monthlyReport.generalComments}</p>
-                            </div>
-                            ` : ''}
-
-                            <div class="text-right mt-8 pt-4 border-t">
-                                <p class="text-gray-600">Best regards,</p>
-                                <p class="font-semibold text-green-800">${monthlyReport.tutorName || 'N/A'}</p>
-                            </div>
-
-                            <div class="mt-6 text-center">
-                                <button onclick="downloadMonthlyReport(${monthlyIndex}, '${fullName}')" class="bg-green-600 text-white px-6 py-2 rounded-lg font-semibold hover:bg-green-700 transition-all duration-200">
-                                    Download Monthly Report PDF
-                                </button>
+                            <div>
+                                <p><strong>Tutor:</strong> ${report.tutorName || 'N/A'}</p>
+                                <p><strong>Month:</strong> ${report.month || 'N/A'}</p>
                             </div>
                         </div>
-                    `;
-                    reportContent.innerHTML += monthlyBlock;
-                    monthlyIndex++;
-                });
-            }
+                        
+                        <h3 class="text-lg font-semibold mt-4 mb-2 text-green-700">Monthly Progress Summary</h3>
+                        <div class="preserve-whitespace bg-gray-50 p-4 rounded-lg mb-4">
+                            ${report.progressSummary || 'No progress summary provided.'}
+                        </div>
+                        
+                        <h3 class="text-lg font-semibold mt-4 mb-2 text-green-700">Areas of Strength</h3>
+                        <div class="preserve-whitespace bg-gray-50 p-4 rounded-lg mb-4">
+                            ${report.strengths || 'No strengths detailed.'}
+                        </div>
+                        
+                        <h3 class="text-lg font-semibold mt-4 mb-2 text-green-700">Areas for Improvement</h3>
+                        <div class="preserve-whitespace bg-gray-50 p-4 rounded-lg mb-4">
+                            ${report.improvements || 'No improvement areas specified.'}
+                        </div>
+                        
+                        <h3 class="text-lg font-semibold mt-4 mb-2 text-green-700">Recommendations</h3>
+                        <div class="preserve-whitespace bg-gray-50 p-4 rounded-lg mb-4">
+                            ${report.recommendations || 'No recommendations provided.'}
+                        </div>
+
+                        <div class="bg-yellow-50 p-4 rounded-lg mt-6">
+                            <h3 class="text-lg font-semibold mb-1 text-green-700">Director's Message</h3>
+                            <p class="italic text-sm text-gray-700">At Blooming Kids House, we are committed to nurturing your child's potential through personalized learning. This report reflects their current progress and provides a roadmap for future growth. We look forward to continuing this educational journey together.</p>
+                        </div>
+                        
+                        <div class="mt-6 text-center">
+                            <button onclick="downloadPDF('monthly-block-${index}')" 
+                                    class="bg-green-600 text-white px-6 py-2 rounded-lg font-semibold hover:bg-green-700 transition-all duration-200">
+                                Download PDF Report
+                            </button>
+                        </div>
+                    </div>
+                `;
+
+                reportContent.innerHTML += monthlyBlock;
+            });
         }
-        
-        // --- CACHE SAVING LOGIC ---
+
+        // --- CACHE THE RESULTS ---
         try {
-            const dataToCache = {
+            const htmlToCache = reportContent.innerHTML;
+            const cacheData = {
                 timestamp: Date.now(),
-                html: reportContent.innerHTML,
+                html: htmlToCache,
                 chartConfigs: chartConfigsToCache
             };
-            localStorage.setItem(cacheKey, JSON.stringify(dataToCache));
-            console.log("Report data cached successfully.");
+            localStorage.setItem(cacheKey, JSON.stringify(cacheData));
         } catch (e) {
             console.error("Could not write to cache:", e);
         }
-        // --- END CACHE SAVING ---
 
-        document.getElementById("inputArea").classList.add("hidden");
+        authArea.classList.add("hidden");
         reportArea.classList.remove("hidden");
-        document.getElementById("logoutArea").style.display = "flex";
+        logoutArea.style.display = "flex";
 
     } catch (error) {
-        console.error("Error generating report:", error);
-        alert("Sorry, there was an error generating the report. Please try again.");
-    } finally {
-        loader.classList.add("hidden");
-        generateBtn.disabled = false;
-        generateBtn.textContent = "Generate Report";
+        console.error("Error loading reports:", error);
+        alert("BKH says: An error occurred while loading reports. Please try again.");
     }
-}
-
-function downloadSessionReport(index, studentName, type) {
-    const element = document.getElementById(`${type}-block-${index}`);
-    const safeStudentName = studentName.replace(/ /g, '_');
-    const fileName = `${type === 'assessment' ? 'Assessment' : 'Monthly'}_Report_${safeStudentName}.pdf`;
-    const opt = { margin: 0.5, filename: fileName, image: { type: 'jpeg', quality: 0.98 }, html2canvas: { scale: 2, useCORS: true }, jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' } };
-    html2pdf().from(element).set(opt).save();
-}
-
-function downloadMonthlyReport(index, studentName) {
-    downloadSessionReport(index, studentName, 'monthly');
 }
 
 function logout() {
-    window.location.href = "parent.html";
+    auth.signOut().then(() => {
+        // Clear cache on logout
+        const cacheKey = `reportCache_${auth.currentUser?.uid}`;
+        if (cacheKey) localStorage.removeItem(cacheKey);
+        
+        document.getElementById('authArea').classList.remove('hidden');
+        document.getElementById('reportArea').classList.add('hidden');
+        document.getElementById('logoutArea').style.display = 'none';
+        document.getElementById('reportContent').innerHTML = '';
+        
+        // Clear form fields
+        document.getElementById('signInIdentifier').value = '';
+        document.getElementById('signInPassword').value = '';
+        document.getElementById('signUpPhone').value = '';
+        document.getElementById('signUpEmail').value = '';
+        document.getElementById('signUpPassword').value = '';
+        document.getElementById('signUpConfirmPassword').value = '';
+        
+        // Show sign in tab by default
+        showTab('signIn');
+    }).catch((error) => {
+        console.error("Error signing out:", error);
+    });
 }
 
-// Initialize the page
+function downloadPDF(elementId) {
+    const element = document.getElementById(elementId);
+    const options = {
+        margin: 10,
+        filename: 'BKH_Report.pdf',
+        image: { type: 'jpeg', quality: 0.98 },
+        html2canvas: { scale: 2 },
+        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+    };
+    html2pdf().set(options).from(element).save();
+}
+
+// Event Listeners
 document.addEventListener('DOMContentLoaded', function() {
-    // Check if we have URL parameters (coming from login)
-    const urlParams = new URLSearchParams(window.location.search);
-    const studentFromUrl = urlParams.get('student');
-    const phoneFromUrl = urlParams.get('phone');
+    // Tab switching
+    document.getElementById('signInTab').addEventListener('click', () => showTab('signIn'));
+    document.getElementById('signUpTab').addEventListener('click', () => showTab('signUp'));
     
-    if (studentFromUrl && phoneFromUrl) {
-        document.getElementById('studentName').value = studentFromUrl;
-        document.getElementById('parentPhone').value = phoneFromUrl;
-    }
+    // Form submissions
+    document.getElementById('signInBtn').addEventListener('click', signIn);
+    document.getElementById('signUpBtn').addEventListener('click', signUp);
     
-    document.getElementById("generateBtn").addEventListener("click", loadReport);
+    // Forgot password flow
+    document.getElementById('forgotPasswordBtn').addEventListener('click', showForgotPasswordModal);
+    document.getElementById('cancelResetBtn').addEventListener('click', closeForgotPasswordModal);
+    document.getElementById('sendResetBtn').addEventListener('click', forgotPassword);
+    
+    // Enter key support
+    document.getElementById('signInPassword').addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') signIn();
+    });
+    
+    document.getElementById('signUpConfirmPassword').addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') signUp();
+    });
+    
+    document.getElementById('resetEmail').addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') forgotPassword();
+    });
 });
