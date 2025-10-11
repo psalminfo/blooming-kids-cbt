@@ -11,13 +11,17 @@ firebase.initializeApp({
 const db = firebase.firestore();
 const auth = firebase.auth();
 
-// Normalize phone number to last 10 digits
+// Normalize phone number - keep multiple formats for compatibility
 function normalizePhone(phone) {
     if (!phone) return "";
     // Remove all non-digit characters
     const digitsOnly = phone.replace(/\D/g, "");
-    // Return last 10 digits
-    return digitsOnly.slice(-10);
+    // Return last 10 digits AND full international format for compatibility
+    return {
+        last10: digitsOnly.slice(-10),
+        full: digitsOnly,
+        withPlus: digitsOnly.startsWith('234') ? `+${digitsOnly}` : digitsOnly
+    };
 }
 
 // Check if user is logged in on page load
@@ -232,6 +236,23 @@ async function signUp() {
     signUpBtn.textContent = 'Creating Account...';
     
     try {
+        // First check if user already exists with this phone number
+        const normalizedPhone = normalizePhone(phone);
+        const existingUserQuery = await db.collection('parents')
+            .where('normalizedPhone.last10', '==', normalizedPhone.last10)
+            .limit(1)
+            .get();
+        
+        if (!existingUserQuery.empty) {
+            // User exists with this phone, guide them to sign in
+            authLoader.classList.add('hidden');
+            signUpBtn.disabled = false;
+            signUpBtn.textContent = 'Create Account';
+            alert('BKH says: An account already exists with this phone number. Please sign in instead.');
+            showTab('signIn');
+            return;
+        }
+        
         // Create user with email and password
         const userCredential = await auth.createUserWithEmailAndPassword(email, password);
         const user = userCredential.user;
@@ -258,6 +279,7 @@ async function signUp() {
         
         if (error.code === 'auth/email-already-in-use') {
             errorMessage = 'This email address is already in use. Please sign in instead.';
+            showTab('signIn');
         } else if (error.code === 'auth/weak-password') {
             errorMessage = 'Password is too weak. Please use a stronger password.';
         } else if (error.code === 'auth/invalid-email') {
@@ -286,7 +308,6 @@ async function signIn() {
     signInBtn.textContent = 'Signing In...';
     
     try {
-        // Check if identifier is email or phone
         let emailToUse = identifier;
         
         // If identifier looks like a phone number (contains mostly digits)
@@ -294,7 +315,7 @@ async function signIn() {
             // It's a phone number, we need to find the associated email
             const normalizedPhone = normalizePhone(identifier);
             const parentQuery = await db.collection('parents')
-                .where('normalizedPhone', '==', normalizedPhone)
+                .where('normalizedPhone.last10', '==', normalizedPhone.last10)
                 .limit(1)
                 .get();
             
@@ -401,17 +422,17 @@ async function loadReportsForUser(user) {
     const logoutArea = document.getElementById("logoutArea");
 
     // Get user's phone number from Firestore
-    let userPhone = "";
+    let userPhoneData = null;
     try {
         const parentDoc = await db.collection('parents').doc(user.uid).get();
         if (parentDoc.exists) {
-            userPhone = parentDoc.data().normalizedPhone;
+            userPhoneData = parentDoc.data().normalizedPhone;
         }
     } catch (error) {
         console.error("Error fetching user data:", error);
     }
 
-    if (!userPhone) {
+    if (!userPhoneData) {
         alert("BKH says: Unable to retrieve your account information. Please try logging in again.");
         logout();
         return;
@@ -452,9 +473,24 @@ async function loadReportsForUser(user) {
 
     try {
         // --- HIGHLY OPTIMIZED READS ---
-        // Query collections using the parent's normalized phone number
-        const assessmentQuery = db.collection("student_results").where("parentPhone", "==", userPhone).get();
-        const monthlyQuery = db.collection("tutor_submissions").where("parentPhone", "==", userPhone).get();
+        // Query collections using multiple phone formats for backward compatibility
+        const assessmentQuery = db.collection("student_results")
+            .where("parentPhone", "in", [
+                userPhoneData.last10, 
+                userPhoneData.full,
+                userPhoneData.withPlus,
+                `+${userPhoneData.full}`,
+                `234${userPhoneData.last10}`
+            ]).get();
+        
+        const monthlyQuery = db.collection("tutor_submissions")
+            .where("parentPhone", "in", [
+                userPhoneData.last10, 
+                userPhoneData.full,
+                userPhoneData.withPlus,
+                `+${userPhoneData.full}`,
+                `234${userPhoneData.last10}`
+            ]).get();
         
         const [assessmentSnapshot, monthlySnapshot] = await Promise.all([assessmentQuery, monthlyQuery]);
 
