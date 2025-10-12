@@ -412,7 +412,8 @@ async function submitFeedback() {
             message: message,
             status: 'New',
             timestamp: firebase.firestore.FieldValue.serverTimestamp(),
-            emailSent: false
+            emailSent: false,
+            responses: [] // Initialize empty responses array
         };
 
         // Save to Firestore
@@ -430,6 +431,144 @@ async function submitFeedback() {
         submitBtn.disabled = false;
         submitBtn.textContent = 'Submit Feedback';
     }
+}
+
+// NEW: Function to show feedback responses
+function showFeedbackResponses() {
+    document.getElementById('feedbackResponsesModal').classList.remove('hidden');
+    loadFeedbackResponses();
+}
+
+// NEW: Function to hide feedback responses modal
+function hideFeedbackResponses() {
+    document.getElementById('feedbackResponsesModal').classList.add('hidden');
+}
+
+// NEW: Function to load and display feedback responses
+async function loadFeedbackResponses() {
+    const responsesList = document.getElementById('feedbackResponsesList');
+    responsesList.innerHTML = '<p class="text-center py-4">Loading your feedback responses...</p>';
+
+    try {
+        const user = auth.currentUser;
+        if (!user) {
+            responsesList.innerHTML = '<p class="text-center py-4 text-red-500">Please sign in to view responses.</p>';
+            return;
+        }
+
+        // Get user data to find their phone number
+        const userDoc = await db.collection('parent_users').doc(user.uid).get();
+        const userData = userDoc.data();
+        const userPhone = userData.phone;
+
+        if (!userPhone) {
+            responsesList.innerHTML = '<p class="text-center py-4 text-red-500">Unable to find your account information.</p>';
+            return;
+        }
+
+        // Query for feedback messages from this parent
+        const feedbackQuery = await db.collection('parent_feedback')
+            .where('parentPhone', '==', userPhone)
+            .orderBy('timestamp', 'desc')
+            .get();
+
+        if (feedbackQuery.empty) {
+            responsesList.innerHTML = '<p class="text-center py-4 text-gray-500">You have not submitted any feedback yet.</p>';
+            return;
+        }
+
+        responsesList.innerHTML = '';
+
+        feedbackQuery.docs.forEach(doc => {
+            const feedback = doc.data();
+            const feedbackElement = createFeedbackResponseElement(feedback, doc.id);
+            responsesList.appendChild(feedbackElement);
+        });
+
+    } catch (error) {
+        console.error('Error loading feedback responses:', error);
+        responsesList.innerHTML = '<p class="text-center py-4 text-red-500">Error loading responses. Please try again.</p>';
+    }
+}
+
+// NEW: Function to create feedback response element
+function createFeedbackResponseElement(feedback, feedbackId) {
+    const div = document.createElement('div');
+    div.className = 'border rounded-lg p-4 bg-white shadow-sm mb-4';
+    
+    const timestamp = feedback.timestamp?.toDate ? feedback.timestamp.toDate() : new Date();
+    const formattedDate = timestamp.toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+    });
+
+    // Create responses HTML
+    let responsesHTML = '';
+    if (feedback.responses && feedback.responses.length > 0) {
+        responsesHTML = `
+            <div class="mt-4 border-t pt-4">
+                <h4 class="font-semibold text-green-700 mb-3">Responses from Blooming Kids House:</h4>
+                ${feedback.responses.map(response => {
+                    const responseDate = response.responseDate?.toDate ? 
+                        response.responseDate.toDate().toLocaleDateString('en-US', {
+                            year: 'numeric',
+                            month: 'long',
+                            day: 'numeric',
+                            hour: '2-digit',
+                            minute: '2-digit'
+                        }) : 'Recent';
+                    
+                    return `
+                        <div class="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-3">
+                            <div class="flex justify-between items-start mb-2">
+                                <span class="font-medium text-blue-800">${response.responderName || 'Blooming Kids House Staff'}</span>
+                                <span class="text-xs text-blue-600">${responseDate}</span>
+                            </div>
+                            <p class="text-gray-700 text-sm leading-relaxed">${response.responseText}</p>
+                        </div>
+                    `;
+                }).join('')}
+            </div>
+        `;
+    } else {
+        responsesHTML = `
+            <div class="mt-4 border-t pt-4">
+                <p class="text-yellow-600 text-sm italic">No responses yet. We will respond to your feedback within 24-48 hours.</p>
+            </div>
+        `;
+    }
+
+    div.innerHTML = `
+        <div class="flex justify-between items-start mb-3">
+            <div>
+                <h3 class="font-bold text-lg text-gray-800">Feedback for ${feedback.studentName || 'Student'}</h3>
+                <p class="text-sm text-gray-600">Submitted: ${formattedDate}</p>
+            </div>
+            <div class="text-right">
+                <span class="text-xs px-2 py-1 rounded-full ${feedback.status === 'New' ? 'bg-yellow-100 text-yellow-800' : 'bg-green-100 text-green-800'}">
+                    ${feedback.status || 'New'}
+                </span>
+            </div>
+        </div>
+        
+        <div class="mb-3">
+            <p class="text-gray-700 whitespace-pre-wrap bg-gray-50 p-3 rounded-lg">${feedback.message}</p>
+        </div>
+        
+        <div class="flex justify-between items-center text-sm text-gray-600">
+            <div>
+                <span class="mr-3">Category: ${feedback.category || 'General'}</span>
+                <span>Priority: ${feedback.priority || 'Medium'}</span>
+            </div>
+        </div>
+        
+        ${responsesHTML}
+    `;
+
+    return div;
 }
 
 async function loadAllReportsForParent(parentPhone, userId) {
@@ -967,6 +1106,10 @@ document.addEventListener('DOMContentLoaded', function() {
     document.getElementById("signUpBtn").addEventListener("click", handleSignUp);
     document.getElementById("sendResetBtn").addEventListener("click", handlePasswordReset);
     document.getElementById("submitFeedbackBtn").addEventListener("click", submitFeedback);
+    
+    // NEW: Feedback responses listeners
+    document.getElementById("viewFeedbackResponsesBtn").addEventListener("click", showFeedbackResponses);
+    document.getElementById("closeFeedbackResponsesBtn").addEventListener("click", hideFeedbackResponses);
     
     document.getElementById("signInTab").addEventListener("click", () => switchTab('signin'));
     document.getElementById("signUpTab").addEventListener("click", () => switchTab('signup'));
