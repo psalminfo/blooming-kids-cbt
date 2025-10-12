@@ -1305,10 +1305,10 @@ function renderBreakStudentsFromCache() {
 }
 
 // ##################################################################
-// # SECTION 7: STAFF PANEL (FIXED FOR FEEDBACK TAB)
+// # SECTION 7: STAFF PANEL (FIXED FOR FEEDBACK TAB - NO DUPLICATES)
 // ##################################################################
 
-// Define ROLE_PERMISSIONS with feedback tab included
+// Define ROLE_PERMISSIONS with feedback tab included (make sure this is at the top level)
 const ROLE_PERMISSIONS = {
     pending: { 
         tabs: { 
@@ -1318,7 +1318,7 @@ const ROLE_PERMISSIONS = {
             viewSummerBreak: false, 
             viewPendingApprovals: false, 
             viewStaffManagement: false,
-            viewFeedback: false // Add this line
+            viewFeedback: false
         }, 
         actions: { 
             canDownloadReports: false, 
@@ -1336,7 +1336,7 @@ const ROLE_PERMISSIONS = {
             viewSummerBreak: false, 
             viewPendingApprovals: false, 
             viewStaffManagement: false,
-            viewFeedback: false // Add this line
+            viewFeedback: false
         }, 
         actions: { 
             canDownloadReports: false, 
@@ -1354,7 +1354,7 @@ const ROLE_PERMISSIONS = {
             viewSummerBreak: true, 
             viewPendingApprovals: true, 
             viewStaffManagement: false,
-            viewFeedback: true // Enable feedback for managers
+            viewFeedback: true
         }, 
         actions: { 
             canDownloadReports: false, 
@@ -1372,7 +1372,7 @@ const ROLE_PERMISSIONS = {
             viewSummerBreak: true, 
             viewPendingApprovals: true, 
             viewStaffManagement: true,
-            viewFeedback: true // Enable feedback for directors
+            viewFeedback: true
         }, 
         actions: { 
             canDownloadReports: true, 
@@ -1390,7 +1390,7 @@ const ROLE_PERMISSIONS = {
             viewSummerBreak: true, 
             viewPendingApprovals: true, 
             viewStaffManagement: true,
-            viewFeedback: true // Enable feedback for admins
+            viewFeedback: true
         }, 
         actions: { 
             canDownloadReports: true, 
@@ -1402,30 +1402,8 @@ const ROLE_PERMISSIONS = {
     }
 };
 
-// Update the updateStaffPermissions function to include feedback tab
-async function updateStaffPermissions(staffEmail, newRole) {
-    const staffDocRef = doc(db, "staff", staffEmail);
-    
-    // Use the global ROLE_PERMISSIONS that includes viewFeedback
-    const newPermissions = ROLE_PERMISSIONS[newRole];
-    
-    if (!newPermissions) {
-        console.error("Invalid role specified:", newRole);
-        return;
-    }
-    
-    try {
-        await updateDoc(staffDocRef, { 
-            role: newRole, 
-            permissions: newPermissions 
-        });
-        invalidateCache('staff');
-        console.log(`Successfully updated permissions for ${staffEmail} to role: ${newRole}`);
-        fetchAndRenderStaff();
-    } catch (error) {
-        console.error("Error updating staff permissions:", error);
-    }
-}
+// REMOVE the duplicate updateStaffPermissions function from here
+// Keep only the one that exists earlier in your file
 
 async function renderStaffPanel(container) {
     container.innerHTML = `
@@ -1650,7 +1628,7 @@ async function openPermissionsModal(staffId) {
                 viewSummerBreak: document.getElementById('p-viewSummerBreak').checked,
                 viewPendingApprovals: document.getElementById('p-viewPendingApprovals').checked,
                 viewStaffManagement: document.getElementById('p-viewStaffManagement').checked,
-                viewFeedback: document.getElementById('p-viewFeedback').checked // Include feedback tab
+                viewFeedback: document.getElementById('p-viewFeedback').checked
             },
             actions: {
                 canDownloadReports: document.getElementById('p-canDownloadReports').checked,
@@ -1743,4 +1721,5 @@ onAuthStateChanged(auth, async (user) => {
 
 
 // [End Updated admin.js File]
+
 
