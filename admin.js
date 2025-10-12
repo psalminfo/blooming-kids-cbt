@@ -84,6 +84,7 @@ async function updateStaffPermissions(staffEmail, newRole) {
         manager: { tabs: { viewTutorManagement: true, viewPayAdvice: false, viewTutorReports: true, viewSummerBreak: true, viewPendingApprovals: true, viewStaffManagement: false }, actions: { canDownloadReports: false, canExportPayAdvice: false, canEndSummerBreak: false, canEditStudents: true, canDeleteStudents: false } },
         director: { tabs: { viewTutorManagement: true, viewPayAdvice: true, viewTutorReports: true, viewSummerBreak: true, viewPendingApprovals: true, viewStaffManagement: true }, actions: { canDownloadReports: true, canExportPayAdvice: true, canEndSummerBreak: true, canEditStudents: true, canDeleteStudents: true } },
         admin: { tabs: { viewTutorManagement: true, viewPayAdvice: true, viewTutorReports: true, viewSummerBreak: true, viewPendingApprovals: true, viewStaffManagement: true }, actions: { canDownloadReports: true, canExportPayAdvice: true, canEndSummerBreak: true, canEditStudents: true, canDeleteStudents: true } }
+        viewParentFeedback: true
     };
     const newPermissions = ROLE_PERMISSIONS[newRole];
     if (!newPermissions) {
@@ -1486,3 +1487,4 @@ onAuthStateChanged(auth, async (user) => {
 
 
 // [End Updated admin.js File]
+
