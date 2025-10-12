@@ -308,7 +308,21 @@ async function handlePasswordReset() {
 }
 
 // Feedback System Functions
-async function populateStudentDropdown() {
+function showFeedbackModal() {
+    populateStudentDropdown();
+    document.getElementById('feedbackModal').classList.remove('hidden');
+}
+
+function hideFeedbackModal() {
+    document.getElementById('feedbackModal').classList.add('hidden');
+    // Reset form
+    document.getElementById('feedbackCategory').value = '';
+    document.getElementById('feedbackPriority').value = '';
+    document.getElementById('feedbackStudent').value = '';
+    document.getElementById('feedbackMessage').value = '';
+}
+
+function populateStudentDropdown() {
     const studentDropdown = document.getElementById('feedbackStudent');
     studentDropdown.innerHTML = '<option value="">Select student</option>';
     
@@ -373,16 +387,10 @@ async function submitFeedback() {
         // Save to Firestore
         await db.collection('parent_feedback').add(feedbackData);
 
-        // Send email
-        await sendFeedbackEmail(feedbackData);
-
         showMessage('Thank you! Your feedback has been submitted successfully. We will respond within 24-48 hours.', 'success');
         
-        // Reset form
-        document.getElementById('feedbackCategory').value = '';
-        document.getElementById('feedbackPriority').value = '';
-        document.getElementById('feedbackStudent').value = '';
-        document.getElementById('feedbackMessage').value = '';
+        // Close modal and reset form
+        hideFeedbackModal();
 
     } catch (error) {
         console.error('Feedback submission error:', error);
@@ -393,30 +401,38 @@ async function submitFeedback() {
     }
 }
 
+// Email integration using EmailJS (simple solution)
+function initializeEmailJS() {
+    // You'll need to sign up for EmailJS (free) and replace these with your credentials
+    emailjs.init("YOUR_PUBLIC_KEY"); // Replace with your EmailJS public key
+}
+
 async function sendFeedbackEmail(feedbackData) {
-    // Using EmailJS or similar service - you'll need to set this up
-    // For now, we'll just log it and mark as sent
-    console.log('Feedback email would be sent to: bloomingkidshouse.learning@gmail.com');
-    console.log('Feedback details:', feedbackData);
-    
-    // You can integrate with EmailJS, SendGrid, or any email service
-    // Example with EmailJS (you'll need to set up an account):
-    /*
-    emailjs.send('YOUR_SERVICE_ID', 'YOUR_TEMPLATE_ID', {
-        to_email: 'bloomingkidshouse.learning@gmail.com',
-        parent_name: feedbackData.parentName,
-        parent_phone: feedbackData.parentPhone,
-        parent_email: feedbackData.parentEmail,
-        student_name: feedbackData.studentName,
-        category: feedbackData.category,
-        priority: feedbackData.priority,
-        message: feedbackData.message,
-        timestamp: new Date().toLocaleString()
-    });
-    */
-    
-    // Mark as sent in Firestore (optional)
-    // You can update the document here if needed
+    try {
+        // Using EmailJS for simple email sending
+        const templateParams = {
+            to_email: 'bloomingkidshouse.learning@gmail.com',
+            from_name: 'Blooming Kids House Portal',
+            subject: `Parent ${feedbackData.category}: ${feedbackData.studentName} - ${feedbackData.priority} Priority`,
+            parent_name: feedbackData.parentName,
+            parent_phone: feedbackData.parentPhone,
+            parent_email: feedbackData.parentEmail,
+            student_name: feedbackData.studentName,
+            category: feedbackData.category,
+            priority: feedbackData.priority,
+            message: feedbackData.message,
+            timestamp: new Date().toLocaleString()
+        };
+
+        // Send email using EmailJS
+        await emailjs.send('YOUR_SERVICE_ID', 'YOUR_TEMPLATE_ID', templateParams);
+        
+        console.log('Feedback email sent successfully');
+        return true;
+    } catch (error) {
+        console.error('Error sending feedback email:', error);
+        return false;
+    }
 }
 
 async function loadAllReportsForParent(parentPhone, userId) {
@@ -459,9 +475,6 @@ async function loadAllReportsForParent(parentPhone, userId) {
 
                     authArea.classList.add("hidden");
                     reportArea.classList.remove("hidden");
-                    
-                    // Populate student dropdown for feedback
-                    await populateStudentDropdown();
                     return;
                 }
             }
@@ -841,9 +854,6 @@ async function loadAllReportsForParent(parentPhone, userId) {
         authArea.classList.add("hidden");
         reportArea.classList.remove("hidden");
 
-        // Populate student dropdown for feedback
-        await populateStudentDropdown();
-
     } catch (error) {
         console.error("Error loading reports:", error);
         showMessage("Sorry, there was an error loading the reports. Please try again.", "error");
@@ -896,38 +906,23 @@ function showMessage(message, type) {
 function switchTab(tab) {
     const signInTab = document.getElementById('signInTab');
     const signUpTab = document.getElementById('signUpTab');
-    const feedbackTab = document.getElementById('feedbackTab');
     const signInForm = document.getElementById('signInForm');
     const signUpForm = document.getElementById('signUpForm');
-    const feedbackForm = document.getElementById('feedbackForm');
-
-    // Reset all tabs and forms
-    signInTab.classList.remove('tab-active');
-    signInTab.classList.add('tab-inactive');
-    signUpTab.classList.remove('tab-active');
-    signUpTab.classList.add('tab-inactive');
-    feedbackTab.classList.remove('tab-active');
-    feedbackTab.classList.add('tab-inactive');
-    
-    signInForm.classList.add('hidden');
-    signUpForm.classList.add('hidden');
-    feedbackForm.classList.add('hidden');
 
     if (tab === 'signin') {
         signInTab.classList.remove('tab-inactive');
         signInTab.classList.add('tab-active');
+        signUpTab.classList.remove('tab-active');
+        signUpTab.classList.add('tab-inactive');
         signInForm.classList.remove('hidden');
-    } else if (tab === 'signup') {
+        signUpForm.classList.add('hidden');
+    } else {
         signUpTab.classList.remove('tab-inactive');
         signUpTab.classList.add('tab-active');
+        signInTab.classList.remove('tab-active');
+        signInTab.classList.add('tab-inactive');
         signUpForm.classList.remove('hidden');
-    } else if (tab === 'feedback') {
-        feedbackTab.classList.remove('tab-inactive');
-        feedbackTab.classList.add('tab-active');
-        feedbackForm.classList.remove('hidden');
-        
-        // Populate student dropdown when feedback tab is opened
-        populateStudentDropdown();
+        signInForm.classList.add('hidden');
     }
 }
 
@@ -959,7 +954,6 @@ document.addEventListener('DOMContentLoaded', function() {
     
     document.getElementById("signInTab").addEventListener("click", () => switchTab('signin'));
     document.getElementById("signUpTab").addEventListener("click", () => switchTab('signup'));
-    document.getElementById("feedbackTab").addEventListener("click", () => switchTab('feedback'));
     
     document.getElementById("forgotPasswordBtn").addEventListener("click", () => {
         document.getElementById("passwordResetModal").classList.remove("hidden");
@@ -980,11 +974,5 @@ document.addEventListener('DOMContentLoaded', function() {
     
     document.getElementById('resetEmail').addEventListener('keypress', (e) => {
         if (e.key === 'Enter') handlePasswordReset();
-    });
-    
-    document.getElementById('feedbackMessage').addEventListener('keypress', (e) => {
-        if (e.key === 'Enter' && e.ctrlKey) {
-            submitFeedback();
-        }
     });
 });
