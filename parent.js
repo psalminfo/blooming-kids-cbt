@@ -540,36 +540,41 @@ async function loadAllReportsForParent(parentPhone, userId) {
         const chartConfigsToCache = [];
 
         // Group reports by student name and extract parent name
-        const studentsMap = new Map();
-        let parentName = '';
+       // Group reports by student name and extract parent name
+const studentsMap = new Map();
+let parentName = '';
 
-        // Process assessment reports
-        studentResults.forEach(result => {
-            const studentName = result.studentName;
-            if (!studentsMap.has(studentName)) {
-                studentsMap.set(studentName, { assessments: [], monthly: [] });
-            }
-            studentsMap.get(studentName).assessments.push(result);
-            
-            // Extract parent name from the first report we find
-            if (!parentName && result.parentName) {
-                parentName = result.parentName;
-            }
-        });
+// Process assessment reports
+studentResults.forEach(result => {
+    const studentName = result.studentName;
+    if (!studentsMap.has(studentName)) {
+        studentsMap.set(studentName, { assessments: [], monthly: [] });
+    }
+    studentsMap.get(studentName).assessments.push(result);
+});
 
-        // Process monthly reports
-        monthlyReports.forEach(report => {
-            const studentName = report.studentName;
-            if (!studentsMap.has(studentName)) {
-                studentsMap.set(studentName, { assessments: [], monthly: [] });
-            }
-            studentsMap.get(studentName).monthly.push(report);
-            
-            // Extract parent name from monthly reports if not found
-            if (!parentName && report.parentName) {
-                parentName = report.parentName;
-            }
-        });
+// Process monthly reports - THIS IS WHERE WE GET PARENT NAME
+monthlyReports.forEach(report => {
+    const studentName = report.studentName;
+    if (!studentsMap.has(studentName)) {
+        studentsMap.set(studentName, { assessments: [], monthly: [] });
+    }
+    studentsMap.get(studentName).monthly.push(report);
+    
+    // Extract parent name from monthly reports (tutor_submissions)
+    if (!parentName && report.parentName) {
+        parentName = report.parentName;
+    }
+});
+
+// If still no parent name, try to get from assessment reports as fallback
+if (!parentName) {
+    studentResults.forEach(result => {
+        if (!parentName && result.parentName) {
+            parentName = result.parentName;
+        }
+    });
+}
 
         // Store user data globally
         currentUserData = {
@@ -980,4 +985,5 @@ document.addEventListener('DOMContentLoaded', function() {
         if (e.key === 'Enter') handlePasswordReset();
     });
 });
+
 
