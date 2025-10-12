@@ -412,7 +412,8 @@ async function submitFeedback() {
             message: message,
             status: 'New',
             timestamp: firebase.firestore.FieldValue.serverTimestamp(),
-            emailSent: false
+            emailSent: false,
+            parentUid: user.uid // Add parent UID for querying responses
         };
 
         // Save to Firestore
@@ -430,6 +431,118 @@ async function submitFeedback() {
         submitBtn.disabled = false;
         submitBtn.textContent = 'Submit Feedback';
     }
+}
+
+// Admin Responses Functions
+function showResponsesModal() {
+    document.getElementById('responsesModal').classList.remove('hidden');
+    loadAdminResponses();
+}
+
+function hideResponsesModal() {
+    document.getElementById('responsesModal').classList.add('hidden');
+}
+
+async function loadAdminResponses() {
+    const responsesContent = document.getElementById('responsesContent');
+    responsesContent.innerHTML = '<div class="text-center py-8"><div class="loading-spinner mx-auto" style="width: 40px; height: 40px;"></div><p class="text-green-600 font-semibold mt-4">Loading responses...</p></div>';
+
+    try {
+        const user = auth.currentUser;
+        if (!user) {
+            throw new Error('Please sign in to view responses');
+        }
+
+        // Query feedback where parentUid matches current user AND adminResponse exists
+        const feedbackSnapshot = await db.collection('parent_feedback')
+            .where('parentUid', '==', user.uid)
+            .where('adminResponse', '!=', null)
+            .orderBy('timestamp', 'desc')
+            .get();
+
+        if (feedbackSnapshot.empty) {
+            responsesContent.innerHTML = `
+                <div class="text-center py-12">
+                    <div class="text-6xl mb-4">📭</div>
+                    <h3 class="text-xl font-bold text-gray-700 mb-2">No Responses Yet</h3>
+                    <p class="text-gray-500 max-w-md mx-auto">You haven't received any responses from our staff yet. We'll respond to your feedback within 24-48 hours.</p>
+                </div>
+            `;
+            return;
+        }
+
+        responsesContent.innerHTML = '';
+
+        feedbackSnapshot.forEach(doc => {
+            const feedback = doc.data();
+            const responseDate = feedback.respondedAt?.toDate() || feedback.timestamp?.toDate() || new Date();
+            const formattedDate = responseDate.toLocaleDateString('en-US', {
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+
+            const responseElement = document.createElement('div');
+            responseElement.className = 'bg-white border border-gray-200 rounded-xl p-6 mb-4';
+            responseElement.innerHTML = `
+                <div class="flex justify-between items-start mb-4">
+                    <div class="flex flex-wrap gap-2">
+                        <span class="inline-block px-3 py-1 rounded-full text-sm font-semibold ${getCategoryColor(feedback.category)}">
+                            ${feedback.category}
+                        </span>
+                        <span class="inline-block px-3 py-1 rounded-full text-sm font-semibold ${getPriorityColor(feedback.priority)}">
+                            ${feedback.priority} Priority
+                        </span>
+                    </div>
+                    <span class="text-sm text-gray-500">${formattedDate}</span>
+                </div>
+                
+                <div class="mb-4">
+                    <h4 class="font-semibold text-gray-800 mb-2">Regarding: ${feedback.studentName}</h4>
+                    <p class="text-gray-700 bg-gray-50 p-4 rounded-lg border">${feedback.message}</p>
+                </div>
+                
+                <div class="response-bubble">
+                    <div class="response-header">📨 Admin Response:</div>
+                    <p class="text-gray-700 mt-2">${feedback.adminResponse}</p>
+                </div>
+            `;
+
+            responsesContent.appendChild(responseElement);
+        });
+
+    } catch (error) {
+        console.error('Error loading responses:', error);
+        responsesContent.innerHTML = `
+            <div class="text-center py-8">
+                <div class="text-4xl mb-4">❌</div>
+                <h3 class="text-xl font-bold text-red-700 mb-2">Error Loading Responses</h3>
+                <p class="text-gray-500">Unable to load responses at this time. Please try again later.</p>
+            </div>
+        `;
+    }
+}
+
+function getCategoryColor(category) {
+    const colors = {
+        'Feedback': 'bg-blue-100 text-blue-800',
+        'Request': 'bg-green-100 text-green-800',
+        'Complaint': 'bg-red-100 text-red-800',
+        'Suggestion': 'bg-purple-100 text-purple-800'
+    };
+    return colors[category] || 'bg-gray-100 text-gray-800';
+}
+
+function getPriorityColor(priority) {
+    const colors = {
+        'Low': 'bg-gray-100 text-gray-800',
+        'Medium': 'bg-yellow-100 text-yellow-800',
+        'High': 'bg-orange-100 text-orange-800',
+        'Urgent': 'bg-red-100 text-red-800'
+    };
+    return colors[priority] || 'bg-gray-100 text-gray-800';
 }
 
 async function loadAllReportsForParent(parentPhone, userId) {
@@ -454,10 +567,13 @@ async function loadAllReportsForParent(parentPhone, userId) {
                     console.log("Loading reports from cache.");
                     reportContent.innerHTML = html;
                     
-                    // Set welcome message from cache
+                    // Set welcome message from cache - FIXED: This was the main issue
                     if (userData && userData.parentName) {
                         welcomeMessage.textContent = `Welcome, ${userData.parentName}!`;
                         currentUserData = userData;
+                    } else {
+                        // Fallback if no parent name in cache
+                        welcomeMessage.textContent = `Welcome!`;
                     }
                     
                     // Re-initialize charts from cached configuration
@@ -472,6 +588,9 @@ async function loadAllReportsForParent(parentPhone, userId) {
 
                     authArea.classList.add("hidden");
                     reportArea.classList.remove("hidden");
+                    
+                    // Add View Responses button to welcome section
+                    addViewResponsesButton();
                     return;
                 }
             }
@@ -489,6 +608,33 @@ async function loadAllReportsForParent(parentPhone, userId) {
                 .preserve-whitespace {
                     white-space: pre-line !important;
                     line-height: 1.6 !important;
+                }
+                .response-bubble {
+                    background-color: #f0fdf4;
+                    border: 1px solid #bbf7d0;
+                    border-radius: 12px;
+                    padding: 12px;
+                    margin-top: 8px;
+                }
+                .response-header {
+                    font-weight: 600;
+                    color: #065f46;
+                    margin-bottom: 4px;
+                }
+                .loading-spinner {
+                    border: 3px solid #f3f3f3;
+                    border-top: 3px solid #10b981;
+                    border-radius: 50%;
+                    width: 20px;
+                    height: 20px;
+                    animation: spin 1s linear infinite;
+                    display: inline-block;
+                    margin-right: 8px;
+                    vertical-align: middle;
+                }
+                @keyframes spin {
+                    0% { transform: rotate(0deg); }
+                    100% { transform: rotate(360deg); }
                 }
             `;
             document.head.appendChild(style);
@@ -554,9 +700,10 @@ async function loadAllReportsForParent(parentPhone, userId) {
             studentsMap.get(studentName).monthly.push(report);
             
             // Extract parent name from monthly reports (tutor_submissions)
-            // Try multiple possible field names
+            // Try multiple possible field names - FIXED: More comprehensive field name checking
             if (!parentName) {
-                parentName = report.parentName || report.parent_name || report.parent || report.guardianName || report.parentFullName;
+                parentName = report.parentName || report.parent_name || report.parent || report.guardianName || report.parentFullName || 
+                            report.parentFirstName || report.parentLastName || report.motherName || report.fatherName;
             }
         });
 
@@ -564,26 +711,28 @@ async function loadAllReportsForParent(parentPhone, userId) {
         if (!parentName) {
             studentResults.forEach(result => {
                 if (!parentName) {
-                    parentName = result.parentName || result.parent_name || result.parent || result.guardianName || result.parentFullName;
+                    parentName = result.parentName || result.parent_name || result.parent || result.guardianName || result.parentFullName ||
+                                result.parentFirstName || result.parentLastName || result.motherName || result.fatherName;
                 }
             });
             
             // Last resort: try monthly reports again with different field names
             monthlyReports.forEach(report => {
                 if (!parentName) {
-                    parentName = report.parentName || report.parent_name || report.parent || report.guardianName || report.parentFullName;
+                    parentName = report.parentName || report.parent_name || report.parent || report.guardianName || report.parentFullName ||
+                                report.parentFirstName || report.parentLastName || report.motherName || report.fatherName;
                 }
             });
         }
 
-        // Store user data globally
+        // Store user data globally - FIXED: Ensure parentName is never empty
         currentUserData = {
             parentName: parentName || 'Parent',
             parentPhone: parentPhone
         };
         userChildren = Array.from(studentsMap.keys());
 
-        // Update welcome message - THIS IS WHAT SHOWS THE PARENT NAME
+        // Update welcome message - THIS IS WHAT SHOWS THE PARENT NAME - FIXED: This was the main issue
         welcomeMessage.textContent = `Welcome, ${currentUserData.parentName}!`;
 
         // Update parent name in user document if not set
@@ -863,12 +1012,36 @@ async function loadAllReportsForParent(parentPhone, userId) {
         authArea.classList.add("hidden");
         reportArea.classList.remove("hidden");
 
+        // Add View Responses button to welcome section
+        addViewResponsesButton();
+
     } catch (error) {
         console.error("Error loading reports:", error);
         showMessage("Sorry, there was an error loading the reports. Please try again.", "error");
     } finally {
         authLoader.classList.add("hidden");
     }
+}
+
+// Add View Responses button to the welcome section
+function addViewResponsesButton() {
+    const welcomeSection = document.querySelector('.bg-green-50');
+    if (!welcomeSection) return;
+    
+    const buttonContainer = welcomeSection.querySelector('.flex.gap-2');
+    if (!buttonContainer) return;
+    
+    // Check if button already exists
+    if (document.getElementById('viewResponsesBtn')) return;
+    
+    const viewResponsesBtn = document.createElement('button');
+    viewResponsesBtn.id = 'viewResponsesBtn';
+    viewResponsesBtn.onclick = showResponsesModal;
+    viewResponsesBtn.className = 'bg-blue-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-blue-700 transition-all duration-200 btn-glow flex items-center justify-center';
+    viewResponsesBtn.innerHTML = '<span class="mr-2">📨</span> View Responses';
+    
+    // Insert before the logout button
+    buttonContainer.insertBefore(viewResponsesBtn, buttonContainer.lastElementChild);
 }
 
 function downloadSessionReport(studentIndex, sessionIndex, studentName, type) {
