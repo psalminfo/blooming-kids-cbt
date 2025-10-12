@@ -22,6 +22,10 @@ function capitalize(str) {
     return str.replace(/\b\w/g, l => l.toUpperCase());
 }
 
+// Global variables for user data
+let currentUserData = null;
+let userChildren = [];
+
 /**
  * Generates a unique, personalized recommendation using a smart template.
  * It summarizes performance instead of just listing topics.
@@ -142,22 +146,18 @@ async function handleSignUp() {
         const userCredential = await auth.createUserWithEmailAndPassword(email, password);
         const user = userCredential.user;
 
-        // Store phone number in user profile (as displayName for easy access)
-        await user.updateProfile({
-            displayName: cleanedPhone
-        });
-
         // Store user data in Firestore for easy retrieval
         await db.collection('parent_users').doc(user.uid).set({
             phone: cleanedPhone,
             email: email,
+            parentName: '', // Will be updated when we fetch reports
             createdAt: firebase.firestore.FieldValue.serverTimestamp()
         });
 
         showMessage('Account created successfully!', 'success');
         
         // Automatically load reports after signup
-        await loadAllReportsForParent(cleanedPhone);
+        await loadAllReportsForParent(cleanedPhone, user.uid);
 
     } catch (error) {
         console.error('Sign up error:', error);
@@ -204,13 +204,15 @@ async function handleSignIn() {
     try {
         let userCredential;
         let userPhone;
+        let userId;
         
         // Determine if identifier is email or phone
         if (identifier.includes('@')) {
             // Sign in with email
             userCredential = await auth.signInWithEmailAndPassword(identifier, password);
+            userId = userCredential.user.uid;
             // Get phone from user profile
-            const userDoc = await db.collection('parent_users').doc(userCredential.user.uid).get();
+            const userDoc = await db.collection('parent_users').doc(userId).get();
             if (userDoc.exists) {
                 userPhone = userDoc.data().phone;
             }
@@ -229,6 +231,7 @@ async function handleSignIn() {
             const userData = userQuery.docs[0].data();
             userCredential = await auth.signInWithEmailAndPassword(userData.email, password);
             userPhone = cleanedPhone;
+            userId = userCredential.user.uid;
         }
 
         if (!userPhone) {
@@ -236,7 +239,7 @@ async function handleSignIn() {
         }
         
         // Load all reports for the parent using the exact phone number as stored
-        await loadAllReportsForParent(userPhone);
+        await loadAllReportsForParent(userPhone, userId);
 
     } catch (error) {
         console.error('Sign in error:', error);
@@ -304,11 +307,124 @@ async function handlePasswordReset() {
     }
 }
 
-async function loadAllReportsForParent(parentPhone) {
+// Feedback System Functions
+async function populateStudentDropdown() {
+    const studentDropdown = document.getElementById('feedbackStudent');
+    studentDropdown.innerHTML = '<option value="">Select student</option>';
+    
+    if (userChildren.length === 0) {
+        studentDropdown.innerHTML += '<option value="" disabled>No students found</option>';
+        return;
+    }
+
+    userChildren.forEach(student => {
+        const option = document.createElement('option');
+        option.value = student;
+        option.textContent = student;
+        studentDropdown.appendChild(option);
+    });
+}
+
+async function submitFeedback() {
+    const category = document.getElementById('feedbackCategory').value;
+    const priority = document.getElementById('feedbackPriority').value;
+    const student = document.getElementById('feedbackStudent').value;
+    const message = document.getElementById('feedbackMessage').value;
+
+    // Validation
+    if (!category || !priority || !student || !message) {
+        showMessage('Please fill in all required fields', 'error');
+        return;
+    }
+
+    if (message.length < 10) {
+        showMessage('Please provide a more detailed message (at least 10 characters)', 'error');
+        return;
+    }
+
+    const submitBtn = document.getElementById('submitFeedbackBtn');
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Submitting...';
+
+    try {
+        const user = auth.currentUser;
+        if (!user) {
+            throw new Error('Please sign in to submit feedback');
+        }
+
+        // Get user data
+        const userDoc = await db.collection('parent_users').doc(user.uid).get();
+        const userData = userDoc.data();
+
+        // Create feedback document
+        const feedbackData = {
+            parentName: currentUserData?.parentName || userData.parentName || 'Unknown Parent',
+            parentPhone: userData.phone,
+            parentEmail: userData.email,
+            studentName: student,
+            category: category,
+            priority: priority,
+            message: message,
+            status: 'New',
+            timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+            emailSent: false
+        };
+
+        // Save to Firestore
+        await db.collection('parent_feedback').add(feedbackData);
+
+        // Send email
+        await sendFeedbackEmail(feedbackData);
+
+        showMessage('Thank you! Your feedback has been submitted successfully. We will respond within 24-48 hours.', 'success');
+        
+        // Reset form
+        document.getElementById('feedbackCategory').value = '';
+        document.getElementById('feedbackPriority').value = '';
+        document.getElementById('feedbackStudent').value = '';
+        document.getElementById('feedbackMessage').value = '';
+
+    } catch (error) {
+        console.error('Feedback submission error:', error);
+        showMessage('Failed to submit feedback. Please try again.', 'error');
+    } finally {
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Submit Feedback';
+    }
+}
+
+async function sendFeedbackEmail(feedbackData) {
+    // Using EmailJS or similar service - you'll need to set this up
+    // For now, we'll just log it and mark as sent
+    console.log('Feedback email would be sent to: bloomingkidshouse.learning@gmail.com');
+    console.log('Feedback details:', feedbackData);
+    
+    // You can integrate with EmailJS, SendGrid, or any email service
+    // Example with EmailJS (you'll need to set up an account):
+    /*
+    emailjs.send('YOUR_SERVICE_ID', 'YOUR_TEMPLATE_ID', {
+        to_email: 'bloomingkidshouse.learning@gmail.com',
+        parent_name: feedbackData.parentName,
+        parent_phone: feedbackData.parentPhone,
+        parent_email: feedbackData.parentEmail,
+        student_name: feedbackData.studentName,
+        category: feedbackData.category,
+        priority: feedbackData.priority,
+        message: feedbackData.message,
+        timestamp: new Date().toLocaleString()
+    });
+    */
+    
+    // Mark as sent in Firestore (optional)
+    // You can update the document here if needed
+}
+
+async function loadAllReportsForParent(parentPhone, userId) {
     const reportArea = document.getElementById("reportArea");
     const reportContent = document.getElementById("reportContent");
     const authArea = document.getElementById("authArea");
     const authLoader = document.getElementById("authLoader");
+    const welcomeMessage = document.getElementById("welcomeMessage");
 
     authLoader.classList.remove("hidden");
 
@@ -320,10 +436,16 @@ async function loadAllReportsForParent(parentPhone) {
         try {
             const cachedItem = localStorage.getItem(cacheKey);
             if (cachedItem) {
-                const { timestamp, html, chartConfigs } = JSON.parse(cachedItem);
+                const { timestamp, html, chartConfigs, userData } = JSON.parse(cachedItem);
                 if (Date.now() - timestamp < twoWeeksInMillis) {
                     console.log("Loading reports from cache.");
                     reportContent.innerHTML = html;
+                    
+                    // Set welcome message from cache
+                    if (userData && userData.parentName) {
+                        welcomeMessage.textContent = `Welcome, ${userData.parentName}!`;
+                        currentUserData = userData;
+                    }
                     
                     // Re-initialize charts from cached configuration
                     if (chartConfigs && chartConfigs.length > 0) {
@@ -337,6 +459,9 @@ async function loadAllReportsForParent(parentPhone) {
 
                     authArea.classList.add("hidden");
                     reportArea.classList.remove("hidden");
+                    
+                    // Populate student dropdown for feedback
+                    await populateStudentDropdown();
                     return;
                 }
             }
@@ -397,8 +522,9 @@ async function loadAllReportsForParent(parentPhone) {
         reportContent.innerHTML = "";
         const chartConfigsToCache = [];
 
-        // Group reports by student name
+        // Group reports by student name and extract parent name
         const studentsMap = new Map();
+        let parentName = '';
 
         // Process assessment reports
         studentResults.forEach(result => {
@@ -407,6 +533,11 @@ async function loadAllReportsForParent(parentPhone) {
                 studentsMap.set(studentName, { assessments: [], monthly: [] });
             }
             studentsMap.get(studentName).assessments.push(result);
+            
+            // Extract parent name from the first report we find
+            if (!parentName && result.parentName) {
+                parentName = result.parentName;
+            }
         });
 
         // Process monthly reports
@@ -416,7 +547,29 @@ async function loadAllReportsForParent(parentPhone) {
                 studentsMap.set(studentName, { assessments: [], monthly: [] });
             }
             studentsMap.get(studentName).monthly.push(report);
+            
+            // Extract parent name from monthly reports if not found
+            if (!parentName && report.parentName) {
+                parentName = report.parentName;
+            }
         });
+
+        // Store user data globally
+        currentUserData = {
+            parentName: parentName || 'Parent',
+            parentPhone: parentPhone
+        };
+        userChildren = Array.from(studentsMap.keys());
+
+        // Update welcome message
+        welcomeMessage.textContent = `Welcome, ${currentUserData.parentName}!`;
+
+        // Update parent name in user document if not set
+        if (userId && parentName) {
+            await db.collection('parent_users').doc(userId).update({
+                parentName: parentName
+            });
+        }
 
         // Display reports for each student
         let studentIndex = 0;
@@ -675,7 +828,8 @@ async function loadAllReportsForParent(parentPhone) {
             const dataToCache = {
                 timestamp: Date.now(),
                 html: reportContent.innerHTML,
-                chartConfigs: chartConfigsToCache
+                chartConfigs: chartConfigsToCache,
+                userData: currentUserData
             };
             localStorage.setItem(cacheKey, JSON.stringify(dataToCache));
             console.log("Report data cached successfully.");
@@ -686,6 +840,9 @@ async function loadAllReportsForParent(parentPhone) {
 
         authArea.classList.add("hidden");
         reportArea.classList.remove("hidden");
+
+        // Populate student dropdown for feedback
+        await populateStudentDropdown();
 
     } catch (error) {
         console.error("Error loading reports:", error);
@@ -739,23 +896,38 @@ function showMessage(message, type) {
 function switchTab(tab) {
     const signInTab = document.getElementById('signInTab');
     const signUpTab = document.getElementById('signUpTab');
+    const feedbackTab = document.getElementById('feedbackTab');
     const signInForm = document.getElementById('signInForm');
     const signUpForm = document.getElementById('signUpForm');
+    const feedbackForm = document.getElementById('feedbackForm');
+
+    // Reset all tabs and forms
+    signInTab.classList.remove('tab-active');
+    signInTab.classList.add('tab-inactive');
+    signUpTab.classList.remove('tab-active');
+    signUpTab.classList.add('tab-inactive');
+    feedbackTab.classList.remove('tab-active');
+    feedbackTab.classList.add('tab-inactive');
+    
+    signInForm.classList.add('hidden');
+    signUpForm.classList.add('hidden');
+    feedbackForm.classList.add('hidden');
 
     if (tab === 'signin') {
         signInTab.classList.remove('tab-inactive');
         signInTab.classList.add('tab-active');
-        signUpTab.classList.remove('tab-active');
-        signUpTab.classList.add('tab-inactive');
         signInForm.classList.remove('hidden');
-        signUpForm.classList.add('hidden');
-    } else {
+    } else if (tab === 'signup') {
         signUpTab.classList.remove('tab-inactive');
         signUpTab.classList.add('tab-active');
-        signInTab.classList.remove('tab-active');
-        signInTab.classList.add('tab-inactive');
         signUpForm.classList.remove('hidden');
-        signInForm.classList.add('hidden');
+    } else if (tab === 'feedback') {
+        feedbackTab.classList.remove('tab-inactive');
+        feedbackTab.classList.add('tab-active');
+        feedbackForm.classList.remove('hidden');
+        
+        // Populate student dropdown when feedback tab is opened
+        populateStudentDropdown();
     }
 }
 
@@ -770,7 +942,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 .then((doc) => {
                     if (doc.exists) {
                         const userPhone = doc.data().phone;
-                        loadAllReportsForParent(userPhone);
+                        loadAllReportsForParent(userPhone, user.uid);
                     }
                 })
                 .catch((error) => {
@@ -783,9 +955,11 @@ document.addEventListener('DOMContentLoaded', function() {
     document.getElementById("signInBtn").addEventListener("click", handleSignIn);
     document.getElementById("signUpBtn").addEventListener("click", handleSignUp);
     document.getElementById("sendResetBtn").addEventListener("click", handlePasswordReset);
+    document.getElementById("submitFeedbackBtn").addEventListener("click", submitFeedback);
     
     document.getElementById("signInTab").addEventListener("click", () => switchTab('signin'));
     document.getElementById("signUpTab").addEventListener("click", () => switchTab('signup'));
+    document.getElementById("feedbackTab").addEventListener("click", () => switchTab('feedback'));
     
     document.getElementById("forgotPasswordBtn").addEventListener("click", () => {
         document.getElementById("passwordResetModal").classList.remove("hidden");
@@ -806,5 +980,11 @@ document.addEventListener('DOMContentLoaded', function() {
     
     document.getElementById('resetEmail').addEventListener('keypress', (e) => {
         if (e.key === 'Enter') handlePasswordReset();
+    });
+    
+    document.getElementById('feedbackMessage').addEventListener('keypress', (e) => {
+        if (e.key === 'Enter' && e.ctrlKey) {
+            submitFeedback();
+        }
     });
 });
