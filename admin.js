@@ -78,13 +78,13 @@ async function uploadImageToCloudinary(file) {
 
 async function updateStaffPermissions(staffEmail, newRole) {
     const staffDocRef = doc(db, "staff", staffEmail);
-    const ROLE_PERMISSIONS = {
-        pending: { tabs: { viewTutorManagement: false, viewPayAdvice: false, viewTutorReports: false, viewSummerBreak: false, viewPendingApprovals: false, viewStaffManagement: false }, actions: { canDownloadReports: false, canExportPayAdvice: false, canEndSummerBreak: false, canEditStudents: false, canDeleteStudents: false } },
-        tutor: { tabs: { viewTutorManagement: false, viewPayAdvice: false, viewTutorReports: false, viewSummerBreak: false, viewPendingApprovals: false, viewStaffManagement: false }, actions: { canDownloadReports: false, canExportPayAdvice: false, canEndSummerBreak: false, canEditStudents: false, canDeleteStudents: false } },
-        manager: { tabs: { viewTutorManagement: true, viewPayAdvice: false, viewTutorReports: true, viewSummerBreak: true, viewPendingApprovals: true, viewStaffManagement: false }, actions: { canDownloadReports: false, canExportPayAdvice: false, canEndSummerBreak: false, canEditStudents: true, canDeleteStudents: false } },
-        director: { tabs: { viewTutorManagement: true, viewPayAdvice: true, viewTutorReports: true, viewSummerBreak: true, viewPendingApprovals: true, viewStaffManagement: true }, actions: { canDownloadReports: true, canExportPayAdvice: true, canEndSummerBreak: true, canEditStudents: true, canDeleteStudents: true } },
-        admin: { tabs: { viewTutorManagement: true, viewPayAdvice: true, viewTutorReports: true, viewSummerBreak: true, viewPendingApprovals: true, viewStaffManagement: true }, actions: { canDownloadReports: true, canExportPayAdvice: true, canEndSummerBreak: true, canEditStudents: true, canDeleteStudents: true } }
-    };
+  const ROLE_PERMISSIONS = {
+    pending: { tabs: { viewTutorManagement: false, viewPayAdvice: false, viewTutorReports: false, viewSummerBreak: false, viewPendingApprovals: false, viewStaffManagement: false, viewParentFeedback: false }, actions: { canDownloadReports: false, canExportPayAdvice: false, canEndSummerBreak: false, canEditStudents: false, canDeleteStudents: false } },
+    tutor: { tabs: { viewTutorManagement: false, viewPayAdvice: false, viewTutorReports: false, viewSummerBreak: false, viewPendingApprovals: false, viewStaffManagement: false, viewParentFeedback: false }, actions: { canDownloadReports: false, canExportPayAdvice: false, canEndSummerBreak: false, canEditStudents: false, canDeleteStudents: false } },
+    manager: { tabs: { viewTutorManagement: true, viewPayAdvice: false, viewTutorReports: true, viewSummerBreak: true, viewPendingApprovals: true, viewStaffManagement: false, viewParentFeedback: true }, actions: { canDownloadReports: false, canExportPayAdvice: false, canEndSummerBreak: false, canEditStudents: true, canDeleteStudents: false } },
+    director: { tabs: { viewTutorManagement: true, viewPayAdvice: true, viewTutorReports: true, viewSummerBreak: true, viewPendingApprovals: true, viewStaffManagement: true, viewParentFeedback: true }, actions: { canDownloadReports: true, canExportPayAdvice: true, canEndSummerBreak: true, canEditStudents: true, canDeleteStudents: true } },
+    admin: { tabs: { viewTutorManagement: true, viewPayAdvice: true, viewTutorReports: true, viewSummerBreak: true, viewPendingApprovals: true, viewStaffManagement: true, viewParentFeedback: true }, actions: { canDownloadReports: true, canExportPayAdvice: true, canEndSummerBreak: true, canEditStudents: true, canDeleteStudents: true } }
+};
     const newPermissions = ROLE_PERMISSIONS[newRole];
     if (!newPermissions) {
         console.error("Invalid role specified:", newRole);
@@ -1395,6 +1395,7 @@ async function openPermissionsModal(staffId) {
                     <label class="flex items-center"><input type="checkbox" id="p-canExportPayAdvice" class="mr-2" ${permissions.actions?.canExportPayAdvice ? 'checked' : ''}> Can Export Pay Advice</label>
                     <label class="flex items-center"><input type="checkbox" id="p-canEndSummerBreak" class="mr-2" ${permissions.actions?.canEndSummerBreak ? 'checked' : ''}> Can End Summer Break</label>
                     <label class="flex items-center"><input type="checkbox" id="p-canEditStudents" class="mr-2" ${permissions.actions?.canEditStudents ? 'checked' : ''}> Can Edit Students</label>
+                    <label class="flex items-center"><input type="checkbox" id="p-viewParentFeedback" class="mr-2" ${permissions.tabs?.viewParentFeedback ? 'checked' : ''}> Parent Feedback</label>
                     <label class="flex items-center"><input type="checkbox" id="p-canDeleteStudents" class="mr-2" ${permissions.actions?.canDeleteStudents ? 'checked' : ''}> Can Delete Students</label>
                 </div></div>
                 <div class="flex justify-end space-x-4 mt-6"><button id="cancel-permissions" class="bg-gray-300 px-4 py-2 rounded">Cancel</button><button id="save-permissions" class="bg-green-600 text-white px-4 py-2 rounded">Save Changes</button></div>
@@ -1406,9 +1407,23 @@ async function openPermissionsModal(staffId) {
     document.getElementById('cancel-permissions').addEventListener('click', closeModal);
     document.getElementById('save-permissions').addEventListener('click', async () => {
         const newPermissions = {
-            tabs: { viewTutorManagement: document.getElementById('p-viewTutorManagement').checked, viewPayAdvice: document.getElementById('p-viewPayAdvice').checked, viewTutorReports: document.getElementById('p-viewTutorReports').checked, viewSummerBreak: document.getElementById('p-viewSummerBreak').checked, viewPendingApprovals: document.getElementById('p-viewPendingApprovals').checked, viewStaffManagement: document.getElementById('p-viewStaffManagement').checked },
-            actions: { canDownloadReports: document.getElementById('p-canDownloadReports').checked, canExportPayAdvice: document.getElementById('p-canExportPayAdvice').checked, canEndSummerBreak: document.getElementById('p-canEndSummerBreak').checked, canEditStudents: document.getElementById('p-canEditStudents').checked, canDeleteStudents: document.getElementById('p-canDeleteStudents').checked }
-        };
+    tabs: { 
+        viewTutorManagement: document.getElementById('p-viewTutorManagement').checked, 
+        viewPayAdvice: document.getElementById('p-viewPayAdvice').checked, 
+        viewTutorReports: document.getElementById('p-viewTutorReports').checked, 
+        viewSummerBreak: document.getElementById('p-viewSummerBreak').checked, 
+        viewPendingApprovals: document.getElementById('p-viewPendingApprovals').checked, 
+        viewStaffManagement: document.getElementById('p-viewStaffManagement').checked,
+        viewParentFeedback: document.getElementById('p-viewParentFeedback').checked // Add this line
+    },
+    actions: { 
+        canDownloadReports: document.getElementById('p-canDownloadReports').checked, 
+        canExportPayAdvice: document.getElementById('p-canExportPayAdvice').checked, 
+        canEndSummerBreak: document.getElementById('p-canEndSummerBreak').checked, 
+        canEditStudents: document.getElementById('p-canEditStudents').checked, 
+        canDeleteStudents: document.getElementById('p-canDeleteStudents').checked 
+    }
+};
         await updateDoc(doc(db, "staff", staffId), { permissions: newPermissions });
         alert("Custom permissions saved successfully!");
         invalidateCache('staff'); // Invalidate
@@ -1464,7 +1479,7 @@ onAuthStateChanged(auth, async (user) => {
             navDashboard: renderAdminPanel, navContent: renderContentManagerPanel, navTutorManagement: renderTutorManagementPanel,
             navPayAdvice: renderPayAdvicePanel, navTutorReports: renderTutorReportsPanel, navSummerBreak: renderSummerBreakPanel,
   
-             navStaff: renderStaffPanel, navPendingApprovals: renderPendingApprovalsPanel
+             navStaff: renderStaffPanel, navPendingApprovals: renderPendingApprovalsPanel, navParentFeedback: renderParentFeedbackPanel
         };
         const setActiveNav = (activeId) => Object.keys(navItems).forEach(id => {
             document.getElementById(id)?.classList.toggle('active', id === activeId);
@@ -1486,3 +1501,4 @@ onAuthStateChanged(auth, async (user) => {
 
 
 // [End Updated admin.js File]
+
