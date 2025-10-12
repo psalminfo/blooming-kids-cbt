@@ -61,10 +61,8 @@ function invalidateCache(key) {
     localStorage.removeItem(CACHE_PREFIX + key);
 }
 
-
 // Load any persisted data as soon as the script runs
 loadFromLocalStorage();
-
 
 // Session-level state for the Pay Advice gift feature.
 let payAdviceGifts = {};
@@ -101,7 +99,6 @@ function convertPayAdviceToCSV(data) {
     });
     return [header.join(','), ...rows.map(row => row.join(','))].join('\n');
 }
-
 
 // ##################################
 // # ACTION HANDLER FUNCTIONS
@@ -269,7 +266,6 @@ function showAssignStudentModal() {
     });
 }
 
-
 async function handleDeleteStudent(studentId) {
     if (confirm("Are you sure you want to delete this student? This action cannot be undone.")) {
         try {
@@ -323,7 +319,6 @@ async function handleRejectStudent(studentId) {
         }
     }
 }
-
 
 // ##################################
 // # PANEL RENDERING FUNCTIONS
@@ -495,7 +490,6 @@ function renderDirectoryFromCache(searchTerm = '') {
         document.querySelectorAll('.delete-student-btn').forEach(button => button.addEventListener('click', () => handleDeleteStudent(button.dataset.studentId)));
     }
 }
-
 
 // --- Pay Advice Panel ---
 async function renderPayAdvicePanel(container) {
@@ -698,7 +692,6 @@ function renderPayAdviceTable() {
     });
 }
 
-
 // --- Tutor Reports Panel ---
 async function renderTutorReportsPanel(container) {
     container.innerHTML = `
@@ -792,7 +785,6 @@ function renderTutorReportsFromCache() {
     }));
 }
 
-
 // --- Pending Approvals Panel ---
 async function renderPendingApprovalsPanel(container) {
     container.innerHTML = `
@@ -855,7 +847,6 @@ function renderPendingApprovalsFromCache() {
     document.querySelectorAll('.approve-btn').forEach(button => button.addEventListener('click', () => handleApproveStudent(button.dataset.studentId)));
     document.querySelectorAll('.reject-btn').forEach(button => button.addEventListener('click', () => handleRejectStudent(button.dataset.studentId)));
 }
-
 
 // --- Summer Break Panel ---
 async function renderSummerBreakPanel(container) {
@@ -942,7 +933,6 @@ function renderBreakStudentsFromCache() {
     }
 }
 
-
 // --- Parent Feedback Panel ---
 async function renderParentFeedbackPanel(container) {
     container.innerHTML = `
@@ -978,8 +968,52 @@ async function fetchAndRenderParentFeedback(forceRefresh = false) {
     try {
         if (!sessionCache.parentFeedback) {
             listContainer.innerHTML = `<p class="text-center text-gray-500 py-10">Fetching feedback messages...</p>`;
-            const snapshot = await getDocs(query(collection(db, "parent_feedback"), orderBy("submittedAt", "desc")));
-            saveToLocalStorage('parentFeedback', snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+            
+            // Get all feedback messages
+            const feedbackSnapshot = await getDocs(query(collection(db, "parent_feedback"), orderBy("timestamp", "desc")));
+            const feedbackData = feedbackSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            
+            // Get all tutor submissions to find parent names
+            const submissionsSnapshot = await getDocs(collection(db, "tutor_submissions"));
+            const submissionsData = submissionsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            
+            // Create a map of student names to parent names
+            const studentParentMap = {};
+            submissionsData.forEach(submission => {
+                if (submission.studentName && submission.parentName) {
+                    studentParentMap[submission.studentName] = submission.parentName;
+                }
+            });
+            
+            // Enhance feedback data with proper timestamps and parent names
+            const enhancedFeedbackData = feedbackData.map(feedback => {
+                // Convert timestamp to Firestore Timestamp format for submittedAt
+                let submittedAt = feedback.submittedAt;
+                if (feedback.timestamp && !submittedAt) {
+                    // Convert your timestamp string to Firestore Timestamp
+                    const date = new Date(feedback.timestamp);
+                    submittedAt = Timestamp.fromDate(date);
+                }
+                
+                // Get parent name from tutor submissions if available
+                let parentName = feedback.parentName;
+                if ((!parentName || parentName === "Unknown Parent") && feedback.studentName) {
+                    parentName = studentParentMap[feedback.studentName] || feedback.parentName;
+                }
+                
+                return {
+                    ...feedback,
+                    submittedAt: submittedAt || Timestamp.now(),
+                    parentName: parentName || 'Unknown Parent',
+                    // Ensure all required fields have defaults
+                    read: feedback.read || false,
+                    message: feedback.message || '',
+                    parentEmail: feedback.parentEmail || '',
+                    parentPhone: feedback.parentPhone || ''
+                };
+            });
+            
+            saveToLocalStorage('parentFeedback', enhancedFeedbackData);
         }
         renderParentFeedbackFromCache();
     } catch(error) {
@@ -1006,7 +1040,23 @@ function renderParentFeedbackFromCache() {
     document.getElementById('feedback-unread-count').textContent = unreadCount;
 
     listContainer.innerHTML = feedbackMessages.map(message => {
-        const submittedDate = message.submittedAt ? new Date(message.submittedAt.seconds * 1000).toLocaleDateString() : 'Unknown date';
+        // Handle both timestamp formats
+        let submittedDate = 'Unknown date';
+        if (message.submittedAt) {
+            if (message.submittedAt.toDate) {
+                // It's a Firestore Timestamp
+                submittedDate = message.submittedAt.toDate().toLocaleDateString();
+            } else if (message.submittedAt.seconds) {
+                // It's a Timestamp object
+                submittedDate = new Date(message.submittedAt.seconds * 1000).toLocaleDateString();
+            } else if (message.timestamp) {
+                // Use the original timestamp field
+                submittedDate = new Date(message.timestamp).toLocaleDateString();
+            }
+        } else if (message.timestamp) {
+            submittedDate = new Date(message.timestamp).toLocaleDateString();
+        }
+        
         const readStatus = message.read ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800';
         const readText = message.read ? 'Read' : 'Unread';
         
@@ -1104,7 +1154,6 @@ async function handleDeleteFeedback(messageId) {
         }
     }
 }
-
 
 // ##################################
 // # REPORT GENERATION & ZIPPING
@@ -1208,7 +1257,6 @@ async function generateReportHTML(reportId) {
     return { html: reportTemplate, reportData: reportData };
 }
 
-
 async function viewReportInNewTab(reportId, shouldDownload = false) {
     try {
         const { html, reportData } = await generateReportHTML(reportId);
@@ -1232,7 +1280,6 @@ async function viewReportInNewTab(reportId, shouldDownload = false) {
         alert(`Error: ${error.message}`);
     }
 }
-
 
 async function zipAndDownloadTutorReports(reports, tutorName, buttonElement) {
     const originalButtonText = buttonElement.textContent;
@@ -1267,7 +1314,6 @@ async function zipAndDownloadTutorReports(reports, tutorName, buttonElement) {
         buttonElement.disabled = false;
     }
 }
-
 
 // ##################################
 // # AUTHENTICATION & INITIALIZATION
@@ -1350,6 +1396,5 @@ onAuthStateChanged(auth, async (user) => {
         window.location.href = "management-auth.html";
     }
 });
-
 
 // [End Updated management.js File]
