@@ -78,9 +78,6 @@
                 <button id="signUpTab" class="flex-1 py-3 font-semibold tab-inactive transition-all duration-200">
                     Sign Up
                 </button>
-                <button id="feedbackTab" class="flex-1 py-3 font-semibold tab-inactive transition-all duration-200">
-                    Feedback & Requests
-                </button>
             </div>
 
             <!-- Sign In Form -->
@@ -178,11 +175,49 @@
                     </button>
                 </div>
             </div>
+            
+            <div id="authLoader" class="hidden text-center mt-4">
+                <p class="text-green-600 font-semibold">Processing... Please wait.</p>
+            </div>
+        </div>
 
-            <!-- Feedback Form -->
-            <div id="feedbackForm" class="hidden">
-                <h2 class="text-2xl font-bold text-gray-800 mb-6 text-center">Feedback & Requests</h2>
-                <p class="text-gray-600 mb-6 text-center">We value your feedback. Please share your thoughts, requests, or concerns with us.</p>
+        <!-- Report Area -->
+        <div id="reportArea" class="hidden">
+            <!-- Welcome Message and Navigation -->
+            <div class="bg-green-50 border-l-4 border-green-600 p-6 rounded-lg mb-6">
+                <div class="flex justify-between items-center">
+                    <div>
+                        <h2 id="welcomeMessage" class="text-2xl font-bold text-green-800">Welcome!</h2>
+                        <p class="text-green-600">Thank you for being part of Blooming Kids House family</p>
+                    </div>
+                    <div class="flex gap-2">
+                        <button onclick="showFeedbackModal()" 
+                                class="bg-green-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-green-700 transition-all duration-200 btn-glow">
+                            📝 Feedback & Requests
+                        </button>
+                        <button onclick="logout()" 
+                                class="bg-red-500 text-white px-6 py-3 rounded-lg font-semibold hover:bg-red-600 transition-all duration-200">
+                            Logout
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <h2 class="text-2xl font-bold text-green-800 mb-6">Your Children's Reports</h2>
+            <div id="reportContent" class="space-y-6"></div>
+        </div>
+
+        <!-- Feedback Modal -->
+        <div id="feedbackModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden z-50">
+            <div class="bg-white rounded-2xl p-8 max-w-2xl w-full mx-4 card-glow max-h-[90vh] overflow-y-auto">
+                <div class="flex justify-between items-center mb-6">
+                    <h3 class="text-2xl font-bold text-gray-800">Feedback & Requests</h3>
+                    <button onclick="hideFeedbackModal()" class="text-gray-500 hover:text-gray-700 text-2xl">
+                        &times;
+                    </button>
+                </div>
+                
+                <p class="text-gray-600 mb-6">We value your feedback. Please share your thoughts, requests, or concerns with us.</p>
                 
                 <div class="space-y-4">
                     <div>
@@ -237,10 +272,16 @@
                                   required></textarea>
                     </div>
                     
-                    <button id="submitFeedbackBtn" 
-                            class="w-full bg-green-600 text-white py-3 rounded-xl font-semibold btn-glow hover:bg-green-700 transition-all duration-200">
-                        Submit Feedback
-                    </button>
+                    <div class="flex gap-2 pt-4">
+                        <button id="submitFeedbackBtn" 
+                                class="flex-1 bg-green-600 text-white py-3 rounded-xl font-semibold btn-glow hover:bg-green-700 transition-all duration-200">
+                            Submit Feedback
+                        </button>
+                        <button onclick="hideFeedbackModal()" 
+                                class="flex-1 bg-gray-500 text-white py-3 rounded-xl font-semibold hover:bg-gray-600 transition-all duration-200">
+                            Cancel
+                        </button>
+                    </div>
                 </div>
 
                 <div class="mt-6 text-center">
@@ -249,37 +290,6 @@
                     </p>
                 </div>
             </div>
-            
-            <div id="authLoader" class="hidden text-center mt-4">
-                <p class="text-green-600 font-semibold">Processing... Please wait.</p>
-            </div>
-        </div>
-
-        <!-- Report Area -->
-        <div id="reportArea" class="hidden">
-            <!-- Welcome Message and Feedback Button -->
-            <div class="bg-green-50 border-l-4 border-green-600 p-6 rounded-lg mb-6">
-                <div class="flex justify-between items-center">
-                    <div>
-                        <h2 id="welcomeMessage" class="text-2xl font-bold text-green-800">Welcome!</h2>
-                        <p class="text-green-600">Thank you for being part of Blooming Kids House family</p>
-                    </div>
-                    <button onclick="switchTab('feedback')" 
-                            class="bg-green-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-green-700 transition-all duration-200 btn-glow">
-                        Submit Feedback & Requests
-                    </button>
-                </div>
-            </div>
-
-            <div class="flex justify-between items-center mb-6">
-                <h2 class="text-2xl font-bold text-green-800">Your Children's Reports</h2>
-                <div class="flex gap-2">
-                    <button onclick="logout()" class="bg-red-500 text-white px-6 py-2 rounded-lg font-semibold hover:bg-red-600 transition-all duration-200">
-                        Logout
-                    </button>
-                </div>
-            </div>
-            <div id="reportContent" class="space-y-6"></div>
         </div>
 
         <!-- Password Reset Modal -->
