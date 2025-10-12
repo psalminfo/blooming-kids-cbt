@@ -26,6 +26,30 @@ function capitalize(str) {
 let currentUserData = null;
 let userChildren = [];
 
+// Remember Me Functionality
+function setupRememberMe() {
+    const rememberMe = localStorage.getItem('rememberMe');
+    const savedEmail = localStorage.getItem('savedEmail');
+    
+    if (rememberMe === 'true' && savedEmail) {
+        document.getElementById('loginIdentifier').value = savedEmail;
+        document.getElementById('rememberMe').checked = true;
+    }
+}
+
+function handleRememberMe() {
+    const rememberMe = document.getElementById('rememberMe').checked;
+    const identifier = document.getElementById('loginIdentifier').value.trim();
+    
+    if (rememberMe && identifier) {
+        localStorage.setItem('rememberMe', 'true');
+        localStorage.setItem('savedEmail', identifier);
+    } else {
+        localStorage.removeItem('rememberMe');
+        localStorage.removeItem('savedEmail');
+    }
+}
+
 /**
  * Generates a unique, personalized recommendation using a smart template.
  * It summarizes performance instead of just listing topics.
@@ -238,6 +262,9 @@ async function handleSignIn() {
             throw new Error('Could not retrieve phone number for user');
         }
         
+        // Handle Remember Me
+        handleRememberMe();
+        
         // Load all reports for the parent using the exact phone number as stored
         await loadAllReportsForParent(userPhone, userId);
 
@@ -405,40 +432,6 @@ async function submitFeedback() {
     }
 }
 
-// Email integration using EmailJS (simple solution)
-function initializeEmailJS() {
-    // You'll need to sign up for EmailJS (free) and replace these with your credentials
-    emailjs.init("YOUR_PUBLIC_KEY"); // Replace with your EmailJS public key
-}
-
-async function sendFeedbackEmail(feedbackData) {
-    try {
-        // Using EmailJS for simple email sending
-        const templateParams = {
-            to_email: 'bloomingkidshouse.learning@gmail.com',
-            from_name: 'Blooming Kids House Portal',
-            subject: `Parent ${feedbackData.category}: ${feedbackData.studentName} - ${feedbackData.priority} Priority`,
-            parent_name: feedbackData.parentName,
-            parent_phone: feedbackData.parentPhone,
-            parent_email: feedbackData.parentEmail,
-            student_name: feedbackData.studentName,
-            category: feedbackData.category,
-            priority: feedbackData.priority,
-            message: feedbackData.message,
-            timestamp: new Date().toLocaleString()
-        };
-
-        // Send email using EmailJS
-        await emailjs.send('YOUR_SERVICE_ID', 'YOUR_TEMPLATE_ID', templateParams);
-        
-        console.log('Feedback email sent successfully');
-        return true;
-    } catch (error) {
-        console.error('Error sending feedback email:', error);
-        return false;
-    }
-}
-
 async function loadAllReportsForParent(parentPhone, userId) {
     const reportArea = document.getElementById("reportArea");
     const reportContent = document.getElementById("reportContent");
@@ -540,41 +533,48 @@ async function loadAllReportsForParent(parentPhone, userId) {
         const chartConfigsToCache = [];
 
         // Group reports by student name and extract parent name
-       // Group reports by student name and extract parent name
-const studentsMap = new Map();
-let parentName = '';
+        const studentsMap = new Map();
+        let parentName = '';
 
-// Process assessment reports
-studentResults.forEach(result => {
-    const studentName = result.studentName;
-    if (!studentsMap.has(studentName)) {
-        studentsMap.set(studentName, { assessments: [], monthly: [] });
-    }
-    studentsMap.get(studentName).assessments.push(result);
-});
+        // Process assessment reports
+        studentResults.forEach(result => {
+            const studentName = result.studentName;
+            if (!studentsMap.has(studentName)) {
+                studentsMap.set(studentName, { assessments: [], monthly: [] });
+            }
+            studentsMap.get(studentName).assessments.push(result);
+        });
 
-// Process monthly reports - THIS IS WHERE WE GET PARENT NAME
-monthlyReports.forEach(report => {
-    const studentName = report.studentName;
-    if (!studentsMap.has(studentName)) {
-        studentsMap.set(studentName, { assessments: [], monthly: [] });
-    }
-    studentsMap.get(studentName).monthly.push(report);
-    
-    // Extract parent name from monthly reports (tutor_submissions)
-    if (!parentName && report.parentName) {
-        parentName = report.parentName;
-    }
-});
+        // Process monthly reports - THIS IS WHERE WE GET PARENT NAME
+        monthlyReports.forEach(report => {
+            const studentName = report.studentName;
+            if (!studentsMap.has(studentName)) {
+                studentsMap.set(studentName, { assessments: [], monthly: [] });
+            }
+            studentsMap.get(studentName).monthly.push(report);
+            
+            // Extract parent name from monthly reports (tutor_submissions)
+            // Try multiple possible field names
+            if (!parentName) {
+                parentName = report.parentName || report.parent_name || report.parent || report.guardianName || report.parentFullName;
+            }
+        });
 
-// If still no parent name, try to get from assessment reports as fallback
-if (!parentName) {
-    studentResults.forEach(result => {
-        if (!parentName && result.parentName) {
-            parentName = result.parentName;
+        // If still no parent name, try to get from any report as fallback
+        if (!parentName) {
+            studentResults.forEach(result => {
+                if (!parentName) {
+                    parentName = result.parentName || result.parent_name || result.parent || result.guardianName || result.parentFullName;
+                }
+            });
+            
+            // Last resort: try monthly reports again with different field names
+            monthlyReports.forEach(report => {
+                if (!parentName) {
+                    parentName = report.parentName || report.parent_name || report.parent || report.guardianName || report.parentFullName;
+                }
+            });
         }
-    });
-}
 
         // Store user data globally
         currentUserData = {
@@ -583,7 +583,7 @@ if (!parentName) {
         };
         userChildren = Array.from(studentsMap.keys());
 
-        // Update welcome message
+        // Update welcome message - THIS IS WHAT SHOWS THE PARENT NAME
         welcomeMessage.textContent = `Welcome, ${currentUserData.parentName}!`;
 
         // Update parent name in user document if not set
@@ -884,6 +884,10 @@ function downloadMonthlyReport(studentIndex, monthlyIndex, studentName) {
 }
 
 function logout() {
+    // Clear remember me on logout
+    localStorage.removeItem('rememberMe');
+    localStorage.removeItem('savedEmail');
+    
     auth.signOut().then(() => {
         window.location.reload();
     });
@@ -937,6 +941,9 @@ function switchTab(tab) {
 
 // Initialize the page
 document.addEventListener('DOMContentLoaded', function() {
+    // Setup Remember Me
+    setupRememberMe();
+    
     // Check authentication state
     auth.onAuthStateChanged((user) => {
         if (user) {
@@ -972,6 +979,8 @@ document.addEventListener('DOMContentLoaded', function() {
         document.getElementById("passwordResetModal").classList.add("hidden");
     });
 
+    document.getElementById("rememberMe").addEventListener("change", handleRememberMe);
+
     // Allow Enter key to submit forms
     document.getElementById('loginPassword').addEventListener('keypress', (e) => {
         if (e.key === 'Enter') handleSignIn();
@@ -985,5 +994,3 @@ document.addEventListener('DOMContentLoaded', function() {
         if (e.key === 'Enter') handlePasswordReset();
     });
 });
-
-
