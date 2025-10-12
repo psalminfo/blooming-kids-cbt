@@ -1305,23 +1305,167 @@ function renderBreakStudentsFromCache() {
 }
 
 // ##################################################################
-// # SECTION 7: STAFF PANEL (OPTIMIZED)
+// # SECTION 7: STAFF PANEL (FIXED FOR FEEDBACK TAB)
 // ##################################################################
+
+// Define ROLE_PERMISSIONS with feedback tab included
+const ROLE_PERMISSIONS = {
+    pending: { 
+        tabs: { 
+            viewTutorManagement: false, 
+            viewPayAdvice: false, 
+            viewTutorReports: false, 
+            viewSummerBreak: false, 
+            viewPendingApprovals: false, 
+            viewStaffManagement: false,
+            viewFeedback: false // Add this line
+        }, 
+        actions: { 
+            canDownloadReports: false, 
+            canExportPayAdvice: false, 
+            canEndSummerBreak: false, 
+            canEditStudents: false, 
+            canDeleteStudents: false 
+        } 
+    },
+    tutor: { 
+        tabs: { 
+            viewTutorManagement: false, 
+            viewPayAdvice: false, 
+            viewTutorReports: false, 
+            viewSummerBreak: false, 
+            viewPendingApprovals: false, 
+            viewStaffManagement: false,
+            viewFeedback: false // Add this line
+        }, 
+        actions: { 
+            canDownloadReports: false, 
+            canExportPayAdvice: false, 
+            canEndSummerBreak: false, 
+            canEditStudents: false, 
+            canDeleteStudents: false 
+        } 
+    },
+    manager: { 
+        tabs: { 
+            viewTutorManagement: true, 
+            viewPayAdvice: false, 
+            viewTutorReports: true, 
+            viewSummerBreak: true, 
+            viewPendingApprovals: true, 
+            viewStaffManagement: false,
+            viewFeedback: true // Enable feedback for managers
+        }, 
+        actions: { 
+            canDownloadReports: false, 
+            canExportPayAdvice: false, 
+            canEndSummerBreak: false, 
+            canEditStudents: true, 
+            canDeleteStudents: false 
+        } 
+    },
+    director: { 
+        tabs: { 
+            viewTutorManagement: true, 
+            viewPayAdvice: true, 
+            viewTutorReports: true, 
+            viewSummerBreak: true, 
+            viewPendingApprovals: true, 
+            viewStaffManagement: true,
+            viewFeedback: true // Enable feedback for directors
+        }, 
+        actions: { 
+            canDownloadReports: true, 
+            canExportPayAdvice: true, 
+            canEndSummerBreak: true, 
+            canEditStudents: true, 
+            canDeleteStudents: true 
+        } 
+    },
+    admin: { 
+        tabs: { 
+            viewTutorManagement: true, 
+            viewPayAdvice: true, 
+            viewTutorReports: true, 
+            viewSummerBreak: true, 
+            viewPendingApprovals: true, 
+            viewStaffManagement: true,
+            viewFeedback: true // Enable feedback for admins
+        }, 
+        actions: { 
+            canDownloadReports: true, 
+            canExportPayAdvice: true, 
+            canEndSummerBreak: true, 
+            canEditStudents: true, 
+            canDeleteStudents: true 
+        } 
+    }
+};
+
+// Update the updateStaffPermissions function to include feedback tab
+async function updateStaffPermissions(staffEmail, newRole) {
+    const staffDocRef = doc(db, "staff", staffEmail);
+    
+    // Use the global ROLE_PERMISSIONS that includes viewFeedback
+    const newPermissions = ROLE_PERMISSIONS[newRole];
+    
+    if (!newPermissions) {
+        console.error("Invalid role specified:", newRole);
+        return;
+    }
+    
+    try {
+        await updateDoc(staffDocRef, { 
+            role: newRole, 
+            permissions: newPermissions 
+        });
+        invalidateCache('staff');
+        console.log(`Successfully updated permissions for ${staffEmail} to role: ${newRole}`);
+        fetchAndRenderStaff();
+    } catch (error) {
+        console.error("Error updating staff permissions:", error);
+    }
+}
+
 async function renderStaffPanel(container) {
     container.innerHTML = `
         <div class="bg-white p-6 rounded-lg shadow-md">
             <div class="flex justify-between items-center mb-4">
                 <h2 class="text-2xl font-bold text-green-700">Staff Management</h2>
                 <button id="refresh-staff-btn" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Refresh</button>
-            
-             </div>
+            </div>
             <p class="text-sm text-gray-600 mb-4">Assign a role to apply default permissions, then click "Manage Permissions" to customize.</p>
+            
+            <div class="mb-6 p-4 bg-blue-50 rounded-lg">
+                <h3 class="font-semibold text-blue-800 mb-2">Role Permissions Overview:</h3>
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 text-sm">
+                    <div><span class="font-medium">Pending:</span> No access</div>
+                    <div><span class="font-medium">Tutor:</span> Basic access only</div>
+                    <div><span class="font-medium">Manager:</span> Tutor mgmt + Reports + Feedback</div>
+                    <div><span class="font-medium">Director:</span> All tabs + Pay advice</div>
+                    <div><span class="font-medium">Admin:</span> Full system access</div>
+                </div>
+            </div>
+            
             <div class="overflow-x-auto">
-                <table class="min-w-full divide-y divide-gray-200"><thead class="bg-gray-50"><tr><th class="px-6 py-3 text-left text-xs font-medium uppercase">Name</th><th class="px-6 py-3 text-left text-xs font-medium uppercase">Email</th><th class="px-6 py-3 text-left text-xs font-medium uppercase">Assign Role</th><th class="px-6 py-3 text-left text-xs font-medium uppercase">Actions</th></tr></thead><tbody id="staff-table-body" class="bg-white divide-y divide-gray-200"><p>Loading staff...</p></tbody></table>
-          
-             </div>
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Email</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Current Role</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Assign New Role</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="staff-table-body" class="bg-white divide-y divide-gray-200">
+                        <tr><td colspan="5" class="text-center p-4">Loading staff data...</td></tr>
+                    </tbody>
+                </table>
+            </div>
         </div>
     `;
+    
     document.getElementById('refresh-staff-btn').addEventListener('click', () => fetchAndRenderStaff(true));
     fetchAndRenderStaff();
 }
@@ -1330,44 +1474,80 @@ async function fetchAndRenderStaff(forceRefresh = false) {
     if (forceRefresh) invalidateCache('staff');
     try {
         if (!sessionCache.staff) {
-            document.getElementById('staff-table-body').innerHTML = `<tr><td colspan="4" class="text-center p-4">Fetching staff data...</td></tr>`;
+            document.getElementById('staff-table-body').innerHTML = `<tr><td colspan="5" class="text-center p-4">Fetching staff data...</td></tr>`;
             const snapshot = await getDocs(collection(db, "staff"));
             saveToLocalStorage('staff', snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
         }
         renderStaffFromCache();
     } catch(error) {
         console.error("Error fetching staff:", error);
-        document.getElementById('staff-table-body').innerHTML = `<tr><td colspan="4" class="text-center p-4 text-red-500">Failed to load staff data.</td></tr>`;
+        document.getElementById('staff-table-body').innerHTML = `<tr><td colspan="5" class="text-center p-4 text-red-500">Failed to load staff data.</td></tr>`;
     }
 }
 
 function renderStaffFromCache() {
     const tableBody = document.getElementById('staff-table-body');
     const staffList = sessionCache.staff || [];
-    const ROLE_PERMISSIONS = {
-        pending: {}, tutor: {}, manager: {}, director: {}, admin: {}
-    };
+    
+    if (staffList.length === 0) {
+        tableBody.innerHTML = `<tr><td colspan="5" class="text-center p-4 text-gray-500">No staff members found.</td></tr>`;
+        return;
+    }
+    
     tableBody.innerHTML = staffList.map(staff => {
-        const optionsHTML = Object.keys(ROLE_PERMISSIONS).map(role => `<option value="${role}" ${staff.role === role ? 'selected' : ''}>${capitalize(role)}</option>`).join('');
+        const optionsHTML = Object.keys(ROLE_PERMISSIONS).map(role => 
+            `<option value="${role}" ${staff.role === role ? 'selected' : ''}>${capitalize(role)}</option>`
+        ).join('');
+        
         return `
             <tr>
-                <td class="px-6 py-4 font-medium">${staff.name}</td><td class="px-6 py-4">${staff.email}</td>
-                <td class="px-6 py-4"><select data-email="${staff.email}" data-original-role="${staff.role}" class="role-select p-2 border rounded bg-white">${optionsHTML}</select></td>
-        
-                 <td class="px-6 py-4"><button data-id="${staff.id}" class="manage-permissions-btn bg-blue-600 text-white px-3 py-1 rounded text-sm hover:bg-blue-700">Manage Permissions</button></td>
+                <td class="px-6 py-4 font-medium">${staff.name}</td>
+                <td class="px-6 py-4">${staff.email}</td>
+                <td class="px-6 py-4">
+                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium 
+                        ${staff.role === 'admin' ? 'bg-red-100 text-red-800' : 
+                          staff.role === 'director' ? 'bg-purple-100 text-purple-800' :
+                          staff.role === 'manager' ? 'bg-blue-100 text-blue-800' :
+                          staff.role === 'tutor' ? 'bg-green-100 text-green-800' :
+                          'bg-gray-100 text-gray-800'}">
+                        ${capitalize(staff.role)}
+                    </span>
+                </td>
+                <td class="px-6 py-4">
+                    <select data-email="${staff.email}" data-original-role="${staff.role}" 
+                            class="role-select p-2 border rounded bg-white text-sm">
+                        ${optionsHTML}
+                    </select>
+                </td>
+                <td class="px-6 py-4">
+                    <button data-id="${staff.id}" 
+                            class="manage-permissions-btn bg-blue-600 text-white px-3 py-1 rounded text-sm hover:bg-blue-700">
+                        Manage Permissions
+                    </button>
+                </td>
             </tr>
         `;
     }).join('');
+    
+    // Add event listeners for role changes
     document.querySelectorAll('.role-select').forEach(select => {
         select.addEventListener('change', async (e) => {
-            if (confirm(`Change role to "${capitalize(e.target.value)}"? This will apply default permissions.`)) {
-                await updateStaffPermissions(e.target.dataset.email, e.target.value);
+            const newRole = e.target.value;
+            const staffEmail = e.target.dataset.email;
+            const originalRole = e.target.dataset.originalRole;
+            
+            if (confirm(`Change role from "${capitalize(originalRole)}" to "${capitalize(newRole)}"? This will apply default permissions.`)) {
+                await updateStaffPermissions(staffEmail, newRole);
+                // Update the original role in dataset for future changes
+                e.target.dataset.originalRole = newRole;
             } else {
-                e.target.value = e.target.dataset.originalRole;
+                // Revert to original role
+                e.target.value = originalRole;
             }
-  
-             });
+        });
     });
+    
+    // Add event listeners for permissions management
     document.querySelectorAll('.manage-permissions-btn').forEach(button => {
         button.addEventListener('click', (e) => openPermissionsModal(e.target.dataset.id));
     });
@@ -1376,44 +1556,121 @@ function renderStaffFromCache() {
 async function openPermissionsModal(staffId) {
     const staffDoc = await getDoc(doc(db, "staff", staffId));
     if (!staffDoc.exists()) return alert("Staff member not found.");
+    
     const staffData = staffDoc.data();
     const permissions = staffData.permissions || { tabs: {}, actions: {} };
+    
     const modalHTML = `
         <div id="permissions-modal" class="fixed inset-0 bg-gray-600 bg-opacity-75 flex items-center justify-center z-50">
-            <div class="bg-white rounded-lg shadow-xl p-8 max-w-lg w-full">
-                <h3 class="text-2xl font-bold mb-4">Edit Permissions for ${staffData.name}</h3><p class="text-sm text-gray-500 mb-4">Current Role: <span class="font-semibold">${capitalize(staffData.role)}</span></p>
-                <div class="space-y-4"><div class="border-t pt-4"><h4 class="font-semibold mb-2">Tab Visibility:</h4><div class="grid grid-cols-2 gap-2">
-   
-                     <label class="flex items-center"><input type="checkbox" id="p-viewTutorManagement" class="mr-2" ${permissions.tabs?.viewTutorManagement ? 'checked' : ''}> Tutor & Student List</label>
-                    <label class="flex items-center"><input type="checkbox" id="p-viewPayAdvice" class="mr-2" ${permissions.tabs?.viewPayAdvice ? 'checked' : ''}> Pay Advice</label>
-                    <label class="flex items-center"><input type="checkbox" id="p-viewTutorReports" class="mr-2" ${permissions.tabs?.viewTutorReports ? 'checked' : ''}> Tutor Reports</label>
-                    <label class="flex items-center"><input type="checkbox" id="p-viewSummerBreak" class="mr-2" ${permissions.tabs?.viewSummerBreak ? 'checked' : ''}> Summer Break</label>
-                    <label class="flex items-center"><input type="checkbox" id="p-viewPendingApprovals" class="mr-2" ${permissions.tabs?.viewPendingApprovals ? 'checked' : ''}> Pending Approvals</label>
-                    <label class="flex items-center"><input type="checkbox" id="p-viewStaffManagement" class="mr-2" ${permissions.tabs?.viewStaffManagement ? 'checked' : ''}> Staff Management</label>
-                </div></div><div class="border-t pt-4"><h4 class="font-semibold mb-2">Specific Actions:</h4>
-                    <label class="flex items-center"><input type="checkbox" id="p-canDownloadReports" class="mr-2" ${permissions.actions?.canDownloadReports ? 'checked' : ''}> Can Download Reports</label>
-                    <label class="flex items-center"><input type="checkbox" id="p-canExportPayAdvice" class="mr-2" ${permissions.actions?.canExportPayAdvice ? 'checked' : ''}> Can Export Pay Advice</label>
-                    <label class="flex items-center"><input type="checkbox" id="p-canEndSummerBreak" class="mr-2" ${permissions.actions?.canEndSummerBreak ? 'checked' : ''}> Can End Summer Break</label>
-                    <label class="flex items-center"><input type="checkbox" id="p-canEditStudents" class="mr-2" ${permissions.actions?.canEditStudents ? 'checked' : ''}> Can Edit Students</label>
-                    <label class="flex items-center"><input type="checkbox" id="p-canDeleteStudents" class="mr-2" ${permissions.actions?.canDeleteStudents ? 'checked' : ''}> Can Delete Students</label>
-                </div></div>
-                <div class="flex justify-end space-x-4 mt-6"><button id="cancel-permissions" class="bg-gray-300 px-4 py-2 rounded">Cancel</button><button id="save-permissions" class="bg-green-600 text-white px-4 py-2 rounded">Save Changes</button></div>
+            <div class="bg-white rounded-lg shadow-xl p-8 max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+                <h3 class="text-2xl font-bold mb-2">Edit Permissions for ${staffData.name}</h3>
+                <p class="text-sm text-gray-500 mb-6">Current Role: <span class="font-semibold">${capitalize(staffData.role)}</span></p>
+                
+                <div class="space-y-6">
+                    <div class="border-t pt-4">
+                        <h4 class="font-semibold mb-3 text-lg">Tab Visibility:</h4>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                            <label class="flex items-center p-2 hover:bg-gray-50 rounded">
+                                <input type="checkbox" id="p-viewTutorManagement" class="mr-3 h-4 w-4" ${permissions.tabs?.viewTutorManagement ? 'checked' : ''}>
+                                <span>Tutor & Student Management</span>
+                            </label>
+                            <label class="flex items-center p-2 hover:bg-gray-50 rounded">
+                                <input type="checkbox" id="p-viewPayAdvice" class="mr-3 h-4 w-4" ${permissions.tabs?.viewPayAdvice ? 'checked' : ''}>
+                                <span>Pay Advice</span>
+                            </label>
+                            <label class="flex items-center p-2 hover:bg-gray-50 rounded">
+                                <input type="checkbox" id="p-viewTutorReports" class="mr-3 h-4 w-4" ${permissions.tabs?.viewTutorReports ? 'checked' : ''}>
+                                <span>Tutor Reports</span>
+                            </label>
+                            <label class="flex items-center p-2 hover:bg-gray-50 rounded">
+                                <input type="checkbox" id="p-viewSummerBreak" class="mr-3 h-4 w-4" ${permissions.tabs?.viewSummerBreak ? 'checked' : ''}>
+                                <span>Summer Break</span>
+                            </label>
+                            <label class="flex items-center p-2 hover:bg-gray-50 rounded">
+                                <input type="checkbox" id="p-viewPendingApprovals" class="mr-3 h-4 w-4" ${permissions.tabs?.viewPendingApprovals ? 'checked' : ''}>
+                                <span>Pending Approvals</span>
+                            </label>
+                            <label class="flex items-center p-2 hover:bg-gray-50 rounded">
+                                <input type="checkbox" id="p-viewStaffManagement" class="mr-3 h-4 w-4" ${permissions.tabs?.viewStaffManagement ? 'checked' : ''}>
+                                <span>Staff Management</span>
+                            </label>
+                            <label class="flex items-center p-2 hover:bg-gray-50 rounded">
+                                <input type="checkbox" id="p-viewFeedback" class="mr-3 h-4 w-4" ${permissions.tabs?.viewFeedback ? 'checked' : ''}>
+                                <span class="font-medium text-blue-600">Feedback Tab</span>
+                            </label>
+                        </div>
+                    </div>
+                    
+                    <div class="border-t pt-4">
+                        <h4 class="font-semibold mb-3 text-lg">Specific Actions:</h4>
+                        <div class="space-y-2">
+                            <label class="flex items-center p-2 hover:bg-gray-50 rounded">
+                                <input type="checkbox" id="p-canDownloadReports" class="mr-3 h-4 w-4" ${permissions.actions?.canDownloadReports ? 'checked' : ''}>
+                                <span>Can Download Reports</span>
+                            </label>
+                            <label class="flex items-center p-2 hover:bg-gray-50 rounded">
+                                <input type="checkbox" id="p-canExportPayAdvice" class="mr-3 h-4 w-4" ${permissions.actions?.canExportPayAdvice ? 'checked' : ''}>
+                                <span>Can Export Pay Advice</span>
+                            </label>
+                            <label class="flex items-center p-2 hover:bg-gray-50 rounded">
+                                <input type="checkbox" id="p-canEndSummerBreak" class="mr-3 h-4 w-4" ${permissions.actions?.canEndSummerBreak ? 'checked' : ''}>
+                                <span>Can End Summer Break</span>
+                            </label>
+                            <label class="flex items-center p-2 hover:bg-gray-50 rounded">
+                                <input type="checkbox" id="p-canEditStudents" class="mr-3 h-4 w-4" ${permissions.actions?.canEditStudents ? 'checked' : ''}>
+                                <span>Can Edit Students</span>
+                            </label>
+                            <label class="flex items-center p-2 hover:bg-gray-50 rounded">
+                                <input type="checkbox" id="p-canDeleteStudents" class="mr-3 h-4 w-4" ${permissions.actions?.canDeleteStudents ? 'checked' : ''}>
+                                <span>Can Delete Students</span>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="flex justify-end space-x-4 mt-8 pt-4 border-t">
+                    <button id="cancel-permissions" class="bg-gray-300 px-6 py-2 rounded hover:bg-gray-400">Cancel</button>
+                    <button id="save-permissions" class="bg-green-600 text-white px-6 py-2 rounded hover:bg-green-700">Save Changes</button>
+                </div>
             </div>
         </div>
     `;
+    
     document.body.insertAdjacentHTML('beforeend', modalHTML);
+    
     const closeModal = () => document.getElementById('permissions-modal').remove();
+    
     document.getElementById('cancel-permissions').addEventListener('click', closeModal);
     document.getElementById('save-permissions').addEventListener('click', async () => {
         const newPermissions = {
-            tabs: { viewTutorManagement: document.getElementById('p-viewTutorManagement').checked, viewPayAdvice: document.getElementById('p-viewPayAdvice').checked, viewTutorReports: document.getElementById('p-viewTutorReports').checked, viewSummerBreak: document.getElementById('p-viewSummerBreak').checked, viewPendingApprovals: document.getElementById('p-viewPendingApprovals').checked, viewStaffManagement: document.getElementById('p-viewStaffManagement').checked },
-            actions: { canDownloadReports: document.getElementById('p-canDownloadReports').checked, canExportPayAdvice: document.getElementById('p-canExportPayAdvice').checked, canEndSummerBreak: document.getElementById('p-canEndSummerBreak').checked, canEditStudents: document.getElementById('p-canEditStudents').checked, canDeleteStudents: document.getElementById('p-canDeleteStudents').checked }
+            tabs: {
+                viewTutorManagement: document.getElementById('p-viewTutorManagement').checked,
+                viewPayAdvice: document.getElementById('p-viewPayAdvice').checked,
+                viewTutorReports: document.getElementById('p-viewTutorReports').checked,
+                viewSummerBreak: document.getElementById('p-viewSummerBreak').checked,
+                viewPendingApprovals: document.getElementById('p-viewPendingApprovals').checked,
+                viewStaffManagement: document.getElementById('p-viewStaffManagement').checked,
+                viewFeedback: document.getElementById('p-viewFeedback').checked // Include feedback tab
+            },
+            actions: {
+                canDownloadReports: document.getElementById('p-canDownloadReports').checked,
+                canExportPayAdvice: document.getElementById('p-canExportPayAdvice').checked,
+                canEndSummerBreak: document.getElementById('p-canEndSummerBreak').checked,
+                canEditStudents: document.getElementById('p-canEditStudents').checked,
+                canDeleteStudents: document.getElementById('p-canDeleteStudents').checked
+            }
         };
-        await updateDoc(doc(db, "staff", staffId), { permissions: newPermissions });
-        alert("Custom permissions saved successfully!");
-        invalidateCache('staff'); // Invalidate
-        fetchAndRenderStaff();
-        closeModal();
+        
+        try {
+            await updateDoc(doc(db, "staff", staffId), { permissions: newPermissions });
+            alert("Custom permissions saved successfully!");
+            invalidateCache('staff');
+            fetchAndRenderStaff();
+            closeModal();
+        } catch (error) {
+            console.error("Error saving permissions:", error);
+            alert("Failed to save permissions. Please try again.");
+        }
     });
 }
 
@@ -1486,3 +1743,4 @@ onAuthStateChanged(auth, async (user) => {
 
 
 // [End Updated admin.js File]
+
