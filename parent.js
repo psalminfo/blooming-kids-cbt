@@ -413,7 +413,8 @@ async function submitFeedback() {
             status: 'New',
             timestamp: firebase.firestore.FieldValue.serverTimestamp(),
             emailSent: false,
-            parentUid: user.uid // Add parent UID for querying responses
+            parentUid: user.uid, // Add parent UID for querying responses
+            responses: [] // Initialize empty responses array
         };
 
         // Save to Firestore
@@ -453,11 +454,9 @@ async function loadAdminResponses() {
             throw new Error('Please sign in to view responses');
         }
 
-        // Query feedback where parentUid matches current user AND adminResponse exists
+        // Query feedback where parentUid matches current user AND responses array exists and is not empty
         const feedbackSnapshot = await db.collection('parent_feedback')
             .where('parentUid', '==', user.uid)
-            .where('adminResponse', '!=', null)
-            .orderBy('timestamp', 'desc')
             .get();
 
         if (feedbackSnapshot.empty) {
@@ -471,46 +470,78 @@ async function loadAdminResponses() {
             return;
         }
 
-        responsesContent.innerHTML = '';
-
+        // Filter feedback that has responses
+        const feedbackWithResponses = [];
         feedbackSnapshot.forEach(doc => {
-            const feedback = doc.data();
-            const responseDate = feedback.respondedAt?.toDate() || feedback.timestamp?.toDate() || new Date();
-            const formattedDate = responseDate.toLocaleDateString('en-US', {
-                year: 'numeric',
-                month: 'long',
-                day: 'numeric',
-                hour: '2-digit',
-                minute: '2-digit'
-            });
+            const feedback = { id: doc.id, ...doc.data() };
+            if (feedback.responses && feedback.responses.length > 0) {
+                feedbackWithResponses.push(feedback);
+            }
+        });
 
-            const responseElement = document.createElement('div');
-            responseElement.className = 'bg-white border border-gray-200 rounded-xl p-6 mb-4';
-            responseElement.innerHTML = `
-                <div class="flex justify-between items-start mb-4">
-                    <div class="flex flex-wrap gap-2">
-                        <span class="inline-block px-3 py-1 rounded-full text-sm font-semibold ${getCategoryColor(feedback.category)}">
-                            ${feedback.category}
-                        </span>
-                        <span class="inline-block px-3 py-1 rounded-full text-sm font-semibold ${getPriorityColor(feedback.priority)}">
-                            ${feedback.priority} Priority
-                        </span>
-                    </div>
-                    <span class="text-sm text-gray-500">${formattedDate}</span>
-                </div>
-                
-                <div class="mb-4">
-                    <h4 class="font-semibold text-gray-800 mb-2">Regarding: ${feedback.studentName}</h4>
-                    <p class="text-gray-700 bg-gray-50 p-4 rounded-lg border">${feedback.message}</p>
-                </div>
-                
-                <div class="response-bubble">
-                    <div class="response-header">📨 Admin Response:</div>
-                    <p class="text-gray-700 mt-2">${feedback.adminResponse}</p>
+        if (feedbackWithResponses.length === 0) {
+            responsesContent.innerHTML = `
+                <div class="text-center py-12">
+                    <div class="text-6xl mb-4">📭</div>
+                    <h3 class="text-xl font-bold text-gray-700 mb-2">No Responses Yet</h3>
+                    <p class="text-gray-500 max-w-md mx-auto">You haven't received any responses from our staff yet. We'll respond to your feedback within 24-48 hours.</p>
                 </div>
             `;
+            return;
+        }
 
-            responsesContent.appendChild(responseElement);
+        // Sort by most recent response
+        feedbackWithResponses.sort((a, b) => {
+            const aDate = a.responses[0]?.responseDate?.toDate() || new Date(0);
+            const bDate = b.responses[0]?.responseDate?.toDate() || new Date(0);
+            return bDate - aDate;
+        });
+
+        responsesContent.innerHTML = '';
+
+        feedbackWithResponses.forEach((feedback) => {
+            feedback.responses.forEach((response, index) => {
+                const responseDate = response.responseDate?.toDate() || feedback.timestamp?.toDate() || new Date();
+                const formattedDate = responseDate.toLocaleDateString('en-US', {
+                    year: 'numeric',
+                    month: 'long',
+                    day: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit'
+                });
+
+                const responseElement = document.createElement('div');
+                responseElement.className = 'bg-white border border-gray-200 rounded-xl p-6 mb-4';
+                responseElement.innerHTML = `
+                    <div class="flex justify-between items-start mb-4">
+                        <div class="flex flex-wrap gap-2">
+                            <span class="inline-block px-3 py-1 rounded-full text-sm font-semibold ${getCategoryColor(feedback.category)}">
+                                ${feedback.category}
+                            </span>
+                            <span class="inline-block px-3 py-1 rounded-full text-sm font-semibold ${getPriorityColor(feedback.priority)}">
+                                ${feedback.priority} Priority
+                            </span>
+                        </div>
+                        <span class="text-sm text-gray-500">${formattedDate}</span>
+                    </div>
+                    
+                    <div class="mb-4">
+                        <h4 class="font-semibold text-gray-800 mb-2">Regarding: ${feedback.studentName}</h4>
+                        <p class="text-gray-700 bg-gray-50 p-4 rounded-lg border">${feedback.message}</p>
+                    </div>
+                    
+                    <div class="response-bubble">
+                        <div class="response-header">📨 Response from ${response.responderName || 'Admin'}:</div>
+                        <p class="text-gray-700 mt-2">${response.responseText}</p>
+                        <div class="text-sm text-gray-500 mt-2">
+                            Responded by: ${response.responderName || 'Admin Staff'} 
+                            ${response.responderEmail ? `(${response.responderEmail})` : ''}
+                        </div>
+                    </div>
+                `;
+
+                responsesContent.appendChild(responseElement);
+            });
         });
 
     } catch (error) {
@@ -689,6 +720,12 @@ async function loadAllReportsForParent(parentPhone, userId) {
                 studentsMap.set(studentName, { assessments: [], monthly: [] });
             }
             studentsMap.get(studentName).assessments.push(result);
+            
+            // Try to get parent name from assessment reports too
+            if (!parentName) {
+                parentName = result.parentName || result.parent_name || result.parent || result.guardianName || result.parentFullName ||
+                            result.parentFirstName || result.parentLastName || result.motherName || result.fatherName;
+            }
         });
 
         // Process monthly reports - THIS IS WHERE WE GET PARENT NAME
@@ -703,31 +740,32 @@ async function loadAllReportsForParent(parentPhone, userId) {
             // Try multiple possible field names - FIXED: More comprehensive field name checking
             if (!parentName) {
                 parentName = report.parentName || report.parent_name || report.parent || report.guardianName || report.parentFullName || 
-                            report.parentFirstName || report.parentLastName || report.motherName || report.fatherName;
+                            report.parentFirstName || report.parentLastName || report.motherName || report.fatherName ||
+                            report.parentFirstname || report.parentLastname; // Added common variations
             }
         });
 
-        // If still no parent name, try to get from any report as fallback
+        // If still no parent name, try to get from user document
+        if (!parentName && userId) {
+            try {
+                const userDoc = await db.collection('parent_users').doc(userId).get();
+                if (userDoc.exists) {
+                    const userData = userDoc.data();
+                    parentName = userData.parentName;
+                }
+            } catch (error) {
+                console.error('Error getting parent name from user document:', error);
+            }
+        }
+
+        // Final fallback - use the phone number or generic name
         if (!parentName) {
-            studentResults.forEach(result => {
-                if (!parentName) {
-                    parentName = result.parentName || result.parent_name || result.parent || result.guardianName || result.parentFullName ||
-                                result.parentFirstName || result.parentLastName || result.motherName || result.fatherName;
-                }
-            });
-            
-            // Last resort: try monthly reports again with different field names
-            monthlyReports.forEach(report => {
-                if (!parentName) {
-                    parentName = report.parentName || report.parent_name || report.parent || report.guardianName || report.parentFullName ||
-                                report.parentFirstName || report.parentLastName || report.motherName || report.fatherName;
-                }
-            });
+            parentName = 'Parent'; // Simple fallback
         }
 
         // Store user data globally - FIXED: Ensure parentName is never empty
         currentUserData = {
-            parentName: parentName || 'Parent',
+            parentName: parentName,
             parentPhone: parentPhone
         };
         userChildren = Array.from(studentsMap.keys());
@@ -736,10 +774,14 @@ async function loadAllReportsForParent(parentPhone, userId) {
         welcomeMessage.textContent = `Welcome, ${currentUserData.parentName}!`;
 
         // Update parent name in user document if not set
-        if (userId && parentName) {
-            await db.collection('parent_users').doc(userId).update({
-                parentName: parentName
-            });
+        if (userId && parentName && parentName !== 'Parent') {
+            try {
+                await db.collection('parent_users').doc(userId).update({
+                    parentName: parentName
+                });
+            } catch (error) {
+                console.error('Error updating parent name:', error);
+            }
         }
 
         // Display reports for each student
