@@ -326,15 +326,19 @@ function populateStudentDropdown() {
     const studentDropdown = document.getElementById('feedbackStudent');
     studentDropdown.innerHTML = '<option value="">Select student</option>';
     
-    if (userChildren.length === 0) {
-        studentDropdown.innerHTML += '<option value="" disabled>No students found</option>';
+    // Get student names from the report headers that are already displayed
+    const studentHeaders = document.querySelectorAll('[class*="bg-green-100"] h2');
+    
+    if (studentHeaders.length === 0) {
+        studentDropdown.innerHTML += '<option value="" disabled>No students found - please wait for reports to load</option>';
         return;
     }
 
-    userChildren.forEach(student => {
+    studentHeaders.forEach(header => {
+        const studentName = header.textContent.trim();
         const option = document.createElement('option');
-        option.value = student;
-        option.textContent = student;
+        option.value = studentName;
+        option.textContent = studentName;
         studentDropdown.appendChild(option);
     });
 }
@@ -976,3 +980,4 @@ document.addEventListener('DOMContentLoaded', function() {
         if (e.key === 'Enter') handlePasswordReset();
     });
 });
+
