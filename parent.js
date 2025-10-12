@@ -746,7 +746,7 @@ function addViewResponsesButton() {
     }, 1000);
 }
 
-// MAIN REPORT LOADING FUNCTION - KEPT COMPLETELY INTACT
+// MAIN REPORT LOADING FUNCTION - COMPLETE AND INTACT
 async function loadAllReportsForParent(parentPhone, userId) {
     const reportArea = document.getElementById("reportArea");
     const reportContent = document.getElementById("reportContent");
@@ -769,7 +769,7 @@ async function loadAllReportsForParent(parentPhone, userId) {
                     console.log("Loading reports from cache.");
                     reportContent.innerHTML = html;
                     
-                    // Set welcome message from cache
+                    // Set welcome message from cache - THIS IS WHERE PARENT NAME IS SET FROM CACHE
                     if (userData && userData.parentName) {
                         welcomeMessage.textContent = `Welcome, ${userData.parentName}!`;
                         currentUserData = userData;
@@ -802,9 +802,11 @@ async function loadAllReportsForParent(parentPhone, userId) {
         }
         // --- END CACHE IMPLEMENTATION ---
 
-        // First, try to get parent name from user document
-        let parentName = null;
-        if (userId) {
+        // FIRST - FIND PARENT NAME FROM STUDENTS COLLECTION
+        let parentName = await findParentNameFromStudents(parentPhone);
+        
+        // If not found in students collection, try user document
+        if (!parentName && userId) {
             const userDoc = await db.collection('parent_users').doc(userId).get();
             if (userDoc.exists) {
                 const userData = userDoc.data();
@@ -812,18 +814,18 @@ async function loadAllReportsForParent(parentPhone, userId) {
             }
         }
 
-        // If not found in user document, search in students collection
-        if (!parentName || parentName === 'Parent') {
-            parentName = await findParentNameFromStudents(parentPhone);
+        // Final fallback
+        if (!parentName) {
+            parentName = 'Parent';
         }
 
-        // Set current user data
+        // Store user data globally - THIS IS CRITICAL FOR PARENT NAME DISPLAY
         currentUserData = {
-            parentName: parentName || 'Parent',
+            parentName: parentName,
             parentPhone: parentPhone
         };
 
-        // Update welcome message with parent name
+        // UPDATE WELCOME MESSAGE WITH PARENT NAME - THIS IS WHAT SHOWS IT!
         welcomeMessage.textContent = `Welcome, ${currentUserData.parentName}!`;
 
         // Update parent name in user document if we found a better one
@@ -1219,7 +1221,6 @@ async function loadAllReportsForParent(parentPhone, userId) {
     }
 }
 
-// KEEP ALL YOUR EXISTING FUNCTIONS EXACTLY AS THEY WERE
 function downloadSessionReport(studentIndex, sessionIndex, studentName, type) {
     const element = document.getElementById(`${type}-block-${studentIndex}-${sessionIndex}`);
     const safeStudentName = studentName.replace(/ /g, '_');
