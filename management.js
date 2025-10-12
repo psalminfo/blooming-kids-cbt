@@ -18,6 +18,7 @@ const sessionCache = {
     pendingStudents: null,
     reports: null,
     breakStudents: null,
+    parentFeedback: null,
 };
 
 /**
@@ -942,6 +943,169 @@ function renderBreakStudentsFromCache() {
 }
 
 
+// --- Parent Feedback Panel ---
+async function renderParentFeedbackPanel(container) {
+    container.innerHTML = `
+        <div class="bg-white p-6 rounded-lg shadow-md">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-2xl font-bold text-green-700">Parent Feedback & Requests</h2>
+                <button id="refresh-feedback-btn" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Refresh</button>
+            </div>
+            <div class="flex space-x-4 mb-4">
+                <div class="bg-green-100 p-3 rounded-lg text-center shadow w-full">
+                    <h4 class="font-bold text-green-800 text-sm">Total Messages</h4>
+                    <p id="feedback-total-count" class="text-2xl font-extrabold">0</p>
+                </div>
+                <div class="bg-yellow-100 p-3 rounded-lg text-center shadow w-full">
+                    <h4 class="font-bold text-yellow-800 text-sm">Unread Messages</h4>
+                    <p id="feedback-unread-count" class="text-2xl font-extrabold">0</p>
+                </div>
+            </div>
+            <div id="parent-feedback-list" class="space-y-4">
+                <p class="text-center text-gray-500 py-10">Loading feedback messages...</p>
+            </div>
+        </div>
+    `;
+    
+    document.getElementById('refresh-feedback-btn').addEventListener('click', () => fetchAndRenderParentFeedback(true));
+    fetchAndRenderParentFeedback();
+}
+
+async function fetchAndRenderParentFeedback(forceRefresh = false) {
+    if (forceRefresh) invalidateCache('parentFeedback');
+    const listContainer = document.getElementById('parent-feedback-list');
+    
+    try {
+        if (!sessionCache.parentFeedback) {
+            listContainer.innerHTML = `<p class="text-center text-gray-500 py-10">Fetching feedback messages...</p>`;
+            const snapshot = await getDocs(query(collection(db, "parent_feedback"), orderBy("submittedAt", "desc")));
+            saveToLocalStorage('parentFeedback', snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+        }
+        renderParentFeedbackFromCache();
+    } catch(error) {
+        console.error("Error fetching parent feedback:", error);
+        listContainer.innerHTML = `<p class="text-center text-red-500 py-10">Failed to load feedback messages.</p>`;
+    }
+}
+
+function renderParentFeedbackFromCache() {
+    const feedbackMessages = sessionCache.parentFeedback || [];
+    const listContainer = document.getElementById('parent-feedback-list');
+    if (!listContainer) return;
+
+    if (feedbackMessages.length === 0) {
+        listContainer.innerHTML = `<p class="text-center text-gray-500">No feedback messages found.</p>`;
+        document.getElementById('feedback-total-count').textContent = '0';
+        document.getElementById('feedback-unread-count').textContent = '0';
+        return;
+    }
+
+    const unreadCount = feedbackMessages.filter(msg => !msg.read).length;
+    
+    document.getElementById('feedback-total-count').textContent = feedbackMessages.length;
+    document.getElementById('feedback-unread-count').textContent = unreadCount;
+
+    listContainer.innerHTML = feedbackMessages.map(message => {
+        const submittedDate = message.submittedAt ? new Date(message.submittedAt.seconds * 1000).toLocaleDateString() : 'Unknown date';
+        const readStatus = message.read ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800';
+        const readText = message.read ? 'Read' : 'Unread';
+        
+        return `
+            <div class="border rounded-lg p-4 bg-white shadow-sm hover:shadow-md transition-shadow ${message.read ? '' : 'border-l-4 border-l-yellow-500'}">
+                <div class="flex justify-between items-start mb-3">
+                    <div>
+                        <h3 class="font-bold text-lg text-gray-800">${message.parentName || 'Anonymous Parent'}</h3>
+                        <p class="text-sm text-gray-600">Student: ${message.studentName || 'N/A'}</p>
+                    </div>
+                    <div class="text-right">
+                        <span class="text-xs text-gray-500 block">${submittedDate}</span>
+                        <span class="text-xs px-2 py-1 rounded-full ${readStatus}">${readText}</span>
+                    </div>
+                </div>
+                
+                <div class="mb-3">
+                    <p class="text-gray-700 whitespace-pre-wrap">${message.message || 'No message content'}</p>
+                </div>
+                
+                <div class="flex justify-between items-center text-sm text-gray-600">
+                    <div>
+                        ${message.parentEmail ? `<span class="mr-3">📧 ${message.parentEmail}</span>` : ''}
+                        ${message.parentPhone ? `<span>📞 ${message.parentPhone}</span>` : ''}
+                    </div>
+                    <div class="flex space-x-2">
+                        ${!message.read ? `
+                            <button class="mark-read-btn bg-blue-500 text-white px-3 py-1 rounded text-xs hover:bg-blue-600" data-message-id="${message.id}">
+                                Mark as Read
+                            </button>
+                        ` : ''}
+                        <button class="delete-feedback-btn bg-red-500 text-white px-3 py-1 rounded text-xs hover:bg-red-600" data-message-id="${message.id}">
+                            Delete
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `;
+    }).join('');
+
+    // Add event listeners for the buttons
+    document.querySelectorAll('.mark-read-btn').forEach(button => {
+        button.addEventListener('click', (e) => {
+            e.stopPropagation();
+            handleMarkAsRead(e.target.dataset.messageId);
+        });
+    });
+
+    document.querySelectorAll('.delete-feedback-btn').forEach(button => {
+        button.addEventListener('click', (e) => {
+            e.stopPropagation();
+            handleDeleteFeedback(e.target.dataset.messageId);
+        });
+    });
+}
+
+async function handleMarkAsRead(messageId) {
+    try {
+        await updateDoc(doc(db, "parent_feedback", messageId), {
+            read: true,
+            readAt: Timestamp.now()
+        });
+        
+        // Update cache and re-render
+        if (sessionCache.parentFeedback) {
+            const messageIndex = sessionCache.parentFeedback.findIndex(msg => msg.id === messageId);
+            if (messageIndex !== -1) {
+                sessionCache.parentFeedback[messageIndex].read = true;
+                saveToLocalStorage('parentFeedback', sessionCache.parentFeedback);
+            }
+        }
+        
+        renderParentFeedbackFromCache();
+    } catch (error) {
+        console.error("Error marking message as read:", error);
+        alert("Failed to mark message as read. Please try again.");
+    }
+}
+
+async function handleDeleteFeedback(messageId) {
+    if (confirm("Are you sure you want to delete this feedback message? This action cannot be undone.")) {
+        try {
+            await deleteDoc(doc(db, "parent_feedback", messageId));
+            
+            // Update cache and re-render
+            if (sessionCache.parentFeedback) {
+                sessionCache.parentFeedback = sessionCache.parentFeedback.filter(msg => msg.id !== messageId);
+                saveToLocalStorage('parentFeedback', sessionCache.parentFeedback);
+            }
+            
+            renderParentFeedbackFromCache();
+        } catch (error) {
+            console.error("Error deleting feedback message:", error);
+            alert("Failed to delete message. Please try again.");
+        }
+    }
+}
+
+
 // ##################################
 // # REPORT GENERATION & ZIPPING
 // ##################################
@@ -1127,7 +1291,8 @@ onAuthStateChanged(auth, async (user) => {
                     navPayAdvice: { fn: renderPayAdvicePanel, perm: 'viewPayAdvice' },
                     navTutorReports: { fn: renderTutorReportsPanel, perm: 'viewTutorReports' },
                     navSummerBreak: { fn: renderSummerBreakPanel, perm: 'viewSummerBreak' },
-                    navPendingApprovals: { fn: renderPendingApprovalsPanel, perm: 'viewPendingApprovals' }
+                    navPendingApprovals: { fn: renderPendingApprovalsPanel, perm: 'viewPendingApprovals' },
+                    navParentFeedback: { fn: renderParentFeedbackPanel, perm: 'viewParentFeedback' }
                 };
 
                 const navContainer = document.querySelector('nav');
