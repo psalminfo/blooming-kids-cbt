@@ -11,74 +11,50 @@
 <body class="bg-green-50 min-h-screen flex items-center justify-center">
 
   <div class="bg-white p-8 rounded-xl shadow-xl w-full max-w-md">
-        <div class="flex justify-between items-center mb-6">
+    <!-- THIS IS THE UPDATED SECTION -->
+    <div class="flex justify-between items-center mb-6">
       <h2 class="text-2xl font-bold text-green-800">Select a Subject</h2>
-            <button onclick="logout()" class="bg-yellow-400 text-white px-4 py-2 rounded hover:bg-yellow-500 text-sm">Logout</button>
+      <!-- The logout button has been added back here -->
+      <button onclick="logout()" class="bg-yellow-400 text-white px-4 py-2 rounded hover:bg-yellow-500 text-sm">Logout</button>
     </div>
-        <div id="subjectButtons" class="space-y-4">
-          </div>
+    <!-- END OF UPDATED SECTION -->
+
+    <div id="subjectButtons" class="space-y-4">
+      <button onclick="goToSubject('math')" class="bg-green-600 text-white w-full py-2 rounded hover:bg-green-700">Math</button>
+      <button onclick="goToSubject('ela')" class="bg-green-600 text-white w-full py-2 rounded hover:bg-green-700">English Language Arts</button>
+      <button onclick="goToSubject('biology')" class="bg-green-600 text-white w-full py-2 rounded hover:bg-green-700">Biology</button>
+      <button onclick="goToSubject('physics')" class="bg-green-600 text-white w-full py-2 rounded hover:bg-green-700">Physics</button>
+      <button onclick="goToSubject('chemistry')" class="bg-green-600 text-white w-full py-2 rounded hover:bg-green-700">Chemistry</button>
+    </div>
     <p class="text-xs text-center mt-8 text-gray-600">POWERED BY <span style="color:#FFEB3B">POG</span></p>
   </div>
 
   <script>
-    // Fetch and parse the student data object from localStorage
     const studentDataString = localStorage.getItem('studentData');
     const studentData = JSON.parse(studentDataString);
-    const subjectButtonsDiv = document.getElementById('subjectButtons');
 
-    // Essential data check
     if (!studentData || !studentData.grade) {
       alert("Missing student info. Please log in again.");
       window.location.href = "index.html";
     }
 
-    // Ensure grade is treated as an integer for comparison
-    const grade = parseInt(studentData.grade);
-
-    // Function to handle logout
-    function logout() {
-        localStorage.clear();
-        window.location.href = "index.html";
-    }
-
     function goToSubject(subject) {
-      // Pass all required student data along with the subject via URL parameters
       const params = new URLSearchParams({
         subject: subject,
-        studentName: studentData.studentName || 'Student', // Fallback for studentName
+        studentName: studentData.studentName,
         parentEmail: studentData.parentEmail,
         grade: studentData.grade,
-        tutorId: studentData.tutorId // Assuming tutorId is also in studentData
+        tutorEmail: studentData.tutorEmail,
+        country: studentData.country
       });
       window.location.href = `student.html?${params.toString()}`;
     }
 
-    // --- LOGIC TO RESTRICT SUBJECTS TO GRADES 3 THROUGH 6 ---
-    if (grade >= 3 && grade <= 6) {
-        // Subjects available for Grades 3-6
-        const subjects = [
-            { id: 'math', name: 'Math' },
-            { id: 'ela', name: 'English Language Arts' },
-            { id: 'science', name: 'Science' }
-        ];
-
-        // Generate the buttons for the allowed subjects
-        subjectButtonsDiv.innerHTML = subjects.map(subject => 
-            `<button onclick="goToSubject('${subject.id}')" class="bg-green-600 text-white w-full py-2 rounded hover:bg-green-700">${subject.name}</button>`
-        ).join('');
-
-    } else {
-        // Display a message for non-supported grades
-        subjectButtonsDiv.innerHTML = `
-            <p class="text-lg text-red-500 font-semibold">
-                Subjects not yet configured for Grade ${studentData.grade}.
-            </p>
-            <p class="text-sm text-gray-500 mt-2">
-                This app currently supports Maths, English, and Science for Grades 3 through 6.
-            </p>
-        `;
+    // The logout function has been added here
+    window.logout = function() {
+      localStorage.clear(); // Clears the student's login data
+      window.location.href = 'index.html';
     }
-    // --- END LOGIC ---
   </script>
 
 </body>
