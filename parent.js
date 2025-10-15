@@ -1,3 +1,4 @@
+
 // Firebase config for the 'bloomingkidsassessment' project
 firebase.initializeApp({
     apiKey: "AIzaSyD1lJhsWMMs_qerLBSzk7wKhjLyI_11RJg",
