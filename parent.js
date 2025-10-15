@@ -147,7 +147,13 @@ async function findParentNameFromStudents(parentPhone) {
             
             // Try multiple possible field names for parent name
             const parentName = studentData.parentName || 
-                              
+                              studentData.parent_name || 
+                              studentData.parentFullName ||
+                              (studentData.parentFirstName && studentData.parentLastName ? 
+                               studentData.parentFirstName + ' ' + studentData.parentLastName : null) ||
+                              studentData.motherName || 
+                              studentData.fatherName ||
+                              studentData.guardianName;
             
             if (parentName) {
                 console.log("Found parent name in students collection:", parentName);
@@ -166,7 +172,8 @@ async function findParentNameFromStudents(parentPhone) {
             const submissionData = submissionDoc.data();
             
             const parentName = submissionData.parentName || 
-                          
+                              submissionData.parent_name || 
+                              submissionData.parentFullName;
             
             if (parentName) {
                 console.log("Found parent name in tutor_submissions:", parentName);
@@ -185,7 +192,8 @@ async function findParentNameFromStudents(parentPhone) {
             const resultData = resultDoc.data();
             
             const parentName = resultData.parentName || 
-                             
+                              resultData.parent_name || 
+                              resultData.parentFullName;
             
             if (parentName) {
                 console.log("Found parent name in student_results:", parentName);
@@ -1336,4 +1344,3 @@ document.addEventListener('DOMContentLoaded', function() {
         if (e.key === 'Enter') handlePasswordReset();
     });
 });
-
