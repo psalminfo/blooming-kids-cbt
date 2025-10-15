@@ -130,12 +130,12 @@ function nameMatches(storedName, searchName) {
     return false;
 }
 
-// Find parent name from students collection
+// Find parent name from students collection (SAME AS TUTOR.JS)
 async function findParentNameFromStudents(parentPhone) {
     try {
         console.log("Searching for parent name with phone:", parentPhone);
         
-        // Search in students collection for matching parent phone
+        // PRIMARY SEARCH: students collection (same as tutor.js)
         const studentsSnapshot = await db.collection("students")
             .where("parentPhone", "==", parentPhone)
             .limit(1)
@@ -145,15 +145,8 @@ async function findParentNameFromStudents(parentPhone) {
             const studentDoc = studentsSnapshot.docs[0];
             const studentData = studentDoc.data();
             
-            // Try multiple possible field names for parent name
-            const parentName = studentData.parentName || 
-                              studentData.parent_name || 
-                              studentData.parentFullName ||
-                              (studentData.parentFirstName && studentData.parentLastName ? 
-                               studentData.parentFirstName + ' ' + studentData.parentLastName : null) ||
-                              studentData.motherName || 
-                              studentData.fatherName ||
-                              studentData.guardianName;
+            // Use parentName field (same as tutor.js)
+            const parentName = studentData.parentName;
             
             if (parentName) {
                 console.log("Found parent name in students collection:", parentName);
@@ -161,7 +154,26 @@ async function findParentNameFromStudents(parentPhone) {
             }
         }
 
-        // If not found in students, try tutor_submissions
+        // SECONDARY SEARCH: pending_students collection (same as tutor.js)
+        const pendingStudentsSnapshot = await db.collection("pending_students")
+            .where("parentPhone", "==", parentPhone)
+            .limit(1)
+            .get();
+
+        if (!pendingStudentsSnapshot.empty) {
+            const pendingStudentDoc = pendingStudentsSnapshot.docs[0];
+            const pendingStudentData = pendingStudentDoc.data();
+            
+            // Use parentName field (same as tutor.js)
+            const parentName = pendingStudentData.parentName;
+            
+            if (parentName) {
+                console.log("Found parent name in pending_students collection:", parentName);
+                return parentName;
+            }
+        }
+
+        // FALLBACK SEARCH: tutor_submissions (for historical data)
         const submissionsSnapshot = await db.collection("tutor_submissions")
             .where("parentPhone", "==", parentPhone)
             .limit(1)
@@ -171,32 +183,10 @@ async function findParentNameFromStudents(parentPhone) {
             const submissionDoc = submissionsSnapshot.docs[0];
             const submissionData = submissionDoc.data();
             
-            const parentName = submissionData.parentName || 
-                              submissionData.parent_name || 
-                              submissionData.parentFullName;
+            const parentName = submissionData.parentName;
             
             if (parentName) {
                 console.log("Found parent name in tutor_submissions:", parentName);
-                return parentName;
-            }
-        }
-
-        // If not found in tutor_submissions, try student_results
-        const resultsSnapshot = await db.collection("student_results")
-            .where("parentPhone", "==", parentPhone)
-            .limit(1)
-            .get();
-
-        if (!resultsSnapshot.empty) {
-            const resultDoc = resultsSnapshot.docs[0];
-            const resultData = resultDoc.data();
-            
-            const parentName = resultData.parentName || 
-                              resultData.parent_name || 
-                              resultData.parentFullName;
-            
-            if (parentName) {
-                console.log("Found parent name in student_results:", parentName);
                 return parentName;
             }
         }
@@ -250,7 +240,7 @@ async function handleSignUp() {
         const userCredential = await auth.createUserWithEmailAndPassword(email, password);
         const user = userCredential.user;
 
-        // Find parent name from existing data
+        // Find parent name from existing data (SAME SOURCE AS TUTOR.JS)
         const parentName = await findParentNameFromStudents(cleanedPhone);
 
         // Store user data in Firestore for easy retrieval
@@ -802,10 +792,10 @@ async function loadAllReportsForParent(parentPhone, userId) {
         }
         // --- END CACHE IMPLEMENTATION ---
 
-        // FIRST - FIND PARENT NAME FROM STUDENTS COLLECTION
+        // FIND PARENT NAME FROM SAME SOURCES AS TUTOR.JS
         let parentName = await findParentNameFromStudents(parentPhone);
         
-        // If not found in students collection, try user document
+        // If not found in students collections, try user document
         if (!parentName && userId) {
             const userDoc = await db.collection('parent_users').doc(userId).get();
             if (userDoc.exists) {
