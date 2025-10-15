@@ -1,4 +1,3 @@
-
 // Firebase config for the 'bloomingkidsassessment' project
 firebase.initializeApp({
     apiKey: "AIzaSyD1lJhsWMMs_qerLBSzk7wKhjLyI_11RJg",
@@ -12,10 +11,19 @@ firebase.initializeApp({
 const db = firebase.firestore();
 const auth = firebase.auth();
 
-// Simple phone cleaning - just trim, no normalization
+// PROPER PHONE NUMBER NORMALIZATION - Last 10-digit rule
 function cleanPhoneNumber(phone) {
     if (!phone) return '';
-    return phone.trim();
+    
+    // Extract only digits
+    const digitsOnly = phone.replace(/\D/g, '');
+    
+    // Take last 10 digits (Nigeria numbers)
+    if (digitsOnly.length >= 10) {
+        return digitsOnly.slice(-10);
+    }
+    
+    return digitsOnly;
 }
 
 function capitalize(str) {
@@ -134,11 +142,13 @@ function nameMatches(storedName, searchName) {
 // Find parent name from students collection (SAME AS TUTOR.JS)
 async function findParentNameFromStudents(parentPhone) {
     try {
-        console.log("Searching for parent name with phone:", parentPhone);
+        // CLEAN THE PHONE NUMBER FIRST - Last 10 digits
+        const cleanedPhone = cleanPhoneNumber(parentPhone);
+        console.log("Searching for parent name with cleaned phone:", cleanedPhone);
         
         // PRIMARY SEARCH: students collection (same as tutor.js)
         const studentsSnapshot = await db.collection("students")
-            .where("parentPhone", "==", parentPhone)
+            .where("parentPhone", "==", cleanedPhone)
             .limit(1)
             .get();
 
@@ -157,7 +167,7 @@ async function findParentNameFromStudents(parentPhone) {
 
         // SECONDARY SEARCH: pending_students collection (same as tutor.js)
         const pendingStudentsSnapshot = await db.collection("pending_students")
-            .where("parentPhone", "==", parentPhone)
+            .where("parentPhone", "==", cleanedPhone)
             .limit(1)
             .get();
 
@@ -176,7 +186,7 @@ async function findParentNameFromStudents(parentPhone) {
 
         // FALLBACK SEARCH: tutor_submissions (for historical data)
         const submissionsSnapshot = await db.collection("tutor_submissions")
-            .where("parentPhone", "==", parentPhone)
+            .where("parentPhone", "==", cleanedPhone)
             .limit(1)
             .get();
 
@@ -224,8 +234,8 @@ async function handleSignUp() {
     }
 
     const cleanedPhone = cleanPhoneNumber(phone);
-    if (!cleanedPhone) {
-        showMessage('Please enter a valid phone number', 'error');
+    if (!cleanedPhone || cleanedPhone.length < 10) {
+        showMessage('Please enter a valid 10-digit phone number', 'error');
         return;
     }
 
@@ -340,7 +350,7 @@ async function handleSignIn() {
         // Handle Remember Me
         handleRememberMe();
         
-        // Load all reports for the parent using the exact phone number as stored
+        // Load all reports for the parent using the cleaned phone number
         await loadAllReportsForParent(userPhone, userId);
 
     } catch (error) {
@@ -577,9 +587,26 @@ async function loadAdminResponses() {
         responsesContent.innerHTML = '';
 
         feedbackWithResponses.forEach((feedback) => {
+            // FIX: Properly handle the parent's original feedback timestamp
+            const feedbackDate = feedback.timestamp?.toDate ? feedback.timestamp.toDate() : 
+                               new Date(feedback.timestamp?.seconds * 1000) || new Date();
+            
+            const formattedFeedbackDate = feedbackDate.toLocaleDateString('en-US', {
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+
             feedback.responses.forEach((response, index) => {
-                const responseDate = response.responseDate?.toDate() || feedback.timestamp?.toDate() || new Date();
-                const formattedDate = responseDate.toLocaleDateString('en-US', {
+                // FIX: Properly handle the admin response timestamp
+                const responseDate = response.responseDate?.toDate ? response.responseDate.toDate() : 
+                                   new Date(response.responseDate?.seconds * 1000) || 
+                                   feedback.timestamp?.toDate ? feedback.timestamp.toDate() : 
+                                   new Date(feedback.timestamp?.seconds * 1000) || new Date();
+                
+                const formattedResponseDate = responseDate.toLocaleDateString('en-US', {
                     year: 'numeric',
                     month: 'long',
                     day: 'numeric',
@@ -599,7 +626,10 @@ async function loadAdminResponses() {
                                 ${feedback.priority} Priority
                             </span>
                         </div>
-                        <span class="text-sm text-gray-500">${formattedDate}</span>
+                        <div class="text-right">
+                            <div class="text-sm text-gray-500">Your feedback: ${formattedFeedbackDate}</div>
+                            <div class="text-sm text-green-600 font-semibold">Response: ${formattedResponseDate}</div>
+                        </div>
                     </div>
                     
                     <div class="mb-4">
