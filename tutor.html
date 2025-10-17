@@ -65,23 +65,24 @@
             transition: color 0.3s;
         }
 
-        /* --- DARK MODE STYLES (Green on Dark Gray/Black) --- */
+        /* --- DARK MODE STYLES (White on Dark Gray) --- */
         .dark .wrapper {
-            background-color: #111827 !important; /* Very Dark gray/Near Black wrapper background */
-            background-image: none !important; 
+            background-color: #111827 !important; /* Very Dark gray/near black wrapper background for max contrast */
+            background-image: none !important; /* Remove registration form image in dark mode */
         }
         
-        /* Fix logo contrast in dark mode */
+        /* NEW: Fix logo contrast in dark mode */
         .dark #logoImg {
+            /* Adjust brightness and add a white drop-shadow to make the dark logo visible */
             filter: brightness(2) drop-shadow(0 0 5px rgba(255, 255, 255, 0.5));
         }
 
         .dark .inner {
-            background: #1f2937; /* Dark Gray for the main content panel */
+            background: #1f2937; /* Very Dark gray/near black for the main content panel */
             box-shadow: 0 0 15px rgba(0, 0, 0, 0.5);
         }
         
-        /* Text color override: ENFORCING BRIGHT GREEN (#34D399) over the dark background */
+        /* Expanded General text color override to ensure pure white contrast on all elements */
         .dark .inner, 
         .dark .inner p, 
         .dark .inner span, 
@@ -89,29 +90,28 @@
         .dark .inner label, 
         .dark .inner div, 
         .dark .inner button,
-        .dark .inner input, 
-        .dark .inner select, 
-        .dark .inner textarea, 
+        .dark .inner input, /* Explicitly target input fields */
+        .dark .inner select, /* Explicitly target select fields */
+        .dark .inner textarea, /* Explicitly target textarea fields */
         .dark .inner h1, .dark .inner h2, .dark .inner h3 {
-             color: #34D399 !important; /* ENFORCED BRIGHT GREEN (Emerald 400) */
+             color: #ffffff !important; /* ENFORCED PURE WHITE */
         }
-        
-        /* Special handling for headers to ensure they are green */
+
+        /* Override specific bright elements in dark mode (headers should be white) */
         .dark .dashboard-header {
-            color: #34D399 !important;
+            color: #ffffff !important;
         }
         
-        /* Navigation link colors in dark mode (consistent green theme) */
+        /* Override nav link colors in dark mode */
         .dark .nav-btn {
-            color: #6EE7B7 !important; /* Muted Green for inactive tabs (Emerald 300) */
+            color: ##060e1f !important; /* Light gray for inactive tabs */
         }
         .dark .nav-btn.active {
-            border-bottom-color: #48bb78; /* Brighter green for active tab (Green-500) */
+            border-bottom-color: #48bb78; /* Brighter green for active tab */
             color: #48bb78 !important;
         }
-        
-        /* Ensure buttons maintain contrast */
         .dark #logoutBtn, .dark #whatsappBtn {
+             /* Ensure buttons maintain contrast */
              filter: brightness(1.2);
         }
     </style>
