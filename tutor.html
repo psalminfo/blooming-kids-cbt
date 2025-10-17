@@ -71,20 +71,20 @@
         }
 
         .dark .inner {
-            background: #2d3748; /* Dark gray for the main content panel */
+            background: #1f2937; /* Very Dark gray/near black for the main content panel - UPDATED */
             box-shadow: 0 0 15px rgba(0, 0, 0, 0.5);
         }
         
-        /* General text color in dark mode - REINFORCED to fix visibility issues */
+        /* General text color in dark mode - Set to pure white and enforced with !important */
         .dark .inner {
-             color: #e2e8f0 !important; /* Ensures the container itself has light text color */
+             color: #ffffff !important; 
         }
-        /* Explicitly target common text elements to ensure high contrast */
+        /* Explicitly target common text elements to ensure high contrast and override other CSS */
         .dark .inner p, .dark .inner span, .dark .inner a, .dark .inner label, .dark .inner div {
-            color: #e2e8f0 !important;
+            color: #ffffff !important; /* ENFORCED PURE WHITE */
         }
 
-        /* Override specific bright elements in dark mode */
+        /* Override specific bright elements in dark mode (headers should be white) */
         .dark .dashboard-header,
         .dark h1, .dark h2, .dark h3 {
             color: #ffffff !important;
@@ -92,7 +92,7 @@
         
         /* Override nav link colors in dark mode */
         .dark .nav-btn {
-            color: #a0aec0 !important;
+            color: #e5e7eb !important; /* Light gray for inactive tabs - UPDATED for contrast */
         }
         .dark .nav-btn.active {
             border-bottom-color: #48bb78; /* Brighter green for active tab */
