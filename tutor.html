@@ -62,7 +62,8 @@
         /* --- DARK MODE STYLES (White on Dark Gray) --- */
         .dark .wrapper {
             background-color: #111827 !important; /* Very Dark gray/near black wrapper background for max contrast */
-            background-image: none !important; /* Remove registration form image in dark mode */
+            background-image: linear-gradient(rgba(17, 24, 39, 0.9), rgba(17, 24, 39, 0.9)), url('images/bg-registration-form-2.jpg') !important;
+            background-blend-mode: overlay;
         }
         
         /* NEW: Fix logo contrast in dark mode */
@@ -97,21 +98,59 @@
             color: #cccccc !important; /* Light gray for placeholder, still high contrast */
             opacity: 1 !important; /* Ensure full visibility */
         }
-        /* ⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐ */
+        
+        /* ⭐⭐ NEW: Form elements styling for dark mode ⭐⭐ */
+        .dark .inner input:not([type="checkbox"]):not([type="radio"]),
+        .dark .inner select,
+        .dark .inner textarea {
+            background-color: #374151 !important;
+            border-color: #4b5563 !important;
+            color: #ffffff !important;
+        }
+        
+        /* ⭐⭐ NEW: Table and data container styling for dark mode ⭐⭐ */
+        .dark .inner table, 
+        .dark .inner .bg-white {
+            background-color: #374151 !important;
+            color: #ffffff !important;
+        }
+        
+        .dark .inner table td, 
+        .dark .inner table th {
+            border-color: #4b5563 !important;
+            color: #ffffff !important;
+        }
+        
+        /* ⭐⭐ NEW: Card and content container styling for dark mode ⭐⭐ */
+        .dark .inner .bg-gray-50 {
+            background-color: #374151 !important;
+        }
+        
+        /* ⭐⭐ NEW: Focus states for accessibility ⭐⭐ */
+        .dark .inner button:focus,
+        .dark .inner input:focus,
+        .dark .inner select:focus {
+            outline: 2px solid #3b82f6 !important;
+            outline-offset: 2px !important;
+        }
+        
+        /* ⭐⭐ NEW: Smooth transitions for all theme-able properties ⭐⭐ */
+        .inner * {
+            transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
+        }
 
         /* Override specific bright elements in dark mode (headers should be white) */
         .dark .dashboard-header {
             color: #ffffff !important;
         }
         
-        /* Override nav link colors in dark mode */
+        /* Override nav link colors in dark mode - FIXED SYNTAX ERROR */
         .dark .nav-btn {
-            /* Fix: The original color was ##060e1f which is a syntax error. Changed to a light gray */
-            color: #9ca3af !important; /* Light gray for inactive tabs */
+            color: #e5e7eb !important; /* Better contrast light gray for inactive tabs */
         }
         .dark .nav-btn.active {
-            border-bottom-color: #48bb78; /* Brighter green for active tab */
-            color: #48bb78 !important;
+            border-bottom-color: #10b981 !important; /* Brighter green for active tab */
+            color: #10b981 !important;
         }
         .dark #logoutBtn, .dark #whatsappBtn {
              /* Ensure buttons maintain contrast */
