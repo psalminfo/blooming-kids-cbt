@@ -50,7 +50,7 @@
             max-width: 1280px; 
             width: 90%; 
             padding: 40px;
-            /* LIGHT MODE: White background and dark text defaults are retained */
+            /* LIGHT MODE: White background and dark text defaults are retained (Black on White) */
             background: #ffffff; 
             border-radius: 10px;
             box-shadow: 0 0 10px rgba(0, 0, 0, 0.2);
@@ -65,10 +65,16 @@
             transition: color 0.3s;
         }
 
-        /* --- DARK MODE STYLES --- */
+        /* --- DARK MODE STYLES (White on Dark Gray) --- */
         .dark .wrapper {
-            background-color: #111827 !important; /* Very Dark gray/near black wrapper background - UPDATED for max contrast */
+            background-color: #111827 !important; /* Very Dark gray/near black wrapper background for max contrast */
             background-image: none !important; /* Remove registration form image in dark mode */
+        }
+        
+        /* NEW: Fix logo contrast in dark mode */
+        .dark #logoImg {
+            /* Adjust brightness and add a white drop-shadow to make the dark logo visible */
+            filter: brightness(2) drop-shadow(0 0 5px rgba(255, 255, 255, 0.5));
         }
 
         .dark .inner {
@@ -76,24 +82,29 @@
             box-shadow: 0 0 15px rgba(0, 0, 0, 0.5);
         }
         
-        /* General text color in dark mode - Set to pure white and enforced with !important */
-        .dark .inner {
-             color: #ffffff !important; 
-        }
-        /* Explicitly target common text elements to ensure high contrast and override other CSS */
-        .dark .inner p, .dark .inner span, .dark .inner a, .dark .inner label, .dark .inner div {
-            color: #ffffff !important; /* ENFORCED PURE WHITE */
+        /* Expanded General text color override to ensure pure white contrast on all elements */
+        .dark .inner, 
+        .dark .inner p, 
+        .dark .inner span, 
+        .dark .inner a, 
+        .dark .inner label, 
+        .dark .inner div, 
+        .dark .inner button,
+        .dark .inner input, /* Explicitly target input fields */
+        .dark .inner select, /* Explicitly target select fields */
+        .dark .inner textarea, /* Explicitly target textarea fields */
+        .dark .inner h1, .dark .inner h2, .dark .inner h3 {
+             color: #ffffff !important; /* ENFORCED PURE WHITE */
         }
 
         /* Override specific bright elements in dark mode (headers should be white) */
-        .dark .dashboard-header,
-        .dark h1, .dark h2, .dark h3 {
+        .dark .dashboard-header {
             color: #ffffff !important;
         }
         
         /* Override nav link colors in dark mode */
         .dark .nav-btn {
-            color: #e5e7eb !important; /* Light gray for inactive tabs - UPDATED for contrast */
+            color: #e5e7eb !important; /* Light gray for inactive tabs */
         }
         .dark .nav-btn.active {
             border-bottom-color: #48bb78; /* Brighter green for active tab */
@@ -114,7 +125,8 @@
                 <div class="flex justify-between items-center mb-6">
                     <!-- Logo and Heading (Retained) -->
                     <div class="flex items-center">
-                        <img src="https://res.cloudinary.com/dy2hxcyaf/image/upload/v1757700806/newbhlogo_umwqzy.svg" alt="Blooming Kids House Logo" class="h-16 w-auto mr-4" style="filter: drop-shadow(0 0 5px rgba(0, 0, 0, 0.2));">
+                        <!-- ID ADDED HERE for dark mode contrast fix -->
+                        <img id="logoImg" src="https://res.cloudinary.com/dy2hxcyaf/image/upload/v1757700806/newbhlogo_umwqzy.svg" alt="Blooming Kids House Logo" class="h-16 w-auto mr-4" style="filter: drop-shadow(0 0 5px rgba(0, 0, 0, 0.2));">
                         
                         <!-- UPDATED: Added ID to target with JS for personalization -->
                         <h1 id="tutorNameHeading" class="text-3xl font-bold dashboard-header">Welcome, Tutor!</h1>
