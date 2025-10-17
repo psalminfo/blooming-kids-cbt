@@ -24,6 +24,7 @@
             padding: 8px 16px;
             border-bottom: 2px solid transparent;
             transition: all 0.3s ease;
+            white-space: nowrap;
         }
         .nav-btn.active {
             border-bottom-color: #16a34a; /* green-600 */
@@ -32,24 +33,27 @@
         
         /* Overrides to fit Dashboard into Colorlib wrapper structure */
         .wrapper {
-            padding: 20px 0;
+            padding: 10px 0;
             display: flex;
             justify-content: center;
             align-items: flex-start;
             min-height: 100vh;
             background-image: url('images/bg-registration-form-2.jpg') !important;
+            background-size: cover;
+            background-position: center;
             transition: background-color 0.3s;
         }
         .inner {
             max-width: 1280px; 
-            width: 90%; 
-            padding: 40px;
+            width: 95%; 
+            padding: 20px;
             /* LIGHT MODE: White background and dark text defaults are retained (Black on White) */
             background: #ffffff; 
             border-radius: 10px;
             box-shadow: 0 0 10px rgba(0, 0, 0, 0.2);
             min-height: 80vh; 
             transition: background-color 0.3s, color 0.3s;
+            margin: 10px 0;
         }
         
         /* Ensure Dashboard title elements are styled for the new UI */
@@ -57,6 +61,93 @@
             color: #333; /* LIGHT MODE: Dark text for headers */
             text-shadow: none;
             transition: color 0.3s;
+        }
+
+        /* Mobile-first responsive design */
+        @media (max-width: 768px) {
+            .wrapper {
+                padding: 5px 0;
+            }
+            .inner {
+                width: 98%;
+                padding: 15px;
+                margin: 5px 0;
+            }
+            
+            .header-container {
+                flex-direction: column;
+                align-items: flex-start !important;
+                gap: 15px;
+            }
+            
+            .logo-title-container {
+                flex-direction: column;
+                align-items: flex-start !important;
+                text-align: left;
+                width: 100%;
+            }
+            
+            .action-buttons {
+                width: 100%;
+                justify-content: space-between;
+                gap: 10px;
+            }
+            
+            .action-buttons .btn-mobile {
+                flex: 1;
+                min-width: 0;
+                padding: 10px 8px;
+                font-size: 0.875rem;
+            }
+            
+            #tutorNameHeading {
+                font-size: 1.5rem;
+                margin-top: 10px;
+            }
+            
+            #logoImg {
+                height: 50px !important;
+            }
+            
+            .nav-container {
+                overflow-x: auto;
+                padding-bottom: 5px;
+            }
+            
+            .nav-buttons {
+                display: flex;
+                min-width: max-content;
+                gap: 10px;
+            }
+            
+            .nav-btn {
+                padding: 8px 12px;
+                font-size: 1rem;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .inner {
+                padding: 12px;
+                border-radius: 8px;
+            }
+            
+            .action-buttons {
+                flex-direction: column;
+            }
+            
+            .action-buttons .btn-mobile {
+                width: 100%;
+            }
+            
+            #tutorNameHeading {
+                font-size: 1.25rem;
+            }
+            
+            .nav-btn {
+                padding: 6px 10px;
+                font-size: 0.9rem;
+            }
         }
 
         /* --- DARK MODE STYLES (White on Dark Gray) --- */
@@ -156,6 +247,15 @@
              /* Ensure buttons maintain contrast */
              filter: brightness(1.2);
         }
+
+        /* Hide scrollbar for nav but keep functionality */
+        .nav-container::-webkit-scrollbar {
+            display: none;
+        }
+        .nav-container {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
     </style>
 </head>
 <body>
@@ -163,41 +263,47 @@
     <div class="wrapper">
         <div class="inner">
             <div class="max-w-7xl mx-auto">
-                <div class="flex justify-between items-center mb-6">
-                    <div class="flex items-center">
-                        <img id="logoImg" src="https://res.cloudinary.com/dy2hxcyaf/image/upload/v1757700806/newbhlogo_umwqzy.svg" alt="Blooming Kids House Logo" class="h-16 w-auto mr-4" style="filter: drop-shadow(0 0 5px rgba(0, 0, 0, 0.2));">
+                <!-- Updated header with mobile-friendly classes -->
+                <div class="flex justify-between items-center mb-6 header-container">
+                    <div class="flex items-center logo-title-container">
+                        <img id="logoImg" src="https://res.cloudinary.com/dy2hxcyaf/image/upload/v1757700806/newbhlogo_umwqzy.svg" alt="Blooming Kids House Logo" class="h-16 w-auto mr-4 mobile-logo" style="filter: drop-shadow(0 0 5px rgba(0, 0, 0, 0.2));">
                         
-                        <h1 id="tutorNameHeading" class="text-3xl font-bold dashboard-header">Welcome, Tutor!</h1>
+                        <h1 id="tutorNameHeading" class="text-3xl font-bold dashboard-header mobile-title">Welcome, Tutor!</h1>
                     </div>
                     
-                    <div class="flex space-x-3 items-center">
-                        <button id="modeToggle" class="p-3 rounded-full bg-gray-200 hover:bg-gray-300 text-gray-700 dark:bg-gray-600 dark:hover:bg-gray-700 dark:text-white transition-colors duration-300 shadow-md" aria-label="Toggle dark mode">
+                    <div class="flex space-x-3 items-center action-buttons">
+                        <button id="modeToggle" class="p-3 rounded-full bg-gray-200 hover:bg-gray-300 text-gray-700 dark:bg-gray-600 dark:hover:bg-gray-700 dark:text-white transition-colors duration-300 shadow-md btn-mobile" aria-label="Toggle dark mode">
                             <i class="fas fa-moon" id="modeIcon"></i>
                         </button>
 
                         <a id="whatsappBtn" 
                            href="https://wa.me/2348158768689" 
                            target="_blank" 
-                           class="bg-green-500 text-white px-4 py-2 rounded flex items-center hover:bg-green-600 shadow-md transition-colors duration-300"
+                           class="bg-green-500 text-white px-4 py-2 rounded flex items-center hover:bg-green-600 shadow-md transition-colors duration-300 btn-mobile"
                            title="Contact Tech Support via WhatsApp">
                             <i class="fab fa-whatsapp mr-2 text-lg"></i> 
-                            Tech Support
+                            <span class="mobile-text">Tech Support</span>
                         </a>
 
-                        <button id="logoutBtn" class="bg-yellow-400 text-white px-4 py-2 rounded hover:bg-yellow-500 shadow-md">Logout</button>
+                        <button id="logoutBtn" class="bg-yellow-400 text-white px-4 py-2 rounded hover:bg-yellow-500 shadow-md btn-mobile">
+                            <span class="mobile-text">Logout</span>
+                        </button>
                     </div>
                 </div>
                 
-                <nav class="flex space-x-4 mb-6 border-b border-gray-200 dark:border-gray-700">
-                    <button id="navDashboard" class="nav-btn text-lg font-semibold active dashboard-header">Dashboard</button>
-                    <button id="navStudentDatabase" class="nav-btn text-lg font-semibold text-gray-500 hover:text-green-600">Student Database</button>
+                <!-- Updated nav with mobile scrolling -->
+                <nav class="mb-6 border-b border-gray-200 dark:border-gray-700 nav-container">
+                    <div class="flex space-x-4 nav-buttons">
+                        <button id="navDashboard" class="nav-btn text-lg font-semibold active dashboard-header">Dashboard</button>
+                        <button id="navStudentDatabase" class="nav-btn text-lg font-semibold text-gray-500 hover:text-green-600">Student Database</button>
+                    </div>
                 </nav>
 
                 <div id="mainContent">
-                    <p class="text-center text-gray-600 mt-12">Checking user permissions...</p>
+                    <p class="text-center text-gray-600 mt-12 mobile-content">Checking user permissions...</p>
                 </div>
             </div>
-            </div>
+        </div>
     </div>
     
     <script type="module" src="tutor.js"></script>
@@ -241,6 +347,26 @@
                 const newTheme = currentTheme === 'light' ? 'dark' : 'light';
                 setTheme(newTheme);
             });
+
+            // 3. Mobile-specific enhancements
+            function handleResize() {
+                const isMobile = window.innerWidth < 768;
+                
+                // Add mobile-specific classes for further customization
+                if (isMobile) {
+                    document.body.classList.add('mobile-view');
+                    document.body.classList.remove('desktop-view');
+                } else {
+                    document.body.classList.add('desktop-view');
+                    document.body.classList.remove('mobile-view');
+                }
+            }
+
+            // Initial check
+            handleResize();
+            
+            // Listen for resize events
+            window.addEventListener('resize', handleResize);
         });
     </script>
 </body>
