@@ -5,10 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Tutor Portal - Blooming Kids House</title>
     
-    <!-- Original Tailwind Link (Retained for existing utility classes) [cite: tutor.html] -->
+    <!-- Original Tailwind Link (Retained for existing utility classes) -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" />
    
-    <!-- Google Analytics Script - RETAINED [cite: tutor.html] -->
+    <!-- Google Analytics Script - RETAINED -->
     <script async src="https://www.googletagmanager.com/gtag/js?id=G-NBTVEGH1SL"></script>
     <script>
         window.dataLayer = window.dataLayer || [];
@@ -19,6 +19,8 @@
     <!-- End Google Analytics Script -->
    
     <!-- COLORLIB UI STYLESHEETS (from index.html) -->
+    <!-- Added Font Awesome for icons (WhatsApp/Mode Toggle) -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     <link rel="stylesheet" href="fonts/material-design-iconic-font/css/material-design-iconic-font.min.css">
     <link rel="stylesheet" href="css/style.css">
     
@@ -35,69 +37,166 @@
         }
         
         /* Overrides to fit Dashboard into Colorlib wrapper structure */
-        /* Center the wrapper and allow it to be larger than the default form */
         .wrapper {
             padding: 20px 0;
             display: flex;
             justify-content: center;
-            align-items: flex-start; /* Align content to the top instead of the middle */
+            align-items: flex-start;
             min-height: 100vh;
             background-image: url('images/bg-registration-form-2.jpg') !important;
+            transition: background-color 0.3s;
         }
-        /* Modify the inner container to be a wide, readable dashboard panel */
         .inner {
-            /* Max width of 7xl container used in original tutor.html */
             max-width: 1280px; 
-            width: 90%; /* Responsive width */
+            width: 90%; 
             padding: 40px;
-            background: #ffffff; /* Use solid white for dashboard readability */
+            background: #ffffff; 
             border-radius: 10px;
             box-shadow: 0 0 10px rgba(0, 0, 0, 0.2);
-            /* Remove fixed height constraint from Colorlib CSS */
             min-height: 80vh; 
+            transition: background-color 0.3s, color 0.3s;
         }
         
         /* Ensure Dashboard title elements are styled for the new UI */
         .dashboard-header {
-            color: #333; /* Dark text for visibility on white inner background */
+            color: #333; 
             text-shadow: none;
+            transition: color 0.3s;
+        }
+
+        /* --- DARK MODE STYLES --- */
+        .dark .wrapper {
+            background-color: #1a202c !important; /* Darker wrapper background */
+            background-image: none !important; /* Remove registration form image in dark mode */
+        }
+
+        .dark .inner {
+            background: #2d3748; /* Dark gray for the main content panel */
+            box-shadow: 0 0 15px rgba(0, 0, 0, 0.5);
+        }
+        
+        /* General text color in dark mode */
+        .dark .inner * {
+            color: #e2e8f0 !important;
+        }
+
+        /* Override specific bright elements in dark mode */
+        .dark .dashboard-header,
+        .dark h1, .dark h2, .dark h3 {
+            color: #ffffff !important;
+        }
+        
+        /* Override nav link colors in dark mode */
+        .dark .nav-btn {
+            color: #a0aec0 !important;
+        }
+        .dark .nav-btn.active {
+            border-bottom-color: #48bb78; /* Brighter green for active tab */
+            color: #48bb78 !important;
+        }
+        .dark #logoutBtn, .dark #whatsappBtn {
+             /* Ensure buttons maintain contrast */
+             filter: brightness(1.2);
         }
     </style>
 </head>
-<!-- The body contains the wrapper for the Colorlib background image -->
 <body>
 
     <div class="wrapper">
         <div class="inner">
-            <!-- START: ORIGINAL TUTOR.HTML CONTENT -->
+            <!-- START: TUTOR.HTML CONTENT (Functionality Retained) -->
             <div class="max-w-7xl mx-auto">
                 <div class="flex justify-between items-center mb-6">
                     <!-- Logo and Heading (Retained) -->
                     <div class="flex items-center">
                         <img src="https://res.cloudinary.com/dy2hxcyaf/image/upload/v1757700806/newbhlogo_umwqzy.svg" alt="Blooming Kids House Logo" class="h-16 w-auto mr-4" style="filter: drop-shadow(0 0 5px rgba(0, 0, 0, 0.2));">
-                        <!-- Applied dark text for visibility on white background -->
-                        <h1 class="text-3xl font-bold dashboard-header">Tutor Portal</h1>
+                        
+                        <!-- UPDATED: Added ID to target with JS for personalization -->
+                        <h1 id="tutorNameHeading" class="text-3xl font-bold dashboard-header">Welcome, Tutor!</h1>
                     </div>
-                    <!-- Logout Button (Retained) -->
-                    <button id="logoutBtn" class="bg-yellow-400 text-white px-4 py-2 rounded hover:bg-yellow-500 shadow-md">Logout</button>
+                    
+                    <!-- New Container for Buttons -->
+                    <div class="flex space-x-3 items-center">
+                        <!-- 1. MODE TOGGLE BUTTON -->
+                        <button id="modeToggle" class="p-3 rounded-full bg-gray-200 hover:bg-gray-300 text-gray-700 dark:bg-gray-600 dark:hover:bg-gray-700 dark:text-white transition-colors duration-300 shadow-md" aria-label="Toggle dark mode">
+                            <!-- Icon will be set dynamically by JavaScript -->
+                            <i class="fas fa-moon" id="modeIcon"></i>
+                        </button>
+
+                        <!-- 2. WHATSAPP SUPPORT BUTTON -->
+                        <a id="whatsappBtn" 
+                           href="https://wa.me/2348158768689" 
+                           target="_blank" 
+                           class="bg-green-500 text-white px-4 py-2 rounded flex items-center hover:bg-green-600 shadow-md transition-colors duration-300"
+                           title="Contact Support via WhatsApp">
+                            <i class="fab fa-whatsapp mr-2 text-lg"></i> 
+                            Support
+                        </a>
+
+                        <!-- 3. LOGOUT BUTTON -->
+                        <button id="logoutBtn" class="bg-yellow-400 text-white px-4 py-2 rounded hover:bg-yellow-500 shadow-md">Logout</button>
+                    </div>
                 </div>
                 
-                <!-- Navigation (Retained) -->
-                <nav class="flex space-x-4 mb-6 border-b border-gray-200">
+                <!-- Navigation (Functionality Retained) -->
+                <nav class="flex space-x-4 mb-6 border-b border-gray-200 dark:border-gray-700">
                     <button id="navDashboard" class="nav-btn text-lg font-semibold active dashboard-header">Dashboard</button>
                     <button id="navStudentDatabase" class="nav-btn text-lg font-semibold text-gray-500 hover:text-green-600">Student Database</button>
                 </nav>
 
-                <!-- Main Content Area (Retained - Your data/functions appear here via tutor.js) -->
+                <!-- Main Content Area (Functionality Retained - Your data/functions appear here via tutor.js) -->
                 <div id="mainContent">
                     <p class="text-center text-gray-600 mt-12">Checking user permissions...</p>
                 </div>
             </div>
-            <!-- END: ORIGINAL TUTOR.HTML CONTENT -->
+            <!-- END: TUTOR.HTML CONTENT -->
         </div>
     </div>
     
     <!-- Original JavaScript Link - RETAINED -->
     <script type="module" src="tutor.js"></script>
+
+    <!-- Theme Toggle Script -->
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const body = document.body;
+            const toggleButton = document.getElementById('modeToggle');
+            const modeIcon = document.getElementById('modeIcon');
+            const modeKey = 'tutor_theme';
+
+            // Function to set the theme
+            const setTheme = (theme) => {
+                if (theme === 'dark') {
+                    body.classList.add('dark');
+                    modeIcon.classList.remove('fa-moon');
+                    modeIcon.classList.add('fa-sun');
+                    localStorage.setItem(modeKey, 'dark');
+                } else {
+                    body.classList.remove('dark');
+                    modeIcon.classList.remove('fa-sun');
+                    modeIcon.classList.add('fa-moon');
+                    localStorage.setItem(modeKey, 'light');
+                }
+            };
+
+            // 1. Load saved theme or default to light
+            const savedTheme = localStorage.getItem(modeKey);
+            if (savedTheme) {
+                setTheme(savedTheme);
+            } else if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+                // Check system preference if no saved theme
+                setTheme('dark');
+            } else {
+                setTheme('light');
+            }
+
+            // 2. Add event listener to toggle theme on click
+            toggleButton.addEventListener('click', () => {
+                const currentTheme = body.classList.contains('dark') ? 'dark' : 'light';
+                const newTheme = currentTheme === 'light' ? 'dark' : 'light';
+                setTheme(newTheme);
+            });
+        });
+    </script>
 </body>
 </html>
