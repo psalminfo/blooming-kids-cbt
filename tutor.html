@@ -4,9 +4,11 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Tutor Portal - Blooming Kids House</title>
+    
+    <!-- Original Tailwind Link (Retained for existing utility classes) [cite: tutor.html] -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" />
    
-    <!-- Google Analytics Script - ADDED HERE -->
+    <!-- Google Analytics Script - RETAINED [cite: tutor.html] -->
     <script async src="https://www.googletagmanager.com/gtag/js?id=G-NBTVEGH1SL"></script>
     <script>
         window.dataLayer = window.dataLayer || [];
@@ -16,7 +18,12 @@
     </script>
     <!-- End Google Analytics Script -->
    
+    <!-- COLORLIB UI STYLESHEETS (from index.html) -->
+    <link rel="stylesheet" href="fonts/material-design-iconic-font/css/material-design-iconic-font.min.css">
+    <link rel="stylesheet" href="css/style.css">
+    
     <style>
+        /* Custom Styles for Nav Buttons - RETAINED */
         .nav-btn {
             padding: 8px 16px;
             border-bottom: 2px solid transparent;
@@ -26,29 +33,71 @@
             border-bottom-color: #16a34a; /* green-600 */
             color: #16a34a;
         }
+        
+        /* Overrides to fit Dashboard into Colorlib wrapper structure */
+        /* Center the wrapper and allow it to be larger than the default form */
+        .wrapper {
+            padding: 20px 0;
+            display: flex;
+            justify-content: center;
+            align-items: flex-start; /* Align content to the top instead of the middle */
+            min-height: 100vh;
+            background-image: url('images/bg-registration-form-2.jpg') !important;
+        }
+        /* Modify the inner container to be a wide, readable dashboard panel */
+        .inner {
+            /* Max width of 7xl container used in original tutor.html */
+            max-width: 1280px; 
+            width: 90%; /* Responsive width */
+            padding: 40px;
+            background: #ffffff; /* Use solid white for dashboard readability */
+            border-radius: 10px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.2);
+            /* Remove fixed height constraint from Colorlib CSS */
+            min-height: 80vh; 
+        }
+        
+        /* Ensure Dashboard title elements are styled for the new UI */
+        .dashboard-header {
+            color: #333; /* Dark text for visibility on white inner background */
+            text-shadow: none;
+        }
     </style>
 </head>
-<body class="bg-green-50 min-h-screen">
-    <div class="max-w-7xl mx-auto p-6">
-        <div class="flex justify-between items-center mb-6">
-            <!-- New container for the logo and heading -->
-            <div class="flex items-center">
-                <!-- The logo with a glowing black shadow and a size that makes it clearly visible -->
-                <img src="https://res.cloudinary.com/dy2hxcyaf/image/upload/v1757700806/newbhlogo_umwqzy.svg" alt="Blooming Kids House Logo" class="h-16 w-auto mr-4" style="filter: drop-shadow(0 0 5px rgba(0, 0, 0, 0.8));">
-                <h1 class="text-3xl font-bold text-green-800">Tutor Portal</h1>
-            </div>
-            <button id="logoutBtn" class="bg-yellow-400 text-white px-4 py-2 rounded hover:bg-yellow-500">Logout</button>
-        </div>
-        
-        <nav class="flex space-x-4 mb-6 border-b">
-            <button id="navDashboard" class="nav-btn text-lg font-semibold active">Dashboard</button>
-            <button id="navStudentDatabase" class="nav-btn text-lg font-semibold text-gray-500 hover:text-green-600">Student Database</button>
-        </nav>
+<!-- The body contains the wrapper for the Colorlib background image -->
+<body>
 
-        <div id="mainContent">
-            <p class="text-center text-gray-600 mt-12">Checking user permissions...</p>
+    <div class="wrapper">
+        <div class="inner">
+            <!-- START: ORIGINAL TUTOR.HTML CONTENT -->
+            <div class="max-w-7xl mx-auto">
+                <div class="flex justify-between items-center mb-6">
+                    <!-- Logo and Heading (Retained) -->
+                    <div class="flex items-center">
+                        <img src="https://res.cloudinary.com/dy2hxcyaf/image/upload/v1757700806/newbhlogo_umwqzy.svg" alt="Blooming Kids House Logo" class="h-16 w-auto mr-4" style="filter: drop-shadow(0 0 5px rgba(0, 0, 0, 0.2));">
+                        <!-- Applied dark text for visibility on white background -->
+                        <h1 class="text-3xl font-bold dashboard-header">Tutor Portal</h1>
+                    </div>
+                    <!-- Logout Button (Retained) -->
+                    <button id="logoutBtn" class="bg-yellow-400 text-white px-4 py-2 rounded hover:bg-yellow-500 shadow-md">Logout</button>
+                </div>
+                
+                <!-- Navigation (Retained) -->
+                <nav class="flex space-x-4 mb-6 border-b border-gray-200">
+                    <button id="navDashboard" class="nav-btn text-lg font-semibold active dashboard-header">Dashboard</button>
+                    <button id="navStudentDatabase" class="nav-btn text-lg font-semibold text-gray-500 hover:text-green-600">Student Database</button>
+                </nav>
+
+                <!-- Main Content Area (Retained - Your data/functions appear here via tutor.js) -->
+                <div id="mainContent">
+                    <p class="text-center text-gray-600 mt-12">Checking user permissions...</p>
+                </div>
+            </div>
+            <!-- END: ORIGINAL TUTOR.HTML CONTENT -->
         </div>
     </div>
+    
+    <!-- Original JavaScript Link - RETAINED -->
     <script type="module" src="tutor.js"></script>
 </body>
 </html>
