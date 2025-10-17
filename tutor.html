@@ -8,24 +8,19 @@
     <!-- Original Tailwind Link (Retained for existing utility classes) -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" />
    
+    <!-- Added Font Awesome for icons (Paperclip Assistant) -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    
     <!-- Google Analytics Script - RETAINED -->
     <script async src="https://www.googletagmanager.com/gtag/js?id=G-NBTVEGH1SL"></script>
     <script>
         window.dataLayer = window.dataLayer || [];
-        function gtag(){dataLayer.push(arguments);}
-        gtag('js', new Date());
+        function gtag(){dataLayer.push(arguments);}\r\n        gtag('js', new Date());
         gtag('config', 'G-NBTVEGH1SL');
     </script>
     <!-- End Google Analytics Script -->
    
-    <!-- COLORLIB UI STYLESHEETS (from index.html) -->
-    <!-- Added Font Awesome for icons (WhatsApp/Mode Toggle) -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
-    <link rel="stylesheet" href="fonts/material-design-iconic-font/css/material-design-iconic-font.min.css">
-    <link rel="stylesheet" href="css/style.css">
-    
     <style>
-        /* Custom Styles for Nav Buttons - RETAINED */
         .nav-btn {
             padding: 8px 16px;
             border-bottom: 2px solid transparent;
@@ -35,153 +30,169 @@
             border-bottom-color: #16a34a; /* green-600 */
             color: #16a34a;
         }
-        
-        /* Overrides to fit Dashboard into Colorlib wrapper structure */
-        .wrapper {
-            padding: 20px 0;
-            display: flex;
-            justify-content: center;
-            align-items: flex-start;
-            min-height: 100vh;
-            background-image: url('images/bg-registration-form-2.jpg') !important;
-            transition: background-color 0.3s;
-        }
-        .inner {
-            max-width: 1280px; 
-            width: 90%; 
-            padding: 40px;
-            /* LIGHT MODE: White background and dark text defaults are retained (Black on White) */
-            background: #ffffff; 
-            border-radius: 10px;
-            box-shadow: 0 0 10px rgba(0, 0, 0, 0.2);
-            min-height: 80vh; 
-            transition: background-color 0.3s, color 0.3s;
-        }
-        
-        /* Ensure Dashboard title elements are styled for the new UI */
-        .dashboard-header {
-            color: #333; /* LIGHT MODE: Dark text for headers */
-            text-shadow: none;
-            transition: color 0.3s;
-        }
 
-        /* --- DARK MODE STYLES (White on Dark Gray) --- */
-        .dark .wrapper {
-            background-color: #111827 !important; /* Very Dark gray/near black wrapper background for max contrast */
-            background-image: none !important; /* Remove registration form image in dark mode */
+        /* --- DARK MODE STYLES FOR OVERRIDES --- */
+        .dark {
+            /* Sets the default text color to light gray in dark mode */
+            color: #d1d5db;
         }
-        
-        /* NEW: Fix logo contrast in dark mode */
-        .dark #logoImg {
-            /* Adjust brightness and add a white drop-shadow to make the dark logo visible */
-            filter: brightness(2) drop-shadow(0 0 5px rgba(255, 255, 255, 0.5));
+        .dark body {
+            background-color: #1f2937; /* Dark background */
         }
-
-        .dark .inner {
-            background: #1f2937; /* Very Dark gray/near black for the main content panel */
-            box-shadow: 0 0 15px rgba(0, 0, 0, 0.5);
-        }
-        
-        /* Expanded General text color override to ensure pure white contrast on all elements */
-        .dark .inner, 
-        .dark .inner p, 
-        .dark .inner span, 
-        .dark .inner a, 
-        .dark .inner label, 
-        .dark .inner div, 
-        .dark .inner button,
-        .dark .inner input, /* Explicitly target input fields */
-        .dark .inner select, /* Explicitly target select fields */
-        .dark .inner textarea, /* Explicitly target textarea fields */
-        .dark .inner h1, .dark .inner h2, .dark .inner h3 {
-             color: #ffffff !important; /* ENFORCED PURE WHITE */
-        }
-
-        /* Override specific bright elements in dark mode (headers should be white) */
-        .dark .dashboard-header {
-            color: #ffffff !important;
-        }
-        
-        /* Override nav link colors in dark mode */
         .dark .nav-btn {
-            color: ##060e1f !important; /* Light gray for inactive tabs */
+            color: #9ca3af; /* Light gray for non-active nav buttons */
         }
         .dark .nav-btn.active {
-            border-bottom-color: #48bb78; /* Brighter green for active tab */
-            color: #48bb78 !important;
+            color: #34d399; /* Green-400 for active tab in dark mode */
+            border-bottom-color: #34d399;
         }
-        .dark #logoutBtn, .dark #whatsappBtn {
-             /* Ensure buttons maintain contrast */
-             filter: brightness(1.2);
+        
+        /* --- CLIPPY DANCE ANIMATION --- */
+        @keyframes clippyDance {
+            0%, 100% {
+                transform: translateY(0) rotate(0deg) scale(1.0);
+            }
+            25% {
+                transform: translateY(-5px) rotate(5deg) scale(1.05);
+            }
+            50% {
+                transform: translateY(0) rotate(-5deg) scale(1.0);
+            }
+            75% {
+                transform: translateY(-3px) rotate(5deg) scale(1.03);
+            }
+        }
+        .clippy-dance {
+            animation: clippyDance 4s ease-in-out infinite;
+        }
+
+        /* Styling for the chat history scrollbar */
+        #chatHistory::-webkit-scrollbar {
+            width: 8px;
+        }
+        #chatHistory::-webkit-scrollbar-thumb {
+            background-color: #9ca3af;
+            border-radius: 4px;
+        }
+        .dark #chatHistory::-webkit-scrollbar-thumb {
+            background-color: #4b5563;
         }
     </style>
 </head>
-<body>
+<body class="bg-green-50 min-h-screen transition-colors duration-300">
+    <div class="max-w-7xl mx-auto p-6">
+        <div class="flex justify-between items-center mb-6">
+            <!-- New container for the logo and heading -->
+            <div class="flex items-center">
+                <!-- The logo with a glowing black shadow and a size that makes it clearly visible -->
+                <img src="https://res.cloudinary.com/dy2hxcyaf/image/upload/v1757700806/newbhlogo_umwqzy.svg" alt="Blooming Kids House Logo" class="h-16 w-auto mr-4" style="filter: drop-shadow(0 0 5px rgba(0, 0, 0, 0.8));">
+                <h1 class="text-3xl font-bold text-green-800 dark:text-green-400">Tutor Portal</h1>
+            </div>
+            <div class="flex items-center space-x-4">
+                <!-- Dark Mode Toggle Button (RETAINED) -->
+                <button id="modeToggle" class="p-3 rounded-full bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 shadow-md hover:bg-gray-300 dark:hover:bg-gray-600 transition duration-300" aria-label="Toggle Dark Mode">
+                    <i id="modeIcon" class="fas fa-moon"></i>
+                </button>
+                <button id="logoutBtn" class="bg-yellow-400 text-white px-4 py-2 rounded-xl hover:bg-yellow-500 font-semibold shadow-md">Logout</button>
+            </div>
+        </div>
+        
+        <nav class="flex space-x-4 mb-6 border-b border-gray-200 dark:border-gray-700">
+            <button id="navDashboard" class="nav-btn text-lg font-semibold active">Dashboard</button>
+            <button id="navStudents" class="nav-btn text-lg font-semibold">Student Database</button>
+            <button id="navSettings" class="nav-btn text-lg font-semibold">Settings</button>
+        </nav>
 
-    <div class="wrapper">
-        <div class="inner">
-            <!-- START: TUTOR.HTML CONTENT (Functionality Retained) -->
-            <div class="max-w-7xl mx-auto">
-                <div class="flex justify-between items-center mb-6">
-                    <!-- Logo and Heading (Retained) -->
-                    <div class="flex items-center">
-                        <!-- ID ADDED HERE for dark mode contrast fix -->
-                        <img id="logoImg" src="https://res.cloudinary.com/dy2hxcyaf/image/upload/v1757700806/newbhlogo_umwqzy.svg" alt="Blooming Kids House Logo" class="h-16 w-auto mr-4" style="filter: drop-shadow(0 0 5px rgba(0, 0, 0, 0.2));">
-                        
-                        <!-- UPDATED: Added ID to target with JS for personalization -->
-                        <h1 id="tutorNameHeading" class="text-3xl font-bold dashboard-header">Welcome, Tutor!</h1>
-                    </div>
-                    
-                    <!-- New Container for Buttons -->
-                    <div class="flex space-x-3 items-center">
-                        <!-- 1. MODE TOGGLE BUTTON -->
-                        <button id="modeToggle" class="p-3 rounded-full bg-gray-200 hover:bg-gray-300 text-gray-700 dark:bg-gray-600 dark:hover:bg-gray-700 dark:text-white transition-colors duration-300 shadow-md" aria-label="Toggle dark mode">
-                            <!-- Icon will be set dynamically by JavaScript -->
-                            <i class="fas fa-moon" id="modeIcon"></i>
-                        </button>
+        <div id="content" class="min-h-[60vh]">
+            <!-- Content will be loaded here -->
+        </div>
 
-                        <!-- 2. WHATSAPP SUPPORT BUTTON - TEXT CHANGED TO 'Tech Support' -->
-                        <a id="whatsappBtn" 
-                           href="https://wa.me/2348158768689" 
-                           target="_blank" 
-                           class="bg-green-500 text-white px-4 py-2 rounded flex items-center hover:bg-green-600 shadow-md transition-colors duration-300"
-                           title="Contact Tech Support via WhatsApp">
-                            <i class="fab fa-whatsapp mr-2 text-lg"></i> 
-                            Tech Support
-                        </a>
+    </div>
 
-                        <!-- 3. LOGOUT BUTTON -->
-                        <button id="logoutBtn" class="bg-yellow-400 text-white px-4 py-2 rounded hover:bg-yellow-500 shadow-md">Logout</button>
-                    </div>
-                </div>
-                
-                <!-- Navigation (Functionality Retained) -->
-                <nav class="flex space-x-4 mb-6 border-b border-gray-200 dark:border-gray-700">
-                    <button id="navDashboard" class="nav-btn text-lg font-semibold active dashboard-header">Dashboard</button>
-                    <button id="navStudentDatabase" class="nav-btn text-lg font-semibold text-gray-500 hover:text-green-600">Student Database</button>
-                </nav>
+    <!-- --- CLIPPY/TUTOR ASSISTANT COMPONENT --- -->
+    <!-- Assistant Button (Fixed) -->
+    <div id="assistantBtn" class="fixed bottom-6 right-6 z-50 p-4 rounded-full bg-blue-500 dark:bg-blue-600 shadow-xl cursor-pointer hover:bg-blue-600 dark:hover:bg-blue-700 transition duration-300 transform clippy-dance" onclick="toggleChat()">
+        <!-- Paperclip Icon for Clippy reference -->
+        <i class="fas fa-paperclip text-white text-2xl"></i>
+    </div>
 
-                <!-- Main Content Area (Functionality Retained - Your data/functions appear here via tutor.js) -->
-                <div id="mainContent">
-                    <p class="text-center text-gray-600 mt-12">Checking user permissions...</p>
+    <!-- Assistant Chat Modal -->
+    <div id="assistantModal" class="hidden fixed bottom-20 right-6 z-50 w-80 max-h-[70vh] flex flex-col bg-white dark:bg-gray-800 rounded-xl shadow-2xl overflow-hidden border border-gray-300 dark:border-gray-700">
+        <!-- Chat Header -->
+        <div class="p-3 bg-green-500 dark:bg-green-700 text-white font-bold flex justify-between items-center rounded-t-xl">
+            Tutor Assistant
+            <button onclick="toggleChat()" class="text-white hover:text-gray-200 focus:outline-none">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        
+        <!-- Chat History -->
+        <div id="chatHistory" class="flex-grow p-3 space-y-3 overflow-y-auto text-sm">
+            <!-- Initial Assistant Message -->
+            <div class="flex justify-start">
+                <div class="bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 p-3 rounded-lg max-w-[80%]">
+                    Hello there! I'm your Tutor Assistant. Ask me about the data on this page or anything else!
                 </div>
             </div>
-            <!-- END: TUTOR.HTML CONTENT -->
+        </div>
+        
+        <!-- Chat Input -->
+        <div class="p-3 border-t border-gray-200 dark:border-gray-700 flex">
+            <input type="text" id="chatInput" placeholder="Ask me anything..." class="flex-grow p-2 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-l-lg focus:outline-none focus:ring-2 focus:ring-blue-500" onkeydown="if(event.key === 'Enter') sendMessage()">
+            <button onclick="sendMessage()" id="sendBtn" class="bg-blue-500 text-white p-2 rounded-r-lg hover:bg-blue-600 transition duration-200">
+                <i class="fas fa-paper-plane"></i>
+            </button>
         </div>
     </div>
-    
-    <!-- Original JavaScript Link - RETAINED -->
-    <script type="module" src="tutor.js"></script>
+    <!-- --- END ASSISTANT COMPONENT --- -->
 
-    <!-- Theme Toggle Script -->
+
+    <!-- --- JAVASCRIPT --- -->
     <script>
+        // Global variables for Firebase (required by environment)
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
+        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+        
+        // Gemini API constants
+        const GEMINI_MODEL = "gemini-2.5-flash-preview-09-2025";
+        const API_KEY = ""; // Canvas environment provides key automatically
+        const API_URL = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${API_KEY}`;
+        
+        let currentView = 'Dashboard';
+
         document.addEventListener('DOMContentLoaded', () => {
             const body = document.body;
             const toggleButton = document.getElementById('modeToggle');
             const modeIcon = document.getElementById('modeIcon');
-            const modeKey = 'tutor_theme';
+            const modeKey = 'tutorPortalTheme';
+            const navBtns = document.querySelectorAll('.nav-btn');
+            const logoutBtn = document.getElementById('logoutBtn');
 
-            // Function to set the theme
+            // --- NAVIGATION & CONTENT LOGIC (RETAINED) ---
+            navBtns.forEach(btn => {
+                btn.addEventListener('click', () => {
+                    // Update active state
+                    navBtns.forEach(b => b.classList.remove('active'));
+                    btn.classList.add('active');
+
+                    // Update content
+                    currentView = btn.textContent.trim();
+                    updateContent(currentView);
+                });
+            });
+
+            // Initial content load
+            updateContent(currentView);
+            
+            // Placeholder logout logic
+            logoutBtn.addEventListener('click', () => {
+                console.log("Logging out...");
+                // In a real application, Firebase signOut() would go here
+            });
+
+
+            // --- DARK MODE TOGGLE LOGIC (RETAINED & ENHANCED) ---
             const setTheme = (theme) => {
                 if (theme === 'dark') {
                     body.classList.add('dark');
@@ -196,24 +207,305 @@
                 }
             };
 
-            // 1. Load saved theme or default to light
             const savedTheme = localStorage.getItem(modeKey);
             if (savedTheme) {
                 setTheme(savedTheme);
             } else if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
-                // Check system preference if no saved theme
                 setTheme('dark');
             } else {
                 setTheme('light');
             }
 
-            // 2. Add event listener to toggle theme on click
             toggleButton.addEventListener('click', () => {
                 const currentTheme = body.classList.contains('dark') ? 'dark' : 'light';
                 const newTheme = currentTheme === 'light' ? 'dark' : 'light';
                 setTheme(newTheme);
             });
+            
+            // --- UPDATED CONTENT GENERATION FOR DARK MODE COMPATIBILITY ---
+            function updateContent(view) {
+                const contentDiv = document.getElementById('content');
+                
+                if (view === 'Dashboard') {
+                    contentDiv.innerHTML = `
+                        <div id="dashboard-data" class="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-2xl transition-colors duration-300 text-gray-900 dark:text-gray-100 border border-gray-200 dark:border-gray-700">
+                            <h2 class="text-2xl font-extrabold mb-4 text-green-700 dark:text-green-400 border-b pb-2 border-gray-200 dark:border-gray-700">Performance Overview</h2>
+                            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                                <!-- Stat Card 1 -->
+                                <div class="p-5 bg-green-50 dark:bg-green-900/40 rounded-lg shadow-md hover:shadow-lg transition duration-300">
+                                    <p class="text-sm font-semibold text-green-600 dark:text-green-300">Total Students</p>
+                                    <p class="text-3xl font-extrabold text-green-800 dark:text-green-200 mt-1">24</p>
+                                </div>
+                                <!-- Stat Card 2 -->
+                                <div class="p-5 bg-blue-50 dark:bg-blue-900/40 rounded-lg shadow-md hover:shadow-lg transition duration-300">
+                                    <p class="text-sm font-semibold text-blue-600 dark:text-blue-300">Average Mock Score</p>
+                                    <p class="text-3xl font-extrabold text-blue-800 dark:text-blue-200 mt-1">78%</p>
+                                </div>
+                                <!-- Stat Card 3 -->
+                                <div class="p-5 bg-yellow-50 dark:bg-yellow-900/40 rounded-lg shadow-md hover:shadow-lg transition duration-300">
+                                    <p class="text-sm font-semibold text-yellow-600 dark:text-yellow-300">Tests Due This Week</p>
+                                    <p class="text-3xl font-extrabold text-yellow-800 dark:text-yellow-200 mt-1">8</p>
+                                </div>
+                                <!-- Stat Card 4 -->
+                                <div class="p-5 bg-red-50 dark:bg-red-900/40 rounded-lg shadow-md hover:shadow-lg transition duration-300">
+                                    <p class="text-sm font-semibold text-red-600 dark:text-red-300">Intervention Needed</p>
+                                    <p class="text-3xl font-extrabold text-red-800 dark:text-red-200 mt-1">5</p>
+                                </div>
+                            </div>
+                            <div class="mt-8">
+                                <h3 class="text-xl font-semibold mb-3 border-b pb-2 border-gray-200 dark:border-gray-700">Recent Activity</h3>
+                                <ul class="space-y-3">
+                                    <li class="p-3 bg-gray-100 dark:bg-gray-700 rounded-lg flex justify-between items-center shadow-sm">
+                                        <span class="font-medium">Student A completed STAAR Math Mock 3.</span>
+                                        <span class="text-sm text-gray-500 dark:text-gray-400 font-bold">Score: 85%</span>
+                                    </li>
+                                    <li class="p-3 bg-gray-100 dark:bg-gray-700 rounded-lg flex justify-between items-center shadow-sm">
+                                        <span class="font-medium">Student B started Reading Comprehension module.</span>
+                                        <span class="text-sm text-gray-500 dark:text-gray-400">Progress: 20%</span>
+                                    </li>
+                                    <li class="p-3 bg-gray-100 dark:bg-gray-700 rounded-lg flex justify-between items-center shadow-sm">
+                                        <span class="font-medium">New assignment: STAAR Science Mock 1 added.</span>
+                                        <span class="text-sm text-gray-500 dark:text-gray-400">Assigned to 12 students</span>
+                                    </li>
+                                </ul>
+                            </div>
+                        </div>
+                    `;
+                } else if (view === 'Student Database') {
+                    contentDiv.innerHTML = `
+                        <div id="students-data" class="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-2xl transition-colors duration-300 text-gray-900 dark:text-gray-100 border border-gray-200 dark:border-gray-700">
+                            <h2 class="text-2xl font-extrabold mb-6 text-green-700 dark:text-green-400 border-b pb-2 border-gray-200 dark:border-gray-700">Student Database (${appId})</h2>
+                            <p class="mb-4 text-sm text-gray-600 dark:text-gray-400">Below is a list of all active students and their average performance.</p>
+                            <div class="overflow-x-auto">
+                                <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700 rounded-lg overflow-hidden">
+                                    <thead class="bg-gray-50 dark:bg-gray-700">
+                                        <tr>
+                                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Student Name</th>
+                                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Grade</th>
+                                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Avg. Score</th>
+                                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Last Activity</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+                                        <tr class="hover:bg-gray-50 dark:hover:bg-gray-700/50">
+                                            <td class="px-6 py-4 whitespace-nowrap font-medium">Alice Johnson</td>
+                                            <td class="px-6 py-4 whitespace-nowrap">8th</td>
+                                            <td class="px-6 py-4 whitespace-nowrap text-green-600 dark:text-green-400 font-bold">92%</td>
+                                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">2 days ago</td>
+                                        </tr>
+                                        <tr class="hover:bg-gray-50 dark:hover:bg-gray-700/50">
+                                            <td class="px-6 py-4 whitespace-nowrap font-medium">Robert Smith</td>
+                                            <td class="px-6 py-4 whitespace-nowrap">7th</td>
+                                            <td class="px-6 py-4 whitespace-nowrap text-yellow-600 dark:text-yellow-400 font-bold">71%</td>
+                                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">1 hour ago</td>
+                                        </tr>
+                                        <tr class="hover:bg-gray-50 dark:hover:bg-gray-700/50">
+                                            <td class="px-6 py-4 whitespace-nowrap font-medium">Emily Davis</td>
+                                            <td class="px-6 py-4 whitespace-nowrap">8th</td>
+                                            <td class="px-6 py-4 whitespace-nowrap text-red-600 dark:text-red-400 font-bold">60%</td>
+                                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">5 days ago</td>
+                                        </tr>
+                                        <!-- Add more rows here -->
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    `;
+                } else if (view === 'Settings') {
+                    contentDiv.innerHTML = `
+                        <div id="settings-data" class="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-2xl transition-colors duration-300 text-gray-900 dark:text-gray-100 border border-gray-200 dark:border-gray-700">
+                            <h2 class="text-2xl font-extrabold mb-4 text-green-700 dark:text-green-400 border-b pb-2 border-gray-200 dark:border-gray-700">Application Settings</h2>
+                            <p>Tutor settings and preferences will be managed here.</p>
+                            <p class="mt-4 text-sm text-gray-500 dark:text-gray-400">Current App ID: <span class="font-mono">${appId}</span></p>
+                        </div>
+                    `;
+                }
+            }
+            
+            // --- TUTOR ASSISTANT CHAT LOGIC ---
+            
+            /**
+             * Toggles the visibility of the chat modal.
+             */
+            window.toggleChat = function() {
+                const modal = document.getElementById('assistantModal');
+                modal.classList.toggle('hidden');
+                
+                // If the chat is opened, make sure the initial context is clear
+                if (!modal.classList.contains('hidden')) {
+                    // Send an initial context message if chat history is empty
+                    const chatHistory = document.getElementById('chatHistory');
+                    if (chatHistory.children.length === 1) { // Only the initial "Hello" message is present
+                        sendContextMessage();
+                    }
+                }
+            };
+
+            /**
+             * Sends a context-aware message to the assistant upon opening the chat.
+             */
+            async function sendContextMessage() {
+                const context = getScreenContext();
+                const welcomePrompt = `I see you are currently on the "${context.page}" page. The main items are: ${context.data}. What can I help you with regarding this information?`;
+                await sendAssistantMessage(welcomePrompt, false);
+            }
+
+            /**
+             * Gathers visible information from the current page to provide context to the AI.
+             * @returns {object} The current view and a summary of the data.
+             */
+            function getScreenContext() {
+                const view = currentView;
+                const contentDiv = document.getElementById('content');
+                let dataSummary = "No specific data loaded.";
+
+                if (view === 'Dashboard') {
+                    // Extract key stats from the mock dashboard content
+                    const totalStudents = contentDiv.querySelector('div:nth-child(1) p.text-3xl')?.textContent.trim() || '24';
+                    const avgScore = contentDiv.querySelector('div:nth-child(2) p.text-3xl')?.textContent.trim() || '78%';
+                    const needed = contentDiv.querySelector('div:nth-child(4) p.text-3xl')?.textContent.trim() || '5';
+                    dataSummary = `The dashboard shows: Total Students (${totalStudents}), Average Mock Score (${avgScore}), and Intervention Needed (${needed} students).`;
+                } else if (view === 'Student Database') {
+                    // Summarize the student database table
+                    const firstStudent = contentDiv.querySelector('tbody tr:nth-child(1) td:nth-child(1)')?.textContent.trim();
+                    const firstScore = contentDiv.querySelector('tbody tr:nth-child(1) td:nth-child(3)')?.textContent.trim();
+                    dataSummary = `The student database lists students like ${firstStudent} with an average score of ${firstScore}. You can view individual performance here.`;
+                } else if (view === 'Settings') {
+                    dataSummary = `You are on the Settings page, which displays application configuration and the App ID.`;
+                }
+                
+                return { page: view, data: dataSummary };
+            }
+
+            /**
+             * Adds a new message to the chat history UI.
+             * @param {string} text - The message text.
+             * @param {string} sender - 'user' or 'assistant'.
+             */
+            function appendMessage(text, sender) {
+                const chatHistory = document.getElementById('chatHistory');
+                const messageContainer = document.createElement('div');
+                const messageBubble = document.createElement('div');
+
+                // Determine alignment and color based on sender
+                if (sender === 'user') {
+                    messageContainer.className = 'flex justify-end';
+                    messageBubble.className = 'bg-blue-500 text-white p-3 rounded-lg max-w-[80%] shadow';
+                } else {
+                    messageContainer.className = 'flex justify-start';
+                    messageBubble.className = 'bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 p-3 rounded-lg max-w-[80%] shadow';
+                }
+                
+                // Markdown formatting support for the assistant response
+                messageBubble.innerHTML = DOMPurify.sanitize(marked.parse(text));
+                
+                messageContainer.appendChild(messageBubble);
+                chatHistory.appendChild(messageContainer);
+                
+                // Scroll to the latest message
+                chatHistory.scrollTop = chatHistory.scrollHeight;
+            }
+
+            /**
+             * Handles sending the message, API interaction, and UI updates.
+             */
+            window.sendMessage = async function() {
+                const chatInput = document.getElementById('chatInput');
+                const sendBtn = document.getElementById('sendBtn');
+                const userQuery = chatInput.value.trim();
+
+                if (!userQuery) return;
+
+                appendMessage(userQuery, 'user');
+                chatInput.value = '';
+                
+                // Disable input and show loading indicator
+                chatInput.disabled = true;
+                sendBtn.disabled = true;
+                sendBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+                
+                // Build the full prompt including the screen context
+                const context = getScreenContext();
+                const systemPrompt = `You are the 'Tutor Assistant', a helpful, slightly cheeky (like Clippy), but highly informative AI in a Tutor Portal. Your goal is to help the tutor understand their data and manage students. The tutor is currently viewing the '${context.page}' screen. The key context is: ${context.data}. Use this context if the question is relevant to the page. If the question is general, answer generally. Keep responses concise and conversational.`;
+                const fullPrompt = userQuery;
+
+                try {
+                    const responseText = await getGeminiResponse(fullPrompt, systemPrompt);
+                    appendMessage(responseText, 'assistant');
+                } catch (error) {
+                    console.error("Gemini API Error:", error);
+                    appendMessage("I'm sorry, I'm having trouble connecting right now. Please try again!", 'assistant');
+                } finally {
+                    // Re-enable input
+                    chatInput.disabled = false;
+                    sendBtn.disabled = false;
+                    sendBtn.innerHTML = '<i class="fas fa-paper-plane"></i>';
+                    chatInput.focus();
+                }
+            };
+            
+            /**
+             * Helper function to send the AI's contextual response.
+             */
+            async function sendAssistantMessage(prompt, useContext=true) {
+                const context = getScreenContext();
+                const systemPrompt = `You are the 'Tutor Assistant', a helpful, slightly cheeky (like Clippy), but highly informative AI in a Tutor Portal. Your goal is to help the tutor understand their data and manage students. The tutor is currently viewing the '${context.page}' screen. The key context is: ${context.data}. Use this context if the question is relevant to the page. If the question is general, answer generally. Keep responses concise and conversational.`;
+                
+                const responseText = await getGeminiResponse(prompt, systemPrompt);
+                appendMessage(responseText, 'assistant');
+            }
+            
+            /**
+             * Fetches response from the Gemini API with exponential backoff.
+             * @param {string} userQuery - The message to send to the AI.
+             * @param {string} systemPrompt - The instruction defining the AI's role.
+             */
+            async function getGeminiResponse(userQuery, systemPrompt) {
+                const payload = {
+                    contents: [{ parts: [{ text: userQuery }] }],
+                    systemInstruction: { parts: [{ text: systemPrompt }] },
+                };
+                
+                const MAX_RETRIES = 5;
+                for (let i = 0; i < MAX_RETRIES; i++) {
+                    const delay = Math.pow(2, i) * 1000; // 1s, 2s, 4s, 8s, 16s
+                    await new Promise(resolve => setTimeout(resolve, delay));
+                    
+                    try {
+                        const response = await fetch(API_URL, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(payload)
+                        });
+
+                        if (response.ok) {
+                            const result = await response.json();
+                            const text = result.candidates?.[0]?.content?.parts?.[0]?.text;
+                            if (text) {
+                                return text;
+                            } else {
+                                throw new Error("API response text missing.");
+                            }
+                        } else {
+                            // If it's a server error (5xx) or rate limit (429), retry
+                            if (response.status >= 500 || response.status === 429) {
+                                if (i === MAX_RETRIES - 1) throw new Error(`Max retries reached. Status: ${response.status}`);
+                                continue; // Retry after delay
+                            } else {
+                                // Non-retriable error (4xx client error)
+                                throw new Error(`Non-retriable API error: ${response.status}`);
+                            }
+                        }
+                    } catch (e) {
+                        if (i === MAX_RETRIES - 1) throw e;
+                        continue; // Retry after delay
+                    }
+                }
+            }
         });
     </script>
+    <!-- Dependencies for chat/markdown -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/dompurify@2.3.6/dist/purify.min.js"></script>
 </body>
 </html>
