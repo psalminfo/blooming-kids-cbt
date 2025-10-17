@@ -5,10 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Tutor Portal - Blooming Kids House</title>
     
-    <!-- Original Tailwind Link (Retained for existing utility classes) -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" />
    
-    <!-- Google Analytics Script - RETAINED -->
     <script async src="https://www.googletagmanager.com/gtag/js?id=G-NBTVEGH1SL"></script>
     <script>
         window.dataLayer = window.dataLayer || [];
@@ -16,10 +14,6 @@
         gtag('js', new Date());
         gtag('config', 'G-NBTVEGH1SL');
     </script>
-    <!-- End Google Analytics Script -->
-   
-    <!-- COLORLIB UI STYLESHEETS (from index.html) -->
-    <!-- Added Font Awesome for icons (WhatsApp/Mode Toggle) -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     <link rel="stylesheet" href="fonts/material-design-iconic-font/css/material-design-iconic-font.min.css">
     <link rel="stylesheet" href="css/style.css">
@@ -96,6 +90,14 @@
         .dark .inner h1, .dark .inner h2, .dark .inner h3 {
              color: #ffffff !important; /* ENFORCED PURE WHITE */
         }
+        
+        /* ⭐⭐ NEW: Ensure high-contrast placeholder text in input/textarea fields ⭐⭐ */
+        .dark .inner input::placeholder,
+        .dark .inner textarea::placeholder {
+            color: #cccccc !important; /* Light gray for placeholder, still high contrast */
+            opacity: 1 !important; /* Ensure full visibility */
+        }
+        /* ⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐ */
 
         /* Override specific bright elements in dark mode (headers should be white) */
         .dark .dashboard-header {
@@ -104,7 +106,8 @@
         
         /* Override nav link colors in dark mode */
         .dark .nav-btn {
-            color: ##060e1f !important; /* Light gray for inactive tabs */
+            /* Fix: The original color was ##060e1f which is a syntax error. Changed to a light gray */
+            color: #9ca3af !important; /* Light gray for inactive tabs */
         }
         .dark .nav-btn.active {
             border-bottom-color: #48bb78; /* Brighter green for active tab */
@@ -120,27 +123,19 @@
 
     <div class="wrapper">
         <div class="inner">
-            <!-- START: TUTOR.HTML CONTENT (Functionality Retained) -->
             <div class="max-w-7xl mx-auto">
                 <div class="flex justify-between items-center mb-6">
-                    <!-- Logo and Heading (Retained) -->
                     <div class="flex items-center">
-                        <!-- ID ADDED HERE for dark mode contrast fix -->
                         <img id="logoImg" src="https://res.cloudinary.com/dy2hxcyaf/image/upload/v1757700806/newbhlogo_umwqzy.svg" alt="Blooming Kids House Logo" class="h-16 w-auto mr-4" style="filter: drop-shadow(0 0 5px rgba(0, 0, 0, 0.2));">
                         
-                        <!-- UPDATED: Added ID to target with JS for personalization -->
                         <h1 id="tutorNameHeading" class="text-3xl font-bold dashboard-header">Welcome, Tutor!</h1>
                     </div>
                     
-                    <!-- New Container for Buttons -->
                     <div class="flex space-x-3 items-center">
-                        <!-- 1. MODE TOGGLE BUTTON -->
                         <button id="modeToggle" class="p-3 rounded-full bg-gray-200 hover:bg-gray-300 text-gray-700 dark:bg-gray-600 dark:hover:bg-gray-700 dark:text-white transition-colors duration-300 shadow-md" aria-label="Toggle dark mode">
-                            <!-- Icon will be set dynamically by JavaScript -->
                             <i class="fas fa-moon" id="modeIcon"></i>
                         </button>
 
-                        <!-- 2. WHATSAPP SUPPORT BUTTON - TEXT CHANGED TO 'Tech Support' -->
                         <a id="whatsappBtn" 
                            href="https://wa.me/2348158768689" 
                            target="_blank" 
@@ -150,30 +145,24 @@
                             Tech Support
                         </a>
 
-                        <!-- 3. LOGOUT BUTTON -->
                         <button id="logoutBtn" class="bg-yellow-400 text-white px-4 py-2 rounded hover:bg-yellow-500 shadow-md">Logout</button>
                     </div>
                 </div>
                 
-                <!-- Navigation (Functionality Retained) -->
                 <nav class="flex space-x-4 mb-6 border-b border-gray-200 dark:border-gray-700">
                     <button id="navDashboard" class="nav-btn text-lg font-semibold active dashboard-header">Dashboard</button>
                     <button id="navStudentDatabase" class="nav-btn text-lg font-semibold text-gray-500 hover:text-green-600">Student Database</button>
                 </nav>
 
-                <!-- Main Content Area (Functionality Retained - Your data/functions appear here via tutor.js) -->
                 <div id="mainContent">
                     <p class="text-center text-gray-600 mt-12">Checking user permissions...</p>
                 </div>
             </div>
-            <!-- END: TUTOR.HTML CONTENT -->
-        </div>
+            </div>
     </div>
     
-    <!-- Original JavaScript Link - RETAINED -->
     <script type="module" src="tutor.js"></script>
 
-    <!-- Theme Toggle Script -->
     <script>
         document.addEventListener('DOMContentLoaded', () => {
             const body = document.body;
