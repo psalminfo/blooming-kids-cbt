@@ -50,6 +50,7 @@
             max-width: 1280px; 
             width: 90%; 
             padding: 40px;
+            /* LIGHT MODE: White background and dark text defaults are retained */
             background: #ffffff; 
             border-radius: 10px;
             box-shadow: 0 0 10px rgba(0, 0, 0, 0.2);
@@ -59,19 +60,19 @@
         
         /* Ensure Dashboard title elements are styled for the new UI */
         .dashboard-header {
-            color: #333; 
+            color: #333; /* LIGHT MODE: Dark text for headers */
             text-shadow: none;
             transition: color 0.3s;
         }
 
         /* --- DARK MODE STYLES --- */
         .dark .wrapper {
-            background-color: #1a202c !important; /* Darker wrapper background */
+            background-color: #111827 !important; /* Very Dark gray/near black wrapper background - UPDATED for max contrast */
             background-image: none !important; /* Remove registration form image in dark mode */
         }
 
         .dark .inner {
-            background: #1f2937; /* Very Dark gray/near black for the main content panel - UPDATED */
+            background: #1f2937; /* Very Dark gray/near black for the main content panel */
             box-shadow: 0 0 15px rgba(0, 0, 0, 0.5);
         }
         
