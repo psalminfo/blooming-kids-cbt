@@ -762,7 +762,7 @@ async function setupContentManager() {
                 for (let questionIndex = 0; questionIndex < test.questions.length; questionIndex++) {
                     const question = test.questions[questionIndex];
                     
-                    if (question.questionId === questionId) {
+                    if (question.questionId === `q${questionId}`) {
                         // In overwrite mode, match ALL questions with this ID
                         // In normal mode, only match questions that need images (have placeholder but no URL)
                         if (overwriteMode || (question.imagePlaceholder && !question.imageUrl)) {
@@ -1766,6 +1766,7 @@ onAuthStateChanged(auth, async (user) => {
 
 
 // [End Updated admin.js File]
+
 
 
 
