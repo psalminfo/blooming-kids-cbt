@@ -328,7 +328,6 @@
         {
           "questionId": "q27",
           "question": "Elisha listed the amounts she paid for guitar lessons for three months: • February: $78, • March: $90, • April: $156. What is the amount Elisha paid for guitar lessons for these three months?",
-        "imagePlaceholder": "q27_model_options_image",
           "options": [
             "A $314",
             "B $324",
