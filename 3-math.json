@@ -71,12 +71,12 @@
           "question": "The number lines model two different fractions. The top number line is partitioned into 2 equal parts, with 1 part shaded ($\\frac{1}{2}$). The bottom number line is partitioned into 8 equal parts, with 4 parts shaded ($\\frac{4}{8}$). Which comparison of these fractions is true?",
           "imagePlaceholder": "q6_number_lines_image",
           "options": [
-            "F $\\frac{1}{2} > \\frac{1}{8}$",
-            "G $\\frac{1}{2} = \\frac{4}{8}$",
-            "H $\\frac{2}{8} < \\frac{1}{8}$",
-            "J $\\frac{2}{8} = \\frac{1}{8}$"
+            "F 1/2 > 1/1",
+            "G 2/8 > 1/8",
+            "H 1/8 = 2/8",
+            "J 2 8 < 1 8"
           ],
-          "correctAnswer": "G $\\frac{1}{2} = \\frac{4}{8}$",
+          "correctAnswer": "G 2/8 > 1/8",
           "topic": "Fractions/Comparison"
         },
         {
