@@ -38,10 +38,12 @@ export async function loadQuestions(subject, grade, state) {
         if (!querySnapshot.empty) {
             const docSnap = querySnapshot.docs[0];
             rawData = docSnap.data();
+            console.log("Loaded from Firebase:", rawData);
         } else {
             const gitHubRes = await fetch(GITHUB_URL);
             if (!gitHubRes.ok) throw new Error("Test file not found.");
             rawData = await gitHubRes.json();
+            console.log("Loaded from GitHub:", rawData);
         }
 
         let testArray = [];
@@ -63,25 +65,39 @@ export async function loadQuestions(subject, grade, state) {
             }
         });
 
+        console.log("Creative Writing State:", state);
+        console.log("Subject:", subject);
+        console.log("Creative Writing Question:", allQuestions.find(q => q.type === 'creative-writing'));
+        console.log("All Questions:", allQuestions);
+        console.log("All Passages:", allPassages);
+
         if (allQuestions.length === 0) {
             container.innerHTML = `<p class="text-red-600">❌ No questions found.</p>`;
             return;
         }
 
+        // Check if we should show creative writing first
         if (subject.toLowerCase() === 'ela' && state === 'creative-writing') {
             creativeWritingQuestion = allQuestions.find(q => q.type === 'creative-writing');
+            console.log("Found Creative Writing:", creativeWritingQuestion);
+            
             if (!creativeWritingQuestion) {
-                container.innerHTML = `<p class="text-red-600">❌ Creative writing question not found. Redirecting...</p>`;
-                window.location.href = window.location.href.split('&state=')[0] + '&state=mcq';
+                container.innerHTML = `<p class="text-red-600">❌ Creative writing question not found. Redirecting to multiple choice...</p>`;
+                setTimeout(() => {
+                    const params = new URLSearchParams(window.location.search);
+                    params.set('state', 'mcq');
+                    window.location.search = params.toString();
+                }, 2000);
                 return;
             }
             loadedQuestions = [{ ...creativeWritingQuestion, id: 0 }];
-            displayQuestions(loadedQuestions, true, passagesMap);
+            displayCreativeWriting(creativeWritingQuestion);
         } else {
+            // For MCQ mode, group questions by passage
             const filteredQuestions = allQuestions.filter(q => q.type !== 'creative-writing');
             const shuffledQuestions = filteredQuestions.sort(() => 0.5 - Math.random()).slice(0, 30);
             loadedQuestions = shuffledQuestions.map((q, index) => ({ ...q, id: index }));
-            displayQuestions(loadedQuestions, false, passagesMap);
+            displayMCQQuestions(loadedQuestions, passagesMap);
             if (submitBtnContainer) {
                 submitBtnContainer.style.display = 'block';
             }
@@ -97,98 +113,113 @@ export function getLoadedQuestions() {
 }
 
 /**
- * Displays a reading passage before its associated questions
- * @param {Object} passage The passage object to display
- * @param {HTMLElement} container The container to append the passage to
+ * Displays creative writing section
  */
-function displayPassage(passage, container) {
-    if (!passage || !passage.content) return;
+function displayCreativeWriting(question) {
+    const container = document.getElementById("question-container");
+    const params = new URLSearchParams(window.location.search);
+    const studentName = params.get('studentName');
+    const parentEmail = params.get('parentEmail');
+    const tutorEmail = params.get('tutorEmail');
+    const grade = params.get('grade');
     
-    const passageElement = document.createElement('div');
-    passageElement.className = 'passage-container bg-white p-6 rounded-lg shadow-md mb-6 border-l-4 border-green-500';
-    passageElement.setAttribute('data-passage-id', passage.passageId);
-    
-    passageElement.innerHTML = `
-        <h3 class="text-lg font-bold text-green-800 mb-2">${passage.title || 'Reading Passage'}</h3>
-        ${passage.subtitle ? `<h4 class="text-md text-gray-600 mb-3">${passage.subtitle}</h4>` : ''}
-        ${passage.author ? `<p class="text-sm text-gray-500 mb-4">${passage.author}</p>` : ''}
-        <div class="passage-content text-gray-700 leading-relaxed whitespace-pre-line bg-gray-50 p-4 rounded border">${passage.content}</div>
+    container.innerHTML = `
+        <div class="bg-white p-6 border rounded-lg shadow-sm question-block">
+            <h2 class="font-semibold text-xl mb-4 text-blue-800">Creative Writing</h2>
+            <p class="font-semibold mb-4 question-text text-gray-700 text-lg">${question.question || ''}</p>
+            
+            <textarea id="creative-writing-text-${question.id}" class="w-full h-48 p-4 border border-gray-300 rounded-lg mb-4 focus:ring-2 focus:ring-blue-500 focus:border-transparent" placeholder="Write your essay or creative writing response here..."></textarea>
+            
+            <div class="mb-4">
+                <label class="block mb-2 text-sm font-medium text-gray-700">Or Upload a File (PDF, DOC, DOCX, TXT)</label>
+                <input type="file" id="creative-writing-file-${question.id}" accept=".pdf,.doc,.docx,.txt" class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"/>
+            </div>
+            
+            <button onclick="window.continueToMCQ(${question.id}, '${studentName}', '${parentEmail}', '${tutorEmail}', '${grade}')" class="bg-blue-600 text-white font-bold py-3 px-6 rounded-lg hover:bg-blue-700 transition-colors duration-200 mt-4 w-full">
+                Continue to Multiple-Choice Questions
+            </button>
+        </div>
     `;
-    
-    container.appendChild(passageElement);
 }
 
 /**
- * Renders the questions to the DOM with their associated passages.
- * @param {Array} questions The array of questions to display.
- * @param {boolean} isCreativeWritingOnly A flag to render only the CW question with a special button.
- * @param {Object} passagesMap Map of passageId to passage data.
+ * Displays MCQ questions grouped by their passages
  */
-function displayQuestions(questions, isCreativeWritingOnly, passagesMap = {}) {
+function displayMCQQuestions(questions, passagesMap = {}) {
     const container = document.getElementById("question-container");
     container.innerHTML = '';
     
-    // Track which passages we've already displayed to avoid duplicates
-    const displayedPassages = new Set();
+    // Group questions by passage
+    const questionsByPassage = {};
+    const questionsWithoutPassage = [];
     
-    (questions || []).forEach((q, i) => {
-        // Display passage if this question has one and we haven't shown it yet
-        if (q.passageId && passagesMap[q.passageId] && !displayedPassages.has(q.passageId)) {
-            displayPassage(passagesMap[q.passageId], container);
-            displayedPassages.add(q.passageId);
+    questions.forEach((question, index) => {
+        if (question.passageId && passagesMap[question.passageId]) {
+            if (!questionsByPassage[question.passageId]) {
+                questionsByPassage[question.passageId] = [];
+            }
+            questionsByPassage[question.passageId].push({ ...question, displayIndex: index + 1 });
+        } else {
+            questionsWithoutPassage.push({ ...question, displayIndex: index + 1 });
         }
-
-        const showImageBefore = q.imageUrl && q.image_position !== 'after';
-        const showImageAfter = q.imageUrl && q.image_position === 'after';
-
-        if (isCreativeWritingOnly) {
-            const params = new URLSearchParams(window.location.search);
-            const studentName = params.get('studentName');
-            const parentEmail = params.get('parentEmail');
-            const tutorEmail = params.get('tutorEmail');
-            const grade = params.get('grade');
-            
-            const questionElement = document.createElement('div');
-            questionElement.className = 'bg-white p-4 border rounded-lg shadow-sm question-block mt-6';
-            questionElement.setAttribute('data-question-id', q.id);
-            questionElement.innerHTML = `
-                <h2 class="font-semibold text-lg mb-2 text-blue-800">Creative Writing</h2>
-                <p class="font-semibold mb-4 question-text text-gray-700">${q.question || ''}</p>
-                
-                <textarea id="creative-writing-text-${q.id}" class="w-full h-48 p-3 border border-gray-300 rounded-lg mb-4 focus:ring-2 focus:ring-blue-500 focus:border-transparent" placeholder="Write your essay or creative writing response here..."></textarea>
-                
-                <div class="mb-4">
-                    <label class="block mb-2 text-sm font-medium text-gray-700">Or Upload a File (PDF, DOC, DOCX, TXT)</label>
-                    <input type="file" id="creative-writing-file-${q.id}" accept=".pdf,.doc,.docx,.txt" class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"/>
-                </div>
-                
-                <button onclick="window.continueToMCQ(${q.id}, '${studentName}', '${parentEmail}', '${tutorEmail}', '${grade}')" class="bg-blue-600 text-white font-bold py-3 px-6 rounded-lg hover:bg-blue-700 transition-colors duration-200 mt-4 w-full">
-                    Continue to Multiple-Choice Questions
-                </button>
-            `;
-            container.appendChild(questionElement);
-            return;
-        }
+    });
+    
+    // Display passages with their corresponding questions
+    Object.keys(questionsByPassage).forEach(passageId => {
+        const passage = passagesMap[passageId];
+        const passageQuestions = questionsByPassage[passageId];
         
-        let mcqIndex = i + 1;
-        const questionElement = document.createElement('div');
-        questionElement.className = 'bg-white p-4 border rounded-lg shadow-sm question-block mt-4';
-        questionElement.setAttribute('data-question-id', q.id);
-        questionElement.innerHTML = `
-            ${showImageBefore ? `<img src="${q.imageUrl}" class="mb-3 w-full rounded-lg border" alt="Question image"/>` : ''}
-            <p class="font-semibold mb-3 question-text text-gray-800">${mcqIndex}. ${q.question || ''}</p>
-            ${showImageAfter ? `<img src="${q.imageUrl}" class="mt-3 w-full rounded-lg border" alt="Question image"/>` : ''}
-            <div class="mt-3 space-y-2">
-                ${(q.options || []).map(opt => `
-                    <label class="flex items-center py-2 px-3 rounded-lg border border-gray-200 hover:bg-gray-50 cursor-pointer transition-colors duration-150">
-                        <input type="radio" name="q${i}" value="${opt}" class="mr-3 h-4 w-4 text-blue-600 focus:ring-blue-500"> 
-                        <span class="text-gray-700">${opt}</span>
-                    </label>
-                `).join('')}
-            </div>
+        // Display the passage
+        const passageElement = document.createElement('div');
+        passageElement.className = 'passage-container bg-white p-6 rounded-lg shadow-md mb-6 border-l-4 border-green-500';
+        passageElement.innerHTML = `
+            <h3 class="text-lg font-bold text-green-800 mb-2">${passage.title || 'Reading Passage'}</h3>
+            ${passage.subtitle ? `<h4 class="text-md text-gray-600 mb-3">${passage.subtitle}</h4>` : ''}
+            ${passage.author ? `<p class="text-sm text-gray-500 mb-4">${passage.author}</p>` : ''}
+            <div class="passage-content text-gray-700 leading-relaxed whitespace-pre-line bg-gray-50 p-4 rounded border">${passage.content}</div>
         `;
+        container.appendChild(passageElement);
+        
+        // Display questions for this passage
+        passageQuestions.forEach(q => {
+            const questionElement = createQuestionElement(q, q.displayIndex);
+            container.appendChild(questionElement);
+        });
+    });
+    
+    // Display questions without passages
+    questionsWithoutPassage.forEach(q => {
+        const questionElement = createQuestionElement(q, q.displayIndex);
         container.appendChild(questionElement);
     });
+}
+
+/**
+ * Creates a question element
+ */
+function createQuestionElement(q, displayIndex) {
+    const questionElement = document.createElement('div');
+    questionElement.className = 'bg-white p-4 border rounded-lg shadow-sm question-block mt-4';
+    questionElement.setAttribute('data-question-id', q.id);
+    
+    const showImageBefore = q.imageUrl && q.image_position !== 'after';
+    const showImageAfter = q.imageUrl && q.image_position === 'after';
+    
+    questionElement.innerHTML = `
+        ${showImageBefore ? `<img src="${q.imageUrl}" class="mb-3 w-full rounded-lg border" alt="Question image"/>` : ''}
+        <p class="font-semibold mb-3 question-text text-gray-800">${displayIndex}. ${q.question || ''}</p>
+        ${showImageAfter ? `<img src="${q.imageUrl}" class="mt-3 w-full rounded-lg border" alt="Question image"/>` : ''}
+        <div class="mt-3 space-y-2">
+            ${(q.options || []).map(opt => `
+                <label class="flex items-center py-2 px-3 rounded-lg border border-gray-200 hover:bg-gray-50 cursor-pointer transition-colors duration-150">
+                    <input type="radio" name="q${q.id}" value="${opt}" class="mr-3 h-4 w-4 text-blue-600 focus:ring-blue-500"> 
+                    <span class="text-gray-700">${opt}</span>
+                </label>
+            `).join('')}
+        </div>
+    `;
+    
+    return questionElement;
 }
 
 // Continue to MCQ handler for creative writing submissions
