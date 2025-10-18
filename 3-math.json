@@ -227,6 +227,7 @@
         {
           "questionId": "q19",
           "question": "Dominique put figures into groups based on certain attributes. Sometimes she put figures into more than one group.\n\nGroup 1: Has all sides congruent\nGroup 2: Has exactly 4 sides\nGroup 3: Is a polygon\n\nWhich statement is true?",
+          "imagePlaceholder": "q9_model_options_image",
           "options": [
             "A A square could be put into all the groups.",
             "B A triangle could be put into all the groups.",
