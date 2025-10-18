@@ -376,6 +376,7 @@
         {
           "questionId": "q31",
           "question": "The table shows the weights of four elephants. Which comparison of these weights is true?\n\nElephant R: 12,345 pounds\nElephant S: 13,960 pounds\nElephant T: 12,509 pounds\nElephant U: 11,960 pounds",
+         "imagePlaceholder": "31_model_options_image",
           "options": [
             "A The weight of Elephant R < the weight of Elephant T",
             "B The weight of Elephant U > the weight of Elephant T",
