@@ -6,26 +6,6 @@ import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/
 import { onSnapshot } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
 
 const ADMIN_EMAIL = 'psalm4all@gmail.com';
-// --- Cloudinary Configuration ---
-const CLOUDINARY_CLOUD_NAME = 'dy2hxcyaf';
-const CLOUDINARY_UPLOAD_PRESET = 'bkh_assessments';
-const CLOUDINARY_UPLOAD_URL = `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`;
-
-// --- Utility Functions ---
-async function uploadImageToCloudinary(file) {
-    const formData = new FormData();
-    formData.append('file', file);
-    formData.append('upload_preset', CLOUDINARY_UPLOAD_PRESET);
-    const res = await fetch(CLOUDINARY_UPLOAD_URL, { method: 'POST', body: formData });
-    if (!res.ok) throw new Error("Image upload failed");
-    const data = await res.json();
-    return data.secure_url;
-}
-
-function capitalize(str) {
-    if (!str) return '';
-    return str.replace(/\b\w/g, l => l.toUpperCase());
-}
 let activeTutorId = null;
 
 // #################################################
@@ -1507,4 +1487,5 @@ onAuthStateChanged(auth, async (user) => {
 
 
 // [End Updated admin.js File]
+
 
