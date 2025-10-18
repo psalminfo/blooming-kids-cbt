@@ -47,7 +47,7 @@
         {
           "questionId": "q4",
           "question": "Which of these models represent the same number?\n\nModel X: 2 hundreds (2 blocks of 100)\nModel Y: 20 tens (2 columns of 10 tens)\nModel Z: 20 ones (2 groups of 10 ones)",
-          "imagePlaceholder": "q4_model_options_image",
+          "imagePlaceholder": "math_prac_q13_parallel_lines.png",
           "options": [
             "F Model X and Model Y, because 20 ones is equivalent to 20 tens.",
             "G Model X and Model Z, because 20 ones is equivalent to 2 hundreds.",
