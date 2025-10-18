@@ -8,324 +8,392 @@
       "defaultQuestionType": "multiple-choice",
       "questions": [
         {
-          "questionId": "staar3_2018_q1",
+          "questionId": "q1",
           "question": "Nina works for a restaurant. The restaurant pays her every week for the work she does. Some weeks she works more hours than other weeks. Which statement is most likely true?",
           "options": [
-            "When Nina works fewer hours, she earns more income from the restaurant.",
-            "When Nina works more hours, she earns more income from the restaurant.",
-            "When Nina works more hours, the restaurant gets less labor from her.",
-            "When Nina works fewer hours, the restaurant gets more labor from her."
+            "A When Nina works fewer hours, she earns more income from the restaurant.",
+            "B When Nina works more hours, she earns more income from the restaurant.",
+            "C When Nina works more hours, the restaurant gets less labor from her.",
+            "D When Nina works fewer hours, the restaurant gets more labor from her."
           ],
-          "correctAnswer": "B",
-          "topic": "Income and Hours Worked"
+          "correctAnswer": "B When Nina works more hours, she earns more income from the restaurant.",
+          "topic": "Economics/Income"
         },
         {
-          "questionId": "staar3_2018_q2",
+          "questionId": "q2",
           "question": "A band plays 8 songs at every show. Last year the band had 8 shows. Which model can be used to find the number of songs the band played at shows last year?",
-          "options": ["F", "G", "H", "J"],
-          "correctAnswer": "F",
-          "topic": "Multiplication Models",
-          "imageRequired": true
+          "imagePlaceholder": "q2_model_options_image",
+          "options": [
+            "F Model showing 8 groups of 8 items (8x8)",
+            "G Model showing 8 groups of a different number of items (e.g., 8x5)",
+            "H Model showing 8 groups of a different number of items",
+            "J Model showing 8 groups of a different number of items"
+          ],
+          "correctAnswer": "F Model showing 8 groups of 8 items (8x8)",
+          "topic": "Multiplication/Modeling"
         },
         {
-          "questionId": "staar3_2018_q3",
-          "question": "Gretchen made this table to show the side lengths and perimeters of three figures. What mistake, if any, did Gretchen make?",
+          "questionId": "q3",
+          "question": "Gretchen made this table to show the side lengths and perimeters of three figures.\n\nFigure: Square, Side Lengths: 6, 6, 6, 6 (yards), Perimeter: 24 (yards)\nFigure: Triangle, Side Lengths: 4, 7, 8 (yards), Perimeter: 19 (yards)\nFigure: Rectangle, Side Lengths: 4, 8, 4, 8 (yards), Perimeter: 32 (yards)\n\nWhat mistake, if any, did Gretchen make?",
           "options": [
-            "The perimeter of the rectangle should be 24 yards.",
-            "The perimeter of the square should be 36 yards.",
-            "The perimeter of the triangle should be 20 yards.",
-            "Gretchen did not make any mistakes in the table."
+            "A The perimeter of the rectangle should be 24 yards.",
+            "B The perimeter of the square should be 36 yards.",
+            "C The perimeter of the triangle should be 20 yards.",
+            "D Gretchen did not make any mistakes in the table."
           ],
-          "correctAnswer": "A",
+          "correctAnswer": "A The perimeter of the rectangle should be 24 yards.",
           "topic": "Perimeter"
         },
         {
-          "questionId": "staar3_2018_q4",
-          "question": "Which of these models represent the same number?",
+          "questionId": "q4",
+          "question": "Which of these models represent the same number?\n\nModel X: 2 hundreds (2 blocks of 100)\nModel Y: 20 tens (2 columns of 10 tens)\nModel Z: 20 ones (2 groups of 10 ones)",
+          "imagePlaceholder": "q4_model_options_image",
           "options": [
-            "Model X and Model Y, because 20 ones is equivalent to 20 tens.",
-            "Model X and Model Z, because 20 ones is equivalent to 2 hundreds.",
-            "Model Y and Model Z, because 20 tens is equivalent to 2 hundreds.",
-            "None of these"
+            "F Model X and Model Y, because 20 ones is equivalent to 20 tens.",
+            "G Model X and Model Z, because 20 ones is equivalent to 2 hundreds.",
+            "H Model Y and Model Z, because 20 tens is equivalent to 2 hundreds.",
+            "J None of these"
           ],
-          "correctAnswer": "H",
-          "topic": "Place Value",
-          "imageRequired": true
+          "correctAnswer": "H Model Y and Model Z, because 20 tens is equivalent to 2 hundreds.",
+          "topic": "Place Value"
         },
         {
-          "questionId": "staar3_2018_q5",
+          "questionId": "q5",
           "question": "Lin has a total of 36 sodas in packs. There are 6 sodas in each pack. How many packs of sodas does Lin have?",
           "options": [],
           "correctAnswer": "6",
           "topic": "Division",
-          "questionType": "griddable"
+          "defaultQuestionType": "griddable"
         },
         {
-          "questionId": "staar3_2018_q6",
-          "question": "The number lines model two different fractions. Which comparison of these fractions is true?",
+          "questionId": "q6",
+          "question": "The number lines model two different fractions. The top number line is partitioned into 2 equal parts, with 1 part shaded ($\\frac{1}{2}$). The bottom number line is partitioned into 8 equal parts, with 4 parts shaded ($\\frac{4}{8}$). Which comparison of these fractions is true?",
+          "imagePlaceholder": "q6_number_lines_image",
           "options": [
-            "1/2 > 1/1",
-            "2/8 > 1/8",
-            "1/8 = 2/8",
-            "2/8 < 1/8"
+            "F $\\frac{1}{2} > \\frac{1}{8}$",
+            "G $\\frac{1}{2} = \\frac{4}{8}$",
+            "H $\\frac{2}{8} < \\frac{1}{8}$",
+            "J $\\frac{2}{8} = \\frac{1}{8}$"
           ],
-          "correctAnswer": "G",
-          "topic": "Fractions",
-          "imageRequired": true
+          "correctAnswer": "G $\\frac{1}{2} = \\frac{4}{8}$",
+          "topic": "Fractions/Comparison"
         },
         {
-          "questionId": "staar3_2018_q7",
-          "question": "The table shows the relationship between the number of toy airplanes made in a factory and the number of batteries needed for the airplanes. Based on the relationship shown in the table, which statement is true?",
+          "questionId": "q7",
+          "question": "The table shows the relationship between the number of toy airplanes made in a factory and the number of batteries needed for the airplanes.\n\nNumber of Toy Airplanes: 5, 7, 9, 11, 13, 15\nNumber of Batteries: 15, 21, 27, 33, 39, 45\n\nBased on the relationship shown in the table, which statement is true?",
           "options": [
-            "The number of batteries is equal to the number of toy airplanes times 3.",
-            "The number of batteries is equal to the number of toy airplanes times 2.",
-            "The number of batteries is equal to the number of toy airplanes times 6.",
-            "The number of batteries is equal to the number of toy airplanes times 5."
+            "A The number of batteries is equal to the number of toy airplanes times 3.",
+            "B The number of batteries is equal to the number of toy airplanes times 2.",
+            "C The number of batteries is equal to the number of toy airplanes times 6.",
+            "D The number of batteries is equal to the number of toy airplanes times 5."
           ],
-          "correctAnswer": "A",
-          "topic": "Patterns and Relationships"
+          "correctAnswer": "A The number of batteries is equal to the number of toy airplanes times 3.",
+          "topic": "Patterns/Multiplication"
         },
         {
-          "questionId": "staar3_2018_q8",
-          "question": "Four fraction models are shown. Which two models are shaded to show equivalent fractions?",
+          "questionId": "q8",
+          "question": "Four fraction models are shown. Model 1 is shaded to represent $\\frac{2}{4}$. Model 2 is shaded to represent $\\frac{1}{2}$. Model 3 is shaded to represent $\\frac{3}{4}$. Model 4 is shaded to represent $\\frac{1}{4}$. Which two models are shaded to show equivalent fractions?",
+          "imagePlaceholder": "q8_fraction_models_image",
           "options": [
-            "Models 1 and 2",
-            "Models 1 and 3",
-            "Models 2 and 4",
-            "Models 2 and 3"
+            "F Models 1 and 2",
+            "G Models 1 and 3",
+            "H Models 2 and 4",
+            "J Models 2 and 3"
           ],
-          "correctAnswer": "G",
-          "topic": "Equivalent Fractions",
-          "imageRequired": true
+          "correctAnswer": "F Models 1 and 2",
+          "topic": "Equivalent Fractions"
         },
         {
-          "questionId": "staar3_2018_q9",
-          "question": "The figures shown can be sorted into groups. Which list shows a correct way to group the figures?",
+          "questionId": "q9",
+          "question": "The figures shown can be sorted into groups. The figures are: Cube, Rectangular Prism (x2), Cone, Cylinder (x2). Which list shows a correct way to group the figures?",
+          "imagePlaceholder": "q9_3d_figures_image",
           "options": [
-            "2 prisms, 1 cone, 2 cylinders, and 1 pyramid",
-            "3 prisms, 1 cone, and 2 cylinders",
-            "2 prisms, 2 cylinders, 1 sphere, and 1 cube",
-            "3 prisms, 1 cylinder, and 2 cones"
+            "A 2 prisms, 1 cone, 2 cylinders, and 1 pyramid",
+            "B 3 prisms, 1 cone, and 2 cylinders",
+            "C 2 prisms, 2 cylinders, 1 sphere, and 1 cube",
+            "D 3 prisms, 1 cylinder, and 2 cones"
           ],
-          "correctAnswer": "B",
-          "topic": "3D Shapes",
-          "imageRequired": true
+          "correctAnswer": "B 3 prisms, 1 cone, and 2 cylinders",
+          "topic": "3D Shapes"
         },
         {
-          "questionId": "staar3_2018_q10",
-          "question": "What number goes in the □ to make the equation true? □ ÷ 11 = 9",
-          "options": ["99", "91", "20", "2"],
-          "correctAnswer": "F",
-          "topic": "Division"
+          "questionId": "q10",
+          "question": "What number goes in the $\\square$ to make the equation $\\square \\div 11 = 9$ true?",
+          "options": [
+            "F 99",
+            "G 91",
+            "H 20",
+            "J 2"
+          ],
+          "correctAnswer": "F 99",
+          "topic": "Division/Inverse Operations"
         },
         {
-          "questionId": "staar3_2018_q11",
-          "question": "The list shows the number of ribbons of each color that a school ordered for a science fair: 12 blue, 18 red, 36 green, 60 purple. Which pictograph best represents the information in the list?",
-          "options": ["Each symbol means 4 ribbons", "Each symbol means 6 ribbons", "Each symbol means 9 ribbons", "Each symbol means 12 ribbons"],
-          "correctAnswer": "B",
-          "topic": "Pictographs",
-          "imageRequired": true
+          "questionId": "q11",
+          "question": "The list shows the number of ribbons of each color that a school ordered for a science fair: • 12 blue, • 18 red, • 36 green, • 60 purple. Which pictograph best represents the information in the list?",
+          "imagePlaceholder": "q11_pictograph_options_image",
+          "options": [
+            "A Each $\\bigstar$ means 4 ribbons.",
+            "B Each $\\bigstar$ means 6 ribbons.",
+            "C Each $\\bigstar$ means 12 ribbons.",
+            "D Each $\\bigstar$ means 9 ribbons."
+          ],
+          "correctAnswer": "C Each $\\bigstar$ means 12 ribbons.",
+          "topic": "Data Representation/Pictographs"
         },
         {
-          "questionId": "staar3_2018_q12",
+          "questionId": "q12",
           "question": "Tyrese had 572 baseball cards. He sold some of the baseball cards and then had 98 baseball cards left. Which equation could NOT be used to find the number of baseball cards Tyrese sold?",
           "options": [
-            "572 - □ = 98",
-            "572 - 98 = □",
-            "98 + □ = 572",
-            "98 + 572 = □"
+            "F $98 + 572 = \\square$",
+            "G $98 + \\square = 572$",
+            "H $572 - 98 = \\square$",
+            "J $572 - \\square = 98$"
           ],
-          "correctAnswer": "J",
-          "topic": "Equations"
+          "correctAnswer": "F $98 + 572 = \\square$",
+          "topic": "Algebraic Reasoning"
         },
         {
-          "questionId": "staar3_2018_q13",
-          "question": "A rectangular business card is shown. Use the ruler provided to measure the length and width of the business card to the nearest centimeter. Which measurement is closest to the perimeter of the business card in centimeters?",
-          "options": ["14 cm", "28 cm", "45 cm", "32 cm"],
-          "correctAnswer": "B",
-          "topic": "Perimeter",
-          "imageRequired": true
+          "questionId": "q13",
+          "question": "A rectangular business card is shown. Use the ruler provided (implied, assuming standard paper size for the image) to measure the length and width of the business card to the nearest centimeter. The dimensions are approximately: Length $\\approx 9$ cm, Width $\\approx 5$ cm. Which measurement is closest to the perimeter of the business card in centimeters?",
+          "imagePlaceholder": "q13_business_card_image",
+          "options": [
+            "A 14 cm",
+            "B 28 cm",
+            "C 45 cm",
+            "D 32 cm"
+          ],
+          "correctAnswer": "B 28 cm",
+          "topic": "Perimeter/Measurement"
         },
         {
-          "questionId": "staar3_2018_q14",
+          "questionId": "q14",
           "question": "There are 297 peach trees on a farm. There are 615 peach trees on a different farm. What is the difference between the numbers of peach trees on these farms?",
           "options": [],
           "correctAnswer": "318",
           "topic": "Subtraction",
-          "questionType": "griddable"
+          "defaultQuestionType": "griddable"
         },
         {
-          "questionId": "staar3_2018_q15",
-          "question": "The picture represents the trophies 3 brothers have on a shelf. Each brother won the same number of trophies. What fraction of the trophies did each brother win?",
-          "options": ["2/3", "2/6", "3/6", "3/3"],
-          "correctAnswer": "B",
-          "topic": "Fractions",
-          "imageRequired": true
+          "questionId": "q15",
+          "question": "The picture represents the trophies 3 brothers have on a shelf. There are 6 trophies in total. Each brother won the same number of trophies. What fraction of the trophies did each brother win?",
+          "imagePlaceholder": "q15_trophies_image",
+          "options": [
+            "A $\\frac{2}{3}$",
+            "B $\\frac{2}{6}$",
+            "C $\\frac{3}{6}$",
+            "D $\\frac{3}{3}$"
+          ],
+          "correctAnswer": "B $\\frac{2}{6}$",
+          "topic": "Fractions"
         },
         {
-          "questionId": "staar3_2018_q16",
+          "questionId": "q16",
           "question": "A group of 64 children and 24 adults will travel to a zoo in vans. There will be 8 people in each van. How many vans will be needed to take the group to the zoo?",
-          "options": ["11", "80", "8", "5"],
-          "correctAnswer": "F",
-          "topic": "Division"
+          "options": [
+            "F 11",
+            "G 80",
+            "H 8",
+            "J 5"
+          ],
+          "correctAnswer": "F 11",
+          "topic": "Multi-Step Problem/Division"
         },
         {
-          "questionId": "staar3_2018_q17",
+          "questionId": "q17",
           "question": "A container of liquid laundry detergent at a grocery store is marked with the volume of detergent inside. Which unit of measurement could be marked on the container?",
-          "options": ["Kilograms", "Meters", "Pounds", "Liters"],
-          "correctAnswer": "D",
-          "topic": "Measurement"
+          "options": [
+            "A Kilograms",
+            "B Meters",
+            "C Pounds",
+            "D Liters"
+          ],
+          "correctAnswer": "D Liters",
+          "topic": "Measurement/Volume"
         },
         {
-          "questionId": "staar3_2018_q18",
+          "questionId": "q18",
           "question": "A store is having a sale on books. The sale price of each book is $6 less than the regular price. Which table shows prices of different books at this store?",
-          "options": ["F", "G", "H", "J"],
-          "correctAnswer": "G",
-          "topic": "Patterns",
-          "imageRequired": true
+          "options": [
+            "F Regular Price: $12, $19, $26, $33 | Sale Price: $18, $25, $32, $39",
+            "G Regular Price: $18, $25, $32, $39 | Sale Price: $12, $19, $26, $33",
+            "H Regular Price: $36, $30, $24, $18 | Sale Price: $34, $28, $22, $16",
+            "J Regular Price: $36, $30, $24, $18 | Sale Price: $6, $5, $4, $3"
+          ],
+          "correctAnswer": "G Regular Price: $18, $25, $32, $39 | Sale Price: $12, $19, $26, $33",
+          "topic": "Addition/Subtraction Relationships"
         },
         {
-          "questionId": "staar3_2018_q19",
-          "question": "Dominique put figures into groups based on certain attributes. Sometimes she put figures into more than one group. Which statement is true?",
+          "questionId": "q19",
+          "question": "Dominique put figures into groups based on certain attributes. Sometimes she put figures into more than one group.\n\nGroup 1: Has all sides congruent\nGroup 2: Has exactly 4 sides\nGroup 3: Is a polygon\n\nWhich statement is true?",
           "options": [
-            "A square could be put into all the groups.",
-            "A triangle could be put into all the groups.",
-            "A rectangle could be put into Groups 1 and 2 only.",
-            "A pentagon could be put into Group 1 only."
+            "A A square could be put into all the groups.",
+            "B A triangle could be put into all the groups.",
+            "C A rectangle could be put into Groups 1 and 2 only.",
+            "D A pentagon could be put into Group 1 only."
           ],
-          "correctAnswer": "A",
-          "topic": "Geometric Attributes"
+          "correctAnswer": "A A square could be put into all the groups.",
+          "topic": "Geometry/Attributes of Shapes"
         },
         {
-          "questionId": "staar3_2018_q20",
-          "question": "Hakeem received 13 phone calls on Tuesday. This expression can be used to show the number of phone calls he received on Saturday: 13 × 4. Which statement is true?",
+          "questionId": "q20",
+          "question": "Hakeem received 13 phone calls on Tuesday. This expression can be used to show the number of phone calls he received on Saturday: $13 \\times 4$. Which statement is true?",
           "options": [
-            "Hakeem received 4 more phone calls on Saturday than he received on Tuesday.",
-            "Hakeem received 4 more phone calls on Tuesday than he received on Saturday.",
-            "Hakeem received 4 times as many phone calls on Saturday as he received on Tuesday.",
-            "Hakeem received 4 times as many phone calls on Tuesday as he received on Saturday."
+            "F Hakeem received 4 more phone calls on Saturday than he received on Tuesday.",
+            "G Hakeem received 4 more phone calls on Tuesday than he received on Saturday.",
+            "H Hakeem received 4 times as many phone calls on Saturday as he received on Tuesday.",
+            "J Hakeem received 4 times as many phone calls on Tuesday as he received on Saturday."
           ],
-          "correctAnswer": "H",
+          "correctAnswer": "H Hakeem received 4 times as many phone calls on Saturday as he received on Tuesday.",
           "topic": "Multiplication"
         },
         {
-          "questionId": "staar3_2018_q21",
-          "question": "The expanded notation of a number is shown: (9 × 10,000) + (4 × 100) + (1 × 10). What is the standard form of this number?",
-          "options": ["9,410", "94,010", "90,401", "90,410"],
-          "correctAnswer": "D",
+          "questionId": "q21",
+          "question": "The expanded notation of a number is shown: $(9 \\times 10,000) + (4 \\times 100) + (1 \\times 10)$. What is the standard form of this number?",
+          "options": [
+            "A 9,410",
+            "B 94,010",
+            "C 90,401",
+            "D 90,410"
+          ],
+          "correctAnswer": "D 90,410",
           "topic": "Place Value"
         },
         {
-          "questionId": "staar3_2018_q22",
-          "question": "Noah has 48 cookies. The model represents what he did with the cookies. Based on the model, which of these could explain what Noah did with the cookies?",
+          "questionId": "q22",
+          "question": "Noah has 48 cookies. The model (a visual representation of 48 divided into 8 groups of 6, with 2 groups shaded out or 'eaten') represents what he did with the cookies. Based on the model, which of these could explain what Noah did with the cookies?",
+          "imagePlaceholder": "q22_cookies_model_image",
           "options": [
-            "He put (48 ÷ 8) cookies into each of 8 bags and ate (2 × 6) of the cookies.",
-            "He put (48 ÷ 6) cookies into each of 8 bags and ate (2 × 8) of the cookies.",
-            "He put (48 – 6) cookies into each of 8 bags and ate (2 × 6) of the cookies.",
-            "He put (48 × 6) cookies into each of 8 bags and ate (2 + 6) of the cookies."
+            "F He put $(48 \\div 8)$ cookies into each of 8 bags and ate $(2 \\times 6)$ of the cookies.",
+            "G He put $(48 \\div 6)$ cookies into each of 8 bags and ate $(2 \\times 8)$ of the cookies.",
+            "H He put $(48 - 6)$ cookies into each of 8 bags and ate $(2 \\times 6)$ of the cookies.",
+            "J He put $(48 \\times 6)$ cookies into each of 8 bags and ate $(2 + 6)$ of the cookies."
           ],
-          "correctAnswer": "F",
-          "topic": "Division",
-          "imageRequired": true
+          "correctAnswer": "F He put $(48 \\div 8)$ cookies into each of 8 bags and ate $(2 \\times 6)$ of the cookies.",
+          "topic": "Multi-Step Problem/Modeling"
         },
         {
-          "questionId": "staar3_2018_q23",
-          "question": "There are 4 books on a shelf. In the model the shaded books represent nonfiction books. Which expression represents the fraction of the books on the shelf that are nonfiction?",
+          "questionId": "q23",
+          "question": "There are 4 books on a shelf. In the model, 3 of the books are shaded, representing nonfiction books. Which expression represents the fraction of the books on the shelf that are nonfiction?",
+          "imagePlaceholder": "q23_books_model_image",
           "options": [
-            "1/4 + 1/4 + 1/4 + 1/4",
-            "1/4 + 1/4 + 1/4",
-            "1/3 + 1/3 + 1/3",
-            "3/1 + 3/1 + 3/1"
+            "A $\\frac{1}{4} + \\frac{1}{4} + \\frac{1}{4} + \\frac{1}{4}$",
+            "B $\\frac{1}{4} + \\frac{1}{4} + \\frac{1}{4}$",
+            "C $\\frac{1}{3} + \\frac{1}{3} + \\frac{1}{3}$",
+            "D $\\frac{3}{1} + \\frac{3}{1} + \\frac{3}{1}$"
           ],
-          "correctAnswer": "B",
-          "topic": "Fractions",
-          "imageRequired": true
+          "correctAnswer": "B $\\frac{1}{4} + \\frac{1}{4} + \\frac{1}{4}$",
+          "topic": "Fractions/Unit Fractions"
         },
         {
-          "questionId": "staar3_2018_q24",
-          "question": "The frequency table shows the number of points scored by each player on a basketball team during a game. What is the combined number of points scored by Stephen, Alfred, Pete, and Wesley?",
+          "questionId": "q24",
+          "question": "The frequency table shows the number of points scored by each player on a basketball team during a game. The tallies represent:\n\nStephen: 15 points\nAlfred: 5 points\nKenji: 12 points\nPete: 8 points\nEric: 12 points\nWesley: 6 points\nHayes: 10 points\n\nWhat is the combined number of points scored by Stephen, Alfred, Pete, and Wesley?",
           "options": [],
-          "correctAnswer": "37",
-          "topic": "Data Analysis",
-          "questionType": "griddable",
-          "imageRequired": true
+          "correctAnswer": "34",
+          "topic": "Data Analysis/Addition",
+          "defaultQuestionType": "griddable"
         },
         {
-          "questionId": "staar3_2018_q25",
-          "question": "The model shown can represent two number sentences. Which two number sentences can the model represent?",
+          "questionId": "q25",
+          "question": "The model shown (a 3x2 array) can represent two number sentences. Which two number sentences can the model represent?",
+          "imagePlaceholder": "q25_array_model_image",
           "options": [
-            "3 × 3 = □ and 3 + 3 = □",
-            "3 × 2 = □ and 3 + 3 = □",
-            "2 × 3 = □ and 2 × 2 × 2 = □",
-            "3 + 3 + 3 = □ and 2 + 2 + 2 = □"
+            "A $3 + 3 + 3 = \\square$ and $2 + 2 + 2 = \\square$",
+            "B $3 \\times 2 = \\square$ and $2 \\times 3 = \\square$",
+            "C $3 + 3 = \\square$ and $2 \\times 2 = \\square$",
+            "D $3 \\times 3 = \\square$ and $3 + 3 + 3 = \\square$"
           ],
-          "correctAnswer": "B",
-          "topic": "Multiplication",
-          "imageRequired": true
+          "correctAnswer": "B $3 \\times 2 = \\square$ and $2 \\times 3 = \\square$",
+          "topic": "Multiplication/Arrays"
         },
         {
-          "questionId": "staar3_2018_q26",
-          "question": "Kaliani drew four congruent squares. She shaded the same fraction of each square. This is one of Kaliani's squares. Which square CANNOT be another one of Kaliani's squares?",
-          "options": ["F", "G", "H", "J"],
-          "correctAnswer": "J",
-          "topic": "Fractions",
-          "imageRequired": true
+          "questionId": "q26",
+          "question": "Kailani drew four congruent squares. She shaded the same fraction of each square. One square is shown with $\\frac{1}{4}$ shaded. Which square CANNOT be another one of Kailani’s squares?",
+          "imagePlaceholder": "q26_fraction_squares_image",
+          "options": [
+            "F $\\frac{1}{4}$ shaded",
+            "H $\\frac{1}{4}$ shaded",
+            "G $\\frac{1}{4}$ shaded",
+            "J $\\frac{1}{2}$ shaded"
+          ],
+          "correctAnswer": "J $\\frac{1}{2}$ shaded",
+          "topic": "Equivalent Fractions"
         },
         {
-          "questionId": "staar3_2018_q27",
-          "question": "Elisha listed the amounts she paid for guitar lessons for three months: February: $78, March: $90, April: $156. What is the amount Elisha paid for guitar lessons for these three months?",
-          "options": ["$314", "$324", "$114", "$325"],
-          "correctAnswer": "B",
+          "questionId": "q27",
+          "question": "Elisha listed the amounts she paid for guitar lessons for three months: • February: $78, • March: $90, • April: $156. What is the amount Elisha paid for guitar lessons for these three months?",
+          "options": [
+            "A $314",
+            "B $324",
+            "C $114",
+            "D $325"
+          ],
+          "correctAnswer": "B $324",
           "topic": "Addition"
         },
         {
-          "questionId": "staar3_2018_q28",
-          "question": "The models shown are the same size and are each divided into equal-size parts. The models are shaded to represent two fractions. Which statement is true?",
+          "questionId": "q28",
+          "question": "The models shown are the same size. Model 1 is divided into 3 equal parts with 2 shaded ($\\frac{2}{3}$). Model 2 is divided into 4 equal parts with 2 shaded ($\\frac{2}{4}$). Which statement is true?",
+          "imagePlaceholder": "q28_fraction_comparison_image",
           "options": [
-            "2/3 > 2/4, because thirds are larger than fourths.",
-            "2/3 = 2/4, because each model has 2 parts shaded.",
-            "1/3 < 1/4, because 3 is less than 4.",
-            "1/3 = 1/4, because each model shows 1 whole."
+            "F $\\frac{2}{3} > \\frac{2}{4}$, because thirds are larger than fourths.",
+            "G $\\frac{2}{3} = \\frac{2}{4}$, because each model has 2 parts shaded.",
+            "H $\\frac{1}{3} < \\frac{1}{4}$, because 3 is less than 4.",
+            "J $\\frac{1}{3} = \\frac{1}{4}$, because each model shows 1 whole."
           ],
-          "correctAnswer": "F",
-          "topic": "Fractions",
-          "imageRequired": true
+          "correctAnswer": "F $\\frac{2}{3} > \\frac{2}{4}$, because thirds are larger than fourths.",
+          "topic": "Fractions/Comparison"
         },
         {
-          "questionId": "staar3_2018_q29",
-          "question": "The picture shows the coins that are in a piggy bank. Which dot plot represents the value in cents of each coin in the piggy bank?",
-          "options": ["A", "B", "C", "D"],
-          "correctAnswer": "C",
-          "topic": "Data Analysis",
-          "imageRequired": true
+          "questionId": "q29",
+          "question": "The picture shows the coins that are in a piggy bank: 3 dimes (10 cents), 2 nickels (5 cents), 2 quarters (25 cents), and 1 penny (1 cent). Which dot plot represents the value in cents of each coin in the piggy bank?",
+          "imagePlaceholder": "q29_coins_dot_plot_image",
+          "options": [
+            "A Dot plot with 3 dots at 10, 2 at 5, 2 at 25, 1 at 1",
+            "B Dot plot with 3 dots at 10, 2 at 5, 2 at 25, 1 at 1",
+            "C Dot plot with 3 dots at 10, 2 at 5, 2 at 25, 1 at 1",
+            "D Dot plot with 3 dots at 10, 2 at 5, 2 at 25, 1 at 1"
+          ],
+          "correctAnswer": "A Dot plot with 3 dots at 10, 2 at 5, 2 at 25, 1 at 1",
+          "topic": "Data Representation/Dot Plots"
         },
         {
-          "questionId": "staar3_2018_q30",
+          "questionId": "q30",
           "question": "There are a total of 294 restaurants in a city. Of these restaurants, 196 are along the highways, and 49 are downtown. The rest of the restaurants are in shopping malls. Which model can be used to find the number of restaurants in the city that are in shopping malls?",
-          "options": ["F", "G", "H", "J"],
-          "correctAnswer": "G",
-          "topic": "Problem Solving",
-          "imageRequired": true
-        },
-        {
-          "questionId": "staar3_2018_q31",
-          "question": "The table shows the weights of four elephants. Which comparison of these weights is true?",
+          "imagePlaceholder": "q30_strip_diagram_options_image",
           "options": [
-            "The weight of Elephant R < the weight of Elephant T",
-            "The weight of Elephant U > the weight of Elephant T",
-            "The weight of Elephant S = the weight of Elephant U",
-            "The weight of Elephant S < the weight of Elephant T"
+            "F Model showing $294 - 196 - 49 = \\text{?}$",
+            "G Model showing $196 + 49 + \\text{?} = 294$",
+            "H Model showing $294 - 196 = \\text{?}$, then $\\text{?} - 49 = \\text{mall}$",
+            "J Model showing $196 + 49 = \\text{?}$, then $294 - \\text{?} = \\text{mall}$"
           ],
-          "correctAnswer": "A",
-          "topic": "Comparison"
+          "correctAnswer": "J Model showing $196 + 49 = \\text{?}$, then $294 - \\text{?} = \\text{mall}$",
+          "topic": "Multi-Step Problem/Modeling"
         },
         {
-          "questionId": "staar3_2018_q32",
-          "question": "Maria put cloth squares together to make a blanket. The blanket is modeled by this rectangle. What is the area of the blanket in square feet?",
-          "options": ["17 square feet", "34 square feet", "72 square feet", "63 square feet"],
-          "correctAnswer": "H",
-          "topic": "Area",
-          "imageRequired": true
+          "questionId": "q31",
+          "question": "The table shows the weights of four elephants. Which comparison of these weights is true?\n\nElephant R: 12,345 pounds\nElephant S: 13,960 pounds\nElephant T: 12,509 pounds\nElephant U: 11,960 pounds",
+          "options": [
+            "A The weight of Elephant R < the weight of Elephant T",
+            "B The weight of Elephant U > the weight of Elephant T",
+            "C The weight of Elephant S = the weight of Elephant U",
+            "D The weight of Elephant S < the weight of Elephant T"
+          ],
+          "correctAnswer": "A The weight of Elephant R < the weight of Elephant T",
+          "topic": "Number Comparison"
+        },
+        {
+          "questionId": "q32",
+          "question": "Maria put cloth squares together to make a blanket. The blanket is modeled by this rectangle (an array of 9 rows and 8 columns, with each square being 1 foot by 1 foot). What is the area of the blanket in square feet?",
+          "imagePlaceholder": "q32_area_model_image",
+          "options": [
+            "F 17 square feet",
+            "G 34 square feet",
+            "H 72 square feet",
+            "J 63 square feet"
+          ],
+          "correctAnswer": "H 72 square feet",
+          "topic": "Area"
         }
       ]
     }
