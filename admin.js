@@ -355,7 +355,7 @@ async function loadAndRenderReport(docId) {
 }
 
 // ##################################################################
-// # SECTION 2: CONTENT MANAGER (UPDATED WITH BULK UPLOAD & IMAGE PRESERVATION)
+// # SECTION 2: CONTENT MANAGER (UPDATED WITH HYBRID BULK UPLOAD)
 // ##################################################################
 
 async function renderContentManagerPanel(container) {
@@ -396,7 +396,7 @@ async function renderContentManagerPanel(container) {
                     <button id="update-image-btn" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 mt-2">Upload & Save Image to Firestore</button>
                 </div>
 
-                <!-- NEW: Bulk Image Upload Section -->
+                <!-- UPDATED: Bulk Image Upload Section with Overwrite Option -->
                 <div class="p-4 border rounded-md bg-blue-50">
                     <h4 class="text-xl font-semibold mb-2">4. Bulk Image Upload (Numbered Images)</h4>
                     <p class="text-sm text-gray-600 mb-4">
@@ -408,6 +408,16 @@ async function renderContentManagerPanel(container) {
                         <label class="font-bold">Select Numbered Images:</label>
                         <input type="file" id="bulk-image-upload-input" class="w-full mt-1 border p-2 rounded" accept="image/*" multiple>
                         <p class="text-xs text-gray-500 mt-1">Hold Ctrl/Cmd to select multiple images</p>
+                    </div>
+                    
+                    <div class="mb-4">
+                        <input type="checkbox" id="overwrite-existing-checkbox" class="mr-2">
+                        <label for="overwrite-existing-checkbox" class="text-sm font-medium text-gray-700">
+                            Overwrite existing images
+                        </label>
+                        <p class="text-xs text-gray-500 ml-6">
+                            When checked: Replaces ALL matched questions' images. When unchecked: Only fills missing images.
+                        </p>
                     </div>
                     
                     <div id="bulk-upload-preview" class="mb-4" style="display:none;">
@@ -577,8 +587,9 @@ async function setupContentManager() {
     const imagePreviewContainer = document.getElementById('image-preview-container');
     const imagePreview = document.getElementById('image-preview');
 
-    // NEW: Bulk upload elements
+    // UPDATED: Bulk upload elements with overwrite option
     const bulkImageUploadInput = document.getElementById('bulk-image-upload-input');
+    const overwriteExistingCheckbox = document.getElementById('overwrite-existing-checkbox');
     const bulkUploadPreview = document.getElementById('bulk-upload-preview');
     const bulkImageList = document.getElementById('bulk-image-list');
     const bulkUploadBtn = document.getElementById('bulk-upload-btn');
@@ -692,7 +703,7 @@ async function setupContentManager() {
         }
     });
 
-    // NEW: Bulk Image Upload Implementation
+    // UPDATED: Bulk Image Upload Implementation with Overwrite Option
     bulkImageUploadInput.addEventListener('change', (e) => {
         const files = Array.from(e.target.files);
         bulkImageList.innerHTML = '';
@@ -707,13 +718,29 @@ async function setupContentManager() {
         files.forEach((file, index) => {
             const fileName = file.name;
             const questionId = extractQuestionIdFromFileName(fileName);
+            const questionLocation = findQuestionById(questionId, overwriteExistingCheckbox.checked);
             
             const fileItem = document.createElement('div');
             fileItem.className = 'flex justify-between items-center p-2 bg-white border rounded';
+            
+            let statusText = 'No number found';
+            let statusColor = 'text-red-600';
+            
+            if (questionId) {
+                if (questionLocation) {
+                    const hasExistingImage = questionLocation.question.imageUrl;
+                    statusText = `→ Q-ID: ${questionId} ${hasExistingImage ? '(will overwrite)' : '(new image)'}`;
+                    statusColor = hasExistingImage ? 'text-orange-600' : 'text-green-600';
+                } else {
+                    statusText = `→ Q-ID: ${questionId} (no match found)`;
+                    statusColor = 'text-gray-500';
+                }
+            }
+            
             fileItem.innerHTML = `
                 <span class="text-sm">${fileName}</span>
-                <span class="text-xs ${questionId ? 'text-green-600' : 'text-red-600'}">
-                    ${questionId ? `→ Will match Q-ID: ${questionId}` : 'No number found'}
+                <span class="text-xs ${statusColor}">
+                    ${statusText}
                 </span>
             `;
             bulkImageList.appendChild(fileItem);
@@ -727,15 +754,20 @@ async function setupContentManager() {
         return match ? parseInt(match[1]) : null;
     }
 
-    // Find question by ID across all tests
-    function findQuestionById(questionId) {
+    // UPDATED: Find question by ID with overwrite option
+    function findQuestionById(questionId, overwriteMode = false) {
         for (let testIndex = 0; testIndex < loadedTestData.tests.length; testIndex++) {
             const test = loadedTestData.tests[testIndex];
             if (test.questions) {
                 for (let questionIndex = 0; questionIndex < test.questions.length; questionIndex++) {
                     const question = test.questions[questionIndex];
-                    if (question.questionId === questionId && question.imagePlaceholder && !question.imageUrl) {
-                        return { testIndex, questionIndex, question };
+                    
+                    if (question.questionId === questionId) {
+                        // In overwrite mode, match ALL questions with this ID
+                        // In normal mode, only match questions that need images (have placeholder but no URL)
+                        if (overwriteMode || (question.imagePlaceholder && !question.imageUrl)) {
+                            return { testIndex, questionIndex, question };
+                        }
                     }
                 }
             }
@@ -745,6 +777,7 @@ async function setupContentManager() {
 
     bulkUploadBtn.addEventListener('click', async () => {
         const files = Array.from(bulkImageUploadInput.files);
+        const overwriteMode = overwriteExistingCheckbox.checked;
         
         if (files.length === 0) {
             bulkUploadStatus.textContent = 'Please select some images first.';
@@ -752,13 +785,14 @@ async function setupContentManager() {
             return;
         }
 
-        bulkUploadStatus.textContent = `Starting bulk upload of ${files.length} images...`;
+        bulkUploadStatus.textContent = `Starting bulk upload of ${files.length} images (${overwriteMode ? 'OVERWRITE mode' : 'FILL mode'})...`;
         bulkUploadStatus.style.color = 'blue';
         bulkUploadBtn.disabled = true;
 
         try {
             let successfulUploads = 0;
             let skippedUploads = 0;
+            let overwrittenUploads = 0;
             
             // Process each file
             for (const file of files) {
@@ -770,10 +804,10 @@ async function setupContentManager() {
                     continue;
                 }
                 
-                const questionLocation = findQuestionById(questionId);
+                const questionLocation = findQuestionById(questionId, overwriteMode);
                 
                 if (!questionLocation) {
-                    console.log(`Skipping ${file.name} - no matching question found for ID ${questionId}`);
+                    console.log(`Skipping ${file.name} - no matching question found for ID ${questionId}${overwriteMode ? '' : ' or question already has image'}`);
                     skippedUploads++;
                     continue;
                 }
@@ -783,10 +817,17 @@ async function setupContentManager() {
                 const imageUrl = await uploadImageToCloudinary(file);
                 
                 // Update the question data
+                const hadExistingImage = !!loadedTestData.tests[questionLocation.testIndex].questions[questionLocation.questionIndex].imageUrl;
                 loadedTestData.tests[questionLocation.testIndex].questions[questionLocation.questionIndex].imageUrl = imageUrl;
-                delete loadedTestData.tests[questionLocation.testIndex].questions[questionLocation.questionIndex].imagePlaceholder;
+                
+                // Remove placeholder when adding image
+                if (loadedTestData.tests[questionLocation.testIndex].questions[questionLocation.questionIndex].imagePlaceholder) {
+                    delete loadedTestData.tests[questionLocation.testIndex].questions[questionLocation.questionIndex].imagePlaceholder;
+                }
                 
                 successfulUploads++;
+                if (hadExistingImage) overwrittenUploads++;
+                
                 bulkUploadStatus.textContent = `✅ Uploaded ${file.name} → Q-ID ${questionId} (${successfulUploads}/${files.length})`;
             }
             
@@ -796,7 +837,15 @@ async function setupContentManager() {
                 const testDocRef = doc(db, "tests", currentTestDocId);
                 await setDoc(testDocRef, loadedTestData);
                 
-                bulkUploadStatus.textContent = `✅ Success! ${successfulUploads} images uploaded and linked. ${skippedUploads} files skipped.`;
+                let resultMessage = `✅ Success! ${successfulUploads} images processed.`;
+                if (overwrittenUploads > 0) {
+                    resultMessage += ` ${overwrittenUploads} existing images were replaced.`;
+                }
+                if (skippedUploads > 0) {
+                    resultMessage += ` ${skippedUploads} files skipped.`;
+                }
+                
+                bulkUploadStatus.textContent = resultMessage;
                 bulkUploadStatus.style.color = 'green';
             } else {
                 bulkUploadStatus.textContent = 'No images were successfully processed. Check file names and question IDs.';
@@ -1717,6 +1766,7 @@ onAuthStateChanged(auth, async (user) => {
 
 
 // [End Updated admin.js File]
+
 
 
 
