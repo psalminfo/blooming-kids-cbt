@@ -1,41 +1,83 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Select Subject - Blooming Kids House</title>
-  <link rel="icon" href="favicon.ico" />
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" />
-  <link rel="stylesheet" href="style.css" />
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Select Subject - Blooming Kids House</title>
+  <link rel="icon" href="favicon.ico" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" />
+  <link rel="stylesheet" href="style.css" />
 </head>
 <body class="bg-green-50 min-h-screen flex items-center justify-center">
 
-  <div class="bg-white p-8 rounded-xl shadow-xl w-full max-w-md">
-    <!-- THIS IS THE UPDATED SECTION -->
-    <div class="flex justify-between items-center mb-6">
-      <h2 class="text-2xl font-bold text-green-800">Select a Subject</h2>
-      <!-- The logout button has been added back here -->
-      <button onclick="logout()" class="bg-yellow-400 text-white px-4 py-2 rounded hover:bg-yellow-500 text-sm">Logout</button>
-    </div>
-    <!-- END OF UPDATED SECTION -->
+  <div class="bg-white p-8 rounded-xl shadow-xl w-full max-w-md">
+    <div class="flex justify-between items-center mb-6">
+      <h2 class="text-2xl font-bold text-green-800">Select a Subject</h2>
+      <button onclick="logout()" class="bg-yellow-400 text-white px-4 py-2 rounded hover:bg-yellow-500 text-sm">Logout</button>
+    </div>
 
-    <div id="subjectButtons" class="space-y-4">
-      <button onclick="goToSubject('math')" class="bg-green-600 text-white w-full py-2 rounded hover:bg-green-700">Math</button>
-      <button onclick="goToSubject('ela')" class="bg-green-600 text-white w-full py-2 rounded hover:bg-green-700">English Language Arts</button>
-      <button onclick="goToSubject('biology')" class="bg-green-600 text-white w-full py-2 rounded hover:bg-green-700">Biology</button>
-      <button onclick="goToSubject('physics')" class="bg-green-600 text-white w-full py-2 rounded hover:bg-green-700">Physics</button>
-      <button onclick="goToSubject('chemistry')" class="bg-green-600 text-white w-full py-2 rounded hover:bg-green-700">Chemistry</button>
-    </div>
-    <p class="text-xs text-center mt-8 text-gray-600">POWERED BY <span style="color:#FFEB3B">POG</span></p>
-  </div>
+    <div id="subjectButtons" class="space-y-4">
+      <!-- Subjects will be dynamically loaded here based on grade -->
+    </div>
+    <p class="text-xs text-center mt-8 text-gray-600">POWERED BY <span style="color:#FFEB3B">POG</span></p>
+  </div>
 
-  <script>
+  <script>
     const studentDataString = localStorage.getItem('studentData');
     const studentData = JSON.parse(studentDataString);
 
     if (!studentData || !studentData.grade) {
       alert("Missing student info. Please log in again.");
       window.location.href = "index.html";
+    }
+
+    function loadSubjectsBasedOnGrade() {
+      const subjectButtons = document.getElementById('subjectButtons');
+      const grade = parseInt(studentData.grade);
+      
+      // Always show Math and ELA for all grades
+      let subjects = [
+        { id: 'math', name: 'Math' },
+        { id: 'ela', name: 'English Language Arts' }
+      ];
+
+      // Add Science for grades 5-7
+      if (grade >= 5 && grade <= 7) {
+        subjects.push({ id: 'science', name: 'Science' });
+      }
+      
+      // Add all Science subjects for grades 8 and above
+      if (grade >= 8) {
+        subjects.push(
+          { id: 'biology', name: 'Biology' },
+          { id: 'physics', name: 'Physics' },
+          { id: 'chemistry', name: 'Chemistry' }
+        );
+      }
+
+      // Clear existing buttons
+      subjectButtons.innerHTML = '';
+
+      // Create buttons for each subject
+      subjects.forEach(subject => {
+        const button = document.createElement('button');
+        button.textContent = subject.name;
+        button.className = 'bg-green-600 text-white w-full py-2 rounded hover:bg-green-700 transition-colors duration-200';
+        button.onclick = () => goToSubject(subject.id);
+        subjectButtons.appendChild(button);
+      });
+
+      // Show grade info
+      const infoText = document.createElement('p');
+      infoText.className = 'text-sm text-gray-600 text-center mt-4';
+      if (grade <= 4) {
+        infoText.textContent = `Grade ${grade}: Math and English available`;
+      } else if (grade >= 5 && grade <= 7) {
+        infoText.textContent = `Grade ${grade}: Math, English, and Science available`;
+      } else {
+        infoText.textContent = `Grade ${grade}: All subjects available`;
+      }
+      subjectButtons.appendChild(infoText);
     }
 
     function goToSubject(subject) {
@@ -47,15 +89,24 @@
         tutorEmail: studentData.tutorEmail,
         country: studentData.country
       });
+      
+      // AUTO-ADD creative-writing state for ELA
+      if (subject === 'ela') {
+        params.set('state', 'creative-writing');
+      }
+      
       window.location.href = `student.html?${params.toString()}`;
     }
 
-    // The logout function has been added here
+    // The logout function
     window.logout = function() {
       localStorage.clear(); // Clears the student's login data
       window.location.href = 'index.html';
     }
-  </script>
+
+    // Load subjects when page loads
+    document.addEventListener('DOMContentLoaded', loadSubjectsBasedOnGrade);
+  </script>
 
 </body>
 </html>
