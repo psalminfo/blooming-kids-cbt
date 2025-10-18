@@ -68,7 +68,7 @@
         },
         {
           "questionId": "q6",
-          "question": "The number lines model two different fractions. The top number line is partitioned into 2 equal parts, with 1 part shaded ($\\frac{1}{2}$). The bottom number line is partitioned into 8 equal parts, with 4 parts shaded ($\\frac{4}{8}$). Which comparison of these fractions is true?",
+          "question": "The number lines model two different fractions. Which comparison of these fractions is true?",
           "imagePlaceholder": "q6_number_lines_image",
           "options": [
             "F 1/2 > 1/1",
