@@ -63,121 +63,6 @@
             transition: color 0.3s;
         }
 
-        /* Network Error Overlay Styles */
-        #networkErrorOverlay {
-            display: none;
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0, 0, 0, 0.85);
-            z-index: 10000;
-            justify-content: center;
-            align-items: center;
-            backdrop-filter: blur(5px);
-        }
-
-        .error-content {
-            background: white;
-            padding: 3rem;
-            border-radius: 15px;
-            text-align: center;
-            max-width: 500px;
-            box-shadow: 0 20px 40px rgba(0,0,0,0.3);
-            animation: fadeIn 0.5s ease-out;
-        }
-
-        .dark .error-content {
-            background: #1f2937;
-            color: white;
-        }
-
-        .error-icon {
-            font-size: 4rem;
-            color: #f59e0b;
-            margin-bottom: 1rem;
-        }
-
-        .error-buttons {
-            display: flex;
-            gap: 15px;
-            justify-content: center;
-            margin-top: 2rem;
-            flex-wrap: wrap;
-        }
-
-        .error-btn {
-            padding: 12px 24px;
-            border-radius: 8px;
-            text-decoration: none;
-            font-weight: 600;
-            transition: all 0.3s ease;
-            border: none;
-            cursor: pointer;
-        }
-
-        .error-btn.primary {
-            background: #16a34a;
-            color: white;
-        }
-
-        .error-btn.secondary {
-            background: #f59e0b;
-            color: white;
-        }
-
-        .error-btn:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
-        }
-
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(-20px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-
-        /* Network Warning Banner */
-        #networkWarning {
-            display: none;
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            background: #fef3cd;
-            border-bottom: 2px solid #f59e0b;
-            padding: 12px 20px;
-            text-align: center;
-            z-index: 9999;
-            font-weight: 500;
-        }
-
-        .dark #networkWarning {
-            background: #78350f;
-            border-bottom-color: #f59e0b;
-            color: white;
-        }
-
-        #networkWarning .close-btn {
-            background: none;
-            border: none;
-            font-size: 1.2rem;
-            cursor: pointer;
-            margin-left: 15px;
-            padding: 5px 10px;
-            border-radius: 3px;
-        }
-
-        .dark #networkWarning .close-btn {
-            color: white;
-        }
-
-        /* Loading States */
-        .loading {
-            opacity: 0.6;
-            pointer-events: none;
-        }
-
         /* Mobile-first responsive design */
         @media (max-width: 768px) {
             .wrapper {
@@ -239,19 +124,6 @@
                 padding: 8px 12px;
                 font-size: 1rem;
             }
-
-            .error-content {
-                margin: 20px;
-                padding: 2rem;
-            }
-
-            .error-buttons {
-                flex-direction: column;
-            }
-
-            .error-btn {
-                width: 100%;
-            }
         }
 
         @media (max-width: 480px) {
@@ -275,11 +147,6 @@
             .nav-btn {
                 padding: 6px 10px;
                 font-size: 0.9rem;
-            }
-
-            .error-content {
-                padding: 1.5rem;
-                margin: 15px;
             }
         }
 
@@ -393,32 +260,6 @@
 </head>
 <body>
 
-    <!-- Network Error Overlay -->
-    <div id="networkErrorOverlay">
-        <div class="error-content">
-            <div class="error-icon">
-                <i class="fas fa-wifi"></i>
-            </div>
-            <h2 class="text-2xl font-bold mb-4">Connection Issue</h2>
-            <p class="text-lg mb-2">We're having trouble connecting to the server.</p>
-            <p class="text-gray-600 dark:text-gray-300 mb-6">This might be due to network problems or temporary server issues.</p>
-            <div class="error-buttons">
-                <button onclick="window.location.reload()" class="error-btn primary">
-                    <i class="fas fa-redo mr-2"></i>Try Again
-                </button>
-                <button onclick="checkConnectivity()" class="error-btn secondary">
-                    <i class="fas fa-network-wired mr-2"></i>Check Connection
-                </button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Network Warning Banner -->
-    <div id="networkWarning">
-        <span id="warningMessage">You appear to be offline. Some features may not work properly.</span>
-        <button class="close-btn" onclick="hideNetworkWarning()">×</button>
-    </div>
-
     <div class="wrapper">
         <div class="inner">
             <div class="max-w-7xl mx-auto">
@@ -468,7 +309,6 @@
     <script type="module" src="tutor.js"></script>
 
     <script>
-        // Network Error Handling System
         document.addEventListener('DOMContentLoaded', () => {
             const body = document.body;
             const toggleButton = document.getElementById('modeToggle');
@@ -527,183 +367,7 @@
             
             // Listen for resize events
             window.addEventListener('resize', handleResize);
-
-            // 4. Initialize Network Monitoring
-            initializeNetworkMonitoring();
-        });
-
-        // Network Monitoring Functions
-        function initializeNetworkMonitoring() {
-            // Monitor online/offline status
-            window.addEventListener('online', function() {
-                hideNetworkWarning();
-                hideNetworkError();
-                console.log('Connection restored - back online');
-                
-                // Show success message
-                showTemporaryMessage('Connection restored!', 'success');
-            });
-
-            window.addEventListener('offline', function() {
-                showNetworkWarning('You appear to be offline. Some features may not work properly.');
-                console.log('Connection lost - offline');
-            });
-
-            // Monitor page resource loading errors
-            window.addEventListener('error', function(e) {
-                if (e.target && (e.target.tagName === 'LINK' || e.target.tagName === 'SCRIPT' || e.target.tagName === 'IMG')) {
-                    console.warn('Resource loading failed:', e.target.href || e.target.src);
-                    
-                    // Don't show full error for minor resources, just warn
-                    if (!e.target.href?.includes('gtag') && !e.target.src?.includes('gtag')) {
-                        showNetworkWarning('Some resources failed to load. The app may not work correctly.');
-                    }
-                }
-            });
-
-            // Override fetch to catch API errors
-            const originalFetch = window.fetch;
-            window.fetch = function(...args) {
-                return originalFetch.apply(this, args)
-                    .then(response => {
-                        if (!response.ok) {
-                            // Don't show overlay for 401/403 (auth errors)
-                            if (response.status !== 401 && response.status !== 403) {
-                                showNetworkError('Server error. Please try again.');
-                            }
-                            throw new Error(`HTTP ${response.status}`);
-                        }
-                        return response;
-                    })
-                    .catch(error => {
-                        console.error('Fetch error:', error);
-                        
-                        // Only show network error for actual network issues, not CORS or auth
-                        if (error.name === 'TypeError' || error.message.includes('Failed to fetch')) {
-                            showNetworkError('Cannot connect to server. Please check your internet connection.');
-                        }
-                        throw error;
-                    });
-            };
-
-            // Periodic connectivity check
-            setInterval(checkConnectivity, 30000); // Check every 30 seconds
-        }
-
-        function showNetworkError(message = 'Connection issue detected') {
-            const overlay = document.getElementById('networkErrorOverlay');
-            const warningMessage = overlay.querySelector('p');
-            
-            if (warningMessage) {
-                warningMessage.textContent = message;
-            }
-            
-            overlay.style.display = 'flex';
-            document.body.style.overflow = 'hidden';
-        }
-
-        function hideNetworkError() {
-            const overlay = document.getElementById('networkErrorOverlay');
-            overlay.style.display = 'none';
-            document.body.style.overflow = 'auto';
-        }
-
-        function showNetworkWarning(message) {
-            const warning = document.getElementById('networkWarning');
-            const messageElement = document.getElementById('warningMessage');
-            
-            if (messageElement) {
-                messageElement.textContent = message;
-            }
-            
-            warning.style.display = 'block';
-            
-            // Auto-hide after 10 seconds if not a critical error
-            setTimeout(() => {
-                if (navigator.onLine) {
-                    hideNetworkWarning();
-                }
-            }, 10000);
-        }
-
-        function hideNetworkWarning() {
-            const warning = document.getElementById('networkWarning');
-            warning.style.display = 'none';
-        }
-
-        function checkConnectivity() {
-            // Simple connectivity check by trying to fetch a small resource
-            fetch('https://www.google.com/favicon.ico', { 
-                mode: 'no-cors',
-                cache: 'no-cache'
-            })
-            .then(() => {
-                // If we reach here, we have internet
-                hideNetworkWarning();
-                hideNetworkError();
-                showTemporaryMessage('Connection is working properly!', 'success');
-            })
-            .catch(() => {
-                // No internet connection
-                showNetworkError('No internet connection detected. Please check your network settings.');
-            });
-        }
-
-        function showTemporaryMessage(message, type = 'info') {
-            // Create temporary message element
-            const messageEl = document.createElement('div');
-            messageEl.textContent = message;
-            messageEl.style.cssText = `
-                position: fixed;
-                top: 20px;
-                right: 20px;
-                background: ${type === 'success' ? '#10b981' : '#3b82f6'};
-                color: white;
-                padding: 12px 20px;
-                border-radius: 8px;
-                z-index: 10001;
-                box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-                animation: slideIn 0.3s ease-out;
-            `;
-            
-            document.body.appendChild(messageEl);
-            
-            // Remove after 3 seconds
-            setTimeout(() => {
-                messageEl.style.animation = 'slideOut 0.3s ease-in';
-                setTimeout(() => {
-                    if (messageEl.parentNode) {
-                        messageEl.parentNode.removeChild(messageEl);
-                    }
-                }, 300);
-            }, 3000);
-        }
-
-        // Add CSS for slide animations
-        const style = document.createElement('style');
-        style.textContent = `
-            @keyframes slideIn {
-                from { transform: translateX(100%); opacity: 0; }
-                to { transform: translateX(0); opacity: 1; }
-            }
-            @keyframes slideOut {
-                from { transform: translateX(0); opacity: 1; }
-                to { transform: translateX(100%); opacity: 0; }
-            }
-        `;
-        document.head.appendChild(style);
-
-        // Global error handler for uncaught errors
-        window.addEventListener('unhandledrejection', (event) => {
-            console.error('Unhandled promise rejection:', event.reason);
-            
-            // Only show network errors, not programming errors
-            if (event.reason && (event.reason.message.includes('fetch') || 
-                                 event.reason.message.includes('network') ||
-                                 event.reason.name === 'TypeError')) {
-                showNetworkWarning('A network error occurred. Some features may not work.');
-            }
         });
     </script>
 </body>
-</html>
+</html> 
