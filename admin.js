@@ -72,8 +72,17 @@ function convertPayAdviceToCSV(data) {
 }
 
 async function uploadImageToCloudinary(file) {
-    console.log("Image upload function called for:", file.name);
-    return "https://via.placeholder.com/150";
+    const CLOUDINARY_CLOUD_NAME = 'dy2hxcyaf';
+    const CLOUDINARY_UPLOAD_PRESET = 'bkh_assessments';
+    const CLOUDINARY_UPLOAD_URL = `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`;
+    
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('upload_preset', CLOUDINARY_UPLOAD_PRESET);
+    const res = await fetch(CLOUDINARY_UPLOAD_URL, { method: 'POST', body: formData });
+    if (!res.ok) throw new Error("Image upload failed");
+    const data = await res.json();
+    return data.secure_url;
 }
 
 async function updateStaffPermissions(staffEmail, newRole) {
@@ -1487,5 +1496,6 @@ onAuthStateChanged(auth, async (user) => {
 
 
 // [End Updated admin.js File]
+
 
 
