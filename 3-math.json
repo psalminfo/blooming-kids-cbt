@@ -290,6 +290,7 @@
         {
           "questionId": "q24",
           "question": "The frequency table shows the number of points scored by each player on a basketball team during a game. The tallies represent:\n\nStephen: 15 points\nAlfred: 5 points\nKenji: 12 points\nPete: 8 points\nEric: 12 points\nWesley: 6 points\nHayes: 10 points\n\nWhat is the combined number of points scored by Stephen, Alfred, Pete, and Wesley?",
+          "imagePlaceholder": "q24_model_options_image",
           "options": [],
           "correctAnswer": "34",
           "topic": "Data Analysis/Addition",
