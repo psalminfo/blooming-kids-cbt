@@ -290,15 +290,7 @@
           "correctAnswer": "B $\\frac{1}{4} + \\frac{1}{4} + \\frac{1}{4}$",
           "topic": "Fractions/Unit Fractions"
         },
-        {
-          "questionId": "q24",
-          "question": "The frequency table shows the number of points scored by each player on a basketball team during a game. The tallies represent:\n\nStephen: 15 points\nAlfred: 5 points\nKenji: 12 points\nPete: 8 points\nEric: 12 points\nWesley: 6 points\nHayes: 10 points\n\nWhat is the combined number of points scored by Stephen, Alfred, Pete, and Wesley?",
-          "imagePlaceholder": "q24_model_options_image",
-          "options": [],
-          "correctAnswer": "34",
-          "topic": "Data Analysis/Addition",
-          "defaultQuestionType": "griddable"
-        },
+       
         {
           "questionId": "q25",
           "question": "The model shown (a 3x2 array) can represent two number sentences. Which two number sentences can the model represent?",
@@ -311,19 +303,6 @@
           ],
           "correctAnswer": "B $3 \\times 2 = \\square$ and $2 \\times 3 = \\square$",
           "topic": "Multiplication/Arrays"
-        },
-        {
-          "questionId": "q26",
-          "question": "Kailani drew four congruent squares. She shaded the same fraction of each square. One square is shown with $\\frac{1}{4}$ shaded. Which square CANNOT be another one of Kailani’s squares?",
-          "imagePlaceholder": "q26_fraction_squares_image",
-          "options": [
-            "F $\\frac{1}{4}$ shaded",
-            "H $\\frac{1}{4}$ shaded",
-            "G $\\frac{1}{4}$ shaded",
-            "J $\\frac{1}{2}$ shaded"
-          ],
-          "correctAnswer": "J $\\frac{1}{2}$ shaded",
-          "topic": "Equivalent Fractions"
         },
         {
           "questionId": "q27",
