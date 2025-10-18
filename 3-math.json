@@ -48,7 +48,7 @@
         {
           "questionId": "q4",
           "question": "Which of these models represent the same number?\n\nModel X: 2 hundreds (2 blocks of 100)\nModel Y: 20 tens (2 columns of 10 tens)\nModel Z: 20 ones (2 groups of 10 ones)",
-          "imagePlaceholder": "math_prac_q13_parallel_lines.png",
+         "imagePlaceholder": "q4_model_options_image",
           "options": [
             "F Model X and Model Y, because 20 ones is equivalent to 20 tens.",
             "G Model X and Model Z, because 20 ones is equivalent to 2 hundreds.",
@@ -82,6 +82,7 @@
         {
           "questionId": "q7",
           "question": "The table shows the relationship between the number of toy airplanes made in a factory and the number of batteries needed for the airplanes.\n\nNumber of Toy Airplanes: 5, 7, 9, 11, 13, 15\nNumber of Batteries: 15, 21, 27, 33, 39, 45\n\nBased on the relationship shown in the table, which statement is true?",
+          "imagePlaceholder": "q_fraction_models_image",
           "options": [
             "A The number of batteries is equal to the number of toy airplanes times 3.",
             "B The number of batteries is equal to the number of toy airplanes times 2.",
@@ -215,6 +216,7 @@
         {
           "questionId": "q18",
           "question": "A store is having a sale on books. The sale price of each book is $6 less than the regular price. Which table shows prices of different books at this store?",
+         "imagePlaceholder": "q18_model_options_image",
           "options": [
             "F Regular Price: $12, $19, $26, $33 | Sale Price: $18, $25, $32, $39",
             "G Regular Price: $18, $25, $32, $39 | Sale Price: $12, $19, $26, $33",
@@ -265,6 +267,7 @@
           "questionId": "q22",
           "question": "Noah has 48 cookies. The model (a visual representation of 48 divided into 8 groups of 6, with 2 groups shaded out or 'eaten') represents what he did with the cookies. Based on the model, which of these could explain what Noah did with the cookies?",
           "imagePlaceholder": "q22_cookies_model_image",
+          "imagePlaceholder": "q22_model_options_image",
           "options": [
             "F He put $(48 \\div 8)$ cookies into each of 8 bags and ate $(2 \\times 6)$ of the cookies.",
             "G He put $(48 \\div 6)$ cookies into each of 8 bags and ate $(2 \\times 8)$ of the cookies.",
@@ -325,6 +328,7 @@
         {
           "questionId": "q27",
           "question": "Elisha listed the amounts she paid for guitar lessons for three months: • February: $78, • March: $90, • April: $156. What is the amount Elisha paid for guitar lessons for these three months?",
+        "imagePlaceholder": "q27_model_options_image",
           "options": [
             "A $314",
             "B $324",
