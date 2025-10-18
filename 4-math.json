@@ -1,284 +1,336 @@
 {
-  "questions": [
+  "tests": [
     {
-      "topic": "Addition",
-      "question": "A farmer has 23 apples and buys 19 more. How many apples does he have now?",
-      "type": "multiple-choice",
-      "options": ["40 apples", "41 apples", "42 apples", "43 apples"],
-      "correct_answer": "42 apples"
-    },
-    {
-      "topic": "Subtraction",
-      "question": "What is 85 - 27?",
-      "type": "multiple-choice",
-      "options": ["56", "57", "58", "59"],
-      "correct_answer": "58"
-    },
-    {
-      "topic": "Multiplication",
-      "question": "What is 6 × 7?",
-      "type": "multiple-choice",
-      "options": ["40", "41", "42", "43"],
-      "correct_answer": "42"
-    },
-    {
-      "topic": "Division",
-      "question": "If 28 candies are shared equally among 4 children, how many candies does each child get?",
-      "type": "multiple-choice",
-      "options": ["6 candies", "7 candies", "8 candies", "9 candies"],
-      "correct_answer": "7 candies"
-    },
-    {
-      "topic": "Fractions",
-      "question": "What fraction of a cake is left if 2 out of 6 slices are eaten?",
-      "type": "multiple-choice",
-      "options": ["1/6", "2/6", "3/6", "4/6"],
-      "correct_answer": "4/6"
-    },
-    {
-      "topic": "Shapes",
-      "question": "Which shape has 4 equal sides and 4 right angles?",
-      "type": "multiple-choice",
-      "options": ["Rectangle", "Square", "Triangle", "Pentagon"],
-      "correct_answer": "Square"
-    },
-    {
-      "topic": "Perimeter",
-      "question": "What is the perimeter of a rectangle with a length of 6 cm and a width of 4 cm?",
-      "type": "multiple-choice",
-      "options": ["18 cm", "20 cm", "22 cm", "24 cm"],
-      "correct_answer": "20 cm"
-    },
-    {
-      "topic": "Time Conversion",
-      "question": "How many minutes are in 2 hours?",
-      "type": "multiple-choice",
-      "options": ["100 minutes", "120 minutes", "140 minutes", "160 minutes"],
-      "correct_answer": "120 minutes"
-    },
-    {
-      "topic": "Multiples",
-      "question": "Which number is a multiple of 4?",
-      "type": "multiple-choice",
-      "options": ["10", "12", "14", "15"],
-      "correct_answer": "12"
-    },
-    {
-      "topic": "Rates",
-      "question": "If a horse runs 15 miles in 3 hours, how many miles does it run in 1 hour?",
-      "type": "multiple-choice",
-      "options": ["4 miles", "5 miles", "6 miles", "7 miles"],
-      "correct_answer": "5 miles"
-    },
-    {
-      "topic": "Addition",
-      "question": "What is 56 + 29?",
-      "type": "multiple-choice",
-      "options": ["83", "84", "85", "86"],
-      "correct_answer": "85"
-    },
-    {
-      "topic": "Subtraction",
-      "question": "A store has 72 pencils. If 19 are sold, how many are left?",
-      "type": "multiple-choice",
-      "options": ["51", "52", "53", "54"],
-      "correct_answer": "53"
-    },
-    {
-      "topic": "Multiplication",
-      "question": "If a box holds 9 eggs and there are 5 boxes, how many eggs are there?",
-      "type": "multiple-choice",
-      "options": ["40 eggs", "45 eggs", "50 eggs", "55 eggs"],
-      "correct_answer": "45 eggs"
-    },
-    {
-      "topic": "Division",
-      "question": "What is 36 ÷ 6?",
-      "type": "multiple-choice",
-      "options": ["5", "6", "7", "8"],
-      "correct_answer": "6"
-    },
-    {
-      "topic": "Fractions",
-      "question": "What is 1/2 of 10?",
-      "type": "multiple-choice",
-      "options": ["4", "5", "6", "7"],
-      "correct_answer": "5"
-    },
-    {
-      "topic": "Shapes",
-      "question": "Which shape has 3 sides?",
-      "type": "multiple-choice",
-      "options": ["Triangle", "Square", "Pentagon", "Hexagon"],
-      "correct_answer": "Triangle"
-    },
-    {
-      "topic": "Perimeter",
-      "question": "What is the perimeter of a square with a side length of 5 cm?",
-      "type": "multiple-choice",
-      "options": ["18 cm", "20 cm", "22 cm", "24 cm"],
-      "correct_answer": "20 cm"
-    },
-    {
-      "topic": "Time Conversion",
-      "question": "How many seconds are in 1 minute?",
-      "type": "multiple-choice",
-      "options": ["50 seconds", "60 seconds", "70 seconds", "80 seconds"],
-      "correct_answer": "60 seconds"
-    },
-    {
-      "topic": "Odd Numbers",
-      "question": "Which number is odd?",
-      "type": "multiple-choice",
-      "options": ["10", "12", "13", "14"],
-      "correct_answer": "13"
-    },
-    {
-      "topic": "Multiplication",
-      "question": "What is 8 × 5?",
-      "type": "multiple-choice",
-      "options": ["35", "40", "45", "50"],
-      "correct_answer": "40"
-    },
-    {
-      "topic": "Subtraction",
-      "question": "What is 90 - 45?",
-      "type": "multiple-choice",
-      "options": ["43", "44", "45", "46"],
-      "correct_answer": "45"
-    },
-    {
-      "topic": "Division",
-      "question": "If 15 books are divided equally among 3 shelves, how many books are on each shelf?",
-      "type": "multiple-choice",
-      "options": ["4 books", "5 books", "6 books", "7 books"],
-      "correct_answer": "5 books"
-    },
-    {
-      "topic": "Fractions",
-      "question": "What fraction of a day is 6 hours?",
-      "type": "multiple-choice",
-      "options": ["1/4", "1/3", "1/2", "2/3"],
-      "correct_answer": "1/4"
-    },
-    {
-      "topic": "Shapes",
-      "question": "Which shape has no sides?",
-      "type": "multiple-choice",
-      "options": ["Circle", "Square", "Triangle", "Rectangle"],
-      "correct_answer": "Circle"
-    },
-    {
-      "topic": "Perimeter",
-      "question": "What is the perimeter of a triangle with sides 4 cm, 5 cm, and 6 cm?",
-      "type": "multiple-choice",
-      "options": ["13 cm", "14 cm", "15 cm", "16 cm"],
-      "correct_answer": "15 cm"
-    },
-    {
-      "topic": "Multiplication",
-      "question": "If a tray holds 7 cookies and there are 4 trays, how many cookies are there?",
-      "type": "multiple-choice",
-      "options": ["24 cookies", "28 cookies", "32 cookies", "36 cookies"],
-      "correct_answer": "28 cookies"
-    },
-    {
-      "topic": "Addition",
-      "question": "What is 37 + 48?",
-      "type": "multiple-choice",
-      "options": ["83", "84", "85", "86"],
-      "correct_answer": "85"
-    },
-    {
-      "topic": "Subtraction",
-      "question": "What is 64 - 28?",
-      "type": "multiple-choice",
-      "options": ["34", "35", "36", "37"],
-      "correct_answer": "36"
-    },
-    {
-      "topic": "Division",
-      "question": "What is 45 ÷ 9?",
-      "type": "multiple-choice",
-      "options": ["4", "5", "6", "7"],
-      "correct_answer": "5"
-    },
-    {
-      "topic": "Fractions",
-      "question": "What is 3/4 of 8?",
-      "type": "multiple-choice",
-      "options": ["4", "5", "6", "7"],
-      "correct_answer": "6"
-    },
-    {
-      "topic": "Shapes",
-      "question": "Which shape has 5 sides?",
-      "type": "multiple-choice",
-      "options": ["Pentagon", "Hexagon", "Octagon", "Quadrilateral"],
-      "correct_answer": "Pentagon"
-    },
-    {
-      "topic": "Multiples",
-      "question": "Which number is a multiple of 5?",
-      "type": "multiple-choice",
-      "options": ["12", "13", "14", "15"],
-      "correct_answer": "15"
-    },
-    {
-      "topic": "Rates",
-      "question": "If a car travels 24 miles in 4 hours, how far does it travel in 1 hour?",
-      "type": "multiple-choice",
-      "options": ["5 miles", "6 miles", "7 miles", "8 miles"],
-      "correct_answer": "6 miles"
-    },
-    {
-      "topic": "Addition",
-      "question": "A store sells 47 red balloons and 26 blue balloons. How many balloons are sold in total?",
-      "type": "multiple-choice",
-      "options": ["71", "72", "73", "74"],
-      "correct_answer": "73"
-    },
-    {
-      "topic": "Subtraction",
-      "question": "What is 99 - 53?",
-      "type": "multiple-choice",
-      "options": ["44", "45", "46", "47"],
-      "correct_answer": "46"
-    },
-    {
-      "topic": "Multiplication",
-      "question": "What is 9 × 6?",
-      "type": "multiple-choice",
-      "options": ["52", "53", "54", "55"],
-      "correct_answer": "54"
-    },
-    {
-      "topic": "Division",
-      "question": "If 20 marbles are divided equally among 5 bags, how many marbles are in each bag?",
-      "type": "multiple-choice",
-      "options": ["3 marbles", "4 marbles", "5 marbles", "6 marbles"],
-      "correct_answer": "4 marbles"
-    },
-    {
-      "topic": "Fractions",
-      "question": "What fraction of a pizza is left if 4 out of 8 slices are eaten?",
-      "type": "multiple-choice",
-      "options": ["2/8", "3/8", "4/8", "5/8"],
-      "correct_answer": "4/8"
-    },
-    {
-      "topic": "Perimeter",
-      "question": "What is the perimeter of a square with a side length of 8 cm?",
-      "type": "multiple-choice",
-      "options": ["28 cm", "30 cm", "32 cm", "34 cm"],
-      "correct_answer": "32 cm"
-    },
-    {
-      "topic": "Time Conversion",
-      "question": "How many minutes are in 4 hours?",
-      "type": "multiple-choice",
-      "options": ["200 minutes", "220 minutes", "240 minutes", "260 minutes"],
-      "correct_answer": "240 minutes"
+      "id": "grade_4_math_staar_2022",
+      "subject": "Math",
+      "grade": "4",
+      "year": "2022",
+      "defaultQuestionType": "multiple-choice",
+      "questions": [
+        {
+          "questionId": "m4_2022_q1",
+          "question": "Jon put a pie in the oven at 5:15 P.M. He took the pie out of the oven 35 minutes later. At what time did Jon take the pie out of the oven?",
+          "options": ["5:45 P.M.", "6:50 P.M.", "5:50 P.M.", "6:45 P.M."],
+          "correctAnswer": "5:50 P.M.",
+          "topic": "Time"
+        },
+        {
+          "questionId": "m4_2022_q2",
+          "question": "A town had three and fourteen-hundredths inches of rain during June. What is the value of the digit in the tenths place?",
+          "options": ["3", "0.04", "0", "0.1"],
+          "correctAnswer": "0.1",
+          "topic": "Place Value"
+        },
+        {
+          "questionId": "m4_2022_q3",
+          "question": "An art teacher ordered 26 marker sets for his classes. There are 100 markers in each set. How many markers are in 26 sets?",
+          "options": ["800", "26,000", "2,600", "126"],
+          "correctAnswer": "2,600",
+          "topic": "Multiplication"
+        },
+        {
+          "questionId": "m4_2022_q4",
+          "imagePlaceholder": "grade4_q4_lines.png",
+          "question": "What does the drawing show?",
+          "options": [
+            "Two line segments that appear to be parallel",
+            "Two line segments that appear to be perpendicular", 
+            "Two lines that appear to be parallel",
+            "Two lines that appear to intersect"
+          ],
+          "correctAnswer": "Two line segments that appear to be perpendicular",
+          "topic": "Geometry"
+        },
+        {
+          "questionId": "m4_2022_q5",
+          "question": "A store sells bags of potato chips. 1/3 of the bags are barbecue-flavored chips. 3/5 of the bags are cheese-flavored chips. The rest of the bags are plain chips. Which statement is true?",
+          "options": [
+            "More than 1/2 of the bags are plain chips",
+            "There are no bags of plain chips",
+            "Exactly 1/2 of the bags are plain chips", 
+            "Less than 1/2 of the bags are plain chips"
+          ],
+          "correctAnswer": "Less than 1/2 of the bags are plain chips",
+          "topic": "Fractions"
+        },
+        {
+          "questionId": "m4_2022_q6",
+          "imagePlaceholder": "grade4_q6_frequency_table.png",
+          "question": "The list shows the numbers of books donated to a library on fourteen days: 0,1,4,4,6,7,8,8,9,12,12,16,16,17. The librarian made this frequency table to show the data. Which row of the frequency table is incomplete?",
+          "options": [
+            "The row showing 0 to 4 books",
+            "The row showing 5 to 9 books",
+            "The row showing 10 to 14 books",
+            "The row showing 15 to 19 books"
+          ],
+          "correctAnswer": "The row showing 5 to 9 books",
+          "topic": "Data Analysis"
+        },
+        {
+          "questionId": "m4_2022_q7",
+          "question": "There are two hiking trails in a park. Trail Y is 2.7 miles long. Trail Z is 5.84 miles long. What is the total length of these two hiking trails?",
+          "options": ["Gridable question"],
+          "correctAnswer": "8.54",
+          "topic": "Addition"
+        },
+        {
+          "questionId": "m4_2022_q8",
+          "imagePlaceholder": "grade4_q8_angles.png",
+          "question": "Angle SRT has a measure of 35°. Angle TRV has a measure of 65°. What is the measure in degrees of angle SRV?",
+          "options": ["30°", "110°", "90°", "100°"],
+          "correctAnswer": "100°",
+          "topic": "Angles"
+        },
+        {
+          "questionId": "m4_2022_q9",
+          "imagePlaceholder": "grade4_q9_number_line.png",
+          "question": "Point J is shown on the number line. Which number does point J represent?",
+          "options": ["8.02", "8.2", "7.12", "7.13"],
+          "correctAnswer": "8.02",
+          "topic": "Number Line"
+        },
+        {
+          "questionId": "m4_2022_q10",
+          "imagePlaceholder": "grade4_q10_rectangle_models.png",
+          "question": "A rectangle has a perimeter of 40 centimeters and an area of 64 square centimeters. Which model could represent this rectangle?",
+          "options": ["Model F", "Model G", "Model H", "Model J"],
+          "correctAnswer": "Model G",
+          "topic": "Area and Perimeter"
+        },
+        {
+          "questionId": "m4_2022_q11",
+          "question": "The fourth-grade classes at a school made flowers to decorate the cafeteria. There are 5 fourth-grade classes. To make each flower, 4 sheets of paper were used. The classes used a total of 300 sheets of paper. Each class made the same number of flowers. How many flowers did each fourth-grade class make?",
+          "options": ["75", "15", "240", "17"],
+          "correctAnswer": "15",
+          "topic": "Division"
+        },
+        {
+          "questionId": "m4_2022_q12",
+          "imagePlaceholder": "grade4_q12_expense_table.png",
+          "question": "Trina lives in an apartment. The table shows some of the expenses that Trina paid for three months to live in the apartment. Which expenses were variable expenses for Trina during these three months?",
+          "options": [
+            "Water and Electricity only",
+            "Rent, Water, and Electricity",
+            "Rent and Cable TV only",
+            "Cable TV only"
+          ],
+          "correctAnswer": "Water and Electricity only",
+          "topic": "Financial Literacy"
+        },
+        {
+          "questionId": "m4_2022_q13",
+          "imagePlaceholder": "grade4_q13_fraction_table.png",
+          "question": "Four people are mowing their lawns. The table shows the fraction of each lawn that has already been mowed by each person. Which of these people have mowed greater than 3/4 of a lawn?",
+          "options": [
+            "Nate, Rudy, Marc, and Santos",
+            "Nate and Marc only", 
+            "Rudy only",
+            "Santos only"
+          ],
+          "correctAnswer": "Rudy only",
+          "topic": "Fractions"
+        },
+        {
+          "questionId": "m4_2022_q14",
+          "imagePlaceholder": "grade4_q14_strip_diagrams.png",
+          "question": "Erin has 12 pictures from a field trip and some pictures from a vacation. She has twice as many pictures from the vacation as from the field trip. Which strip diagram represents p, the total number of pictures Erin has?",
+          "options": ["Diagram F", "Diagram G", "Diagram H", "Diagram J"],
+          "correctAnswer": "Diagram F",
+          "topic": "Strip Diagrams"
+        },
+        {
+          "questionId": "m4_2022_q15",
+          "question": "What decimal number is equivalent to 18/10?",
+          "options": ["Gridable question"],
+          "correctAnswer": "1.8",
+          "topic": "Fractions and Decimals"
+        },
+        {
+          "questionId": "m4_2022_q16",
+          "imagePlaceholder": "grade4_q16_travel_table.png",
+          "question": "The table shows the number of miles a family will travel next summer. Which is the best estimate of the combined number of miles this family will travel next summer?",
+          "options": ["700 mi", "900 mi", "1,100 mi", "2,300 mi"],
+          "correctAnswer": "900 mi",
+          "topic": "Estimation"
+        },
+        {
+          "questionId": "m4_2022_q17",
+          "imagePlaceholder": "grade4_q17_figures.png",
+          "question": "Deon sorted figures into groups. The figures shown were sorted into the same group. Which statement best describes the figures in this group?",
+          "options": [
+            "Each figure has only one obtuse angle",
+            "Each figure has at least one acute angle",
+            "Each figure has only one pair of parallel sides",
+            "Each figure has at least one pair of perpendicular sides"
+          ],
+          "correctAnswer": "Each figure has at least one pair of perpendicular sides",
+          "topic": "Geometry"
+        },
+        {
+          "questionId": "m4_2022_q18",
+          "imagePlaceholder": "grade4_q18_fraction_model.png",
+          "question": "The blank model shown can be shaded to represent 7/10. Which expression does NOT show a way to represent 7/10 as a sum of fractions?",
+          "options": [
+            "2/10 + 2/10 + 2/10 + 1/10",
+            "4/10 + 3/10 + 3/10",
+            "6/10 + 1/10", 
+            "1/10 + 1/10 + 1/10 + 1/10 + 1/10 + 1/10"
+          ],
+          "correctAnswer": "4/10 + 3/10 + 3/10",
+          "topic": "Fractions"
+        },
+        {
+          "questionId": "m4_2022_q19",
+          "imagePlaceholder": "grade4_q19_price_models.png",
+          "question": "The models represent the price for a pound of grapes at four different stores. Each model is shaded to represent a price that is greater than $1.00. Which stores have a price greater than $1.60 but less than $1.90 for a pound of grapes?",
+          "options": [
+            "Store L, Store N, and Store P only",
+            "Store L, Store M, and Store N only", 
+            "Store L and Store N only",
+            "None of the stores"
+          ],
+          "correctAnswer": "Store L and Store N only",
+          "topic": "Decimals"
+        },
+        {
+          "questionId": "m4_2022_q20",
+          "imagePlaceholder": "grade4_q20_array.png",
+          "question": "Lori started to draw an array to help her solve a math problem. She drew one full row and one full column of the array, as shown. Which equation represents a problem Lori could solve using this array?",
+          "options": ["12 × 13 = 156", "13 × 13 = 169", "14 × 12 = 168", "13 × 14 = 182"],
+          "correctAnswer": "13 × 14 = 182",
+          "topic": "Multiplication"
+        },
+        {
+          "questionId": "m4_2022_q21",
+          "imagePlaceholder": "grade4_q21_conversion_table.png",
+          "question": "The table shows numbers of feet and the equivalent numbers of inches. Lionel painted a wall that is 12 feet long. How many inches long is the wall that Lionel painted?",
+          "options": ["144 in.", "122 in.", "156 in.", "132 in."],
+          "correctAnswer": "144 in.",
+          "topic": "Measurement Conversion"
+        },
+        {
+          "questionId": "m4_2022_q22",
+          "imagePlaceholder": "grade4_q22_test_table.png",
+          "question": "Ms. Panvini gave her students a test with twenty math problems. The table shows the fraction of correct answers for each of the five students who finished the test first. Which comparison is true?",
+          "options": [
+            "9/10 < 4/5",
+            "17/20 < 9/10", 
+            "9/10 < 3/4",
+            "17/20 < 1/2"
+          ],
+          "correctAnswer": "9/10 < 3/4",
+          "topic": "Comparing Fractions"
+        },
+        {
+          "questionId": "m4_2022_q23",
+          "question": "There were 3 quarts of water in a container in a science classroom. A student poured 1 quart 3 cups of the water into a sink. What amount of the water in quarts and cups was left in the container after the student poured some of the water into the sink?",
+          "options": ["4 qt 3 c", "2 qt 3 c", "2 qt 1 c", "1 qt 1 c"],
+          "correctAnswer": "1 qt 1 c",
+          "topic": "Measurement"
+        },
+        {
+          "questionId": "m4_2022_q24",
+          "imagePlaceholder": "grade4_q24_bush_model.png",
+          "question": "A gardener planted 28 bushes in 4 rows. All of the bushes were either rose bushes or lilac bushes. The shaded parts of the model represent the lilac bushes. Which equation shows how to find the fraction of the bushes that are lilac bushes?",
+          "options": [
+            "4/28 + 3/28 + 3/28 + 5/28 = 15/28",
+            "3/28 + 4/28 + 4/28 + 2/28 = 13/28",
+            "4/7 + 3/7 + 3/7 + 5/7 = 15/28",
+            "15/28 + 13/28 = 28/28"
+          ],
+          "correctAnswer": "4/28 + 3/28 + 3/28 + 5/28 = 15/28",
+          "topic": "Fractions"
+        },
+        {
+          "questionId": "m4_2022_q25",
+          "question": "Yolanda wrote a number. The digit in the millions place is an 8. The digit in the thousands place is a 6. The digit in the hundredths place is a 2. Which number could be the number Yolanda wrote?",
+          "options": [
+            "85,346,000.12",
+            "38,056,000.21", 
+            "58,346,000.12",
+            "98,674,200.21"
+          ],
+          "correctAnswer": "58,346,000.12",
+          "topic": "Place Value"
+        },
+        {
+          "questionId": "m4_2022_q26",
+          "imagePlaceholder": "grade4_q26_stem_leaf.png",
+          "question": "The list shows the numbers of points a basketball team scored during the games the team played last season: 83,98,104,88,95,98,101,89,92,89. The stem and leaf plot also shows these data. What number goes in the to complete the stem and leaf plot?",
+          "options": ["Gridable question"],
+          "correctAnswer": "2",
+          "topic": "Stem and Leaf Plots"
+        },
+        {
+          "questionId": "m4_2022_q27",
+          "imagePlaceholder": "grade4_q27_protractor.png",
+          "question": "Angle TUV is shown on the protractor. What is the measure of angle TUV to the nearest degree?",
+          "options": ["170°", "60°", "110°", "10°"],
+          "correctAnswer": "110°",
+          "topic": "Angles"
+        },
+        {
+          "questionId": "m4_2022_q28",
+          "question": "On Thursday 50 books were returned to a library. On Friday 4 times as many books were returned to the library as books that were returned on Thursday. Which set of equations can be used to find b, the total number of books returned to the library on these two days?",
+          "options": [
+            "50 + 50 = 100; 100 × 4 = b",
+            "50 + 50 = 100; 100 + 4 = b", 
+            "50 × 4 = 200; 200 × 50 = b",
+            "50 × 4 = 200; 200 + 50 = b"
+          ],
+          "correctAnswer": "50 × 4 = 200; 200 + 50 = b",
+          "topic": "Multiplication and Addition"
+        },
+        {
+          "questionId": "m4_2022_q29",
+          "question": "Which of these statements describe the primary services of a bank? I. Customers can borrow money from a bank. II. Customers can put money into a savings or checking account. III. Customers can pick up packages at a bank. IV. Customers can cash checks at a bank.",
+          "options": [
+            "Statements II and IV only",
+            "Statements I, II, and IV only",
+            "Statement III only", 
+            "Statements I, II, and III only"
+          ],
+          "correctAnswer": "Statements I, II, and IV only",
+          "topic": "Financial Literacy"
+        },
+        {
+          "questionId": "m4_2022_q30",
+          "question": "A baker is making cakes. It takes 9 eggs to make each cake. The baker has 8 cartons of eggs, and each carton contains 12 eggs. What is the greatest number of cakes the baker can make using these eggs?",
+          "options": ["10", "11", "6", "13"],
+          "correctAnswer": "10",
+          "topic": "Multiplication and Division"
+        },
+        {
+          "questionId": "m4_2022_q31",
+          "imagePlaceholder": "grade4_q31_figures.png",
+          "question": "A set of figures is shown. Which figure has at least one acute angle, right angle, and obtuse angle?",
+          "options": ["Figure T", "Figure W", "Figure X", "Figure Y"],
+          "correctAnswer": "Figure X",
+          "topic": "Angles"
+        },
+        {
+          "questionId": "m4_2022_q32",
+          "question": "Which mixed number is equivalent to 17.04?",
+          "options": ["17 4/10", "17 1/4", "17 40/10", "17 4/100"],
+          "correctAnswer": "17 4/100",
+          "topic": "Decimals and Fractions"
+        },
+        {
+          "questionId": "m4_2022_q33",
+          "question": "A rectangular place mat is 18 inches long and 12 inches wide. What is the area of this place mat in square inches?",
+          "options": ["216 square inches", "60 square inches", "54 square inches", "900 square inches"],
+          "correctAnswer": "216 square inches",
+          "topic": "Area"
+        },
+        {
+          "questionId": "m4_2022_q34",
+          "imagePlaceholder": "grade4_q34_pattern_table.png",
+          "question": "The table shows a relationship between the position of a number in a pattern and its value. Which set of expressions shows how to find the value when given the position?",
+          "options": ["Set F", "Set G", "Set H", "Set J"],
+          "correctAnswer": "Set H",
+          "topic": "Patterns"
+        }
+      ]
     }
   ]
 }
