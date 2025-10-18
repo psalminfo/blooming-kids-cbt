@@ -35,6 +35,7 @@
         {
           "questionId": "q3",
           "question": "Gretchen made this table to show the side lengths and perimeters of three figures.\n\nFigure: Square, Side Lengths: 6, 6, 6, 6 (yards), Perimeter: 24 (yards)\nFigure: Triangle, Side Lengths: 4, 7, 8 (yards), Perimeter: 19 (yards)\nFigure: Rectangle, Side Lengths: 4, 8, 4, 8 (yards), Perimeter: 32 (yards)\n\nWhat mistake, if any, did Gretchen make?",
+         "imagePlaceholder": "q3_model_options_image",
           "options": [
             "A The perimeter of the rectangle should be 24 yards.",
             "B The perimeter of the square should be 36 yards.",
