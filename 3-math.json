@@ -59,6 +59,14 @@
           "topic": "Place Value"
         },
         {
+          "questionId": "q5",
+          "question": "Lin has a total of 36 sodas in packs. There are 6 sodas in each pack. How many packs of sodas does Lin have?",
+          "options": [],
+          "correctAnswer": "6",
+          "topic": "Division",
+          "defaultQuestionType": "griddable"
+        },
+        {
           "questionId": "q6",
           "question": "The number lines model two different fractions. Which comparison of these fractions is true?",
           "imagePlaceholder": "q6_number_lines_image",
@@ -66,7 +74,7 @@
             "F 1/2 > 1/1",
             "G 2/8 > 1/8",
             "H 1/8 = 2/8",
-            "J 2/8 < 1/8"
+            "J 2 8 < 1 8"
           ],
           "correctAnswer": "G 2/8 > 1/8",
           "topic": "Fractions/Comparison"
@@ -161,9 +169,9 @@
           "topic": "Perimeter/Measurement"
         },
         {
-          "questionId": "q15",
+          "questionId": "q14",
           "question": "The picture represents the trophies 3 brothers have on a shelf. There are 6 trophies in total. Each brother won the same number of trophies. What fraction of the trophies did each brother win?",
-          "imagePlaceholder": "q15_trophies_image",
+          "imagePlaceholder": "q14_trophies_image",
           "options": [
             "A 2/3",
             "B 2/6",
@@ -174,7 +182,7 @@
           "topic": "Fractions"
         },
         {
-          "questionId": "q16",
+          "questionId": "q15",
           "question": "A group of 64 children and 24 adults will travel to a zoo in vans. There will be 8 people in each van. How many vans will be needed to take the group to the zoo?",
           "options": [
             "F 11",
@@ -186,7 +194,7 @@
           "topic": "Multi-Step Problem/Division"
         },
         {
-          "questionId": "q17",
+          "questionId": "q16",
           "question": "A container of liquid laundry detergent at a grocery store is marked with the volume of detergent inside. Which unit of measurement could be marked on the container?",
           "options": [
             "A Kilograms",
@@ -198,9 +206,9 @@
           "topic": "Measurement/Volume"
         },
         {
-          "questionId": "q18",
+          "questionId": "q17",
           "question": "A store is having a sale on books. The sale price of each book is 6 less than the regular price. Which table shows prices of different books at this store?",
-          "imagePlaceholder": "q18_model_options_image",
+          "imagePlaceholder": "q17_model_options_image",
           "options": [
             "F F",
             "G G",
@@ -211,9 +219,9 @@
           "topic": "Addition/Subtraction Relationships"
         },
         {
-          "questionId": "q19",
+          "questionId": "q18",
           "question": "Dominique put figures into groups based on certain attributes. Sometimes she put figures into more than one group. Group 1: Has all sides congruent Group 2: Has exactly 4 sides Group 3: Is a polygon Which statement is true?",
-          "imagePlaceholder": "q9_model_options_image",
+          "imagePlaceholder": "q18_model_options_image",
           "options": [
             "A A square could be put into all the groups.",
             "B A triangle could be put into all the groups.",
@@ -224,7 +232,7 @@
           "topic": "Geometry/Attributes of Shapes"
         },
         {
-          "questionId": "q20",
+          "questionId": "q19",
           "question": "Hakeem received 13 phone calls on Tuesday. This expression can be used to show the number of phone calls he received on Saturday: 13 times 4. Which statement is true?",
           "options": [
             "F Hakeem received 4 more phone calls on Saturday than he received on Tuesday.",
@@ -236,7 +244,7 @@
           "topic": "Multiplication"
         },
         {
-          "questionId": "q21",
+          "questionId": "q20",
           "question": "The expanded notation of a number is shown. (9 × 10,000) + (4 × 100) + (1 × 10)",
           "options": [
             "A 9,410",
@@ -248,9 +256,9 @@
           "topic": "Place Value"
         },
         {
-          "questionId": "q22",
+          "questionId": "q21",
           "question": "Noah has 48 cookies. The model represents what he did with the cookies. Based on the model, which of these could explain what Noah did with the cookies?",
-          "imagePlaceholder": "q22_model_options_image",
+          "imagePlaceholder": "q21_model_options_image",
           "options": [
             "F He put (48 ÷ 8) cookies into each of 8 bags and ate (2 X 6) of the cookies.",
             "G He put (48 ÷ 6) cookies into each of 8 bags and ate (2 X 8) of the cookies.",
@@ -261,9 +269,9 @@
           "topic": "Multi-Step Problem/Modeling"
         },
         {
-          "questionId": "q23",
+          "questionId": "q22",
           "question": "There are 4 books on a shelf. In the model, 3 of the books are shaded, representing nonfiction books. Which expression represents the fraction of the books on the shelf that are nonfiction?",
-          "imagePlaceholder": "q23_books_model_image",
+          "imagePlaceholder": "q22_books_model_image",
           "options": [
             "A 1/4 + 1/4 + 1/4 + 1/4",
             "B 1/4 + 1/4 + 1/4",
@@ -274,9 +282,9 @@
           "topic": "Fractions/Unit Fractions"
         },
         {
-          "questionId": "q25",
+          "questionId": "q23",
           "question": "The model shown can represent two number sentences. Which two number sentences can the model represent?",
-          "imagePlaceholder": "q25_array_model_image",
+          "imagePlaceholder": "q23_array_model_image",
           "options": [
             "A 3 + 3 + 3 = ☐ and 2 + 2 + 2 = ☐",
             "B 3 X 2 = ☐ and 2 X 3 = ☐",
@@ -287,7 +295,7 @@
           "topic": "Multiplication/Arrays"
         },
         {
-          "questionId": "q27",
+          "questionId": "q24",
           "question": "Elisha listed the amounts she paid for guitar lessons for three months: • February: 78, • March: 90, • April: 156. What is the amount Elisha paid for guitar lessons for these three months?",
           "options": [
             "A 314",
@@ -299,9 +307,9 @@
           "topic": "Addition"
         },
         {
-          "questionId": "q28",
+          "questionId": "q25",
           "question": "The models shown are the same size and are each divided into equal-size parts. The models are shaded to represent two fractions. Which statement is true?",
-          "imagePlaceholder": "q28_fraction_comparison_image",
+          "imagePlaceholder": "q25_fraction_comparison_image",
           "options": [
             "F 2/3 > 2/4, because thirds are larger than fourths.",
             "G 2/3 = 2/4, because each model has 2 parts shaded.",
@@ -312,9 +320,9 @@
           "topic": "Fractions/Comparison"
         },
         {
-          "questionId": "q29",
+          "questionId": "q26",
           "question": "The picture shows the coins that are in a piggy bank: 3 dimes (10 cents), 2 nickels (5 cents), 2 quarters (25 cents), and 1 penny (1 cent). Which dot plot represents the value in cents of each coin in the piggy bank?",
-          "imagePlaceholder": "q29_coins_dot_plot_image",
+          "imagePlaceholder": "q26_coins_dot_plot_image",
           "options": [
             "A A",
             "B B",
@@ -325,9 +333,9 @@
           "topic": "Data Representation/Dot Plots"
         },
         {
-          "questionId": "q30",
+          "questionId": "q27",
           "question": "There are a total of 294 restaurants in a city. Of these restaurants, 196 are along the highways, and 49 are downtown. The rest of the restaurants are in shopping malls. Which model can be used to find the number of restaurants in the city that are in shopping malls?",
-          "imagePlaceholder": "q30_strip_diagram_options_image",
+          "imagePlaceholder": "q27_strip_diagram_options_image",
           "options": [
             "F F",
             "G G",
@@ -338,9 +346,9 @@
           "topic": "Multi-Step Problem/Modeling"
         },
         {
-          "questionId": "q31",
+          "questionId": "q28",
           "question": "The table shows the weights of four elephants. Which comparison of these weights is true?",
-          "imagePlaceholder": "31_model_options_image",
+          "imagePlaceholder": "q28_model_options_image",
           "options": [
             "A The weight of Elephant R < the weight of Elephant T",
             "B The weight of Elephant U > the weight of Elephant T",
@@ -351,9 +359,9 @@
           "topic": "Number Comparison"
         },
         {
-          "questionId": "q32",
+          "questionId": "q29",
           "question": "Maria put cloth squares together to make a blanket. The blanket is modeled by this rectangle. What is the area of the blanket in square feet?",
-          "imagePlaceholder": "q32_area_model_image",
+          "imagePlaceholder": "q29_area_model_image",
           "options": [
             "F 17 square feet",
             "G 34 square feet",
@@ -367,4 +375,3 @@
     }
   ]
 }
-```
