@@ -355,7 +355,7 @@ async function loadAndRenderReport(docId) {
 }
 
 // ##################################################################
-// # SECTION 2: CONTENT MANAGER (No changes needed)
+// # SECTION 2: CONTENT MANAGER (UPDATED WITH BULK UPLOAD & IMAGE PRESERVATION)
 // ##################################################################
 
 async function renderContentManagerPanel(container) {
@@ -371,14 +371,56 @@ async function renderContentManagerPanel(container) {
                 </div>
                 <div class="mt-2">
                     <input type="checkbox" id="force-reload-checkbox" class="mr-2">
-                    <label for="force-reload-checkbox" class="text-sm text-gray-700">Reload from GitHub (overwrites saved progress)</label>
-                 </div>
+                    <label for="force-reload-checkbox" class="text-sm text-gray-700">Reload from GitHub (preserves existing images)</label>
+                </div>
                 <div id="loader-status" class="mt-2"></div>
             </div>
             <div id="manager-workspace" style="display:none;">
                  <h3 class="text-gray-800 font-bold mb-4 text-lg" id="loaded-file-name"></h3>
-                <div class="mb-8 p-4 border rounded-md"><h4 class="text-xl font-semibold mb-2">2. Edit Incomplete Passages</h4><select id="passage-select" class="w-full p-2 border rounded mt-1 mb-2"></select><textarea id="passage-content" placeholder="Passage content..." class="w-full p-2 border rounded h-40"></textarea><button id="update-passage-btn" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 mt-2">Save Passage to Firestore</button></div>
-                <div class="p-4 border rounded-md"><h4 class="text-xl font-semibold mb-2">3. Add Missing Images</h4><select id="image-select" class="w-full p-2 border rounded mt-1 mb-2"></select><div id="image-preview-container" class="my-2" style="display:none;"><p class="font-semibold text-sm">Image to be replaced:</p><img id="image-preview" src="" class="border rounded max-w-xs mt-1"/></div><label class="font-bold mt-2">Upload New Image:</label><input type="file" id="image-upload-input" class="w-full mt-1 border p-2 rounded" accept="image/*"><button id="update-image-btn" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 mt-2">Upload & Save Image to Firestore</button></div>
+                <div class="mb-8 p-4 border rounded-md">
+                    <h4 class="text-xl font-semibold mb-2">2. Edit Incomplete Passages</h4>
+                    <select id="passage-select" class="w-full p-2 border rounded mt-1 mb-2"></select>
+                    <textarea id="passage-content" placeholder="Passage content..." class="w-full p-2 border rounded h-40"></textarea>
+                    <button id="update-passage-btn" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 mt-2">Save Passage to Firestore</button>
+                </div>
+                
+                <div class="p-4 border rounded-md mb-6">
+                    <h4 class="text-xl font-semibold mb-2">3. Add Missing Images (Single)</h4>
+                    <select id="image-select" class="w-full p-2 border rounded mt-1 mb-2"></select>
+                    <div id="image-preview-container" class="my-2" style="display:none;">
+                        <p class="font-semibold text-sm">Image to be replaced:</p>
+                        <img id="image-preview" src="" class="border rounded max-w-xs mt-1"/>
+                    </div>
+                    <label class="font-bold mt-2">Upload New Image:</label>
+                    <input type="file" id="image-upload-input" class="w-full mt-1 border p-2 rounded" accept="image/*">
+                    <button id="update-image-btn" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 mt-2">Upload & Save Image to Firestore</button>
+                </div>
+
+                <!-- NEW: Bulk Image Upload Section -->
+                <div class="p-4 border rounded-md bg-blue-50">
+                    <h4 class="text-xl font-semibold mb-2">4. Bulk Image Upload (Numbered Images)</h4>
+                    <p class="text-sm text-gray-600 mb-4">
+                        Upload multiple images at once. Name your images as numbers that match question IDs (e.g., 1.jpg, 2.png, 3.jpg).
+                        The system will automatically match image "1.jpg" to question with ID 1.
+                    </p>
+                    
+                    <div class="mb-4">
+                        <label class="font-bold">Select Numbered Images:</label>
+                        <input type="file" id="bulk-image-upload-input" class="w-full mt-1 border p-2 rounded" accept="image/*" multiple>
+                        <p class="text-xs text-gray-500 mt-1">Hold Ctrl/Cmd to select multiple images</p>
+                    </div>
+                    
+                    <div id="bulk-upload-preview" class="mb-4" style="display:none;">
+                        <p class="font-semibold mb-2">Selected Images for Upload:</p>
+                        <div id="bulk-image-list" class="space-y-2 max-h-40 overflow-y-auto"></div>
+                    </div>
+                    
+                    <button id="bulk-upload-btn" class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 w-full">
+                        Upload All Images & Update Questions
+                    </button>
+                    <div id="bulk-upload-status" class="mt-2 text-sm"></div>
+                </div>
+                
                 <p id="status" class="mt-4 font-bold"></p>
             </div>
         </div>
@@ -398,9 +440,26 @@ async function setupContentManager() {
     const loadTestBtn = document.getElementById('load-test-btn');
     const forceReloadCheckbox = document.getElementById('force-reload-checkbox');
     const status = document.getElementById('status');
-
+    
     let loadedTestData = null;
     let currentTestDocId = null;
+
+    // Cloudinary configuration
+    const CLOUDINARY_CLOUD_NAME = 'dy2hxcyaf';
+    const CLOUDINARY_UPLOAD_PRESET = 'bkh_assessments';
+    const CLOUDINARY_UPLOAD_URL = `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`;
+
+    // Fixed uploadImageToCloudinary function
+    async function uploadImageToCloudinary(file) {
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('upload_preset', CLOUDINARY_UPLOAD_PRESET);
+        const res = await fetch(CLOUDINARY_UPLOAD_URL, { method: 'POST', body: formData });
+        if (!res.ok) throw new Error("Image upload failed");
+        const data = await res.json();
+        return data.secure_url;
+    }
+
     async function discoverFiles() {
         try {
             const response = await fetch(API_URL);
@@ -409,8 +468,8 @@ async function setupContentManager() {
             testFileSelect.innerHTML = '<option value="">-- Select a Test File --</option>';
             const jsonFiles = files.filter(file => file.name.endsWith('.json'));
             if (jsonFiles.length === 0) {
-                testFileSelect.innerHTML = '<option value="">No .json files found.</option>';
-                return;
+                 testFileSelect.innerHTML = '<option value="">No .json files found.</option>';
+                 return;
             }
             jsonFiles.forEach(file => {
                 const option = document.createElement('option');
@@ -427,12 +486,12 @@ async function setupContentManager() {
     loadTestBtn.addEventListener('click', async () => {
         const url = testFileSelect.value;
         const fileName = testFileSelect.options[testFileSelect.selectedIndex].text;
-        currentTestDocId = fileName.replace('.json', '');
+        currentTestDocId = fileName.replace('.json', ''); 
         const forceReload = forceReloadCheckbox.checked;
 
         if (!url) {
             loaderStatus.innerHTML = `<p class="text-yellow-600">Please select a file.</p>`;
-             return;
+            return;
         }
 
         loaderStatus.innerHTML = `<p class="text-blue-600">Checking for test...</p>`;
@@ -448,20 +507,29 @@ async function setupContentManager() {
                 loaderStatus.innerHTML = `<p class="text-green-600 font-bold">✅ Loaded saved version from Firestore!</p>`;
                 loadedTestData = docSnap.data();
             } else {
-                const logMessage = forceReload ?
-                "Force Reload activated. Fetching from GitHub." : "No saved version. Loading template from GitHub.";
+                const logMessage = forceReload ? "Force Reload activated. Fetching from GitHub." : "No saved version. Loading template from GitHub.";
                 console.log(logMessage);
                 loaderStatus.innerHTML = `<p class="text-blue-600">Loading latest version from GitHub...</p>`;
-
+                
                 const response = await fetch(url);
                 if (!response.ok) throw new Error(`Could not fetch file from GitHub. Status: ${response.status}`);
-                loadedTestData = await response.json();
-
+                const githubData = await response.json();
+                
+                // ENHANCEMENT: Preserve existing image URLs when reloading from GitHub
+                if (forceReload && docSnap.exists()) {
+                    const existingData = docSnap.data();
+                    loadedTestData = preserveImageUrls(githubData, existingData);
+                    loaderStatus.innerHTML += `<p class="text-green-600 font-bold">✅ Preserved existing Cloudinary images!</p>`;
+                } else {
+                    loadedTestData = githubData;
+                }
+                
                 await setDoc(testDocRef, loadedTestData);
                 loaderStatus.innerHTML = `<p class="text-green-600 font-bold">✅ Synced latest version from GitHub to Firestore!</p>`;
             }
-
+            
             if (!loadedTestData || !loadedTestData.tests) throw new Error("Invalid test file format.");
+            
             document.getElementById('loaded-file-name').textContent = `Editing: ${fileName}`;
             workspace.style.display = 'block';
             populateDropdowns();
@@ -472,6 +540,34 @@ async function setupContentManager() {
         }
     });
 
+    // NEW FUNCTION: Preserve existing image URLs when reloading from GitHub
+    function preserveImageUrls(newData, existingData) {
+        if (!existingData.tests || !newData.tests) return newData;
+        
+        const preservedData = JSON.parse(JSON.stringify(newData));
+        
+        preservedData.tests.forEach((newTest, testIndex) => {
+            const existingTest = existingData.tests[testIndex];
+            if (!existingTest) return;
+            
+            // Preserve question image URLs
+            if (newTest.questions && existingTest.questions) {
+                newTest.questions.forEach((newQuestion, questionIndex) => {
+                    const existingQuestion = existingTest.questions[questionIndex];
+                    if (existingQuestion && existingQuestion.imageUrl) {
+                        preservedData.tests[testIndex].questions[questionIndex].imageUrl = existingQuestion.imageUrl;
+                        // Remove placeholder if image exists
+                        if (preservedData.tests[testIndex].questions[questionIndex].imagePlaceholder) {
+                            delete preservedData.tests[testIndex].questions[questionIndex].imagePlaceholder;
+                        }
+                    }
+                });
+            }
+        });
+        
+        return preservedData;
+    }
+
     const passageSelect = document.getElementById('passage-select');
     const passageContent = document.getElementById('passage-content');
     const imageSelect = document.getElementById('image-select');
@@ -481,41 +577,44 @@ async function setupContentManager() {
     const imagePreviewContainer = document.getElementById('image-preview-container');
     const imagePreview = document.getElementById('image-preview');
 
+    // NEW: Bulk upload elements
+    const bulkImageUploadInput = document.getElementById('bulk-image-upload-input');
+    const bulkUploadPreview = document.getElementById('bulk-upload-preview');
+    const bulkImageList = document.getElementById('bulk-image-list');
+    const bulkUploadBtn = document.getElementById('bulk-upload-btn');
+    const bulkUploadStatus = document.getElementById('bulk-upload-status');
 
     function populateDropdowns() {
         passageSelect.innerHTML = '<option value="">-- Select an incomplete passage --</option>';
         imageSelect.innerHTML = '<option value="">-- Select a question needing an image --</option>';
         imagePreviewContainer.style.display = 'none';
+        
         loadedTestData.tests.forEach((test, testIndex) => {
-            (test.passages || []).forEach((passage, passageIndex) => {
+             (test.passages || []).forEach((passage, passageIndex) => {
                 if (passage.content && passage.content.includes("TO BE UPLOADED")) {
                     const option = document.createElement('option');
                     option.value = `${testIndex}-${passageIndex}`;
-                     option.textContent = `[${test.subject} G${test.grade}] ${passage.title}`;
+                    option.textContent = `[${test.subject} G${test.grade}] ${passage.title}`;
                     passageSelect.appendChild(option);
                 }
-            });
-            (test.questions || []).forEach((question, questionIndex) => {
+             });
+             (test.questions || []).forEach((question, questionIndex) => {
                 if (question.imagePlaceholder && !question.imageUrl) {
-                    
-                    const option = document.createElement('option');
-                    option.value = `${testIndex}-${questionIndex}`;
-                    option.textContent = `[${test.subject} G${test.grade}] Q-ID ${question.questionId}`;
-                    imageSelect.appendChild(option);
-              
-                 }
-            });
+                     const option = document.createElement('option');
+                     option.value = `${testIndex}-${questionIndex}`;
+                     option.textContent = `[${test.subject} G${test.grade}] Q-ID ${question.questionId}`;
+                     imageSelect.appendChild(option);
+                }
+             });
         });
     }
 
     passageSelect.addEventListener('change', e => {
-        if (!e.target.value) {
-            passageContent.value = '';
-            return;
-        }
+        if (!e.target.value) { passageContent.value = ''; return; }
         const [testIndex, passageIndex] = e.target.value.split('-');
         passageContent.value = loadedTestData.tests[testIndex].passages[passageIndex].content || '';
     });
+
     imageSelect.addEventListener('change', e => {
         if (!e.target.value) {
             imagePreviewContainer.style.display = 'none';
@@ -524,15 +623,15 @@ async function setupContentManager() {
         const [testIndex, questionIndex] = e.target.value.split('-');
         const question = loadedTestData.tests[testIndex].questions[questionIndex];
         const imageName = question.imagePlaceholder;
-
+        
         if (imageName) {
-         
-             imagePreview.src = GITHUB_IMAGE_PREVIEW_URL + imageName;
+            imagePreview.src = GITHUB_IMAGE_PREVIEW_URL + imageName;
             imagePreviewContainer.style.display = 'block';
         } else {
             imagePreviewContainer.style.display = 'none';
         }
     });
+    
     updatePassageBtn.addEventListener('click', async () => {
         const selected = passageSelect.value;
         if (!selected) {
@@ -545,14 +644,13 @@ async function setupContentManager() {
 
         const [testIndex, passageIndex] = selected.split('-');
         loadedTestData.tests[testIndex].passages[passageIndex].content = passageContent.value;
-
+        
         try {
             const testDocRef = doc(db, "tests", currentTestDocId);
             await setDoc(testDocRef, loadedTestData);
             status.textContent = `✅ Passage saved successfully!`;
             status.style.color = 'green';
-       
-             passageContent.value = '';
+            passageContent.value = '';
             populateDropdowns();
         } catch (error) {
             status.textContent = `❌ Error saving passage: ${error.message}`;
@@ -568,23 +666,21 @@ async function setupContentManager() {
             status.textContent = 'Please select a question and an image file.';
             status.style.color = 'orange';
             return;
-      
-         }
+        }
 
         try {
             status.textContent = 'Uploading image...';
             status.style.color = 'blue';
             const imageUrl = await uploadImageToCloudinary(file);
-
+            
             status.textContent = 'Saving URL to Firestore...';
             const [testIndex, questionIndex] = selectedImage.split('-');
-           
-             loadedTestData.tests[testIndex].questions[questionIndex].imageUrl = imageUrl;
+            loadedTestData.tests[testIndex].questions[questionIndex].imageUrl = imageUrl;
             delete loadedTestData.tests[testIndex].questions[questionIndex].imagePlaceholder;
 
             const testDocRef = doc(db, "tests", currentTestDocId);
             await setDoc(testDocRef, loadedTestData);
-
+            
             status.textContent = `✅ Image URL saved successfully!`;
             status.style.color = 'green';
             imageUploadInput.value = '';
@@ -593,6 +689,131 @@ async function setupContentManager() {
             console.error('Error saving image:', error);
             status.textContent = `❌ Error: ${error.message}`;
             status.style.color = 'red';
+        }
+    });
+
+    // NEW: Bulk Image Upload Implementation
+    bulkImageUploadInput.addEventListener('change', (e) => {
+        const files = Array.from(e.target.files);
+        bulkImageList.innerHTML = '';
+        
+        if (files.length === 0) {
+            bulkUploadPreview.style.display = 'none';
+            return;
+        }
+        
+        bulkUploadPreview.style.display = 'block';
+        
+        files.forEach((file, index) => {
+            const fileName = file.name;
+            const questionId = extractQuestionIdFromFileName(fileName);
+            
+            const fileItem = document.createElement('div');
+            fileItem.className = 'flex justify-between items-center p-2 bg-white border rounded';
+            fileItem.innerHTML = `
+                <span class="text-sm">${fileName}</span>
+                <span class="text-xs ${questionId ? 'text-green-600' : 'text-red-600'}">
+                    ${questionId ? `→ Will match Q-ID: ${questionId}` : 'No number found'}
+                </span>
+            `;
+            bulkImageList.appendChild(fileItem);
+        });
+    });
+
+    // Helper function to extract question ID from filename
+    function extractQuestionIdFromFileName(fileName) {
+        // Extract numbers from filename (e.g., "1.jpg" → 1, "math_2.png" → 2)
+        const match = fileName.match(/(\d+)/);
+        return match ? parseInt(match[1]) : null;
+    }
+
+    // Find question by ID across all tests
+    function findQuestionById(questionId) {
+        for (let testIndex = 0; testIndex < loadedTestData.tests.length; testIndex++) {
+            const test = loadedTestData.tests[testIndex];
+            if (test.questions) {
+                for (let questionIndex = 0; questionIndex < test.questions.length; questionIndex++) {
+                    const question = test.questions[questionIndex];
+                    if (question.questionId === questionId && question.imagePlaceholder && !question.imageUrl) {
+                        return { testIndex, questionIndex, question };
+                    }
+                }
+            }
+        }
+        return null;
+    }
+
+    bulkUploadBtn.addEventListener('click', async () => {
+        const files = Array.from(bulkImageUploadInput.files);
+        
+        if (files.length === 0) {
+            bulkUploadStatus.textContent = 'Please select some images first.';
+            bulkUploadStatus.style.color = 'orange';
+            return;
+        }
+
+        bulkUploadStatus.textContent = `Starting bulk upload of ${files.length} images...`;
+        bulkUploadStatus.style.color = 'blue';
+        bulkUploadBtn.disabled = true;
+
+        try {
+            let successfulUploads = 0;
+            let skippedUploads = 0;
+            
+            // Process each file
+            for (const file of files) {
+                const questionId = extractQuestionIdFromFileName(file.name);
+                
+                if (!questionId) {
+                    console.log(`Skipping ${file.name} - no number found in filename`);
+                    skippedUploads++;
+                    continue;
+                }
+                
+                const questionLocation = findQuestionById(questionId);
+                
+                if (!questionLocation) {
+                    console.log(`Skipping ${file.name} - no matching question found for ID ${questionId}`);
+                    skippedUploads++;
+                    continue;
+                }
+                
+                // Upload image to Cloudinary
+                bulkUploadStatus.textContent = `Uploading ${file.name} for Q-ID ${questionId}...`;
+                const imageUrl = await uploadImageToCloudinary(file);
+                
+                // Update the question data
+                loadedTestData.tests[questionLocation.testIndex].questions[questionLocation.questionIndex].imageUrl = imageUrl;
+                delete loadedTestData.tests[questionLocation.testIndex].questions[questionLocation.questionIndex].imagePlaceholder;
+                
+                successfulUploads++;
+                bulkUploadStatus.textContent = `✅ Uploaded ${file.name} → Q-ID ${questionId} (${successfulUploads}/${files.length})`;
+            }
+            
+            // Save all changes to Firestore
+            if (successfulUploads > 0) {
+                bulkUploadStatus.textContent = `Saving ${successfulUploads} image links to Firestore...`;
+                const testDocRef = doc(db, "tests", currentTestDocId);
+                await setDoc(testDocRef, loadedTestData);
+                
+                bulkUploadStatus.textContent = `✅ Success! ${successfulUploads} images uploaded and linked. ${skippedUploads} files skipped.`;
+                bulkUploadStatus.style.color = 'green';
+            } else {
+                bulkUploadStatus.textContent = 'No images were successfully processed. Check file names and question IDs.';
+                bulkUploadStatus.style.color = 'orange';
+            }
+            
+            // Reset and refresh
+            bulkImageUploadInput.value = '';
+            bulkUploadPreview.style.display = 'none';
+            populateDropdowns();
+            
+        } catch (error) {
+            console.error('Bulk upload error:', error);
+            bulkUploadStatus.textContent = `❌ Bulk upload failed: ${error.message}`;
+            bulkUploadStatus.style.color = 'red';
+        } finally {
+            bulkUploadBtn.disabled = false;
         }
     });
 
@@ -1496,6 +1717,7 @@ onAuthStateChanged(auth, async (user) => {
 
 
 // [End Updated admin.js File]
+
 
 
 
