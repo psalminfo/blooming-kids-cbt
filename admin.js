@@ -355,7 +355,7 @@ async function loadAndRenderReport(docId) {
 }
 
 // ##################################################################
-// # SECTION 2: CONTENT MANAGER (UPDATED WITH HYBRID BULK UPLOAD)
+// # SECTION 2: CONTENT MANAGER (UPDATED WITH ENHANCED BULK UPLOAD)
 // ##################################################################
 
 async function renderContentManagerPanel(container) {
@@ -396,16 +396,16 @@ async function renderContentManagerPanel(container) {
                     <button id="update-image-btn" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 mt-2">Upload & Save Image to Firestore</button>
                 </div>
 
-                <!-- UPDATED: Bulk Image Upload Section with Overwrite Option -->
+                <!-- ENHANCED: Bulk Image Upload Section with Full Question ID Matching -->
                 <div class="p-4 border rounded-md bg-blue-50">
-                    <h4 class="text-xl font-semibold mb-2">4. Bulk Image Upload (Numbered Images)</h4>
+                    <h4 class="text-xl font-semibold mb-2">4. Bulk Image Upload (Enhanced Matching)</h4>
                     <p class="text-sm text-gray-600 mb-4">
-                        Upload multiple images at once. Name your images as numbers that match question IDs (e.g., 1.jpg, 2.png, 3.jpg).
-                        The system will automatically match image "1.jpg" to question with ID 1.
+                        Upload multiple images at once. Name your images to match the exact Question IDs from your tests.
+                        Example: For question ID "m4_2022_q6", name your image "m4_2022_q6.jpg"
                     </p>
                     
                     <div class="mb-4">
-                        <label class="font-bold">Select Numbered Images:</label>
+                        <label class="font-bold">Select Images (Match Question IDs):</label>
                         <input type="file" id="bulk-image-upload-input" class="w-full mt-1 border p-2 rounded" accept="image/*" multiple>
                         <p class="text-xs text-gray-500 mt-1">Hold Ctrl/Cmd to select multiple images</p>
                     </div>
@@ -587,7 +587,7 @@ async function setupContentManager() {
     const imagePreviewContainer = document.getElementById('image-preview-container');
     const imagePreview = document.getElementById('image-preview');
 
-    // UPDATED: Bulk upload elements with overwrite option
+    // ENHANCED: Bulk upload elements with full question ID matching
     const bulkImageUploadInput = document.getElementById('bulk-image-upload-input');
     const overwriteExistingCheckbox = document.getElementById('overwrite-existing-checkbox');
     const bulkUploadPreview = document.getElementById('bulk-upload-preview');
@@ -703,7 +703,7 @@ async function setupContentManager() {
         }
     });
 
-    // UPDATED: Bulk Image Upload Implementation with Overwrite Option
+    // ENHANCED: Bulk Image Upload Implementation with Full Question ID Matching
     bulkImageUploadInput.addEventListener('change', (e) => {
         const files = Array.from(e.target.files);
         bulkImageList.innerHTML = '';
@@ -723,7 +723,7 @@ async function setupContentManager() {
             const fileItem = document.createElement('div');
             fileItem.className = 'flex justify-between items-center p-2 bg-white border rounded';
             
-            let statusText = 'No number found';
+            let statusText = 'No valid question ID found';
             let statusColor = 'text-red-600';
             
             if (questionId) {
@@ -747,22 +747,25 @@ async function setupContentManager() {
         });
     });
 
-    // Helper function to extract question ID from filename
+    // ENHANCED: Extract full question ID from filename (without extension)
     function extractQuestionIdFromFileName(fileName) {
-        // Extract numbers from filename (e.g., "1.jpg" → 1, "math_2.png" → 2)
-        const match = fileName.match(/(\d+)/);
-        return match ? parseInt(match[1]) : null;
+        // Remove file extension and get the base name
+        const baseName = fileName.replace(/\.[^/.]+$/, ""); // Remove extension
+        return baseName || null;
     }
 
-    // UPDATED: Find question by ID with overwrite option
+    // ENHANCED: Find question by full question ID with overwrite option
     function findQuestionById(questionId, overwriteMode = false) {
+        if (!questionId) return null;
+        
         for (let testIndex = 0; testIndex < loadedTestData.tests.length; testIndex++) {
             const test = loadedTestData.tests[testIndex];
             if (test.questions) {
                 for (let questionIndex = 0; questionIndex < test.questions.length; questionIndex++) {
                     const question = test.questions[questionIndex];
                     
-                    if (question.questionId === `q${questionId}`) {
+                    // Match exact questionId (case-sensitive)
+                    if (question.questionId === questionId) {
                         // In overwrite mode, match ALL questions with this ID
                         // In normal mode, only match questions that need images (have placeholder but no URL)
                         if (overwriteMode || (question.imagePlaceholder && !question.imageUrl)) {
@@ -799,7 +802,7 @@ async function setupContentManager() {
                 const questionId = extractQuestionIdFromFileName(file.name);
                 
                 if (!questionId) {
-                    console.log(`Skipping ${file.name} - no number found in filename`);
+                    console.log(`Skipping ${file.name} - no valid question ID found in filename`);
                     skippedUploads++;
                     continue;
                 }
@@ -807,7 +810,7 @@ async function setupContentManager() {
                 const questionLocation = findQuestionById(questionId, overwriteMode);
                 
                 if (!questionLocation) {
-                    console.log(`Skipping ${file.name} - no matching question found for ID ${questionId}${overwriteMode ? '' : ' or question already has image'}`);
+                    console.log(`Skipping ${file.name} - no matching question found for ID "${questionId}"${overwriteMode ? '' : ' or question already has image'}`);
                     skippedUploads++;
                     continue;
                 }
@@ -1766,6 +1769,7 @@ onAuthStateChanged(auth, async (user) => {
 
 
 // [End Updated admin.js File]
+
 
 
 
