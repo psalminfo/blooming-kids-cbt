@@ -1,0 +1,490 @@
+{
+  "tests": [
+    {
+      "id": "staar_reading_3_2022",
+      "subject": "Reading",
+      "grade": "3",
+      "year": "2022",
+      "defaultQuestionType": "multiple-choice",
+      "passages": [
+        {
+          "passageId": "p1",
+          "title": "The Unwelcome Neighbor",
+          "subtitle": "A tale from the Panchatantra¹",
+          "author": "Retold by Santhini Govindan",
+          "content": "[PASSAGE TEXT TO BE UPLOADED: The Unwelcome Neighbor, paragraphs 1-13]"
+        },
+        {
+          "passageId": "p2",
+          "title": "Mission Blue",
+          "content": "[PASSAGE TEXT TO BE UPLOADED: Mission Blue, paragraphs 1-12]"
+        },
+        {
+          "passageId": "p3",
+          "title": "Cheese for Dinner",
+          "subtitle": "A Tale from Mexico",
+          "author": "by Judy Goldman",
+          "content": "[PASSAGE TEXT TO BE UPLOADED: Cheese for Dinner, paragraphs 1-18]"
+        },
+        {
+          "passageId": "p4",
+          "title": "Book Clubs Are for Everyone!",
+          "content": "[PASSAGE TEXT TO BE UPLOADED: Book Clubs Are for Everyone!, paragraphs 1-7]"
+        },
+        {
+          "passageId": "p5",
+          "title": "The Rescue",
+          "author": "by Laura Sassi",
+          "content": "[PASSAGE TEXT TO BE UPLOADED: The Rescue, lines 1-16]"
+        }
+      ],
+      "questions": [
+        {
+          "questionId": "q1",
+          "passageId": "p1",
+          "type": "multiple-choice",
+          "question": "What does the word snatched mean in paragraph 11?",
+          "options": [
+            "Hid",
+            "Tossed",
+            "Broke",
+            "Grabbed"
+          ],
+          "correctAnswer": "Grabbed"
+        },
+        {
+          "questionId": "q2",
+          "passageId": "p1",
+          "type": "multiple-choice",
+          "question": "Why is the fox's plan important to the resolution of the story?",
+          "options": [
+            "The plan helps the crows learn how much they like their home.",
+            "The plan causes the snake to move away from the tree.",
+            "The plan gives the snake a chance to find an important necklace.",
+            "The plan proves to the crows that they like attention."
+          ],
+          "correctAnswer": "The plan causes the snake to move away from the tree."
+        },
+        {
+          "questionId": "q3",
+          "passageId": "p1",
+          "type": "multiple-choice",
+          "question": "What can the reader infer about the crows based on their actions after Father Crow talks to the fox?",
+          "options": [
+            "They worry that the snake will harm the servants.",
+            "They often visit the royal ladies and servants at the river.",
+            "They want to give the necklace to the fox.",
+            "They trust the fox and the plan he shares."
+          ],
+          "correctAnswer": "They trust the fox and the plan he shares."
+        },
+        {
+          "questionId": "q4",
+          "passageId": "p1",
+          "type": "multiple-choice",
+          "question": "What key idea about Mother Crow do the details in paragraphs 7 and 8 best support?",
+          "options": [
+            "Mother Crow is worried about the snake that is living in the tree.",
+            "Mother Crow is afraid that she will not find enough food for her babies.",
+            "Mother Crow is sad because the nest is getting too crowded.",
+            "Mother Crow is upset because no one is listening to her."
+          ],
+          "correctAnswer": "Mother Crow is worried about the snake that is living in the tree."
+        },
+        {
+          "questionId": "q5",
+          "passageId": "p1",
+          "type": "multiple-choice",
+          "question": "How is the setting of the river important to the plot of the story?",
+          "options": [
+            "The river is where Mother Crow wants to build a nest.",
+            "The river is where Father Crow meets with the fox.",
+            "The river is where Mother Crow picks up the necklace.",
+            "The river is where Father Crow wants the snake to live."
+          ],
+          "correctAnswer": "The river is where Mother Crow picks up the necklace."
+        },
+        {
+          "questionId": "q6",
+          "passageId": "p1",
+          "type": "multiple-choice",
+          "imagePlaceholder": "unwelcome_neighbor_illustration.png",
+          "question": "Look at this illustration. What is the most likely reason the author includes this illustration in the story?",
+          "options": [
+            "To show an important part of the fox's plan",
+            "To show how the crows build their nest in the banyan tree",
+            "To show why the snake moves into the banyan tree",
+            "To show that the crows need the fox's help in order to stay safe"
+          ],
+          "correctAnswer": "To show an important part of the fox's plan"
+        },
+        {
+          "questionId": "q7",
+          "passageId": "p2",
+          "type": "multiple-choice",
+          "question": "Which key idea do the details in paragraphs 11 and 12 support about the goals of Mission Blue?",
+          "options": [
+            "Young people can do their part to help oceans.",
+            "Storms may cause some problems for oceans.",
+            "Schools should teach young people about oceans.",
+            "Taking care of oceans requires several talents."
+          ],
+          "correctAnswer": "Young people can do their part to help oceans."
+        },
+        {
+          "questionId": "q8",
+          "passageId": "p2",
+          "type": "multiple-choice",
+          "question": "In paragraph 6, the prefix un- helps the reader understand that unharmed means —",
+          "options": [
+            "harmed again",
+            "able to harm",
+            "full of harm",
+            "not harmed"
+          ],
+          "correctAnswer": "not harmed"
+        },
+        {
+          "questionId": "q9",
+          "passageId": "p2",
+          "type": "multiple-choice",
+          "question": "What can the reader conclude about Mission Blue from information throughout the selection?",
+          "options": [
+            "Mission Blue wants more people to travel to oceans.",
+            "Mission Blue plans to stop people from fishing in oceans.",
+            "Mission Blue wants all its volunteers to be scientists.",
+            "Mission Blue values teaching people about oceans."
+          ],
+          "correctAnswer": "Mission Blue values teaching people about oceans."
+        },
+        {
+          "questionId": "q10",
+          "passageId": "p2",
+          "type": "multiple-choice",
+          "question": "In paragraphs 5 and 6, which key idea do the details support about why Mission Blue divides the ocean into small areas called \"hope spots\"?",
+          "options": [
+            "These areas are easier to reach by boat.",
+            "These areas have the deepest waters.",
+            "These areas are easier to care for.",
+            "These areas have very few visitors."
+          ],
+          "correctAnswer": "These areas are easier to care for."
+        },
+        {
+          "questionId": "q11",
+          "passageId": "p2",
+          "type": "multiple-choice",
+          "question": "What is the most likely reason the author wrote this selection?",
+          "options": [
+            "To inform the reader about the work of Mission Blue members",
+            "To persuade the reader to visit oceans",
+            "To teach the reader about plant life in oceans",
+            "To tell the reader where Mission Blue members meet"
+          ],
+          "correctAnswer": "To inform the reader about the work of Mission Blue members"
+        },
+        {
+          "questionId": "q12",
+          "passageId": "p2",
+          "type": "multiple-choice",
+          "question": "Based on the information in paragraph 9, what can the reader infer about why members of Mission Blue enjoy working with scientists?",
+          "options": [
+            "Scientists care more about protecting oceans than other people do.",
+            "Scientists take the best pictures of animals and plants.",
+            "Scientists know how to use boats and machines.",
+            "Scientists have knowledge about which ocean plants or animals need help."
+          ],
+          "correctAnswer": "Scientists have knowledge about which ocean plants or animals need help."
+        },
+        {
+          "questionId": "q13",
+          "passageId": "p2",
+          "type": "multiple-choice",
+          "question": "How does the author organize the selection?",
+          "options": [
+            "By explaining problems happening in oceans and the work Mission Blue does to solve the problems",
+            "By describing in chronological order the actions that Mission Blue has taken to help oceans",
+            "By providing the causes of problems in the ocean and effects of the different ways Mission Blue helped with the problems",
+            "By describing mysteries of the oceans and how Mission Blue plans to learn more about oceans"
+          ],
+          "correctAnswer": "By explaining problems happening in oceans and the work Mission Blue does to solve the problems"
+        },
+        {
+          "questionId": "q14",
+          "passageId": "p2",
+          "type": "multiple-choice",
+          "question": "Based on the section \"Beyond the Ocean,\" what can the reader infer about Mission Blue members?",
+          "options": [
+            "They are more interested in events for students than events for scientists.",
+            "They want more people to help with the team's goals.",
+            "They plan to start identifying hope spots on land.",
+            "They are famous because of the organization's successes."
+          ],
+          "correctAnswer": "They want more people to help with the team's goals."
+        },
+        {
+          "questionId": "q15",
+          "passageId": "p2",
+          "type": "multiple-choice",
+          "question": "What is the central idea of the selection?",
+          "options": [
+            "Oceans are in trouble because sea life is disappearing.",
+            "Sylvia Earle is a scientist who loves studying all ocean life.",
+            "The group Mission Blue works in different ways to care for oceans.",
+            "The group Mission Blue wants to save the plants in the oceans."
+          ],
+          "correctAnswer": "The group Mission Blue works in different ways to care for oceans."
+        },
+        {
+          "questionId": "q16",
+          "passageId": "p3",
+          "type": "multiple-choice",
+          "question": "How can Conejo's relationship with Coyote best be described in paragraphs 6 through 11?",
+          "options": [
+            "Conejo pretends to want to help Coyote.",
+            "Conejo is unsure if he should trust Coyote.",
+            "Conejo is worried that Coyote is unhealthy.",
+            "Conejo enjoys spending time with Coyote."
+          ],
+          "correctAnswer": "Conejo pretends to want to help Coyote."
+        },
+        {
+          "questionId": "q17",
+          "passageId": "p3",
+          "type": "multiple-choice",
+          "question": "What is the meaning of the word sly in paragraph 16?",
+          "options": [
+            "Small",
+            "Quick",
+            "Clever",
+            "Friendly"
+          ],
+          "correctAnswer": "Clever"
+        },
+        {
+          "questionId": "q18",
+          "passageId": "p3",
+          "type": "multiple-choice",
+          "question": "What key idea about Coyote is supported by the details in paragraphs 10 through 12?",
+          "options": [
+            "Coyote believes that he will enjoy eating a giant wheel of cheese.",
+            "Coyote is tired of chasing Conejo.",
+            "Coyote howls at the moon when he is hungry.",
+            "Coyote likes to sneak up on Conejo."
+          ],
+          "correctAnswer": "Coyote believes that he will enjoy eating a giant wheel of cheese."
+        },
+        {
+          "questionId": "q19",
+          "passageId": "p3",
+          "type": "multiple-choice",
+          "imagePlaceholder": "cheese_for_dinner_illustration.png",
+          "question": "Look at this illustration. What is the most likely reason the author includes this illustration in the story?",
+          "options": [
+            "To help the reader understand that Conejo is worried about Coyote",
+            "To show that Coyote has chased Conejo many times",
+            "To help the reader understand why Coyote believes there is cheese in the lake",
+            "To show that Conejo is just as hungry as Coyote"
+          ],
+          "correctAnswer": "To help the reader understand why Coyote believes there is cheese in the lake"
+        },
+        {
+          "questionId": "q20",
+          "passageId": "p3",
+          "type": "multiple-choice",
+          "question": "Based on the events at the end of the story, what can the reader predict about Coyote?",
+          "options": [
+            "Coyote will not trust Conejo again.",
+            "Coyote will no longer try to swim in the lake.",
+            "Coyote will find a way to get the cheese.",
+            "Coyote will discover Conejo in his burrow."
+          ],
+          "correctAnswer": "Coyote will not trust Conejo again."
+        },
+        {
+          "questionId": "q21",
+          "passageId": "p3",
+          "type": "multiple-choice",
+          "question": "In paragraph 1, the word cloudless includes the suffix -less. The suffix helps the reader understand that cloudless means —",
+          "options": [
+            "close",
+            "clear",
+            "dark",
+            "scary"
+          ],
+          "correctAnswer": "clear"
+        },
+        {
+          "questionId": "q22",
+          "passageId": "p3",
+          "type": "multiple-choice",
+          "question": "Which sentence best describes Coyote's relationship with Conejo by the end of the story?",
+          "options": [
+            "Coyote is eager to find Conejo so they can become better friends.",
+            "Coyote is grateful to Conejo for showing where to find cheese.",
+            "Coyote is angry with Conejo because he has a comfortable place to live.",
+            "Coyote is upset with Conejo for saying something that was untrue."
+          ],
+          "correctAnswer": "Coyote is upset with Conejo for saying something that was untrue."
+        },
+        {
+          "questionId": "q23",
+          "passageId": "p4",
+          "type": "multiple-choice",
+          "question": "In paragraph 4, the prefix un- in the word unknown helps the reader understand that the meaning of unknown is –",
+          "options": [
+            "known again",
+            "known by many",
+            "not known",
+            "wrongly known"
+          ],
+          "correctAnswer": "not known"
+        },
+        {
+          "questionId": "q24",
+          "passageId": "p4",
+          "type": "multiple-choice",
+          "question": "Which audience is the author addressing in this selection?",
+          "options": [
+            "Students",
+            "Parents",
+            "Teachers",
+            "Librarians"
+          ],
+          "correctAnswer": "Students"
+        },
+        {
+          "questionId": "q25",
+          "passageId": "p4",
+          "type": "multiple-choice",
+          "question": "Based on the information in paragraphs 1 through 4, what can the reader conclude about students who join a book club?",
+          "options": [
+            "The students want to start a new book club.",
+            "The students belong to several book clubs.",
+            "The students develop good reading habits.",
+            "The students read more than their parents."
+          ],
+          "correctAnswer": "The students develop good reading habits."
+        },
+        {
+          "questionId": "q26",
+          "passageId": "p4",
+          "type": "multiple-choice",
+          "imagePlaceholder": "book_club_photographs.png",
+          "question": "Look at these photographs. What is the most likely reason the author includes these photographs in the selection?",
+          "options": [
+            "To show that book-club members have good reading skills",
+            "To show that book clubs can meet at different places",
+            "To show that book clubs help members choose popular books",
+            "To show that book clubs are mainly for adults"
+          ],
+          "correctAnswer": "To show that book clubs can meet at different places"
+        },
+        {
+          "questionId": "q27",
+          "passageId": "p4",
+          "type": "multiple-choice",
+          "question": "What sentence supports the idea that joining a book club could help someone make friends?",
+          "options": [
+            "Today more young people are forming their own book clubs. (paragraph 1)",
+            "In many book clubs, each member takes a turn selecting the book for the group to read. (paragraph 4)",
+            "In many ways, book clubs allow their members to think about new ideas. (paragraph 4)",
+            "By spending time with them at book-club meetings, you will get to know all the members better. (paragraph 6)"
+          ],
+          "correctAnswer": "By spending time with them at book-club meetings, you will get to know all the members better. (paragraph 6)"
+        },
+        {
+          "questionId": "q28",
+          "passageId": "p4",
+          "type": "multiple-choice",
+          "question": "What opinion does the author include to explain why some students avoid book clubs?",
+          "options": [
+            "Members read the same book. (paragraph 1)",
+            "It also helps you understand their meanings. (paragraph 2)",
+            "After all the reading you do in school, you may think you don't want to join a book club. (paragraph 4)",
+            "Being in a book club allows members to share their thoughts and consider the views of others. (paragraph 5)"
+          ],
+          "correctAnswer": "After all the reading you do in school, you may think you don't want to join a book club. (paragraph 4)"
+        },
+        {
+          "questionId": "q29",
+          "passageId": "p4",
+          "type": "multiple-choice",
+          "question": "Which sentence best explains why members of a book club are likely to read a whole book?",
+          "options": [
+            "Reading helps you learn to say new words. (paragraph 2)",
+            "The desire to be prepared will encourage you to finish reading what you started. (paragraph 3)",
+            "You might already know some members in your book club. (paragraph 6)",
+            "All you need are some other members and a place to meet. (paragraph 7)"
+          ],
+          "correctAnswer": "The desire to be prepared will encourage you to finish reading what you started. (paragraph 3)"
+        },
+        {
+          "questionId": "q30",
+          "passageId": "p5",
+          "type": "multiple-choice",
+          "question": "What is the most likely reason the poet includes lines 9 through 14?",
+          "options": [
+            "To show that the mother squirrel looks like her babies",
+            "To describe why the mother squirrel often changes her mind",
+            "To show that the mother squirrel likes to run",
+            "To emphasize that the mother squirrel values all of her babies"
+          ],
+          "correctAnswer": "To emphasize that the mother squirrel values all of her babies"
+        },
+        {
+          "questionId": "q31",
+          "passageId": "p5",
+          "type": "multiple-choice",
+          "question": "Read lines 6 and 7. What is the most likely reason the poet includes this imagery?",
+          "options": [
+            "To show that the baby squirrel will grow to look like its mother",
+            "To suggest that the baby squirrel is sick",
+            "To suggest that the baby squirrel is small and helpless",
+            "To show that the baby squirrel likes to play games"
+          ],
+          "correctAnswer": "To suggest that the baby squirrel is small and helpless"
+        },
+        {
+          "questionId": "q32",
+          "passageId": "p5",
+          "type": "multiple-choice",
+          "question": "What is the most likely reason the poet includes lines 15 and 16?",
+          "options": [
+            "To show that the baby squirrels are safe at last",
+            "To show that the baby squirrels need a larger home",
+            "To show that the baby squirrels are tired of climbing",
+            "To show that the baby squirrels like one another"
+          ],
+          "correctAnswer": "To show that the baby squirrels are safe at last"
+        },
+        {
+          "questionId": "q33",
+          "passageId": "p5",
+          "type": "multiple-choice",
+          "question": "How does the windy setting contribute to the poem?",
+          "options": [
+            "The windy setting causes the mother squirrel to become afraid of storms.",
+            "The windy setting makes a squirrel family leave the woods.",
+            "The windy setting adds a feeling of mystery to the plot.",
+            "The windy setting causes a problem the mother squirrel must solve."
+          ],
+          "correctAnswer": "The windy setting causes a problem the mother squirrel must solve."
+        },
+        {
+          "questionId": "q34",
+          "passageId": "p5",
+          "type": "multiple-choice",
+          "question": "Which line from the poem best shows that the mother squirrel is kind?",
+          "options": [
+            "A gust of wind blew down her nest. (line 2)",
+            "With pulsing tail and twitching nose, (line 3)",
+            "A baby squirrel just half her size (line 7)",
+            "She gently tucks her baby in (line 11)"
+          ],
+          "correctAnswer": "She gently tucks her baby in (line 11)"
+        }
+      ]
+    }
+  ]
+}
