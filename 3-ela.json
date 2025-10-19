@@ -483,6 +483,12 @@
             "She gently tucks her baby in (line 11)"
           ],
           "correctAnswer": "She gently tucks her baby in (line 11)"
+           {
+          "questionId": "q_composition_1",
+          "passageId": null,
+          "type": "creative-writing",
+          "writing_type": "Expository",
+          "question": "Read the information in the box below.\n\nA Gallup poll found that Americans are 20 percent happier on weekends than on workdays. Americans also ranked working as one of their least pleasurable activities, while socializing after work was one of their most pleasurable activities.\n\nAlthough most people must structure their days around school or work, they still prefer their free time.\n\nThink carefully about this statement.\n\nWrite an essay explaining the importance of making time for both work and play."
         }
       ]
     }
