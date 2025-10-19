@@ -355,7 +355,7 @@ async function loadAndRenderReport(docId) {
 }
 
 // ##################################################################
-// # SECTION 2: CONTENT MANAGER (WITH HYBRID BULK UPLOAD)
+// # SECTION 2: CONTENT MANAGER (WITH FIXED BULK UPLOAD)
 // ##################################################################
 
 async function renderContentManagerPanel(container) {
@@ -396,12 +396,12 @@ async function renderContentManagerPanel(container) {
                     <button id="update-image-btn" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 mt-2">Upload & Save Image to Firestore</button>
                 </div>
 
-                <!-- HYBRID: Bulk Image Upload Section - Works with Numbers AND Complex IDs -->
+                <!-- FIXED: Bulk Image Upload Section - Numbered files match complex IDs -->
                 <div class="p-4 border rounded-md bg-blue-50">
-                    <h4 class="text-xl font-semibold mb-2">4. Bulk Image Upload (Hybrid Matching)</h4>
+                    <h4 class="text-xl font-semibold mb-2">4. Bulk Image Upload (Universal Matching)</h4>
                     <p class="text-sm text-gray-600 mb-4">
                         Upload multiple images at once. Works with BOTH:<br>
-                        • <strong>Numbered files:</strong> 1.jpg, 5.png, 7.jpg (matches questions ending with q1, q5, q7)<br>
+                        • <strong>Numbered files:</strong> 1.jpg, 5.png, 7.jpg (matches SAME questions as m4_2022_q1.jpg, ela_gr4_q5.png)<br>
                         • <strong>Complex IDs:</strong> m4_2022_q1.jpg, ela_gr4_q5.png (matches exact question IDs)
                     </p>
                     
@@ -583,7 +583,7 @@ async function setupContentManager() {
     const imagePreviewContainer = document.getElementById('image-preview-container');
     const imagePreview = document.getElementById('image-preview');
 
-    // HYBRID: Bulk upload elements
+    // FIXED: Bulk upload elements
     const bulkImageUploadInput = document.getElementById('bulk-image-upload-input');
     const overwriteExistingCheckbox = document.getElementById('overwrite-existing-checkbox');
     const bulkUploadPreview = document.getElementById('bulk-upload-preview');
@@ -699,7 +699,7 @@ async function setupContentManager() {
         }
     });
 
-    // HYBRID: Bulk Image Upload - Works with Numbers AND Complex IDs
+    // FIXED: Bulk Image Upload - Numbered files match SAME questions as complex IDs
     bulkImageUploadInput.addEventListener('change', (e) => {
         const files = Array.from(e.target.files);
         bulkImageList.innerHTML = '';
@@ -713,8 +713,8 @@ async function setupContentManager() {
         
         files.forEach((file, index) => {
             const fileName = file.name;
-            const searchPattern = extractSearchPatternFromFileName(fileName);
-            const questionLocations = findQuestionsByPattern(searchPattern, overwriteExistingCheckbox.checked);
+            const searchPatterns = extractSearchPatternsFromFileName(fileName);
+            const questionLocations = findQuestionsByPatterns(searchPatterns, overwriteExistingCheckbox.checked);
             
             const fileItem = document.createElement('div');
             fileItem.className = 'flex justify-between items-center p-2 bg-white border rounded';
@@ -722,14 +722,14 @@ async function setupContentManager() {
             let statusText = 'No valid pattern found';
             let statusColor = 'text-red-600';
             
-            if (searchPattern) {
+            if (searchPatterns.length > 0) {
                 if (questionLocations.length > 0) {
                     const hasExistingImage = questionLocations.some(loc => loc.question.imageUrl);
                     const matchCount = questionLocations.length;
-                    statusText = `→ Pattern: "${searchPattern}" (${matchCount} match${matchCount > 1 ? 'es' : ''}) ${hasExistingImage ? '(some will overwrite)' : '(all new)'}`;
+                    statusText = `→ Patterns: "${searchPatterns.join('", "')}" (${matchCount} match${matchCount > 1 ? 'es' : ''}) ${hasExistingImage ? '(some will overwrite)' : '(all new)'}`;
                     statusColor = hasExistingImage ? 'text-orange-600' : 'text-green-600';
                 } else {
-                    statusText = `→ Pattern: "${searchPattern}" (no matches found)`;
+                    statusText = `→ Patterns: "${searchPatterns.join('", "')}" (no matches found)`;
                     statusColor = 'text-gray-500';
                 }
             }
@@ -744,42 +744,57 @@ async function setupContentManager() {
         });
     });
 
-    // HYBRID: Extract search pattern from filename
-    function extractSearchPatternFromFileName(fileName) {
+    // FIXED: Extract search patterns from filename - numbered files match complex IDs
+    function extractSearchPatternsFromFileName(fileName) {
         // Remove file extension and get the base name
         const baseName = fileName.replace(/\.[^/.]+$/, "");
         
-        if (!baseName) return null;
+        if (!baseName) return [];
         
-        // If it's just a number (like "1", "5", "7"), search for questions ending with that number
+        const patterns = [];
+        
+        // If it's just a number (like "1", "5", "7"), create patterns to match complex IDs
         if (/^\d+$/.test(baseName)) {
-            return `q${baseName}`; // Convert "1" → "q1" for pattern matching
+            // Add patterns that would match complex IDs containing this number
+            patterns.push(`q${baseName}`); // Matches endings like "q1", "q5"
+            patterns.push(`_${baseName}`); // Matches patterns like "_1", "_5" in complex IDs
+            patterns.push(baseName); // Also try exact match for simple numeric question IDs
+        } else {
+            // For complex IDs, use the exact pattern
+            patterns.push(baseName);
         }
         
-        // Otherwise, use the full filename as the exact pattern
-        return baseName;
+        return patterns;
     }
 
-    // HYBRID: Find questions by pattern (supports exact matches AND number patterns)
-    function findQuestionsByPattern(searchPattern, overwriteMode = false) {
-        if (!searchPattern) return [];
+    // FIXED: Find questions by multiple patterns
+    function findQuestionsByPatterns(searchPatterns, overwriteMode = false) {
+        if (!searchPatterns.length) return [];
         
         const matches = [];
+        const foundQuestionIds = new Set(); // Avoid duplicates
         
         for (let testIndex = 0; testIndex < loadedTestData.tests.length; testIndex++) {
             const test = loadedTestData.tests[testIndex];
             if (test.questions) {
                 for (let questionIndex = 0; questionIndex < test.questions.length; questionIndex++) {
                     const question = test.questions[questionIndex];
+                    const questionId = question.questionId;
                     
-                    // Check if this question matches our search pattern
-                    const isMatch = doesQuestionMatchPattern(question, searchPattern);
+                    // Skip if we already found this question
+                    if (foundQuestionIds.has(questionId)) continue;
+                    
+                    // Check if this question matches ANY of our search patterns
+                    const isMatch = searchPatterns.some(pattern => 
+                        doesQuestionMatchPattern(questionId, pattern)
+                    );
                     
                     if (isMatch) {
                         // In overwrite mode, match ALL questions with this pattern
                         // In normal mode, only match questions that need images (have placeholder but no URL)
                         if (overwriteMode || (question.imagePlaceholder && !question.imageUrl)) {
                             matches.push({ testIndex, questionIndex, question });
+                            foundQuestionIds.add(questionId);
                         }
                     }
                 }
@@ -788,17 +803,37 @@ async function setupContentManager() {
         return matches;
     }
 
-    // HYBRID: Check if a question matches the search pattern
-    function doesQuestionMatchPattern(question, searchPattern) {
-        const questionId = question.questionId;
+    // FIXED: Check if a question ID matches a search pattern
+    function doesQuestionMatchPattern(questionId, pattern) {
+        // Exact match
+        if (questionId === pattern) return true;
         
-        // If search pattern is a simple number (like "q1"), check if questionId ends with it
-        if (searchPattern.startsWith('q') && /^q\d+$/.test(searchPattern)) {
-            return questionId.endsWith(searchPattern) || questionId.includes(`_${searchPattern}`);
+        // If pattern is a simple number, check various ways it could appear in complex IDs
+        if (/^\d+$/.test(pattern)) {
+            return (
+                questionId === pattern || // Exact match for simple IDs
+                questionId.endsWith(`q${pattern}`) || // Ends with "q1", "q5" etc.
+                questionId.includes(`_${pattern}`) || // Contains "_1", "_5" etc.
+                questionId === `q${pattern}` // Matches simple "q1", "q5" format
+            );
         }
         
-        // Otherwise, do exact match for complex IDs
-        return questionId === searchPattern;
+        // If pattern starts with "q" and is followed by numbers, check for endings
+        if (pattern.startsWith('q') && /^q\d+$/.test(pattern)) {
+            const number = pattern.substring(1);
+            return (
+                questionId.endsWith(pattern) ||
+                questionId.includes(`_${pattern}`) ||
+                questionId === pattern
+            );
+        }
+        
+        // If pattern starts with "_" and is followed by numbers, check for inclusions
+        if (pattern.startsWith('_') && /^_\d+$/.test(pattern)) {
+            return questionId.includes(pattern);
+        }
+        
+        return false;
     }
 
     bulkUploadBtn.addEventListener('click', async () => {
@@ -823,18 +858,18 @@ async function setupContentManager() {
             
             // Process each file
             for (const file of files) {
-                const searchPattern = extractSearchPatternFromFileName(file.name);
+                const searchPatterns = extractSearchPatternsFromFileName(file.name);
                 
-                if (!searchPattern) {
-                    console.log(`Skipping ${file.name} - no valid pattern found in filename`);
+                if (searchPatterns.length === 0) {
+                    console.log(`Skipping ${file.name} - no valid patterns found in filename`);
                     skippedUploads++;
                     continue;
                 }
                 
-                const questionLocations = findQuestionsByPattern(searchPattern, overwriteMode);
+                const questionLocations = findQuestionsByPatterns(searchPatterns, overwriteMode);
                 
                 if (questionLocations.length === 0) {
-                    console.log(`Skipping ${file.name} - no matching questions found for pattern "${searchPattern}"${overwriteMode ? '' : ' or questions already have images'}`);
+                    console.log(`Skipping ${file.name} - no matching questions found for patterns "${searchPatterns.join('", "')}"${overwriteMode ? '' : ' or questions already have images'}`);
                     skippedUploads++;
                     continue;
                 }
@@ -842,7 +877,7 @@ async function setupContentManager() {
                 totalMatches += questionLocations.length;
                 
                 // Upload image to Cloudinary once
-                bulkUploadStatus.textContent = `Uploading ${file.name} for pattern "${searchPattern}"...`;
+                bulkUploadStatus.textContent = `Uploading ${file.name} for patterns "${searchPatterns.join('", "')}"...`;
                 const imageUrl = await uploadImageToCloudinary(file);
                 
                 // Apply the same image to ALL matched questions
@@ -859,7 +894,7 @@ async function setupContentManager() {
                 }
                 
                 successfulUploads++;
-                bulkUploadStatus.textContent = `✅ Uploaded ${file.name} → Pattern "${searchPattern}" (${questionLocations.length} questions) (${successfulUploads}/${files.length})`;
+                bulkUploadStatus.textContent = `✅ Uploaded ${file.name} → Patterns "${searchPatterns.join('", "')}" (${questionLocations.length} questions) (${successfulUploads}/${files.length})`;
             }
             
             // Save all changes to Firestore
@@ -1796,6 +1831,7 @@ onAuthStateChanged(auth, async (user) => {
 
 
 // [End Updated admin.js File]
+
 
 
 
