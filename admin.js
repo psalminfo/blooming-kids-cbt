@@ -355,7 +355,7 @@ async function loadAndRenderReport(docId) {
 }
 
 // ##################################################################
-// # SECTION 2: CONTENT MANAGER (UPDATED WITH ENHANCED BULK UPLOAD)
+// # SECTION 2: CONTENT MANAGER (WITH HYBRID BULK UPLOAD)
 // ##################################################################
 
 async function renderContentManagerPanel(container) {
@@ -396,16 +396,17 @@ async function renderContentManagerPanel(container) {
                     <button id="update-image-btn" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 mt-2">Upload & Save Image to Firestore</button>
                 </div>
 
-                <!-- ENHANCED: Bulk Image Upload Section with Full Question ID Matching -->
+                <!-- HYBRID: Bulk Image Upload Section - Works with Numbers AND Complex IDs -->
                 <div class="p-4 border rounded-md bg-blue-50">
-                    <h4 class="text-xl font-semibold mb-2">4. Bulk Image Upload (Enhanced Matching)</h4>
+                    <h4 class="text-xl font-semibold mb-2">4. Bulk Image Upload (Hybrid Matching)</h4>
                     <p class="text-sm text-gray-600 mb-4">
-                        Upload multiple images at once. Name your images to match the exact Question IDs from your tests.
-                        Example: For question ID "m4_2022_q6", name your image "m4_2022_q6.jpg"
+                        Upload multiple images at once. Works with BOTH:<br>
+                        • <strong>Numbered files:</strong> 1.jpg, 5.png, 7.jpg (matches questions ending with q1, q5, q7)<br>
+                        • <strong>Complex IDs:</strong> m4_2022_q1.jpg, ela_gr4_q5.png (matches exact question IDs)
                     </p>
                     
                     <div class="mb-4">
-                        <label class="font-bold">Select Images (Match Question IDs):</label>
+                        <label class="font-bold">Select Images:</label>
                         <input type="file" id="bulk-image-upload-input" class="w-full mt-1 border p-2 rounded" accept="image/*" multiple>
                         <p class="text-xs text-gray-500 mt-1">Hold Ctrl/Cmd to select multiple images</p>
                     </div>
@@ -459,7 +460,6 @@ async function setupContentManager() {
     const CLOUDINARY_UPLOAD_PRESET = 'bkh_assessments';
     const CLOUDINARY_UPLOAD_URL = `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`;
 
-    // Fixed uploadImageToCloudinary function
     async function uploadImageToCloudinary(file) {
         const formData = new FormData();
         formData.append('file', file);
@@ -525,7 +525,6 @@ async function setupContentManager() {
                 if (!response.ok) throw new Error(`Could not fetch file from GitHub. Status: ${response.status}`);
                 const githubData = await response.json();
                 
-                // ENHANCEMENT: Preserve existing image URLs when reloading from GitHub
                 if (forceReload && docSnap.exists()) {
                     const existingData = docSnap.data();
                     loadedTestData = preserveImageUrls(githubData, existingData);
@@ -550,7 +549,6 @@ async function setupContentManager() {
         }
     });
 
-    // NEW FUNCTION: Preserve existing image URLs when reloading from GitHub
     function preserveImageUrls(newData, existingData) {
         if (!existingData.tests || !newData.tests) return newData;
         
@@ -560,13 +558,11 @@ async function setupContentManager() {
             const existingTest = existingData.tests[testIndex];
             if (!existingTest) return;
             
-            // Preserve question image URLs
             if (newTest.questions && existingTest.questions) {
                 newTest.questions.forEach((newQuestion, questionIndex) => {
                     const existingQuestion = existingTest.questions[questionIndex];
                     if (existingQuestion && existingQuestion.imageUrl) {
                         preservedData.tests[testIndex].questions[questionIndex].imageUrl = existingQuestion.imageUrl;
-                        // Remove placeholder if image exists
                         if (preservedData.tests[testIndex].questions[questionIndex].imagePlaceholder) {
                             delete preservedData.tests[testIndex].questions[questionIndex].imagePlaceholder;
                         }
@@ -587,7 +583,7 @@ async function setupContentManager() {
     const imagePreviewContainer = document.getElementById('image-preview-container');
     const imagePreview = document.getElementById('image-preview');
 
-    // ENHANCED: Bulk upload elements with full question ID matching
+    // HYBRID: Bulk upload elements
     const bulkImageUploadInput = document.getElementById('bulk-image-upload-input');
     const overwriteExistingCheckbox = document.getElementById('overwrite-existing-checkbox');
     const bulkUploadPreview = document.getElementById('bulk-upload-preview');
@@ -703,7 +699,7 @@ async function setupContentManager() {
         }
     });
 
-    // ENHANCED: Bulk Image Upload Implementation with Full Question ID Matching
+    // HYBRID: Bulk Image Upload - Works with Numbers AND Complex IDs
     bulkImageUploadInput.addEventListener('change', (e) => {
         const files = Array.from(e.target.files);
         bulkImageList.innerHTML = '';
@@ -717,22 +713,23 @@ async function setupContentManager() {
         
         files.forEach((file, index) => {
             const fileName = file.name;
-            const questionId = extractQuestionIdFromFileName(fileName);
-            const questionLocation = findQuestionById(questionId, overwriteExistingCheckbox.checked);
+            const searchPattern = extractSearchPatternFromFileName(fileName);
+            const questionLocations = findQuestionsByPattern(searchPattern, overwriteExistingCheckbox.checked);
             
             const fileItem = document.createElement('div');
             fileItem.className = 'flex justify-between items-center p-2 bg-white border rounded';
             
-            let statusText = 'No valid question ID found';
+            let statusText = 'No valid pattern found';
             let statusColor = 'text-red-600';
             
-            if (questionId) {
-                if (questionLocation) {
-                    const hasExistingImage = questionLocation.question.imageUrl;
-                    statusText = `→ Q-ID: ${questionId} ${hasExistingImage ? '(will overwrite)' : '(new image)'}`;
+            if (searchPattern) {
+                if (questionLocations.length > 0) {
+                    const hasExistingImage = questionLocations.some(loc => loc.question.imageUrl);
+                    const matchCount = questionLocations.length;
+                    statusText = `→ Pattern: "${searchPattern}" (${matchCount} match${matchCount > 1 ? 'es' : ''}) ${hasExistingImage ? '(some will overwrite)' : '(all new)'}`;
                     statusColor = hasExistingImage ? 'text-orange-600' : 'text-green-600';
                 } else {
-                    statusText = `→ Q-ID: ${questionId} (no match found)`;
+                    statusText = `→ Pattern: "${searchPattern}" (no matches found)`;
                     statusColor = 'text-gray-500';
                 }
             }
@@ -747,16 +744,27 @@ async function setupContentManager() {
         });
     });
 
-    // ENHANCED: Extract full question ID from filename (without extension)
-    function extractQuestionIdFromFileName(fileName) {
+    // HYBRID: Extract search pattern from filename
+    function extractSearchPatternFromFileName(fileName) {
         // Remove file extension and get the base name
-        const baseName = fileName.replace(/\.[^/.]+$/, ""); // Remove extension
-        return baseName || null;
+        const baseName = fileName.replace(/\.[^/.]+$/, "");
+        
+        if (!baseName) return null;
+        
+        // If it's just a number (like "1", "5", "7"), search for questions ending with that number
+        if (/^\d+$/.test(baseName)) {
+            return `q${baseName}`; // Convert "1" → "q1" for pattern matching
+        }
+        
+        // Otherwise, use the full filename as the exact pattern
+        return baseName;
     }
 
-    // ENHANCED: Find question by full question ID with overwrite option
-    function findQuestionById(questionId, overwriteMode = false) {
-        if (!questionId) return null;
+    // HYBRID: Find questions by pattern (supports exact matches AND number patterns)
+    function findQuestionsByPattern(searchPattern, overwriteMode = false) {
+        if (!searchPattern) return [];
+        
+        const matches = [];
         
         for (let testIndex = 0; testIndex < loadedTestData.tests.length; testIndex++) {
             const test = loadedTestData.tests[testIndex];
@@ -764,18 +772,33 @@ async function setupContentManager() {
                 for (let questionIndex = 0; questionIndex < test.questions.length; questionIndex++) {
                     const question = test.questions[questionIndex];
                     
-                    // Match exact questionId (case-sensitive)
-                    if (question.questionId === questionId) {
-                        // In overwrite mode, match ALL questions with this ID
+                    // Check if this question matches our search pattern
+                    const isMatch = doesQuestionMatchPattern(question, searchPattern);
+                    
+                    if (isMatch) {
+                        // In overwrite mode, match ALL questions with this pattern
                         // In normal mode, only match questions that need images (have placeholder but no URL)
                         if (overwriteMode || (question.imagePlaceholder && !question.imageUrl)) {
-                            return { testIndex, questionIndex, question };
+                            matches.push({ testIndex, questionIndex, question });
                         }
                     }
                 }
             }
         }
-        return null;
+        return matches;
+    }
+
+    // HYBRID: Check if a question matches the search pattern
+    function doesQuestionMatchPattern(question, searchPattern) {
+        const questionId = question.questionId;
+        
+        // If search pattern is a simple number (like "q1"), check if questionId ends with it
+        if (searchPattern.startsWith('q') && /^q\d+$/.test(searchPattern)) {
+            return questionId.endsWith(searchPattern) || questionId.includes(`_${searchPattern}`);
+        }
+        
+        // Otherwise, do exact match for complex IDs
+        return questionId === searchPattern;
     }
 
     bulkUploadBtn.addEventListener('click', async () => {
@@ -796,51 +819,56 @@ async function setupContentManager() {
             let successfulUploads = 0;
             let skippedUploads = 0;
             let overwrittenUploads = 0;
+            let totalMatches = 0;
             
             // Process each file
             for (const file of files) {
-                const questionId = extractQuestionIdFromFileName(file.name);
+                const searchPattern = extractSearchPatternFromFileName(file.name);
                 
-                if (!questionId) {
-                    console.log(`Skipping ${file.name} - no valid question ID found in filename`);
+                if (!searchPattern) {
+                    console.log(`Skipping ${file.name} - no valid pattern found in filename`);
                     skippedUploads++;
                     continue;
                 }
                 
-                const questionLocation = findQuestionById(questionId, overwriteMode);
+                const questionLocations = findQuestionsByPattern(searchPattern, overwriteMode);
                 
-                if (!questionLocation) {
-                    console.log(`Skipping ${file.name} - no matching question found for ID "${questionId}"${overwriteMode ? '' : ' or question already has image'}`);
+                if (questionLocations.length === 0) {
+                    console.log(`Skipping ${file.name} - no matching questions found for pattern "${searchPattern}"${overwriteMode ? '' : ' or questions already have images'}`);
                     skippedUploads++;
                     continue;
                 }
                 
-                // Upload image to Cloudinary
-                bulkUploadStatus.textContent = `Uploading ${file.name} for Q-ID ${questionId}...`;
+                totalMatches += questionLocations.length;
+                
+                // Upload image to Cloudinary once
+                bulkUploadStatus.textContent = `Uploading ${file.name} for pattern "${searchPattern}"...`;
                 const imageUrl = await uploadImageToCloudinary(file);
                 
-                // Update the question data
-                const hadExistingImage = !!loadedTestData.tests[questionLocation.testIndex].questions[questionLocation.questionIndex].imageUrl;
-                loadedTestData.tests[questionLocation.testIndex].questions[questionLocation.questionIndex].imageUrl = imageUrl;
-                
-                // Remove placeholder when adding image
-                if (loadedTestData.tests[questionLocation.testIndex].questions[questionLocation.questionIndex].imagePlaceholder) {
-                    delete loadedTestData.tests[questionLocation.testIndex].questions[questionLocation.questionIndex].imagePlaceholder;
+                // Apply the same image to ALL matched questions
+                for (const location of questionLocations) {
+                    const hadExistingImage = !!loadedTestData.tests[location.testIndex].questions[location.questionIndex].imageUrl;
+                    loadedTestData.tests[location.testIndex].questions[location.questionIndex].imageUrl = imageUrl;
+                    
+                    // Remove placeholder when adding image
+                    if (loadedTestData.tests[location.testIndex].questions[location.questionIndex].imagePlaceholder) {
+                        delete loadedTestData.tests[location.testIndex].questions[location.questionIndex].imagePlaceholder;
+                    }
+                    
+                    if (hadExistingImage) overwrittenUploads++;
                 }
                 
                 successfulUploads++;
-                if (hadExistingImage) overwrittenUploads++;
-                
-                bulkUploadStatus.textContent = `✅ Uploaded ${file.name} → Q-ID ${questionId} (${successfulUploads}/${files.length})`;
+                bulkUploadStatus.textContent = `✅ Uploaded ${file.name} → Pattern "${searchPattern}" (${questionLocations.length} questions) (${successfulUploads}/${files.length})`;
             }
             
             // Save all changes to Firestore
             if (successfulUploads > 0) {
-                bulkUploadStatus.textContent = `Saving ${successfulUploads} image links to Firestore...`;
+                bulkUploadStatus.textContent = `Saving ${totalMatches} image links to Firestore...`;
                 const testDocRef = doc(db, "tests", currentTestDocId);
                 await setDoc(testDocRef, loadedTestData);
                 
-                let resultMessage = `✅ Success! ${successfulUploads} images processed.`;
+                let resultMessage = `✅ Success! ${successfulUploads} files processed, updating ${totalMatches} questions.`;
                 if (overwrittenUploads > 0) {
                     resultMessage += ` ${overwrittenUploads} existing images were replaced.`;
                 }
@@ -851,7 +879,7 @@ async function setupContentManager() {
                 bulkUploadStatus.textContent = resultMessage;
                 bulkUploadStatus.style.color = 'green';
             } else {
-                bulkUploadStatus.textContent = 'No images were successfully processed. Check file names and question IDs.';
+                bulkUploadStatus.textContent = 'No images were successfully processed. Check file names and question patterns.';
                 bulkUploadStatus.style.color = 'orange';
             }
             
@@ -871,7 +899,6 @@ async function setupContentManager() {
 
     discoverFiles();
 }
-
 
 // ##################################################################
 // # SECTION 3: TUTOR MANAGEMENT (OPTIMIZED)
@@ -1769,6 +1796,7 @@ onAuthStateChanged(auth, async (user) => {
 
 
 // [End Updated admin.js File]
+
 
 
 
