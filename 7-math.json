@@ -1,246 +1,411 @@
 {
-  "math_questions": {
-    "grade_7": [
-      {
-        "question": "What is the value of the expression 2.5 + 3 × (4 – 1)?",
-        "options": ["$11.5", "$12.5", "$10.5", "$9.5"],
-        "answer": "$11.5",
-        "category": "Number and Operations"
-      },
-      {
-        "question": "What is 20% of £150?",
-        "options": ["£20", "£25", "£30", "£35"],
-        "answer": "£30",
-        "category": "Number - Fractions"
-      },
-      {
-        "question": "Explain how to find the surface area of a rectangular prism with dimensions 6 cm, 4 cm, and 3 cm.",
-        "options": [],
-        "answer": "Calculate the area of each face: 2 × (6 × 4) = 48 cm², 2 × (6 × 3) = 36 cm², 2 × (4 × 3) = 24 cm². Add them: 48 + 36 + 24 = 108 cm².",
-        "category": "Spatial Sense"
-      },
-      {
-        "question": "Solve the equation 3x + 5 = 20.",
-        "options": ["5", "6", "7", "8"],
-        "answer": "5",
-        "category": "Algebra"
-      },
-      {
-        "question": "What is the ratio of 15 minutes to 1 hour in simplest form?",
-        "options": ["1:4", "4:1", "3:4", "4:3"],
-        "answer": "1:4",
-        "category": "Ratio and Proportion"
-      },
-      {
-        "question": "What is 0.6 ÷ 0.2?",
-        "options": ["C$3", "C$0.3", "C$30", "C$0.03"],
-        "answer": "C$3",
-        "category": "Number and Operations"
-      },
-      {
-        "question": "A box plot shows a median of 40, a first quartile of 35, and a third quartile of 50. What is the interquartile range?",
-        "options": ["$10", "$15", "$20", "$25"],
-        "answer": "$15",
-        "category": "Data Analysis"
-      },
-      {
-        "question": "Convert 4.5 km to meters.",
-        "options": [],
-        "answer": "4,500 meters",
-        "category": "Measurement"
-      },
-      {
-        "question": "What is the value of x in the equation 2x/3 = 8?",
-        "options": ["12", "14", "16", "18"],
-        "answer": "12",
-        "category": "Algebra"
-      },
-      {
-        "question": "A jacket costs $60.00 and is on sale for 25% off. What is the sale price?",
-        "options": ["$45.00", "$50.00", "$55.00", "$40.00"],
-        "answer": "$45.00",
-        "category": "Personal Financial Literacy"
-      },
-      {
-        "question": "What is -3 + 5?",
-        "options": ["2", "-2", "8", "-8"],
-        "answer": "2",
-        "category": "Number and Operations"
-      },
-      {
-        "question": "What is 2/3 × 3/4?",
-        "options": ["1/2", "1/3", "1/6", "1/4"],
-        "answer": "1/2",
-        "category": "Number - Fractions"
-      },
-      {
-        "question": "What is the value of the digit 7 in 67,890?",
-        "options": ["7", "70", "700", "7,000"],
-        "answer": "7,000",
-        "category": "Number and Place Value"
-      },
-      {
-        "question": "A store sells books for $12.50 each. How much will 5 books cost?",
-        "options": ["$62.50", "$60.00", "$57.50", "$65.00"],
-        "answer": "$62.50",
-        "category": "Personal Financial Literacy"
-      },
-      {
-        "question": "What is 30% of £200?",
-        "options": ["£50", "£60", "£70", "£80"],
-        "answer": "£60",
-        "category": "Number - Fractions"
-      },
-      {
-        "question": "What is the circumference of a circle with a diameter of 10 cm? (Use 3.14 for π.)",
-        "options": ["C$31.4 cm", "C$62.8 cm", "C$15.7 cm", "C$20 cm"],
-        "answer": "C$31.4 cm",
-        "category": "Spatial Sense"
-      },
-      {
-        "question": "Which expression is equivalent to 4 × (3 + 5)?",
-        "options": ["(4 × 3) + (4 × 5)", "(4 × 3) + 5", "(4 + 3) × 5", "4 + (3 × 5)"],
-        "answer": "(4 × 3) + (4 × 5)",
-        "category": "Algebraic Thinking"
-      },
-      {
-        "question": "How many milliliters are in 3.75 liters?",
-        "options": ["£3,750", "£375", "£37,500", "£375,000"],
-        "answer": "£3,750",
-        "category": "Measurement"
-      },
-      {
-        "question": "What is the next number in the sequence 9, 18, 27, 36?",
-        "options": ["45", "46", "47", "48"],
-        "answer": "45",
-        "category": "Patterns"
-      },
-      {
-        "question": "What is 1,234 ÷ 4?",
-        "options": ["308", "308.5", "309", "309.5"],
-        "answer": "308.5",
-        "category": "Number and Operations"
-      },
-      {
-        "question": "Which number is 10,000 less than 56,789?",
-        "options": ["46,789", "56,689", "66,789", "76,789"],
-        "answer": "46,789",
-        "category": "Number and Place Value"
-      },
-      {
-        "question": "Explain how to solve the inequality 2x + 3 < 9.",
-        "options": [],
-        "answer": "Subtract 3 from both sides: 2x < 6. Divide both sides by 2: x < 3.",
-        "category": "Algebra"
-      },
-      {
-        "question": "A bar graph shows 20 votes for soccer, 15 for basketball, and 10 for tennis. How many votes were cast in total?",
-        "options": ["$45", "$50", "$55", "$60"],
-        "answer": "$45",
-        "category": "Data Analysis"
-      },
-      {
-        "question": "What is 0.4 written as a percentage?",
-        "options": ["40%", "4%", "400%", "0.4%"],
-        "answer": "40%",
-        "category": "Number - Fractions"
-      },
-      {
-        "question": "What is the area of a circle with a radius of 5 cm? (Use 3.14 for π.)",
-        "options": ["C$78.5 cm²", "C$31.4 cm²", "C$15.7 cm²", "C$62.8 cm²"],
-        "answer": "C$78.5 cm²",
-        "category": "Spatial Sense"
-      },
-      {
-        "question": "A phone costs C$120.00 and is on sale for 15% off. What is the sale price?",
-        "options": ["C$102.00", "C$105.00", "C$108.00", "C$110.00"],
-        "answer": "C$102.00",
-        "category": "Personal Financial Literacy"
-      },
-      {
-        "question": "What is -7 – (-3)?",
-        "options": ["-4", "4", "-10", "10"],
-        "answer": "-4",
-        "category": "Number and Operations"
-      },
-      {
-        "question": "What is the ratio of 24 cm to 2 m in simplest form?",
-        "options": ["12:100", "24:200", "3:25", "6:50"],
-        "answer": "12:100",
-        "category": "Ratio and Proportion"
-      },
-      {
-        "question": "What is the value of 3x – 4 when x = 5?",
-        "options": ["11", "12", "13", "14"],
-        "answer": "11",
-        "category": "Algebra"
-      },
-      {
-        "question": "What is 12 × 7?",
-        "options": ["84", "91", "98", "105"],
-        "answer": "84",
-        "category": "Number - Multiplication and Division"
-      },
-      {
-        "question": "Explain how to find the volume of a cylinder with a radius of 2 cm and a height of 5 cm. (Use 3.14 for π.)",
-        "options": [],
-        "answer": "Use the formula V = πr²h. Calculate the base area: 3.14 × 2 × 2 = 12.56 cm². Multiply by height: 12.56 × 5 = 62.8 cm³.",
-        "category": "Spatial Sense"
-      },
-      {
-        "question": "What is 25% of $400?",
-        "options": ["$75", "$100", "$125", "$150"],
-        "answer": "$100",
-        "category": "Number - Fractions"
-      },
-      {
-        "question": "Which shape has three sides and one right angle?",
-        "options": ["Equilateral triangle", "Isosceles triangle", "Right triangle", "Scalene triangle"],
-        "answer": "Right triangle",
-        "category": "Geometry"
-      },
-      {
-        "question": "A savings account earns $1.75 interest per month. How much interest is earned in 8 months?",
-        "options": ["$12.50", "$14.00", "$15.50", "$17.00"],
-        "answer": "$14.00",
-        "category": "Personal Financial Literacy"
-      },
-      {
-        "question": "What is 6.7 × 3?",
-        "options": ["$20.1", "$20.4", "$21.1", "$21.4"],
-        "answer": "$20.1",
-        "category": "Number and Operations"
-      },
-      {
-        "question": "What is 5/6 – 1/3?",
-        "options": ["1/3", "1/2", "2/3", "3/4"],
-        "answer": "1/2",
-        "category": "Number - Fractions"
-      },
-      {
-        "question": "What is the next number in the pattern: 12, 18, 24, 30?",
-        "options": ["36", "37", "38", "39"],
-        "answer": "36",
-        "category": "Patterns"
-      },
-      {
-        "question": "What is 789 – 456?",
-        "options": ["333", "343", "353", "363"],
-        "answer": "333",
-        "category": "Number and Operations"
-      },
-      {
-        "question": "Explain how to solve the proportion 3/x = 6/24.",
-        "options": [],
-        "answer": "Cross-multiply: 3 × 24 = 6 × x, so 72 = 6x. Divide both sides by 6: x = 12.",
-        "category": "Ratio and Proportion"
-      },
-      {
-        "question": "What is 15% of £300?",
-        "options": ["£30", "£45", "£60", "£75"],
-        "answer": "£45",
-        "category": "Number - Fractions"
-      }
-    ]
-  }
+  "tests": [
+    {
+      "id": "grade_7_math_staar_2018",
+      "subject": "Math",
+      "grade": "7",
+      "year": "2018",
+      "defaultQuestionType": "multiple-choice",
+      "questions": [
+        {
+          "questionId": "m7_2018_q1",
+          "question": "A recipe says to use 3 cups of flour to make 48 cookies. What is the constant of proportionality that relates the number of cookies made, y, to the number of cups of flour used, x?",
+          "options": ["0.6", "48", "3", "16"],
+          "correctAnswer": "16",
+          "topic": "Proportional Relationships"
+        },
+        {
+          "questionId": "m7_2018_q2",
+          "imagePlaceholder": "grade7_q2_observatory.png",
+          "question": "An observatory is shaped like a cylinder standing on one of its bases with a dome on top. The diameter of the floor of the observatory is 64 feet. Which measurement is closest to the circumference of the base of the observatory in feet?",
+          "options": ["200.96 ft", "3,215.36 ft", "100.48 ft", "401.92 ft"],
+          "correctAnswer": "200.96 ft",
+          "topic": "Circumference"
+        },
+        {
+          "questionId": "m7_2018_q3",
+          "question": "A classroom is arranged with 8 seats in the front row, 10 seats in the middle row, and 12 seats in the back row. The teacher randomly assigns seats to students as they enter the classroom. What is the probability that the first student who enters the classroom will be assigned a seat in the front row?",
+          "options": ["2/5", "2/3", "4/11", "4/15"],
+          "correctAnswer": "4/15",
+          "topic": "Probability"
+        },
+        {
+          "questionId": "m7_2018_q4",
+          "imagePlaceholder": "grade7_q4_quadrilaterals.png",
+          "question": "Quadrilateral KLMN is similar to quadrilateral WXYZ. Which statement about these quadrilaterals must be true?",
+          "options": [
+            "KL/WX = WZ/KN",
+            "Angle NKL is congruent to angle ZWX",
+            "KL/YZ = LM/ZW",
+            "Angle NKL is congruent to angle XYZ"
+          ],
+          "correctAnswer": "Angle NKL is congruent to angle ZWX",
+          "topic": "Similar Figures"
+        },
+        {
+          "questionId": "m7_2018_q5",
+          "question": "Cheddar cheese costs $4.25 per pound. Which equation best represents y, the total cost of x pounds of cheddar cheese?",
+          "options": [
+            "x = 4.25 + y",
+            "x = 4.25y",
+            "y = 4.25 + x",
+            "y = 4.25x"
+          ],
+          "correctAnswer": "y = 4.25x",
+          "topic": "Linear Equations"
+        },
+        {
+          "questionId": "m7_2018_q6",
+          "imagePlaceholder": "grade7_q6_circle_graph.png",
+          "question": "Ursula surveyed 50 classmates about their favorite ice cream flavors. Each classmate chose one flavor. The results are shown in the circle graph. How many more of Ursula's classmates chose chocolate than chose vanilla?",
+          "options": ["8", "6", "34", "16"],
+          "correctAnswer": "16",
+          "topic": "Circle Graphs"
+        },
+        {
+          "questionId": "m7_2018_q7",
+          "question": "What is the solution set for -4x - 10 ≤ 2?",
+          "options": [
+            "x ≤ -3",
+            "x ≥ -3",
+            "x ≤ 2",
+            "x ≥ 2"
+          ],
+          "correctAnswer": "x ≥ -3",
+          "topic": "Inequalities"
+        },
+        {
+          "questionId": "m7_2018_q8",
+          "imagePlaceholder": "grade7_q8_tree_diagrams.png",
+          "question": "Jack tossed a coin three times. Which tree diagram shows all the possible outcomes of the coin landing heads up or tails up?",
+          "options": ["Diagram F", "Diagram G", "Diagram H", "Diagram J"],
+          "correctAnswer": "Diagram H",
+          "topic": "Probability"
+        },
+        {
+          "questionId": "m7_2018_q9",
+          "question": "The ratio of boys to girls in Ms. Cunningham's class is 2 to 3. There are 18 girls in the class. What is the total number of students in Ms. Cunningham's class?",
+          "options": ["12", "30", "45", "27"],
+          "correctAnswer": "30",
+          "topic": "Ratios"
+        },
+        {
+          "questionId": "m7_2018_q10",
+          "imagePlaceholder": "grade7_q10_triangular_prism.png",
+          "question": "The dimensions of a triangular prism are shown in the diagram. What is the volume of the triangular prism in cubic centimeters?",
+          "options": [
+            "1,360 cm³",
+            "408 cm³",
+            "1,632 cm³",
+            "816 cm³"
+          ],
+          "correctAnswer": "816 cm³",
+          "topic": "Volume"
+        },
+        {
+          "questionId": "m7_2018_q11",
+          "imagePlaceholder": "grade7_q11_boat_rental.png",
+          "question": "The table shows the relationship between y, the cost to rent a boat, and x, the amount of time the boat is rented. Which graph best represents the relationship between x and y shown in the table?",
+          "options": ["Graph A", "Graph B", "Graph C", "Graph D"],
+          "correctAnswer": "Graph B",
+          "topic": "Linear Relationships"
+        },
+        {
+          "questionId": "m7_2018_q12",
+          "question": "The sum of the measures of angle M and angle R is 90°. The measure of angle M is (5x + 10)°. The measure of angle R is 55°. What is the value of x?",
+          "options": ["Gridable question"],
+          "correctAnswer": "5",
+          "topic": "Angles"
+        },
+        {
+          "questionId": "m7_2018_q13",
+          "imagePlaceholder": "grade7_q13_dot_plots.png",
+          "question": "The dot plots show the numbers of miles Ian skated on several days in two different months. Which statement is supported by the information in the dot plots?",
+          "options": [
+            "The least number of miles Ian skated on a day in July is greater than the least number of miles Ian skated on a day in August.",
+            "The median number of miles Ian skated each day in July is greater than the median number of miles Ian skated each day in August.",
+            "The mode of the number of miles Ian skated each day in July is less than the mode of the number of miles Ian skated each day in August.",
+            "The range of the number of miles Ian skated each day in July is less than the range of the number of miles Ian skated each day in August."
+          ],
+          "correctAnswer": "The range of the number of miles Ian skated each day in July is less than the range of the number of miles Ian skated each day in August.",
+          "topic": "Data Analysis"
+        },
+        {
+          "questionId": "m7_2018_q14",
+          "imagePlaceholder": "grade7_q14_desk.png",
+          "question": "The top surface of a desk is composed of 2 rectangles and a triangle. Some side lengths of the top surface of the desk are shown. What is the area of the top surface of the desk in square feet?",
+          "options": [
+            "9.75 ft²",
+            "8.625 ft²",
+            "7.50 ft²",
+            "9.375 ft²"
+          ],
+          "correctAnswer": "8.625 ft²",
+          "topic": "Area"
+        },
+        {
+          "questionId": "m7_2018_q15",
+          "imagePlaceholder": "grade7_q15_survey_table.png",
+          "question": "The manager of a movie theater randomly surveyed 50 people who entered the movie theater on Friday. The manager asked about the type of movie each person preferred. Based on the results in the table, which statement about a person who will go to this theater next Friday is true?",
+          "options": [
+            "The person is three times as likely to prefer comedy as horror.",
+            "The person is twice as likely to prefer drama as horror.",
+            "The person is less likely to prefer horror or drama than action.",
+            "The person is more likely to prefer horror or comedy than action or drama."
+          ],
+          "correctAnswer": "The person is more likely to prefer horror or comedy than action or drama.",
+          "topic": "Probability"
+        },
+        {
+          "questionId": "m7_2018_q16",
+          "imagePlaceholder": "grade7_q16_door_window.png",
+          "question": "The diagram shows a door that has a window in it. The front faces of the door and the window are similar rectangles that have the dimensions shown. What is h, the height of the window in centimeters?",
+          "options": ["66 cm", "186 cm", "150 cm", "Not here"],
+          "correctAnswer": "150 cm",
+          "topic": "Similar Figures"
+        },
+        {
+          "questionId": "m7_2018_q17",
+          "question": "Maya has 120 caramel apples to sell. Each caramel apple is covered with one topping. 1/5 are covered with peanuts, 1/3 are covered with chocolate chips, 3/10 are covered with coconut, and the rest are covered with sprinkles. How many caramel apples are covered with sprinkles?",
+          "options": ["100", "33", "25", "20"],
+          "correctAnswer": "20",
+          "topic": "Fractions"
+        },
+        {
+          "questionId": "m7_2018_q18",
+          "imagePlaceholder": "grade7_q18_music_table.png",
+          "question": "The manager of a music store surveyed a random sample of customers who shop in the store about their favorite type of music. Based on the information in the table, which inference about the favorite type of music of all the customers who shop in the music store appears to be valid?",
+          "options": [
+            "They are certain to select rock or pop music.",
+            "They are less likely to select country or rap music than rock music.",
+            "They are more likely to select country music than jazz, classical, or rap music.",
+            "They are certain to select any type of music other than jazz music."
+          ],
+          "correctAnswer": "They are more likely to select country music than jazz, classical, or rap music.",
+          "topic": "Data Analysis"
+        },
+        {
+          "questionId": "m7_2018_q19",
+          "question": "The distance between two towns is 120 kilometers. There are approximately 8 kilometers in 5 miles. Which measurement is closest to the number of miles between these two towns?",
+          "options": ["75 mi", "3 mi", "192 mi", "117 mi"],
+          "correctAnswer": "75 mi",
+          "topic": "Measurement Conversion"
+        },
+        {
+          "questionId": "m7_2018_q20",
+          "imagePlaceholder": "grade7_q20_number_lines.png",
+          "question": "Which number line best represents the solution to the inequality 3.3w - 9 > -22.2?",
+          "options": ["Number Line F", "Number Line G", "Number Line H", "Number Line J"],
+          "correctAnswer": "Number Line G",
+          "topic": "Inequalities"
+        },
+        {
+          "questionId": "m7_2018_q21",
+          "question": "The 200 students in a school band will attend an awards dinner. A random survey of 25 of these students was conducted to determine how many of each meal should be prepared for the dinner. Based on the survey results, which of these is the best prediction of the meals wanted by the 200 students?",
+          "options": [
+            "There are 16 students who want a beef meal.",
+            "There are 52 students who want either a chicken meal or a pasta meal.",
+            "There are 32 more students who want a beef meal than want a chicken meal.",
+            "There are 24 more students who want a pasta meal than want a chicken meal."
+          ],
+          "correctAnswer": "There are 32 more students who want a beef meal than want a chicken meal.",
+          "topic": "Predictions"
+        },
+        {
+          "questionId": "m7_2018_q22",
+          "question": "The price of a DVD is $24.00 plus 8% sales tax. What is the sales tax on this DVD in dollars and cents?",
+          "options": ["Gridable question"],
+          "correctAnswer": "1.92",
+          "topic": "Percentages"
+        },
+        {
+          "questionId": "m7_2018_q23",
+          "imagePlaceholder": "grade7_q23_circles.png",
+          "question": "A company's logo was designed using circles of 3 different sizes. The diameters of two of the circles are shown. Which measurement is closest to the area of the largest circle in square centimeters?",
+          "options": [
+            "56.52 cm²",
+            "141.30 cm²",
+            "1,017.36 cm²",
+            "254.34 cm²"
+          ],
+          "correctAnswer": "254.34 cm²",
+          "topic": "Area"
+        },
+        {
+          "questionId": "m7_2018_q24",
+          "question": "A fish is swimming at a constant rate toward the ocean floor. The equation y = -7x - 3 can be used to represent this situation, where y is the depth of the fish in meters below sea level and x is the number of seconds the fish has been swimming. Which statement best describes the depth of the fish, given this equation?",
+          "options": [
+            "From a starting position of 7 meters below sea level, the fish is descending 3 meters per second.",
+            "From a starting position of 7 meters below sea level, the fish is ascending 3 meters per second.",
+            "From a starting position of 3 meters below sea level, the fish is descending 7 meters per second.",
+            "From a starting position of 3 meters below sea level, the fish is ascending 7 meters per second."
+          ],
+          "correctAnswer": "From a starting position of 3 meters below sea level, the fish is descending 7 meters per second.",
+          "topic": "Linear Equations"
+        },
+        {
+          "questionId": "m7_2018_q25",
+          "imagePlaceholder": "grade7_q25_frequency_table.png",
+          "question": "A number cube with faces labeled from 1 to 6 was rolled 20 times. Each time the number cube was rolled, the number showing on the top face was recorded. Based on these results, what is the experimental probability that the next time the number cube is rolled it will land with 5 or 6 showing on the top face?",
+          "options": ["2/5", "3/20", "1/3", "3/5"],
+          "correctAnswer": "2/5",
+          "topic": "Probability"
+        },
+        {
+          "questionId": "m7_2018_q26",
+          "question": "Russell has a collection of 1,200 pennies. Of these pennies, 25% are dated before 1980, 35% are dated from 1980 to 2000, and the rest are dated after 2000. How many pennies in Russell's collection are dated after 2000?",
+          "options": ["480", "720", "40", "60"],
+          "correctAnswer": "480",
+          "topic": "Percentages"
+        },
+        {
+          "questionId": "m7_2018_q27",
+          "imagePlaceholder": "grade7_q27_circle_expression.png",
+          "question": "A group of students formed a circle during a game. The circumference of the circle was about 43.96 feet, and the diameter of the circle was 14 feet. Which expression best represents the value of π?",
+          "options": [
+            "43.96/7",
+            "43.96/14",
+            "7/43.96",
+            "14/43.96"
+          ],
+          "correctAnswer": "43.96/14",
+          "topic": "Circumference"
+        },
+        {
+          "questionId": "m7_2018_q28",
+          "imagePlaceholder": "grade7_q28_equation_model.png",
+          "question": "The model represents an equation. What is the solution for this equation?",
+          "options": ["x = 3", "x = 15", "x = 5", "x = 1"],
+          "correctAnswer": "x = 5",
+          "topic": "Equations"
+        },
+        {
+          "questionId": "m7_2018_q29",
+          "imagePlaceholder": "grade7_q29_net_worth.png",
+          "question": "The table shows Peter's net worth statement. Assets are shown as positive numbers, and liabilities are shown as negative numbers. Peter's net worth is $101,800. Based on the information in the table, what is the current value of Peter's house?",
+          "options": ["$58,600", "$78,300", "$98,000", "$82,100"],
+          "correctAnswer": "$98,000",
+          "topic": "Financial Literacy"
+        },
+        {
+          "questionId": "m7_2018_q30",
+          "question": "What is the value of the expression -9 × 2.2?",
+          "options": ["Gridable question"],
+          "correctAnswer": "-19.8",
+          "topic": "Multiplication"
+        },
+        {
+          "questionId": "m7_2018_q31",
+          "imagePlaceholder": "grade7_q31_bar_graph.png",
+          "question": "The bar graph shows a company's income and expenses over the last 5 years. Which statement is supported by the information in the graph?",
+          "options": [
+            "Expenses have increased $200,000 each year over the last 5 years.",
+            "The income in Year 5 was twice the income in Year 1.",
+            "The combined income in Years 1, 2, and 3 was equal to the combined expenses in Years 1, 2, and 3.",
+            "The combined expenses in Years 3 and 4 were $300,000 more than the combined income in Years 3 and 4."
+          ],
+          "correctAnswer": "The combined expenses in Years 3 and 4 were $300,000 more than the combined income in Years 3 and 4.",
+          "topic": "Data Analysis"
+        },
+        {
+          "questionId": "m7_2018_q32",
+          "question": "An architect built a scale model of a sports stadium using a scale in which 2 inches represents 30 feet. The height of the sports stadium is 180 feet. What is the height of the scale model in inches?",
+          "options": ["3 in.", "105 in.", "12 in.", "60 in."],
+          "correctAnswer": "12 in.",
+          "topic": "Scale Models"
+        },
+        {
+          "questionId": "m7_2018_q33",
+          "question": "Which situation can be represented by this inequality? 120 ≤ 12k + 29",
+          "options": [
+            "Felicia has 12 buttons in her collection. She will collect 29 new buttons every year. Felicia collects buttons for k years. For what values of k will Felicia have at least 120 buttons?",
+            "Felicia has 29 buttons in her collection. She will collect 12 new buttons every year. Felicia collects buttons for k years. For what values of k will Felicia have at least 120 buttons?",
+            "Felicia has 29 buttons in her collection. She will collect 12 new buttons every year. Felicia collects buttons for k years. For what values of k will Felicia have at most 120 buttons?",
+            "Felicia has 12 buttons in her collection. She will collect 29 new buttons every year. Felicia collects buttons for k years. For what values of k will Felicia have at most 120 buttons?"
+          ],
+          "correctAnswer": "Felicia has 29 buttons in her collection. She will collect 12 new buttons every year. Felicia collects buttons for k years. For what values of k will Felicia have at least 120 buttons?",
+          "topic": "Inequalities"
+        },
+        {
+          "questionId": "m7_2018_q34",
+          "imagePlaceholder": "grade7_q34_shaded_region.png",
+          "question": "The figure shown was created by placing the vertices of a square on the circle. Which measurement is closest to the area of the shaded region of the figure in square centimeters?",
+          "options": [
+            "17.6 cm²",
+            "265.0 cm²",
+            "29.5 cm²",
+            "127.5 cm²"
+          ],
+          "correctAnswer": "29.5 cm²",
+          "topic": "Area"
+        },
+        {
+          "questionId": "m7_2018_q35",
+          "question": "Marsha gave the cashier $20 to pay for 3 pairs of socks. The cashier gave her $5.03 in change. Each pair of socks cost the same amount. What is the cost in dollars and cents for each pair of socks?",
+          "options": ["Gridable question"],
+          "correctAnswer": "4.99",
+          "topic": "Money"
+        },
+        {
+          "questionId": "m7_2018_q36",
+          "imagePlaceholder": "grade7_q36_box_plots.png",
+          "question": "The box plots show the lengths of the songs on two digital music players in minutes. Which statement is best supported by the information in the box plots?",
+          "options": [
+            "The interquartile range of the data for Music Player X is equal to the interquartile range of the data for Music Player Y.",
+            "The interquartile range of the data for Music Player X is greater than the interquartile range of the data for Music Player Y.",
+            "The median length of the songs on Music Player X is equal to the median length of the songs on Music Player Y.",
+            "The median length of the songs on Music Player X is less than the median length of the songs on Music Player Y."
+          ],
+          "correctAnswer": "The interquartile range of the data for Music Player X is greater than the interquartile range of the data for Music Player Y.",
+          "topic": "Box Plots"
+        },
+        {
+          "questionId": "m7_2018_q37",
+          "imagePlaceholder": "grade7_q37_venn_diagrams.png",
+          "question": "Which diagram best represents the relationship among integers, rational numbers, and whole numbers?",
+          "options": ["Diagram A", "Diagram B", "Diagram C", "Diagram D"],
+          "correctAnswer": "Diagram C",
+          "topic": "Number Sets"
+        },
+        {
+          "questionId": "m7_2018_q38",
+          "question": "Which equation is true when k = -15?",
+          "options": [
+            "3k - 11 = -34",
+            "-53 + 4k = 7",
+            "k/3 + 17 = 12",
+            "k/5 + 2.5 = 0.5"
+          ],
+          "correctAnswer": "k/3 + 17 = 12",
+          "topic": "Equations"
+        },
+        {
+          "questionId": "m7_2018_q39",
+          "imagePlaceholder": "grade7_q39_square_pyramid.png",
+          "question": "Some of the dimensions of a square pyramid are shown in the diagram. The height of the square pyramid is 7.5 meters. What is the volume of the square pyramid in cubic meters?",
+          "options": [
+            "202.5 m³",
+            "303.75 m³",
+            "270 m³",
+            "243 m³"
+          ],
+          "correctAnswer": "202.5 m³",
+          "topic": "Volume"
+        },
+        {
+          "questionId": "m7_2018_q40",
+          "imagePlaceholder": "grade7_q40_line_graph.png",
+          "question": "The graph represents the linear relationship between the number of books Layla has read and the number of months she has been a member of a book club. Which of these statements is supported by the rate of change in this relationship?",
+          "options": [
+            "Layla read 2 books in the first 3 months she was a member of the book club.",
+            "Layla read 3 books in the first 2 months she was a member of the book club.",
+            "Layla read 3 books in the first 4 months she was a member of the book club.",
+            "Layla read 4 books in the first 3 months she was a member of the book club."
+          ],
+          "correctAnswer": "Layla read 3 books in the first 2 months she was a member of the book club.",
+          "topic": "Rate of Change"
+        }
+      ]
+    }
+  ]
 }
