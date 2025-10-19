@@ -355,7 +355,7 @@ async function loadAndRenderReport(docId) {
 }
 
 // ##################################################################
-// # SECTION 2: CONTENT MANAGER (WITH FIXED BULK UPLOAD)
+// # SECTION 2: CONTENT MANAGER (WITH CORRECTED BULK UPLOAD)
 // ##################################################################
 
 async function renderContentManagerPanel(container) {
@@ -396,17 +396,18 @@ async function renderContentManagerPanel(container) {
                     <button id="update-image-btn" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 mt-2">Upload & Save Image to Firestore</button>
                 </div>
 
-                <!-- FIXED: Bulk Image Upload Section - Numbered files match complex IDs -->
+                <!-- CORRECTED: Bulk Image Upload Section - One-to-One Mapping -->
                 <div class="p-4 border rounded-md bg-blue-50">
-                    <h4 class="text-xl font-semibold mb-2">4. Bulk Image Upload (Universal Matching)</h4>
+                    <h4 class="text-xl font-semibold mb-2">4. Bulk Image Upload (One-to-One Matching)</h4>
                     <p class="text-sm text-gray-600 mb-4">
-                        Upload multiple images at once. Works with BOTH:<br>
-                        • <strong>Numbered files:</strong> 1.jpg, 5.png, 7.jpg (matches SAME questions as m4_2022_q1.jpg, ela_gr4_q5.png)<br>
-                        • <strong>Complex IDs:</strong> m4_2022_q1.jpg, ela_gr4_q5.png (matches exact question IDs)
+                        Upload multiple images at once. Each numbered image matches ONE specific question:<br>
+                        • <strong>1.jpg</strong> → matches <strong>m4_2022_q1</strong><br>
+                        • <strong>2.jpg</strong> → matches <strong>m4_2022_q2</strong><br>
+                        • <strong>5.png</strong> → matches <strong>m4_2022_q5</strong>
                     </p>
                     
                     <div class="mb-4">
-                        <label class="font-bold">Select Images:</label>
+                        <label class="font-bold">Select Numbered Images:</label>
                         <input type="file" id="bulk-image-upload-input" class="w-full mt-1 border p-2 rounded" accept="image/*" multiple>
                         <p class="text-xs text-gray-500 mt-1">Hold Ctrl/Cmd to select multiple images</p>
                     </div>
@@ -583,7 +584,7 @@ async function setupContentManager() {
     const imagePreviewContainer = document.getElementById('image-preview-container');
     const imagePreview = document.getElementById('image-preview');
 
-    // FIXED: Bulk upload elements
+    // CORRECTED: Bulk upload elements
     const bulkImageUploadInput = document.getElementById('bulk-image-upload-input');
     const overwriteExistingCheckbox = document.getElementById('overwrite-existing-checkbox');
     const bulkUploadPreview = document.getElementById('bulk-upload-preview');
@@ -699,7 +700,7 @@ async function setupContentManager() {
         }
     });
 
-    // FIXED: Bulk Image Upload - Numbered files match SAME questions as complex IDs
+    // CORRECTED: Bulk Image Upload - One-to-One Mapping
     bulkImageUploadInput.addEventListener('change', (e) => {
         const files = Array.from(e.target.files);
         bulkImageList.innerHTML = '';
@@ -713,23 +714,23 @@ async function setupContentManager() {
         
         files.forEach((file, index) => {
             const fileName = file.name;
-            const searchPatterns = extractSearchPatternsFromFileName(fileName);
-            const questionLocations = findQuestionsByPatterns(searchPatterns, overwriteExistingCheckbox.checked);
+            const number = extractNumberFromFileName(fileName);
+            const questionLocation = findQuestionByNumber(number, overwriteExistingCheckbox.checked);
             
             const fileItem = document.createElement('div');
             fileItem.className = 'flex justify-between items-center p-2 bg-white border rounded';
             
-            let statusText = 'No valid pattern found';
+            let statusText = 'No number found in filename';
             let statusColor = 'text-red-600';
             
-            if (searchPatterns.length > 0) {
-                if (questionLocations.length > 0) {
-                    const hasExistingImage = questionLocations.some(loc => loc.question.imageUrl);
-                    const matchCount = questionLocations.length;
-                    statusText = `→ Patterns: "${searchPatterns.join('", "')}" (${matchCount} match${matchCount > 1 ? 'es' : ''}) ${hasExistingImage ? '(some will overwrite)' : '(all new)'}`;
+            if (number) {
+                if (questionLocation) {
+                    const hasExistingImage = questionLocation.question.imageUrl;
+                    const questionId = questionLocation.question.questionId;
+                    statusText = `→ ${number}.jpg → Q-ID: ${questionId} ${hasExistingImage ? '(will overwrite)' : '(new image)'}`;
                     statusColor = hasExistingImage ? 'text-orange-600' : 'text-green-600';
                 } else {
-                    statusText = `→ Patterns: "${searchPatterns.join('", "')}" (no matches found)`;
+                    statusText = `→ ${number}.jpg (no matching question found)`;
                     statusColor = 'text-gray-500';
                 }
             }
@@ -744,96 +745,37 @@ async function setupContentManager() {
         });
     });
 
-    // FIXED: Extract search patterns from filename - numbered files match complex IDs
-    function extractSearchPatternsFromFileName(fileName) {
-        // Remove file extension and get the base name
-        const baseName = fileName.replace(/\.[^/.]+$/, "");
-        
-        if (!baseName) return [];
-        
-        const patterns = [];
-        
-        // If it's just a number (like "1", "5", "7"), create patterns to match complex IDs
-        if (/^\d+$/.test(baseName)) {
-            // Add patterns that would match complex IDs containing this number
-            patterns.push(`q${baseName}`); // Matches endings like "q1", "q5"
-            patterns.push(`_${baseName}`); // Matches patterns like "_1", "_5" in complex IDs
-            patterns.push(baseName); // Also try exact match for simple numeric question IDs
-        } else {
-            // For complex IDs, use the exact pattern
-            patterns.push(baseName);
-        }
-        
-        return patterns;
+    // CORRECTED: Extract number from filename
+    function extractNumberFromFileName(fileName) {
+        const match = fileName.match(/(\d+)\./); // Get number before file extension
+        return match ? parseInt(match[1]) : null;
     }
 
-    // FIXED: Find questions by multiple patterns
-    function findQuestionsByPatterns(searchPatterns, overwriteMode = false) {
-        if (!searchPatterns.length) return [];
+    // CORRECTED: Find ONE question by number - one-to-one mapping
+    function findQuestionByNumber(number, overwriteMode = false) {
+        if (!number) return null;
         
-        const matches = [];
-        const foundQuestionIds = new Set(); // Avoid duplicates
+        // Build the expected question ID pattern for this number
+        const expectedQuestionId = `q${number}`;
         
         for (let testIndex = 0; testIndex < loadedTestData.tests.length; testIndex++) {
             const test = loadedTestData.tests[testIndex];
             if (test.questions) {
                 for (let questionIndex = 0; questionIndex < test.questions.length; questionIndex++) {
                     const question = test.questions[questionIndex];
-                    const questionId = question.questionId;
                     
-                    // Skip if we already found this question
-                    if (foundQuestionIds.has(questionId)) continue;
-                    
-                    // Check if this question matches ANY of our search patterns
-                    const isMatch = searchPatterns.some(pattern => 
-                        doesQuestionMatchPattern(questionId, pattern)
-                    );
-                    
-                    if (isMatch) {
+                    // Check if question ID ends with the expected pattern (q1, q2, q5, etc.)
+                    if (question.questionId.endsWith(expectedQuestionId)) {
                         // In overwrite mode, match ALL questions with this pattern
                         // In normal mode, only match questions that need images (have placeholder but no URL)
                         if (overwriteMode || (question.imagePlaceholder && !question.imageUrl)) {
-                            matches.push({ testIndex, questionIndex, question });
-                            foundQuestionIds.add(questionId);
+                            return { testIndex, questionIndex, question };
                         }
                     }
                 }
             }
         }
-        return matches;
-    }
-
-    // FIXED: Check if a question ID matches a search pattern
-    function doesQuestionMatchPattern(questionId, pattern) {
-        // Exact match
-        if (questionId === pattern) return true;
-        
-        // If pattern is a simple number, check various ways it could appear in complex IDs
-        if (/^\d+$/.test(pattern)) {
-            return (
-                questionId === pattern || // Exact match for simple IDs
-                questionId.endsWith(`q${pattern}`) || // Ends with "q1", "q5" etc.
-                questionId.includes(`_${pattern}`) || // Contains "_1", "_5" etc.
-                questionId === `q${pattern}` // Matches simple "q1", "q5" format
-            );
-        }
-        
-        // If pattern starts with "q" and is followed by numbers, check for endings
-        if (pattern.startsWith('q') && /^q\d+$/.test(pattern)) {
-            const number = pattern.substring(1);
-            return (
-                questionId.endsWith(pattern) ||
-                questionId.includes(`_${pattern}`) ||
-                questionId === pattern
-            );
-        }
-        
-        // If pattern starts with "_" and is followed by numbers, check for inclusions
-        if (pattern.startsWith('_') && /^_\d+$/.test(pattern)) {
-            return questionId.includes(pattern);
-        }
-        
-        return false;
+        return null;
     }
 
     bulkUploadBtn.addEventListener('click', async () => {
@@ -854,56 +796,51 @@ async function setupContentManager() {
             let successfulUploads = 0;
             let skippedUploads = 0;
             let overwrittenUploads = 0;
-            let totalMatches = 0;
             
             // Process each file
             for (const file of files) {
-                const searchPatterns = extractSearchPatternsFromFileName(file.name);
+                const number = extractNumberFromFileName(file.name);
                 
-                if (searchPatterns.length === 0) {
-                    console.log(`Skipping ${file.name} - no valid patterns found in filename`);
+                if (!number) {
+                    console.log(`Skipping ${file.name} - no number found in filename`);
                     skippedUploads++;
                     continue;
                 }
                 
-                const questionLocations = findQuestionsByPatterns(searchPatterns, overwriteMode);
+                const questionLocation = findQuestionByNumber(number, overwriteMode);
                 
-                if (questionLocations.length === 0) {
-                    console.log(`Skipping ${file.name} - no matching questions found for patterns "${searchPatterns.join('", "')}"${overwriteMode ? '' : ' or questions already have images'}`);
+                if (!questionLocation) {
+                    console.log(`Skipping ${file.name} - no matching question found for number ${number}${overwriteMode ? '' : ' or question already has image'}`);
                     skippedUploads++;
                     continue;
                 }
                 
-                totalMatches += questionLocations.length;
-                
-                // Upload image to Cloudinary once
-                bulkUploadStatus.textContent = `Uploading ${file.name} for patterns "${searchPatterns.join('", "')}"...`;
+                // Upload image to Cloudinary
+                bulkUploadStatus.textContent = `Uploading ${file.name} for question ${number}...`;
                 const imageUrl = await uploadImageToCloudinary(file);
                 
-                // Apply the same image to ALL matched questions
-                for (const location of questionLocations) {
-                    const hadExistingImage = !!loadedTestData.tests[location.testIndex].questions[location.questionIndex].imageUrl;
-                    loadedTestData.tests[location.testIndex].questions[location.questionIndex].imageUrl = imageUrl;
-                    
-                    // Remove placeholder when adding image
-                    if (loadedTestData.tests[location.testIndex].questions[location.questionIndex].imagePlaceholder) {
-                        delete loadedTestData.tests[location.testIndex].questions[location.questionIndex].imagePlaceholder;
-                    }
-                    
-                    if (hadExistingImage) overwrittenUploads++;
+                // Update the ONE matched question
+                const hadExistingImage = !!loadedTestData.tests[questionLocation.testIndex].questions[questionLocation.questionIndex].imageUrl;
+                loadedTestData.tests[questionLocation.testIndex].questions[questionLocation.questionIndex].imageUrl = imageUrl;
+                
+                // Remove placeholder when adding image
+                if (loadedTestData.tests[questionLocation.testIndex].questions[questionLocation.questionIndex].imagePlaceholder) {
+                    delete loadedTestData.tests[questionLocation.testIndex].questions[questionLocation.questionIndex].imagePlaceholder;
                 }
                 
                 successfulUploads++;
-                bulkUploadStatus.textContent = `✅ Uploaded ${file.name} → Patterns "${searchPatterns.join('", "')}" (${questionLocations.length} questions) (${successfulUploads}/${files.length})`;
+                if (hadExistingImage) overwrittenUploads++;
+                
+                bulkUploadStatus.textContent = `✅ Uploaded ${file.name} → Q-ID ${questionLocation.question.questionId} (${successfulUploads}/${files.length})`;
             }
             
             // Save all changes to Firestore
             if (successfulUploads > 0) {
-                bulkUploadStatus.textContent = `Saving ${totalMatches} image links to Firestore...`;
+                bulkUploadStatus.textContent = `Saving ${successfulUploads} image links to Firestore...`;
                 const testDocRef = doc(db, "tests", currentTestDocId);
                 await setDoc(testDocRef, loadedTestData);
                 
-                let resultMessage = `✅ Success! ${successfulUploads} files processed, updating ${totalMatches} questions.`;
+                let resultMessage = `✅ Success! ${successfulUploads} images processed.`;
                 if (overwrittenUploads > 0) {
                     resultMessage += ` ${overwrittenUploads} existing images were replaced.`;
                 }
@@ -914,7 +851,7 @@ async function setupContentManager() {
                 bulkUploadStatus.textContent = resultMessage;
                 bulkUploadStatus.style.color = 'green';
             } else {
-                bulkUploadStatus.textContent = 'No images were successfully processed. Check file names and question patterns.';
+                bulkUploadStatus.textContent = 'No images were successfully processed. Check file names contain numbers.';
                 bulkUploadStatus.style.color = 'orange';
             }
             
@@ -1831,6 +1768,7 @@ onAuthStateChanged(auth, async (user) => {
 
 
 // [End Updated admin.js File]
+
 
 
 
