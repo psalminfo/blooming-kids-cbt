@@ -1,4 +1,3 @@
-
 import { auth, db } from './firebaseConfig.js';
 import { collection, getDocs, doc, updateDoc, getDoc, where, query, addDoc, writeBatch, deleteDoc } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
 import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-auth.js";
@@ -254,6 +253,26 @@ function findSpecializedSubject(subjects) {
         }
     }
     return null;
+}
+
+// Function to get current month for reports
+function getCurrentMonthYear() {
+    const now = new Date();
+    return now.toLocaleString('default', { month: 'long', year: 'numeric' });
+}
+
+// Function to validate report completeness
+function validateReportCompleteness(reportData) {
+    const missingFields = [];
+    
+    if (!reportData.introduction?.trim()) missingFields.push('Introduction');
+    if (!reportData.topics?.trim()) missingFields.push('Topics & Remarks');
+    if (!reportData.progress?.trim()) missingFields.push('Progress & Achievements');
+    if (!reportData.strengthsWeaknesses?.trim()) missingFields.push('Strengths & Weaknesses');
+    if (!reportData.recommendations?.trim()) missingFields.push('Recommendations');
+    if (!reportData.generalComments?.trim()) missingFields.push('General Comments');
+    
+    return missingFields;
 }
 
 // Listen for changes to the admin settings in real-time
@@ -787,19 +806,47 @@ async function renderStudentDatabase(container, tutor) {
         attachEventListeners();
     }
 
-    function showReportModal(student) {
+    function showReportModal(student, highlightMissingFields = []) {
         const existingReport = savedReports[student.id] || {};
         const isSingleApprovedStudent = approvedStudents.filter(s => !s.summerBreak && !submittedStudentIds.has(s.id)).length === 1;
+        const currentMonthYear = getCurrentMonthYear();
         
         const reportFormHTML = `
             <h3 class="text-xl font-bold mb-4">Monthly Report for ${student.studentName}</h3>
+            <div class="bg-blue-50 p-3 rounded-lg mb-4">
+                <p class="text-sm font-semibold text-blue-800">Month: ${currentMonthYear}</p>
+            </div>
             <div class="space-y-4">
-                <div><label class="block font-semibold">Introduction</label><textarea id="report-intro" class="w-full mt-1 p-2 border rounded" rows="2">${existingReport.introduction || ''}</textarea></div>
-                <div><label class="block font-semibold">Topics & Remarks</label><textarea id="report-topics" class="w-full mt-1 p-2 border rounded" rows="3">${existingReport.topics || ''}</textarea></div>
-                <div><label class="block font-semibold">Progress & Achievements</label><textarea id="report-progress" class="w-full mt-1 p-2 border rounded" rows="2">${existingReport.progress || ''}</textarea></div>
-                <div><label class="block font-semibold">Strengths & Weaknesses</label><textarea id="report-sw" class="w-full mt-1 p-2 border rounded" rows="2">${existingReport.strengthsWeaknesses || ''}</textarea></div>
-                <div><label class="block font-semibold">Recommendations</label><textarea id="report-recs" class="w-full mt-1 p-2 border rounded" rows="2">${existingReport.recommendations || ''}</textarea></div>
-                <div><label class="block font-semibold">General Comments</label><textarea id="report-general" class="w-full mt-1 p-2 border rounded" rows="2">${existingReport.generalComments || ''}</textarea></div>
+                <div>
+                    <label class="block font-semibold">Introduction</label>
+                    <textarea id="report-intro" class="w-full mt-1 p-2 border rounded ${highlightMissingFields.includes('Introduction') ? 'border-red-500 bg-red-50' : ''}" rows="2" placeholder="Enter introduction...">${existingReport.introduction || ''}</textarea>
+                    ${highlightMissingFields.includes('Introduction') ? '<p class="text-red-500 text-sm mt-1">Please fill in the introduction</p>' : ''}
+                </div>
+                <div>
+                    <label class="block font-semibold">Topics & Remarks</label>
+                    <textarea id="report-topics" class="w-full mt-1 p-2 border rounded ${highlightMissingFields.includes('Topics & Remarks') ? 'border-red-500 bg-red-50' : ''}" rows="3" placeholder="Enter topics covered and remarks...">${existingReport.topics || ''}</textarea>
+                    ${highlightMissingFields.includes('Topics & Remarks') ? '<p class="text-red-500 text-sm mt-1">Please fill in topics & remarks</p>' : ''}
+                </div>
+                <div>
+                    <label class="block font-semibold">Progress & Achievements</label>
+                    <textarea id="report-progress" class="w-full mt-1 p-2 border rounded ${highlightMissingFields.includes('Progress & Achievements') ? 'border-red-500 bg-red-50' : ''}" rows="2" placeholder="Enter progress and achievements...">${existingReport.progress || ''}</textarea>
+                    ${highlightMissingFields.includes('Progress & Achievements') ? '<p class="text-red-500 text-sm mt-1">Please fill in progress & achievements</p>' : ''}
+                </div>
+                <div>
+                    <label class="block font-semibold">Strengths & Weaknesses</label>
+                    <textarea id="report-sw" class="w-full mt-1 p-2 border rounded ${highlightMissingFields.includes('Strengths & Weaknesses') ? 'border-red-500 bg-red-50' : ''}" rows="2" placeholder="Enter strengths and weaknesses...">${existingReport.strengthsWeaknesses || ''}</textarea>
+                    ${highlightMissingFields.includes('Strengths & Weaknesses') ? '<p class="text-red-500 text-sm mt-1">Please fill in strengths & weaknesses</p>' : ''}
+                </div>
+                <div>
+                    <label class="block font-semibold">Recommendations</label>
+                    <textarea id="report-recs" class="w-full mt-1 p-2 border rounded ${highlightMissingFields.includes('Recommendations') ? 'border-red-500 bg-red-50' : ''}" rows="2" placeholder="Enter recommendations...">${existingReport.recommendations || ''}</textarea>
+                    ${highlightMissingFields.includes('Recommendations') ? '<p class="text-red-500 text-sm mt-1">Please fill in recommendations</p>' : ''}
+                </div>
+                <div>
+                    <label class="block font-semibold">General Comments</label>
+                    <textarea id="report-general" class="w-full mt-1 p-2 border rounded ${highlightMissingFields.includes('General Comments') ? 'border-red-500 bg-red-50' : ''}" rows="2" placeholder="Enter general comments...">${existingReport.generalComments || ''}</textarea>
+                    ${highlightMissingFields.includes('General Comments') ? '<p class="text-red-500 text-sm mt-1">Please fill in general comments</p>' : ''}
+                </div>
                 <div class="flex justify-end space-x-2">
                     <button id="cancel-report-btn" class="bg-gray-500 text-white px-6 py-2 rounded">Cancel</button>
                     <button id="modal-action-btn" class="bg-green-600 text-white px-6 py-2 rounded">${isSingleApprovedStudent ? 'Proceed to Submit' : 'Save Report'}</button>
@@ -811,11 +858,34 @@ async function renderStudentDatabase(container, tutor) {
         reportModal.innerHTML = `<div class="relative bg-white p-8 rounded-lg shadow-xl w-full max-w-2xl mx-auto">${reportFormHTML}</div>`;
         document.body.appendChild(reportModal);
 
+        // Auto-focus first missing field or first field
+        if (highlightMissingFields.length > 0) {
+            const firstMissingField = highlightMissingFields[0];
+            const fieldMap = {
+                'Introduction': 'report-intro',
+                'Topics & Remarks': 'report-topics',
+                'Progress & Achievements': 'report-progress',
+                'Strengths & Weaknesses': 'report-sw',
+                'Recommendations': 'report-recs',
+                'General Comments': 'report-general'
+            };
+            const fieldId = fieldMap[firstMissingField];
+            if (fieldId) {
+                document.getElementById(fieldId).focus();
+            }
+        } else {
+            document.getElementById('report-intro').focus();
+        }
+
         document.getElementById('cancel-report-btn').addEventListener('click', () => reportModal.remove());
         document.getElementById('modal-action-btn').addEventListener('click', async () => {
             const reportData = {
-                studentId: student.id, studentName: student.studentName, grade: student.grade,
-                parentName: student.parentName, parentPhone: student.parentPhone,
+                studentId: student.id, 
+                studentName: student.studentName, 
+                grade: student.grade,
+                parentName: student.parentName, 
+                parentPhone: student.parentPhone,
+                reportMonth: currentMonthYear, // Add month to report data
                 introduction: document.getElementById('report-intro').value,
                 topics: document.getElementById('report-topics').value,
                 progress: document.getElementById('report-progress').value,
@@ -823,6 +893,14 @@ async function renderStudentDatabase(container, tutor) {
                 recommendations: document.getElementById('report-recs').value,
                 generalComments: document.getElementById('report-general').value
             };
+
+            // Validate report completeness
+            const missingFields = validateReportCompleteness(reportData);
+            if (missingFields.length > 0) {
+                reportModal.remove();
+                showReportModal(student, missingFields);
+                return;
+            }
 
             reportModal.remove();
             showFeeConfirmationModal(student, reportData);
@@ -832,11 +910,14 @@ async function renderStudentDatabase(container, tutor) {
     function showFeeConfirmationModal(student, reportData) {
         const feeConfirmationHTML = `
             <h3 class="text-xl font-bold mb-4">Confirm Fee for ${student.studentName}</h3>
-            <p class="text-sm text-gray-600 mb-4">Please verify the monthly fee for this student before saving the report. You can make corrections if needed.</p>
+            <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-4">
+                <p class="text-sm text-yellow-800 font-semibold">⚠️ IMPORTANT: Fee Verification</p>
+                <p class="text-sm text-yellow-700 mt-1">Please verify this is the correct monthly fee for <strong>${student.studentName}</strong>. Ensure this matches the agreed amount for this month's services as it determines your payment.</p>
+            </div>
             <div class="space-y-4">
                 <div>
                     <label class="block font-semibold">Current Fee (₦)</label>
-                    <input type="number" id="confirm-student-fee" class="w-full mt-1 p-2 border rounded" 
+                    <input type="number" id="confirm-student-fee" class="w-full mt-1 p-2 border rounded font-semibold text-lg" 
                            value="${student.studentFee || 0}" 
                            placeholder="Enter fee amount">
                 </div>
@@ -1089,6 +1170,32 @@ async function renderStudentDatabase(container, tutor) {
         if (submitAllBtn) {
             submitAllBtn.addEventListener('click', () => {
                 const reportsToSubmit = Object.values(savedReports);
+                
+                // Validate all reports before submission
+                const incompleteReports = [];
+                reportsToSubmit.forEach((report, index) => {
+                    const missingFields = validateReportCompleteness(report);
+                    if (missingFields.length > 0) {
+                        incompleteReports.push({
+                            studentName: report.studentName,
+                            missingFields: missingFields
+                        });
+                    }
+                });
+
+                if (incompleteReports.length > 0) {
+                    // Find the first incomplete report and open it
+                    const firstIncomplete = incompleteReports[0];
+                    const student = students.find(s => s.studentName === firstIncomplete.studentName);
+                    
+                    if (student) {
+                        showCustomAlert(`Tutor ${tutor.name}, reports are incomplete for ${firstIncomplete.studentName}. Missing: ${firstIncomplete.missingFields.join(', ')}`);
+                        showReportModal(student, firstIncomplete.missingFields);
+                    }
+                    return;
+                }
+
+                // All reports are complete, proceed to account details
                 showAccountDetailsModal(reportsToSubmit);
             });
         }
@@ -1190,7 +1297,4 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     });
 });
-
-
-
-
+[file content end]
