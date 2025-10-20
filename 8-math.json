@@ -1,458 +1,428 @@
 {
   "tests": [
     {
-      "id": "grade_9_math_practice_full",
+      "id": "grade_8_math_staar_2018",
       "subject": "Math",
-      "grade": "9",
-      "year": "2024",
+      "grade": "8",
+      "year": "2018",
       "defaultQuestionType": "multiple-choice",
       "questions": [
         {
-          "questionId": "m9p_q1",
-          "question": "-10 - -3 - -4 + 5 =",
-          "options": ["2", "-12", "-4", "16", "None of these"],
-          "correctAnswer": "2",
-          "topic": "Integers"
+          "questionId": "m8_2018_q1",
+          "question": "A fishbowl shaped like a sphere is filled with water. The fishbowl has a diameter of 16 inches. Which measurement is closest to the volume of water in the fishbowl in cubic inches?",
+          "options": [
+            "2,144.66 in³",
+            "17,157.28 in³",
+            "5,461.67 in³",
+            "6,433.98 in³"
+          ],
+          "correctAnswer": "2,144.66 in³",
+          "topic": "Volume"
         },
         {
-          "questionId": "m9p_q2",
-          "question": "-96 ÷ -6 ÷ 8 =",
-          "options": ["2", "12", "-12", "-2", "None of these"],
-          "correctAnswer": "2",
-          "topic": "Order of Operations"
+          "questionId": "m8_2018_q2",
+          "imagePlaceholder": "grade8_q2_scatterplot.png",
+          "question": "Students in a science class investigated how the speed of sound changes with the air temperature outside. The data are shown in the scatterplot. Based on the scatterplot, what is the best prediction of the speed of sound when the air temperature is 50°C?",
+          "options": ["350 m/s", "355 m/s", "360 m/s", "365 m/s"],
+          "correctAnswer": "360 m/s",
+          "topic": "Scatterplots"
         },
         {
-          "questionId": "m9p_q3",
-          "question": "Jo bought a used car for $6000 and paid 15% deposit. How much did he still have to pay?",
-          "options": ["$900", "$5000", "$4500", "$5100", "None of these"],
-          "correctAnswer": "$5100",
-          "topic": "Percentages"
+          "questionId": "m8_2018_q3",
+          "question": "Four plumbers estimated the length of the radius of a cylindrical pipe. The estimates made by the plumbers are listed. Which list shows these lengths in order from greatest to least?",
+          "options": [
+            "List A: 3π/3, 9/11, √25, √24/100",
+            "List B: 3π/3, 100/24, √25, 9/11", 
+            "List C: 3π/3, 9/11, √24/25, √100",
+            "List D: 3π/3, 100/24, √25, 9/11"
+          ],
+          "correctAnswer": "List C: 3π/3, 9/11, √24/25, √100",
+          "topic": "Comparing Numbers"
         },
         {
-          "questionId": "m9p_q4",
-          "question": "5 × -2 - (8 - 12) + 16 ÷ -8 =",
-          "options": ["6", "-8", "-16", "-6", "None of these"],
-          "correctAnswer": "-8",
-          "topic": "Order of Operations"
+          "questionId": "m8_2018_q4",
+          "question": "Jerry has a new job and earns a salary of $45,000. Victoria has a new job and earns a salary of $54,000. Jerry will receive a salary increase of $2,500 per year, and Victoria will receive a salary increase of $1,500 per year. Which equation can be used to find x, the number of years it will take Jerry to earn the same salary as Victoria?",
+          "options": [
+            "45,000x + 2,500x = 54,000x + 1,500x",
+            "45,000x + 2,500 = 54,000x + 1,500",
+            "45,000 + 2,500x = 54,000 + 1,500x",
+            "45,000x + 2,500x = 54,000x + 1,500"
+          ],
+          "correctAnswer": "45,000 + 2,500x = 54,000 + 1,500x",
+          "topic": "Linear Equations"
         },
         {
-          "questionId": "m9p_q5",
-          "question": "What is 8% of $600?",
-          "options": ["$580", "$480", "$48", "$58", "None of these"],
-          "correctAnswer": "$48",
-          "topic": "Percentages"
+          "questionId": "m8_2018_q5",
+          "imagePlaceholder": "grade8_q5_triangle_diagram.png",
+          "question": "Natasha walked from the library to the grocery store and then to her house. The diagram shows the top view of the locations of these three places and their distances from each other. Which measurement is closest to the shortest distance in miles from Natasha's house to the library?",
+          "options": ["2.6 mi", "1.9 mi", "1.4 mi", "2.3 mi"],
+          "correctAnswer": "1.9 mi",
+          "topic": "Pythagorean Theorem"
         },
         {
-          "questionId": "m9p_q6",
-          "question": "Which is the longest distance?",
-          "options": ["3500cm", "65.5m", "75000mm", "0.1km", "15.5m"],
-          "correctAnswer": "0.1km",
-          "topic": "Measurement"
+          "questionId": "m8_2018_q6",
+          "question": "A relation contains the points (1, 2), (2, -1), (3, 0), (4, 1), and (5, -1). Which statement accurately describes this relation?",
+          "options": [
+            "The relation does not represent y as a function of x, because each value of x is associated with a single value of y.",
+            "The relation represents y as a function of x, because one value of y is associated with two values of x.",
+            "The relation does not represent y as a function of x, because each value of y is associated with two values of x.",
+            "The relation represents y as a function of x, because each value of x is associated with a single value of y."
+          ],
+          "correctAnswer": "The relation represents y as a function of x, because each value of x is associated with a single value of y.",
+          "topic": "Functions"
         },
         {
-          "questionId": "m9p_q7",
-          "imagePlaceholder": "math_prac_q7_l_shape.png",
-          "question": "The perimeter of the shape is:",
-          "options": ["47cm", "72cm", "69cm", "94cm", "Not enough information"],
-          "correctAnswer": "94cm",
-          "topic": "Geometry"
+          "questionId": "m8_2018_q7",
+          "question": "In a museum there is a sculpture in the shape of a cylinder. The cylinder has a diameter of 12 feet and a height of h feet. Which equation can be used to find V, the volume of the cylinder in cubic feet?",
+          "options": [
+            "V = π(6)²h",
+            "V = π(6h)²",
+            "V = π(12)²h",
+            "V = π(12h)²"
+          ],
+          "correctAnswer": "V = π(6)²h",
+          "topic": "Volume"
         },
         {
-          "questionId": "m9p_q8",
-          "imagePlaceholder": "math_prac_q8_circle_arc.png",
-          "question": "If the length of the shorter arc AB is 22cm and C is the centre of the circle then the circumference of the circle is:",
-          "options": ["990cm", "67cm", "176cm", "88cm", "None of these"],
-          "correctAnswer": "176cm",
-          "topic": "Circles"
-        },
-        {
-          "questionId": "m9p_q9",
-          "question": "If 2 fligs make a flog and 3 flogs make a flug, how many fligs in 12 flugs?",
-          "options": ["72", "17", "36", "34", "None of these"],
-          "correctAnswer": "72",
-          "topic": "Ratios and Proportions"
-        },
-        {
-          "questionId": "m9p_q10",
-          "question": "If 1/3 of a number is 7, what is 2/3 of the number?",
-          "options": ["12", "13", "14", "21", "None of these"],
-          "correctAnswer": "14",
-          "topic": "Fractions"
-        },
-        {
-          "questionId": "m9p_q11",
-          "question": "Concrete is made by mixing screenings cement and sand in the ratio 3:1:15. How much sand would be needed to make 125 tonnes of concrete?",
-          "options": ["27 tonnes", "33.75 tonnes", "45 tonnes", "75 tonnes", "None of these"],
-          "correctAnswer": "75 tonnes",
-          "topic": "Ratios and Proportions"
-        },
-        {
-          "questionId": "m9p_q12",
-          "imagePlaceholder": "math_prac_q12_triangle_angles.png",
-          "question": "Find the value of a°.",
-          "options": ["53", "40", "93", "146", "None of these"],
-          "correctAnswer": "40",
-          "topic": "Angles"
-        },
-        {
-          "questionId": "m9p_q13",
-          "imagePlaceholder": "math_prac_q13_parallel_lines.png",
-          "question": "Find the value of x°.",
-          "options": ["124", "304", "54", "66", "None of these"],
-          "correctAnswer": "124",
-          "topic": "Angles"
-        },
-        {
-          "questionId": "m9p_q14",
-          "imagePlaceholder": "math_prac_q14_histogram.png",
-          "question": "How many students studied for more than 8 hours in the week?",
-          "options": ["22", "29", "42", "50", "None of these"],
-          "correctAnswer": "22",
-          "topic": "Data Analysis"
-        },
-        {
-          "questionId": "m9p_q15",
-          "imagePlaceholder": "math_prac_q14_histogram.png",
-          "question": "How many students studied for 6 hours or less per week?",
-          "options": ["9", "18", "15", "12", "None of these"],
+          "questionId": "m8_2018_q8",
+          "question": "Julie started with 20 pieces of gum and gave away x pieces. Conrad started with 35 pieces of gum and gave away twice as many pieces as Julie did. How many pieces of gum did Julie give away if they had the same number of pieces of gum left?",
+          "options": ["18", "5", "15", "8"],
           "correctAnswer": "15",
-          "topic": "Data Analysis"
+          "topic": "Equations"
         },
         {
-          "questionId": "m9p_q16",
-          "question": "Two six sided dice are thrown together. What is the probability that a total of 10 is thrown?",
-          "options": ["1/6", "1/12", "1/2", "3/6", "None of these"],
-          "correctAnswer": "1/12",
-          "topic": "Probability"
+          "questionId": "m8_2018_q9",
+          "imagePlaceholder": "grade8_q9_triangular_prism.png",
+          "question": "A container is shaped like a triangular prism. Each base of the container is an equilateral triangle with the dimensions shown. The container has a height of 15 centimeters. What is the lateral surface area of the container in square centimeters?",
+          "options": ["Gridable question"],
+          "correctAnswer": "270",
+          "topic": "Surface Area"
         },
         {
-          "questionId": "m9p_q17",
-          "imagePlaceholder": "math_prac_q17_line_gradient.png",
-          "question": "The gradient of the line is:",
-          "options": ["3/2", "2/3", "-2/3", "-3/2", "None of these"],
-          "correctAnswer": "-2/3",
-          "topic": "Coordinate Geometry"
+          "questionId": "m8_2018_q10",
+          "imagePlaceholder": "grade8_q10_trapezoid.png",
+          "question": "Trapezoid PQRS is rotated 180° about the origin to form trapezoid P'Q'R'S'. Which statement is true?",
+          "options": [
+            "The sum of the angle measures of trapezoid PQRS is 180° less than the sum of the angle measures of trapezoid P'Q'R'S'.",
+            "Trapezoid PQRS is not congruent to trapezoid P'Q'R'S'.",
+            "The area of trapezoid PQRS is less than the area of trapezoid P'Q'R'S'.",
+            "The angle measures of trapezoid PQRS are equal to the corresponding angle measures of trapezoid P'Q'R'S'."
+          ],
+          "correctAnswer": "The angle measures of trapezoid PQRS are equal to the corresponding angle measures of trapezoid P'Q'R'S'.",
+          "topic": "Transformations"
         },
         {
-          "questionId": "m9p_q18",
-          "imagePlaceholder": "math_prac_q18_line_y_intercept.png",
-          "question": "The y intercept of the graph could only be:",
-          "options": ["(4,0)", "(0,-3)", "(-4,0)", "(-3,0)", "(0,3)"],
-          "correctAnswer": "(0,-3)",
-          "topic": "Coordinate Geometry"
+          "questionId": "m8_2018_q11",
+          "imagePlaceholder": "grade8_q11_graph.png",
+          "question": "Which function is best represented by this graph?",
+          "options": [
+            "y = 1/4x + 8",
+            "y = 1/4x - 2",
+            "y = 4x - 2",
+            "y = 4x + 8"
+          ],
+          "correctAnswer": "y = 1/4x - 2",
+          "topic": "Linear Functions"
         },
         {
-          "questionId": "m9p_q19",
-          "question": "Which inequation shows the following statement? x is 6 or less and more than -5",
-          "options": ["-5 < x <= 6", "-5 > x <= 6", "-5 <= x <= 6", "-5 < x < 6", "-5 <= x < 6"],
-          "correctAnswer": "-5 < x <= 6",
-          "topic": "Inequalities"
+          "questionId": "m8_2018_q12",
+          "question": "An employee put $5,000.00 in a retirement account that offers 9% interest compounded annually. The employee makes no additional deposits or withdrawals. Which amount is closest to the interest the employee will have earned at the end of 5 years?",
+          "options": ["$229.09", "$450.00", "$2,250.00", "$2,693.12"],
+          "correctAnswer": "$2,693.12",
+          "topic": "Compound Interest"
         },
         {
-          "questionId": "m9p_q20",
-          "question": "Expand and simplify -6(2x - 3) - 11",
-          "options": ["-12x - 29", "7 - 12x", "12x - 7", "7 + 12x", "None of these"],
-          "correctAnswer": "7 - 12x",
-          "topic": "Algebra"
+          "questionId": "m8_2018_q13",
+          "imagePlaceholder": "grade8_q13_parallel_lines.png",
+          "question": "In each diagram, line k is parallel to line l, and line t intersects lines k and l. Based on the diagrams, which statement is true?",
+          "options": [
+            "The value of x is 79, because the two angles shown in each diagram are congruent.",
+            "The value of x is 101, because the two angles shown in each diagram are supplementary.",
+            "The value of x is greater than 90, because the two angles shown in each diagram are obtuse angles.",
+            "The value of x is 11, because the two angles shown in each diagram are complementary."
+          ],
+          "correctAnswer": "The value of x is 101, because the two angles shown in each diagram are supplementary.",
+          "topic": "Angles"
         },
         {
-          "questionId": "m9p_q21",
-          "imagePlaceholder": "math_prac_q21_solid_nets.png",
-          "question": "Which option would make this solid?",
-          "options": ["A", "B", "C", "D", "None of the nets would make the solid"],
-          "correctAnswer": "B",
-          "topic": "3D Shapes"
+          "questionId": "m8_2018_q14",
+          "imagePlaceholder": "grade8_q14_tables.png",
+          "question": "A hot-air balloon is released at ground level, and it rises into the air at a constant rate. After 5 seconds the height of the balloon is 20 feet. The balloon continues to rise at the same rate. Which table shows the relationship between the time in seconds, x, and the height of the balloon in feet, y?",
+          "options": ["Table A", "Table B", "Table C", "Table D"],
+          "correctAnswer": "Table B",
+          "topic": "Linear Relationships"
         },
         {
-          "questionId": "m9p_q22",
-          "imagePlaceholder": "math_prac_q22_rectangle.png",
-          "question": "The diagram shows a small rectangular field. If Linda runs from A to B to D to C to A, how far does she run?",
-          "options": ["120m", "160m", "140m", "150m", "None of these"],
-          "correctAnswer": "150m",
+          "questionId": "m8_2018_q15",
+          "imagePlaceholder": "grade8_q15_venn_diagrams.png",
+          "question": "Which Venn diagram correctly represents the relationship between rational numbers and irrational numbers?",
+          "options": ["Diagram A", "Diagram B", "Diagram C", "Diagram D"],
+          "correctAnswer": "Diagram A",
+          "topic": "Number Sets"
+        },
+        {
+          "questionId": "m8_2018_q16",
+          "imagePlaceholder": "grade8_q16_representations.png",
+          "question": "Rudolfo has 15 toys in his toy box, and he adds 2 new toys every month. Based on this information, which representation best shows this relationship between the number of toys Rudolfo has in his toy box, y, and the number of months that have passed, x?",
+          "options": ["Representation A", "Representation B", "Representation C", "Representation D"],
+          "correctAnswer": "Representation A",
+          "topic": "Linear Relationships"
+        },
+        {
+          "questionId": "m8_2018_q17",
+          "imagePlaceholder": "grade8_q17_dilation.png",
+          "question": "Triangle JKL is dilated with the origin as the center of dilation to create triangle J'K'L'. Which rule best represents the dilation that has been applied to triangle JKL to create triangle J'K'L'?",
+          "options": [
+            "(x, y) → (x + 6, y - 3)",
+            "(x, y) → (x + 4.5, y + 3)",
+            "(x, y) → (1/2x, 1/2y)",
+            "(x, y) → (7/4x, 7/4y)"
+          ],
+          "correctAnswer": "(x, y) → (7/4x, 7/4y)",
+          "topic": "Dilations"
+        },
+        {
+          "questionId": "m8_2018_q18",
+          "imagePlaceholder": "grade8_q18_yoga_table.png",
+          "question": "A gym charges a membership fee plus an additional fee per yoga class. The table shows the linear relationship between the number of yoga classes taken and the total cost including the membership fee. Which statement is true?",
+          "options": [
+            "The additional fee per yoga class is $3.75.",
+            "The additional fee per yoga class is $8.25.",
+            "The membership fee is $35.00.",
+            "The membership fee is $42.50."
+          ],
+          "correctAnswer": "The additional fee per yoga class is $3.75.",
+          "topic": "Linear Relationships"
+        },
+        {
+          "questionId": "m8_2018_q19",
+          "question": "The list shows the heights of 6 students in inches: 63, 70, 68, 73, 58, 67. What is the mean absolute deviation for these numbers?",
+          "options": ["24", "66.5", "4", "67.5"],
+          "correctAnswer": "4",
+          "topic": "Mean Absolute Deviation"
+        },
+        {
+          "questionId": "m8_2018_q20",
+          "imagePlaceholder": "grade8_q20_graphs.png",
+          "question": "Joseph ran a 6-mile race in 48 minutes. Which graph has a slope that best represents Joseph's average rate of speed during the race?",
+          "options": ["Graph A", "Graph B", "Graph C", "Graph D"],
+          "correctAnswer": "Graph B",
+          "topic": "Slope"
+        },
+        {
+          "questionId": "m8_2018_q21",
+          "imagePlaceholder": "grade8_q21_pentagon.png",
+          "question": "Pentagon VWXYZ is shown on the coordinate grid. A student reflected pentagon VWXYZ across the x-axis to create pentagon V'W'X'Y'Z'. Which rule describes this transformation?",
+          "options": [
+            "(x, y) → (x, -y)",
+            "(x, y) → (x, y + 8)",
+            "(x, y) → (-y, x)",
+            "(x, y) → (-x, y)"
+          ],
+          "correctAnswer": "(x, y) → (x, -y)",
+          "topic": "Transformations"
+        },
+        {
+          "questionId": "m8_2018_q22",
+          "question": "Which list shows these numbers in order from least to greatest? 37/6, -5.17, √33, -26/5",
+          "options": [
+            "-26/5, -5.17, 37/6, √33",
+            "-5.17, -26/5, 37/6, √33",
+            "-26/5, -5.17, √33, 37/6",
+            "-5.17, -26/5, √33, 37/6"
+          ],
+          "correctAnswer": "-5.17, -26/5, √33, 37/6",
+          "topic": "Comparing Numbers"
+        },
+        {
+          "questionId": "m8_2018_q23",
+          "question": "What is the solution to this equation? 2x + 3 = x - 4",
+          "options": ["Gridable question"],
+          "correctAnswer": "-7",
+          "topic": "Equations"
+        },
+        {
+          "questionId": "m8_2018_q24",
+          "question": "An investor puts $2,500 into a life insurance policy that pays 8.5% simple annual interest. If no additional investment is made into the policy, how much accumulated interest should the investor expect at the end of 10 years?",
+          "options": ["$21,250.00", "$2,125.00", "$212.50", "$21.25"],
+          "correctAnswer": "$2,125.00",
+          "topic": "Simple Interest"
+        },
+        {
+          "questionId": "m8_2018_q25",
+          "imagePlaceholder": "grade8_q25_cone_cylinder.png",
+          "question": "Snacks at a county fair are sold in containers shaped like a cone or a cylinder. The dimensions of each container are shown in the drawing. Which statement about the volumes of the cone and the cylinder is true?",
+          "options": [
+            "The volume of the cylinder is about 377 cubic inches greater than the volume of the cone.",
+            "The volume of the cylinder is about 377 cubic inches less than the volume of the cone.",
+            "The volume of the cylinder is about 25 cubic inches greater than the volume of the cone.",
+            "The volume of the cylinder is about 25 cubic inches less than the volume of the cone."
+          ],
+          "correctAnswer": "The volume of the cylinder is about 377 cubic inches greater than the volume of the cone.",
+          "topic": "Volume"
+        },
+        {
+          "questionId": "m8_2018_q26",
+          "question": "Which situation can be represented by this equation? 7x + 1 = 10x",
+          "options": [
+            "Brody ran at a constant rate of 7 miles per hour in a race. Candice ran at a constant rate of 10 miles per hour in a race and started 1 mile in front of the starting point. What is x, the number of hours that Brody and Candice would have to run in order for their distance to be the same?",
+            "Brody played a game where he scored 8 points per hour. Candice played the game and scored 10 points per hour. What is x, the number of hours that Brody and Candice would each have to play the game in order for their scores to be the same?",
+            "Brody went to two different amusement parks. The first park charged $7 per hour and gave a 1% discount for showing a student ID. The other park charged $10 per hour. What is x, the number of hours that Brody would have to stay at each park to have to pay the same amount?",
+            "Brody rode his bicycle on two different days. The first day he rode 7 miles per hour and started 1 mile from his house. The second day he started from his house and rode 10 miles per hour. What is x, the number of hours that Brody would have to ride his bicycle to travel the same distance on both days?"
+          ],
+          "correctAnswer": "Brody rode his bicycle on two different days. The first day he rode 7 miles per hour and started 1 mile from his house. The second day he started from his house and rode 10 miles per hour. What is x, the number of hours that Brody would have to ride his bicycle to travel the same distance on both days?",
+          "topic": "Equations"
+        },
+        {
+          "questionId": "m8_2018_q27",
+          "question": "The coordinates of the endpoints of QR are Q(8, 2) and R(5, 7). Which measurement is closest to the length of QR in units?",
+          "options": ["5.8 units", "5 units", "4 units", "3.9 units"],
+          "correctAnswer": "5.8 units",
+          "topic": "Distance Formula"
+        },
+        {
+          "questionId": "m8_2018_q28",
+          "imagePlaceholder": "grade8_q28_ticket_table.png",
+          "question": "The ticket sales for a concert started at 4:00 P.M. The table shows the linear relationship between the number of tickets remaining and the number of hours since 4:00 P.M. Which function can be used to find y, the number of tickets remaining x hours since 4:00 P.M.?",
+          "options": [
+            "y = 3,000x + 12,000",
+            "y = 3,000x + 15,000",
+            "y = -3,000x + 12,000",
+            "y = -3,000x + 15,000"
+          ],
+          "correctAnswer": "y = -3,000x + 15,000",
+          "topic": "Linear Functions"
+        },
+        {
+          "questionId": "m8_2018_q29",
+          "question": "A square with a perimeter of 20 units is graphed on a coordinate grid. The square is dilated by a scale factor of 0.4 with the origin as the center of dilation. If (x, y) represents the location of any point on the original square, which ordered pair represents the coordinates of the corresponding point on the resulting square?",
+          "options": [
+            "(20x, 20y)",
+            "(0.4x, 0.4y)",
+            "(x + 20, y + 20)",
+            "(x + 0.4, y + 0.4)"
+          ],
+          "correctAnswer": "(0.4x, 0.4y)",
+          "topic": "Dilations"
+        },
+        {
+          "questionId": "m8_2018_q30",
+          "question": "Which situation could NOT represent a proportional relationship?",
+          "options": [
+            "The number of gallons of water in x barrels with 42 gallons of water in each barrel",
+            "The amount an employee who makes $8.50 per hour earns in h hours",
+            "The weight in x weeks of a puppy that gains 2 pounds per week if its starting weight is 8 pounds",
+            "The cost of purchasing p pounds of bananas for $0.55 per pound"
+          ],
+          "correctAnswer": "The weight in x weeks of a puppy that gains 2 pounds per week if its starting weight is 8 pounds",
+          "topic": "Proportional Relationships"
+        },
+        {
+          "questionId": "m8_2018_q31",
+          "question": "Triangle RST is translated 6 units to the left and 4 units up to create triangle R'S'T'. Which rule best describes this transformation?",
+          "options": [
+            "(x, y) → (6x, -4y)",
+            "(x, y) → (-6x, 4y)",
+            "(x, y) → (x + 6, y - 4)",
+            "(x, y) → (x - 6, y + 4)"
+          ],
+          "correctAnswer": "(x, y) → (x - 6, y + 4)",
+          "topic": "Transformations"
+        },
+        {
+          "questionId": "m8_2018_q32",
+          "imagePlaceholder": "grade8_q32_scatterplot.png",
+          "question": "Phil collected data from several of his friends about the number of hours they spent sleeping and the number of hours they spent playing video games on Saturday. He recorded the data in the scatterplot. Based on the scatterplot, what is the best prediction of the number of hours one of Phil's friends spends sleeping when the friend spends 1 hour playing video games?",
+          "options": ["9 hours", "8 hours", "10 hours", "7 hours"],
+          "correctAnswer": "8 hours",
+          "topic": "Scatterplots"
+        },
+        {
+          "questionId": "m8_2018_q33",
+          "question": "The dimensions of a rectangular piece of paper are 8.5 inches and 11 inches. Veronica folded the piece of paper along its diagonal. Which measurement is closest to the length of the diagonal in inches?",
+          "options": ["6.24 in.", "19.5 in.", "6.98 in.", "13.9 in."],
+          "correctAnswer": "13.9 in.",
           "topic": "Pythagorean Theorem"
         },
         {
-          "questionId": "m9p_q23",
-          "question": "Simplify the surd 3√56 completely",
-          "options": ["12√14", "5√14", "6√14", "6√28", "None of these"],
-          "correctAnswer": "6√14",
-          "topic": "Surds"
+          "questionId": "m8_2018_q34",
+          "question": "The amount of water an electric dishwasher uses to wash dishes varies directly with the number of loads of dishes. The dishwasher uses 32 gallons of water to wash 4 loads of dishes. How many gallons of water will the dishwasher use to wash 10 loads of dishes?",
+          "options": ["Gridable question"],
+          "correctAnswer": "80",
+          "topic": "Direct Variation"
         },
         {
-          "questionId": "m9p_q24",
-          "imagePlaceholder": "math_prac_q24_trapezoid.png",
-          "question": "The length of x equals:",
-          "options": ["6cm", "√6 cm", "5√2 cm", "2√5 cm", "None of these"],
-          "correctAnswer": "2√5 cm",
-          "topic": "Pythagorean Theorem"
+          "questionId": "m8_2018_q35",
+          "imagePlaceholder": "grade8_q35_function_representations.png",
+          "question": "Which representation shows y as a function of x?",
+          "options": ["Representation A", "Representation B", "Representation C", "Representation D"],
+          "correctAnswer": "Representation B",
+          "topic": "Functions"
         },
         {
-          "questionId": "m9p_q25",
-          "imagePlaceholder": "math_prac_q25_box_diagonal.png",
-          "question": "The rectangular box has dimensions as shown. What is the length AG?",
-          "options": ["2√26", "4√6", "2√3", "√16", "None of these"],
-          "correctAnswer": "2√26",
-          "topic": "Pythagorean Theorem"
+          "questionId": "m8_2018_q36",
+          "imagePlaceholder": "grade8_q36_similar_figures.png",
+          "question": "Figure I and Figure II are similar quadrilaterals. Which proportion must be true?",
+          "options": [
+            "a/b = 8/2",
+            "3.2/2 = a/8",
+            "b/6.4 = 8/5",
+            "2/3.2 = b/a"
+          ],
+          "correctAnswer": "b/6.4 = 8/5",
+          "topic": "Similar Figures"
         },
         {
-          "questionId": "m9p_q26",
-          "question": "Sam bought a car valued at $7700. One year later the car's value had decreased by 2/7. What is the new value of the car?",
-          "options": ["$2200", "$5500", "$9900", "$4400", "None of these"],
-          "correctAnswer": "$5500",
-          "topic": "Fractions"
+          "questionId": "m8_2018_q37",
+          "question": "The total cost of attending a state university is $19,700 for the first year. A student's grandparents will pay half of this cost. An athletic scholarship will pay another $5,000. Which amount is closest to the minimum that the student will need to save every month in order to pay off the remaining cost at the end of 12 months?",
+          "options": ["$404.17", "$612.50", "$820.83", "$1,029.17"],
+          "correctAnswer": "$404.17",
+          "topic": "Financial Literacy"
         },
         {
-          "questionId": "m9p_q27",
-          "imagePlaceholder": "math_prac_q27_rectangular_prism.png",
-          "question": "If Density = Mass ÷ Volume, what is the Mass of the solid in the diagram if its Density is 1.2gm/cm³?",
-          "options": ["50gm", "60gm", "72gm", "38.4gm", "None of these"],
-          "correctAnswer": "72gm",
-          "topic": "Measurement"
+          "questionId": "m8_2018_q38",
+          "imagePlaceholder": "grade8_q38_vitamin_graph.png",
+          "question": "A company sells bottles of vitamin capsules. The graph and table show the linear relationship between the cost per capsule in cents and the number of bottles ordered. What is the slope of the line that models this situation?",
+          "options": ["Gridable question"],
+          "correctAnswer": "-5",
+          "topic": "Slope"
         },
         {
-          "questionId": "m9p_q28",
-          "question": "What is the speed in m/s of a car that travels 30km in 20 minutes?",
-          "options": ["1500 m/s", "150 m/s", "90 m/s", "540 m/s", "None of these"],
-          "correctAnswer": "None of these",
-          "topic": "Speed, Distance, Time"
+          "questionId": "m8_2018_q39",
+          "imagePlaceholder": "grade8_q39_cylinder.png",
+          "question": "An architect uses a cylindrical container to protect her blueprints. The dimensions of the cylinder are shown in the diagram. Which measurement is closest to the total surface area of the container in square inches?",
+          "options": [
+            "424.12 in²",
+            "791.68 in²",
+            "339.29 in²",
+            "282.74 in²"
+          ],
+          "correctAnswer": "424.12 in²",
+          "topic": "Surface Area"
         },
         {
-          "questionId": "m9p_q29",
-          "question": "If R = (S + T)P / 3 then T equals",
-          "options": ["(3R - S) / P", "(3R / P) - S", "(3R / P) + S", "(3R + S) / P", "(3R / P) - S"],
-          "correctAnswer": "(3R / P) - S",
-          "topic": "Rearranging Formulas"
+          "questionId": "m8_2018_q40",
+          "imagePlaceholder": "grade8_q40_scatterplots.png",
+          "question": "Which scatterplot does NOT suggest a linear relationship between x and y?",
+          "options": ["Scatterplot F", "Scatterplot G", "Scatterplot H", "Scatterplot J"],
+          "correctAnswer": "Scatterplot J",
+          "topic": "Scatterplots"
         },
         {
-          "questionId": "m9p_q30",
-          "question": "Solve the inequation for x: (5(9-x))/3 + 1 < 11",
-          "options": ["x < 3", "x > 3", "x > -3", "x > 1 4/5", "None of these"],
-          "correctAnswer": "x > 3",
-          "topic": "Inequalities"
+          "questionId": "m8_2018_q41",
+          "imagePlaceholder": "grade8_q41_number_line.png",
+          "question": "Point Q is shown on the number line. Which value is best represented by point Q?",
+          "options": ["√5.4", "√29.5", "√35.5", "√5.9"],
+          "correctAnswer": "√29.5",
+          "topic": "Number Line"
         },
         {
-          "questionId": "m9p_q31",
-          "question": "Solve for x: (4x-3)/5 - (2x-3)/2 = -2",
-          "options": ["x = 1 11/18", "x = 5 1/2", "x = -5 1/2", "x = 14 1/2", "x = -14 1/2"],
-          "correctAnswer": "x = 5 1/2",
-          "topic": "Solving Equations"
-        },
-        {
-          "questionId": "m9p_q32",
-          "imagePlaceholder": "math_prac_q32_line_equation.png",
-          "question": "Which equation could only be the equation of the graph?",
-          "options": ["y = 3x + 2", "y = -3x - 2", "y = 3x - 2", "y = -3 + 2", "y = -x - 2"],
-          "correctAnswer": "y = 3x - 2",
-          "topic": "Linear Equations"
-        },
-        {
-          "questionId": "m9p_q33",
-          "imagePlaceholder": "math_prac_q33_shaded_region.png",
-          "question": "Which set of coordinates lie outside the shaded area?",
-          "options": ["(0,0)", "(-1,-6)", "(1,-50)", "(1,1)", "(4,1)"],
-          "correctAnswer": "(4,1)",
-          "topic": "Coordinate Geometry"
-        },
-        {
-          "questionId": "m9p_q34",
-          "imagePlaceholder": "math_prac_q34_line_equation_2.png",
-          "question": "The equation of this graph is:",
-          "options": ["y = -6x/5 + 4", "y = 5x/6 + 4", "y = 5x + 4", "y = -5x/6 + 4", "y = -5x/6 - 4"],
-          "correctAnswer": "y = -5x/6 + 4",
-          "topic": "Linear Equations"
-        },
-        {
-          "questionId": "m9p_q35",
-          "imagePlaceholder": "math_prac_q35_intersecting_lines.png",
-          "question": "The coordinates of the point of intersection for the two graphs could only be:",
-          "options": ["(-1,2)", "(-1,-2)", "(1,2)", "(1,-2)", "(2,-1)"],
-          "correctAnswer": "(-1,2)",
-          "topic": "Simultaneous Equations"
-        },
-        {
-          "questionId": "m9p_q36",
-          "question": "-(-3)³ =",
-          "options": ["-9", "27", "9", "-27", "None of these"],
-          "correctAnswer": "27",
-          "topic": "Indices"
-        },
-        {
-          "questionId": "m9p_q37",
-          "question": "(10x²/4y) * (8y³/5x) =",
-          "options": ["4x²y", "2y/x", "2xy⁵/xy", "4xy²", "None of these"],
-          "correctAnswer": "4xy²",
-          "topic": "Algebraic Fractions"
-        },
-        {
-          "questionId": "m9p_q38",
-          "question": "(3⁰y)² * 2(xy)⁰",
-          "options": ["18y²", "36xy³", "2y²", "6xy²", "None of these"],
-          "correctAnswer": "2y²",
-          "topic": "Indices"
-        },
-        {
-          "questionId": "m9p_q39",
-          "question": "(3x⁻²y²) / (6y⁻¹x³) =",
-          "options": ["y³/2x⁵", "y/2x", "y/3x", "3y/x⁵", "2y³/x"],
-          "correctAnswer": "y³/2x⁵",
-          "topic": "Indices"
-        },
-        {
-          "questionId": "m9p_q40",
-          "question": "Which is not the same as 32^(3/5)?",
-          "options": ["(32^(1/5))³", "(32³)^(1/5)", "(⁵√32)³", "(32^(1/3))⁵", "⁵√32³"],
-          "correctAnswer": "(32^(1/3))⁵",
-          "topic": "Indices"
-        },
-        {
-          "questionId": "m9p_q41",
-          "imagePlaceholder": "math_prac_q41_venn_diagram.png",
-          "question": "What is the total number of students in the class?",
-          "options": ["33", "22", "17", "23", "28"],
-          "correctAnswer": "28",
-          "topic": "Venn Diagrams"
-        },
-        {
-          "questionId": "m9p_q42",
-          "imagePlaceholder": "math_prac_q41_venn_diagram.png",
-          "question": "How many students learnt neither saxophone nor flute?",
-          "options": ["5", "6", "7", "10", "None of these"],
-          "correctAnswer": "6",
-          "topic": "Venn Diagrams"
-        },
-        {
-          "questionId": "m9p_q43",
-          "imagePlaceholder": "math_prac_q41_venn_diagram.png",
-          "question": "How many students learnt just the saxophone or the flute?",
-          "options": ["12", "22", "17", "15", "None of these"],
-          "correctAnswer": "17",
-          "topic": "Venn Diagrams"
-        },
-        {
-          "questionId": "m9p_q44",
-          "imagePlaceholder": "math_prac_q44_histogram_cumulative.png",
-          "question": "Which is the best cumulative frequency graph for the histogram?",
-          "options": ["A", "B", "C", "D", "E"],
-          "correctAnswer": "D",
-          "topic": "Data Analysis"
-        },
-        {
-          "questionId": "m9p_q45",
-          "question": "Jack's Dad invested some money and for every $12 he invested he got a total of $15 back. If Jack's Dad invested $300, how much in total did he get back?",
-          "options": ["$225", "$525", "$480", "$375", "None of these"],
-          "correctAnswer": "$375",
-          "topic": "Ratios and Proportions"
-        },
-        {
-          "questionId": "m9p_q46",
-          "question": "Expand the brackets and simplify (2√5 - √2)²",
-          "options": ["4√5 + 2√2", "12 - 4√10", "8 - 4√10", "2√10 - 2", "None of these"],
-          "correctAnswer": "None of these",
-          "topic": "Surds"
-        },
-        {
-          "questionId": "m9p_q47",
-          "question": "Rationalise and simplify (4√5) / √3",
-          "options": ["√2", "3√6", "√6", "√6 / 3", "None of these"],
-          "correctAnswer": "None of these",
-          "topic": "Surds"
-        },
-        {
-          "questionId": "m9p_q48",
-          "question": "If x = 1/2, y = 2/3, and z = 3/4 evaluate x ÷ y + z",
-          "options": ["1 1/2", "3/7", "1 1/12", "3/4", "None of these"],
-          "correctAnswer": "1 1/2",
-          "topic": "Fractions"
-        },
-        {
-          "questionId": "m9p_q49",
-          "question": "Expand and simplify (3a - 5b)(3a + 5b)",
-          "options": ["9a - 25b", "9a + 25b", "9a² + 25b²", "9a² - 25b²", "None of these"],
-          "correctAnswer": "9a² - 25b²",
-          "topic": "Algebra"
-        },
-        {
-          "questionId": "m9p_q50",
-          "question": "Factorise and simplify 3a² + 3a - 18",
-          "options": ["(a+3)(a-2)", "3(a-3)(a+2)", "3(a-3)(a-2)", "3(a+3)(a-2)", "None of these"],
-          "correctAnswer": "3(a+3)(a-2)",
-          "topic": "Factorising"
-        },
-        {
-          "questionId": "m9p_q51",
-          "question": "Simplify (x² - 9)/(4x - 12) ÷ (x + 3)/2",
-          "options": ["(x+3)/4", "1/2", "(x+3)/(2(x-3))", "2/1", "None of these"],
-          "correctAnswer": "1/2",
-          "topic": "Algebraic Fractions"
-        },
-        {
-          "questionId": "m9p_q52",
-          "imagePlaceholder": "math_prac_q52_trigonometry.png",
-          "question": "The correct ratio to find x is:",
-          "options": ["6 Cos 72°", "6 Tan 72°", "15 Sin 18°", "15 Sin 72°", "15 Cos 18°"],
-          "correctAnswer": "15 Sin 18°",
-          "topic": "Trigonometry"
-        },
-        {
-          "questionId": "m9p_q53",
-          "imagePlaceholder": "math_prac_q53_parabola.png",
-          "question": "The turning point of the graph could only be:",
-          "options": ["(-3,3)", "(4,-2)", "(3,4)", "(-2,3)", "(-3,-2)"],
-          "correctAnswer": "(-3,-2)",
-          "topic": "Quadratics"
-        },
-        {
-          "questionId": "m9p_q54",
-          "question": "A number x is subtracted from two times its square and the result is 45. An equation to find the value of x would be:",
-          "options": ["x² - 2x = 45", "2x - x² = 45", "2x² - x = 45", "2x² - 2x = 45", "x - 2x² = 45"],
-          "correctAnswer": "2x² - x = 45",
-          "topic": "Forming Equations"
-        },
-        {
-          "questionId": "m9p_q55",
-          "question": "Find the points of intersection of the graphs of y = x² and y = 3x - 2.",
-          "options": ["(1,1)(1,4)", "(2,4)(1,1)", "(1,-1)(2,4)", "(-2,4)(1,1)", "None of these"],
-          "correctAnswer": "(2,4)(1,1)",
-          "topic": "Simultaneous Equations"
-        },
-        {
-          "questionId": "m9p_q56",
-          "imagePlaceholder": "math_prac_q56_scatter_plot.png",
-          "question": "Which shop gave the worst value for money?",
-          "options": ["Shop z", "Shop y", "Shop x", "Shop w", "Shop v"],
-          "correctAnswer": "Shop v",
-          "topic": "Data Analysis"
-        },
-        {
-          "questionId": "m9p_q57",
-          "imagePlaceholder": "math_prac_q56_scatter_plot.png",
-          "question": "Which two shops charged the same price per kilogram?",
-          "options": ["Shops z & x", "Shops z & v", "Shops y & z", "Shops v & w", "Shops x & y"],
-          "correctAnswer": "Shops x & y",
-          "topic": "Data Analysis"
-        },
-        {
-          "questionId": "m9p_q58",
-          "imagePlaceholder": "math_prac_q56_scatter_plot.png",
-          "question": "At which shop would you get three times the amount of sugar for the same price as shop z?",
-          "options": ["Shop v", "Shop x", "Shop w", "Shop y", "None of these"],
-          "correctAnswer": "Shop w",
-          "topic": "Data Analysis"
-        },
-        {
-          "questionId": "m9p_q59",
-          "imagePlaceholder": "math_prac_q59_right_triangle.png",
-          "question": "Find the value of x.",
-          "options": ["4", "5", "6", "3", "None of these"],
-          "correctAnswer": "3",
-          "topic": "Pythagorean Theorem"
-        },
-        {
-          "questionId": "m9p_q60",
-          "question": "Factorise ab + b² - ac - bc",
-          "options": ["(b-c)(a-c)", "(b+a)(b+c)", "(b-c)(a+b)", "(b+c)(a-b)", "(b-c)(a+c)"],
-          "correctAnswer": "(b-c)(a+b)",
-          "topic": "Factorising"
+          "questionId": "m8_2018_q42",
+          "imagePlaceholder": "grade8_q42_graphs.png",
+          "question": "An oil-well contractor drills a shaft 7 meters deeper into the ground every 2 hours. Which graph has a slope that best represents this rate?",
+          "options": ["Graph A", "Graph B", "Graph C", "Graph D"],
+          "correctAnswer": "Graph C",
+          "topic": "Slope"
         }
       ]
     }
