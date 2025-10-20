@@ -1,4 +1,3 @@
-
 import { auth, db } from './firebaseConfig.js';
 import { collection, getDocs, doc, updateDoc, getDoc, where, query, addDoc, writeBatch, deleteDoc } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
 import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-auth.js";
@@ -254,6 +253,12 @@ function findSpecializedSubject(subjects) {
         }
     }
     return null;
+}
+
+// Function to get current month for reports
+function getCurrentMonthYear() {
+    const now = new Date();
+    return now.toLocaleString('default', { month: 'long', year: 'numeric' });
 }
 
 // Listen for changes to the admin settings in real-time
@@ -790,9 +795,13 @@ async function renderStudentDatabase(container, tutor) {
     function showReportModal(student) {
         const existingReport = savedReports[student.id] || {};
         const isSingleApprovedStudent = approvedStudents.filter(s => !s.summerBreak && !submittedStudentIds.has(s.id)).length === 1;
+        const currentMonthYear = getCurrentMonthYear();
         
         const reportFormHTML = `
             <h3 class="text-xl font-bold mb-4">Monthly Report for ${student.studentName}</h3>
+            <div class="bg-blue-50 p-3 rounded-lg mb-4">
+                <p class="text-sm font-semibold text-blue-800">Month: ${currentMonthYear}</p>
+            </div>
             <div class="space-y-4">
                 <div><label class="block font-semibold">Introduction</label><textarea id="report-intro" class="w-full mt-1 p-2 border rounded" rows="2">${existingReport.introduction || ''}</textarea></div>
                 <div><label class="block font-semibold">Topics & Remarks</label><textarea id="report-topics" class="w-full mt-1 p-2 border rounded" rows="3">${existingReport.topics || ''}</textarea></div>
@@ -814,8 +823,12 @@ async function renderStudentDatabase(container, tutor) {
         document.getElementById('cancel-report-btn').addEventListener('click', () => reportModal.remove());
         document.getElementById('modal-action-btn').addEventListener('click', async () => {
             const reportData = {
-                studentId: student.id, studentName: student.studentName, grade: student.grade,
-                parentName: student.parentName, parentPhone: student.parentPhone,
+                studentId: student.id, 
+                studentName: student.studentName, 
+                grade: student.grade,
+                parentName: student.parentName, 
+                parentPhone: student.parentPhone,
+                reportMonth: currentMonthYear, // Add month to report data
                 introduction: document.getElementById('report-intro').value,
                 topics: document.getElementById('report-topics').value,
                 progress: document.getElementById('report-progress').value,
@@ -1190,7 +1203,4 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     });
 });
-
-
-
-
+[file content end]
