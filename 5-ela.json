@@ -137,7 +137,6 @@
           "questionId": "q8",
           "passageId": "p2",
           "type": "multiple-choice",
-          "imagePlaceholder": "hammock_cotton_rope.png",
           "question": "Which sentence best supports the idea that hammocks have been used to help solve a problem?",
           "options": [
             "The Taino made the hammocks by weaving together cotton, plant fibers, and tree bark. (paragraph 2)",
@@ -151,7 +150,6 @@
           "questionId": "q9",
           "passageId": "p2",
           "type": "multiple-choice",
-          "imagePlaceholder": "hammock_cotton_rope.png",
           "question": "Which sentence from the selection shows that Joshua John Ward was successful in choosing the design he used to create hammocks?",
           "options": [
             "Hammocks were soon exposed to the rest of the world. (paragraph 6)",
@@ -165,7 +163,6 @@
           "questionId": "q10",
           "passageId": "p2",
           "type": "multiple-choice",
-          "imagePlaceholder": "hammock_cotton_rope.png",
           "question": "Which definition best matches the way the word spotted is used in paragraph 3?",
           "options": [
             "Definition 1: to locate something correctly",
@@ -179,7 +176,7 @@
           "questionId": "q11",
           "passageId": "p2",
           "type": "multiple-choice",
-          "imagePlaceholder": "extreme_hammocking_italy.png",
+          "imagePlaceholder": "hammock_cotton_rope.png",
           "question": "What is the most likely reason the author includes the information in paragraph 7?",
           "options": [
             "To show the reader how to find creative ways to spend time",
@@ -207,7 +204,6 @@
           "questionId": "q13",
           "passageId": "p2",
           "type": "multiple-choice",
-          "imagePlaceholder": "hammock_cotton_rope.png",
           "question": "Which sentence suggests that hammocks were helpful to explorers who traveled by sea?",
           "options": [
             "People have been using hammocks for many years. (paragraph 2)",
