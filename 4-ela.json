@@ -1,309 +1,631 @@
 {
-  "questions": [
+  "tests": [
     {
-      "topic": "Reading Comprehension",
-      "passage": "In Marfa, Texas, Mia found a glowing book in her attic. Its cover sparkled like stars, making her curious. Despite her brother’s warnings about old books, Mia opened it. The pages told of a magical prairie where animals spoke. Mia followed the book’s map to a hidden meadow. There, a talking armadillo greeted her, offering to guide her to a secret spring. With courage, Mia followed, discovering a glowing fountain. She learned that curiosity could lead to amazing adventures.",
-      "question": "Why does Mia open the book?",
-      "type": "multiple-choice",
-      "options": ["Her brother tells her to", "She is curious about its cover", "She needs it for school", "She wants to sell it"],
-      "correct_answer": "She is curious about its cover"
-    },
-    {
-      "topic": "Reading Comprehension",
-      "passage": "In Marfa, Texas, Mia found a glowing book in her attic. Its cover sparkled like stars, making her curious. Despite her brother’s warnings about old books, Mia opened it. The pages told of a magical prairie where animals spoke. Mia followed the book’s map to a hidden meadow. There, a talking armadillo greeted her, offering to guide her to a secret spring. With courage, Mia followed, discovering a glowing fountain. She learned that curiosity could lead to amazing adventures.",
-      "question": "What is the main idea of the passage?",
-      "type": "multiple-choice",
-      "options": ["Books are dangerous", "Curiosity leads to adventure", "Marfa is a magical town", "Animals can talk"],
-      "correct_answer": "Curiosity leads to adventure"
-    },
-    {
-      "topic": "Reading Comprehension",
-      "passage": "In Marfa, Texas, Mia found a glowing book in her attic. Its cover sparkled like stars, making her curious. Despite her brother’s warnings about old books, Mia opened it. The pages told of a magical prairie where animals spoke. Mia followed the book’s map to a hidden meadow. There, a talking armadillo greeted her, offering to guide her to a secret spring. With courage, Mia followed, discovering a glowing fountain. She learned that curiosity could lead to amazing adventures.",
-      "question": "What does Mia find in the meadow?",
-      "type": "multiple-choice",
-      "options": ["A talking armadillo", "A glowing book", "A hidden map", "A secret cave"],
-      "correct_answer": "A talking armadillo"
-    },
-    {
-      "topic": "Reading Comprehension",
-      "passage": "In Marfa, Texas, Mia found a glowing book in her attic. Its cover sparkled like stars, making her curious. Despite her brother’s warnings about old books, Mia opened it. The pages told of a magical prairie where animals spoke. Mia followed the book’s map to a hidden meadow. There, a talking armadillo greeted her, offering to guide her to a secret spring. With courage, Mia followed, discovering a glowing fountain. She learned that curiosity could lead to amazing adventures.",
-      "question": "What lesson does Mia learn?",
-      "type": "multiple-choice",
-      "options": ["Books are boring", "Curiosity leads to discoveries", "Prairies are scary", "Armadillos are friendly"],
-      "correct_answer": "Curiosity leads to discoveries"
-    },
-    {
-      "topic": "Reading Comprehension",
-      "passage": "In Marfa, Texas, Mia found a glowing book in her attic. Its cover sparkled like stars, making her curious. Despite her brother’s warnings about old books, Mia opened it. The pages told of a magical prairie where animals spoke. Mia followed the book’s map to a hidden meadow. There, a talking armadillo greeted her, offering to guide her to a secret spring. With courage, Mia followed, discovering a glowing fountain. She learned that curiosity could lead to amazing adventures.",
-      "question": "Where does Mia’s adventure take place?",
-      "type": "multiple-choice",
-      "options": ["A hidden meadow", "Her attic", "A school library", "A desert cave"],
-      "correct_answer": "A hidden meadow"
-    },
-    {
-      "topic": "Reading Comprehension",
-      "passage": "The bluebonnet is Texas’s state flower, blooming across fields each spring. In Austin, people celebrate these flowers with festivals. Bluebonnets grow in clusters, their petals bright blue with white tips, like tiny stars. They thrive in sunny, rocky soil, needing little water. Long ago, Native American legends said bluebonnets were gifts from the sky, bringing hope. Today, families take photos in bluebonnet fields, creating memories. The flower’s beauty reminds Texans of their state’s vibrant spirit and natural wonders.",
-      "question": "What is the main idea of the passage?",
-      "type": "multiple-choice",
-      "options": ["Bluebonnets are Texas’s state flower", "Festivals are popular in Austin", "Flowers need water to grow", "Texans love to take photos"],
-      "correct_answer": "Bluebonnets are Texas’s state flower"
-    },
-    {
-      "topic": "Reading Comprehension",
-      "passage": "The bluebonnet is Texas’s state flower, blooming across fields each spring. In Austin, people celebrate these flowers with festivals. Bluebonnets grow in clusters, their petals bright blue with white tips, like tiny stars. They thrive in sunny, rocky soil, needing little water. Long ago, Native American legends said bluebonnets were gifts from the sky, bringing hope. Today, families take photos in bluebonnet fields, creating memories. The flower’s beauty reminds Texans of their state’s vibrant spirit and natural wonders.",
-      "question": "How are bluebonnets described in the passage?",
-      "type": "multiple-choice",
-      "options": ["Tall and green", "Blue with white tips", "Red and yellow", "Soft and fluffy"],
-      "correct_answer": "Blue with white tips"
-    },
-    {
-      "topic": "Reading Comprehension",
-      "passage": "The bluebonnet is Texas’s state flower, blooming across fields each spring. In Austin, people celebrate these flowers with festivals. Bluebonnets grow in clusters, their petals bright blue with white tips, like tiny stars. They thrive in sunny, rocky soil, needing little water. Long ago, Native American legends said bluebonnets were gifts from the sky, bringing hope. Today, families take photos in bluebonnet fields, creating memories. The flower’s beauty reminds Texans of their state’s vibrant spirit and natural wonders.",
-      "question": "What do Native American legends say about bluebonnets?",
-      "type": "multiple-choice",
-      "options": ["They are hard to grow", "They are gifts from the sky", "They bloom in winter", "They are used in cooking"],
-      "correct_answer": "They are gifts from the sky"
-    },
-    {
-      "topic": "Reading Comprehension",
-      "passage": "The bluebonnet is Texas’s state flower, blooming across fields each spring. In Austin, people celebrate these flowers with festivals. Bluebonnets grow in clusters, their petals bright blue with white tips, like tiny stars. They thrive in sunny, rocky soil, needing little water. Long ago, Native American legends said bluebonnets were gifts from the sky, bringing hope. Today, families take photos in bluebonnet fields, creating memories. The flower’s beauty reminds Texans of their state’s vibrant spirit and natural wonders.",
-      "question": "Why do families take photos in bluebonnet fields?",
-      "type": "multiple-choice",
-      "options": ["To sell the photos", "To create memories", "To study the flowers", "To enter a contest"],
-      "correct_answer": "To create memories"
-    },
-    {
-      "topic": "Reading Comprehension",
-      "passage": "The bluebonnet is Texas’s state flower, blooming across fields each spring. In Austin, people celebrate these flowers with festivals. Bluebonnets grow in clusters, their petals bright blue with white tips, like tiny stars. They thrive in sunny, rocky soil, needing little water. Long ago, Native American legends said bluebonnets were gifts from the sky, bringing hope. Today, families take photos in bluebonnet fields, creating memories. The flower’s beauty reminds Texans of their state’s vibrant spirit and natural wonders.",
-      "question": "Where do bluebonnets thrive?",
-      "type": "multiple-choice",
-      "options": ["Shady forests", "Sunny, rocky soil", "Wet marshes", "Cold mountains"],
-      "correct_answer": "Sunny, rocky soil"
-    },
-    {
-      "topic": "Reading Comprehension",
-      "passage": "In El Paso, Juan found a stray puppy near the Rio Grande. Its fur was matted, and it looked hungry. Juan wanted to help but didn’t know where to start. He decided to make posters to find the owner. After school, he gave the puppy water and food. A neighbor recognized the puppy from the posters and called its owner. The owner was thrilled, and Juan felt proud. Helping the puppy taught him that kindness makes a difference.",
-      "question": "What does Juan do first to help the puppy?",
-      "type": "multiple-choice",
-      "options": ["He feeds it", "He makes posters", "He calls the owner", "He names the puppy"],
-      "correct_answer": "He makes posters"
-    },
-    {
-      "topic": "Reading Comprehension",
-      "passage": "In El Paso, Juan found a stray puppy near the Rio Grande. Its fur was matted, and it looked hungry. Juan wanted to help but didn’t know where to start. He decided to make posters to find the owner. After school, he gave the puppy water and food. A neighbor recognized the puppy from the posters and called its owner. The owner was thrilled, and Juan felt proud. Helping the puppy taught him that kindness makes a difference.",
-      "question": "What is the main idea of the passage?",
-      "type": "multiple-choice",
-      "options": ["Puppies are hard to care for", "Kindness helps others", "El Paso is near the Rio Grande", "Posters are easy to make"],
-      "correct_answer": "Kindness helps others"
-    },
-    {
-      "topic": "Reading Comprehension",
-      "passage": "In El Paso, Juan found a stray puppy near the Rio Grande. Its fur was matted, and it looked hungry. Juan wanted to help but didn’t know where to start. He decided to make posters to find the owner. After school, he gave the puppy water and food. A neighbor recognized the puppy from the posters and called its owner. The owner was thrilled, and Juan felt proud. Helping the puppy taught him that kindness makes a difference.",
-      "question": "Where does Juan find the puppy?",
-      "type": "multiple-choice",
-      "options": ["In a park", "Near the Rio Grande", "At school", "In his backyard"],
-      "correct_answer": "Near the Rio Grande"
-    },
-    {
-      "topic": "Reading Comprehension",
-      "passage": "In El Paso, Juan found a stray puppy near the Rio Grande. Its fur was matted, and it looked hungry. Juan wanted to help but didn’t know where to start. He decided to make posters to find the owner. After school, he gave the puppy water and food. A neighbor recognized the puppy from the posters and called its owner. The owner was thrilled, and Juan felt proud. Helping the puppy taught him that kindness makes a difference.",
-      "question": "What lesson does Juan learn?",
-      "type": "multiple-choice",
-      "options": ["Kindness makes a difference", "Puppies are friendly", "Posters are fun to make", "The Rio Grande is wide"],
-      "correct_answer": "Kindness makes a difference"
-    },
-    {
-      "topic": "Reading Comprehension",
-      "passage": "In El Paso, Juan found a stray puppy near the Rio Grande. Its fur was matted, and it looked hungry. Juan wanted to help but didn’t know where to start. He decided to make posters to find the owner. After school, he gave the puppy water and food. A neighbor recognized the puppy from the posters and called its owner. The owner was thrilled, and Juan felt proud. Helping the puppy taught him that kindness makes a difference.",
-      "question": "Who helps Juan find the puppy’s owner?",
-      "type": "multiple-choice",
-      "options": ["His teacher", "A neighbor", "His friend", "The puppy"],
-      "correct_answer": "A neighbor"
-    },
-    {
-      "topic": "Reading Comprehension",
-      "passage": "The Texas longhorn, a symbol of the state, roams ranches near San Antonio. These cattle have wide, curved horns, sometimes stretching seven feet. Longhorns are tough, surviving heat and drought. In the 1800s, cowboys drove them across plains to markets. Today, ranchers raise longhorns for their history and strength. Visitors to Texas ranches love seeing these majestic animals, which represent the state’s rugged past and enduring spirit.",
-      "question": "What is the main idea of the passage?",
-      "type": "multiple-choice",
-      "options": ["Longhorns are a symbol of Texas", "Cowboys were brave", "Ranches are popular", "Horns are dangerous"],
-      "correct_answer": "Longhorns are a symbol of Texas"
-    },
-    {
-      "topic": "Reading Comprehension",
-      "passage": "The Texas longhorn, a symbol of the state, roams ranches near San Antonio. These cattle have wide, curved horns, sometimes stretching seven feet. Longhorns are tough, surviving heat and drought. In the 1800s, cowboys drove them across plains to markets. Today, ranchers raise longhorns for their history and strength. Visitors to Texas ranches love seeing these majestic animals, which represent the state’s rugged past and enduring spirit.",
-      "question": "What are longhorns known for?",
-      "type": "multiple-choice",
-      "options": ["Their small size", "Their curved horns", "Their soft fur", "Their fast speed"],
-      "correct_answer": "Their curved horns"
-    },
-    {
-      "topic": "Reading Comprehension",
-      "passage": "The Texas longhorn, a symbol of the state, roams ranches near San Antonio. These cattle have wide, curved horns, sometimes stretching seven feet. Longhorns are tough, surviving heat and drought. In the 1800s, cowboys drove them across plains to markets. Today, ranchers raise longhorns for their history and strength. Visitors to Texas ranches love seeing these majestic animals, which represent the state’s rugged past and enduring spirit.",
-      "question": "Why do ranchers raise longhorns today?",
-      "type": "multiple-choice",
-      "options": ["For their meat", "For their history and strength", "To race them", "To sell their horns"],
-      "correct_answer": "For their history and strength"
-    },
-    {
-      "topic": "Reading Comprehension",
-      "passage": "The Texas longhorn, a symbol of the state, roams ranches near San Antonio. These cattle have wide, curved horns, sometimes stretching seven feet. Longhorns are tough, surviving heat and drought. In the 1800s, cowboys drove them across plains to markets. Today, ranchers raise longhorns for their history and strength. Visitors to Texas ranches love seeing these majestic animals, which represent the state’s rugged past and enduring spirit.",
-      "question": "What do longhorns represent?",
-      "type": "multiple-choice",
-      "options": ["Texas’s rugged past", "Modern farming", "City life", "Fast transportation"],
-      "correct_answer": "Texas’s rugged past"
-    },
-    {
-      "topic": "Reading Comprehension",
-      "passage": "The Texas longhorn, a symbol of the state, roams ranches near San Antonio. These cattle have wide, curved horns, sometimes stretching seven feet. Longhorns are tough, surviving heat and drought. In the 1800s, cowboys drove them across plains to markets. Today, ranchers raise longhorns for their history and strength. Visitors to Texas ranches love seeing these majestic animals, which represent the state’s rugged past and enduring spirit.",
-      "question": "Where do longhorns roam?",
-      "type": "multiple-choice",
-      "options": ["Near Houston", "Near San Antonio", "In Austin", "In Dallas"],
-      "correct_answer": "Near San Antonio"
-    },
-    {
-      "topic": "Reading Comprehension",
-      "passage": "In a Texas sunset, / The sky burns red and gold, / Like a cowboy’s campfire, / Warming stories old. / The horizon glows, / With colors bold and bright, / Painting the wide prairie, / In the fading light. / Stars begin to twinkle, / As day turns into night. / Oh, Texas sunset, / You are a wondrous sight.",
-      "question": "What does the poet compare the sunset to?",
-      "type": "multiple-choice",
-      "options": ["A quiet river", "A cowboy’s campfire", "A bright star", "A tall mountain"],
-      "correct_answer": "A cowboy’s campfire"
-    },
-    {
-      "topic": "Reading Comprehension",
-      "passage": "In a Texas sunset, / The sky burns red and gold, / Like a cowboy’s campfire, / Warming stories old. / The horizon glows, / With colors bold and bright, / Painting the wide prairie, / In the fading light. / Stars begin to twinkle, / As day turns into night. / Oh, Texas sunset, / You are a wondrous sight.",
-      "question": "What is the main idea of the poem?",
-      "type": "multiple-choice",
-      "options": ["The prairie is wide", "The Texas sunset is beautiful", "Cowboys tell stories", "Stars shine at night"],
-      "correct_answer": "The Texas sunset is beautiful"
-    },
-    {
-      "topic": "Reading Comprehension",
-      "passage": "In a Texas sunset, / The sky burns red and gold, / Like a cowboy’s campfire, / Warming stories old. / The horizon glows, / With colors bold and bright, / Painting the wide prairie, / In the fading light. / Stars begin to twinkle, / As day turns into night. / Oh, Texas sunset, / You are a wondrous sight.",
-      "question": "What colors are in the sunset?",
-      "type": "multiple-choice",
-      "options": ["Blue and green", "Red and gold", "Black and white", "Purple and orange"],
-      "correct_answer": "Red and gold"
-    },
-    {
-      "topic": "Reading Comprehension",
-      "passage": "In a Texas sunset, / The sky burns red and gold, / Like a cowboy’s campfire, / Warming stories old. / The horizon glows, / With colors bold and bright, / Painting the wide prairie, / In the fading light. / Stars begin to twinkle, / As day turns into night. / Oh, Texas sunset, / You are a wondrous sight.",
-      "question": "What happens as day turns to night?",
-      "type": "multiple-choice",
-      "options": ["The prairie grows dark", "Stars begin to twinkle", "The campfire burns out", "The horizon fades"],
-      "correct_answer": "Stars begin to twinkle"
-    },
-    {
-      "topic": "Reading Comprehension",
-      "passage": "In a Texas sunset, / The sky burns red and gold, / Like a cowboy’s campfire, / Warming stories old. / The horizon glows, / With colors bold and bright, / Painting the wide prairie, / In the fading light. / Stars begin to twinkle, / As day turns into night. / Oh, Texas sunset, / You are a wondrous sight.",
-      "question": "What does the poet call the sunset?",
-      "type": "multiple-choice",
-      "options": ["A quiet moment", "A wondrous sight", "A dark shadow", "A soft breeze"],
-      "correct_answer": "A wondrous sight"
-    },
-    {
-      "topic": "Vocabulary",
-      "question": "In the sentence 'The festival was jubilant,' what does 'jubilant' mean?",
-      "type": "multiple-choice",
-      "options": ["Quiet", "Joyful", "Sad", "Tired"],
-      "correct_answer": "Joyful"
-    },
-    {
-      "topic": "Vocabulary",
-      "question": "In the sentence 'The river meandered through the valley,' what does 'meandered' mean?",
-      "type": "multiple-choice",
-      "options": ["Rushed", "Stopped", "Wound slowly", "Dried up"],
-      "correct_answer": "Wound slowly"
-    },
-    {
-      "topic": "Vocabulary",
-      "question": "In the sentence 'The hiker was cautious near the cliff,' what does 'cautious' mean?",
-      "type": "multiple-choice",
-      "options": ["Careful", "Excited", "Angry", "Tired"],
-      "correct_answer": "Careful"
-    },
-    {
-      "topic": "Grammar",
-      "question": "Which sentence is written correctly?",
-      "type": "multiple-choice",
-      "options": ["The dog run fast.", "The dog runs fast.", "The dog running fast.", "The dog runned fast."],
-      "correct_answer": "The dog runs fast."
-    },
-    {
-      "topic": "Grammar",
-      "question": "Which word is a plural noun?",
-      "type": "multiple-choice",
-      "options": ["Horse", "Horses", "Ride", "Riding"],
-      "correct_answer": "Horses"
-    },
-    {
-      "topic": "Grammar",
-      "question": "Which sentence uses a possessive noun correctly?",
-      "type": "multiple-choice",
-      "options": ["The dogs bone is buried.", "The dog’s bone is buried.", "The dogs’ bone is buried.", "The dog bone is buried."],
-      "correct_answer": "The dog’s bone is buried."
-    },
-    {
-      "topic": "Writing Conventions",
-      "question": "Which sentence uses correct punctuation?",
-      "type": "multiple-choice",
-      "options": ["I have two cats a dog and a bird.", "I have two cats, a dog, and a bird.", "I have two cats a dog, and a bird.", "I have two cats, a dog and a bird."],
-      "correct_answer": "I have two cats, a dog, and a bird."
-    },
-    {
-      "topic": "Writing Conventions",
-      "question": "Which sentence uses correct capitalization?",
-      "type": "multiple-choice",
-      "options": ["i went to dallas.", "I went to dallas.", "I went to Dallas.", "i went to Dallas."],
-      "correct_answer": "I went to Dallas."
-    },
-    {
-      "topic": "Writing Conventions",
-      "question": "Which sentence uses the correct pronoun?",
-      "type": "multiple-choice",
-      "options": ["Me went to the park.", "I went to the park.", "Him went to the park.", "Us went to the park."],
-      "correct_answer": "I went to the park."
-    },
-    {
-      "topic": "Literary Elements",
-      "question": "In a story about a girl training her horse in San Antonio, what is the setting?",
-      "type": "multiple-choice",
-      "options": ["The girl’s emotions", "The horse’s actions", "San Antonio", "The training process"],
-      "correct_answer": "San Antonio"
-    },
-    {
-      "topic": "Literary Elements",
-      "question": "In a story about a boy who enters a storytelling contest in Austin, what is the main conflict?",
-      "type": "multiple-choice",
-      "options": ["He loses his story", "He is nervous about speaking", "He forgets his lines", "He doesn’t like contests"],
-      "correct_answer": "He is nervous about speaking"
-    },
-    {
-      "topic": "Literary Elements",
-      "question": "In a story about a family camping in Big Bend National Park, what is the theme?",
-      "type": "multiple-choice",
-      "options": ["Nature is dangerous", "Family teamwork is important", "Camping is boring", "The park is far away"],
-      "correct_answer": "Family teamwork is important"
-    },
-    {
-      "topic": "Text Features",
-      "question": "In a book about Texas history, what is the purpose of a timeline?",
-      "type": "multiple-choice",
-      "options": ["To show pictures", "To list important dates", "To explain vocabulary", "To give the author’s name"],
-      "correct_answer": "To list important dates"
-    },
-    {
-      "topic": "Text Features",
-      "question": "In a book about Texas animals, what is the purpose of a glossary?",
-      "type": "multiple-choice",
-      "options": ["To show pictures", "To define words", "To list chapters", "To give directions"],
-      "correct_answer": "To define words"
-    },
-    {
-      "topic": "Text Structure",
-      "question": "In an article about the Alamo, the author describes events in the order they happened. What is this text structure called?",
-      "type": "multiple-choice",
-      "options": ["Cause and effect", "Problem and solution", "Chronological order", "Compare and contrast"],
-      "correct_answer": "Chronological order"
+      "id": "staar_reading_4_2018",
+      "subject": "Reading",
+      "grade": "4",
+      "year": "2018",
+      "defaultQuestionType": "multiple-choice",
+      "passages": [
+        {
+          "passageId": "p1",
+          "title": "Chewing Gum Man",
+          "content": [
+            {"paragraph": 1, "text": "Juicy. Sticky. Bubble. Pop!"},
+            {"paragraph": 2, "text": "For more than 100 years, chewing a tasty piece of gum has been a pleasure that most children and adults have enjoyed. In fact, it's difficult to imagine a world today without grocery store check-out counters lined with colorful packages of minty or fruit-flavored gum. Yet if a young salesman named William Wrigley, Jr., hadn't had such a clever idea to boost sales, gum might not be the popular treat it is today."},
+            {"paragraph": 3, "text": "Wrigley was born in 1862. His father was a soap maker from Philadelphia, Pennsylvania. Wrigley's first job as a teenager was selling soap for his father. Wrigley discovered that he was a good salesperson. He could make people believe that a product was special and that it might make their lives better."},
+            {"paragraph": 4, "text": "In 1891, Wrigley moved to Chicago with the dream of starting his own business. He didn't start with gum, though. He decided to sell a product he knew a lot about: soap. To encourage people to buy his soap, Wrigley offered a gift. Each person who bought soap would get free baking powder. Soon people were asking for the baking powder more than the soap. So Wrigley switched to selling baking powder, and again he gave away a small gift with each purchase. This time he gave away gum."},
+            {"paragraph": 5, "text": "Wrigley's customers loved the gum and kept asking for it. So Wrigley decided to start his own gum business. Wrigley believed that good advertising would help make his business successful. He placed advertisements in newspapers. He also gave gifts, such as clocks or fishing gear, to store owners who ordered gum. The more gum they ordered, the bigger the gift would be. In addition, Wrigley asked store owners to display boxes of his gum next to their cash registers. This way customers would see the gum when they paid for their items. Wrigley hoped that when customers saw the gum, they would decide to buy it."},
+            {"image": "william_wrigley_jr_portrait.png"},
+            {"paragraph": 6, "text": "In 1907 business was bad for many companies across the nation. In order to continue selling his gum, Wrigley had to work extra hard, think creatively, and take some risks. He took out a large personal loan to pay for advertising. If this idea had not worked, he would have lost everything. Wrigley believed that the public would buy his gum if it was something they thought about often. He wanted people to hear about his gum, read about it, see it, and taste it. His motto for selling gum was 'Tell 'em quick and tell 'em often.' Once, Wrigley went so far as to mail gum to every listed address in the country. More than a million people got to try Wrigley's gum for free."},
+            {"paragraph": 7, "text": "Wrigley wanted people everywhere to continue thinking about his gum. When Wrigley died in 1932, his son Philip took over the company. Philip developed another plan to help achieve this goal. In 1939 the company began to advertise Wrigley's Doublemint gum using the Doublemint Twins. It hoped that whenever people saw the advertisement with the smiling, happy twins, they would think about Doublemint gum and want some. And that meant Wrigley's company sold more of its fresh, minty gum."},
+            {"paragraph": 8, "text": "Throughout his career, Wrigley was a determined salesman. Because of his ideas, millions of people enjoy chewing gum."}
+          ]
+        },
+        {
+          "passageId": "p2",
+          "title": "from Because of Winn-Dixie",
+          "author": "by Kate DiCamillo",
+          "content": [
+            {"paragraph": 1, "text": "Winn-Dixie was not allowed to come inside the store (there was a big sign on the door that said NO DOGS ALLOWED), so I held the collar and the leash up to the window. And Winn-Dixie, who was standing on the other side of the window, pulled up his lip and showed me his teeth and sneezed and wagged his tail something furious; so I knew he absolutely loved that leash and collar combination. But it was very expensive."},
+            {"paragraph": 2, "text": "I decided to explain my situation to the man behind the counter. I said, 'I don't get a big enough allowance to afford something this fancy. But I love this collar and leash, and so does my dog, and I was thinking that maybe you could set me up on an installment plan.'"},
+            {"paragraph": 3, "text": "'Installment plan?' said the man."},
+            {"paragraph": 4, "text": "'Gertrude!' somebody screamed in a real irritating voice."},
+            {"paragraph": 5, "text": "I looked around. It was a parrot. She was sitting on top of one of the fish tanks, looking right at me."},
+            {"paragraph": 6, "text": "'An installment plan,' I said, ignoring the parrot, 'you know, where I promise to give you my allowance every week and you give me the leash and the collar now.'"},
+            {"paragraph": 7, "text": "'I don't think I can do that,' said the man. He shook his head. 'No, the owner, she wouldn't like that.' He looked down at the counter. He wouldn't look at me. He had thick black hair, and it was slicked back. He had on a name tag that said OTIS."},
+            {"paragraph": 8, "text": "'Or I could work for you,' I said. 'I could come in and sweep the floors and dust the shelves and take out the trash. I could do that.'"},
+            {"paragraph": 9, "text": "I looked around Gertrude's Pets. There was sand and sunflower-seed shells and big dust bunnies all over the floor. I could tell that it needed to be swept."},
+            {"paragraph": 10, "text": "'Uh,' said Otis. He looked down at the counter some more."},
+            {"paragraph": 11, "text": "'Gertrude!' the parrot screamed again."},
+            {"paragraph": 12, "text": "'I'm real trustworthy,' I said. 'But the only thing is, Winn-Dixie, my dog, he would have to come inside with me; because if we get separated for too long, he starts to howl something terrible.'"},
+            {"paragraph": 13, "text": "'Gertrude doesn't like dogs,' said Otis."},
+            {"paragraph": 14, "text": "'Is she the owner?' I asked."},
+            {"paragraph": 15, "text": "'Yes, I mean, no, I mean . . .' He finally looked up. He pointed at the fish tank. 'That Gertrude. The parrot. I named her after the owner.'"},
+            {"paragraph": 16, "text": "'Gertrude's a pretty bird!' screamed Gertrude."},
+            {"paragraph": 17, "text": "'She might like Winn-Dixie,' I told Otis. 'Almost everybody does. Maybe he could come inside and meet her, and if the two of them get along, then could I have the job?'"},
+            {"paragraph": 18, "text": "'Maybe,' Otis mumbled. He looked down at the counter again."},
+            {"paragraph": 19, "text": "So I went and opened the door, and Winn-Dixie came trotting on inside the store."},
+            {"paragraph": 20, "text": "'Dog!' screamed Gertrude."},
+            {"paragraph": 21, "text": "'I know it,' Otis told her."},
+            {"paragraph": 22, "text": "And then Gertrude got real quiet. She sat on the top of the fish tank and cocked her head from one side to the other, looking at Winn-Dixie. And Winn-Dixie stood and stared back at her. He didn't hardly move. He didn't wag his tail. He didn't smile. He didn't sneeze. He just stared at Gertrude and she stared at him. And then she spread her wings out real far and flew and landed on top of Winn-Dixie's head."},
+            {"paragraph": 23, "text": "'Dog,' she croaked."},
+            {"paragraph": 24, "text": "Winn-Dixie wagged his tail just a little tiny bit."},
+            {"paragraph": 25, "text": "And Otis said, 'You can start on Monday.'"},
+            {"paragraph": 26, "text": "'Thank you!' I told him. 'You won't be sorry.'"},
+            {"paragraph": 27, "text": "On the way out of Gertrude's Pets, I said to Winn-Dixie, 'You are better at making friends than anybody I have ever known.'"}
+          ]
+        },
+        {
+          "passageId": "p3",
+          "title": "Night Flyers",
+          "content": [
+            {"paragraph": 1, "text": "Under the cover of darkness, millions of small, furry bats take flight and fill the night skies of Texas. There are 47 different species of bats in the United States, and 31 species live in Texas. The most common bat found throughout the state is the Mexican free-tailed bat. Each year 20 million Mexican free-tailed bats return to Bracken Cave near San Antonio, where they give birth and raise their young. Bracken Cave is home to the largest bat colony in the world."},
+            {"image": "bracken_cave_bats.png"},
+            {"section": "Bat Benefits"},
+            {"paragraph": 2, "text": "While bats seem mysterious or even scary to some, these night flyers are actually helpful creatures. Bats eat insects that can be harmful to plants, animals, and even people. A solitary bat can eat 1,000 mosquito-sized insects in just one hour. Bats also spread pollen among flowering plants. This allows plants to make seeds, and seeds make more plants. In addition, bats produce droppings that make excellent fertilizer. The fertilizer mixes with the soil and makes it richer, which helps plants grow. More plants mean more food for people and animals."},
+            {"section": "Giving Back to Bats"},
+            {"paragraph": 3, "text": "As humans develop land and build new houses and businesses, bat habitats, like trees and caves, often are destroyed. Without homes, bats do not have a place to rest or to raise their young. Humans can help bats with this problem by providing bat houses. Today there are many people who build homes for bats."},
+            {"paragraph": 4, "text": "Because bats sleep upside down, bat houses need to have something the bats can grab onto while they sleep. The houses must be painted black on the inside so that they are dark inside. This allows the bats to sleep comfortably during the day. Bat houses should also have access to water and plants so that the bats have something to eat and drink. The houses should be located in high places so that they are off the ground, where predators can't reach them. Giving a bat a home is a great way to help these useful creatures."},
+            {"image": "bat_house_diagram.png"},
+            {"paragraph": 5, "text": "Always remember that bats are wild animals, and never try to touch them."}
+          ]
+        },
+        {
+          "passageId": "p4",
+          "title": "A Sweet Part of Nature",
+          "subtitle": "Articles for Young Scientists    June 2014",
+          "content": [
+            {"paragraph": 1, "text": "When people think of bees, they may also think of the sweet taste of the honey that bees make. However, some people may not know that bees help us in more ways than producing honey. Unfortunately, there aren't as many honeybees today as there were a few years ago."},
+            {"section": "What's Happening to the Honeybees?"},
+            {"paragraph": 2, "text": "When scientists realized that the honeybee population was declining, they tried to figure out why. They think there might be several reasons for this. They found that honeybees are not as healthy as they have been in the past. More honeybees are suffering from diseases and catching viruses from bugs. Scientists also learned that some areas where bees live have been turned into farms. The wildflowers and plants that bees feed on have been replaced with crops, which limits honeybees' access to nectar and pollen. Another problem for honeybees may be the chemicals that are used to protect crops. The chemicals are sprayed on the crops, but they spread to other plants and flowers that bees depend on to survive."},
+            {"section": "We Need Bees"},
+            {"paragraph": 3, "text": "Many of the fruits and vegetables that humans and other animals eat cannot grow without the help of honeybees. Honeybees carry pollen among plants. The plants need pollen to grow and produce more seeds. Without the help of honeybees, we would not have as many of the plants we depend on for food."},
+            {"paragraph": 4, "text": "Bees pollinate a wide variety of plants in the United States. They pollinate fruit trees, vegetable plants, and crops such as clover and alfalfa, which feed cows and other farm animals. Many people may not realize it, but honeybees are important to every living thing."},
+            {"image": "honeybee_on_flower.png"},
+            {"section": "How Humans Can Help"},
+            {"paragraph": 5, "text": "There are some things humans can do to help honeybees. People can grow flowers and plants that honeybees like, such as cabbage, sunflowers, and strawberries. People can also build beehives so that more bees will live in their area. In fact, some schools have initiated beekeeping programs to teach students about bees and to provide homes for bees that pollinate local plants."},
+            {"image": "student_with_bees.png"},
+            {"paragraph": 6, "text": "Ian Snyder, a student who participates in a beekeeping program in Pennsylvania, has the right idea. 'It's important to keep the bees alive so they can pollinate everything,' Ian said. 'It's part of the cycle of life.'"}
+          ]
+        },
+        {
+          "passageId": "p5",
+          "title": "Air",
+          "author": "by Mordicai Gerstein",
+          "content": [
+            {"line": 1, "text": "Air is everywhere."},
+            {"line": 2, "text": "Why can't I see it?"},
+            {"line": 3, "text": "The sky is made of air."},
+            {"line": 4, "text": "Is air blue?"},
+            {"line": 5, "text": "Air smells like roses sometimes, or fresh-cut grass;"},
+            {"line": 6, "text": "gasoline or rain or skunk."},
+            {"line": 7, "text": "Birds swim in it and so do butterflies,"},
+            {"line": 8, "text": "bees, bats, and jumbo jets full of people"},
+            {"line": 9, "text": "eating snacks from seat trays."},
+            {"line": 10, "text": "Swimming in air is called flying."},
+            {"line": 11, "text": "Why can't I do it?"},
+            {"line": 12, "text": "Wind is air that's going somewhere;"},
+            {"line": 13, "text": "it musses your hair,"},
+            {"line": 14, "text": "and whistles in your ears."},
+            {"line": 15, "text": "It tears leaves off trees and blows them away."},
+            {"line": 16, "text": "Sometimes, it blows the trees away"},
+            {"line": 17, "text": "and houses too, and whips the seas"},
+            {"line": 18, "text": "into foamy mountains that collapse and crash,"},
+            {"line": 19, "text": "hissing up the sand."},
+            {"line": 20, "text": "You can't see air, only what it does."},
+            {"line": 21, "text": "It has no color or shape unless you push it into a balloon,"},
+            {"line": 22, "text": "or blow a soap bubble."},
+            {"line": 23, "text": "Air."},
+            {"line": 24, "text": "Take a"},
+            {"line": 25, "text": "deeeeeeeeep"},
+            {"line": 26, "text": "breath."},
+            {"line": 27, "text": "I'm so glad"},
+            {"line": 28, "text": "it's everywhere."}
+          ]
+        },
+        {
+          "passageId": "p6",
+          "title": "Tiny Libraries with Big Stories",
+          "content": [
+            {"paragraph": 1, "text": "Whack! Whack! Whack! The hammer pounds another nail into the wood. The box is almost finished. Whack! Whack! Whack! The hammer drives in the last nail. A roof is attached to the four sides. The box is then attached to a pole in the ground. Soon the finished wood box will be filled with books. Visitors will borrow books and donate new ones. This box of books works a bit like an ordinary library, with one major difference: it is tiny."},
+            {"section": "The First Little Free Library"},
+            {"paragraph": 2, "text": "In 2009 in Wisconsin, Todd Bol came up with an idea to honor his mother. Bol's mother had been a teacher who had loved reading. Bol wanted to share his mother's love of reading with others. He decided to build a wood box and fill it with books. He made it look like a tiny red schoolhouse because he knew his mother would appreciate that. Bol placed the box of books on a post in his front yard with a sign that read 'Free Books.'"},
+            {"image": "first_little_free_library.png"},
+            {"paragraph": 3, "text": "Soon Bol's neighbors noticed this tiny model of a schoolhouse. They began taking the books and replacing them with books of their own. This was the beginning of the Little Free Library. The tiny library allowed people the opportunity to 'check out' books day or night. It was always open. A library card was not needed. The books could be read and returned whenever. But this library didn't just provide books. It also helped build friendships and a sense of belonging among community members. As more and more people visited Bol's little library, they began talking with one another. They shared thoughts, ideas, and stories. They got to know one another. Everyone loved the little library. After all, as Bol says, 'It's a magic box with books.'"},
+            {"section": "The Demand for More"},
+            {"paragraph": 4, "text": "Bol's friends and neighbors wanted little libraries of their own. Bol built several and gave them away. One of his friends, Rick Brooks, noticed that the libraries encouraged people to read. He believed that Bol's little libraries could benefit more than just local friends and neighbors. With these ideas in mind, Bol and Brooks came up with a plan to build more than 2,500 Little Free Libraries around the world."},
+            {"paragraph": 5, "text": "Their goal was to build more libraries than Andrew Carnegie. In the late 1800s and early 1900s, Carnegie donated millions of dollars to have public libraries built around the world. Like Carnegie, Bol and Brooks believed that books should be available to all people, no matter where they live or what their background is. To help achieve their goal, Bol and Brooks created a website that provides information about the Little Free Libraries and how people can establish little libraries of their own."},
+            {"paragraph": 6, "text": "Bol often hears from new Little Free Library owners, who tell him how important the libraries are to their community. He says, 'People tell us all the time that they've met more people in a week than they have in a lifetime.'"},
+            {"paragraph": 7, "text": "Lisa Lopez is an excited owner of two Little Free Libraries. She is also an elementary school librarian from El Paso, Texas. She says, 'It's generated a lot of excitement about reading. Kids love it, but adults are using it, too. My goal is to spread them across El Paso.'"},
+            {"image": "family_at_little_library.png"},
+            {"paragraph": 8, "text": "Thanks to Bol and Brooks, the Little Free Libraries are encouraging people to read more and to be friendlier. Today there are more than 25,000 Little Free Libraries around the world, and they can be found on almost every continent."},
+            {"section": "You Can, Too"},
+            {"paragraph": 9, "text": "Finished reading that book? Looking for another book to read? Perhaps there's a Little Free Library where you live. If not, maybe there will be one soon. After all, it only takes some wood, a hammer, a few nails, and some books."},
+            {"section": "Start a Library in Your Neighborhood"},
+            {"paragraph": 10, "text": "Anyone can start a little library. If you want to start one in your neighborhood, follow these helpful steps."},
+            {"subsection": "Make a Plan"},
+            {"paragraph": 11, "text": "Discuss your idea with a parent or guardian. Explain what you want to do and how you will do it. Decide where the library will be located. Get permission to set up the library in the chosen location."},
+            {"subsection": "Build the Box"},
+            {"paragraph": 12, "text": "Build or buy a box that will hold books. It is helpful if the box has a shelf or two. You may want to include a door that opens and closes to help protect the books from rain. Finally, you can paint and decorate your library box."},
+            {"subsection": "Just Add Books"},
+            {"paragraph": 13, "text": "Sort through your old books and select some to put in the library. Ask friends and neighbors to donate some, too. Fill the little library with books, and the readers will come."},
+            {"paragraph": 14, "text": "Visit the Little Free Library website for more information and great tips."}
+          ]
+        }
+      ],
+      "questions": [
+        {
+          "questionId": "q1",
+          "passageId": "p1",
+          "type": "multiple-choice",
+          "question": "As it is used in paragraph 6, the word risks refers to —",
+          "options": [
+            "breaks in a routine",
+            "suggestions from others",
+            "skills that are difficult to learn",
+            "actions that could lead to failure"
+          ],
+          "correctAnswer": "actions that could lead to failure"
+        },
+        {
+          "questionId": "q2",
+          "passageId": "p1",
+          "type": "multiple-choice",
+          "question": "Read this sentence from paragraph 2.\n\nIn fact, it's difficult to imagine a world today without grocery store check-out counters lined with colorful packages of minty or fruit-flavored gum.\n\nThe description in this sentence helps the reader understand that —",
+          "options": [
+            "gum has become more expensive",
+            "gum is a common and popular product",
+            "shoppers often forget to buy gum until the last minute",
+            "there are more flavors of gum than there used to be"
+          ],
+          "correctAnswer": "gum is a common and popular product"
+        },
+        {
+          "questionId": "q3",
+          "passageId": "p1",
+          "type": "multiple-choice",
+          "question": "Based on the author's descriptions of Wrigley's career, the reader can infer that Wrigley —",
+          "options": [
+            "gave away more gum than he sold",
+            "did not try to help the family business",
+            "rarely learned from his own experiences",
+            "was not afraid to try new approaches"
+          ],
+          "correctAnswer": "was not afraid to try new approaches"
+        },
+        {
+          "questionId": "q4",
+          "passageId": "p1",
+          "type": "multiple-choice",
+          "question": "The reader knows that this selection is a biography because it —",
+          "options": [
+            "explains why so many people enjoy chewing Wrigley's gum",
+            "tells about the events in Wrigley's life that led to his success",
+            "tells why Wrigley decided to start selling chewing gum",
+            "explains Wrigley's belief that advertising was important"
+          ],
+          "correctAnswer": "tells about the events in Wrigley's life that led to his success"
+        },
+        {
+          "questionId": "q5",
+          "passageId": "p1",
+          "type": "multiple-choice",
+          "question": "Based on the selection, how does the author most likely feel about Wrigley?",
+          "options": [
+            "The author admires Wrigley for his interesting ideas and hard work.",
+            "The author is amazed that Wrigley's simple methods brought him success.",
+            "The author is bothered by the fact that Wrigley made so few gum flavors.",
+            "The author wishes Wrigley had used his talents on something other than gum."
+          ],
+          "correctAnswer": "The author admires Wrigley for his interesting ideas and hard work."
+        },
+        {
+          "questionId": "q6",
+          "passageId": "p1",
+          "type": "multiple-choice",
+          "question": "Which theme is best supported by details in this selection?",
+          "options": [
+            "Finding joy in personal work can lead to success.",
+            "Working with others is the best way to solve a problem.",
+            "Thinking creatively helps people achieve their goals.",
+            "Showing respect to the boss is an important part of any job."
+          ],
+          "correctAnswer": "Thinking creatively helps people achieve their goals."
+        },
+        {
+          "questionId": "q7",
+          "passageId": "p2",
+          "type": "multiple-choice",
+          "question": "In paragraph 4, what does the word irritating mean?",
+          "options": [
+            "Low",
+            "Curious",
+            "Nervous",
+            "Annoying"
+          ],
+          "correctAnswer": "Annoying"
+        },
+        {
+          "questionId": "q8",
+          "passageId": "p2",
+          "type": "multiple-choice",
+          "question": "The conversation between Opal and Otis in paragraphs 10 through 18 suggests that Otis is —",
+          "options": [
+            "disappointed that he is not going to sell anything",
+            "uncertain about whether to hire Opal",
+            "ashamed of the mess in the pet store",
+            "worried about what Opal will do next"
+          ],
+          "correctAnswer": "uncertain about whether to hire Opal"
+        },
+        {
+          "questionId": "q9",
+          "passageId": "p2",
+          "type": "multiple-choice",
+          "question": "In paragraph 25, the most likely reason Otis says 'You can start on Monday' is that he —",
+          "options": [
+            "realizes that Gertrude is not bothered by the dog",
+            "wants to spend more time with Winn-Dixie",
+            "knows that he needs help keeping the store clean",
+            "does not want Opal to suggest more ideas"
+          ],
+          "correctAnswer": "realizes that Gertrude is not bothered by the dog"
+        },
+        {
+          "questionId": "q10",
+          "passageId": "p2",
+          "type": "multiple-choice",
+          "question": "What is the main message of the story?",
+          "options": [
+            "People who have courage will find that there is nothing to fear.",
+            "People who want to work for others must always keep their promises.",
+            "People who do not give up are more likely to get what they want.",
+            "People who work hard are more successful in life than those who do not."
+          ],
+          "correctAnswer": "People who do not give up are more likely to get what they want."
+        },
+        {
+          "questionId": "q11",
+          "passageId": "p2",
+          "type": "multiple-choice",
+          "question": "Which of these events from the story causes Otis to consider giving Opal a job?",
+          "options": [
+            "Opal finds a leash and a collar that Winn-Dixie likes.",
+            "Otis explains that the parrot does not like being around dogs.",
+            "Otis learns that Winn-Dixie howls when he is away from Opal.",
+            "Opal mentions some chores that she could do at the pet store."
+          ],
+          "correctAnswer": "Opal mentions some chores that she could do at the pet store."
+        },
+        {
+          "questionId": "q12",
+          "passageId": "p2",
+          "type": "multiple-choice",
+          "question": "What is the best summary of the story?",
+          "options": [
+            "A girl finds a collar and a leash that she likes in the pet store, but she realizes that they cost too much money. She asks the worker if she can make a plan to pay for them. He tells her that the owner wouldn't like that idea. A parrot keeps interrupting their conversation, but the girl continues talking to the worker.",
+            "A girl wants to buy a collar and a leash at a pet store, but she does not have enough money. She asks if she can pay over time, but the worker says no. Next she asks if she can pay by working in the store, but the worker is not sure. He agrees at last after he sees how well her dog and the store parrot get along.",
+            "A girl takes her dog to a pet store one day. She leaves her dog outside and goes into the store to find a leash and a collar. The girl meets a worker and the store parrot named Gertrude. The parrot does not like dogs, but the girl thinks it will like her dog because her dog is very nice.",
+            "A girl chooses a leash and a collar that she likes and shows them to her dog. She wants to buy them, but she doesn't have enough money. The girl notices that the store needs cleaning, so she offers to clean the store to earn money to buy the items for her dog."
+          ],
+          "correctAnswer": "A girl wants to buy a collar and a leash at a pet store, but she does not have enough money. She asks if she can pay over time, but the worker says no. Next she asks if she can pay by working in the store, but the worker is not sure. He agrees at last after he sees how well her dog and the store parrot get along."
+        },
+        {
+          "questionId": "q13",
+          "passageId": "p3",
+          "type": "multiple-choice",
+          "question": "The author includes paragraph 2 in the selection most likely to —",
+          "options": [
+            "describe some good things that bats do",
+            "share ideas people have about bats",
+            "explain why bats eat so many insects",
+            "persuade people to visit bat caves"
+          ],
+          "correctAnswer": "describe some good things that bats do"
+        },
+        {
+          "questionId": "q14",
+          "passageId": "p3",
+          "type": "multiple-choice",
+          "question": "According to the selection, why are bats having difficulty finding homes?",
+          "options": [
+            "Bats need places to hang from while they sleep.",
+            "Bats are bothered by people who explore caves.",
+            "People build on the land where bats once lived.",
+            "People are not building bat houses correctly."
+          ],
+          "correctAnswer": "People build on the land where bats once lived."
+        },
+        {
+          "questionId": "q15",
+          "passageId": "p3",
+          "type": "multiple-choice",
+          "question": "Which sentence from the selection expresses an opinion?",
+          "options": [
+            "The fertilizer mixes with the soil and makes it richer, which helps plants grow.",
+            "More plants mean more food for people and animals.",
+            "Today there are many people who build homes for bats.",
+            "Giving a bat a home is a great way to help these useful creatures."
+          ],
+          "correctAnswer": "Giving a bat a home is a great way to help these useful creatures."
+        },
+        {
+          "questionId": "q16",
+          "passageId": "p3",
+          "type": "multiple-choice",
+          "question": "Which section from the selection describes ways that bats can help people?",
+          "options": [
+            "The introductory paragraph",
+            "The section titled 'Bat Benefits'",
+            "The section titled 'Giving Back to Bats'",
+            "The section titled 'Bat Houses'"
+          ],
+          "correctAnswer": "The section titled 'Bat Benefits'"
+        },
+        {
+          "questionId": "q17",
+          "passageId": "p4",
+          "type": "multiple-choice",
+          "question": "The author's purpose for including paragraph 5 in the article most likely is to —",
+          "options": [
+            "explain the problems honeybees are experiencing",
+            "state the benefits of taking care of honeybees",
+            "describe ways to care for the honeybee population",
+            "show why honeybees are good to have around"
+          ],
+          "correctAnswer": "describe ways to care for the honeybee population"
+        },
+        {
+          "questionId": "q18",
+          "passageId": "p4",
+          "type": "multiple-choice",
+          "question": "What happens when the land where bees live is turned into farmland?",
+          "options": [
+            "Honeybees find less pollen and nectar.",
+            "Honeybees catch dangerous diseases.",
+            "Honeybees spread sickness to the plants.",
+            "Honeybees eat too much of the crops."
+          ],
+          "correctAnswer": "Honeybees find less pollen and nectar."
+        },
+        {
+          "questionId": "q19",
+          "passageId": "p4",
+          "type": "multiple-choice",
+          "question": "What problem would most likely occur if there were too few honeybees?",
+          "options": [
+            "There would be much less healthy food to eat.",
+            "Diseases would spread more quickly.",
+            "There would be more farms where bees once lived.",
+            "More harmful insects would be alive."
+          ],
+          "correctAnswer": "There would be much less healthy food to eat."
+        },
+        {
+          "questionId": "q20",
+          "passageId": "p4",
+          "type": "multiple-choice",
+          "question": "What is the best summary of the section titled 'How Humans Can Help'?",
+          "options": [
+            "Beekeepers are people who try to keep bees healthy. Ian Snyder is a student who says this is very important. He participates in a beekeeping program at his school.",
+            "If children want to help honeybees, they should learn about honeybees and the plants that bees like. Many schools offer classes that help students learn about honeybees living in their area.",
+            "Honeybees like plants such as cabbage, sunflowers, and strawberries. People who want to help honeybees should try to grow plants like these.",
+            "Anyone can help honeybees. People can grow plants that honeybees like. They can also build beehives. Some schools are teaching students how to be beekeepers and keep bees healthy."
+          ],
+          "correctAnswer": "Anyone can help honeybees. People can grow plants that honeybees like. They can also build beehives. Some schools are teaching students how to be beekeepers and keep bees healthy."
+        },
+        {
+          "questionId": "q21",
+          "passageId": "p3_p4",
+          "type": "multiple-choice",
+          "question": "Based on details in both 'Night Flyers' and 'A Sweet Part of Nature,' the reader can tell that bats and honeybees are responsible for —",
+          "options": [
+            "fewer insects eating crops",
+            "more people starting new farms",
+            "fewer animals getting sick from diseases and viruses",
+            "more food being produced because of pollination"
+          ],
+          "correctAnswer": "more food being produced because of pollination"
+        },
+        {
+          "questionId": "q22",
+          "passageId": "p3_p4",
+          "type": "multiple-choice",
+          "imagePlaceholder": "comparison_bat_bee_images.png",
+          "question": "The first photograph in 'Night Flyers' and the last photograph in 'A Sweet Part of Nature' both show that —",
+          "options": [
+            "these animals enjoy being near people",
+            "there are more of these animals than people may think",
+            "people are interested in these animals",
+            "it is easy for people to help these animals"
+          ],
+          "correctAnswer": "people are interested in these animals"
+        },
+        {
+          "questionId": "q23",
+          "passageId": "p3_p4",
+          "type": "multiple-choice",
+          "question": "What is one way that the bats in 'Night Flyers' and the honeybees in 'A Sweet Part of Nature' are different?",
+          "options": [
+            "Bats eat insects, while bees do not.",
+            "Bats spread pollen, while bees do not.",
+            "Bats catch diseases, while bees do not.",
+            "Bats need new houses, while bees do not."
+          ],
+          "correctAnswer": "Bats eat insects, while bees do not."
+        },
+        {
+          "questionId": "q24",
+          "passageId": "p3_p4",
+          "type": "multiple-choice",
+          "question": "Read this sentence from paragraph 2 of 'Night Flyers.'\n\nBats also spread pollen among flowering plants.\n\nWhich sentence from 'A Sweet Part of Nature' best shows a way that honeybees are similar to bats?",
+          "options": [
+            "When people think of bees, they may also think of the sweet taste of the honey that bees make.",
+            "The wildflowers and plants that bees feed on have been replaced with crops, which limits honeybees' access to nectar and pollen.",
+            "Bees pollinate a wide variety of plants in the United States.",
+            "People can grow flowers and plants that honeybees like, such as cabbage, sunflowers, and strawberries."
+          ],
+          "correctAnswer": "Bees pollinate a wide variety of plants in the United States."
+        },
+        {
+          "questionId": "q25",
+          "passageId": "p5",
+          "type": "multiple-choice",
+          "question": "In line 19, the word musses means —",
+          "options": [
+            "gets wet",
+            "makes clean",
+            "removes from a location",
+            "rearranges in an untidy way"
+          ],
+          "correctAnswer": "rearranges in an untidy way"
+        },
+        {
+          "questionId": "q26",
+          "passageId": "p5",
+          "type": "multiple-choice",
+          "question": "Read lines 5 through 9 of the poem.\n\nAir smells like roses sometimes, or fresh-cut grass; gasoline or rain or skunk.\n\nWhy does the poet include descriptive language in these lines?",
+          "options": [
+            "To persuade the reader to spend more time outdoors",
+            "To tell the reader that air can smell like many things after it rains",
+            "To explain how the smell of roses is different from the smell of skunk",
+            "To emphasize that air can be both pleasant and unpleasant"
+          ],
+          "correctAnswer": "To emphasize that air can be both pleasant and unpleasant"
+        },
+        {
+          "questionId": "q27",
+          "passageId": "p5",
+          "type": "multiple-choice",
+          "question": "Line 38 is different from the other lines of the poem most likely because the poet wants to —",
+          "options": [
+            "show that this line should be read quickly",
+            "add humor to the poem by spelling the word incorrectly",
+            "emphasize the idea expressed in the line",
+            "suggest that this is the most important word in the poem"
+          ],
+          "correctAnswer": "emphasize the idea expressed in the line"
+        },
+        {
+          "questionId": "q28",
+          "passageId": "p5",
+          "type": "multiple-choice",
+          "question": "Which line from the poem best shows that air can be powerful?",
+          "options": [
+            "The sky is made of air.",
+            "It tears leaves off trees",
+            "It has no color or shape",
+            "or blow a soap bubble."
+          ],
+          "correctAnswer": "It tears leaves off trees"
+        },
+        {
+          "questionId": "q29",
+          "passageId": "p5",
+          "type": "multiple-choice",
+          "question": "The speaker in the poem believes that the difference between wind and air is that wind is —",
+          "options": [
+            "colder",
+            "thinner",
+            "smelly",
+            "moving"
+          ],
+          "correctAnswer": "moving"
+        },
+        {
+          "questionId": "q30",
+          "passageId": "p5",
+          "type": "multiple-choice",
+          "question": "What can the reader conclude about the speaker's ideas about air throughout the poem?",
+          "options": [
+            "The speaker has changed his mind about air.",
+            "The speaker wishes that air could be seen.",
+            "The speaker thinks that air has qualities that make it special.",
+            "The speaker is confused by his thoughts about air."
+          ],
+          "correctAnswer": "The speaker thinks that air has qualities that make it special."
+        },
+        {
+          "questionId": "q31",
+          "passageId": "p6",
+          "type": "multiple-choice",
+          "question": "Read this dictionary entry for the word drive.\n\ndrive \\drix\\ verb\n1. to take to another place by car\n2. to guide the movement of\n3. to force to go through\n4. to throw hard or fast\n\nWhich definition most closely fits the way the word drives is used in paragraph 1?",
+          "options": [
+            "Definition 1",
+            "Definition 2",
+            "Definition 3",
+            "Definition 4"
+          ],
+          "correctAnswer": "Definition 3"
+        },
+        {
+          "questionId": "q32",
+          "passageId": "p6",
+          "type": "multiple-choice",
+          "question": "Read this sentence from paragraph 4.\n\nWith these ideas in mind, Bol and Brooks came up with a plan to build more than 2,500 Little Free Libraries around the world.\n\nBased on information in the selection, how do Brooks and Bol most likely feel about the results of their plan?",
+          "options": [
+            "Disappointed",
+            "Curious",
+            "Delighted",
+            "Confused"
+          ],
+          "correctAnswer": "Delighted"
+        },
+        {
+          "questionId": "q33",
+          "passageId": "p6",
+          "type": "multiple-choice",
+          "imagePlaceholder": "family_at_little_library.png",
+          "question": "The photograph and caption above paragraph 8 are included in the selection to show —",
+          "options": [
+            "why some of the libraries become more popular than others",
+            "how library owners must refill their libraries every day",
+            "what steps people use to check books out of the libraries",
+            "how the libraries help people share and enjoy books"
+          ],
+          "correctAnswer": "how the libraries help people share and enjoy books"
+        },
+        {
+          "questionId": "q34",
+          "passageId": "p6",
+          "type": "multiple-choice",
+          "question": "Read the diagram.\n\nCAUSE\nEFFECT\nBol builds the first Little Free Library.\n\nWhich sentence best completes the diagram?",
+          "options": [
+            "Bol wants to honor his mother.",
+            "Bol thinks his friends do not have enough books.",
+            "Bol wants people to learn to share with others.",
+            "Bol notices that libraries make people want to read."
+          ],
+          "correctAnswer": "Bol wants to honor his mother."
+        },
+        {
+          "questionId": "q35",
+          "passageId": "p6",
+          "type": "multiple-choice",
+          "question": "The author wrote this selection mainly to —",
+          "options": [
+            "provide information about where to find a Little Free Library",
+            "explain why people enjoy reading books outdoors",
+            "persuade the reader to visit a Little Free Library",
+            "tell the reader about an interesting way to share books"
+          ],
+          "correctAnswer": "tell the reader about an interesting way to share books"
+        },
+        {
+          "questionId": "q36",
+          "passageId": "p6",
+          "type": "multiple-choice",
+          "question": "What is the best summary of the selection?",
+          "options": [
+            "A man made a little box and filled it with books for people to borrow. The box was shaped like a red schoolhouse. The man's friends and neighbors loved the little library and soon wanted to have tiny libraries of their own.",
+            "A man built a box in his yard and filled it with books. His neighbors liked the little library, so the man and his friend decided to help get little libraries started everywhere. Today many people enjoy getting books and meeting new friends at the little libraries.",
+            "A man thought of an idea to make a tiny library. Books are placed in a box and then put in a front yard. People do not need library cards and can just take the books for free anytime they want. They can return them whenever they are finished.",
+            "A man and his friend decided to try to get people around the world to build little libraries. They created a website to teach people how. Their goal was to build more libraries than Andrew Carnegie."
+          ],
+          "correctAnswer": "A man built a box in his yard and filled it with books. His neighbors liked the little library, so the man and his friend decided to help get little libraries started everywhere. Today many people enjoy getting books and meeting new friends at the little libraries."
+        }
+      ]
     }
   ]
 }
