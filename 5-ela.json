@@ -1,41 +1,44 @@
 {
   "tests": [
     {
-      "id": "staar_reading_3_2022",
+      "id": "staar_reading_5_2021",
       "subject": "Reading",
-      "grade": "3",
-      "year": "2022",
+      "grade": "5",
+      "year": "2021",
       "defaultQuestionType": "multiple-choice",
       "passages": [
         {
           "passageId": "p1",
-          "title": "The Unwelcome Neighbor",
-          "subtitle": "A tale from the Panchatantra¹",
-          "author": "Retold by Santhini Govindan",
-          "content": "[PASSAGE TEXT TO BE UPLOADED: The Unwelcome Neighbor, paragraphs 1-13]"
+          "title": "Lace Round the Sky",
+          "author": "by Cecilia Aragon",
+          "content": "[PASSAGE TEXT TO BE UPLOADED: Lace Round the Sky, paragraphs 1-32]"
         },
         {
           "passageId": "p2",
-          "title": "Mission Blue",
-          "content": "[PASSAGE TEXT TO BE UPLOADED: Mission Blue, paragraphs 1-12]"
+          "title": "The Hammock's Swaying History",
+          "content": "[PASSAGE TEXT TO BE UPLOADED: The Hammock's Swaying History, paragraphs 1-7]"
         },
         {
           "passageId": "p3",
-          "title": "Cheese for Dinner",
-          "subtitle": "A Tale from Mexico",
-          "author": "by Judy Goldman",
-          "content": "[PASSAGE TEXT TO BE UPLOADED: Cheese for Dinner, paragraphs 1-18]"
+          "title": "Peace and Quiet",
+          "content": "[PASSAGE TEXT TO BE UPLOADED: Peace and Quiet, paragraphs 1-29]"
         },
         {
           "passageId": "p4",
-          "title": "Book Clubs Are for Everyone!",
-          "content": "[PASSAGE TEXT TO BE UPLOADED: Book Clubs Are for Everyone!, paragraphs 1-7]"
+          "title": "Maple Street",
+          "author": "by Tracie Vaughn Zimmer",
+          "content": "[PASSAGE TEXT TO BE UPLOADED: Maple Street poem, lines 1-36]"
         },
         {
           "passageId": "p5",
-          "title": "The Rescue",
-          "author": "by Laura Sassi",
-          "content": "[PASSAGE TEXT TO BE UPLOADED: The Rescue, lines 1-16]"
+          "title": "The Platypus",
+          "content": "[PASSAGE TEXT TO BE UPLOADED: The Platypus, paragraphs 1-10]"
+        },
+        {
+          "passageId": "p6",
+          "title": "These Pumpkins Sure Can Kick!",
+          "author": "by Patricia Cuff",
+          "content": "[PASSAGE TEXT TO BE UPLOADED: These Pumpkins Sure Can Kick!, paragraphs 1-17]"
         }
       ],
       "questions": [
@@ -43,446 +46,495 @@
           "questionId": "q1",
           "passageId": "p1",
           "type": "multiple-choice",
-          "question": "What does the word snatched mean in paragraph 11?",
+          "question": "In paragraph 4, why does the author use the figurative phrase 'the eyes that peered out into the universe' to describe the telescopes?",
           "options": [
-            "Hid",
-            "Tossed",
-            "Broke",
-            "Grabbed"
+            "To suggest that telescopes are used to locate and watch over distant objects in space",
+            "To indicate that telescopes are used for watching certain people",
+            "To show that telescopes are delicate objects that need a lot of care and attention",
+            "To explain that telescopes should be used only by professional scientists"
           ],
-          "correctAnswer": "Grabbed"
+          "correctAnswer": "To suggest that telescopes are used to locate and watch over distant objects in space"
         },
         {
           "questionId": "q2",
           "passageId": "p1",
           "type": "multiple-choice",
-          "question": "Why is the fox's plan important to the resolution of the story?",
+          "question": "Which sentence from the story best describes Catalina's main conflict?",
           "options": [
-            "The plan helps the crows learn how much they like their home.",
-            "The plan causes the snake to move away from the tree.",
-            "The plan gives the snake a chance to find an important necklace.",
-            "The plan proves to the crows that they like attention."
+            "While the visitors were there, Papá could not allow her to help. (paragraph 2)",
+            "No one believed she would be a scientist one day. (paragraph 7)",
+            "Catalina balanced on the balls of her feet. (paragraph 16)",
+            "Catalina's eyes lifted to the clock drive lit by a blinking yellow light. (paragraph 18)"
           ],
-          "correctAnswer": "The plan causes the snake to move away from the tree."
+          "correctAnswer": "No one believed she would be a scientist one day. (paragraph 7)"
         },
         {
           "questionId": "q3",
           "passageId": "p1",
           "type": "multiple-choice",
-          "question": "What can the reader infer about the crows based on their actions after Father Crow talks to the fox?",
+          "question": "The author includes the imagery in paragraph 1 most likely to highlight Catalina's —",
           "options": [
-            "They worry that the snake will harm the servants.",
-            "They often visit the royal ladies and servants at the river.",
-            "They want to give the necklace to the fox.",
-            "They trust the fox and the plan he shares."
+            "loneliness in her mountain home",
+            "desire to spend time outside",
+            "appreciation of the nighttime",
+            "questions about the night sky"
           ],
-          "correctAnswer": "They trust the fox and the plan he shares."
+          "correctAnswer": "appreciation of the nighttime"
         },
         {
           "questionId": "q4",
           "passageId": "p1",
           "type": "multiple-choice",
-          "question": "What key idea about Mother Crow do the details in paragraphs 7 and 8 best support?",
+          "question": "The story's third-person point of view helps the reader —",
           "options": [
-            "Mother Crow is worried about the snake that is living in the tree.",
-            "Mother Crow is afraid that she will not find enough food for her babies.",
-            "Mother Crow is sad because the nest is getting too crowded.",
-            "Mother Crow is upset because no one is listening to her."
+            "identify what the astronomer in the dome feels",
+            "appreciate why the tourists enjoy visiting the observatory",
+            "understand why Catalina wants to spend time at the observatory",
+            "relate to the relationship between Catalina and her father"
           ],
-          "correctAnswer": "Mother Crow is worried about the snake that is living in the tree."
+          "correctAnswer": "understand why Catalina wants to spend time at the observatory"
         },
         {
           "questionId": "q5",
           "passageId": "p1",
           "type": "multiple-choice",
-          "question": "How is the setting of the river important to the plot of the story?",
+          "question": "How does Catalina's observation of the telescope in paragraph 8 advance the plot of the story?",
           "options": [
-            "The river is where Mother Crow wants to build a nest.",
-            "The river is where Father Crow meets with the fox.",
-            "The river is where Mother Crow picks up the necklace.",
-            "The river is where Father Crow wants the snake to live."
+            "It allows Catalina to express her feelings about scientific discovery.",
+            "It leads Catalina to identify a problem that she will resolve.",
+            "It hints that Catalina's actions will cause the main conflict.",
+            "It suggests that Catalina is unfamiliar with the observatory."
           ],
-          "correctAnswer": "The river is where Mother Crow picks up the necklace."
+          "correctAnswer": "It leads Catalina to identify a problem that she will resolve."
         },
         {
           "questionId": "q6",
           "passageId": "p1",
           "type": "multiple-choice",
-          "imagePlaceholder": "unwelcome_neighbor_illustration.png",
-          "question": "Look at this illustration. What is the most likely reason the author includes this illustration in the story?",
+          "question": "What is the most likely reason the author includes figurative language in these sentences from paragraph 6?",
           "options": [
-            "To show an important part of the fox's plan",
-            "To show how the crows build their nest in the banyan tree",
-            "To show why the snake moves into the banyan tree",
-            "To show that the crows need the fox's help in order to stay safe"
+            "To show that Catalina needs to use the telescope to see the sky clearly",
+            "To emphasize that Catalina knows the best time to study the stars",
+            "To emphasize that Catalina pays careful attention to the details of the stars",
+            "To show that Catalina does not understand what she sees in the night sky"
           ],
-          "correctAnswer": "To show an important part of the fox's plan"
+          "correctAnswer": "To emphasize that Catalina pays careful attention to the details of the stars"
         },
         {
           "questionId": "q7",
-          "passageId": "p2",
+          "passageId": "p1",
           "type": "multiple-choice",
-          "question": "Which key idea do the details in paragraphs 11 and 12 support about the goals of Mission Blue?",
+          "question": "Why is Catalina's experience with the injured scientist important to the plot?",
           "options": [
-            "Young people can do their part to help oceans.",
-            "Storms may cause some problems for oceans.",
-            "Schools should teach young people about oceans.",
-            "Taking care of oceans requires several talents."
+            "The experience helps explain why Catalina is only allowed to help her father at certain times.",
+            "The experience shows that Catalina thinks she knows more about telescopes than the scientists.",
+            "The experience tells details about how Catalina's father taught her about telescopes.",
+            "The experience reveals a trait of Catalina's that will help her become a successful scientist."
           ],
-          "correctAnswer": "Young people can do their part to help oceans."
+          "correctAnswer": "The experience reveals a trait of Catalina's that will help her become a successful scientist."
         },
         {
           "questionId": "q8",
           "passageId": "p2",
           "type": "multiple-choice",
-          "question": "In paragraph 6, the prefix un- helps the reader understand that unharmed means —",
+          "question": "Which sentence best supports the idea that hammocks have been used to help solve a problem?",
           "options": [
-            "harmed again",
-            "able to harm",
-            "full of harm",
-            "not harmed"
+            "The Taino made the hammocks by weaving together cotton, plant fibers, and tree bark. (paragraph 2)",
+            "Columbus admired how the hanging beds kept sleepers safe from the soggy ground and pesky forest animals. (paragraph 3)",
+            "Gonzalo Fernández de Oviedo y Valdés was another explorer who was fascinated by hammocks. (paragraph 4)",
+            "Today hammocks are not just for relaxing. (paragraph 7)"
           ],
-          "correctAnswer": "not harmed"
+          "correctAnswer": "Columbus admired how the hanging beds kept sleepers safe from the soggy ground and pesky forest animals. (paragraph 3)"
         },
         {
           "questionId": "q9",
           "passageId": "p2",
           "type": "multiple-choice",
-          "question": "What can the reader conclude about Mission Blue from information throughout the selection?",
+          "question": "Which sentence from the selection shows that Joshua John Ward was successful in choosing the design he used to create hammocks?",
           "options": [
-            "Mission Blue wants more people to travel to oceans.",
-            "Mission Blue plans to stop people from fishing in oceans.",
-            "Mission Blue wants all its volunteers to be scientists.",
-            "Mission Blue values teaching people about oceans."
+            "Hammocks were soon exposed to the rest of the world. (paragraph 6)",
+            "He was interested in creating cool beds for his riverboat. (paragraph 6)",
+            "He created hammocks out of cotton rope. (paragraph 6)",
+            "His company still makes hammocks using the same materials. (paragraph 6)"
           ],
-          "correctAnswer": "Mission Blue values teaching people about oceans."
+          "correctAnswer": "His company still makes hammocks using the same materials. (paragraph 6)"
         },
         {
           "questionId": "q10",
           "passageId": "p2",
           "type": "multiple-choice",
-          "question": "In paragraphs 5 and 6, which key idea do the details support about why Mission Blue divides the ocean into small areas called \"hope spots\"?",
+          "question": "Which definition best matches the way the word spotted is used in paragraph 3?",
           "options": [
-            "These areas are easier to reach by boat.",
-            "These areas have the deepest waters.",
-            "These areas are easier to care for.",
-            "These areas have very few visitors."
+            "Definition 1: to locate something correctly",
+            "Definition 2: to mark with a stain that discolors clothing",
+            "Definition 3: to place something in a certain position",
+            "Definition 4: to notice or identify with the eye"
           ],
-          "correctAnswer": "These areas are easier to care for."
+          "correctAnswer": "Definition 4: to notice or identify with the eye"
         },
         {
           "questionId": "q11",
           "passageId": "p2",
           "type": "multiple-choice",
-          "question": "What is the most likely reason the author wrote this selection?",
+          "question": "What is the most likely reason the author includes the information in paragraph 7?",
           "options": [
-            "To inform the reader about the work of Mission Blue members",
-            "To persuade the reader to visit oceans",
-            "To teach the reader about plant life in oceans",
-            "To tell the reader where Mission Blue members meet"
+            "To show the reader how to find creative ways to spend time",
+            "To provide the reader with a reason that hammocks need to be strong",
+            "To inform the reader of a different way that hammocks are used",
+            "To tell the reader about the equipment needed for one sport"
           ],
-          "correctAnswer": "To inform the reader about the work of Mission Blue members"
+          "correctAnswer": "To inform the reader of a different way that hammocks are used"
         },
         {
           "questionId": "q12",
           "passageId": "p2",
           "type": "multiple-choice",
-          "question": "Based on the information in paragraph 9, what can the reader infer about why members of Mission Blue enjoy working with scientists?",
+          "question": "Based on information from paragraph 7, the reader can conclude that Andy Lewis —",
           "options": [
-            "Scientists care more about protecting oceans than other people do.",
-            "Scientists take the best pictures of animals and plants.",
-            "Scientists know how to use boats and machines.",
-            "Scientists have knowledge about which ocean plants or animals need help."
+            "likes going on adventures",
+            "does not speak to other athletes on the journey",
+            "has not experienced any challenges on his journeys",
+            "has only been on one adventure"
           ],
-          "correctAnswer": "Scientists have knowledge about which ocean plants or animals need help."
+          "correctAnswer": "likes going on adventures"
         },
         {
           "questionId": "q13",
           "passageId": "p2",
           "type": "multiple-choice",
-          "question": "How does the author organize the selection?",
+          "question": "Which sentence suggests that hammocks were helpful to explorers who traveled by sea?",
           "options": [
-            "By explaining problems happening in oceans and the work Mission Blue does to solve the problems",
-            "By describing in chronological order the actions that Mission Blue has taken to help oceans",
-            "By providing the causes of problems in the ocean and effects of the different ways Mission Blue helped with the problems",
-            "By describing mysteries of the oceans and how Mission Blue plans to learn more about oceans"
+            "People have been using hammocks for many years. (paragraph 2)",
+            "They were small enough when folded that they could fit in small spaces on ships. (paragraph 3)",
+            "He drew a picture of the knitted cotton rugs that natives hung between trees using twine strings. (paragraph 4)",
+            "In 1889 a South Carolina riverboat captain named Joshua John Ward crafted a different type of hammock. (paragraph 6)"
           ],
-          "correctAnswer": "By explaining problems happening in oceans and the work Mission Blue does to solve the problems"
+          "correctAnswer": "They were small enough when folded that they could fit in small spaces on ships. (paragraph 3)"
         },
         {
           "questionId": "q14",
-          "passageId": "p2",
+          "passageId": "p3",
           "type": "multiple-choice",
-          "question": "Based on the section \"Beyond the Ocean,\" what can the reader infer about Mission Blue members?",
+          "question": "In the story 'Peace and Quiet,' when does the resolution of Desha's conflict begin?",
           "options": [
-            "They are more interested in events for students than events for scientists.",
-            "They want more people to help with the team's goals.",
-            "They plan to start identifying hope spots on land.",
-            "They are famous because of the organization's successes."
+            "When Eliza looks at Desha's journal",
+            "When James finds Desha sitting on a rock",
+            "When James talks to Desha about how family members support one another",
+            "When Desha learns that James used to play the guitar"
           ],
-          "correctAnswer": "They want more people to help with the team's goals."
+          "correctAnswer": "When James talks to Desha about how family members support one another"
         },
         {
           "questionId": "q15",
-          "passageId": "p2",
+          "passageId": "p3",
           "type": "multiple-choice",
-          "question": "What is the central idea of the selection?",
+          "question": "Based on paragraph 8, what can the reader infer about Desha?",
           "options": [
-            "Oceans are in trouble because sea life is disappearing.",
-            "Sylvia Earle is a scientist who loves studying all ocean life.",
-            "The group Mission Blue works in different ways to care for oceans.",
-            "The group Mission Blue wants to save the plants in the oceans."
+            "She is annoyed that James found her.",
+            "She is ashamed to admit that she is glad James found her.",
+            "She is impressed that James knew where to find her.",
+            "She is surprised that anyone was interested in finding her."
           ],
-          "correctAnswer": "The group Mission Blue works in different ways to care for oceans."
+          "correctAnswer": "She is annoyed that James found her."
         },
         {
           "questionId": "q16",
           "passageId": "p3",
           "type": "multiple-choice",
-          "question": "How can Conejo's relationship with Coyote best be described in paragraphs 6 through 11?",
+          "question": "Which words from paragraph 12 help the reader understand what prying means?",
           "options": [
-            "Conejo pretends to want to help Coyote.",
-            "Conejo is unsure if he should trust Coyote.",
-            "Conejo is worried that Coyote is unhealthy.",
-            "Conejo enjoys spending time with Coyote."
+            "looking through my journal",
+            "watching the game",
+            "went to my room",
+            "to be alone for a change"
           ],
-          "correctAnswer": "Conejo pretends to want to help Coyote."
+          "correctAnswer": "looking through my journal"
         },
         {
           "questionId": "q17",
           "passageId": "p3",
           "type": "multiple-choice",
-          "question": "What is the meaning of the word sly in paragraph 16?",
+          "question": "What does the author's use of simile in paragraph 17 suggest about how Desha feels about her big family?",
           "options": [
-            "Small",
-            "Quick",
-            "Clever",
-            "Friendly"
+            "Desha thinks no one wants to hear her practice the guitar.",
+            "Desha thinks that there are too many people sharing a space.",
+            "Desha feels a close bond with her sisters because they share a room.",
+            "Desha is uncomfortable with others knowing about her personal life."
           ],
-          "correctAnswer": "Clever"
+          "correctAnswer": "Desha thinks that there are too many people sharing a space."
         },
         {
           "questionId": "q18",
           "passageId": "p3",
           "type": "multiple-choice",
-          "question": "What key idea about Coyote is supported by the details in paragraphs 10 through 12?",
+          "question": "In the story 'Peace and Quiet,' why is it important to the plot that James knows about the clearing in the forest?",
           "options": [
-            "Coyote believes that he will enjoy eating a giant wheel of cheese.",
-            "Coyote is tired of chasing Conejo.",
-            "Coyote howls at the moon when he is hungry.",
-            "Coyote likes to sneak up on Conejo."
+            "His knowledge reminds him of a place he can go when he needs help from a family member.",
+            "His knowledge helps him recognize how quickly his sister is growing up.",
+            "His knowledge makes it possible for him to find Desha and talk to her.",
+            "His knowledge leads him to a place that reminds him of Daniel."
           ],
-          "correctAnswer": "Coyote believes that he will enjoy eating a giant wheel of cheese."
+          "correctAnswer": "His knowledge makes it possible for him to find Desha and talk to her."
         },
         {
           "questionId": "q19",
           "passageId": "p3",
           "type": "multiple-choice",
-          "imagePlaceholder": "cheese_for_dinner_illustration.png",
-          "question": "Look at this illustration. What is the most likely reason the author includes this illustration in the story?",
+          "question": "What is the best summary of the story 'Peace and Quiet'?",
           "options": [
-            "To help the reader understand that Conejo is worried about Coyote",
-            "To show that Coyote has chased Conejo many times",
-            "To help the reader understand why Coyote believes there is cheese in the lake",
-            "To show that Conejo is just as hungry as Coyote"
+            "Desha is a member of a large family. There is nowhere for her to be alone in the house, so she goes to her hiding place in the woods. While there she plays her guitar and her brother tells her that he used to play the guitar before he began learning to play the drums.",
+            "Desha is upset because her family decides to watch a basketball game instead of the movie she wants to watch. She leaves the house and goes to an area in the woods. Her brother explains that he used to visit the same spot.",
+            "Desha goes to a secret spot in the woods. Her brother finds her there and helps her learn to play chords on her guitar. They discuss some of the memories and experiences they share with their brothers and sisters.",
+            "Desha, a member of a large family, leaves the house when she cannot find anywhere to have time to herself. She goes to a quiet place in the woods to play her guitar. While there she has a conversation with her brother that changes her attitude toward her family."
           ],
-          "correctAnswer": "To help the reader understand why Coyote believes there is cheese in the lake"
+          "correctAnswer": "Desha, a member of a large family, leaves the house when she cannot find anywhere to have time to herself. She goes to a quiet place in the woods to play her guitar. While there she has a conversation with her brother that changes her attitude toward her family."
         },
         {
           "questionId": "q20",
-          "passageId": "p3",
+          "passageId": "p4",
           "type": "multiple-choice",
-          "question": "Based on the events at the end of the story, what can the reader predict about Coyote?",
+          "question": "What is the most likely reason the poet refers to the tree as a 'tower' in lines 18 and 29 of the poem 'Maple Street'?",
           "options": [
-            "Coyote will not trust Conejo again.",
-            "Coyote will no longer try to swim in the lake.",
-            "Coyote will find a way to get the cheese.",
-            "Coyote will discover Conejo in his burrow."
+            "To suggest the age of the tree that the speaker climbs",
+            "To highlight what objects the speaker enjoys sketching",
+            "To reveal the location of the tree in the speaker's neighborhood",
+            "To emphasize the height from which the speaker observes the neighborhood"
           ],
-          "correctAnswer": "Coyote will not trust Conejo again."
+          "correctAnswer": "To emphasize the height from which the speaker observes the neighborhood"
         },
         {
           "questionId": "q21",
-          "passageId": "p3",
+          "passageId": "p4",
           "type": "multiple-choice",
-          "question": "In paragraph 1, the word cloudless includes the suffix -less. The suffix helps the reader understand that cloudless means —",
+          "question": "Based on stanza 1 (lines 1-13), the speaker most likely feels —",
           "options": [
-            "close",
-            "clear",
-            "dark",
-            "scary"
+            "uncertain about taking the chocolate Jamie Hamlin shares",
+            "surprised to learn the street is named for Jamie Hamlin's tree",
+            "thankful to have Jamie Hamlin as a neighbor",
+            "jealous of the store Jamie Hamlin's family owns"
           ],
-          "correctAnswer": "clear"
+          "correctAnswer": "thankful to have Jamie Hamlin as a neighbor"
         },
         {
           "questionId": "q22",
-          "passageId": "p3",
+          "passageId": "p4",
           "type": "multiple-choice",
-          "question": "Which sentence best describes Coyote's relationship with Conejo by the end of the story?",
+          "question": "Which lines from the poem 'Maple Street' support the idea that the speaker does not wish to be seen looking at others?",
           "options": [
-            "Coyote is eager to find Conejo so they can become better friends.",
-            "Coyote is grateful to Conejo for showing where to find cheese.",
-            "Coyote is angry with Conejo because he has a comfortable place to live.",
-            "Coyote is upset with Conejo for saying something that was untrue."
+            "like I said, there's his tree. (lines 12-13)",
+            "With my sketchbook and colored pencils, (lines 14-15)",
+            "I can see the whole neighborhood. (lines 30-31)",
+            "hidden by these green and paper leaves, (lines 33-34)"
           ],
-          "correctAnswer": "Coyote is upset with Conejo for saying something that was untrue."
+          "correctAnswer": "hidden by these green and paper leaves, (lines 33-34)"
         },
         {
           "questionId": "q23",
           "passageId": "p4",
           "type": "multiple-choice",
-          "question": "In paragraph 4, the prefix un- in the word unknown helps the reader understand that the meaning of unknown is –",
+          "question": "These lines suggest that the speaker thinks —",
           "options": [
-            "known again",
-            "known by many",
-            "not known",
-            "wrongly known"
+            "the maple tree is the most noticeable object on the street",
+            "streets should be named after features found near them",
+            "the street originally had a different name",
+            "people disagree about the meaning of the street's name"
           ],
-          "correctAnswer": "not known"
+          "correctAnswer": "the maple tree is the most noticeable object on the street"
         },
         {
           "questionId": "q24",
-          "passageId": "p4",
+          "passageId": "p3",
           "type": "multiple-choice",
-          "question": "Which audience is the author addressing in this selection?",
+          "question": "How are Desha in the story 'Peace and Quiet' and the speaker in the poem 'Maple Street' alike?",
           "options": [
-            "Students",
-            "Parents",
-            "Teachers",
-            "Librarians"
+            "Desha and the speaker both find a place to work on something they enjoy.",
+            "Desha and the speaker both are bothered by other people.",
+            "Desha and the speaker both spend time secretly observing others.",
+            "Desha and the speaker both take advice from someone."
           ],
-          "correctAnswer": "Students"
+          "correctAnswer": "Desha and the speaker both find a place to work on something they enjoy."
         },
         {
           "questionId": "q25",
-          "passageId": "p4",
+          "passageId": "p3",
           "type": "multiple-choice",
-          "question": "Based on the information in paragraphs 1 through 4, what can the reader conclude about students who join a book club?",
+          "question": "Which topic is addressed by the author of the story 'Peace and Quiet' that is not addressed by the speaker of the poem 'Maple Street'?",
           "options": [
-            "The students want to start a new book club.",
-            "The students belong to several book clubs.",
-            "The students develop good reading habits.",
-            "The students read more than their parents."
+            "The importance of having somewhere to be alone",
+            "The impact that sharing something can have on another person",
+            "The desire to practice a hobby",
+            "The frustration of living with many people"
           ],
-          "correctAnswer": "The students develop good reading habits."
+          "correctAnswer": "The frustration of living with many people"
         },
         {
           "questionId": "q26",
-          "passageId": "p4",
+          "passageId": "p3",
           "type": "multiple-choice",
-          "imagePlaceholder": "book_club_photographs.png",
-          "question": "Look at these photographs. What is the most likely reason the author includes these photographs in the selection?",
+          "question": "In the story 'Peace and Quiet,' what does Desha value in a similar way as the speaker values the tree in the poem 'Maple Street'?",
           "options": [
-            "To show that book-club members have good reading skills",
-            "To show that book clubs can meet at different places",
-            "To show that book clubs help members choose popular books",
-            "To show that book clubs are mainly for adults"
+            "A song",
+            "A movie",
+            "A rock",
+            "A guitar"
           ],
-          "correctAnswer": "To show that book clubs can meet at different places"
+          "correctAnswer": "A rock"
         },
         {
           "questionId": "q27",
-          "passageId": "p4",
+          "passageId": "p3",
           "type": "multiple-choice",
-          "question": "What sentence supports the idea that joining a book club could help someone make friends?",
+          "question": "Which statement describes a difference between the story 'Peace and Quiet' and the poem 'Maple Street'?",
           "options": [
-            "Today more young people are forming their own book clubs. (paragraph 1)",
-            "In many book clubs, each member takes a turn selecting the book for the group to read. (paragraph 4)",
-            "In many ways, book clubs allow their members to think about new ideas. (paragraph 4)",
-            "By spending time with them at book-club meetings, you will get to know all the members better. (paragraph 6)"
+            "In the story, Desha shares thoughts about people who live in her house. In the poem, the speaker expresses thoughts about people who live in the neighborhood.",
+            "In the story, Desha has found a secret location that her brother told her about. In the poem, the speaker is worried about not having a place to spend time alone.",
+            "In the story, Desha visits a place for the first time. In the poem, the speaker goes to a place that is very familiar.",
+            "In the story, Desha is concerned about an event that is planned for the future. In the poem, the speaker is concerned about an event that happened in the past."
           ],
-          "correctAnswer": "By spending time with them at book-club meetings, you will get to know all the members better. (paragraph 6)"
+          "correctAnswer": "In the story, Desha shares thoughts about people who live in her house. In the poem, the speaker expresses thoughts about people who live in the neighborhood."
         },
         {
           "questionId": "q28",
-          "passageId": "p4",
+          "passageId": "p5",
           "type": "multiple-choice",
-          "question": "What opinion does the author include to explain why some students avoid book clubs?",
+          "question": "The author uses a compare-and-contrast organizational pattern in the selection to help the reader understand the —",
           "options": [
-            "Members read the same book. (paragraph 1)",
-            "It also helps you understand their meanings. (paragraph 2)",
-            "After all the reading you do in school, you may think you don't want to join a book club. (paragraph 4)",
-            "Being in a book club allows members to share their thoughts and consider the views of others. (paragraph 5)"
+            "ways in which scientists learn about the platypus",
+            "ways in which the platypus takes care of its young compared to other animals",
+            "ways in which the male and female platypuses defend themselves",
+            "ways in which the platypus is different from other mammals"
           ],
-          "correctAnswer": "After all the reading you do in school, you may think you don't want to join a book club. (paragraph 4)"
+          "correctAnswer": "ways in which the platypus is different from other mammals"
         },
         {
           "questionId": "q29",
-          "passageId": "p4",
+          "passageId": "p5",
           "type": "multiple-choice",
-          "question": "Which sentence best explains why members of a book club are likely to read a whole book?",
+          "question": "In which section would the reader find information about the size of a baby platypus?",
           "options": [
-            "Reading helps you learn to say new words. (paragraph 2)",
-            "The desire to be prepared will encourage you to finish reading what you started. (paragraph 3)",
-            "You might already know some members in your book club. (paragraph 6)",
-            "All you need are some other members and a place to meet. (paragraph 7)"
+            "The introductory paragraph",
+            "The Female Platypus",
+            "The Male Platypus",
+            "A Special Way to Find Food"
           ],
-          "correctAnswer": "The desire to be prepared will encourage you to finish reading what you started. (paragraph 3)"
+          "correctAnswer": "The Female Platypus"
         },
         {
           "questionId": "q30",
           "passageId": "p5",
           "type": "multiple-choice",
-          "question": "What is the most likely reason the poet includes lines 9 through 14?",
+          "question": "What is the most likely reason the author wrote this selection?",
           "options": [
-            "To show that the mother squirrel looks like her babies",
-            "To describe why the mother squirrel often changes her mind",
-            "To show that the mother squirrel likes to run",
-            "To emphasize that the mother squirrel values all of her babies"
+            "To inform the reader about an animal that has fascinated people since it was discovered",
+            "To explain to the reader how to tell mammals from other groups of animals",
+            "To encourage the reader to appreciate animals that are unfamiliar",
+            "To tell the reader how scientists observe and study a wild animal"
           ],
-          "correctAnswer": "To emphasize that the mother squirrel values all of her babies"
+          "correctAnswer": "To inform the reader about an animal that has fascinated people since it was discovered"
         },
         {
           "questionId": "q31",
           "passageId": "p5",
           "type": "multiple-choice",
-          "question": "Read lines 6 and 7. What is the most likely reason the poet includes this imagery?",
+          "question": "In paragraph 5, what does the word prefers mean?",
           "options": [
-            "To show that the baby squirrel will grow to look like its mother",
-            "To suggest that the baby squirrel is sick",
-            "To suggest that the baby squirrel is small and helpless",
-            "To show that the baby squirrel likes to play games"
+            "Spends time",
+            "Finds comfort",
+            "Likes one thing more than another",
+            "Tries to find a better way"
           ],
-          "correctAnswer": "To suggest that the baby squirrel is small and helpless"
+          "correctAnswer": "Likes one thing more than another"
         },
         {
           "questionId": "q32",
           "passageId": "p5",
           "type": "multiple-choice",
-          "question": "What is the most likely reason the poet includes lines 15 and 16?",
+          "question": "What is the main reason the author introduces the selection with the information in paragraph 1?",
           "options": [
-            "To show that the baby squirrels are safe at last",
-            "To show that the baby squirrels need a larger home",
-            "To show that the baby squirrels are tired of climbing",
-            "To show that the baby squirrels like one another"
+            "To show that the platypus is related to the otter and the beaver",
+            "To explain that the platypus is a recent scientific discovery",
+            "To emphasize that the platypus has an unusual appearance",
+            "To suggest that the platypus can survive only in Australia"
           ],
-          "correctAnswer": "To show that the baby squirrels are safe at last"
+          "correctAnswer": "To emphasize that the platypus has an unusual appearance"
         },
         {
           "questionId": "q33",
-          "passageId": "p5",
+          "passageId": "p6",
           "type": "multiple-choice",
-          "question": "How does the windy setting contribute to the poem?",
+          "question": "From the information presented in paragraph 3, what can the reader conclude about the Nordkamp girls?",
           "options": [
-            "The windy setting causes the mother squirrel to become afraid of storms.",
-            "The windy setting makes a squirrel family leave the woods.",
-            "The windy setting adds a feeling of mystery to the plot.",
-            "The windy setting causes a problem the mother squirrel must solve."
+            "They found soccer difficult to learn when they started playing.",
+            "They lacked the equipment they needed to become successful soccer players.",
+            "They asked their coach if they could include boys on their team.",
+            "They were eager to play soccer no matter what the conditions were."
           ],
-          "correctAnswer": "The windy setting causes a problem the mother squirrel must solve."
+          "correctAnswer": "They were eager to play soccer no matter what the conditions were."
         },
         {
           "questionId": "q34",
-          "passageId": "p5",
+          "passageId": "p6",
           "type": "multiple-choice",
-          "question": "Which line from the poem best shows that the mother squirrel is kind?",
+          "question": "Which definition best matches the way arranged is used in paragraph 3?",
           "options": [
-            "A gust of wind blew down her nest. (line 2)",
-            "With pulsing tail and twitching nose, (line 3)",
-            "A baby squirrel just half her size (line 7)",
-            "She gently tucks her baby in (line 11)"
+            "Definition 1: to put in correct order",
+            "Definition 2: to make plans for something",
+            "Definition 3: to come to an agreement",
+            "Definition 4: to change a musical composition for a performance"
           ],
-          "correctAnswer": "She gently tucks her baby in (line 11)"
+          "correctAnswer": "Definition 2: to make plans for something"
+        },
+        {
+          "questionId": "q35",
+          "passageId": "p6",
+          "type": "multiple-choice",
+          "question": "What is the most likely reason the author wrote this selection?",
+          "options": [
+            "To describe how an American soccer team helped a soccer team in Katutura become successful",
+            "To explain why playing soccer is not common for girls in Katutura",
+            "To inform the reader of the accomplishments of the first girls' soccer team in Katutura",
+            "To tell about the different teams that competed in a girls' soccer tournament in Katutura"
+          ],
+          "correctAnswer": "To inform the reader of the accomplishments of the first girls' soccer team in Katutura"
+        },
+        {
+          "questionId": "q36",
+          "passageId": "p6",
+          "type": "multiple-choice",
+          "question": "Which sentence does the author include to suggest that the girls on the new soccer team most likely appreciated the support they received?",
+          "options": [
+            "When the bright orange uniforms arrived, the Nordkamp girls danced with delight. (paragraph 4)",
+            "With their new name—the Pumpkins—and uniforms, the experienced team was ready to enter tournament play. (paragraph 7)",
+            "On December 1, 2006, the Pumpkins gathered and marched in a big orange line to a field near the Nordkamp Center. (paragraph 9)",
+            "Sitting on the grass and eating peanut-butter sandwiches, the Pumpkins waited impatiently for the team to show up. (paragraph 12)"
+          ],
+          "correctAnswer": "When the bright orange uniforms arrived, the Nordkamp girls danced with delight. (paragraph 4)"
+        },
+        {
+          "questionId": "q37",
+          "passageId": "p6",
+          "type": "multiple-choice",
+          "question": "The author presents events in chronological order in paragraphs 9 through 15 to help the reader understand —",
+          "options": [
+            "the process the Pumpkins repeated during each of their games",
+            "how the Pumpkins viewed themselves before and after playing in the tournament",
+            "that the Pumpkins experienced success and failure while competing in a tournament",
+            "the reasons the other teams did not believe the Pumpkins would win"
+          ],
+          "correctAnswer": "that the Pumpkins experienced success and failure while competing in a tournament"
+        },
+        {
+          "questionId": "q38",
+          "passageId": "p6",
+          "type": "multiple-choice",
+          "question": "Details in paragraphs 2 and 3 support the idea that Mary Beth Gallagher organized a girls' soccer team in Katutura because she —",
+          "options": [
+            "dreamed of having a successful career as a girls' soccer coach",
+            "wanted playing soccer to be a positive experience for girls",
+            "knew the team of girls would perform better than a team of boys",
+            "believed the girls were too young to participate in any other type of sport"
+          ],
+          "correctAnswer": "wanted playing soccer to be a positive experience for girls"
         }
       ]
     }
