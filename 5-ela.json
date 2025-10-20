@@ -137,6 +137,7 @@
           "questionId": "q8",
           "passageId": "p2",
           "type": "multiple-choice",
+          "imagePlaceholder": "hammock_cotton_rope.png",
           "question": "Which sentence best supports the idea that hammocks have been used to help solve a problem?",
           "options": [
             "The Taino made the hammocks by weaving together cotton, plant fibers, and tree bark. (paragraph 2)",
@@ -150,6 +151,7 @@
           "questionId": "q9",
           "passageId": "p2",
           "type": "multiple-choice",
+          "imagePlaceholder": "hammock_cotton_rope.png",
           "question": "Which sentence from the selection shows that Joshua John Ward was successful in choosing the design he used to create hammocks?",
           "options": [
             "Hammocks were soon exposed to the rest of the world. (paragraph 6)",
@@ -163,6 +165,7 @@
           "questionId": "q10",
           "passageId": "p2",
           "type": "multiple-choice",
+          "imagePlaceholder": "hammock_cotton_rope.png",
           "question": "Which definition best matches the way the word spotted is used in paragraph 3?",
           "options": [
             "Definition 1: to locate something correctly",
@@ -176,6 +179,7 @@
           "questionId": "q11",
           "passageId": "p2",
           "type": "multiple-choice",
+          "imagePlaceholder": "extreme_hammocking_italy.png",
           "question": "What is the most likely reason the author includes the information in paragraph 7?",
           "options": [
             "To show the reader how to find creative ways to spend time",
@@ -189,6 +193,7 @@
           "questionId": "q12",
           "passageId": "p2",
           "type": "multiple-choice",
+          "imagePlaceholder": "extreme_hammocking_italy.png",
           "question": "Based on information from paragraph 7, the reader can conclude that Andy Lewis —",
           "options": [
             "likes going on adventures",
@@ -202,6 +207,7 @@
           "questionId": "q13",
           "passageId": "p2",
           "type": "multiple-choice",
+          "imagePlaceholder": "hammock_cotton_rope.png",
           "question": "Which sentence suggests that hammocks were helpful to explorers who traveled by sea?",
           "options": [
             "People have been using hammocks for many years. (paragraph 2)",
@@ -397,6 +403,7 @@
           "questionId": "q28",
           "passageId": "p5",
           "type": "multiple-choice",
+          "imagePlaceholder": "platypus_swimming.png",
           "question": "The author uses a compare-and-contrast organizational pattern in the selection to help the reader understand the —",
           "options": [
             "ways in which scientists learn about the platypus",
@@ -410,6 +417,7 @@
           "questionId": "q29",
           "passageId": "p5",
           "type": "multiple-choice",
+          "imagePlaceholder": "platypus_swimming.png",
           "question": "In which section would the reader find information about the size of a baby platypus?",
           "options": [
             "The introductory paragraph",
@@ -423,6 +431,7 @@
           "questionId": "q30",
           "passageId": "p5",
           "type": "multiple-choice",
+          "imagePlaceholder": "platypus_swimming.png",
           "question": "What is the most likely reason the author wrote this selection?",
           "options": [
             "To inform the reader about an animal that has fascinated people since it was discovered",
@@ -436,6 +445,7 @@
           "questionId": "q31",
           "passageId": "p5",
           "type": "multiple-choice",
+          "imagePlaceholder": "platypus_spur.png",
           "question": "In paragraph 5, what does the word prefers mean?",
           "options": [
             "Spends time",
@@ -449,6 +459,7 @@
           "questionId": "q32",
           "passageId": "p5",
           "type": "multiple-choice",
+          "imagePlaceholder": "platypus_swimming.png",
           "question": "What is the main reason the author introduces the selection with the information in paragraph 1?",
           "options": [
             "To show that the platypus is related to the otter and the beaver",
@@ -462,6 +473,7 @@
           "questionId": "q33",
           "passageId": "p6",
           "type": "multiple-choice",
+          "imagePlaceholder": "pumpkins_victory.png",
           "question": "From the information presented in paragraph 3, what can the reader conclude about the Nordkamp girls?",
           "options": [
             "They found soccer difficult to learn when they started playing.",
@@ -475,6 +487,7 @@
           "questionId": "q34",
           "passageId": "p6",
           "type": "multiple-choice",
+          "imagePlaceholder": "pumpkins_victory.png",
           "question": "Which definition best matches the way arranged is used in paragraph 3?",
           "options": [
             "Definition 1: to put in correct order",
@@ -488,6 +501,7 @@
           "questionId": "q35",
           "passageId": "p6",
           "type": "multiple-choice",
+          "imagePlaceholder": "pumpkins_victory.png",
           "question": "What is the most likely reason the author wrote this selection?",
           "options": [
             "To describe how an American soccer team helped a soccer team in Katutura become successful",
@@ -501,6 +515,7 @@
           "questionId": "q36",
           "passageId": "p6",
           "type": "multiple-choice",
+          "imagePlaceholder": "pumpkin_power.png",
           "question": "Which sentence does the author include to suggest that the girls on the new soccer team most likely appreciated the support they received?",
           "options": [
             "When the bright orange uniforms arrived, the Nordkamp girls danced with delight. (paragraph 4)",
@@ -514,6 +529,7 @@
           "questionId": "q37",
           "passageId": "p6",
           "type": "multiple-choice",
+          "imagePlaceholder": "pumpkin_power.png",
           "question": "The author presents events in chronological order in paragraphs 9 through 15 to help the reader understand —",
           "options": [
             "the process the Pumpkins repeated during each of their games",
@@ -527,6 +543,7 @@
           "questionId": "q38",
           "passageId": "p6",
           "type": "multiple-choice",
+          "imagePlaceholder": "pumpkins_victory.png",
           "question": "Details in paragraphs 2 and 3 support the idea that Mary Beth Gallagher organized a girls' soccer team in Katutura because she —",
           "options": [
             "dreamed of having a successful career as a girls' soccer coach",
