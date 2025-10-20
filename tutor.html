@@ -6,7 +6,6 @@
     <title>Tutor Portal - Blooming Kids House</title>
     
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" />
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
    
     <script async src="https://www.googletagmanager.com/gtag/js?id=G-NBTVEGH1SL"></script>
     <script>
@@ -15,9 +14,12 @@
         gtag('js', new Date());
         gtag('config', 'G-NBTVEGH1SL');
     </script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <link rel="stylesheet" href="fonts/material-design-iconic-font/css/material-design-iconic-font.min.css">
+    <link rel="stylesheet" href="css/style.css">
     
     <style>
-        /* Custom Styles for Nav Buttons */
+        /* Custom Styles for Nav Buttons - RETAINED */
         .nav-btn {
             padding: 8px 16px;
             border-bottom: 2px solid transparent;
@@ -29,14 +31,14 @@
             color: #16a34a;
         }
         
-        /* Overrides to fit Dashboard into wrapper structure */
+        /* Overrides to fit Dashboard into Colorlib wrapper structure */
         .wrapper {
             padding: 10px 0;
             display: flex;
             justify-content: center;
             align-items: flex-start;
             min-height: 100vh;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+            background-image: url('images/bg-registration-form-2.jpg') !important;
             background-size: cover;
             background-position: center;
             transition: background-color 0.3s;
@@ -45,6 +47,7 @@
             max-width: 1280px; 
             width: 95%; 
             padding: 20px;
+            /* LIGHT MODE: White background and dark text defaults are retained (Black on White) */
             background: #ffffff; 
             border-radius: 10px;
             box-shadow: 0 0 10px rgba(0, 0, 0, 0.2);
@@ -55,135 +58,9 @@
         
         /* Ensure Dashboard title elements are styled for the new UI */
         .dashboard-header {
-            color: #333;
+            color: #333; /* LIGHT MODE: Dark text for headers */
             text-shadow: none;
             transition: color 0.3s;
-        }
-
-        /* Network Error Overlay Styles - HIDDEN BY DEFAULT */
-        #networkErrorOverlay {
-            display: none;
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0, 0, 0, 0.85);
-            z-index: 10000;
-            justify-content: center;
-            align-items: center;
-            backdrop-filter: blur(5px);
-        }
-
-        .error-content {
-            background: white;
-            padding: 3rem;
-            border-radius: 15px;
-            text-align: center;
-            max-width: 500px;
-            box-shadow: 0 20px 40px rgba(0,0,0,0.3);
-            animation: fadeIn 0.5s ease-out;
-        }
-
-        .dark .error-content {
-            background: #1f2937;
-            color: white;
-        }
-
-        .error-icon {
-            font-size: 4rem;
-            color: #f59e0b;
-            margin-bottom: 1rem;
-        }
-
-        .error-buttons {
-            display: flex;
-            gap: 15px;
-            justify-content: center;
-            margin-top: 2rem;
-            flex-wrap: wrap;
-        }
-
-        .error-btn {
-            padding: 12px 24px;
-            border-radius: 8px;
-            text-decoration: none;
-            font-weight: 600;
-            transition: all 0.3s ease;
-            border: none;
-            cursor: pointer;
-        }
-
-        .error-btn.primary {
-            background: #16a34a;
-            color: white;
-        }
-
-        .error-btn.secondary {
-            background: #f59e0b;
-            color: white;
-        }
-
-        .error-btn:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
-        }
-
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(-20px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-
-        /* Network Warning Banner - HIDDEN BY DEFAULT */
-        #networkWarning {
-            display: none;
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            background: #fef3cd;
-            border-bottom: 2px solid #f59e0b;
-            padding: 12px 20px;
-            text-align: center;
-            z-index: 9999;
-            font-weight: 500;
-        }
-
-        .dark #networkWarning {
-            background: #78350f;
-            border-bottom-color: #f59e0b;
-            color: white;
-        }
-
-        #networkWarning .close-btn {
-            background: none;
-            border: none;
-            font-size: 1.2rem;
-            cursor: pointer;
-            margin-left: 15px;
-            padding: 5px 10px;
-            border-radius: 3px;
-        }
-
-        .dark #networkWarning .close-btn {
-            color: white;
-        }
-
-        /* Mobile view enhancements */
-        .mobile-view .mobile-logo {
-            height: 50px !important;
-        }
-
-        .mobile-view .mobile-title {
-            font-size: 1.25rem;
-        }
-
-        .mobile-view .mobile-text {
-            font-size: 0.875rem;
-        }
-
-        .mobile-view .mobile-content {
-            font-size: 0.9rem;
         }
 
         /* Mobile-first responsive design */
@@ -247,19 +124,6 @@
                 padding: 8px 12px;
                 font-size: 1rem;
             }
-
-            .error-content {
-                margin: 20px;
-                padding: 2rem;
-            }
-
-            .error-buttons {
-                flex-direction: column;
-            }
-
-            .error-btn {
-                width: 100%;
-            }
         }
 
         @media (max-width: 480px) {
@@ -284,29 +148,27 @@
                 padding: 6px 10px;
                 font-size: 0.9rem;
             }
-
-            .error-content {
-                padding: 1.5rem;
-                margin: 15px;
-            }
         }
 
         /* --- DARK MODE STYLES (White on Dark Gray) --- */
         .dark .wrapper {
-            background: linear-gradient(135deg, #1f2937 0%, #111827 100%) !important;
+            background-color: #111827 !important; /* Very Dark gray/near black wrapper background for max contrast */
+            background-image: linear-gradient(rgba(17, 24, 39, 0.9), rgba(17, 24, 39, 0.9)), url('images/bg-registration-form-2.jpg') !important;
+            background-blend-mode: overlay;
         }
         
-        /* Fix logo contrast in dark mode */
+        /* NEW: Fix logo contrast in dark mode */
         .dark #logoImg {
-            filter: brightness(1.5) drop-shadow(0 0 3px rgba(255, 255, 255, 0.3));
+            /* Adjust brightness and add a white drop-shadow to make the dark logo visible */
+            filter: brightness(2) drop-shadow(0 0 5px rgba(255, 255, 255, 0.5));
         }
 
         .dark .inner {
-            background: #1f2937;
+            background: #1f2937; /* Very Dark gray/near black for the main content panel */
             box-shadow: 0 0 15px rgba(0, 0, 0, 0.5);
         }
         
-        /* General text color override for dark mode */
+        /* Expanded General text color override to ensure pure white contrast on all elements */
         .dark .inner, 
         .dark .inner p, 
         .dark .inner span, 
@@ -314,21 +176,21 @@
         .dark .inner label, 
         .dark .inner div, 
         .dark .inner button,
-        .dark .inner input,
-        .dark .inner select,
-        .dark .inner textarea,
+        .dark .inner input, /* Explicitly target input fields */
+        .dark .inner select, /* Explicitly target select fields */
+        .dark .inner textarea, /* Explicitly target textarea fields */
         .dark .inner h1, .dark .inner h2, .dark .inner h3 {
-             color: #ffffff !important;
+             color: #ffffff !important; /* ENFORCED PURE WHITE */
         }
         
-        /* Placeholder text in dark mode */
+        /* ⭐⭐ NEW: Ensure high-contrast placeholder text in input/textarea fields ⭐⭐ */
         .dark .inner input::placeholder,
         .dark .inner textarea::placeholder {
-            color: #cccccc !important;
-            opacity: 1 !important;
+            color: #cccccc !important; /* Light gray for placeholder, still high contrast */
+            opacity: 1 !important; /* Ensure full visibility */
         }
         
-        /* Form elements styling for dark mode */
+        /* ⭐⭐ NEW: Form elements styling for dark mode ⭐⭐ */
         .dark .inner input:not([type="checkbox"]):not([type="radio"]),
         .dark .inner select,
         .dark .inner textarea {
@@ -337,7 +199,7 @@
             color: #ffffff !important;
         }
         
-        /* Table and data container styling for dark mode */
+        /* ⭐⭐ NEW: Table and data container styling for dark mode ⭐⭐ */
         .dark .inner table, 
         .dark .inner .bg-white {
             background-color: #374151 !important;
@@ -350,12 +212,12 @@
             color: #ffffff !important;
         }
         
-        /* Card and content container styling for dark mode */
+        /* ⭐⭐ NEW: Card and content container styling for dark mode ⭐⭐ */
         .dark .inner .bg-gray-50 {
             background-color: #374151 !important;
         }
         
-        /* Focus states for accessibility */
+        /* ⭐⭐ NEW: Focus states for accessibility ⭐⭐ */
         .dark .inner button:focus,
         .dark .inner input:focus,
         .dark .inner select:focus {
@@ -363,29 +225,30 @@
             outline-offset: 2px !important;
         }
         
-        /* Smooth transitions */
+        /* ⭐⭐ NEW: Smooth transitions for all theme-able properties ⭐⭐ */
         .inner * {
             transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
         }
 
-        /* Override headers in dark mode */
+        /* Override specific bright elements in dark mode (headers should be white) */
         .dark .dashboard-header {
             color: #ffffff !important;
         }
         
-        /* Nav buttons in dark mode */
+        /* Override nav link colors in dark mode - FIXED SYNTAX ERROR */
         .dark .nav-btn {
-            color: #e5e7eb !important;
+            color: #e5e7eb !important; /* Better contrast light gray for inactive tabs */
         }
         .dark .nav-btn.active {
-            border-bottom-color: #10b981 !important;
+            border-bottom-color: #10b981 !important; /* Brighter green for active tab */
             color: #10b981 !important;
         }
         .dark #logoutBtn, .dark #whatsappBtn {
+             /* Ensure buttons maintain contrast */
              filter: brightness(1.2);
         }
 
-        /* Hide scrollbar for nav */
+        /* Hide scrollbar for nav but keep functionality */
         .nav-container::-webkit-scrollbar {
             display: none;
         }
@@ -393,56 +256,14 @@
             -ms-overflow-style: none;
             scrollbar-width: none;
         }
-        
-        /* Loading animation */
-        .loading-spinner {
-            border: 4px solid #f3f3f3;
-            border-top: 4px solid #3498db;
-            border-radius: 50%;
-            width: 40px;
-            height: 40px;
-            animation: spin 2s linear infinite;
-            margin: 20px auto;
-        }
-        
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
     </style>
 </head>
 <body>
 
-    <!-- Network Error Overlay - HIDDEN BY DEFAULT -->
-    <div id="networkErrorOverlay">
-        <div class="error-content">
-            <div class="error-icon">
-                <i class="fas fa-wifi"></i>
-            </div>
-            <h2 class="text-2xl font-bold mb-4">Connection Issue</h2>
-            <p class="text-lg mb-2" id="errorMessage">We're having trouble connecting to the server.</p>
-            <p class="text-gray-600 dark:text-gray-300 mb-6">This might be due to network problems or temporary server issues.</p>
-            <div class="error-buttons">
-                <button onclick="window.location.reload()" class="error-btn primary">
-                    <i class="fas fa-redo mr-2"></i>Try Again
-                </button>
-                <button onclick="checkConnectivity()" class="error-btn secondary">
-                    <i class="fas fa-network-wired mr-2"></i>Check Connection
-                </button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Network Warning Banner - HIDDEN BY DEFAULT -->
-    <div id="networkWarning">
-        <span id="warningMessage">You appear to be offline. Some features may not work properly.</span>
-        <button class="close-btn" onclick="hideNetworkWarning()">×</button>
-    </div>
-
     <div class="wrapper">
         <div class="inner">
             <div class="max-w-7xl mx-auto">
-                <!-- Header with mobile-friendly classes -->
+                <!-- Updated header with mobile-friendly classes -->
                 <div class="flex justify-between items-center mb-6 header-container">
                     <div class="flex items-center logo-title-container">
                         <img id="logoImg" src="https://res.cloudinary.com/dy2hxcyaf/image/upload/v1757700806/newbhlogo_umwqzy.svg" alt="Blooming Kids House Logo" class="h-16 w-auto mr-4 mobile-logo" style="filter: drop-shadow(0 0 5px rgba(0, 0, 0, 0.2));">
@@ -470,7 +291,7 @@
                     </div>
                 </div>
                 
-                <!-- Navigation with mobile scrolling -->
+                <!-- Updated nav with mobile scrolling -->
                 <nav class="mb-6 border-b border-gray-200 dark:border-gray-700 nav-container">
                     <div class="flex space-x-4 nav-buttons">
                         <button id="navDashboard" class="nav-btn text-lg font-semibold active dashboard-header">Dashboard</button>
@@ -479,38 +300,22 @@
                 </nav>
 
                 <div id="mainContent">
-                    <div class="loading-spinner"></div>
-                    <p class="text-center text-gray-600 mt-4 mobile-content">Loading tutor portal...</p>
+                    <p class="text-center text-gray-600 mt-12 mobile-content">Checking user permissions...</p>
                 </div>
             </div>
         </div>
     </div>
+    
+    <script type="module" src="tutor.js"></script>
 
     <script>
-        // Main application script
-        document.addEventListener('DOMContentLoaded', function() {
-            console.log('Tutor Portal Initializing...');
-            
-            // Initialize theme
-            initializeTheme();
-            
-            // Initialize navigation
-            initializeNavigation();
-            
-            // Initialize network monitoring
-            initializeNetworkMonitoring();
-            
-            // Load initial content
-            loadDashboard();
-        });
-
-        // Theme Management
-        function initializeTheme() {
+        document.addEventListener('DOMContentLoaded', () => {
             const body = document.body;
             const toggleButton = document.getElementById('modeToggle');
             const modeIcon = document.getElementById('modeIcon');
             const modeKey = 'tutor_theme';
 
+            // Function to set the theme
             const setTheme = (theme) => {
                 if (theme === 'dark') {
                     body.classList.add('dark');
@@ -525,400 +330,44 @@
                 }
             };
 
-            // Load saved theme or default to light
+            // 1. Load saved theme or default to light
             const savedTheme = localStorage.getItem(modeKey);
             if (savedTheme) {
                 setTheme(savedTheme);
             } else if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+                // Check system preference if no saved theme
                 setTheme('dark');
             } else {
                 setTheme('light');
             }
 
-            // Toggle theme on button click
+            // 2. Add event listener to toggle theme on click
             toggleButton.addEventListener('click', () => {
                 const currentTheme = body.classList.contains('dark') ? 'dark' : 'light';
-                setTheme(currentTheme === 'light' ? 'dark' : 'light');
+                const newTheme = currentTheme === 'light' ? 'dark' : 'light';
+                setTheme(newTheme);
             });
 
-            // Mobile responsiveness
+            // 3. Mobile-specific enhancements
             function handleResize() {
                 const isMobile = window.innerWidth < 768;
+                
+                // Add mobile-specific classes for further customization
                 if (isMobile) {
                     document.body.classList.add('mobile-view');
+                    document.body.classList.remove('desktop-view');
                 } else {
+                    document.body.classList.add('desktop-view');
                     document.body.classList.remove('mobile-view');
                 }
             }
 
+            // Initial check
             handleResize();
+            
+            // Listen for resize events
             window.addEventListener('resize', handleResize);
-        }
-
-        // Navigation Management
-        function initializeNavigation() {
-            const navDashboard = document.getElementById('navDashboard');
-            const navStudentDatabase = document.getElementById('navStudentDatabase');
-            const logoutBtn = document.getElementById('logoutBtn');
-            
-            if (navDashboard) {
-                navDashboard.addEventListener('click', function() {
-                    setActiveNav(this);
-                    loadDashboard();
-                });
-            }
-            
-            if (navStudentDatabase) {
-                navStudentDatabase.addEventListener('click', function() {
-                    setActiveNav(this);
-                    loadStudentDatabase();
-                });
-            }
-            
-            if (logoutBtn) {
-                logoutBtn.addEventListener('click', function() {
-                    if (confirm('Are you sure you want to logout?')) {
-                        // Redirect to logout page or clear session
-                        window.location.href = '/login';
-                    }
-                });
-            }
-        }
-
-        function setActiveNav(activeButton) {
-            document.querySelectorAll('.nav-btn').forEach(btn => {
-                btn.classList.remove('active');
-                btn.classList.add('text-gray-500', 'hover:text-green-600');
-            });
-            
-            activeButton.classList.add('active');
-            activeButton.classList.remove('text-gray-500', 'hover:text-green-600');
-        }
-
-        // Content Loading Functions
-        function loadDashboard() {
-            showLoading();
-            
-            // Simulate API call delay
-            setTimeout(() => {
-                document.getElementById('mainContent').innerHTML = `
-                    <div class="p-6 bg-blue-50 rounded-lg border border-blue-200 dark:bg-blue-900 dark:border-blue-700">
-                        <h2 class="text-2xl font-bold text-blue-800 dark:text-blue-200 mb-6">Tutor Dashboard</h2>
-                        
-                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-                            <div class="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-lg border-l-4 border-blue-500">
-                                <div class="flex items-center">
-                                    <div class="p-3 bg-blue-100 dark:bg-blue-900 rounded-lg mr-4">
-                                        <i class="fas fa-users text-blue-600 dark:text-blue-400 text-xl"></i>
-                                    </div>
-                                    <div>
-                                        <p class="text-gray-600 dark:text-gray-400 text-sm">Total Students</p>
-                                        <h3 class="text-2xl font-bold text-gray-800 dark:text-white">24</h3>
-                                    </div>
-                                </div>
-                            </div>
-                            
-                            <div class="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-lg border-l-4 border-green-500">
-                                <div class="flex items-center">
-                                    <div class="p-3 bg-green-100 dark:bg-green-900 rounded-lg mr-4">
-                                        <i class="fas fa-calendar-check text-green-600 dark:text-green-400 text-xl"></i>
-                                    </div>
-                                    <div>
-                                        <p class="text-gray-600 dark:text-gray-400 text-sm">Today's Lessons</p>
-                                        <h3 class="text-2xl font-bold text-gray-800 dark:text-white">8</h3>
-                                    </div>
-                                </div>
-                            </div>
-                            
-                            <div class="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-lg border-l-4 border-yellow-500">
-                                <div class="flex items-center">
-                                    <div class="p-3 bg-yellow-100 dark:bg-yellow-900 rounded-lg mr-4">
-                                        <i class="fas fa-tasks text-yellow-600 dark:text-yellow-400 text-xl"></i>
-                                    </div>
-                                    <div>
-                                        <p class="text-gray-600 dark:text-gray-400 text-sm">Pending Tasks</p>
-                                        <h3 class="text-2xl font-bold text-gray-800 dark:text-white">12</h3>
-                                    </div>
-                                </div>
-                            </div>
-                            
-                            <div class="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-lg border-l-4 border-purple-500">
-                                <div class="flex items-center">
-                                    <div class="p-3 bg-purple-100 dark:bg-purple-900 rounded-lg mr-4">
-                                        <i class="fas fa-chart-line text-purple-600 dark:text-purple-400 text-xl"></i>
-                                    </div>
-                                    <div>
-                                        <p class="text-gray-600 dark:text-gray-400 text-sm">Performance</p>
-                                        <h3 class="text-2xl font-bold text-gray-800 dark:text-white">94%</h3>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                        
-                        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                            <div class="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-lg">
-                                <h3 class="text-xl font-semibold text-gray-800 dark:text-white mb-4">Recent Activity</h3>
-                                <div class="space-y-4">
-                                    <div class="flex items-center p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
-                                        <div class="w-3 h-3 bg-green-500 rounded-full mr-3"></div>
-                                        <div>
-                                            <p class="text-sm font-medium text-gray-800 dark:text-white">Lesson completed with Sarah</p>
-                                            <p class="text-xs text-gray-600 dark:text-gray-400">Mathematics • 30 mins ago</p>
-                                        </div>
-                                    </div>
-                                    <div class="flex items-center p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
-                                        <div class="w-3 h-3 bg-blue-500 rounded-full mr-3"></div>
-                                        <div>
-                                            <p class="text-sm font-medium text-gray-800 dark:text-white">New assignment uploaded</p>
-                                            <p class="text-xs text-gray-600 dark:text-gray-400">Science • 2 hours ago</p>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                            
-                            <div class="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-lg">
-                                <h3 class="text-xl font-semibold text-gray-800 dark:text-white mb-4">Upcoming Schedule</h3>
-                                <div class="space-y-4">
-                                    <div class="flex justify-between items-center p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
-                                        <div>
-                                            <p class="text-sm font-medium text-gray-800 dark:text-white">John - Mathematics</p>
-                                            <p class="text-xs text-gray-600 dark:text-gray-400">10:00 AM - 11:00 AM</p>
-                                        </div>
-                                        <span class="px-2 py-1 bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200 text-xs rounded-full">Confirmed</span>
-                                    </div>
-                                    <div class="flex justify-between items-center p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
-                                        <div>
-                                            <p class="text-sm font-medium text-gray-800 dark:text-white">Emily - English</p>
-                                            <p class="text-xs text-gray-600 dark:text-gray-400">2:00 PM - 3:00 PM</p>
-                                        </div>
-                                        <span class="px-2 py-1 bg-yellow-100 dark:bg-yellow-900 text-yellow-800 dark:text-yellow-200 text-xs rounded-full">Pending</span>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                `;
-            }, 500);
-        }
-
-        function loadStudentDatabase() {
-            showLoading();
-            
-            setTimeout(() => {
-                document.getElementById('mainContent').innerHTML = `
-                    <div class="p-6 bg-purple-50 rounded-lg border border-purple-200 dark:bg-purple-900 dark:border-purple-700">
-                        <div class="flex justify-between items-center mb-6">
-                            <h2 class="text-2xl font-bold text-purple-800 dark:text-purple-200">Student Database</h2>
-                            <button class="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 transition-colors">
-                                <i class="fas fa-plus mr-2"></i>Add Student
-                            </button>
-                        </div>
-                        
-                        <div class="mb-6">
-                            <div class="flex flex-col md:flex-row gap-4">
-                                <input type="text" placeholder="Search students..." class="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-800 dark:text-white">
-                                <select class="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-800 dark:text-white">
-                                    <option>All Levels</option>
-                                    <option>Beginner</option>
-                                    <option>Intermediate</option>
-                                    <option>Advanced</option>
-                                </select>
-                            </div>
-                        </div>
-                        
-                        <div class="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden">
-                            <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-                                <thead class="bg-gray-50 dark:bg-gray-700">
-                                    <tr>
-                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Student Name</th>
-                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Level</th>
-                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Progress</th>
-                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Last Lesson</th>
-                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Actions</th>
-                                    </tr>
-                                </thead>
-                                <tbody class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-                                    <tr>
-                                        <td class="px-6 py-4 whitespace-nowrap">
-                                            <div class="flex items-center">
-                                                <div class="flex-shrink-0 h-10 w-10 bg-blue-500 rounded-full flex items-center justify-center text-white font-bold">S</div>
-                                                <div class="ml-4">
-                                                    <div class="text-sm font-medium text-gray-900 dark:text-white">Sarah Johnson</div>
-                                                    <div class="text-sm text-gray-500 dark:text-gray-400">sarah@example.com</div>
-                                                </div>
-                                            </div>
-                                        </td>
-                                        <td class="px-6 py-4 whitespace-nowrap">
-                                            <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200">Advanced</span>
-                                        </td>
-                                        <td class="px-6 py-4 whitespace-nowrap">
-                                            <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
-                                                <div class="bg-green-600 h-2 rounded-full" style="width: 85%"></div>
-                                            </div>
-                                        </td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">2 days ago</td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                                            <button class="text-blue-600 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300 mr-3">View</button>
-                                            <button class="text-green-600 hover:text-green-900 dark:text-green-400 dark:hover:text-green-300">Message</button>
-                                        </td>
-                                    </tr>
-                                    <tr>
-                                        <td class="px-6 py-4 whitespace-nowrap">
-                                            <div class="flex items-center">
-                                                <div class="flex-shrink-0 h-10 w-10 bg-green-500 rounded-full flex items-center justify-center text-white font-bold">J</div>
-                                                <div class="ml-4">
-                                                    <div class="text-sm font-medium text-gray-900 dark:text-white">John Smith</div>
-                                                    <div class="text-sm text-gray-500 dark:text-gray-400">john@example.com</div>
-                                                </div>
-                                            </div>
-                                        </td>
-                                        <td class="px-6 py-4 whitespace-nowrap">
-                                            <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-yellow-100 dark:bg-yellow-900 text-yellow-800 dark:text-yellow-200">Intermediate</span>
-                                        </td>
-                                        <td class="px-6 py-4 whitespace-nowrap">
-                                            <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
-                                                <div class="bg-yellow-600 h-2 rounded-full" style="width: 65%"></div>
-                                            </div>
-                                        </td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">1 week ago</td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                                            <button class="text-blue-600 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300 mr-3">View</button>
-                                            <button class="text-green-600 hover:text-green-900 dark:text-green-400 dark:hover:text-green-300">Message</button>
-                                        </td>
-                                    </tr>
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                `;
-            }, 500);
-        }
-
-        function showLoading() {
-            document.getElementById('mainContent').innerHTML = `
-                <div class="flex flex-col items-center justify-center py-12">
-                    <div class="loading-spinner"></div>
-                    <p class="text-gray-600 dark:text-gray-400 mt-4">Loading content...</p>
-                </div>
-            `;
-        }
-
-        // Network Monitoring Functions
-        function initializeNetworkMonitoring() {
-            console.log('Network monitoring initialized');
-
-            window.addEventListener('online', function() {
-                hideNetworkWarning();
-                hideNetworkError();
-                showTemporaryMessage('Connection restored!', 'success');
-            });
-
-            window.addEventListener('offline', function() {
-                showNetworkWarning('You appear to be offline. Some features may not work properly.');
-            });
-        }
-
-        function showNetworkError(message = 'Connection issue detected') {
-            const overlay = document.getElementById('networkErrorOverlay');
-            const errorMessage = document.getElementById('errorMessage');
-            
-            if (errorMessage) {
-                errorMessage.textContent = message;
-            }
-            
-            overlay.style.display = 'flex';
-            document.body.style.overflow = 'hidden';
-        }
-
-        function hideNetworkError() {
-            const overlay = document.getElementById('networkErrorOverlay');
-            overlay.style.display = 'none';
-            document.body.style.overflow = 'auto';
-        }
-
-        function showNetworkWarning(message) {
-            const warning = document.getElementById('networkWarning');
-            const messageElement = document.getElementById('warningMessage');
-            
-            if (messageElement) {
-                messageElement.textContent = message;
-            }
-            
-            warning.style.display = 'block';
-            
-            setTimeout(() => {
-                if (navigator.onLine) {
-                    hideNetworkWarning();
-                }
-            }, 10000);
-        }
-
-        function hideNetworkWarning() {
-            const warning = document.getElementById('networkWarning');
-            warning.style.display = 'none';
-        }
-
-        function checkConnectivity() {
-            if (!navigator.onLine) {
-                const img = new Image();
-                img.src = 'https://www.google.com/favicon.ico?' + Date.now();
-                
-                img.onload = function() {
-                    hideNetworkWarning();
-                    hideNetworkError();
-                    showTemporaryMessage('Connection is working properly!', 'success');
-                };
-                
-                img.onerror = function() {
-                    showNetworkError('No internet connection detected. Please check your network settings.');
-                };
-            } else {
-                hideNetworkWarning();
-                hideNetworkError();
-            }
-        }
-
-        function showTemporaryMessage(message, type = 'info') {
-            const messageEl = document.createElement('div');
-            messageEl.textContent = message;
-            messageEl.style.cssText = `
-                position: fixed;
-                top: 20px;
-                right: 20px;
-                background: ${type === 'success' ? '#10b981' : '#3b82f6'};
-                color: white;
-                padding: 12px 20px;
-                border-radius: 8px;
-                z-index: 10001;
-                box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-                animation: slideIn 0.3s ease-out;
-            `;
-            
-            document.body.appendChild(messageEl);
-            
-            setTimeout(() => {
-                messageEl.style.animation = 'slideOut 0.3s ease-in';
-                setTimeout(() => {
-                    if (messageEl.parentNode) {
-                        messageEl.parentNode.removeChild(messageEl);
-                    }
-                }, 300);
-            }, 3000);
-        }
-
-        // Add CSS for animations
-        const style = document.createElement('style');
-        style.textContent = `
-            @keyframes slideIn {
-                from { transform: translateX(100%); opacity: 0; }
-                to { transform: translateX(0); opacity: 1; }
-            }
-            @keyframes slideOut {
-                from { transform: translateX(0); opacity: 1; }
-                to { transform: translateX(100%); opacity: 0; }
-            }
-        `;
-        document.head.appendChild(style);
+        });
     </script>
 </body>
 </html>
