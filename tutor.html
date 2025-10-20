@@ -6,7 +6,6 @@
     <title>Tutor Portal - Blooming Kids House</title>
     
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" />
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,400,500,700">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
    
     <script async src="https://www.googletagmanager.com/gtag/js?id=G-NBTVEGH1SL"></script>
@@ -18,7 +17,7 @@
     </script>
     
     <style>
-        /* Custom Styles for Nav Buttons - RETAINED */
+        /* Custom Styles for Nav Buttons */
         .nav-btn {
             padding: 8px 16px;
             border-bottom: 2px solid transparent;
@@ -30,14 +29,14 @@
             color: #16a34a;
         }
         
-        /* Overrides to fit Dashboard into Colorlib wrapper structure */
+        /* Overrides to fit Dashboard into wrapper structure */
         .wrapper {
             padding: 10px 0;
             display: flex;
             justify-content: center;
             align-items: flex-start;
             min-height: 100vh;
-            background-image: url('images/bg-registration-form-2.jpg') !important;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
             background-size: cover;
             background-position: center;
             transition: background-color 0.3s;
@@ -46,7 +45,6 @@
             max-width: 1280px; 
             width: 95%; 
             padding: 20px;
-            /* LIGHT MODE: White background and dark text defaults are retained (Black on White) */
             background: #ffffff; 
             border-radius: 10px;
             box-shadow: 0 0 10px rgba(0, 0, 0, 0.2);
@@ -57,14 +55,14 @@
         
         /* Ensure Dashboard title elements are styled for the new UI */
         .dashboard-header {
-            color: #333; /* LIGHT MODE: Dark text for headers */
+            color: #333;
             text-shadow: none;
             transition: color 0.3s;
         }
 
         /* Network Error Overlay Styles - HIDDEN BY DEFAULT */
         #networkErrorOverlay {
-            display: none; /* Hidden by default */
+            display: none;
             position: fixed;
             top: 0;
             left: 0;
@@ -138,7 +136,7 @@
 
         /* Network Warning Banner - HIDDEN BY DEFAULT */
         #networkWarning {
-            display: none; /* Hidden by default */
+            display: none;
             position: fixed;
             top: 0;
             left: 0;
@@ -169,12 +167,6 @@
 
         .dark #networkWarning .close-btn {
             color: white;
-        }
-
-        /* Loading States */
-        .loading {
-            opacity: 0.6;
-            pointer-events: none;
         }
 
         /* Mobile view enhancements */
@@ -301,23 +293,20 @@
 
         /* --- DARK MODE STYLES (White on Dark Gray) --- */
         .dark .wrapper {
-            background-color: #111827 !important; /* Very Dark gray/near black wrapper background for max contrast */
-            background-image: linear-gradient(rgba(17, 24, 39, 0.9), rgba(17, 24, 39, 0.9)), url('images/bg-registration-form-2.jpg') !important;
-            background-blend-mode: overlay;
+            background: linear-gradient(135deg, #1f2937 0%, #111827 100%) !important;
         }
         
-        /* NEW: Fix logo contrast in dark mode */
+        /* Fix logo contrast in dark mode */
         .dark #logoImg {
-            /* Adjust brightness and add a white drop-shadow to make the dark logo visible */
             filter: brightness(1.5) drop-shadow(0 0 3px rgba(255, 255, 255, 0.3));
         }
 
         .dark .inner {
-            background: #1f2937; /* Very Dark gray/near black for the main content panel */
+            background: #1f2937;
             box-shadow: 0 0 15px rgba(0, 0, 0, 0.5);
         }
         
-        /* Expanded General text color override to ensure pure white contrast on all elements */
+        /* General text color override for dark mode */
         .dark .inner, 
         .dark .inner p, 
         .dark .inner span, 
@@ -325,21 +314,21 @@
         .dark .inner label, 
         .dark .inner div, 
         .dark .inner button,
-        .dark .inner input, /* Explicitly target input fields */
-        .dark .inner select, /* Explicitly target select fields */
-        .dark .inner textarea, /* Explicitly target textarea fields */
+        .dark .inner input,
+        .dark .inner select,
+        .dark .inner textarea,
         .dark .inner h1, .dark .inner h2, .dark .inner h3 {
-             color: #ffffff !important; /* ENFORCED PURE WHITE */
+             color: #ffffff !important;
         }
         
-        /* ⭐⭐ NEW: Ensure high-contrast placeholder text in input/textarea fields ⭐⭐ */
+        /* Placeholder text in dark mode */
         .dark .inner input::placeholder,
         .dark .inner textarea::placeholder {
-            color: #cccccc !important; /* Light gray for placeholder, still high contrast */
-            opacity: 1 !important; /* Ensure full visibility */
+            color: #cccccc !important;
+            opacity: 1 !important;
         }
         
-        /* ⭐⭐ NEW: Form elements styling for dark mode ⭐⭐ */
+        /* Form elements styling for dark mode */
         .dark .inner input:not([type="checkbox"]):not([type="radio"]),
         .dark .inner select,
         .dark .inner textarea {
@@ -348,7 +337,7 @@
             color: #ffffff !important;
         }
         
-        /* ⭐⭐ NEW: Table and data container styling for dark mode ⭐⭐ */
+        /* Table and data container styling for dark mode */
         .dark .inner table, 
         .dark .inner .bg-white {
             background-color: #374151 !important;
@@ -361,12 +350,12 @@
             color: #ffffff !important;
         }
         
-        /* ⭐⭐ NEW: Card and content container styling for dark mode ⭐⭐ */
+        /* Card and content container styling for dark mode */
         .dark .inner .bg-gray-50 {
             background-color: #374151 !important;
         }
         
-        /* ⭐⭐ NEW: Focus states for accessibility ⭐⭐ */
+        /* Focus states for accessibility */
         .dark .inner button:focus,
         .dark .inner input:focus,
         .dark .inner select:focus {
@@ -374,36 +363,51 @@
             outline-offset: 2px !important;
         }
         
-        /* ⭐⭐ NEW: Smooth transitions for all theme-able properties ⭐⭐ */
+        /* Smooth transitions */
         .inner * {
             transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
         }
 
-        /* Override specific bright elements in dark mode (headers should be white) */
+        /* Override headers in dark mode */
         .dark .dashboard-header {
             color: #ffffff !important;
         }
         
-        /* Override nav link colors in dark mode - FIXED SYNTAX ERROR */
+        /* Nav buttons in dark mode */
         .dark .nav-btn {
-            color: #e5e7eb !important; /* Better contrast light gray for inactive tabs */
+            color: #e5e7eb !important;
         }
         .dark .nav-btn.active {
-            border-bottom-color: #10b981 !important; /* Brighter green for active tab */
+            border-bottom-color: #10b981 !important;
             color: #10b981 !important;
         }
         .dark #logoutBtn, .dark #whatsappBtn {
-             /* Ensure buttons maintain contrast */
              filter: brightness(1.2);
         }
 
-        /* Hide scrollbar for nav but keep functionality */
+        /* Hide scrollbar for nav */
         .nav-container::-webkit-scrollbar {
             display: none;
         }
         .nav-container {
             -ms-overflow-style: none;
             scrollbar-width: none;
+        }
+        
+        /* Loading animation */
+        .loading-spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #3498db;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 2s linear infinite;
+            margin: 20px auto;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
         }
     </style>
 </head>
@@ -438,7 +442,7 @@
     <div class="wrapper">
         <div class="inner">
             <div class="max-w-7xl mx-auto">
-                <!-- Updated header with mobile-friendly classes -->
+                <!-- Header with mobile-friendly classes -->
                 <div class="flex justify-between items-center mb-6 header-container">
                     <div class="flex items-center logo-title-container">
                         <img id="logoImg" src="https://res.cloudinary.com/dy2hxcyaf/image/upload/v1757700806/newbhlogo_umwqzy.svg" alt="Blooming Kids House Logo" class="h-16 w-auto mr-4 mobile-logo" style="filter: drop-shadow(0 0 5px rgba(0, 0, 0, 0.2));">
@@ -466,7 +470,7 @@
                     </div>
                 </div>
                 
-                <!-- Updated nav with mobile scrolling -->
+                <!-- Navigation with mobile scrolling -->
                 <nav class="mb-6 border-b border-gray-200 dark:border-gray-700 nav-container">
                     <div class="flex space-x-4 nav-buttons">
                         <button id="navDashboard" class="nav-btn text-lg font-semibold active dashboard-header">Dashboard</button>
@@ -475,45 +479,38 @@
                 </nav>
 
                 <div id="mainContent">
-                    <div class="p-6 bg-blue-50 rounded-lg border border-blue-200 dark:bg-blue-900 dark:border-blue-700">
-                        <h2 class="text-xl font-semibold text-blue-800 dark:text-blue-200 mb-4">Tutor Portal Ready</h2>
-                        <p class="text-blue-700 dark:text-blue-300">The tutor portal is now ready for use. Please select an option from the navigation above.</p>
-                    </div>
+                    <div class="loading-spinner"></div>
+                    <p class="text-center text-gray-600 mt-4 mobile-content">Loading tutor portal...</p>
                 </div>
             </div>
         </div>
     </div>
 
-    <script type="module">
-        // Handle tutor.js loading with error handling
-        try {
-            // Try to load the tutor.js module
-            await import('./tutor.js');
-            console.log('tutor.js loaded successfully');
-        } catch (error) {
-            console.warn('tutor.js not found or has errors:', error);
-            // Show a friendly message instead of breaking
-            document.getElementById('mainContent').innerHTML = `
-                <div class="p-6 bg-yellow-50 rounded-lg border border-yellow-200 dark:bg-yellow-900 dark:border-yellow-700">
-                    <h2 class="text-xl font-semibold text-yellow-800 dark:text-yellow-200 mb-4">Welcome to Tutor Portal</h2>
-                    <p class="text-yellow-700 dark:text-yellow-300">The portal is ready. Some advanced features may require additional setup.</p>
-                    <div class="mt-4 p-4 bg-white dark:bg-gray-800 rounded border">
-                        <p class="text-sm text-gray-600 dark:text-gray-400">Technical note: tutor.js module could not be loaded. This may affect some functionality.</p>
-                    </div>
-                </div>
-            `;
-        }
-    </script>
-
     <script>
-        // Network Error Handling System - SIMPLIFIED VERSION
-        document.addEventListener('DOMContentLoaded', () => {
+        // Main application script
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('Tutor Portal Initializing...');
+            
+            // Initialize theme
+            initializeTheme();
+            
+            // Initialize navigation
+            initializeNavigation();
+            
+            // Initialize network monitoring
+            initializeNetworkMonitoring();
+            
+            // Load initial content
+            loadDashboard();
+        });
+
+        // Theme Management
+        function initializeTheme() {
             const body = document.body;
             const toggleButton = document.getElementById('modeToggle');
             const modeIcon = document.getElementById('modeIcon');
             const modeKey = 'tutor_theme';
 
-            // Function to set the theme
             const setTheme = (theme) => {
                 if (theme === 'dark') {
                     body.classList.add('dark');
@@ -528,157 +525,296 @@
                 }
             };
 
-            // 1. Load saved theme or default to light
+            // Load saved theme or default to light
             const savedTheme = localStorage.getItem(modeKey);
             if (savedTheme) {
                 setTheme(savedTheme);
             } else if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
-                // Check system preference if no saved theme
                 setTheme('dark');
             } else {
                 setTheme('light');
             }
 
-            // 2. Add event listener to toggle theme on click
+            // Toggle theme on button click
             toggleButton.addEventListener('click', () => {
                 const currentTheme = body.classList.contains('dark') ? 'dark' : 'light';
-                const newTheme = currentTheme === 'light' ? 'dark' : 'light';
-                setTheme(newTheme);
+                setTheme(currentTheme === 'light' ? 'dark' : 'light');
             });
 
-            // 3. Mobile-specific enhancements
+            // Mobile responsiveness
             function handleResize() {
                 const isMobile = window.innerWidth < 768;
-                
-                // Add mobile-specific classes for further customization
                 if (isMobile) {
                     document.body.classList.add('mobile-view');
-                    document.body.classList.remove('desktop-view');
                 } else {
-                    document.body.classList.add('desktop-view');
                     document.body.classList.remove('mobile-view');
                 }
             }
 
-            // Initial check
             handleResize();
-            
-            // Listen for resize events
             window.addEventListener('resize', handleResize);
+        }
 
-            // 4. Initialize Simple Network Monitoring
-            initializeNetworkMonitoring();
-            
-            // 5. Set up navigation buttons
-            setupNavigation();
-        });
-
-        // Simple Navigation Setup
-        function setupNavigation() {
+        // Navigation Management
+        function initializeNavigation() {
             const navDashboard = document.getElementById('navDashboard');
             const navStudentDatabase = document.getElementById('navStudentDatabase');
             const logoutBtn = document.getElementById('logoutBtn');
             
             if (navDashboard) {
-                navDashboard.addEventListener('click', () => {
-                    setActiveNav(navDashboard);
-                    showDashboard();
+                navDashboard.addEventListener('click', function() {
+                    setActiveNav(this);
+                    loadDashboard();
                 });
             }
             
             if (navStudentDatabase) {
-                navStudentDatabase.addEventListener('click', () => {
-                    setActiveNav(navStudentDatabase);
-                    showStudentDatabase();
+                navStudentDatabase.addEventListener('click', function() {
+                    setActiveNav(this);
+                    loadStudentDatabase();
                 });
             }
             
             if (logoutBtn) {
-                logoutBtn.addEventListener('click', () => {
+                logoutBtn.addEventListener('click', function() {
                     if (confirm('Are you sure you want to logout?')) {
-                        window.location.href = '/logout';
+                        // Redirect to logout page or clear session
+                        window.location.href = '/login';
                     }
                 });
             }
         }
 
         function setActiveNav(activeButton) {
-            // Remove active class from all nav buttons
             document.querySelectorAll('.nav-btn').forEach(btn => {
                 btn.classList.remove('active');
                 btn.classList.add('text-gray-500', 'hover:text-green-600');
             });
             
-            // Add active class to clicked button
             activeButton.classList.add('active');
             activeButton.classList.remove('text-gray-500', 'hover:text-green-600');
         }
 
-        function showDashboard() {
-            document.getElementById('mainContent').innerHTML = `
-                <div class="p-6 bg-green-50 rounded-lg border border-green-200 dark:bg-green-900 dark:border-green-700">
-                    <h2 class="text-xl font-semibold text-green-800 dark:text-green-200 mb-4">Dashboard</h2>
-                    <p class="text-green-700 dark:text-green-300">Welcome to your tutor dashboard. This is where you'll see your schedule, recent activity, and quick stats.</p>
-                    <div class="mt-6 grid grid-cols-1 md:grid-cols-3 gap-4">
-                        <div class="bg-white dark:bg-gray-800 p-4 rounded-lg shadow">
-                            <h3 class="font-semibold text-gray-700 dark:text-gray-300">Students</h3>
-                            <p class="text-2xl font-bold text-green-600 dark:text-green-400">0</p>
+        // Content Loading Functions
+        function loadDashboard() {
+            showLoading();
+            
+            // Simulate API call delay
+            setTimeout(() => {
+                document.getElementById('mainContent').innerHTML = `
+                    <div class="p-6 bg-blue-50 rounded-lg border border-blue-200 dark:bg-blue-900 dark:border-blue-700">
+                        <h2 class="text-2xl font-bold text-blue-800 dark:text-blue-200 mb-6">Tutor Dashboard</h2>
+                        
+                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+                            <div class="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-lg border-l-4 border-blue-500">
+                                <div class="flex items-center">
+                                    <div class="p-3 bg-blue-100 dark:bg-blue-900 rounded-lg mr-4">
+                                        <i class="fas fa-users text-blue-600 dark:text-blue-400 text-xl"></i>
+                                    </div>
+                                    <div>
+                                        <p class="text-gray-600 dark:text-gray-400 text-sm">Total Students</p>
+                                        <h3 class="text-2xl font-bold text-gray-800 dark:text-white">24</h3>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-lg border-l-4 border-green-500">
+                                <div class="flex items-center">
+                                    <div class="p-3 bg-green-100 dark:bg-green-900 rounded-lg mr-4">
+                                        <i class="fas fa-calendar-check text-green-600 dark:text-green-400 text-xl"></i>
+                                    </div>
+                                    <div>
+                                        <p class="text-gray-600 dark:text-gray-400 text-sm">Today's Lessons</p>
+                                        <h3 class="text-2xl font-bold text-gray-800 dark:text-white">8</h3>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-lg border-l-4 border-yellow-500">
+                                <div class="flex items-center">
+                                    <div class="p-3 bg-yellow-100 dark:bg-yellow-900 rounded-lg mr-4">
+                                        <i class="fas fa-tasks text-yellow-600 dark:text-yellow-400 text-xl"></i>
+                                    </div>
+                                    <div>
+                                        <p class="text-gray-600 dark:text-gray-400 text-sm">Pending Tasks</p>
+                                        <h3 class="text-2xl font-bold text-gray-800 dark:text-white">12</h3>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-lg border-l-4 border-purple-500">
+                                <div class="flex items-center">
+                                    <div class="p-3 bg-purple-100 dark:bg-purple-900 rounded-lg mr-4">
+                                        <i class="fas fa-chart-line text-purple-600 dark:text-purple-400 text-xl"></i>
+                                    </div>
+                                    <div>
+                                        <p class="text-gray-600 dark:text-gray-400 text-sm">Performance</p>
+                                        <h3 class="text-2xl font-bold text-gray-800 dark:text-white">94%</h3>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
-                        <div class="bg-white dark:bg-gray-800 p-4 rounded-lg shadow">
-                            <h3 class="font-semibold text-gray-700 dark:text-gray-300">Lessons Today</h3>
-                            <p class="text-2xl font-bold text-blue-600 dark:text-blue-400">0</p>
-                        </div>
-                        <div class="bg-white dark:bg-gray-800 p-4 rounded-lg shadow">
-                            <h3 class="font-semibold text-gray-700 dark:text-gray-300">Messages</h3>
-                            <p class="text-2xl font-bold text-yellow-600 dark:text-yellow-400">0</p>
+                        
+                        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                            <div class="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-lg">
+                                <h3 class="text-xl font-semibold text-gray-800 dark:text-white mb-4">Recent Activity</h3>
+                                <div class="space-y-4">
+                                    <div class="flex items-center p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                                        <div class="w-3 h-3 bg-green-500 rounded-full mr-3"></div>
+                                        <div>
+                                            <p class="text-sm font-medium text-gray-800 dark:text-white">Lesson completed with Sarah</p>
+                                            <p class="text-xs text-gray-600 dark:text-gray-400">Mathematics • 30 mins ago</p>
+                                        </div>
+                                    </div>
+                                    <div class="flex items-center p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                                        <div class="w-3 h-3 bg-blue-500 rounded-full mr-3"></div>
+                                        <div>
+                                            <p class="text-sm font-medium text-gray-800 dark:text-white">New assignment uploaded</p>
+                                            <p class="text-xs text-gray-600 dark:text-gray-400">Science • 2 hours ago</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-lg">
+                                <h3 class="text-xl font-semibold text-gray-800 dark:text-white mb-4">Upcoming Schedule</h3>
+                                <div class="space-y-4">
+                                    <div class="flex justify-between items-center p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                                        <div>
+                                            <p class="text-sm font-medium text-gray-800 dark:text-white">John - Mathematics</p>
+                                            <p class="text-xs text-gray-600 dark:text-gray-400">10:00 AM - 11:00 AM</p>
+                                        </div>
+                                        <span class="px-2 py-1 bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200 text-xs rounded-full">Confirmed</span>
+                                    </div>
+                                    <div class="flex justify-between items-center p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                                        <div>
+                                            <p class="text-sm font-medium text-gray-800 dark:text-white">Emily - English</p>
+                                            <p class="text-xs text-gray-600 dark:text-gray-400">2:00 PM - 3:00 PM</p>
+                                        </div>
+                                        <span class="px-2 py-1 bg-yellow-100 dark:bg-yellow-900 text-yellow-800 dark:text-yellow-200 text-xs rounded-full">Pending</span>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
+                `;
+            }, 500);
+        }
+
+        function loadStudentDatabase() {
+            showLoading();
+            
+            setTimeout(() => {
+                document.getElementById('mainContent').innerHTML = `
+                    <div class="p-6 bg-purple-50 rounded-lg border border-purple-200 dark:bg-purple-900 dark:border-purple-700">
+                        <div class="flex justify-between items-center mb-6">
+                            <h2 class="text-2xl font-bold text-purple-800 dark:text-purple-200">Student Database</h2>
+                            <button class="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 transition-colors">
+                                <i class="fas fa-plus mr-2"></i>Add Student
+                            </button>
+                        </div>
+                        
+                        <div class="mb-6">
+                            <div class="flex flex-col md:flex-row gap-4">
+                                <input type="text" placeholder="Search students..." class="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-800 dark:text-white">
+                                <select class="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-800 dark:text-white">
+                                    <option>All Levels</option>
+                                    <option>Beginner</option>
+                                    <option>Intermediate</option>
+                                    <option>Advanced</option>
+                                </select>
+                            </div>
+                        </div>
+                        
+                        <div class="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden">
+                            <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                                <thead class="bg-gray-50 dark:bg-gray-700">
+                                    <tr>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Student Name</th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Level</th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Progress</th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Last Lesson</th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+                                    <tr>
+                                        <td class="px-6 py-4 whitespace-nowrap">
+                                            <div class="flex items-center">
+                                                <div class="flex-shrink-0 h-10 w-10 bg-blue-500 rounded-full flex items-center justify-center text-white font-bold">S</div>
+                                                <div class="ml-4">
+                                                    <div class="text-sm font-medium text-gray-900 dark:text-white">Sarah Johnson</div>
+                                                    <div class="text-sm text-gray-500 dark:text-gray-400">sarah@example.com</div>
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td class="px-6 py-4 whitespace-nowrap">
+                                            <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200">Advanced</span>
+                                        </td>
+                                        <td class="px-6 py-4 whitespace-nowrap">
+                                            <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+                                                <div class="bg-green-600 h-2 rounded-full" style="width: 85%"></div>
+                                            </div>
+                                        </td>
+                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">2 days ago</td>
+                                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                                            <button class="text-blue-600 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300 mr-3">View</button>
+                                            <button class="text-green-600 hover:text-green-900 dark:text-green-400 dark:hover:text-green-300">Message</button>
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td class="px-6 py-4 whitespace-nowrap">
+                                            <div class="flex items-center">
+                                                <div class="flex-shrink-0 h-10 w-10 bg-green-500 rounded-full flex items-center justify-center text-white font-bold">J</div>
+                                                <div class="ml-4">
+                                                    <div class="text-sm font-medium text-gray-900 dark:text-white">John Smith</div>
+                                                    <div class="text-sm text-gray-500 dark:text-gray-400">john@example.com</div>
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td class="px-6 py-4 whitespace-nowrap">
+                                            <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-yellow-100 dark:bg-yellow-900 text-yellow-800 dark:text-yellow-200">Intermediate</span>
+                                        </td>
+                                        <td class="px-6 py-4 whitespace-nowrap">
+                                            <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+                                                <div class="bg-yellow-600 h-2 rounded-full" style="width: 65%"></div>
+                                            </div>
+                                        </td>
+                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">1 week ago</td>
+                                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                                            <button class="text-blue-600 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300 mr-3">View</button>
+                                            <button class="text-green-600 hover:text-green-900 dark:text-green-400 dark:hover:text-green-300">Message</button>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                `;
+            }, 500);
+        }
+
+        function showLoading() {
+            document.getElementById('mainContent').innerHTML = `
+                <div class="flex flex-col items-center justify-center py-12">
+                    <div class="loading-spinner"></div>
+                    <p class="text-gray-600 dark:text-gray-400 mt-4">Loading content...</p>
                 </div>
             `;
         }
 
-        function showStudentDatabase() {
-            document.getElementById('mainContent').innerHTML = `
-                <div class="p-6 bg-purple-50 rounded-lg border border-purple-200 dark:bg-purple-900 dark:border-purple-700">
-                    <h2 class="text-xl font-semibold text-purple-800 dark:text-purple-200 mb-4">Student Database</h2>
-                    <p class="text-purple-700 dark:text-purple-300">Manage your students' information, progress, and assignments here.</p>
-                    <div class="mt-6 bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden">
-                        <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-                            <thead class="bg-gray-50 dark:bg-gray-700">
-                                <tr>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Name</th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Level</th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Last Lesson</th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Status</th>
-                                </tr>
-                            </thead>
-                            <tbody class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-                                <tr>
-                                    <td colspan="4" class="px-6 py-4 text-center text-gray-500 dark:text-gray-400">
-                                        No students found. Student data will appear here once available.
-                                    </td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            `;
-        }
-
-        // Simple Network Monitoring Functions
+        // Network Monitoring Functions
         function initializeNetworkMonitoring() {
             console.log('Network monitoring initialized');
 
-            // Monitor online/offline status
             window.addEventListener('online', function() {
                 hideNetworkWarning();
                 hideNetworkError();
-                console.log('Connection restored - back online');
+                showTemporaryMessage('Connection restored!', 'success');
             });
 
             window.addEventListener('offline', function() {
                 showNetworkWarning('You appear to be offline. Some features may not work properly.');
-                console.log('Connection lost - offline');
             });
         }
 
@@ -710,7 +846,6 @@
             
             warning.style.display = 'block';
             
-            // Auto-hide after 10 seconds
             setTimeout(() => {
                 if (navigator.onLine) {
                     hideNetworkWarning();
@@ -725,7 +860,6 @@
 
         function checkConnectivity() {
             if (!navigator.onLine) {
-                // Simple connectivity check
                 const img = new Image();
                 img.src = 'https://www.google.com/favicon.ico?' + Date.now();
                 
@@ -745,7 +879,6 @@
         }
 
         function showTemporaryMessage(message, type = 'info') {
-            // Create temporary message element
             const messageEl = document.createElement('div');
             messageEl.textContent = message;
             messageEl.style.cssText = `
@@ -763,7 +896,6 @@
             
             document.body.appendChild(messageEl);
             
-            // Remove after 3 seconds
             setTimeout(() => {
                 messageEl.style.animation = 'slideOut 0.3s ease-in';
                 setTimeout(() => {
@@ -774,7 +906,7 @@
             }, 3000);
         }
 
-        // Add CSS for slide animations
+        // Add CSS for animations
         const style = document.createElement('style');
         style.textContent = `
             @keyframes slideIn {
@@ -787,11 +919,6 @@
             }
         `;
         document.head.appendChild(style);
-
-        // Initialize dashboard view
-        setTimeout(() => {
-            showDashboard();
-        }, 100);
     </script>
 </body>
 </html>
