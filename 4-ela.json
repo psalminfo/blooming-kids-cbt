@@ -1,3 +1,4 @@
+```json
 {
   "tests": [
     {
@@ -10,39 +11,35 @@
         {
           "passageId": "p1",
           "title": "Chewing Gum Man",
-          "content": "Juicy. Sticky. Bubble. Pop!\n\nFor more than 100 years, chewing a tasty piece of gum has been a pleasure that most children and adults have enjoyed. In fact, it's difficult to imagine a world today without grocery store check-out counters lined with colorful packages of minty or fruit-flavored gum. Yet if a young salesman named William Wrigley, Jr., hadn't had such a clever idea to boost sales, gum might not be the popular treat it is today.\n\nWrigley was born in 1862. His father was a soap maker from Philadelphia, Pennsylvania. Wrigley's first job as a teenager was selling soap for his father. Wrigley discovered that he was a good salesperson. He could make people believe that a product was special and that it might make their lives better.\n\nIn 1891, Wrigley moved to Chicago with the dream of starting his own business. He didn't start with gum, though. He decided to sell a product he knew a lot about: soap. To encourage people to buy his soap, Wrigley offered a gift. Each person who bought soap would get free baking powder. Soon people were asking for the baking powder more than the soap. So Wrigley switched to selling baking powder, and again he gave away a small gift with each purchase. This time he gave away gum.\n\nWrigley's customers loved the gum and kept asking for it. So Wrigley decided to start his own gum business. Wrigley believed that good advertising would help make his business successful. He placed advertisements in newspapers. He also gave gifts, such as clocks or fishing gear, to store owners who ordered gum. The more gum they ordered, the bigger the gift would be. In addition, Wrigley asked store owners to display boxes of his gum next to their cash registers. This way customers would see the gum when they paid for their items. Wrigley hoped that when customers saw the gum, they would decide to buy it.\n\nIn 1907 business was bad for many companies across the nation. In order to continue selling his gum, Wrigley had to work extra hard, think creatively, and take some risks. He took out a large personal loan to pay for advertising. If this idea had not worked, he would have lost everything. Wrigley believed that the public would buy his gum if it was something they thought about often. He wanted people to hear about his gum, read about it, see it, and taste it. His motto for selling gum was 'Tell 'em quick and tell 'em often.' Once, Wrigley went so far as to mail gum to every listed address in the country. More than a million people got to try Wrigley's gum for free.\n\nWrigley wanted people everywhere to continue thinking about his gum. When Wrigley died in 1932, his son Philip took over the company. Philip developed another plan to help achieve this goal. In 1939 the company began to advertise Wrigley's Doublemint gum using the Doublemint Twins. It hoped that whenever people saw the advertisement with the smiling, happy twins, they would think about Doublemint gum and want some. And that meant Wrigley's company sold more of its fresh, minty gum.\n\nThroughout his career, Wrigley was a determined salesman. Because of his ideas, millions of people enjoy chewing gum.",
-          "imagePlaceholder": "william_wrigley_jr_portrait.png"
+          "content": "[PASSAGE TEXT TO BE UPLOADED: Chewing Gum Man, paragraphs 1-8]"
         },
         {
           "passageId": "p2",
           "title": "from Because of Winn-Dixie",
           "author": "by Kate DiCamillo",
-          "content": "Winn-Dixie was not allowed to come inside the store (there was a big sign on the door that said NO DOGS ALLOWED), so I held the collar and the leash up to the window. And Winn-Dixie, who was standing on the other side of the window, pulled up his lip and showed me his teeth and sneezed and wagged his tail something furious; so I knew he absolutely loved that leash and collar combination. But it was very expensive.\n\nI decided to explain my situation to the man behind the counter. I said, 'I don't get a big enough allowance to afford something this fancy. But I love this collar and leash, and so does my dog, and I was thinking that maybe you could set me up on an installment plan.'\n\n'Installment plan?' said the man.\n\n'Gertrude!' somebody screamed in a real irritating voice.\n\nI looked around. It was a parrot. She was sitting on top of one of the fish tanks, looking right at me.\n\n'An installment plan,' I said, ignoring the parrot, 'you know, where I promise to give you my allowance every week and you give me the leash and the collar now.'\n\n'I don't think I can do that,' said the man. He shook his head. 'No, the owner, she wouldn't like that.' He looked down at the counter. He wouldn't look at me. He had thick black hair, and it was slicked back. He had on a name tag that said OTIS.\n\n'Or I could work for you,' I said. 'I could come in and sweep the floors and dust the shelves and take out the trash. I could do that.'\n\nI looked around Gertrude's Pets. There was sand and sunflower-seed shells and big dust bunnies all over the floor. I could tell that it needed to be swept.\n\n'Uh,' said Otis. He looked down at the counter some more.\n\n'Gertrude!' the parrot screamed again.\n\n'I'm real trustworthy,' I said. 'But the only thing is, Winn-Dixie, my dog, he would have to come inside with me; because if we get separated for too long, he starts to howl something terrible.'\n\n'Gertrude doesn't like dogs,' said Otis.\n\n'Is she the owner?' I asked.\n\n'Yes, I mean, no, I mean . . .' He finally looked up. He pointed at the fish tank. 'That Gertrude. The parrot. I named her after the owner.'\n\n'Gertrude's a pretty bird!' screamed Gertrude.\n\n'She might like Winn-Dixie,' I told Otis. 'Almost everybody does. Maybe he could come inside and meet her, and if the two of them get along, then could I have the job?'\n\n'Maybe,' Otis mumbled. He looked down at the counter again.\n\nSo I went and opened the door, and Winn-Dixie came trotting on inside the store.\n\n'Dog!' screamed Gertrude.\n\n'I know it,' Otis told her.\n\nAnd then Gertrude got real quiet. She sat on the top of the fish tank and cocked her head from one side to the other, looking at Winn-Dixie. And Winn-Dixie stood and stared back at her. He didn't hardly move. He didn't wag his tail. He didn't smile. He didn't sneeze. He just stared at Gertrude and she stared at him. And then she spread her wings out real far and flew and landed on top of Winn-Dixie's head.\n\n'Dog,' she croaked.\n\nWinn-Dixie wagged his tail just a little tiny bit.\n\nAnd Otis said, 'You can start on Monday.'\n\n'Thank you!' I told him. 'You won't be sorry.'\n\nOn the way out of Gertrude's Pets, I said to Winn-Dixie, 'You are better at making friends than anybody I have ever known.'"
+          "content": "[PASSAGE TEXT TO BE UPLOADED: Because of Winn-Dixie excerpt, paragraphs 1-27]"
         },
         {
           "passageId": "p3",
           "title": "Night Flyers",
-          "content": "Under the cover of darkness, millions of small, furry bats take flight and fill the night skies of Texas. There are 47 different species of bats in the United States, and 31 species live in Texas. The most common bat found throughout the state is the Mexican free-tailed bat. Each year 20 million Mexican free-tailed bats return to Bracken Cave near San Antonio, where they give birth and raise their young. Bracken Cave is home to the largest bat colony in the world.\n\nBat Benefits\n\nWhile bats seem mysterious or even scary to some, these night flyers are actually helpful creatures. Bats eat insects that can be harmful to plants, animals, and even people. A solitary bat can eat 1,000 mosquito-sized insects in just one hour. Bats also spread pollen among flowering plants. This allows plants to make seeds, and seeds make more plants. In addition, bats produce droppings that make excellent fertilizer. The fertilizer mixes with the soil and makes it richer, which helps plants grow. More plants mean more food for people and animals.\n\nGiving Back to Bats\n\nAs humans develop land and build new houses and businesses, bat habitats, like trees and caves, often are destroyed. Without homes, bats do not have a place to rest or to raise their young. Humans can help bats with this problem by providing bat houses. Today there are many people who build homes for bats.\n\nBecause bats sleep upside down, bat houses need to have something the bats can grab onto while they sleep. The houses must be painted black on the inside so that they are dark inside. This allows the bats to sleep comfortably during the day. Bat houses should also have access to water and plants so that the bats have something to eat and drink. The houses should be located in high places so that they are off the ground, where predators can't reach them. Giving a bat a home is a great way to help these useful creatures.\n\nAlways remember that bats are wild animals, and never try to touch them.",
-          "imagePlaceholder": "bracken_cave_bats.png"
+          "content": "[PASSAGE TEXT TO BE UPLOADED: Night Flyers, paragraphs 1-4]"
         },
         {
           "passageId": "p4",
           "title": "A Sweet Part of Nature",
-          "subtitle": "Articles for Young Scientists    June 2014",
-          "content": "When people think of bees, they may also think of the sweet taste of the honey that bees make. However, some people may not know that bees help us in more ways than producing honey. Unfortunately, there aren't as many honeybees today as there were a few years ago.\n\nWhat's Happening to the Honeybees?\n\nWhen scientists realized that the honeybee population was declining, they tried to figure out why. They think there might be several reasons for this. They found that honeybees are not as healthy as they have been in the past. More honeybees are suffering from diseases and catching viruses from bugs. Scientists also learned that some areas where bees live have been turned into farms. The wildflowers and plants that bees feed on have been replaced with crops, which limits honeybees' access to nectar and pollen. Another problem for honeybees may be the chemicals that are used to protect crops. The chemicals are sprayed on the crops, but they spread to other plants and flowers that bees depend on to survive.\n\nWe Need Bees\n\nMany of the fruits and vegetables that humans and other animals eat cannot grow without the help of honeybees. Honeybees carry pollen among plants. The plants need pollen to grow and produce more seeds. Without the help of honeybees, we would not have as many of the plants we depend on for food.\n\nBees pollinate a wide variety of plants in the United States. They pollinate fruit trees, vegetable plants, and crops such as clover and alfalfa, which feed cows and other farm animals. Many people may not realize it, but honeybees are important to every living thing.\n\nHow Humans Can Help\n\nThere are some things humans can do to help honeybees. People can grow flowers and plants that honeybees like, such as cabbage, sunflowers, and strawberries. People can also build beehives so that more bees will live in their area. In fact, some schools have initiated beekeeping programs to teach students about bees and to provide homes for bees that pollinate local plants.\n\nIan Snyder, a student who participates in a beekeeping program in Pennsylvania, has the right idea. 'It's important to keep the bees alive so they can pollinate everything,' Ian said. 'It's part of the cycle of life.'",
-          "imagePlaceholder": "honeybee_on_flower.png"
+          "subtitle": "Summertime Science - June 2014",
+          "content": "[PASSAGE TEXT TO BE UPLOADED: A Sweet Part of Nature, paragraphs 1-6]"
         },
         {
           "passageId": "p5",
           "title": "Air",
           "author": "by Mordicai Gerstein",
-          "content": "Air is everywhere.\nWhy can't I see it?\nThe sky is made of air.\nIs air blue?\nAir smells like roses sometimes, or fresh-cut grass;\ngasoline or rain or skunk.\nBirds swim in it and so do butterflies,\nbees, bats, and jumbo jets full of people\neating snacks from seat trays.\nSwimming in air is called flying.\nWhy can't I do it?\nWind is air that's going somewhere;\nit musses your hair,\nand whistles in your ears.\nIt tears leaves off trees and blows them away.\nSometimes, it blows the trees away\nand houses too, and whips the seas\ninto foamy mountains that collapse and crash,\nhissing up the sand.\nYou can't see air, only what it does.\nIt has no color or shape unless you push it into a balloon,\nor blow a soap bubble.\nAir.\nTake a\ndeeeeeeeep\nbreath.\nI'm so glad\nit's everywhere."
+          "content": "[PASSAGE TEXT TO BE UPLOADED: Air poem, lines 1-40]"
         },
         {
           "passageId": "p6",
           "title": "Tiny Libraries with Big Stories",
-          "content": "Whack! Whack! Whack! The hammer pounds another nail into the wood. The box is almost finished. Whack! Whack! Whack! The hammer drives in the last nail. A roof is attached to the four sides. The box is then attached to a pole in the ground. Soon the finished wood box will be filled with books. Visitors will borrow books and donate new ones. This box of books works a bit like an ordinary library, with one major difference: it is tiny.\n\nThe First Little Free Library\n\nIn 2009 in Wisconsin, Todd Bol came up with an idea to honor his mother. Bol's mother had been a teacher who had loved reading. Bol wanted to share his mother's love of reading with others. He decided to build a wood box and fill it with books. He made it look like a tiny red schoolhouse because he knew his mother would appreciate that. Bol placed the box of books on a post in his front yard with a sign that read 'Free Books.'\n\nSoon Bol's neighbors noticed this tiny model of a schoolhouse. They began taking the books and replacing them with books of their own. This was the beginning of the Little Free Library. The tiny library allowed people the opportunity to 'check out' books day or night. It was always open. A library card was not needed. The books could be read and returned whenever. But this library didn't just provide books. It also helped build friendships and a sense of belonging among community members. As more and more people visited Bol's little library, they began talking with one another. They shared thoughts, ideas, and stories. They got to know one another. Everyone loved the little library. After all, as Bol says, 'It's a magic box with books.'\n\nThe Demand for More\n\nBol's friends and neighbors wanted little libraries of their own. Bol built several and gave them away. One of his friends, Rick Brooks, noticed that the libraries encouraged people to read. He believed that Bol's little libraries could benefit more than just local friends and neighbors. With these ideas in mind, Bol and Brooks came up with a plan to build more than 2,500 Little Free Libraries around the world.\n\nTheir goal was to build more libraries than Andrew Carnegie. In the late 1800s and early 1900s, Carnegie donated millions of dollars to have public libraries built around the world. Like Carnegie, Bol and Brooks believed that books should be available to all people, no matter where they live or what their background is. To help achieve their goal, Bol and Brooks created a website that provides information about the Little Free Libraries and how people can establish little libraries of their own.\n\nBol often hears from new Little Free Library owners, who tell him how important the libraries are to their community. He says, 'People tell us all the time that they've met more people in a week than they have in a lifetime.'\n\nLisa Lopez is an excited owner of two Little Free Libraries. She is also an elementary school librarian from El Paso, Texas. She says, 'It's generated a lot of excitement about reading. Kids love it, but adults are using it, too. My goal is to spread them across El Paso.'\n\nThanks to Bol and Brooks, the Little Free Libraries are encouraging people to read more and to be friendlier. Today there are more than 25,000 Little Free Libraries around the world, and they can be found on almost every continent.\n\nYou Can, Too\n\nFinished reading that book? Looking for another book to read? Perhaps there's a Little Free Library where you live. If not, maybe there will be one soon. After all, it only takes some wood, a hammer, a few nails, and some books.\n\nStart a Library in Your Neighborhood\n\nAnyone can start a little library. If you want to start one in your neighborhood, follow these helpful steps.\n\nMake a Plan\nDiscuss your idea with a parent or guardian. Explain what you want to do and how you will do it. Decide where the library will be located. Get permission to set up the library in the chosen location.\n\nBuild the Box\nBuild or buy a box that will hold books. It is helpful if the box has a shelf or two. You may want to include a door that opens and closes to help protect the books from rain. Finally, you can paint and decorate your library box.\n\nJust Add Books\nSort through your old books and select some to put in the library. Ask friends and neighbors to donate some, too. Fill the little library with books, and the readers will come.\n\nVisit the Little Free Library website for more information and great tips.",
-          "imagePlaceholder": "little_free_library_example.png"
+          "content": "[PASSAGE TEXT TO BE UPLOADED: Tiny Libraries with Big Stories, paragraphs 1-9]"
         }
       ],
       "questions": [
@@ -63,7 +60,7 @@
           "questionId": "q2",
           "passageId": "p1",
           "type": "multiple-choice",
-          "question": "Read this sentence from paragraph 2.\n\nIn fact, it's difficult to imagine a world today without grocery store check-out counters lined with colorful packages of minty or fruit-flavored gum.\n\nThe description in this sentence helps the reader understand that —",
+          "question": "Read this sentence from paragraph 2. 'In fact, it's difficult to imagine a world today without grocery store check-out counters lined with colorful packages of minty or fruit-flavored gum.' The description in this sentence helps the reader understand that —",
           "options": [
             "gum has become more expensive",
             "gum is a common and popular product",
@@ -308,7 +305,7 @@
         },
         {
           "questionId": "q21",
-          "passageId": "p3_p4",
+          "passageId": "p3",
           "type": "multiple-choice",
           "question": "Based on details in both 'Night Flyers' and 'A Sweet Part of Nature,' the reader can tell that bats and honeybees are responsible for —",
           "options": [
@@ -321,7 +318,7 @@
         },
         {
           "questionId": "q22",
-          "passageId": "p3_p4",
+          "passageId": "p3",
           "type": "multiple-choice",
           "question": "The first photograph in 'Night Flyers' and the last photograph in 'A Sweet Part of Nature' both show that —",
           "options": [
@@ -334,7 +331,7 @@
         },
         {
           "questionId": "q23",
-          "passageId": "p3_p4",
+          "passageId": "p3",
           "type": "multiple-choice",
           "question": "What is one way that the bats in 'Night Flyers' and the honeybees in 'A Sweet Part of Nature' are different?",
           "options": [
@@ -347,9 +344,9 @@
         },
         {
           "questionId": "q24",
-          "passageId": "p3_p4",
+          "passageId": "p3",
           "type": "multiple-choice",
-          "question": "Read this sentence from paragraph 2 of 'Night Flyers.'\n\nBats also spread pollen among flowering plants.\n\nWhich sentence from 'A Sweet Part of Nature' best shows a way that honeybees are similar to bats?",
+          "question": "Read this sentence from paragraph 2 of 'Night Flyers.' 'Bats also spread pollen among flowering plants.' Which sentence from 'A Sweet Part of Nature' best shows a way that honeybees are similar to bats?",
           "options": [
             "When people think of bees, they may also think of the sweet taste of the honey that bees make.",
             "The wildflowers and plants that bees feed on have been replaced with crops, which limits honeybees' access to nectar and pollen.",
@@ -375,7 +372,7 @@
           "questionId": "q26",
           "passageId": "p5",
           "type": "multiple-choice",
-          "question": "Read lines 5 through 9 of the poem.\n\nAir smells like roses sometimes, or fresh-cut grass; gasoline or rain or skunk.\n\nWhy does the poet include descriptive language in these lines?",
+          "question": "Read lines 5 through 9 of the poem. 'Air smells like roses sometimes, or fresh-cut grass; gasoline or rain or skunk.' Why does the poet include descriptive language in these lines?",
           "options": [
             "To persuade the reader to spend more time outdoors",
             "To tell the reader that air can smell like many things after it rains",
@@ -414,107 +411,109 @@
           "questionId": "q29",
           "passageId": "p5",
           "type": "multiple-choice",
-          "question": "The poet's use of line breaks throughout the poem helps the reader —",
+          "question": "The speaker in the poem believes that the difference between wind and air is that wind is —",
           "options": [
-            "understand the meaning of difficult words",
-            "know when to pause while reading",
-            "recognize the rhyming words",
-            "identify the main idea"
+            "colder",
+            "thinner",
+            "smelly",
+            "moving"
           ],
-          "correctAnswer": "know when to pause while reading"
+          "correctAnswer": "moving"
         },
         {
           "questionId": "q30",
           "passageId": "p5",
           "type": "multiple-choice",
-          "question": "What is the poet's message in the poem?",
+          "question": "What can the reader conclude about the speaker's ideas about air throughout the poem?",
           "options": [
-            "Air is a powerful force that can be dangerous.",
-            "Air is a part of nature that should be appreciated.",
-            "Air is a mysterious substance that is difficult to understand.",
-            "Air is a natural resource that needs to be protected."
+            "The speaker has changed his mind about air.",
+            "The speaker wishes that air could be seen.",
+            "The speaker thinks that air has qualities that make it special.",
+            "The speaker is confused by his thoughts about air."
           ],
-          "correctAnswer": "Air is a part of nature that should be appreciated."
+          "correctAnswer": "The speaker thinks that air has qualities that make it special."
         },
         {
           "questionId": "q31",
           "passageId": "p6",
           "type": "multiple-choice",
-          "question": "The author includes the first paragraph in the selection most likely to —",
+          "question": "Read this dictionary entry for the word drive. Which definition most closely fits the way the word drives is used in paragraph 1?",
           "options": [
-            "describe the steps for building a Little Free Library",
-            "explain why the Little Free Library was created",
-            "help the reader imagine a Little Free Library",
-            "show how the Little Free Library is different from other libraries"
+            "Definition 1: to take to another place by car",
+            "Definition 2: to guide the movement of",
+            "Definition 3: to force to go through",
+            "Definition 4: to throw hard or fast"
           ],
-          "correctAnswer": "help the reader imagine a Little Free Library"
+          "correctAnswer": "Definition 3: to force to go through"
         },
         {
           "questionId": "q32",
           "passageId": "p6",
           "type": "multiple-choice",
-          "question": "What is the main idea of the section titled 'The First Little Free Library'?",
+          "question": "Based on information in the selection, how do Brooks and Bol most likely feel about the results of their plan?",
           "options": [
-            "Todd Bol created a small library to honor his mother.",
-            "Todd Bol's mother was a teacher who loved reading.",
-            "Todd Bol's neighbors enjoyed borrowing books from his library.",
-            "Todd Bol built a tiny red schoolhouse to hold books."
+            "Disappointed",
+            "Curious",
+            "Delighted",
+            "Confused"
           ],
-          "correctAnswer": "Todd Bol created a small library to honor his mother."
+          "correctAnswer": "Delighted"
         },
         {
           "questionId": "q33",
           "passageId": "p6",
           "type": "multiple-choice",
-          "question": "Read this sentence from paragraph 5.\n\nBut this library didn't just provide books.\n\nWhat does the author mean by this sentence?",
+          "imagePlaceholder": "little_free_library_photo.png",
+          "question": "The photograph and caption above paragraph 8 are included in the selection to show —",
           "options": [
-            "The library was not the only place to get books.",
-            "The library offered more than just books.",
-            "The library was not open all the time.",
-            "The library was not always full of books."
+            "why some of the libraries become more popular than others",
+            "how library owners must refill their libraries every day",
+            "what steps people use to check books out of the libraries",
+            "how the libraries help people share and enjoy books"
           ],
-          "correctAnswer": "The library offered more than just books."
+          "correctAnswer": "how the libraries help people share and enjoy books"
         },
         {
           "questionId": "q34",
           "passageId": "p6",
           "type": "multiple-choice",
-          "question": "Which sentence from the selection best supports the idea that Little Free Libraries have become popular?",
+          "question": "Which sentence best completes the diagram? CAUSE: Bol builds the first Little Free Library. EFFECT: ?",
           "options": [
-            "In 2009 in Wisconsin, Todd Bol came up with an idea to honor his mother.",
-            "Soon Bol's neighbors noticed this tiny model of a schoolhouse.",
-            "Bol's friends and neighbors wanted little libraries of their own.",
-            "Today there are more than 25,000 Little Free Libraries around the world, and they can be found on almost every continent."
+            "Bol wants to honor his mother.",
+            "Bol thinks his friends do not have enough books.",
+            "Bol wants people to learn to share with others.",
+            "Bol notices that libraries make people want to read."
           ],
-          "correctAnswer": "Today there are more than 25,000 Little Free Libraries around the world, and they can be found on almost every continent."
+          "correctAnswer": "Bol wants to honor his mother."
         },
         {
           "questionId": "q35",
           "passageId": "p6",
           "type": "multiple-choice",
-          "question": "According to the selection, what is one way that Little Free Libraries have helped communities?",
+          "question": "The author wrote this selection mainly to —",
           "options": [
-            "They have encouraged people to read more.",
-            "They have helped people earn extra money.",
-            "They have taught people how to build things.",
-            "They have allowed people to travel more."
+            "provide information about where to find a Little Free Library",
+            "explain why people enjoy reading books outdoors",
+            "persuade the reader to visit a Little Free Library",
+            "tell the reader about an interesting way to share books"
           ],
-          "correctAnswer": "They have encouraged people to read more."
+          "correctAnswer": "tell the reader about an interesting way to share books"
         },
         {
           "questionId": "q36",
           "passageId": "p6",
           "type": "multiple-choice",
-          "question": "The author organizes the selection by —",
+          "question": "What is the best summary of the selection?",
           "options": [
-            "explaining the steps for building a Little Free Library and then telling why it is important to have one",
-            "describing the first Little Free Library and then explaining how the idea grew and spread",
-            "comparing the first Little Free Library with the ones that are built today",
-            "providing reasons why the Little Free Library was created and then telling how it has changed over time"
+            "A man made a little box and filled it with books for people to borrow. The box was shaped like a red schoolhouse. The man's friends and neighbors loved the little library and soon wanted to have tiny libraries of their own.",
+            "A man built a box in his yard and filled it with books. His neighbors liked the little library, so the man and his friend decided to help get little libraries started everywhere. Today many people enjoy getting books and meeting new friends at the little libraries.",
+            "A man thought of an idea to make a tiny library. Books are placed in a box and then put in a front yard. People do not need library cards and can just take the books for free anytime they want. They can return them whenever they are finished.",
+            "A man and his friend decided to try to get people around the world to build little libraries. They created a website to teach people how. Their goal was to build more libraries than Andrew Carnegie."
           ],
-          "correctAnswer": "describing the first Little Free Library and then explaining how the idea grew and spread"
+          "correctAnswer": "A man built a box in his yard and filled it with books. His neighbors liked the little library, so the man and his friend decided to help get little libraries started everywhere. Today many people enjoy getting books and meeting new friends at the little libraries."
         }
       ]
     }
   ]
 }
+```
