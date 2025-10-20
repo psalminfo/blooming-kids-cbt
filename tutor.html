@@ -4,9 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Tutor Portal - Blooming Kids House</title>
-    
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" />
    
+    <!-- Google Analytics Script - ADDED HERE -->
     <script async src="https://www.googletagmanager.com/gtag/js?id=G-NBTVEGH1SL"></script>
     <script>
         window.dataLayer = window.dataLayer || [];
@@ -14,360 +14,41 @@
         gtag('js', new Date());
         gtag('config', 'G-NBTVEGH1SL');
     </script>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
-    <link rel="stylesheet" href="fonts/material-design-iconic-font/css/material-design-iconic-font.min.css">
-    <link rel="stylesheet" href="css/style.css">
-    
+    <!-- End Google Analytics Script -->
+   
     <style>
-        /* Custom Styles for Nav Buttons - RETAINED */
         .nav-btn {
             padding: 8px 16px;
             border-bottom: 2px solid transparent;
             transition: all 0.3s ease;
-            white-space: nowrap;
         }
         .nav-btn.active {
             border-bottom-color: #16a34a; /* green-600 */
             color: #16a34a;
         }
-        
-        /* Overrides to fit Dashboard into Colorlib wrapper structure */
-        .wrapper {
-            padding: 10px 0;
-            display: flex;
-            justify-content: center;
-            align-items: flex-start;
-            min-height: 100vh;
-            background-image: url('images/bg-registration-form-2.jpg') !important;
-            background-size: cover;
-            background-position: center;
-            transition: background-color 0.3s;
-        }
-        .inner {
-            max-width: 1280px; 
-            width: 95%; 
-            padding: 20px;
-            /* LIGHT MODE: White background and dark text defaults are retained (Black on White) */
-            background: #ffffff; 
-            border-radius: 10px;
-            box-shadow: 0 0 10px rgba(0, 0, 0, 0.2);
-            min-height: 80vh; 
-            transition: background-color 0.3s, color 0.3s;
-            margin: 10px 0;
-        }
-        
-        /* Ensure Dashboard title elements are styled for the new UI */
-        .dashboard-header {
-            color: #333; /* LIGHT MODE: Dark text for headers */
-            text-shadow: none;
-            transition: color 0.3s;
-        }
-
-        /* Mobile-first responsive design */
-        @media (max-width: 768px) {
-            .wrapper {
-                padding: 5px 0;
-            }
-            .inner {
-                width: 98%;
-                padding: 15px;
-                margin: 5px 0;
-            }
-            
-            .header-container {
-                flex-direction: column;
-                align-items: flex-start !important;
-                gap: 15px;
-            }
-            
-            .logo-title-container {
-                flex-direction: column;
-                align-items: flex-start !important;
-                text-align: left;
-                width: 100%;
-            }
-            
-            .action-buttons {
-                width: 100%;
-                justify-content: space-between;
-                gap: 10px;
-            }
-            
-            .action-buttons .btn-mobile {
-                flex: 1;
-                min-width: 0;
-                padding: 10px 8px;
-                font-size: 0.875rem;
-            }
-            
-            #tutorNameHeading {
-                font-size: 1.5rem;
-                margin-top: 10px;
-            }
-            
-            #logoImg {
-                height: 50px !important;
-            }
-            
-            .nav-container {
-                overflow-x: auto;
-                padding-bottom: 5px;
-            }
-            
-            .nav-buttons {
-                display: flex;
-                min-width: max-content;
-                gap: 10px;
-            }
-            
-            .nav-btn {
-                padding: 8px 12px;
-                font-size: 1rem;
-            }
-        }
-
-        @media (max-width: 480px) {
-            .inner {
-                padding: 12px;
-                border-radius: 8px;
-            }
-            
-            .action-buttons {
-                flex-direction: column;
-            }
-            
-            .action-buttons .btn-mobile {
-                width: 100%;
-            }
-            
-            #tutorNameHeading {
-                font-size: 1.25rem;
-            }
-            
-            .nav-btn {
-                padding: 6px 10px;
-                font-size: 0.9rem;
-            }
-        }
-
-        /* --- DARK MODE STYLES (White on Dark Gray) --- */
-        .dark .wrapper {
-            background-color: #111827 !important; /* Very Dark gray/near black wrapper background for max contrast */
-            background-image: linear-gradient(rgba(17, 24, 39, 0.9), rgba(17, 24, 39, 0.9)), url('images/bg-registration-form-2.jpg') !important;
-            background-blend-mode: overlay;
-        }
-        
-        /* NEW: Fix logo contrast in dark mode */
-        .dark #logoImg {
-            /* Adjust brightness and add a white drop-shadow to make the dark logo visible */
-            filter: brightness(2) drop-shadow(0 0 5px rgba(255, 255, 255, 0.5));
-        }
-
-        .dark .inner {
-            background: #1f2937; /* Very Dark gray/near black for the main content panel */
-            box-shadow: 0 0 15px rgba(0, 0, 0, 0.5);
-        }
-        
-        /* Expanded General text color override to ensure pure white contrast on all elements */
-        .dark .inner, 
-        .dark .inner p, 
-        .dark .inner span, 
-        .dark .inner a, 
-        .dark .inner label, 
-        .dark .inner div, 
-        .dark .inner button,
-        .dark .inner input, /* Explicitly target input fields */
-        .dark .inner select, /* Explicitly target select fields */
-        .dark .inner textarea, /* Explicitly target textarea fields */
-        .dark .inner h1, .dark .inner h2, .dark .inner h3 {
-             color: #ffffff !important; /* ENFORCED PURE WHITE */
-        }
-        
-        /* ⭐⭐ NEW: Ensure high-contrast placeholder text in input/textarea fields ⭐⭐ */
-        .dark .inner input::placeholder,
-        .dark .inner textarea::placeholder {
-            color: #cccccc !important; /* Light gray for placeholder, still high contrast */
-            opacity: 1 !important; /* Ensure full visibility */
-        }
-        
-        /* ⭐⭐ NEW: Form elements styling for dark mode ⭐⭐ */
-        .dark .inner input:not([type="checkbox"]):not([type="radio"]),
-        .dark .inner select,
-        .dark .inner textarea {
-            background-color: #374151 !important;
-            border-color: #4b5563 !important;
-            color: #ffffff !important;
-        }
-        
-        /* ⭐⭐ NEW: Table and data container styling for dark mode ⭐⭐ */
-        .dark .inner table, 
-        .dark .inner .bg-white {
-            background-color: #374151 !important;
-            color: #ffffff !important;
-        }
-        
-        .dark .inner table td, 
-        .dark .inner table th {
-            border-color: #4b5563 !important;
-            color: #ffffff !important;
-        }
-        
-        /* ⭐⭐ NEW: Card and content container styling for dark mode ⭐⭐ */
-        .dark .inner .bg-gray-50 {
-            background-color: #374151 !important;
-        }
-        
-        /* ⭐⭐ NEW: Focus states for accessibility ⭐⭐ */
-        .dark .inner button:focus,
-        .dark .inner input:focus,
-        .dark .inner select:focus {
-            outline: 2px solid #3b82f6 !important;
-            outline-offset: 2px !important;
-        }
-        
-        /* ⭐⭐ NEW: Smooth transitions for all theme-able properties ⭐⭐ */
-        .inner * {
-            transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
-        }
-
-        /* Override specific bright elements in dark mode (headers should be white) */
-        .dark .dashboard-header {
-            color: #ffffff !important;
-        }
-        
-        /* Override nav link colors in dark mode - FIXED SYNTAX ERROR */
-        .dark .nav-btn {
-            color: #e5e7eb !important; /* Better contrast light gray for inactive tabs */
-        }
-        .dark .nav-btn.active {
-            border-bottom-color: #10b981 !important; /* Brighter green for active tab */
-            color: #10b981 !important;
-        }
-        .dark #logoutBtn, .dark #whatsappBtn {
-             /* Ensure buttons maintain contrast */
-             filter: brightness(1.2);
-        }
-
-        /* Hide scrollbar for nav but keep functionality */
-        .nav-container::-webkit-scrollbar {
-            display: none;
-        }
-        .nav-container {
-            -ms-overflow-style: none;
-            scrollbar-width: none;
-        }
     </style>
 </head>
-<body>
-
-    <div class="wrapper">
-        <div class="inner">
-            <div class="max-w-7xl mx-auto">
-                <!-- Updated header with mobile-friendly classes -->
-                <div class="flex justify-between items-center mb-6 header-container">
-                    <div class="flex items-center logo-title-container">
-                        <img id="logoImg" src="https://res.cloudinary.com/dy2hxcyaf/image/upload/v1757700806/newbhlogo_umwqzy.svg" alt="Blooming Kids House Logo" class="h-16 w-auto mr-4 mobile-logo" style="filter: drop-shadow(0 0 5px rgba(0, 0, 0, 0.2));">
-                        
-                        <h1 id="tutorNameHeading" class="text-3xl font-bold dashboard-header mobile-title">Welcome, Tutor!</h1>
-                    </div>
-                    
-                    <div class="flex space-x-3 items-center action-buttons">
-                        <button id="modeToggle" class="p-3 rounded-full bg-gray-200 hover:bg-gray-300 text-gray-700 dark:bg-gray-600 dark:hover:bg-gray-700 dark:text-white transition-colors duration-300 shadow-md btn-mobile" aria-label="Toggle dark mode">
-                            <i class="fas fa-moon" id="modeIcon"></i>
-                        </button>
-
-                        <a id="whatsappBtn" 
-                           href="https://wa.me/2348158768689" 
-                           target="_blank" 
-                           class="bg-green-500 text-white px-4 py-2 rounded flex items-center hover:bg-green-600 shadow-md transition-colors duration-300 btn-mobile"
-                           title="Contact Tech Support via WhatsApp">
-                            <i class="fab fa-whatsapp mr-2 text-lg"></i> 
-                            <span class="mobile-text">Tech Support</span>
-                        </a>
-
-                        <button id="logoutBtn" class="bg-yellow-400 text-white px-4 py-2 rounded hover:bg-yellow-500 shadow-md btn-mobile">
-                            <span class="mobile-text">Logout</span>
-                        </button>
-                    </div>
-                </div>
-                
-                <!-- Updated nav with mobile scrolling -->
-                <nav class="mb-6 border-b border-gray-200 dark:border-gray-700 nav-container">
-                    <div class="flex space-x-4 nav-buttons">
-                        <button id="navDashboard" class="nav-btn text-lg font-semibold active dashboard-header">Dashboard</button>
-                        <button id="navStudentDatabase" class="nav-btn text-lg font-semibold text-gray-500 hover:text-green-600">Student Database</button>
-                    </div>
-                </nav>
-
-                <div id="mainContent">
-                    <p class="text-center text-gray-600 mt-12 mobile-content">Checking user permissions...</p>
-                </div>
+<body class="bg-green-50 min-h-screen">
+    <div class="max-w-7xl mx-auto p-6">
+        <div class="flex justify-between items-center mb-6">
+            <!-- New container for the logo and heading -->
+            <div class="flex items-center">
+                <!-- The logo with a glowing black shadow and a size that makes it clearly visible -->
+                <img src="https://res.cloudinary.com/dy2hxcyaf/image/upload/v1757700806/newbhlogo_umwqzy.svg" alt="Blooming Kids House Logo" class="h-16 w-auto mr-4" style="filter: drop-shadow(0 0 5px rgba(0, 0, 0, 0.8));">
+                <h1 class="text-3xl font-bold text-green-800">Tutor Portal</h1>
             </div>
+            <button id="logoutBtn" class="bg-yellow-400 text-white px-4 py-2 rounded hover:bg-yellow-500">Logout</button>
+        </div>
+        
+        <nav class="flex space-x-4 mb-6 border-b">
+            <button id="navDashboard" class="nav-btn text-lg font-semibold active">Dashboard</button>
+            <button id="navStudentDatabase" class="nav-btn text-lg font-semibold text-gray-500 hover:text-green-600">Student Database</button>
+        </nav>
+
+        <div id="mainContent">
+            <p class="text-center text-gray-600 mt-12">Checking user permissions...</p>
         </div>
     </div>
-    
     <script type="module" src="tutor.js"></script>
-
-    <script>
-        document.addEventListener('DOMContentLoaded', () => {
-            const body = document.body;
-            const toggleButton = document.getElementById('modeToggle');
-            const modeIcon = document.getElementById('modeIcon');
-            const modeKey = 'tutor_theme';
-
-            // Function to set the theme
-            const setTheme = (theme) => {
-                if (theme === 'dark') {
-                    body.classList.add('dark');
-                    modeIcon.classList.remove('fa-moon');
-                    modeIcon.classList.add('fa-sun');
-                    localStorage.setItem(modeKey, 'dark');
-                } else {
-                    body.classList.remove('dark');
-                    modeIcon.classList.remove('fa-sun');
-                    modeIcon.classList.add('fa-moon');
-                    localStorage.setItem(modeKey, 'light');
-                }
-            };
-
-            // 1. Load saved theme or default to light
-            const savedTheme = localStorage.getItem(modeKey);
-            if (savedTheme) {
-                setTheme(savedTheme);
-            } else if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
-                // Check system preference if no saved theme
-                setTheme('dark');
-            } else {
-                setTheme('light');
-            }
-
-            // 2. Add event listener to toggle theme on click
-            toggleButton.addEventListener('click', () => {
-                const currentTheme = body.classList.contains('dark') ? 'dark' : 'light';
-                const newTheme = currentTheme === 'light' ? 'dark' : 'light';
-                setTheme(newTheme);
-            });
-
-            // 3. Mobile-specific enhancements
-            function handleResize() {
-                const isMobile = window.innerWidth < 768;
-                
-                // Add mobile-specific classes for further customization
-                if (isMobile) {
-                    document.body.classList.add('mobile-view');
-                    document.body.classList.remove('desktop-view');
-                } else {
-                    document.body.classList.add('desktop-view');
-                    document.body.classList.remove('mobile-view');
-                }
-            }
-
-            // Initial check
-            handleResize();
-            
-            // Listen for resize events
-            window.addEventListener('resize', handleResize);
-        });
-    </script>
 </body>
 </html>
