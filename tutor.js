@@ -1,3 +1,5 @@
+[file name]: tutor.js
+[file content begin]
 import { auth, db } from './firebaseConfig.js';
 import { collection, getDocs, doc, updateDoc, getDoc, where, query, addDoc, writeBatch, deleteDoc } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
 import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-auth.js";
@@ -310,6 +312,70 @@ function renderTutorDashboard(container, tutor) {
     loadTutorReports(tutor.email);
 }
 
+// NEW: Function to sync creative writing comments to student_results
+async function syncCreativeWritingToStudentResults(submissionData, tutorReport) {
+    try {
+        console.log("Syncing creative writing comments to student_results...");
+        
+        // Find the corresponding creative writing assessment in student_results
+        const studentResultsQuery = query(
+            collection(db, "student_results"),
+            where("studentName", "==", submissionData.studentName),
+            where("parentPhone", "==", submissionData.parentPhone),
+            where("tutorEmail", "==", submissionData.tutorEmail)
+        );
+        
+        const studentResultsSnapshot = await getDocs(studentResultsQuery);
+        
+        if (!studentResultsSnapshot.empty) {
+            const batch = writeBatch(db);
+            
+            studentResultsSnapshot.forEach(doc => {
+                const resultData = doc.data();
+                
+                // Check if this is a creative writing submission
+                if (resultData.answers && Array.isArray(resultData.answers)) {
+                    const creativeWritingAnswer = resultData.answers.find(answer => 
+                        answer.type === 'creative-writing'
+                    );
+                    
+                    if (creativeWritingAnswer) {
+                        // Update the tutorReport field in the creative writing answer
+                        const updatedAnswers = resultData.answers.map(answer => {
+                            if (answer.type === 'creative-writing') {
+                                return {
+                                    ...answer,
+                                    tutorReport: tutorReport
+                                };
+                            }
+                            return answer;
+                        });
+                        
+                        // Update the document with the new answers
+                        const resultRef = doc(db, "student_results", doc.id);
+                        batch.update(resultRef, {
+                            answers: updatedAnswers,
+                            tutorReport: tutorReport // Also add at top level for easy access
+                        });
+                        
+                        console.log("Updated creative writing comments for:", submissionData.studentName);
+                    }
+                }
+            });
+            
+            // Commit all updates
+            if (batch._mutations.length > 0) {
+                await batch.commit();
+                console.log("Successfully synced creative writing comments to student_results");
+            }
+        } else {
+            console.log("No matching student_results found for creative writing sync");
+        }
+    } catch (error) {
+        console.error("Error syncing creative writing comments:", error);
+    }
+}
+
 async function loadTutorReports(tutorEmail, parentName = null) {
     const pendingReportsContainer = document.getElementById('pendingReportsContainer');
     const gradedReportsContainer = document.getElementById('gradedReportsContainer');
@@ -363,7 +429,20 @@ async function loadTutorReports(tutorEmail, parentName = null) {
                 const tutorReport = reportTextarea.value.trim();
                 if (tutorReport) {
                     const docRef = doc(db, "tutor_submissions", docId);
-                    await updateDoc(docRef, { tutorReport: tutorReport, status: 'Graded' });
+                    
+                    // Get the submission data first
+                    const submissionDoc = await getDoc(docRef);
+                    const submissionData = submissionDoc.data();
+                    
+                    // Update the tutor_submissions document
+                    await updateDoc(docRef, { 
+                        tutorReport: tutorReport, 
+                        status: 'Graded' 
+                    });
+                    
+                    // NEW: Sync creative writing comments to student_results
+                    await syncCreativeWritingToStudentResults(submissionData, tutorReport);
+                    
                     loadTutorReports(tutorEmail, parentName); // Refresh the list
                 }
             });
@@ -1203,3 +1282,4 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     });
 });
+[file content end]
