@@ -1279,5 +1279,131 @@ document.addEventListener('DOMContentLoaded', async () => {
             renderStudentDatabase(document.getElementById('mainContent'), window.tutorData);
         }
     });
+
+    // ##################################################################
+    // # SECTION 4: AUTO-REGISTERED STUDENTS NAVIGATION (NEW - ADDED AT BOTTOM)
+    // ##################################################################
+    document.getElementById('navAutoStudents').addEventListener('click', () => {
+        if (window.tutorData) {
+            renderAutoRegisteredStudents(document.getElementById('mainContent'), window.tutorData);
+        }
+    });
 });
 
+// ##################################################################
+// # SECTION 5: AUTO-REGISTERED STUDENTS DISPLAY (NEW - ADDED AT BOTTOM)
+// ##################################################################
+
+function renderAutoRegisteredStudents(container, tutor) {
+    container.innerHTML = `
+        <div class="bg-white p-6 rounded-lg shadow-md">
+            <h2 class="text-2xl font-bold text-blue-700 mb-4">Auto-Registered Students</h2>
+            <p class="text-sm text-gray-600 mb-4">Students who completed tests and need profile completion</p>
+            <div id="auto-students-list">
+                <p class="text-gray-500">Loading auto-registered students...</p>
+            </div>
+        </div>
+    `;
+    
+    loadAutoRegisteredStudents(tutor.email);
+}
+
+async function loadAutoRegisteredStudents(tutorEmail) {
+    // Query both collections for auto-registered students
+    const studentsQuery = query(collection(db, "students"), 
+        where("tutorEmail", "==", tutorEmail),
+        where("autoRegistered", "==", true));
+    
+    const pendingQuery = query(collection(db, "pending_students"), 
+        where("tutorEmail", "==", tutorEmail),
+        where("autoRegistered", "==", true));
+
+    try {
+        const [studentsSnapshot, pendingSnapshot] = await Promise.all([
+            getDocs(studentsQuery),
+            getDocs(pendingQuery)
+        ]);
+
+        const autoStudents = [
+            ...studentsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data(), collection: "students" })),
+            ...pendingSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data(), collection: "pending_students" }))
+        ];
+
+        renderAutoStudentsList(autoStudents);
+    } catch (error) {
+        console.error("Error loading auto-registered students:", error);
+        document.getElementById('auto-students-list').innerHTML = `<p class="text-red-500">Failed to load auto-registered students.</p>`;
+    }
+}
+
+function renderAutoStudentsList(students) {
+    const container = document.getElementById('auto-students-list');
+    
+    if (students.length === 0) {
+        container.innerHTML = `<p class="text-gray-500">No auto-registered students found.</p>`;
+        return;
+    }
+
+    let html = `
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-200">
+                <thead>
+                    <tr>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Student</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Test Info</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
+                    </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-gray-200">
+    `;
+
+    students.forEach(student => {
+        const status = student.collection === "students" ? 
+            "🆕 Needs Completion" : 
+            "🆕 Awaiting Approval";
+            
+        const statusClass = student.collection === "students" ? 
+            'bg-blue-100 text-blue-800' : 
+            'bg-yellow-100 text-yellow-800';
+        
+        html += `
+            <tr>
+                <td class="px-6 py-4 whitespace-nowrap">
+                    <div class="font-medium">${student.studentName}</div>
+                    <div class="text-sm text-gray-500">${student.grade} • ${student.parentPhone || 'No phone'}</div>
+                    <div class="text-xs text-gray-400">${student.parentEmail || 'No email'}</div>
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap">
+                    <span class="px-2 py-1 text-xs font-semibold rounded-full ${statusClass}">
+                        ${status}
+                    </span>
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    ${student.testSubject || 'General Test'}
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap space-x-2">
+                    <button class="complete-student-btn bg-green-600 text-white px-3 py-1 rounded text-sm" 
+                            data-student-id="${student.id}" data-collection="${student.collection}">
+                        Complete Profile
+                    </button>
+                </td>
+            </tr>
+        `;
+    });
+
+    html += `</tbody></table></div>`;
+    container.innerHTML = html;
+    
+    // Attach event listeners
+    document.querySelectorAll('.complete-student-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const studentId = btn.getAttribute('data-student-id');
+            const collection = btn.getAttribute('data-collection');
+            const student = students.find(s => s.id === studentId && s.collection === collection);
+            if (student) {
+                showEditStudentModal(student); // Reuse existing edit modal
+            }
+        });
+    });
+}
