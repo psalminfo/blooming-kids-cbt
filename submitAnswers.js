@@ -49,7 +49,7 @@ export async function submitTestToFirebase(subject, grade, studentName, parentEm
 
     for (const block of questionBlocks) {
         const questionId = block.getAttribute('data-question-id');
-        const originalQuestion = loadedQuestions.find(q => q.id === parseInt(questionId));
+        const originalQuestion = loadedQuestions.find(q =>      q.id == questionId ||      String(q.id) === String(questionId) );
 
         console.log(`📝 Processing question ${questionId}:`, {
             foundOriginal: !!originalQuestion,
