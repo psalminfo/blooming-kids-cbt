@@ -71,6 +71,17 @@ export function clearAllTestSessions() {
     console.log("All test sessions cleared - ready for new test");
 }
 
+// Export function to get answer data for submission
+export function getAnswerData() {
+    const savedAnswers = sessionStorage.getItem(`${currentSessionId}-answers`);
+    return savedAnswers ? JSON.parse(savedAnswers) : {};
+}
+
+// Export function to get all loaded questions
+export function getAllLoadedQuestions() {
+    return loadedQuestions;
+}
+
 /**
  * The entry point to load and display questions for a test.
  * @param {string} subject The subject of the test (e.g., 'ela').
