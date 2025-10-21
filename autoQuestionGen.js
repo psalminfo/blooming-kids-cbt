@@ -12,6 +12,15 @@ let saveTimeout = null;
  * @param {string} state The current state of the test ('creative-writing' or 'mcq').
  */
 export async function loadQuestions(subject, grade, state) {
+    // BLOCK CREATIVE WRITING FOR NON-ELA SUBJECTS
+    if (state === 'creative-writing' && subject.toLowerCase() !== 'ela') {
+        console.warn("Creative writing is only available for ELA subjects. Redirecting to MCQ.");
+        const params = new URLSearchParams(window.location.search);
+        params.set('state', 'mcq');
+        window.location.search = params.toString();
+        return;
+    }
+
     const container = document.getElementById("question-container");
     const submitBtnContainer = document.getElementById("submit-button-container");
     container.innerHTML = `<p class="text-gray-500">Please wait, preparing your test...</p>`;
@@ -170,6 +179,7 @@ export async function loadQuestions(subject, grade, state) {
             saveSession(loadedQuestions, passagesMap);
             displayCreativeWriting(creativeWritingQuestion);
         } else {
+            // FOR ALL SUBJECTS: Filter out creative writing questions from MCQ display
             const filteredQuestions = allQuestions.filter(q => q.type !== 'creative-writing');
             const shuffledQuestions = filteredQuestions.sort(() => 0.5 - Math.random()).slice(0, 30);
             loadedQuestions = shuffledQuestions.map((q, index) => ({ 
@@ -530,8 +540,8 @@ window.continueToMCQ = async (questionId, studentName, parentEmail, tutorEmail, 
             fileUrl: fileUrl,
             submittedAt: new Date(),
             studentName: studentName,
-            parentEmail: parentEmail,
-            tutorEmail: tutorEmail,
+            parentEmail: parentEmail,    // ✅ Goes to parent portal
+            tutorEmail: tutorEmail,      // ✅ Goes to tutor
             grade: grade,
             subject: 'ela',
             status: "pending_review",
@@ -544,7 +554,6 @@ window.continueToMCQ = async (questionId, studentName, parentEmail, tutorEmail, 
         alert("Creative writing submitted successfully! Moving to multiple-choice questions.");
         
         // Don't clear session - we need it for MCQ questions
-        // Just redirect to MCQ section
         const params = new URLSearchParams(window.location.search);
         params.set('state', 'mcq');
         window.location.search = params.toString();
