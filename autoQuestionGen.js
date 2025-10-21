@@ -436,7 +436,7 @@ function displayCreativeWriting(question) {
 }
 
 /**
- * Displays MCQ questions grouped by their passages
+ * Displays MCQ questions grouped by their passages WITH PROPER NUMBERING AND GROUPING
  */
 function displayMCQQuestions(questions, passagesMap = {}) {
     const container = document.getElementById("question-container");
@@ -466,18 +466,21 @@ function displayMCQQuestions(questions, passagesMap = {}) {
     const questionsByPassage = {};
     const questionsWithoutPassage = [];
     
-    questions.forEach((question, index) => {
+    // First pass: group all questions by their passageId
+    questions.forEach((question) => {
         if (question.passageId && passagesMap[question.passageId]) {
             if (!questionsByPassage[question.passageId]) {
                 questionsByPassage[question.passageId] = [];
             }
-            questionsByPassage[question.passageId].push({ ...question, displayIndex: index + 1 });
+            questionsByPassage[question.passageId].push(question);
         } else {
-            questionsWithoutPassage.push({ ...question, displayIndex: index + 1 });
+            questionsWithoutPassage.push(question);
         }
     });
     
-    // Display passages with their corresponding questions
+    let globalQuestionIndex = 1; // Continuous numbering across ALL questions
+    
+    // Display passages with their corresponding questions FIRST
     Object.keys(questionsByPassage).forEach(passageId => {
         const passage = passagesMap[passageId];
         const passageQuestions = questionsByPassage[passageId];
@@ -493,17 +496,19 @@ function displayMCQQuestions(questions, passagesMap = {}) {
         `;
         container.appendChild(passageElement);
         
-        // Display questions for this passage
+        // Display questions for this passage with continuous numbering
         passageQuestions.forEach(q => {
-            const questionElement = createQuestionElement(q, q.displayIndex);
+            const questionElement = createQuestionElement(q, globalQuestionIndex);
             container.appendChild(questionElement);
+            globalQuestionIndex++; // Increment for next question
         });
     });
     
-    // Display questions without passages
+    // Display questions without passages AFTER passage questions
     questionsWithoutPassage.forEach(q => {
-        const questionElement = createQuestionElement(q, q.displayIndex);
+        const questionElement = createQuestionElement(q, globalQuestionIndex);
         container.appendChild(questionElement);
+        globalQuestionIndex++; // Increment for next question
     });
 }
 
