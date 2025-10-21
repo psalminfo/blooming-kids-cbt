@@ -1023,10 +1023,10 @@ async function loadAllReportsForParent(parentPhone, userId) {
                             ` : ''}
 
                             ${results.length > 0 ? `
-                            <canvas id="chart-${studentIndex}-${assessmentIndex}" class="w-full h-20 mb-4"></canvas>
+                            <canvas id="chart-${studentIndex}-${assessmentIndex}" class="w-full h-48 mb-4"></canvas>
                             ` : ''}
                             
-                            <div class="bg-yellow-30 p-4 rounded-lg mt-6">
+                            <div class="bg-yellow-50 p-4 rounded-lg mt-6">
                                 <h3 class="text-lg font-semibold mb-1 text-green-700">Director's Message</h3>
                                 <p class="italic text-sm text-gray-700">At Blooming Kids House, we are committed to helping every child succeed. We believe that with personalized support from our tutors, ${fullName} will unlock their full potential. Keep up the great work!<br/>– Mrs. Yinka Isikalu, Director</p>
                             </div>
@@ -1041,30 +1041,28 @@ async function loadAllReportsForParent(parentPhone, userId) {
 
                     reportContent.innerHTML += assessmentBlock;
 
-                   if (results.length > 0) {
-    const ctx = document.getElementById(`chart-${studentIndex}-${assessmentIndex}`);
-    if (ctx) {
-        const chartConfig = {
-            type: 'bar',
-            data: {
-                labels: results.map(r => r.subject.toUpperCase()),
-                datasets: [
-                    { label: 'Correct Answers', data: results.map(s => s.correct), backgroundColor: '#4CAF50' }, 
-                    { label: 'Incorrect/Unanswered', data: results.map(s => s.total - s.correct), backgroundColor: '#FFCD56' }
-                ]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,  // ADDED
-                aspectRatio: 3,              // ADDED
-                scales: { x: { stacked: true }, y: { stacked: true, beginAtZero: true } },
-                plugins: { title: { display: true, text: 'Score Distribution by Subject' } }
-            }
-        };
-        new Chart(ctx, chartConfig);
-        chartConfigsToCache.push({ canvasId: `chart-${studentIndex}-${assessmentIndex}`, config: chartConfig });
-    }
-}
+                    if (results.length > 0) {
+                        const ctx = document.getElementById(`chart-${studentIndex}-${assessmentIndex}`);
+                        if (ctx) {
+                            const chartConfig = {
+                                type: 'bar',
+                                data: {
+                                    labels: results.map(r => r.subject.toUpperCase()),
+                                    datasets: [
+                                        { label: 'Correct Answers', data: results.map(s => s.correct), backgroundColor: '#4CAF50' }, 
+                                        { label: 'Incorrect/Unanswered', data: results.map(s => s.total - s.correct), backgroundColor: '#FFCD56' }
+                                    ]
+                                },
+                                options: {
+                                    responsive: true,
+                                    scales: { x: { stacked: true }, y: { stacked: true, beginAtZero: true } },
+                                    plugins: { title: { display: true, text: 'Score Distribution by Subject' } }
+                                }
+                            };
+                            new Chart(ctx, chartConfig);
+                            chartConfigsToCache.push({ canvasId: `chart-${studentIndex}-${assessmentIndex}`, config: chartConfig });
+                        }
+                    }
                     assessmentIndex++;
                 }
             }
@@ -1324,7 +1322,3 @@ document.addEventListener('DOMContentLoaded', function() {
         if (e.key === 'Enter') handlePasswordReset();
     });
 });
-
-
-
-
