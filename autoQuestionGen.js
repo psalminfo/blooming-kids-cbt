@@ -6,6 +6,21 @@ let currentSessionId = null;
 let saveTimeout = null;
 
 /**
+ * Convert test subject to admin_questions subject format
+ */
+function getAdminQuestionsSubject(testSubject) {
+    const subjectMap = {
+        'ela': 'English',
+        'math': 'Mathematics', 
+        'science': 'Science',
+        'socialstudies': 'Social Studies'
+        // Add more subject mappings as needed
+    };
+    
+    return subjectMap[testSubject.toLowerCase()] || testSubject;
+}
+
+/**
  * The entry point to load and display questions for a test.
  * @param {string} subject The subject of the test (e.g., 'ela').
  * @param {string} grade The grade level of the test (e.g., 'grade4').
@@ -97,11 +112,11 @@ export async function loadQuestions(subject, grade, state) {
                 where(documentId(), '<', `${grade}-${subject.toLowerCase().slice(0, 3)}` + '\uf8ff')
             )),
             
-            // Fetch from admin_questions collection - MATCH YOUR EXACT FORMAT
+            // Fetch from admin_questions collection - MATCH THE ACTUAL SUBJECT BEING TESTED
             getDocs(query(
                 collection(db, "admin_questions"),
                 where("grade", "==", grade.replace('grade', '')),
-                where("subject", "==", "English")
+                where("subject", "==", getAdminQuestionsSubject(subject))
             ))
         ]);
 
@@ -118,19 +133,28 @@ export async function loadQuestions(subject, grade, state) {
             
             allQuestions = testArray.flatMap(test => test.questions || []);
             allPassages = testArray.flatMap(test => test.passages || []);
-            console.log(`Loaded ${allQuestions.length} questions from tests collection`);
+            console.log(`Loaded ${allQuestions.length} questions from tests collection for ${subject}`);
         }
 
-        // 3. PROCESS ADMIN_QUESTIONS COLLECTION (ALL question types - MCQ + Creative Writing)
+        // 3. PROCESS ADMIN_QUESTIONS COLLECTION (ONLY FOR CURRENT SUBJECT)
         if (!adminSnapshot.empty) {
             const adminQuestions = [];
             adminSnapshot.forEach(doc => {
                 try {
                     const questionData = doc.data();
                     
-                    // Validate required question structure
+                    // Validate required question structure AND SUBJECT MATCH
                     if (!questionData || (!questionData.question && !questionData.type)) {
                         console.warn('Skipping invalid admin question (missing fields):', doc.id);
+                        return;
+                    }
+                    
+                    // DOUBLE CHECK: Ensure the question is for the correct subject
+                    const questionSubject = questionData.subject?.toLowerCase();
+                    const expectedSubject = getAdminQuestionsSubject(subject).toLowerCase();
+                    
+                    if (questionSubject !== expectedSubject) {
+                        console.warn(`Skipping admin question - subject mismatch. Expected: ${expectedSubject}, Got: ${questionSubject}`, doc.id);
                         return;
                     }
                     
@@ -139,7 +163,7 @@ export async function loadQuestions(subject, grade, state) {
                         ...questionData,
                         firebaseId: doc.id,
                         id: doc.id || `admin-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-                        subject: questionData.subject?.toLowerCase() === 'english' ? 'ela' : questionData.subject?.toLowerCase(),
+                        subject: subject.toLowerCase(), // Use the test subject, not the stored one
                         grade: questionData.grade?.startsWith('grade') ? questionData.grade : `grade${questionData.grade}`
                     };
                     
@@ -149,15 +173,15 @@ export async function loadQuestions(subject, grade, state) {
                     console.error('Error processing admin question:', doc.id, err);
                 }
             });
-            console.log(`Loaded ${adminQuestions.length} valid questions from admin_questions`);
+            console.log(`Loaded ${adminQuestions.length} valid ${subject} questions from admin_questions`);
             
-            // Merge ALL admin questions with existing questions
+            // Merge admin questions with existing questions
             allQuestions = [...allQuestions, ...adminQuestions];
         }
 
         // 4. FALLBACK TO GITHUB IF BOTH COLLECTIONS EMPTY
         if (allQuestions.length === 0) {
-            console.log("No questions found in Firebase, trying GitHub...");
+            console.log(`No ${subject} questions found in Firebase, trying GitHub...`);
             try {
                 const gitHubRes = await fetch(GITHUB_URL);
                 if (!gitHubRes.ok) throw new Error("GitHub file not found.");
@@ -184,7 +208,7 @@ export async function loadQuestions(subject, grade, state) {
             allQuestions = allQuestions.filter(q => q.type !== 'creative-writing');
             const afterFilter = allQuestions.length;
             if (beforeFilter !== afterFilter) {
-                console.log(`Removed ${beforeFilter - afterFilter} creative writing questions for non-ELA subject`);
+                console.log(`Removed ${beforeFilter - afterFilter} creative writing questions for ${subject}`);
             }
         }
 
@@ -196,11 +220,11 @@ export async function loadQuestions(subject, grade, state) {
             }
         });
 
-        console.log("Final question count:", allQuestions.length);
+        console.log(`Final ${subject} question count:`, allQuestions.length);
         console.log("Passages count:", allPassages.length);
 
         if (allQuestions.length === 0) {
-            container.innerHTML = `<p class="text-red-600">❌ No questions found in any source.</p>`;
+            container.innerHTML = `<p class="text-red-600">❌ No ${subject} questions found in any source.</p>`;
             return;
         }
 
@@ -225,7 +249,7 @@ export async function loadQuestions(subject, grade, state) {
             // FOR ALL SUBJECTS: Filter out creative writing questions from MCQ display
             const filteredQuestions = allQuestions.filter(q => q.type !== 'creative-writing');
             if (filteredQuestions.length === 0) {
-                container.innerHTML = `<p class="text-red-600">❌ No multiple-choice questions found.</p>`;
+                container.innerHTML = `<p class="text-red-600">❌ No ${subject} multiple-choice questions found.</p>`;
                 return;
             }
             
