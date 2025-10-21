@@ -71,19 +71,31 @@ export async function submitTestToFirebase(subject, grade, studentName, parentEm
         let isCorrect = false;
 
         if (selectedOption) {
-            studentAnswer = selectedOption.value;
+            studentAnswer = selectedOption.value.trim();
             answerType = 'multiple_choice';
             totalScoreableQuestions++;
             
-            const correctAnswer = originalQuestion.correctAnswer || originalQuestion.correct_answer || null;
-            console.log(`🎯 Scoring: Student: "${studentAnswer}", Correct: "${correctAnswer}"`);
+            // Get the correct answer from the question data
+            const correctAnswer = originalQuestion.correctAnswer || originalQuestion.correct_answer;
             
-            if (studentAnswer === correctAnswer) {
-                score++;
-                isCorrect = true;
-                console.log(`✅ CORRECT! Score: ${score}/${totalScoreableQuestions}`);
+            if (!correctAnswer) {
+                console.warn(`❌ No correct answer found for question: ${originalQuestion.question}`);
+                // Don't score if no correct answer exists
+                totalScoreableQuestions--; 
             } else {
-                console.log(`❌ INCORRECT`);
+                // Normalize both answers for case-insensitive comparison
+                const normalizedStudent = studentAnswer.toLowerCase().trim();
+                const normalizedCorrect = correctAnswer.toString().toLowerCase().trim();
+                
+                console.log(`🎯 Scoring: Student: "${studentAnswer}", Correct: "${correctAnswer}"`);
+                
+                if (normalizedStudent === normalizedCorrect) {
+                    score++;
+                    isCorrect = true;
+                    console.log(`✅ CORRECT! Score: ${score}/${totalScoreableQuestions}`);
+                } else {
+                    console.log(`❌ INCORRECT: "${studentAnswer}" vs "${correctAnswer}"`);
+                }
             }
         } else if (hasTextAnswer) {
             studentAnswer = textResponse.value.trim();
