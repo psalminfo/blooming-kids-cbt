@@ -52,11 +52,11 @@ export async function loadQuestions(subject, grade, state) {
                 where(documentId(), '<', `${grade}-${subject.toLowerCase().slice(0, 3)}` + '\uf8ff')
             )),
             
-            // Fetch from admin_questions collection  
+            // Fetch from admin_questions collection - MATCH YOUR EXACT FORMAT
             getDocs(query(
                 collection(db, "admin_questions"),
-                where("grade", "==", grade),
-                where("subject", "==", subject.toLowerCase())
+                where("grade", "==", grade.replace('grade', '')), // Match "10" for grade10
+                where("subject", "==", "English") // Match "English" exactly
             ))
         ]);
 
@@ -76,29 +76,37 @@ export async function loadQuestions(subject, grade, state) {
             console.log(`Loaded ${allQuestions.length} questions from tests collection`);
         }
 
-        // 3. PROCESS ADMIN_QUESTIONS COLLECTION (with error handling)
+        // 3. PROCESS ADMIN_QUESTIONS COLLECTION (ALL question types - MCQ + Creative Writing)
         if (!adminSnapshot.empty) {
             const adminQuestions = [];
             adminSnapshot.forEach(doc => {
                 try {
                     const questionData = doc.data();
-                    // Validate required fields and ensure valid question structure
-                    if (questionData && (questionData.question || questionData.type || questionData.options)) {
-                        adminQuestions.push({
-                            ...questionData,
-                            firebaseId: doc.id,
-                            id: doc.id // Ensure we have an ID
-                        });
-                    } else {
-                        console.warn('Skipping invalid question format in admin_questions:', doc.id);
-                    }
+                    
+                    console.log("Raw admin question:", questionData);
+                    
+                    // Normalize the data to match your system
+                    const normalizedQuestion = {
+                        ...questionData,
+                        firebaseId: doc.id,
+                        id: doc.id || `admin-${Date.now()}-${Math.random()}`,
+                        // Convert subject from "English" to "ela" if needed
+                        subject: questionData.subject?.toLowerCase() === 'english' ? 'ela' : questionData.subject?.toLowerCase(),
+                        // Ensure grade format matches (convert "10" to "grade10")
+                        grade: questionData.grade?.startsWith('grade') ? questionData.grade : `grade${questionData.grade}`
+                    };
+                    
+                    console.log("Normalized admin question:", normalizedQuestion);
+                    
+                    adminQuestions.push(normalizedQuestion);
+                    
                 } catch (err) {
                     console.warn('Error processing admin question:', doc.id, err);
                 }
             });
             console.log(`Loaded ${adminQuestions.length} questions from admin_questions`);
             
-            // Merge admin questions with existing questions
+            // Merge ALL admin questions with existing questions
             allQuestions = [...allQuestions, ...adminQuestions];
         }
 
@@ -145,7 +153,7 @@ export async function loadQuestions(subject, grade, state) {
         }
 
         // Process and store questions for session persistence
-        if (subject.toLowerCase() === 'ela' && state === 'creative-writing') {
+        if (subject.toLowerCase() === 'ela' && state === 'creative-writing' && isGrade3Plus(grade)) {
             creativeWritingQuestion = allQuestions.find(q => q.type === 'creative-writing');
             console.log("Found Creative Writing:", creativeWritingQuestion);
             
@@ -166,7 +174,7 @@ export async function loadQuestions(subject, grade, state) {
             const shuffledQuestions = filteredQuestions.sort(() => 0.5 - Math.random()).slice(0, 30);
             loadedQuestions = shuffledQuestions.map((q, index) => ({ 
                 ...q, 
-                id: q.firebaseId || q.id || `question-${index}` // Ensure unique ID
+                id: q.firebaseId || q.id || `question-${index}`
             }));
             saveSession(loadedQuestions, passagesMap);
             displayMCQQuestions(loadedQuestions, passagesMap);
@@ -178,6 +186,14 @@ export async function loadQuestions(subject, grade, state) {
         console.error("Failed to load questions:", err);
         container.innerHTML = `<p class="text-red-600">❌ An error occurred: ${err.message}</p>`;
     }
+}
+
+/**
+ * Check if grade is 3 or higher for creative writing
+ */
+function isGrade3Plus(grade) {
+    const gradeNumber = parseInt(grade.replace('grade', ''));
+    return gradeNumber >= 3 && gradeNumber <= 12;
 }
 
 /**
@@ -272,7 +288,7 @@ function saveAnswer(questionId, answer) {
         } catch (err) {
             console.error('Error saving answer:', err);
         }
-    }, 300); // Wait 300ms after last change
+    }, 300);
 }
 
 /**
