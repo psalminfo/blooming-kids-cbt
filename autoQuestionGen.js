@@ -2,6 +2,7 @@ import { db } from './firebaseConfig.js';
 import { collection, getDocs, query, where, documentId, doc, setDoc } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
 
 let loadedQuestions = [];
+let currentSessionId = null;
 
 /**
  * The entry point to load and display questions for a test.
@@ -17,6 +18,22 @@ export async function loadQuestions(subject, grade, state) {
         submitBtnContainer.style.display = 'none';
     }
 
+    // Generate or retrieve session ID
+    currentSessionId = generateSessionId(grade, subject);
+    
+    // Check if we have saved questions for this session
+    const savedSession = getSavedSession();
+    if (savedSession && savedSession.questions && savedSession.questions.length > 0) {
+        console.log("Loading questions from saved session");
+        loadedQuestions = savedSession.questions;
+        displayQuestionsBasedOnState(loadedQuestions, state);
+        restoreSavedAnswers();
+        if (submitBtnContainer && state === 'mcq') {
+            submitBtnContainer.style.display = 'block';
+        }
+        return;
+    }
+
     const fileName = `${grade}-${subject}`.toLowerCase();
     const GITHUB_URL = `https://raw.githubusercontent.com/psalminfo/blooming-kids-cbt/main/${fileName}.json`;
 
@@ -25,39 +42,74 @@ export async function loadQuestions(subject, grade, state) {
     let creativeWritingQuestion = null;
 
     try {
-        let rawData;
-        const testsCollectionRef = collection(db, "tests");
-        const searchPrefix = `${grade}-${subject.toLowerCase().slice(0, 3)}`;
-        const q = query(
-            testsCollectionRef,
-            where(documentId(), '>=', searchPrefix),
-            where(documentId(), '<', searchPrefix + '\uf8ff')
-        );
-        const querySnapshot = await getDocs(q);
+        // 1. FETCH FROM BOTH FIREBASE COLLECTIONS SIMULTANEOUSLY
+        const [testsSnapshot, adminSnapshot] = await Promise.all([
+            // Fetch from tests collection
+            getDocs(query(
+                collection(db, "tests"),
+                where(documentId(), '>=', `${grade}-${subject.toLowerCase().slice(0, 3)}`),
+                where(documentId(), '<', `${grade}-${subject.toLowerCase().slice(0, 3)}` + '\uf8ff')
+            )),
+            
+            // Fetch from admin_questions collection  
+            getDocs(query(
+                collection(db, "admin_questions"),
+                where("grade", "==", grade),
+                where("subject", "==", subject.toLowerCase())
+            ))
+        ]);
 
-        if (!querySnapshot.empty) {
-            const docSnap = querySnapshot.docs[0];
-            rawData = docSnap.data();
-            console.log("Loaded from Firebase:", rawData);
-        } else {
+        // 2. PROCESS TESTS COLLECTION
+        if (!testsSnapshot.empty) {
+            const docSnap = testsSnapshot.docs[0];
+            const rawData = docSnap.data();
+            let testArray = [];
+            if (rawData && rawData.tests) {
+                testArray = rawData.tests;
+            } else if (rawData && rawData.questions) {
+                testArray = [{ questions: rawData.questions }];
+            }
+            
+            allQuestions = testArray.flatMap(test => test.questions || []);
+            allPassages = testArray.flatMap(test => test.passages || []);
+            console.log(`Loaded ${allQuestions.length} questions from tests collection`);
+        }
+
+        // 3. PROCESS ADMIN_QUESTIONS COLLECTION
+        if (!adminSnapshot.empty) {
+            const adminQuestions = [];
+            adminSnapshot.forEach(doc => {
+                const questionData = doc.data();
+                adminQuestions.push({
+                    ...questionData,
+                    firebaseId: doc.id
+                });
+            });
+            console.log(`Loaded ${adminQuestions.length} questions from admin_questions`);
+            
+            // Merge admin questions with existing questions
+            allQuestions = [...allQuestions, ...adminQuestions];
+        }
+
+        // 4. FALLBACK TO GITHUB IF BOTH COLLECTIONS EMPTY
+        if (allQuestions.length === 0) {
             const gitHubRes = await fetch(GITHUB_URL);
             if (!gitHubRes.ok) throw new Error("Test file not found.");
-            rawData = await gitHubRes.json();
+            const rawData = await gitHubRes.json();
             console.log("Loaded from GitHub:", rawData);
+
+            let testArray = [];
+            if (rawData && rawData.tests) {
+                testArray = rawData.tests;
+            } else if (rawData && rawData.questions) {
+                testArray = [{ questions: rawData.questions }];
+            }
+            
+            allQuestions = testArray.flatMap(test => test.questions || []);
+            allPassages = testArray.flatMap(test => test.passages || []);
         }
 
-        let testArray = [];
-        if (rawData && rawData.tests) {
-            testArray = rawData.tests;
-        } else if (rawData && rawData.questions) {
-            testArray = [{ questions: rawData.questions }];
-        }
-        
-        // Extract both questions AND passages
-        allQuestions = testArray.flatMap(test => test.questions || []);
-        allPassages = testArray.flatMap(test => test.passages || []);
-        
-        // Create a map for easy passage lookup
+        // Create passages map for easy lookup
         const passagesMap = {};
         allPassages.forEach(passage => {
             if (passage.passageId && passage.content) {
@@ -67,16 +119,15 @@ export async function loadQuestions(subject, grade, state) {
 
         console.log("Creative Writing State:", state);
         console.log("Subject:", subject);
-        console.log("Creative Writing Question:", allQuestions.find(q => q.type === 'creative-writing'));
-        console.log("All Questions:", allQuestions);
-        console.log("All Passages:", allPassages);
+        console.log("All Questions Loaded:", allQuestions.length);
+        console.log("All Passages:", allPassages.length);
 
         if (allQuestions.length === 0) {
             container.innerHTML = `<p class="text-red-600">❌ No questions found.</p>`;
             return;
         }
 
-        // Check if we should show creative writing first
+        // Process and store questions for session persistence
         if (subject.toLowerCase() === 'ela' && state === 'creative-writing') {
             creativeWritingQuestion = allQuestions.find(q => q.type === 'creative-writing');
             console.log("Found Creative Writing:", creativeWritingQuestion);
@@ -91,12 +142,13 @@ export async function loadQuestions(subject, grade, state) {
                 return;
             }
             loadedQuestions = [{ ...creativeWritingQuestion, id: 0 }];
+            saveSession(loadedQuestions, passagesMap);
             displayCreativeWriting(creativeWritingQuestion);
         } else {
-            // For MCQ mode, group questions by passage
             const filteredQuestions = allQuestions.filter(q => q.type !== 'creative-writing');
             const shuffledQuestions = filteredQuestions.sort(() => 0.5 - Math.random()).slice(0, 30);
             loadedQuestions = shuffledQuestions.map((q, index) => ({ ...q, id: index }));
+            saveSession(loadedQuestions, passagesMap);
             displayMCQQuestions(loadedQuestions, passagesMap);
             if (submitBtnContainer) {
                 submitBtnContainer.style.display = 'block';
@@ -105,6 +157,96 @@ export async function loadQuestions(subject, grade, state) {
     } catch (err) {
         console.error("Failed to load questions:", err);
         container.innerHTML = `<p class="text-red-600">❌ An error occurred: ${err.message}</p>`;
+    }
+}
+
+/**
+ * Optimizes Cloudinary image URLs with automatic transformations
+ */
+function optimizeImageUrl(originalUrl) {
+    if (!originalUrl || !originalUrl.includes('cloudinary.com')) {
+        return originalUrl;
+    }
+    
+    // Check if URL already has transformations
+    if (originalUrl.includes('/upload/') && !originalUrl.includes('/upload/q_')) {
+        // Insert optimization parameters after /upload/
+        return originalUrl.replace('/upload/', '/upload/q_auto,f_auto,w_600,c_limit/');
+    }
+    
+    return originalUrl;
+}
+
+/**
+ * Generate unique session ID
+ */
+function generateSessionId(grade, subject) {
+    const params = new URLSearchParams(window.location.search);
+    const studentName = params.get('studentName');
+    return `${grade}-${subject}-${studentName}-${Date.now()}`;
+}
+
+/**
+ * Save session to storage
+ */
+function saveSession(questions, passages) {
+    const sessionData = {
+        questions: questions,
+        passages: passages,
+        timestamp: Date.now(),
+        sessionId: currentSessionId
+    };
+    sessionStorage.setItem(currentSessionId, JSON.stringify(sessionData));
+}
+
+/**
+ * Get saved session from storage
+ */
+function getSavedSession() {
+    if (!currentSessionId) return null;
+    const saved = sessionStorage.getItem(currentSessionId);
+    return saved ? JSON.parse(saved) : null;
+}
+
+/**
+ * Restore saved answers from storage
+ */
+function restoreSavedAnswers() {
+    const savedAnswers = sessionStorage.getItem(`${currentSessionId}-answers`);
+    if (!savedAnswers) return;
+    
+    const answers = JSON.parse(savedAnswers);
+    Object.keys(answers).forEach(questionId => {
+        const radio = document.querySelector(`input[name="q${questionId}"][value="${answers[questionId]}"]`);
+        if (radio) {
+            radio.checked = true;
+        }
+    });
+}
+
+/**
+ * Save answer to storage
+ */
+function saveAnswer(questionId, answer) {
+    const savedAnswers = sessionStorage.getItem(`${currentSessionId}-answers`) || '{}';
+    const answers = JSON.parse(savedAnswers);
+    answers[questionId] = answer;
+    sessionStorage.setItem(`${currentSessionId}-answers`, JSON.stringify(answers));
+}
+
+/**
+ * Display questions based on current state
+ */
+function displayQuestionsBasedOnState(questions, state) {
+    const passagesMap = getSavedSession()?.passages || {};
+    
+    if (state === 'creative-writing') {
+        const creativeWritingQuestion = questions.find(q => q.type === 'creative-writing');
+        if (creativeWritingQuestion) {
+            displayCreativeWriting(creativeWritingQuestion);
+        }
+    } else {
+        displayMCQQuestions(questions, passagesMap);
     }
 }
 
@@ -124,7 +266,7 @@ function displayCreativeWriting(question) {
     const grade = params.get('grade');
     
     container.innerHTML = `
-        <div class="bg-white p-6 border rounded-lg shadow-sm question-block">
+        <div class="bg-white p-6 border rounded-lg shadow-sm question-block mx-auto max-w-4xl">
             <h2 class="font-semibold text-xl mb-4 text-blue-800">Creative Writing</h2>
             <p class="font-semibold mb-4 question-text text-gray-700 text-lg">${question.question || ''}</p>
             
@@ -148,6 +290,21 @@ function displayCreativeWriting(question) {
 function displayMCQQuestions(questions, passagesMap = {}) {
     const container = document.getElementById("question-container");
     container.innerHTML = '';
+    
+    // Add CSS for optimal layout
+    const style = document.createElement('style');
+    style.textContent = `
+        .question-container { max-width: 800px; margin: 0 auto; padding: 0 20px; }
+        .question-block { max-width: 100%; }
+        .image-container img { max-width: 600px; max-height: 400px; width: auto; height: auto; }
+        @media (max-width: 768px) {
+            .question-container { padding: 0 16px; }
+            .image-container img { max-width: 100%; }
+        }
+    `;
+    document.head.appendChild(style);
+    
+    container.className = 'question-container';
     
     // Group questions by passage
     const questionsByPassage = {};
@@ -195,20 +352,41 @@ function displayMCQQuestions(questions, passagesMap = {}) {
 }
 
 /**
- * Creates a question element
+ * Creates a question element with optimized images and answer tracking
  */
 function createQuestionElement(q, displayIndex) {
     const questionElement = document.createElement('div');
     questionElement.className = 'bg-white p-4 border rounded-lg shadow-sm question-block mt-4';
     questionElement.setAttribute('data-question-id', q.id);
     
-    const showImageBefore = q.imageUrl && q.image_position !== 'after';
-    const showImageAfter = q.imageUrl && q.image_position === 'after';
+    // Optimize the image URL
+    const optimizedImageUrl = q.imageUrl ? optimizeImageUrl(q.imageUrl) : null;
+    const showImageBefore = optimizedImageUrl && q.image_position !== 'after';
+    const showImageAfter = optimizedImageUrl && q.image_position === 'after';
     
     questionElement.innerHTML = `
-        ${showImageBefore ? `<img src="${q.imageUrl}" class="mb-3 w-full rounded-lg border" alt="Question image"/>` : ''}
+        ${showImageBefore ? `
+            <div class="image-container mb-3">
+                <img src="${optimizedImageUrl}" 
+                     class="max-w-full h-auto rounded-lg border cursor-pointer hover:opacity-90 transition-opacity"
+                     alt="Question image"
+                     onclick="window.open('${q.imageUrl}', '_blank')"/>
+                <p class="text-xs text-gray-500 text-center mt-1">Click image to view full size</p>
+            </div>
+        ` : ''}
+        
         <p class="font-semibold mb-3 question-text text-gray-800">${displayIndex}. ${q.question || ''}</p>
-        ${showImageAfter ? `<img src="${q.imageUrl}" class="mt-3 w-full rounded-lg border" alt="Question image"/>` : ''}
+        
+        ${showImageAfter ? `
+            <div class="image-container mt-3">
+                <img src="${optimizedImageUrl}" 
+                     class="max-w-full h-auto rounded-lg border cursor-pointer hover:opacity-90 transition-opacity"
+                     alt="Question image"
+                     onclick="window.open('${q.imageUrl}', '_blank')"/>
+                <p class="text-xs text-gray-500 text-center mt-1">Click image to view full size</p>
+            </div>
+        ` : ''}
+        
         <div class="mt-3 space-y-2">
             ${(q.options || []).map(opt => `
                 <label class="flex items-center py-2 px-3 rounded-lg border border-gray-200 hover:bg-gray-50 cursor-pointer transition-colors duration-150">
@@ -219,7 +397,23 @@ function createQuestionElement(q, displayIndex) {
         </div>
     `;
     
+    // Add event listeners to save answers
+    const radioInputs = questionElement.querySelectorAll(`input[name="q${q.id}"]`);
+    radioInputs.forEach(radio => {
+        radio.addEventListener('change', (e) => {
+            saveAnswer(q.id, e.target.value);
+        });
+    });
+    
     return questionElement;
+}
+
+// Clear session storage when test is submitted
+export function clearTestSession() {
+    if (currentSessionId) {
+        sessionStorage.removeItem(currentSessionId);
+        sessionStorage.removeItem(`${currentSessionId}-answers`);
+    }
 }
 
 // Continue to MCQ handler for creative writing submissions
@@ -284,7 +478,8 @@ window.continueToMCQ = async (questionId, studentName, parentEmail, tutorEmail, 
         
         alert("Creative writing submitted successfully! Moving to multiple-choice questions.");
         
-        // Redirect to MCQ section
+        // Clear creative writing session and redirect to MCQ
+        clearTestSession();
         const params = new URLSearchParams(window.location.search);
         params.set('state', 'mcq');
         window.location.search = params.toString();
