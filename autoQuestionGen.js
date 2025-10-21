@@ -3,6 +3,7 @@ import { collection, getDocs, query, where, documentId, doc, setDoc } from "http
 
 let loadedQuestions = [];
 let currentSessionId = null;
+let saveTimeout = null;
 
 /**
  * The entry point to load and display questions for a test.
@@ -19,7 +20,7 @@ export async function loadQuestions(subject, grade, state) {
     }
 
     // Generate or retrieve session ID
-    currentSessionId = generateSessionId(grade, subject);
+    currentSessionId = generateSessionId(grade, subject, state);
     
     // Check if we have saved questions for this session
     const savedSession = getSavedSession();
@@ -75,15 +76,25 @@ export async function loadQuestions(subject, grade, state) {
             console.log(`Loaded ${allQuestions.length} questions from tests collection`);
         }
 
-        // 3. PROCESS ADMIN_QUESTIONS COLLECTION
+        // 3. PROCESS ADMIN_QUESTIONS COLLECTION (with error handling)
         if (!adminSnapshot.empty) {
             const adminQuestions = [];
             adminSnapshot.forEach(doc => {
-                const questionData = doc.data();
-                adminQuestions.push({
-                    ...questionData,
-                    firebaseId: doc.id
-                });
+                try {
+                    const questionData = doc.data();
+                    // Validate required fields and ensure valid question structure
+                    if (questionData && (questionData.question || questionData.type || questionData.options)) {
+                        adminQuestions.push({
+                            ...questionData,
+                            firebaseId: doc.id,
+                            id: doc.id // Ensure we have an ID
+                        });
+                    } else {
+                        console.warn('Skipping invalid question format in admin_questions:', doc.id);
+                    }
+                } catch (err) {
+                    console.warn('Error processing admin question:', doc.id, err);
+                }
             });
             console.log(`Loaded ${adminQuestions.length} questions from admin_questions`);
             
@@ -93,20 +104,26 @@ export async function loadQuestions(subject, grade, state) {
 
         // 4. FALLBACK TO GITHUB IF BOTH COLLECTIONS EMPTY
         if (allQuestions.length === 0) {
-            const gitHubRes = await fetch(GITHUB_URL);
-            if (!gitHubRes.ok) throw new Error("Test file not found.");
-            const rawData = await gitHubRes.json();
-            console.log("Loaded from GitHub:", rawData);
+            console.log("No questions found in Firebase, trying GitHub...");
+            try {
+                const gitHubRes = await fetch(GITHUB_URL);
+                if (!gitHubRes.ok) throw new Error("GitHub file not found.");
+                const rawData = await gitHubRes.json();
+                console.log("Loaded from GitHub:", rawData);
 
-            let testArray = [];
-            if (rawData && rawData.tests) {
-                testArray = rawData.tests;
-            } else if (rawData && rawData.questions) {
-                testArray = [{ questions: rawData.questions }];
+                let testArray = [];
+                if (rawData && rawData.tests) {
+                    testArray = rawData.tests;
+                } else if (rawData && rawData.questions) {
+                    testArray = [{ questions: rawData.questions }];
+                }
+                
+                allQuestions = testArray.flatMap(test => test.questions || []);
+                allPassages = testArray.flatMap(test => test.passages || []);
+            } catch (gitHubError) {
+                console.error("GitHub fallback also failed:", gitHubError);
+                throw new Error("No questions found in any source.");
             }
-            
-            allQuestions = testArray.flatMap(test => test.questions || []);
-            allPassages = testArray.flatMap(test => test.passages || []);
         }
 
         // Create passages map for easy lookup
@@ -123,7 +140,7 @@ export async function loadQuestions(subject, grade, state) {
         console.log("All Passages:", allPassages.length);
 
         if (allQuestions.length === 0) {
-            container.innerHTML = `<p class="text-red-600">❌ No questions found.</p>`;
+            container.innerHTML = `<p class="text-red-600">❌ No questions found in any source.</p>`;
             return;
         }
 
@@ -141,13 +158,16 @@ export async function loadQuestions(subject, grade, state) {
                 }, 2000);
                 return;
             }
-            loadedQuestions = [{ ...creativeWritingQuestion, id: 0 }];
+            loadedQuestions = [{ ...creativeWritingQuestion, id: 'creative-writing-0' }];
             saveSession(loadedQuestions, passagesMap);
             displayCreativeWriting(creativeWritingQuestion);
         } else {
             const filteredQuestions = allQuestions.filter(q => q.type !== 'creative-writing');
             const shuffledQuestions = filteredQuestions.sort(() => 0.5 - Math.random()).slice(0, 30);
-            loadedQuestions = shuffledQuestions.map((q, index) => ({ ...q, id: index }));
+            loadedQuestions = shuffledQuestions.map((q, index) => ({ 
+                ...q, 
+                id: q.firebaseId || q.id || `question-${index}` // Ensure unique ID
+            }));
             saveSession(loadedQuestions, passagesMap);
             displayMCQQuestions(loadedQuestions, passagesMap);
             if (submitBtnContainer) {
@@ -180,10 +200,20 @@ function optimizeImageUrl(originalUrl) {
 /**
  * Generate unique session ID
  */
-function generateSessionId(grade, subject) {
+function generateSessionId(grade, subject, state) {
     const params = new URLSearchParams(window.location.search);
     const studentName = params.get('studentName');
-    return `${grade}-${subject}-${studentName}-${Date.now()}`;
+    
+    // Try to get existing session first
+    const existingSessionId = sessionStorage.getItem('currentSessionId');
+    if (existingSessionId && state !== 'creative-writing') {
+        return existingSessionId;
+    }
+    
+    // Create new session ID
+    const newSessionId = `${grade}-${subject}-${studentName}-${Date.now()}`;
+    sessionStorage.setItem('currentSessionId', newSessionId);
+    return newSessionId;
 }
 
 /**
@@ -215,23 +245,34 @@ function restoreSavedAnswers() {
     const savedAnswers = sessionStorage.getItem(`${currentSessionId}-answers`);
     if (!savedAnswers) return;
     
-    const answers = JSON.parse(savedAnswers);
-    Object.keys(answers).forEach(questionId => {
-        const radio = document.querySelector(`input[name="q${questionId}"][value="${answers[questionId]}"]`);
-        if (radio) {
-            radio.checked = true;
-        }
-    });
+    try {
+        const answers = JSON.parse(savedAnswers);
+        Object.keys(answers).forEach(questionId => {
+            const radio = document.querySelector(`input[name="q${questionId}"][value="${answers[questionId]}"]`);
+            if (radio) {
+                radio.checked = true;
+            }
+        });
+    } catch (err) {
+        console.warn('Error restoring saved answers:', err);
+    }
 }
 
 /**
- * Save answer to storage
+ * Save answer to storage (debounced)
  */
 function saveAnswer(questionId, answer) {
-    const savedAnswers = sessionStorage.getItem(`${currentSessionId}-answers`) || '{}';
-    const answers = JSON.parse(savedAnswers);
-    answers[questionId] = answer;
-    sessionStorage.setItem(`${currentSessionId}-answers`, JSON.stringify(answers));
+    clearTimeout(saveTimeout);
+    saveTimeout = setTimeout(() => {
+        try {
+            const savedAnswers = sessionStorage.getItem(`${currentSessionId}-answers`) || '{}';
+            const answers = JSON.parse(savedAnswers);
+            answers[questionId] = answer;
+            sessionStorage.setItem(`${currentSessionId}-answers`, JSON.stringify(answers));
+        } catch (err) {
+            console.error('Error saving answer:', err);
+        }
+    }, 300); // Wait 300ms after last change
 }
 
 /**
@@ -408,11 +449,18 @@ function createQuestionElement(q, displayIndex) {
     return questionElement;
 }
 
-// Clear session storage when test is submitted
-export function clearTestSession() {
-    if (currentSessionId) {
-        sessionStorage.removeItem(currentSessionId);
-        sessionStorage.removeItem(`${currentSessionId}-answers`);
+// Clear session storage when test is fully completed
+export function clearTestSession(forceClear = false) {
+    const params = new URLSearchParams(window.location.search);
+    const state = params.get('state');
+    
+    // Only clear if we're actually finished or forced
+    if (forceClear || state === 'completed' || state === 'submitted') {
+        if (currentSessionId) {
+            sessionStorage.removeItem(currentSessionId);
+            sessionStorage.removeItem(`${currentSessionId}-answers`);
+            sessionStorage.removeItem('currentSessionId');
+        }
     }
 }
 
@@ -450,6 +498,7 @@ window.continueToMCQ = async (questionId, studentName, parentEmail, tutorEmail, 
             formData.append('file', file);
             formData.append('upload_preset', CLOUDINARY_UPLOAD_PRESET);
             const response = await fetch(CLOUDINARY_URL, { method: 'POST', body: formData });
+            if (!response.ok) throw new Error("File upload failed.");
             const result = await response.json();
             if (result.secure_url) {
                 fileUrl = result.secure_url;
@@ -478,8 +527,8 @@ window.continueToMCQ = async (questionId, studentName, parentEmail, tutorEmail, 
         
         alert("Creative writing submitted successfully! Moving to multiple-choice questions.");
         
-        // Clear creative writing session and redirect to MCQ
-        clearTestSession();
+        // Don't clear session - we need it for MCQ questions
+        // Just redirect to MCQ section
         const params = new URLSearchParams(window.location.search);
         params.set('state', 'mcq');
         window.location.search = params.toString();
@@ -493,3 +542,12 @@ window.continueToMCQ = async (questionId, studentName, parentEmail, tutorEmail, 
         }
     }
 };
+
+// Clear session when page is unloaded (test completed)
+window.addEventListener('beforeunload', function() {
+    const params = new URLSearchParams(window.location.search);
+    const state = params.get('state');
+    if (state === 'completed' || state === 'submitted') {
+        clearTestSession(true);
+    }
+});
