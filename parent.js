@@ -736,7 +736,7 @@ function addViewResponsesButton() {
     }, 1000);
 }
 
-// MAIN REPORT LOADING FUNCTION - UPDATED TO SEARCH BY BOTH PHONE AND EMAIL
+// MAIN REPORT LOADING FUNCTION - UPDATED TO PREVENT DUPLICATE ASSESSMENT REPORTS
 async function loadAllReportsForParent(parentPhone, userId) {
     const reportArea = document.getElementById("reportArea");
     const reportContent = document.getElementById("reportContent");
@@ -835,40 +835,42 @@ async function loadAllReportsForParent(parentPhone, userId) {
 
         console.log("🔍 Searching reports with:", { parentPhone, parentEmail });
 
-        // --- UPDATED: SEARCH BY BOTH PHONE AND EMAIL ---
-        // Search assessments by BOTH phone AND email
+        // --- UPDATED: SMART SEARCH TO PREVENT DUPLICATES ---
+        // Assessment reports: Search by BOTH but use document ID to prevent duplicates
         const assessmentByPhone = db.collection("student_results").where("parentPhone", "==", parentPhone).get();
         const assessmentByEmail = db.collection("student_results").where("parentEmail", "==", parentEmail).get();
         
-        // Monthly reports: keep searching by phone only (no change)
+        // Monthly reports: search by phone only (no change)
         const monthlyQuery = db.collection("tutor_submissions").where("parentPhone", "==", parentPhone).get();
         
         const [assessmentPhoneSnapshot, assessmentEmailSnapshot, monthlySnapshot] = 
             await Promise.all([assessmentByPhone, assessmentByEmail, monthlyQuery]);
 
-        // Combine assessment results from both queries
-        const studentResults = [];
+        // CRITICAL FIX: Use Set to ensure UNIQUE assessment reports by document ID
+        const uniqueAssessmentReports = new Map();
+        
+        // Process phone results
         assessmentPhoneSnapshot.forEach(doc => {
-            const data = doc.data();
-            studentResults.push({ 
+            uniqueAssessmentReports.set(doc.id, { 
                 id: doc.id,
-                ...data,
-                timestamp: data.submittedAt?.seconds || Date.now() / 1000,
+                ...doc.data(),
+                timestamp: doc.data().submittedAt?.seconds || Date.now() / 1000,
                 type: 'assessment'
             });
         });
+        
+        // Process email results - will automatically overwrite duplicates by document ID
         assessmentEmailSnapshot.forEach(doc => {
-            // Avoid duplicates
-            if (!studentResults.find(r => r.id === doc.id)) {
-                const data = doc.data();
-                studentResults.push({ 
-                    id: doc.id,
-                    ...data,
-                    timestamp: data.submittedAt?.seconds || Date.now() / 1000,
-                    type: 'assessment'
-                });
-            }
+            uniqueAssessmentReports.set(doc.id, { 
+                id: doc.id,
+                ...doc.data(),
+                timestamp: doc.data().submittedAt?.seconds || Date.now() / 1000,
+                type: 'assessment'
+            });
         });
+
+        // Convert back to array
+        const studentResults = Array.from(uniqueAssessmentReports.values());
 
         const monthlyReports = [];
         monthlySnapshot.forEach(doc => {
@@ -881,9 +883,7 @@ async function loadAllReportsForParent(parentPhone, userId) {
             });
         });
 
-        console.log("📊 Assessment results (phone):", assessmentPhoneSnapshot.size);
-        console.log("📊 Assessment results (email):", assessmentEmailSnapshot.size);
-        console.log("📊 Assessment results (total):", studentResults.length);
+        console.log("📊 Assessment results (unique):", studentResults.length);
         console.log("📊 Monthly reports:", monthlySnapshot.size);
 
         if (studentResults.length === 0 && monthlyReports.length === 0) {
@@ -932,18 +932,21 @@ async function loadAllReportsForParent(parentPhone, userId) {
             `;
             reportContent.innerHTML += studentHeader;
 
-            // Display Assessment Reports for this student
+            // Display Assessment Reports for this student - NO DUPLICATES
             if (reports.assessments.length > 0) {
-                const groupedAssessments = {};
+                // Group by unique test sessions using timestamp
+                const uniqueSessions = new Map();
+                
                 reports.assessments.forEach((result) => {
-                    const sessionKey = Math.floor(result.timestamp / 86400); 
-                    if (!groupedAssessments[sessionKey]) groupedAssessments[sessionKey] = [];
-                    groupedAssessments[sessionKey].push(result);
+                    const sessionKey = Math.floor(result.timestamp / 86400); // Group by day
+                    if (!uniqueSessions.has(sessionKey)) {
+                        uniqueSessions.set(sessionKey, []);
+                    }
+                    uniqueSessions.get(sessionKey).push(result);
                 });
 
                 let assessmentIndex = 0;
-                for (const key in groupedAssessments) {
-                    const session = groupedAssessments[key];
+                for (const [sessionKey, session] of uniqueSessions) {
                     const tutorEmail = session[0].tutorEmail || 'N/A';
                     const studentCountry = session[0].studentCountry || 'N/A';
                     const formattedDate = new Date(session[0].timestamp * 1000).toLocaleString('en-US', {
