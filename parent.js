@@ -835,10 +835,36 @@ async function loadAllReportsForParent(parentPhone, userId) {
 
         console.log("🔍 Searching reports with:", { parentPhone, parentEmail });
 
-        // --- UPDATED: SMART SEARCH TO PREVENT DUPLICATES ---
-        // Assessment reports: Search by BOTH but use document ID to prevent duplicates
-        const assessmentByPhone = db.collection("student_results").where("parentPhone", "==", parentPhone).get();
-        const assessmentByEmail = db.collection("student_results").where("parentEmail", "==", parentEmail).get();
+        // --- FIXED: PRIORITY SEARCH TO PREVENT DUPLICATES ---
+// Try phone search first (newer tests), fall back to email search only if needed
+let assessmentSnapshot;
+
+try {
+    // First try phone search (newer tests)
+    assessmentSnapshot = await db.collection("student_results").where("parentPhone", "==", parentPhone).get();
+    console.log("📊 Assessment results (phone search):", assessmentSnapshot.size);
+    
+    // If no results from phone search, try email search (older tests)
+    if (assessmentSnapshot.empty) {
+        console.log("🔍 No results from phone search, trying email search...");
+        assessmentSnapshot = await db.collection("student_results").where("parentEmail", "==", parentEmail).get();
+        console.log("📊 Assessment results (email search):", assessmentSnapshot.size);
+    }
+} catch (error) {
+    console.error("Error searching assessments:", error);
+    assessmentSnapshot = { empty: true, forEach: () => {} };
+}
+
+const studentResults = [];
+assessmentSnapshot.forEach(doc => {
+    const data = doc.data();
+    studentResults.push({ 
+        id: doc.id,
+        ...data,
+        timestamp: data.submittedAt?.seconds || Date.now() / 1000,
+        type: 'assessment'
+    });
+});
         
         // Monthly reports: search by phone only (no change)
         const monthlyQuery = db.collection("tutor_submissions").where("parentPhone", "==", parentPhone).get();
@@ -1325,3 +1351,4 @@ document.addEventListener('DOMContentLoaded', function() {
         if (e.key === 'Enter') handlePasswordReset();
     });
 });
+
