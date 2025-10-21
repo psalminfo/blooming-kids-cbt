@@ -47,10 +47,29 @@ export async function loadQuestions(subject, grade, state) {
 
     // Generate or retrieve session ID
     currentSessionId = generateSessionId(grade, subject, state);
-    
-    // Check if we have saved questions for this session
+
+    // CRITICAL FIX: CLEAR SESSION WHEN MOVING FROM CREATIVE WRITING TO MCQ
+    if (state === 'mcq') {
+        const justCompletedWriting = sessionStorage.getItem('justCompletedCreativeWriting');
+        if (justCompletedWriting) {
+            console.log("Detected creative writing completion - clearing session to load fresh MCQ questions");
+            clearTestSession(true);
+            sessionStorage.removeItem('justCompletedCreativeWriting');
+            
+            // Also clear any saved session data
+            sessionStorage.removeItem(currentSessionId);
+            sessionStorage.removeItem(`${currentSessionId}-answers`);
+        }
+    }
+
+    // Check if we have saved questions for this session (BUT NOT after creative writing)
     const savedSession = getSavedSession();
-    if (savedSession && savedSession.questions && savedSession.questions.length > 0) {
+    const shouldUseSavedSession = savedSession && 
+                                 savedSession.questions && 
+                                 savedSession.questions.length > 0 && 
+                                 !sessionStorage.getItem('justCompletedCreativeWriting');
+
+    if (shouldUseSavedSession) {
         console.log("Loading questions from saved session");
         loadedQuestions = savedSession.questions;
         displayQuestionsBasedOnState(loadedQuestions, state);
@@ -660,9 +679,11 @@ window.continueToMCQ = async (questionId, studentName, parentEmail, tutorEmail, 
         
         console.log("Creative writing submitted successfully, now redirecting...");
         
-        // FIXED REDIRECT LOGIC - More robust approach
+        // CRITICAL FIX: Set flag to clear session when loading MCQ
+        sessionStorage.setItem('justCompletedCreativeWriting', 'true');
+        
+        // FIXED REDIRECT LOGIC
         setTimeout(() => {
-            // Method 1: Direct URL replacement (most reliable)
             const currentUrl = window.location.href;
             
             // Handle both encoded and unencoded parameters
@@ -683,7 +704,7 @@ window.continueToMCQ = async (questionId, studentName, parentEmail, tutorEmail, 
             
             // Force redirect
             window.location.href = newUrl;
-        }, 500); // Small delay to ensure Firebase write completes
+        }, 500);
         
     } catch (error) {
         console.error("Error submitting creative writing:", error);
