@@ -835,7 +835,7 @@ async function loadAllReportsForParent(parentPhone, userId) {
 
         console.log("🔍 Searching reports with:", { parentPhone, parentEmail });
 
-        // --- FIXED: PRIORITY SEARCH TO PREVENT DUPLICATES ---
+       // --- FIXED: PRIORITY SEARCH TO PREVENT DUPLICATES ---
 // Try phone search first (newer tests), fall back to email search only if needed
 let assessmentSnapshot;
 
@@ -855,7 +855,8 @@ try {
     assessmentSnapshot = { empty: true, forEach: () => {} };
 }
 
-const studentResults = [];
+// FIX: Remove "const" - just reassign the existing array
+studentResults = [];
 assessmentSnapshot.forEach(doc => {
     const data = doc.data();
     studentResults.push({ 
@@ -1351,4 +1352,5 @@ document.addEventListener('DOMContentLoaded', function() {
         if (e.key === 'Enter') handlePasswordReset();
     });
 });
+
 
