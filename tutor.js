@@ -1,5 +1,3 @@
-[file name]: tutor.js
-[file content begin]
 import { auth, db } from './firebaseConfig.js';
 import { collection, getDocs, doc, updateDoc, getDoc, where, query, addDoc, writeBatch, deleteDoc } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
 import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-auth.js";
@@ -1283,3 +1281,4 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
 });
 [file content end]
+
