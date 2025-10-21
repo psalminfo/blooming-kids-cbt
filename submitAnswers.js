@@ -148,9 +148,91 @@ export async function submitTestToFirebase(subject, grade, studentName, parentEm
     try {
         await addDoc(collection(db, "student_results"), resultData);
         console.log("✅ Test results submitted successfully!");
+        
+        // ==================================================
+        // NEW: AUTO-REGISTER STUDENT AFTER TEST SUBMISSION
+        // ==================================================
+        await autoRegisterStudentAfterTest(subject, grade, studentName, parentEmail, tutorEmail, studentCountry);
+        
         alert("Test results submitted successfully.");
     } catch (err) {
         console.error("❌ Error submitting test results to Firebase:", err);
         alert("Failed to submit test results. Please try again.");
+    }
+}
+
+// ##################################################################
+// # SECTION: AUTO STUDENT REGISTRATION (NEW - ADDED AT BOTTOM)
+// ##################################################################
+
+/**
+ * Automatically registers student after test completion
+ */
+async function autoRegisterStudentAfterTest(subject, grade, studentName, parentEmail, tutorEmail, studentCountry) {
+    try {
+        console.log("🚀 Starting auto-registration for student:", studentName);
+        
+        // Import additional Firebase functions needed
+        const { doc, getDoc, query, where, getDocs } = await import("https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js");
+        
+        // Get parentPhone from student data
+        const studentData = JSON.parse(localStorage.getItem("studentData") || "{}");
+        const parentPhone = studentData.parentPhone || '';
+        
+        // Check if student already exists to avoid duplicates
+        const studentsQuery = query(
+            collection(db, "students"), 
+            where("studentName", "==", studentName),
+            where("parentPhone", "==", parentPhone),
+            where("tutorEmail", "==", tutorEmail)
+        );
+        
+        const pendingQuery = query(
+            collection(db, "pending_students"), 
+            where("studentName", "==", studentName),
+            where("parentPhone", "==", parentPhone),
+            where("tutorEmail", "==", tutorEmail)
+        );
+
+        const [studentsSnapshot, pendingSnapshot] = await Promise.all([
+            getDocs(studentsQuery),
+            getDocs(pendingQuery)
+        ]);
+
+        // If student already exists, skip registration
+        if (!studentsSnapshot.empty || !pendingSnapshot.empty) {
+            console.log("📝 Student already exists, skipping auto-registration");
+            return;
+        }
+        
+        // Get settings to determine approval bypass
+        const settingsDoc = await getDoc(doc(db, "settings", "global_settings"));
+        const isBypassApprovalEnabled = settingsDoc.exists() ? settingsDoc.data().bypassPendingApproval : false;
+        
+        const studentRecord = {
+            studentName: studentName,
+            parentEmail: parentEmail,
+            parentPhone: parentPhone,
+            grade: grade,
+            country: studentCountry,
+            tutorEmail: tutorEmail,
+            subjects: ["Auto-Registered"], // Placeholder
+            days: 1, // Default
+            studentFee: 0, // To be set by tutor
+            autoRegistered: true,
+            registrationDate: Timestamp.now(),
+            needsCompletion: true, // Flag for tutors
+            testCompleted: true,
+            testSubject: subject
+        };
+
+        const targetCollection = isBypassApprovalEnabled ? "students" : "pending_students";
+        
+        await addDoc(collection(db, targetCollection), studentRecord);
+        console.log(`✅ Auto-registered student: ${studentName} in ${targetCollection}`);
+        
+    } catch (error) {
+        console.error("❌ Error auto-registering student:", error);
+        // Fail silently - don't affect test submission
     }
 }
