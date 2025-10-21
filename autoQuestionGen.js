@@ -382,9 +382,16 @@ function restoreSavedAnswers() {
     try {
         const answers = JSON.parse(savedAnswers);
         Object.keys(answers).forEach(questionId => {
+            // Handle radio buttons (multiple choice)
             const radio = document.querySelector(`input[name="q${questionId}"][value="${answers[questionId]}"]`);
             if (radio) {
                 radio.checked = true;
+            }
+            
+            // Handle text inputs (open-ended questions)
+            const textInput = document.querySelector(`#text-answer-${questionId}`);
+            if (textInput && answers[questionId]) {
+                textInput.value = answers[questionId];
             }
         });
     } catch (err) {
@@ -407,6 +414,23 @@ function saveAnswer(questionId, answer) {
             console.error('Error saving answer:', err);
         }
     }, 300);
+}
+
+/**
+ * Save text answer to storage (debounced)
+ */
+function saveTextAnswer(questionId, answer) {
+    clearTimeout(saveTimeout);
+    saveTimeout = setTimeout(() => {
+        try {
+            const savedAnswers = sessionStorage.getItem(`${currentSessionId}-answers`) || '{}';
+            const answers = JSON.parse(savedAnswers);
+            answers[questionId] = answer;
+            sessionStorage.setItem(`${currentSessionId}-answers`, JSON.stringify(answers));
+        } catch (err) {
+            console.error('Error saving text answer:', err);
+        }
+    }, 500);
 }
 
 /**
@@ -500,6 +524,28 @@ function displayMCQQuestions(questions, passagesMap = {}) {
         .question-container { max-width: 800px; margin: 0 auto; padding: 0 20px; }
         .question-block { max-width: 100%; }
         .image-container img { max-width: 600px; max-height: 400px; width: auto; height: auto; }
+        .text-answer-input { 
+            width: 100%; 
+            padding: 12px; 
+            border: 2px solid #e5e7eb; 
+            border-radius: 8px; 
+            font-size: 16px;
+            transition: border-color 0.2s;
+        }
+        .text-answer-input:focus {
+            outline: none;
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+        }
+        .answer-type-label {
+            display: inline-block;
+            padding: 4px 8px;
+            background: #f3f4f6;
+            border-radius: 4px;
+            font-size: 12px;
+            color: #6b7280;
+            margin-left: 8px;
+        }
         @media (max-width: 768px) {
             .question-container { padding: 0 16px; }
             .image-container img { max-width: 100%; }
@@ -575,6 +621,10 @@ function createQuestionElement(q, displayIndex) {
     const safeQuestionText = escapeHtml(q.question || '');
     const safeOptions = (q.options || []).map(opt => escapeHtml(opt));
     
+    // Determine if this is a multiple choice or text input question
+    const hasOptions = safeOptions && safeOptions.length > 0;
+    const answerType = hasOptions ? 'multiple-choice' : 'text-answer';
+    
     questionElement.innerHTML = `
         ${showImageBefore ? `
             <div class="image-container mb-3">
@@ -586,7 +636,10 @@ function createQuestionElement(q, displayIndex) {
             </div>
         ` : ''}
         
-        <p class="font-semibold mb-3 question-text text-gray-800">${displayIndex}. ${safeQuestionText}</p>
+        <p class="font-semibold mb-3 question-text text-gray-800">
+            ${displayIndex}. ${safeQuestionText}
+            <span class="answer-type-label">${hasOptions ? 'Multiple Choice' : 'Text Answer'}</span>
+        </p>
         
         ${showImageAfter ? `
             <div class="image-container mt-3">
@@ -599,22 +652,47 @@ function createQuestionElement(q, displayIndex) {
         ` : ''}
         
         <div class="mt-3 space-y-2">
-            ${safeOptions.map(opt => `
-                <label class="flex items-center py-2 px-3 rounded-lg border border-gray-200 hover:bg-gray-50 cursor-pointer transition-colors duration-150">
-                    <input type="radio" name="q${q.id}" value="${opt}" class="mr-3 h-4 w-4 text-blue-600 focus:ring-blue-500"> 
-                    <span class="text-gray-700">${opt}</span>
-                </label>
-            `).join('')}
+            ${hasOptions ? 
+                safeOptions.map(opt => `
+                    <label class="flex items-center py-2 px-3 rounded-lg border border-gray-200 hover:bg-gray-50 cursor-pointer transition-colors duration-150">
+                        <input type="radio" name="q${q.id}" value="${opt}" class="mr-3 h-4 w-4 text-blue-600 focus:ring-blue-500"> 
+                        <span class="text-gray-700">${opt}</span>
+                    </label>
+                `).join('') 
+                : 
+                `
+                <div class="text-answer-container">
+                    <textarea 
+                        id="text-answer-${q.id}" 
+                        class="text-answer-input" 
+                        placeholder="Type your answer here..."
+                        rows="3"
+                    ></textarea>
+                    <p class="text-xs text-gray-500 mt-1">Type your answer in the box above</p>
+                </div>
+                `
+            }
         </div>
     `;
     
-    // Add event listeners to save answers
-    const radioInputs = questionElement.querySelectorAll(`input[name="q${q.id}"]`);
-    radioInputs.forEach(radio => {
-        radio.addEventListener('change', (e) => {
-            saveAnswer(q.id, e.target.value);
+    // Add event listeners based on question type
+    if (hasOptions) {
+        // Multiple choice: radio button event listeners
+        const radioInputs = questionElement.querySelectorAll(`input[name="q${q.id}"]`);
+        radioInputs.forEach(radio => {
+            radio.addEventListener('change', (e) => {
+                saveAnswer(q.id, e.target.value);
+            });
         });
-    });
+    } else {
+        // Text answer: input event listener with debouncing
+        const textInput = questionElement.querySelector(`#text-answer-${q.id}`);
+        if (textInput) {
+            textInput.addEventListener('input', (e) => {
+                saveTextAnswer(q.id, e.target.value);
+            });
+        }
+    }
     
     return questionElement;
 }
