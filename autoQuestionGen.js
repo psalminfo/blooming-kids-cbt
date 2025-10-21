@@ -21,6 +21,57 @@ function getAdminQuestionsSubject(testSubject) {
 }
 
 /**
+ * Generate unique session ID scoped to current test only
+ */
+function generateSessionId(grade, subject, state) {
+    const params = new URLSearchParams(window.location.search);
+    const studentName = params.get('studentName');
+    const parentEmail = params.get('parentEmail');
+    
+    // Create a unique session ID for THIS SPECIFIC TEST
+    const testSessionKey = `test-${grade}-${subject}-${studentName}-${parentEmail}`;
+    
+    // Try to get existing session for THIS TEST
+    const existingSessionId = sessionStorage.getItem('currentTestSession');
+    
+    // Only reuse session if it's for the EXACT same test
+    if (existingSessionId && existingSessionId === testSessionKey) {
+        console.log("Reusing session for current test:", testSessionKey);
+        return existingSessionId;
+    }
+    
+    // New test session - clear any old sessions
+    clearAllTestSessions();
+    
+    // Set new session for current test
+    sessionStorage.setItem('currentTestSession', testSessionKey);
+    console.log("Started new test session:", testSessionKey);
+    
+    return testSessionKey;
+}
+
+/**
+ * Clear all test sessions (call on logout)
+ */
+export function clearAllTestSessions() {
+    // Clear all session storage related to tests
+    const keysToRemove = [];
+    for (let i = 0; i < sessionStorage.length; i++) {
+        const key = sessionStorage.key(i);
+        if (key && (key.startsWith('test-') || key.startsWith('session-') || key.includes('-answers') || key === 'currentSessionId' || key === 'currentTestSession' || key === 'justCompletedCreativeWriting')) {
+            keysToRemove.push(key);
+        }
+    }
+    
+    keysToRemove.forEach(key => {
+        sessionStorage.removeItem(key);
+        console.log("Cleared session:", key);
+    });
+    
+    console.log("All test sessions cleared - ready for new test");
+}
+
+/**
  * The entry point to load and display questions for a test.
  * @param {string} subject The subject of the test (e.g., 'ela').
  * @param {string} grade The grade level of the test (e.g., 'grade4').
@@ -60,32 +111,13 @@ export async function loadQuestions(subject, grade, state) {
         submitBtnContainer.style.display = 'none';
     }
 
-    // Generate or retrieve session ID
+    // Generate session ID for current test
     currentSessionId = generateSessionId(grade, subject, state);
 
-    // CRITICAL FIX: CLEAR SESSION WHEN MOVING FROM CREATIVE WRITING TO MCQ
-    if (state === 'mcq') {
-        const justCompletedWriting = sessionStorage.getItem('justCompletedCreativeWriting');
-        if (justCompletedWriting) {
-            console.log("Detected creative writing completion - clearing session to load fresh MCQ questions");
-            clearTestSession(true);
-            sessionStorage.removeItem('justCompletedCreativeWriting');
-            
-            // Also clear any saved session data
-            sessionStorage.removeItem(currentSessionId);
-            sessionStorage.removeItem(`${currentSessionId}-answers`);
-        }
-    }
-
-    // Check if we have saved questions for this session (BUT NOT after creative writing)
+    // Check if we have saved questions for THIS SPECIFIC TEST
     const savedSession = getSavedSession();
-    const shouldUseSavedSession = savedSession && 
-                                 savedSession.questions && 
-                                 savedSession.questions.length > 0 && 
-                                 !sessionStorage.getItem('justCompletedCreativeWriting');
-
-    if (shouldUseSavedSession) {
-        console.log("Loading questions from saved session");
+    if (savedSession && savedSession.questions && savedSession.questions.length > 0) {
+        console.log("Loading questions from saved session for current test");
         loadedQuestions = savedSession.questions;
         displayQuestionsBasedOnState(loadedQuestions, state);
         restoreSavedAnswers();
@@ -103,22 +135,27 @@ export async function loadQuestions(subject, grade, state) {
     let creativeWritingQuestion = null;
 
     try {
+        console.log(`🔄 FETCHING QUESTIONS FOR: ${grade} ${subject.toUpperCase()}`);
+
         // 1. FETCH FROM BOTH FIREBASE COLLECTIONS SIMULTANEOUSLY
         const [testsSnapshot, adminSnapshot] = await Promise.all([
-            // Fetch from tests collection
+            // Fetch from tests collection - BY DOCUMENT ID PATTERN
             getDocs(query(
                 collection(db, "tests"),
                 where(documentId(), '>=', `${grade}-${subject.toLowerCase().slice(0, 3)}`),
                 where(documentId(), '<', `${grade}-${subject.toLowerCase().slice(0, 3)}` + '\uf8ff')
             )),
             
-            // Fetch from admin_questions collection - MATCH THE ACTUAL SUBJECT BEING TESTED
+            // Fetch from admin_questions collection - BY SUBJECT AND GRADE
             getDocs(query(
                 collection(db, "admin_questions"),
                 where("grade", "==", grade.replace('grade', '')),
                 where("subject", "==", getAdminQuestionsSubject(subject))
             ))
         ]);
+
+        console.log(`📊 TESTS Collection: Found ${testsSnapshot.size} documents for ${grade}-${subject}`);
+        console.log(`📊 ADMIN_QUESTIONS Collection: Found ${adminSnapshot.size} documents for ${grade} ${getAdminQuestionsSubject(subject)}`);
 
         // 2. PROCESS TESTS COLLECTION
         if (!testsSnapshot.empty) {
@@ -133,7 +170,9 @@ export async function loadQuestions(subject, grade, state) {
             
             allQuestions = testArray.flatMap(test => test.questions || []);
             allPassages = testArray.flatMap(test => test.passages || []);
-            console.log(`Loaded ${allQuestions.length} questions from tests collection for ${subject}`);
+            console.log(`✅ Loaded ${allQuestions.length} questions from TESTS collection for ${subject}`);
+        } else {
+            console.log(`❌ No documents found in TESTS collection for ${grade}-${subject}`);
         }
 
         // 3. PROCESS ADMIN_QUESTIONS COLLECTION (ONLY FOR CURRENT SUBJECT)
@@ -173,15 +212,17 @@ export async function loadQuestions(subject, grade, state) {
                     console.error('Error processing admin question:', doc.id, err);
                 }
             });
-            console.log(`Loaded ${adminQuestions.length} valid ${subject} questions from admin_questions`);
+            console.log(`✅ Loaded ${adminQuestions.length} valid ${subject} questions from ADMIN_QUESTIONS`);
             
             // Merge admin questions with existing questions
             allQuestions = [...allQuestions, ...adminQuestions];
+        } else {
+            console.log(`❌ No documents found in ADMIN_QUESTIONS for ${grade} ${getAdminQuestionsSubject(subject)}`);
         }
 
         // 4. FALLBACK TO GITHUB IF BOTH COLLECTIONS EMPTY
         if (allQuestions.length === 0) {
-            console.log(`No ${subject} questions found in Firebase, trying GitHub...`);
+            console.log(`📦 No ${subject} questions found in Firebase, trying GitHub...`);
             try {
                 const gitHubRes = await fetch(GITHUB_URL);
                 if (!gitHubRes.ok) throw new Error("GitHub file not found.");
@@ -196,8 +237,9 @@ export async function loadQuestions(subject, grade, state) {
                 
                 allQuestions = testArray.flatMap(test => test.questions || []);
                 allPassages = testArray.flatMap(test => test.passages || []);
+                console.log(`✅ Loaded ${allQuestions.length} questions from GitHub for ${subject}`);
             } catch (gitHubError) {
-                console.error("GitHub fallback also failed:", gitHubError);
+                console.error("❌ GitHub fallback also failed:", gitHubError);
                 throw new Error("No questions found in any source.");
             }
         }
@@ -208,7 +250,7 @@ export async function loadQuestions(subject, grade, state) {
             allQuestions = allQuestions.filter(q => q.type !== 'creative-writing');
             const afterFilter = allQuestions.length;
             if (beforeFilter !== afterFilter) {
-                console.log(`Removed ${beforeFilter - afterFilter} creative writing questions for ${subject}`);
+                console.log(`🚫 Removed ${beforeFilter - afterFilter} creative writing questions for ${subject}`);
             }
         }
 
@@ -220,8 +262,8 @@ export async function loadQuestions(subject, grade, state) {
             }
         });
 
-        console.log(`Final ${subject} question count:`, allQuestions.length);
-        console.log("Passages count:", allPassages.length);
+        console.log(`🎯 FINAL: ${allQuestions.length} ${subject.toUpperCase()} questions ready for ${grade}`);
+        console.log("📚 Passages count:", allPassages.length);
 
         if (allQuestions.length === 0) {
             container.innerHTML = `<p class="text-red-600">❌ No ${subject} questions found in any source.</p>`;
@@ -265,7 +307,7 @@ export async function loadQuestions(subject, grade, state) {
             }
         }
     } catch (err) {
-        console.error("Failed to load questions:", err);
+        console.error("❌ Failed to load questions:", err);
         container.innerHTML = `<p class="text-red-600">❌ An error occurred: ${err.message}</p>`;
     }
 }
@@ -297,25 +339,6 @@ function optimizeImageUrl(originalUrl) {
     }
     
     return originalUrl;
-}
-
-/**
- * Generate unique session ID
- */
-function generateSessionId(grade, subject, state) {
-    const params = new URLSearchParams(window.location.search);
-    const studentName = params.get('studentName');
-    
-    // Try to get existing session first
-    const existingSessionId = sessionStorage.getItem('currentSessionId');
-    if (existingSessionId && state !== 'creative-writing') {
-        return existingSessionId;
-    }
-    
-    // Create new session ID
-    const newSessionId = `session-${grade}-${subject}-${studentName}-${Date.now()}`;
-    sessionStorage.setItem('currentSessionId', newSessionId);
-    return newSessionId;
 }
 
 /**
@@ -753,3 +776,11 @@ window.addEventListener('beforeunload', function() {
         clearTestSession(true);
     }
 });
+
+// Logout handler
+window.handleLogout = function() {
+    console.log("Logging out - clearing all test sessions");
+    clearAllTestSessions();
+    // Then redirect to login page or wherever
+    window.location.href = '/login.html';
+};
