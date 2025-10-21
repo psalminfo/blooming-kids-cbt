@@ -1041,28 +1041,30 @@ async function loadAllReportsForParent(parentPhone, userId) {
 
                     reportContent.innerHTML += assessmentBlock;
 
-                    if (results.length > 0) {
-                        const ctx = document.getElementById(`chart-${studentIndex}-${assessmentIndex}`);
-                        if (ctx) {
-                            const chartConfig = {
-                                type: 'bar',
-                                data: {
-                                    labels: results.map(r => r.subject.toUpperCase()),
-                                    datasets: [
-                                        { label: 'Correct Answers', data: results.map(s => s.correct), backgroundColor: '#4CAF50' }, 
-                                        { label: 'Incorrect/Unanswered', data: results.map(s => s.total - s.correct), backgroundColor: '#FFCD56' }
-                                    ]
-                                },
-                                options: {
-                                    responsive: true,
-                                    scales: { x: { stacked: true }, y: { stacked: true, beginAtZero: true } },
-                                    plugins: { title: { display: true, text: 'Score Distribution by Subject' } }
-                                }
-                            };
-                            new Chart(ctx, chartConfig);
-                            chartConfigsToCache.push({ canvasId: `chart-${studentIndex}-${assessmentIndex}`, config: chartConfig });
-                        }
-                    }
+                   if (results.length > 0) {
+    const ctx = document.getElementById(`chart-${studentIndex}-${assessmentIndex}`);
+    if (ctx) {
+        const chartConfig = {
+            type: 'bar',
+            data: {
+                labels: results.map(r => r.subject.toUpperCase()),
+                datasets: [
+                    { label: 'Correct Answers', data: results.map(s => s.correct), backgroundColor: '#4CAF50' }, 
+                    { label: 'Incorrect/Unanswered', data: results.map(s => s.total - s.correct), backgroundColor: '#FFCD56' }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,  // ADDED
+                aspectRatio: 3,              // ADDED
+                scales: { x: { stacked: true }, y: { stacked: true, beginAtZero: true } },
+                plugins: { title: { display: true, text: 'Score Distribution by Subject' } }
+            }
+        };
+        new Chart(ctx, chartConfig);
+        chartConfigsToCache.push({ canvasId: `chart-${studentIndex}-${assessmentIndex}`, config: chartConfig });
+    }
+}
                     assessmentIndex++;
                 }
             }
@@ -1322,6 +1324,7 @@ document.addEventListener('DOMContentLoaded', function() {
         if (e.key === 'Enter') handlePasswordReset();
     });
 });
+
 
 
 
