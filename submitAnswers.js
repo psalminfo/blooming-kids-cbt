@@ -21,6 +21,10 @@ export async function submitTestToFirebase(subject, grade, studentName, parentEm
     const studentData = JSON.parse(localStorage.getItem("studentData") || "{}");
     const parentPhone = studentData.parentPhone || '';
 
+    console.log("🚀 Starting test submission...");
+    console.log("📋 Loaded questions:", loadedQuestions.length);
+    console.log("👤 Student:", studentName);
+
     // Validation to ensure all questions are answered (either MC or text)
     for (let i = 0; i < loadedQuestions.length; i++) {
         const questionBlock = document.querySelector(`.question-block[data-question-id="${loadedQuestions[i].id}"]`);
@@ -32,7 +36,6 @@ export async function submitTestToFirebase(subject, grade, studentName, parentEm
             // Check if either MC option OR text response is provided
             if (!selectedOption && !hasTextAnswer) {
                 alert("Please answer all questions before submitting. You can provide multiple-choice answers or text responses.");
-                // We'll take the user to the first unanswered question
                 questionBlock.scrollIntoView({ behavior: 'smooth', block: 'center' });
                 questionBlock.style.border = "2px solid red";
                 throw new Error("All questions must be answered (either multiple-choice or text).");
@@ -42,11 +45,20 @@ export async function submitTestToFirebase(subject, grade, studentName, parentEm
 
     // Process all questions (both MC and text)
     const questionBlocks = document.querySelectorAll(".question-block");
+    console.log("🔍 Found question blocks:", questionBlocks.length);
+
     for (const block of questionBlocks) {
         const questionId = block.getAttribute('data-question-id');
         const originalQuestion = loadedQuestions.find(q => q.id === parseInt(questionId));
 
+        console.log(`📝 Processing question ${questionId}:`, {
+            foundOriginal: !!originalQuestion,
+            questionText: originalQuestion?.question?.substring(0, 50) + '...',
+            hasOptions: originalQuestion?.options?.length > 0
+        });
+
         if (!originalQuestion) {
+            console.warn(`❌ No original question found for ID: ${questionId}`);
             continue;
         }
 
@@ -56,32 +68,52 @@ export async function submitTestToFirebase(subject, grade, studentName, parentEm
 
         let studentAnswer = '';
         let answerType = '';
+        let isCorrect = false;
 
         if (selectedOption) {
             studentAnswer = selectedOption.value;
             answerType = 'multiple_choice';
-            totalScoreableQuestions++; // Only score MC questions
+            totalScoreableQuestions++;
             
             const correctAnswer = originalQuestion.correctAnswer || originalQuestion.correct_answer || null;
+            console.log(`🎯 Scoring: Student: "${studentAnswer}", Correct: "${correctAnswer}"`);
+            
             if (studentAnswer === correctAnswer) {
                 score++;
+                isCorrect = true;
+                console.log(`✅ CORRECT! Score: ${score}/${totalScoreableQuestions}`);
+            } else {
+                console.log(`❌ INCORRECT`);
             }
         } else if (hasTextAnswer) {
             studentAnswer = textResponse.value.trim();
             answerType = 'text_response';
+            console.log(`📄 Text answer: ${studentAnswer.substring(0, 30)}...`);
             // Text responses are not scored
+        } else {
+            console.warn(`⚠️ No answer provided for question ${questionId}`);
         }
 
+        // Ensure we have valid topic data
+        const topic = originalQuestion.topic || originalQuestion.subject || 'General';
+        const questionText = originalQuestion.question || 'No question text';
+
         answers.push({
-            questionText: originalQuestion.question || null,
+            questionText: questionText,
             studentAnswer: studentAnswer,
             correctAnswer: originalQuestion.correctAnswer || originalQuestion.correct_answer || null,
             answerType: answerType,
-            topic: originalQuestion.topic || null,
+            isCorrect: isCorrect,
+            topic: topic,
             imageUrl: originalQuestion.imageUrl || null,
             imagePosition: originalQuestion.imagePosition || null
         });
     }
+
+    console.log("📊 FINAL SCORING SUMMARY:");
+    console.log(`✅ Score: ${score}/${totalScoreableQuestions}`);
+    console.log(`📝 Total answers: ${answers.length}`);
+    console.log(`🏷️ Topics found:`, [...new Set(answers.map(a => a.topic))]);
 
     const resultData = {
         subject,
@@ -90,18 +122,21 @@ export async function submitTestToFirebase(subject, grade, studentName, parentEm
         parentEmail,
         tutorEmail,
         studentCountry,
-        parentPhone, // Added parent phone for matching
+        parentPhone,
         answers,
         score: score,
         totalScoreableQuestions: totalScoreableQuestions,
         submittedAt: Timestamp.now()
     };
 
+    console.log("🔥 Saving to Firebase:", resultData);
+
     try {
         await addDoc(collection(db, "student_results"), resultData);
+        console.log("✅ Test results submitted successfully!");
         alert("Test results submitted successfully.");
     } catch (err) {
-        console.error("Error submitting test results to Firebase:", err);
+        console.error("❌ Error submitting test results to Firebase:", err);
         alert("Failed to submit test results. Please try again.");
     }
 }
