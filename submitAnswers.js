@@ -17,22 +17,26 @@ export async function submitTestToFirebase(subject, grade, studentName, parentEm
     let score = 0;
     let totalScoreableQuestions = 0;
 
-    // Validation to ensure all questions are answered
+    // Validation to ensure all questions are answered (either MC or text)
     for (let i = 0; i < loadedQuestions.length; i++) {
         const questionBlock = document.querySelector(`.question-block[data-question-id="${loadedQuestions[i].id}"]`);
         if (questionBlock) {
             const selectedOption = questionBlock.querySelector("input[type='radio']:checked");
-            if (!selectedOption) {
-                alert("Please answer all multiple-choice questions before submitting.");
+            const textResponse = questionBlock.querySelector("textarea, input[type='text']");
+            const hasTextAnswer = textResponse && textResponse.value.trim() !== '';
+            
+            // Check if either MC option OR text response is provided
+            if (!selectedOption && !hasTextAnswer) {
+                alert("Please answer all questions before submitting. You can provide multiple-choice answers or text responses.");
                 // We'll take the user to the first unanswered question
                 questionBlock.scrollIntoView({ behavior: 'smooth', block: 'center' });
                 questionBlock.style.border = "2px solid red";
-                console.log(`Submitting ${Object.keys(selectedAnswers).length} out of ${loadedQuestions.length} questions answered`); // Allow submission even if not all questions are answered - supports both MCQs and text responses
+                throw new Error("All questions must be answered (either multiple-choice or text).");
             }
         }
     }
 
-    // Process all multiple-choice questions
+    // Process all questions (both MC and text)
     const questionBlocks = document.querySelectorAll(".question-block");
     for (const block of questionBlocks) {
         const questionId = block.getAttribute('data-question-id');
@@ -42,19 +46,33 @@ export async function submitTestToFirebase(subject, grade, studentName, parentEm
             continue;
         }
 
-        totalScoreableQuestions++;
         const selectedOption = block.querySelector("input[type='radio']:checked");
-        const studentAnswer = selectedOption.value;
-        const correctAnswer = originalQuestion.correctAnswer || originalQuestion.correct_answer || null;
-        
-        if (studentAnswer === correctAnswer) {
-            score++;
+        const textResponse = block.querySelector("textarea, input[type='text']");
+        const hasTextAnswer = textResponse && textResponse.value.trim() !== '';
+
+        let studentAnswer = '';
+        let answerType = '';
+
+        if (selectedOption) {
+            studentAnswer = selectedOption.value;
+            answerType = 'multiple_choice';
+            totalScoreableQuestions++; // Only score MC questions
+            
+            const correctAnswer = originalQuestion.correctAnswer || originalQuestion.correct_answer || null;
+            if (studentAnswer === correctAnswer) {
+                score++;
+            }
+        } else if (hasTextAnswer) {
+            studentAnswer = textResponse.value.trim();
+            answerType = 'text_response';
+            // Text responses are not scored
         }
 
         answers.push({
             questionText: originalQuestion.question || null,
             studentAnswer: studentAnswer,
-            correctAnswer: correctAnswer,
+            correctAnswer: originalQuestion.correctAnswer || originalQuestion.correct_answer || null,
+            answerType: answerType,
             topic: originalQuestion.topic || null,
             imageUrl: originalQuestion.imageUrl || null,
             imagePosition: originalQuestion.imagePosition || null
