@@ -1023,7 +1023,7 @@ async function loadAllReportsForParent(parentPhone, userId) {
                             ` : ''}
 
                             ${results.length > 0 ? `
-                            <canvas id="chart-${studentIndex}-${assessmentIndex}" class="w-full h-30 mb-4"></canvas>
+                            <canvas id="chart-${studentIndex}-${assessmentIndex}" class="w-full h-20 mb-4"></canvas>
                             ` : ''}
                             
                             <div class="bg-yellow-50 p-4 rounded-lg mt-6">
@@ -1322,4 +1322,5 @@ document.addEventListener('DOMContentLoaded', function() {
         if (e.key === 'Enter') handlePasswordReset();
     });
 });
+
 
