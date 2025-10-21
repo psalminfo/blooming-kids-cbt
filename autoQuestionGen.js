@@ -563,7 +563,7 @@ export function clearTestSession(forceClear = false) {
     }
 }
 
-// Continue to MCQ handler for creative writing submissions
+// Continue to MCQ handler for creative writing submissions - FIXED REDIRECT
 window.continueToMCQ = async (questionId, studentName, parentEmail, tutorEmail, grade) => {
     const CLOUDINARY_URL = 'https://api.cloudinary.com/v1_1/dy2hxcyaf/upload';
     const CLOUDINARY_UPLOAD_PRESET = 'bkh_assessments';
@@ -658,13 +658,33 @@ window.continueToMCQ = async (questionId, studentName, parentEmail, tutorEmail, 
         const docRef = doc(db, "tutor_submissions", `${parentEmail}-${questionId}-${Date.now()}`);
         await setDoc(docRef, submittedData);
         
-        alert("Creative writing submitted successfully! Moving to multiple-choice questions.");
+        console.log("Creative writing submitted successfully, now redirecting...");
         
-        // Don't clear session - we need it for MCQ questions
-        const params = new URLSearchParams(window.location.search);
-        params.set('state', 'mcq');
-        window.location.search = params.toString();
-
+        // FIXED REDIRECT LOGIC - More robust approach
+        setTimeout(() => {
+            // Method 1: Direct URL replacement (most reliable)
+            const currentUrl = window.location.href;
+            
+            // Handle both encoded and unencoded parameters
+            let newUrl;
+            if (currentUrl.includes('state=creative-writing')) {
+                newUrl = currentUrl.replace('state=creative-writing', 'state=mcq');
+            } else if (currentUrl.includes('state=creative%2Dwriting')) {
+                newUrl = currentUrl.replace('state=creative%2Dwriting', 'state=mcq');
+            } else {
+                // Fallback: Use URLSearchParams
+                const url = new URL(currentUrl);
+                url.searchParams.set('state', 'mcq');
+                newUrl = url.toString();
+            }
+            
+            console.log("Redirecting from:", currentUrl);
+            console.log("Redirecting to:", newUrl);
+            
+            // Force redirect
+            window.location.href = newUrl;
+        }, 500); // Small delay to ensure Firebase write completes
+        
     } catch (error) {
         console.error("Error submitting creative writing:", error);
         alert(`Submission error: ${error.message}. Please try again.`);
