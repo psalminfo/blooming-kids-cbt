@@ -17,6 +17,10 @@ export async function submitTestToFirebase(subject, grade, studentName, parentEm
     let score = 0;
     let totalScoreableQuestions = 0;
 
+    // Get parentPhone from student data
+    const studentData = JSON.parse(localStorage.getItem("studentData") || "{}");
+    const parentPhone = studentData.parentPhone || '';
+
     // Validation to ensure all questions are answered (either MC or text)
     for (let i = 0; i < loadedQuestions.length; i++) {
         const questionBlock = document.querySelector(`.question-block[data-question-id="${loadedQuestions[i].id}"]`);
@@ -86,6 +90,7 @@ export async function submitTestToFirebase(subject, grade, studentName, parentEm
         parentEmail,
         tutorEmail,
         studentCountry,
+        parentPhone, // Added parent phone for matching
         answers,
         score: score,
         totalScoreableQuestions: totalScoreableQuestions,
