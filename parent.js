@@ -1026,7 +1026,7 @@ async function loadAllReportsForParent(parentPhone, userId) {
                             <canvas id="chart-${studentIndex}-${assessmentIndex}" class="w-full h-20 mb-4"></canvas>
                             ` : ''}
                             
-                            <div class="bg-yellow-50 p-4 rounded-lg mt-6">
+                            <div class="bg-yellow-30 p-4 rounded-lg mt-6">
                                 <h3 class="text-lg font-semibold mb-1 text-green-700">Director's Message</h3>
                                 <p class="italic text-sm text-gray-700">At Blooming Kids House, we are committed to helping every child succeed. We believe that with personalized support from our tutors, ${fullName} will unlock their full potential. Keep up the great work!<br/>– Mrs. Yinka Isikalu, Director</p>
                             </div>
@@ -1322,5 +1322,6 @@ document.addEventListener('DOMContentLoaded', function() {
         if (e.key === 'Enter') handlePasswordReset();
     });
 });
+
 
 
