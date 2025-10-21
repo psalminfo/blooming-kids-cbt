@@ -27,7 +27,7 @@ export async function submitTestToFirebase(subject, grade, studentName, parentEm
                 // We'll take the user to the first unanswered question
                 questionBlock.scrollIntoView({ behavior: 'smooth', block: 'center' });
                 questionBlock.style.border = "2px solid red";
-                throw new Error("All multiple-choice questions must be answered.");
+                console.log(`Submitting ${Object.keys(selectedAnswers).length} out of ${loadedQuestions.length} questions answered`); // Allow submission even if not all questions are answered - supports both MCQs and text responses
             }
         }
     }
