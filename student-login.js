@@ -3,14 +3,10 @@ document.getElementById("studentLoginForm").addEventListener("submit", function 
 
   const studentName = document.getElementById("studentName").value;
   const parentEmail = document.getElementById("parentEmail").value;
+  const parentPhone = document.getElementById("parentPhone").value;
   const grade = document.getElementById("grade").value;
-  
-  // --- CHANGE 1: Use the correct ID "tutorEmail" ---
   const tutorEmail = document.getElementById("tutorEmail").value;
-  
-  // --- CHANGE 2: Use the correct ID "country" ---
   const country = document.getElementById("country").value;
-  
   const accessCode = document.getElementById("accessCode").value;
 
   if (accessCode !== "bkh2025") {
@@ -18,10 +14,10 @@ document.getElementById("studentLoginForm").addEventListener("submit", function 
     return;
   }
 
-  // --- CHANGE 3: Save the correct variables ---
   const studentData = {
     studentName,
     parentEmail,
+    parentPhone,
     grade,
     tutorEmail,
     country
