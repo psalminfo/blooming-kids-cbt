@@ -12,17 +12,34 @@ let saveTimeout = null;
  * @param {string} state The current state of the test ('creative-writing' or 'mcq').
  */
 export async function loadQuestions(subject, grade, state) {
-    // BLOCK CREATIVE WRITING FOR NON-ELA SUBJECTS
-    if (state === 'creative-writing' && subject.toLowerCase() !== 'ela') {
-        console.warn("Creative writing is only available for ELA subjects. Redirecting to MCQ.");
-        const params = new URLSearchParams(window.location.search);
-        params.set('state', 'mcq');
-        window.location.search = params.toString();
-        return;
+    // STRONG VALIDATION: CREATIVE WRITING ONLY FOR ELA, GRADES 3-12
+    if (state === 'creative-writing') {
+        if (subject.toLowerCase() !== 'ela') {
+            console.error("Security violation: Creative writing attempted for non-ELA subject:", subject);
+            const params = new URLSearchParams(window.location.search);
+            params.set('state', 'mcq');
+            window.location.search = params.toString();
+            return;
+        }
+        
+        if (!isGrade3Plus(grade)) {
+            console.error("Security violation: Creative writing attempted for invalid grade:", grade);
+            const params = new URLSearchParams(window.location.search);
+            params.set('state', 'mcq');
+            window.location.search = params.toString();
+            return;
+        }
     }
 
     const container = document.getElementById("question-container");
     const submitBtnContainer = document.getElementById("submit-button-container");
+    
+    // Validate required DOM elements exist
+    if (!container) {
+        console.error("CRITICAL: question-container element not found in DOM");
+        return;
+    }
+    
     container.innerHTML = `<p class="text-gray-500">Please wait, preparing your test...</p>`;
     if (submitBtnContainer) {
         submitBtnContainer.style.display = 'none';
@@ -64,8 +81,8 @@ export async function loadQuestions(subject, grade, state) {
             // Fetch from admin_questions collection - MATCH YOUR EXACT FORMAT
             getDocs(query(
                 collection(db, "admin_questions"),
-                where("grade", "==", grade.replace('grade', '')), // Match "10" for grade10
-                where("subject", "==", "English") // Match "English" exactly
+                where("grade", "==", grade.replace('grade', '')),
+                where("subject", "==", "English")
             ))
         ]);
 
@@ -92,28 +109,28 @@ export async function loadQuestions(subject, grade, state) {
                 try {
                     const questionData = doc.data();
                     
-                    console.log("Raw admin question:", questionData);
+                    // Validate required question structure
+                    if (!questionData || (!questionData.question && !questionData.type)) {
+                        console.warn('Skipping invalid admin question (missing fields):', doc.id);
+                        return;
+                    }
                     
                     // Normalize the data to match your system
                     const normalizedQuestion = {
                         ...questionData,
                         firebaseId: doc.id,
-                        id: doc.id || `admin-${Date.now()}-${Math.random()}`,
-                        // Convert subject from "English" to "ela" if needed
+                        id: doc.id || `admin-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
                         subject: questionData.subject?.toLowerCase() === 'english' ? 'ela' : questionData.subject?.toLowerCase(),
-                        // Ensure grade format matches (convert "10" to "grade10")
                         grade: questionData.grade?.startsWith('grade') ? questionData.grade : `grade${questionData.grade}`
                     };
-                    
-                    console.log("Normalized admin question:", normalizedQuestion);
                     
                     adminQuestions.push(normalizedQuestion);
                     
                 } catch (err) {
-                    console.warn('Error processing admin question:', doc.id, err);
+                    console.error('Error processing admin question:', doc.id, err);
                 }
             });
-            console.log(`Loaded ${adminQuestions.length} questions from admin_questions`);
+            console.log(`Loaded ${adminQuestions.length} valid questions from admin_questions`);
             
             // Merge ALL admin questions with existing questions
             allQuestions = [...allQuestions, ...adminQuestions];
@@ -126,7 +143,6 @@ export async function loadQuestions(subject, grade, state) {
                 const gitHubRes = await fetch(GITHUB_URL);
                 if (!gitHubRes.ok) throw new Error("GitHub file not found.");
                 const rawData = await gitHubRes.json();
-                console.log("Loaded from GitHub:", rawData);
 
                 let testArray = [];
                 if (rawData && rawData.tests) {
@@ -143,6 +159,16 @@ export async function loadQuestions(subject, grade, state) {
             }
         }
 
+        // SECURITY: Remove creative writing questions for non-ELA subjects
+        if (subject.toLowerCase() !== 'ela') {
+            const beforeFilter = allQuestions.length;
+            allQuestions = allQuestions.filter(q => q.type !== 'creative-writing');
+            const afterFilter = allQuestions.length;
+            if (beforeFilter !== afterFilter) {
+                console.log(`Removed ${beforeFilter - afterFilter} creative writing questions for non-ELA subject`);
+            }
+        }
+
         // Create passages map for easy lookup
         const passagesMap = {};
         allPassages.forEach(passage => {
@@ -151,10 +177,8 @@ export async function loadQuestions(subject, grade, state) {
             }
         });
 
-        console.log("Creative Writing State:", state);
-        console.log("Subject:", subject);
-        console.log("All Questions Loaded:", allQuestions.length);
-        console.log("All Passages:", allPassages.length);
+        console.log("Final question count:", allQuestions.length);
+        console.log("Passages count:", allPassages.length);
 
         if (allQuestions.length === 0) {
             container.innerHTML = `<p class="text-red-600">❌ No questions found in any source.</p>`;
@@ -181,6 +205,11 @@ export async function loadQuestions(subject, grade, state) {
         } else {
             // FOR ALL SUBJECTS: Filter out creative writing questions from MCQ display
             const filteredQuestions = allQuestions.filter(q => q.type !== 'creative-writing');
+            if (filteredQuestions.length === 0) {
+                container.innerHTML = `<p class="text-red-600">❌ No multiple-choice questions found.</p>`;
+                return;
+            }
+            
             const shuffledQuestions = filteredQuestions.sort(() => 0.5 - Math.random()).slice(0, 30);
             loadedQuestions = shuffledQuestions.map((q, index) => ({ 
                 ...q, 
@@ -202,8 +231,13 @@ export async function loadQuestions(subject, grade, state) {
  * Check if grade is 3 or higher for creative writing
  */
 function isGrade3Plus(grade) {
-    const gradeNumber = parseInt(grade.replace('grade', ''));
-    return gradeNumber >= 3 && gradeNumber <= 12;
+    try {
+        const gradeNumber = parseInt(grade.replace('grade', ''));
+        return !isNaN(gradeNumber) && gradeNumber >= 3 && gradeNumber <= 12;
+    } catch (err) {
+        console.error('Error checking grade:', err);
+        return false;
+    }
 }
 
 /**
@@ -216,7 +250,6 @@ function optimizeImageUrl(originalUrl) {
     
     // Check if URL already has transformations
     if (originalUrl.includes('/upload/') && !originalUrl.includes('/upload/q_')) {
-        // Insert optimization parameters after /upload/
         return originalUrl.replace('/upload/', '/upload/q_auto,f_auto,w_600,c_limit/');
     }
     
@@ -237,7 +270,7 @@ function generateSessionId(grade, subject, state) {
     }
     
     // Create new session ID
-    const newSessionId = `${grade}-${subject}-${studentName}-${Date.now()}`;
+    const newSessionId = `session-${grade}-${subject}-${studentName}-${Date.now()}`;
     sessionStorage.setItem('currentSessionId', newSessionId);
     return newSessionId;
 }
@@ -246,13 +279,17 @@ function generateSessionId(grade, subject, state) {
  * Save session to storage
  */
 function saveSession(questions, passages) {
-    const sessionData = {
-        questions: questions,
-        passages: passages,
-        timestamp: Date.now(),
-        sessionId: currentSessionId
-    };
-    sessionStorage.setItem(currentSessionId, JSON.stringify(sessionData));
+    try {
+        const sessionData = {
+            questions: questions,
+            passages: passages,
+            timestamp: Date.now(),
+            sessionId: currentSessionId
+        };
+        sessionStorage.setItem(currentSessionId, JSON.stringify(sessionData));
+    } catch (err) {
+        console.error('Error saving session:', err);
+    }
 }
 
 /**
@@ -260,8 +297,13 @@ function saveSession(questions, passages) {
  */
 function getSavedSession() {
     if (!currentSessionId) return null;
-    const saved = sessionStorage.getItem(currentSessionId);
-    return saved ? JSON.parse(saved) : null;
+    try {
+        const saved = sessionStorage.getItem(currentSessionId);
+        return saved ? JSON.parse(saved) : null;
+    } catch (err) {
+        console.error('Error reading saved session:', err);
+        return null;
+    }
 }
 
 /**
@@ -280,7 +322,7 @@ function restoreSavedAnswers() {
             }
         });
     } catch (err) {
-        console.warn('Error restoring saved answers:', err);
+        console.error('Error restoring saved answers:', err);
     }
 }
 
@@ -322,29 +364,52 @@ export function getLoadedQuestions() {
 }
 
 /**
+ * Escape HTML to prevent XSS
+ */
+function escapeHtml(unsafe) {
+    if (typeof unsafe !== 'string') return unsafe;
+    return unsafe
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+}
+
+/**
  * Displays creative writing section
  */
 function displayCreativeWriting(question) {
     const container = document.getElementById("question-container");
+    if (!container) {
+        console.error('question-container not found');
+        return;
+    }
+
     const params = new URLSearchParams(window.location.search);
-    const studentName = params.get('studentName');
-    const parentEmail = params.get('parentEmail');
-    const tutorEmail = params.get('tutorEmail');
-    const grade = params.get('grade');
+    const studentName = escapeHtml(params.get('studentName') || '');
+    const parentEmail = escapeHtml(params.get('parentEmail') || '');
+    const tutorEmail = escapeHtml(params.get('tutorEmail') || '');
+    const grade = escapeHtml(params.get('grade') || '');
+    
+    // SAFE QUESTION ID - ensure it's a valid JavaScript variable name
+    const safeQuestionId = question.id ? question.id.replace(/[^a-zA-Z0-9]/g, '_') : 'creative_writing_0';
+    const safeQuestionText = escapeHtml(question.question || '');
     
     container.innerHTML = `
         <div class="bg-white p-6 border rounded-lg shadow-sm question-block mx-auto max-w-4xl">
             <h2 class="font-semibold text-xl mb-4 text-blue-800">Creative Writing</h2>
-            <p class="font-semibold mb-4 question-text text-gray-700 text-lg">${question.question || ''}</p>
+            <p class="font-semibold mb-4 question-text text-gray-700 text-lg">${safeQuestionText}</p>
             
-            <textarea id="creative-writing-text-${question.id}" class="w-full h-48 p-4 border border-gray-300 rounded-lg mb-4 focus:ring-2 focus:ring-blue-500 focus:border-transparent" placeholder="Write your essay or creative writing response here..."></textarea>
+            <textarea id="creative-writing-text-${safeQuestionId}" class="w-full h-48 p-4 border border-gray-300 rounded-lg mb-4 focus:ring-2 focus:ring-blue-500 focus:border-transparent" placeholder="Write your essay or creative writing response here..."></textarea>
             
             <div class="mb-4">
-                <label class="block mb-2 text-sm font-medium text-gray-700">Or Upload a File (PDF, DOC, DOCX, TXT)</label>
-                <input type="file" id="creative-writing-file-${question.id}" accept=".pdf,.doc,.docx,.txt" class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"/>
+                <label class="block mb-2 text-sm font-medium text-gray-700">Or Upload an Image (JPG, PNG, GIF, WebP - Max 5MB)</label>
+                <input type="file" id="creative-writing-file-${safeQuestionId}" accept=".jpg,.jpeg,.png,.gif,.webp" class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"/>
+                <p class="text-xs text-gray-500 mt-1">Maximum file size: 5MB. Supported formats: JPG, PNG, GIF, WebP</p>
             </div>
             
-            <button onclick="window.continueToMCQ(${question.id}, '${studentName}', '${parentEmail}', '${tutorEmail}', '${grade}')" class="bg-blue-600 text-white font-bold py-3 px-6 rounded-lg hover:bg-blue-700 transition-colors duration-200 mt-4 w-full">
+            <button onclick="window.continueToMCQ('${safeQuestionId}', '${studentName}', '${parentEmail}', '${tutorEmail}', '${grade}')" class="bg-blue-600 text-white font-bold py-3 px-6 rounded-lg hover:bg-blue-700 transition-colors duration-200 mt-4 w-full">
                 Continue to Multiple-Choice Questions
             </button>
         </div>
@@ -356,6 +421,11 @@ function displayCreativeWriting(question) {
  */
 function displayMCQQuestions(questions, passagesMap = {}) {
     const container = document.getElementById("question-container");
+    if (!container) {
+        console.error('question-container not found');
+        return;
+    }
+    
     container.innerHTML = '';
     
     // Add CSS for optimal layout
@@ -397,10 +467,10 @@ function displayMCQQuestions(questions, passagesMap = {}) {
         const passageElement = document.createElement('div');
         passageElement.className = 'passage-container bg-white p-6 rounded-lg shadow-md mb-6 border-l-4 border-green-500';
         passageElement.innerHTML = `
-            <h3 class="text-lg font-bold text-green-800 mb-2">${passage.title || 'Reading Passage'}</h3>
-            ${passage.subtitle ? `<h4 class="text-md text-gray-600 mb-3">${passage.subtitle}</h4>` : ''}
-            ${passage.author ? `<p class="text-sm text-gray-500 mb-4">${passage.author}</p>` : ''}
-            <div class="passage-content text-gray-700 leading-relaxed whitespace-pre-line bg-gray-50 p-4 rounded border">${passage.content}</div>
+            <h3 class="text-lg font-bold text-green-800 mb-2">${escapeHtml(passage.title || 'Reading Passage')}</h3>
+            ${passage.subtitle ? `<h4 class="text-md text-gray-600 mb-3">${escapeHtml(passage.subtitle)}</h4>` : ''}
+            ${passage.author ? `<p class="text-sm text-gray-500 mb-4">${escapeHtml(passage.author)}</p>` : ''}
+            <div class="passage-content text-gray-700 leading-relaxed whitespace-pre-line bg-gray-50 p-4 rounded border">${escapeHtml(passage.content)}</div>
         `;
         container.appendChild(passageElement);
         
@@ -431,6 +501,9 @@ function createQuestionElement(q, displayIndex) {
     const showImageBefore = optimizedImageUrl && q.image_position !== 'after';
     const showImageAfter = optimizedImageUrl && q.image_position === 'after';
     
+    const safeQuestionText = escapeHtml(q.question || '');
+    const safeOptions = (q.options || []).map(opt => escapeHtml(opt));
+    
     questionElement.innerHTML = `
         ${showImageBefore ? `
             <div class="image-container mb-3">
@@ -442,7 +515,7 @@ function createQuestionElement(q, displayIndex) {
             </div>
         ` : ''}
         
-        <p class="font-semibold mb-3 question-text text-gray-800">${displayIndex}. ${q.question || ''}</p>
+        <p class="font-semibold mb-3 question-text text-gray-800">${displayIndex}. ${safeQuestionText}</p>
         
         ${showImageAfter ? `
             <div class="image-container mt-3">
@@ -455,7 +528,7 @@ function createQuestionElement(q, displayIndex) {
         ` : ''}
         
         <div class="mt-3 space-y-2">
-            ${(q.options || []).map(opt => `
+            ${safeOptions.map(opt => `
                 <label class="flex items-center py-2 px-3 rounded-lg border border-gray-200 hover:bg-gray-50 cursor-pointer transition-colors duration-150">
                     <input type="radio" name="q${q.id}" value="${opt}" class="mr-3 h-4 w-4 text-blue-600 focus:ring-blue-500"> 
                     <span class="text-gray-700">${opt}</span>
@@ -494,12 +567,18 @@ export function clearTestSession(forceClear = false) {
 window.continueToMCQ = async (questionId, studentName, parentEmail, tutorEmail, grade) => {
     const CLOUDINARY_URL = 'https://api.cloudinary.com/v1_1/dy2hxcyaf/upload';
     const CLOUDINARY_UPLOAD_PRESET = 'bkh_assessments';
+    const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
     
     const questionTextarea = document.getElementById(`creative-writing-text-${questionId}`);
     const fileInput = document.getElementById(`creative-writing-file-${questionId}`);
     
+    if (!questionTextarea) {
+        alert("Error: Could not find text area. Please refresh the page and try again.");
+        return;
+    }
+
     const textAnswer = questionTextarea.value.trim();
-    const file = fileInput.files[0];
+    const file = fileInput?.files[0];
 
     const continueBtn = document.querySelector('button[onclick*="continueToMCQ"]');
     if (continueBtn) {
@@ -509,12 +588,34 @@ window.continueToMCQ = async (questionId, studentName, parentEmail, tutorEmail, 
     
     // Validate that at least one method is used
     if (!textAnswer && !file) {
-        alert("Please either write your response in the text area or upload a file before continuing.");
+        alert("Please either write your response in the text area or upload an image before continuing.");
         if (continueBtn) {
             continueBtn.textContent = "Continue to Multiple-Choice Questions";
             continueBtn.disabled = false;
         }
         return;
+    }
+    
+    // Validate file size and type
+    if (file) {
+        if (file.size > MAX_FILE_SIZE) {
+            alert("File is too large. Please select an image smaller than 5MB.");
+            if (continueBtn) {
+                continueBtn.textContent = "Continue to Multiple-Choice Questions";
+                continueBtn.disabled = false;
+            }
+            return;
+        }
+        
+        const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
+        if (!validTypes.includes(file.type)) {
+            alert("Invalid file type. Please upload JPG, PNG, GIF, or WebP images only.");
+            if (continueBtn) {
+                continueBtn.textContent = "Continue to Multiple-Choice Questions";
+                continueBtn.disabled = false;
+            }
+            return;
+        }
     }
     
     try {
@@ -523,9 +624,15 @@ window.continueToMCQ = async (questionId, studentName, parentEmail, tutorEmail, 
             const formData = new FormData();
             formData.append('file', file);
             formData.append('upload_preset', CLOUDINARY_UPLOAD_PRESET);
-            const response = await fetch(CLOUDINARY_URL, { method: 'POST', body: formData });
-            if (!response.ok) throw new Error("File upload failed.");
+            
+            const response = await fetch(CLOUDINARY_URL, { 
+                method: 'POST', 
+                body: formData 
+            });
+            
+            if (!response.ok) throw new Error("File upload failed. Please try again.");
             const result = await response.json();
+            
             if (result.secure_url) {
                 fileUrl = result.secure_url;
             } else {
@@ -540,8 +647,8 @@ window.continueToMCQ = async (questionId, studentName, parentEmail, tutorEmail, 
             fileUrl: fileUrl,
             submittedAt: new Date(),
             studentName: studentName,
-            parentEmail: parentEmail,    // ✅ Goes to parent portal
-            tutorEmail: tutorEmail,      // ✅ Goes to tutor
+            parentEmail: parentEmail,
+            tutorEmail: tutorEmail,
             grade: grade,
             subject: 'ela',
             status: "pending_review",
