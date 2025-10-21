@@ -736,7 +736,7 @@ function addViewResponsesButton() {
     }, 1000);
 }
 
-// MAIN REPORT LOADING FUNCTION - UPDATED TO PREVENT DUPLICATE ASSESSMENT REPORTS
+// MAIN REPORT LOADING FUNCTION - FIXED COLLECTION NAME AND VARIABLE DECLARATION
 async function loadAllReportsForParent(parentPhone, userId) {
     const reportArea = document.getElementById("reportArea");
     const reportContent = document.getElementById("reportContent");
@@ -835,70 +835,40 @@ async function loadAllReportsForParent(parentPhone, userId) {
 
         console.log("🔍 Searching reports with:", { parentPhone, parentEmail });
 
-       // --- FIXED: PRIORITY SEARCH TO PREVENT DUPLICATES ---
-// Try phone search first (newer tests), fall back to email search only if needed
-let assessmentSnapshot;
+        // --- FIXED: PRIORITY SEARCH WITH CORRECT COLLECTION NAME ---
+        // Try phone search first (newer tests), fall back to email search only if needed
+        let assessmentSnapshot;
 
-try {
-    // First try phone search (newer tests)
-    assessmentSnapshot = await db.collection("student_results").where("parentPhone", "==", parentPhone).get();
-    console.log("📊 Assessment results (phone search):", assessmentSnapshot.size);
-    
-    // If no results from phone search, try email search (older tests)
-    if (assessmentSnapshot.empty) {
-        console.log("🔍 No results from phone search, trying email search...");
-        assessmentSnapshot = await db.collection("student_results").where("parentEmail", "==", parentEmail).get();
-        console.log("📊 Assessment results (email search):", assessmentSnapshot.size);
-    }
-} catch (error) {
-    console.error("Error searching assessments:", error);
-    assessmentSnapshot = { empty: true, forEach: () => {} };
-}
+        try {
+            // First try phone search (newer tests) - FIXED COLLECTION NAME
+            assessmentSnapshot = await db.collection("student_results").where("parentPhone", "==", parentPhone).get();
+            console.log("📊 Assessment results (phone search):", assessmentSnapshot.size);
+            
+            // If no results from phone search, try email search (older tests) - FIXED COLLECTION NAME
+            if (assessmentSnapshot.empty) {
+                console.log("🔍 No results from phone search, trying email search...");
+                assessmentSnapshot = await db.collection("student_results").where("parentEmail", "==", parentEmail).get();
+                console.log("📊 Assessment results (email search):", assessmentSnapshot.size);
+            }
+        } catch (error) {
+            console.error("Error searching assessments:", error);
+            assessmentSnapshot = { empty: true, forEach: () => {} };
+        }
 
-// FIX: Remove "const" - just reassign the existing array
-studentResults = [];
-assessmentSnapshot.forEach(doc => {
-    const data = doc.data();
-    studentResults.push({ 
-        id: doc.id,
-        ...data,
-        timestamp: data.submittedAt?.seconds || Date.now() / 1000,
-        type: 'assessment'
-    });
-});
-        
-        // Monthly reports: search by phone only (no change)
-        const monthlyQuery = db.collection("tutor_submissions").where("parentPhone", "==", parentPhone).get();
-        
-        const [assessmentPhoneSnapshot, assessmentEmailSnapshot, monthlySnapshot] = 
-            await Promise.all([assessmentByPhone, assessmentByEmail, monthlyQuery]);
-
-        // CRITICAL FIX: Use Set to ensure UNIQUE assessment reports by document ID
-        const uniqueAssessmentReports = new Map();
-        
-        // Process phone results
-        assessmentPhoneSnapshot.forEach(doc => {
-            uniqueAssessmentReports.set(doc.id, { 
+        // FIX: Declare studentResults array
+        let studentResults = [];
+        assessmentSnapshot.forEach(doc => {
+            const data = doc.data();
+            studentResults.push({ 
                 id: doc.id,
-                ...doc.data(),
-                timestamp: doc.data().submittedAt?.seconds || Date.now() / 1000,
-                type: 'assessment'
-            });
-        });
-        
-        // Process email results - will automatically overwrite duplicates by document ID
-        assessmentEmailSnapshot.forEach(doc => {
-            uniqueAssessmentReports.set(doc.id, { 
-                id: doc.id,
-                ...doc.data(),
-                timestamp: doc.data().submittedAt?.seconds || Date.now() / 1000,
+                ...data,
+                timestamp: data.submittedAt?.seconds || Date.now() / 1000,
                 type: 'assessment'
             });
         });
 
-        // Convert back to array
-        const studentResults = Array.from(uniqueAssessmentReports.values());
-
+        // Monthly reports: search by phone only
+        const monthlySnapshot = await db.collection("tutor_submissions").where("parentPhone", "==", parentPhone).get();
         const monthlyReports = [];
         monthlySnapshot.forEach(doc => {
             const data = doc.data();
@@ -1352,5 +1322,3 @@ document.addEventListener('DOMContentLoaded', function() {
         if (e.key === 'Enter') handlePasswordReset();
     });
 });
-
-
