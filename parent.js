@@ -736,7 +736,7 @@ function addViewResponsesButton() {
     }, 1000);
 }
 
-// MAIN REPORT LOADING FUNCTION - COMPLETE AND INTACT
+// MAIN REPORT LOADING FUNCTION - UPDATED TO SEARCH BY BOTH PHONE AND EMAIL
 async function loadAllReportsForParent(parentPhone, userId) {
     const reportArea = document.getElementById("reportArea");
     const reportContent = document.getElementById("reportContent");
@@ -759,12 +759,11 @@ async function loadAllReportsForParent(parentPhone, userId) {
                     console.log("Loading reports from cache.");
                     reportContent.innerHTML = html;
                     
-                    // Set welcome message from cache - THIS IS WHERE PARENT NAME IS SET FROM CACHE
+                    // Set welcome message from cache
                     if (userData && userData.parentName) {
                         welcomeMessage.textContent = `Welcome, ${userData.parentName}!`;
                         currentUserData = userData;
                     } else {
-                        // Fallback if no parent name in cache
                         welcomeMessage.textContent = `Welcome!`;
                     }
                     
@@ -809,13 +808,13 @@ async function loadAllReportsForParent(parentPhone, userId) {
             parentName = 'Parent';
         }
 
-        // Store user data globally - THIS IS CRITICAL FOR PARENT NAME DISPLAY
+        // Store user data globally
         currentUserData = {
             parentName: parentName,
             parentPhone: parentPhone
         };
 
-        // UPDATE WELCOME MESSAGE WITH PARENT NAME - THIS IS WHAT SHOWS IT!
+        // UPDATE WELCOME MESSAGE WITH PARENT NAME
         welcomeMessage.textContent = `Welcome, ${currentUserData.parentName}!`;
 
         // Update parent name in user document if we found a better one
@@ -829,55 +828,27 @@ async function loadAllReportsForParent(parentPhone, userId) {
             }
         }
 
-        // Add CSS for preserving whitespace dynamically
-        if (!document.querySelector('#whitespace-style')) {
-            const style = document.createElement('style');
-            style.id = 'whitespace-style';
-            style.textContent = `
-                .preserve-whitespace {
-                    white-space: pre-line !important;
-                    line-height: 1.6 !important;
-                }
-                .response-bubble {
-                    background-color: #f0fdf4;
-                    border: 1px solid #bbf7d0;
-                    border-radius: 12px;
-                    padding: 12px;
-                    margin-top: 8px;
-                }
-                .response-header {
-                    font-weight: 600;
-                    color: #065f46;
-                    margin-bottom: 4px;
-                }
-                .loading-spinner {
-                    border: 3px solid #f3f3f3;
-                    border-top: 3px solid #10b981;
-                    border-radius: 50%;
-                    width: 20px;
-                    height: 20px;
-                    animation: spin 1s linear infinite;
-                    display: inline-block;
-                    margin-right: 8px;
-                    vertical-align: middle;
-                }
-                @keyframes spin {
-                    0% { transform: rotate(0deg); }
-                    100% { transform: rotate(360deg); }
-                }
-            `;
-            document.head.appendChild(style);
-        }
+        // Get parent's email from their account
+        const userDoc = await db.collection('parent_users').doc(userId).get();
+        const userData = userDoc.data();
+        const parentEmail = userData.email;
 
-        // --- HIGHLY OPTIMIZED READS ---
-        // Query collections using the exact parent phone number (as stored in existing reports)
-        const assessmentQuery = db.collection("student_results").where("parentPhone", "==", parentPhone).get();
+        console.log("🔍 Searching reports with:", { parentPhone, parentEmail });
+
+        // --- UPDATED: SEARCH BY BOTH PHONE AND EMAIL ---
+        // Search assessments by BOTH phone AND email
+        const assessmentByPhone = db.collection("student_results").where("parentPhone", "==", parentPhone).get();
+        const assessmentByEmail = db.collection("student_results").where("parentEmail", "==", parentEmail).get();
+        
+        // Monthly reports: keep searching by phone only (no change)
         const monthlyQuery = db.collection("tutor_submissions").where("parentPhone", "==", parentPhone).get();
         
-        const [assessmentSnapshot, monthlySnapshot] = await Promise.all([assessmentQuery, monthlyQuery]);
+        const [assessmentPhoneSnapshot, assessmentEmailSnapshot, monthlySnapshot] = 
+            await Promise.all([assessmentByPhone, assessmentByEmail, monthlyQuery]);
 
+        // Combine assessment results from both queries
         const studentResults = [];
-        assessmentSnapshot.forEach(doc => {
+        assessmentPhoneSnapshot.forEach(doc => {
             const data = doc.data();
             studentResults.push({ 
                 id: doc.id,
@@ -885,6 +856,18 @@ async function loadAllReportsForParent(parentPhone, userId) {
                 timestamp: data.submittedAt?.seconds || Date.now() / 1000,
                 type: 'assessment'
             });
+        });
+        assessmentEmailSnapshot.forEach(doc => {
+            // Avoid duplicates
+            if (!studentResults.find(r => r.id === doc.id)) {
+                const data = doc.data();
+                studentResults.push({ 
+                    id: doc.id,
+                    ...data,
+                    timestamp: data.submittedAt?.seconds || Date.now() / 1000,
+                    type: 'assessment'
+                });
+            }
         });
 
         const monthlyReports = [];
@@ -897,6 +880,11 @@ async function loadAllReportsForParent(parentPhone, userId) {
                 type: 'monthly'
             });
         });
+
+        console.log("📊 Assessment results (phone):", assessmentPhoneSnapshot.size);
+        console.log("📊 Assessment results (email):", assessmentEmailSnapshot.size);
+        console.log("📊 Assessment results (total):", studentResults.length);
+        console.log("📊 Monthly reports:", monthlySnapshot.size);
 
         if (studentResults.length === 0 && monthlyReports.length === 0) {
             showMessage(`No reports found for your account. Please contact Blooming Kids House if you believe this is an error.`, 'info');
