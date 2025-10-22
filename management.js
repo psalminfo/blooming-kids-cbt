@@ -1,7 +1,7 @@
-// [Begin Complete management.js File]
+// [Begin Updated management.js File]
 
 import { auth, db } from './firebaseConfig.js';
-import { collection, getDocs, doc, getDoc, where, query, orderBy, Timestamp, writeBatch, updateDoc, deleteDoc, setDoc, addDoc, increment } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
+import { collection, getDocs, doc, getDoc, where, query, orderBy, Timestamp, writeBatch, updateDoc, deleteDoc, setDoc, addDoc } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
 import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-auth.js";
 import { onSnapshot } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
 
@@ -16,7 +16,6 @@ const sessionCache = {
     tutors: null,
     students: null,
     pendingStudents: null,
-    pendingReferrals: null,
     reports: null,
     breakStudents: null,
     parentFeedback: null,
@@ -322,136 +321,6 @@ async function handleRejectStudent(studentId) {
 }
 
 // ##################################
-// # REFERRAL APPROVAL FUNCTIONS
-// ##################################
-
-/**
- * Fetches pending referrals from Firestore
- */
-async function fetchPendingReferrals() {
-    try {
-        const snapshot = await getDocs(query(
-            collection(db, "pending_referrals"), 
-            orderBy("createdAt", "desc")
-        ));
-        const referrals = snapshot.docs.map(doc => ({ 
-            id: doc.id, 
-            ...doc.data() 
-        }));
-        saveToLocalStorage('pendingReferrals', referrals);
-        return referrals;
-    } catch (error) {
-        console.error("Error fetching pending referrals:", error);
-        return [];
-    }
-}
-
-/**
- * Renders the pending referrals section
- */
-function renderPendingReferralsSection(referrals) {
-    if (referrals.length === 0) {
-        return `
-            <div class="mt-8">
-                <h3 class="text-xl font-bold text-blue-700 mb-4">Pending Referrals</h3>
-                <div class="bg-blue-50 p-6 rounded-lg text-center">
-                    <p class="text-blue-600">No pending referrals to approve.</p>
-                </div>
-            </div>
-        `;
-    }
-
-    return `
-        <div class="mt-8">
-            <h3 class="text-xl font-bold text-blue-700 mb-4">Pending Referrals (${referrals.length})</h3>
-            <div class="space-y-4">
-                ${referrals.map(referral => {
-                    const date = referral.createdAt?.toDate 
-                        ? referral.createdAt.toDate().toLocaleDateString() 
-                        : 'Unknown date';
-                    
-                    return `
-                        <div class="border border-blue-200 p-4 rounded-lg bg-blue-50 flex justify-between items-center">
-                            <div>
-                                <p class="font-semibold text-blue-800">${referral.referredStudentName || 'Unknown Student'}</p>
-                                <p class="text-sm text-blue-600">Referred by: ${referral.referrerName || 'Unknown Parent'}</p>
-                                <p class="text-sm text-gray-600">Email: ${referral.referrerEmail || 'N/A'}</p>
-                                <p class="text-xs text-gray-500">Submitted: ${date}</p>
-                            </div>
-                            <div class="flex space-x-2">
-                                <button class="approve-referral-btn bg-green-600 text-white px-3 py-1 text-sm rounded-full hover:bg-green-700" 
-                                        data-referral-id="${referral.id}" 
-                                        data-referrer-email="${referral.referrerEmail}">
-                                    Approve
-                                </button>
-                                <button class="reject-referral-btn bg-red-600 text-white px-3 py-1 text-sm rounded-full hover:bg-red-700" 
-                                        data-referral-id="${referral.id}">
-                                    Reject
-                                </button>
-                            </div>
-                        </div>
-                    `;
-                }).join('')}
-            </div>
-        </div>
-    `;
-}
-
-/**
- * Handles approving a referral
- */
-async function handleApproveReferral(referralId, referrerEmail) {
-    if (confirm("Are you sure you want to approve this referral? This will increment the parent's referral count.")) {
-        try {
-            const batch = writeBatch(db);
-            
-            // Increment the referral count for the parent
-            if (referrerEmail) {
-                const parentRef = doc(db, "parents", referrerEmail);
-                batch.update(parentRef, {
-                    referralCount: increment(1)
-                });
-            }
-            
-            // Delete the pending referral
-            const referralRef = doc(db, "pending_referrals", referralId);
-            batch.delete(referralRef);
-            
-            await batch.commit();
-            alert("Referral approved successfully! Parent's referral count has been updated.");
-            
-            // Invalidate cache and refresh
-            invalidateCache('pendingReferrals');
-            fetchAndRenderPendingApprovals();
-            
-        } catch (error) {
-            console.error("Error approving referral:", error);
-            alert("Failed to approve referral. Check the console for details.");
-        }
-    }
-}
-
-/**
- * Handles rejecting a referral
- */
-async function handleRejectReferral(referralId) {
-    if (confirm("Are you sure you want to reject this referral? This action cannot be undone.")) {
-        try {
-            await deleteDoc(doc(db, "pending_referrals", referralId));
-            alert("Referral rejected successfully!");
-            
-            // Invalidate cache and refresh
-            invalidateCache('pendingReferrals');
-            fetchAndRenderPendingApprovals();
-            
-        } catch (error) {
-            console.error("Error rejecting referral:", error);
-            alert("Failed to reject referral. Check the console for details.");
-        }
-    }
-}
-
-// ##################################
 // # PANEL RENDERING FUNCTIONS
 // ##################################
 
@@ -685,336 +554,382 @@ async function renderPayAdvicePanel(container) {
             const link = document.createElement('a');
             const start = document.getElementById('start-date').value;
             const end = document.getElementById('end-date').value;
-            const filename = `pay_advice_${start}_to_${end}.csv`;
             link.href = URL.createObjectURL(blob);
-            link.download = filename;
+            link.download = `Pay_Advice_${start}_to_${end}.csv`;
             link.click();
         };
     }
 }
 
 async function loadPayAdviceData(startDate, endDate) {
+    const tableBody = document.getElementById('pay-advice-table-body');
+    if (!tableBody) return;
+    tableBody.innerHTML = `<tr><td colspan="8" class="text-center py-4">Loading pay data...</td></tr>`;
+
+    const startTimestamp = Timestamp.fromDate(startDate);
+    const endTimestamp = Timestamp.fromDate(endDate);
+    const reportsQuery = query(collection(db, "tutor_submissions"), where("submittedAt", ">=", startTimestamp), where("submittedAt", "<=", endTimestamp));
     try {
-        const tutorsSnapshot = await getDocs(query(collection(db, "tutors"), orderBy("name"));
-        const studentsSnapshot = await getDocs(query(
-            collection(db, "students"),
-            where("createdAt", ">=", Timestamp.fromDate(startDate)),
-            where("createdAt", "<=", Timestamp.fromDate(endDate))
-        ));
-        const students = studentsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        const studentsByTutor = {};
-        students.forEach(student => {
-            if (!studentsByTutor[student.tutorEmail]) {
-                studentsByTutor[student.tutorEmail] = [];
+        const reportsSnapshot = await getDocs(reportsQuery);
+        const activeTutorEmails = [...new Set(reportsSnapshot.docs.map(doc => doc.data().tutorEmail))];
+
+        if (activeTutorEmails.length === 0) {
+            tableBody.innerHTML = `<tr><td colspan="8" class="text-center py-4">No active tutors in this period.</td></tr>`;
+            document.getElementById('pay-tutor-count').textContent = 0;
+            document.getElementById('pay-student-count').textContent = 0;
+            currentPayData = [];
+            return;
+        }
+
+        const tutorBankDetails = {};
+        reportsSnapshot.docs.forEach(doc => {
+            const data = doc.data();
+            if (data.beneficiaryBank && data.beneficiaryAccount) {
+                tutorBankDetails[data.tutorEmail] = {
+                    beneficiaryBank: data.beneficiaryBank,
+                    beneficiaryAccount: data.beneficiaryAccount,
+                    beneficiaryName: data.beneficiaryName || 'N/A',
+                };
             }
-            studentsByTutor[student.tutorEmail].push(student);
         });
-        const payData = tutorsSnapshot.docs.map(doc => {
+        
+        // ### FIXED SECTION ###
+        // Firestore 'in' queries are limited to 30 values. This function fetches tutors by chunking the email list.
+        const fetchTutorsInChunks = async (emails) => {
+            if (emails.length === 0) return [];
+            const chunks = [];
+            for (let i = 0; i < emails.length; i += 30) {
+                chunks.push(emails.slice(i, i + 30));
+            }
+
+            const queryPromises = chunks.map(chunk =>
+                getDocs(query(collection(db, "tutors"), where("email", "in", chunk)))
+            );
+
+            const querySnapshots = await Promise.all(queryPromises);
+            // Combine the docs from all snapshot results into a single array
+            return querySnapshots.flatMap(snapshot => snapshot.docs);
+        };
+
+        // Fetch both tutors (in chunks) and all students concurrently.
+        const [tutorDocs, studentsSnapshot] = await Promise.all([
+            fetchTutorsInChunks(activeTutorEmails),
+            getDocs(collection(db, "students"))
+        ]);
+        // ### END FIXED SECTION ###
+
+        const allStudents = studentsSnapshot.docs.map(doc => doc.data());
+        let totalStudentCount = 0;
+        const payData = [];
+        
+        // Iterate over the combined array of tutor documents
+        tutorDocs.forEach(doc => {
             const tutor = doc.data();
-            const assignedStudents = studentsByTutor[tutor.email] || [];
+            const assignedStudents = allStudents.filter(s => s.tutorEmail === tutor.email);
             const totalStudentFees = assignedStudents.reduce((sum, s) => sum + (s.studentFee || 0), 0);
-            const managementFee = totalStudentFees * 0.15;
-            const totalPay = totalStudentFees - managementFee;
-            return {
+            const managementFee = (tutor.isManagementStaff && tutor.managementFee) ? tutor.managementFee : 0;
+            totalStudentCount += assignedStudents.length;
+            const bankDetails = tutorBankDetails[tutor.email] || { beneficiaryBank: 'N/A', beneficiaryAccount: 'N/A', beneficiaryName: 'N/A' };
+
+            payData.push({
                 tutorName: tutor.name,
                 tutorEmail: tutor.email,
                 studentCount: assignedStudents.length,
-                totalStudentFees,
-                managementFee,
-                totalPay,
-                beneficiaryBank: tutor.beneficiaryBank || 'N/A',
-                beneficiaryAccount: tutor.beneficiaryAccount || 'N/A',
-                beneficiaryName: tutor.beneficiaryName || 'N/A'
-            };
+                totalStudentFees: totalStudentFees,
+                managementFee: managementFee,
+                totalPay: totalStudentFees + managementFee,
+                ...bankDetails
+            });
         });
-        currentPayData = payData;
+        currentPayData = payData; // Store for reuse
         document.getElementById('pay-tutor-count').textContent = payData.length;
-        document.getElementById('pay-student-count').textContent = students.length;
-        renderPayAdviceTable(payData);
+        document.getElementById('pay-student-count').textContent = totalStudentCount;
+        renderPayAdviceTable();
+
     } catch (error) {
         console.error("Error loading pay advice data:", error);
-        document.getElementById('pay-advice-table-body').innerHTML = `<tr><td colspan="8" class="text-center py-4 text-red-500">Failed to load data.</td></tr>`;
+        tableBody.innerHTML = `<tr><td colspan="8" class="text-center py-4 text-red-500">Failed to load data.</td></tr>`;
     }
 }
 
-function renderPayAdviceTable(payData) {
+function renderPayAdviceTable() {
     const tableBody = document.getElementById('pay-advice-table-body');
-    if (payData.length === 0) {
-        tableBody.innerHTML = `<tr><td colspan="8" class="text-center py-4">No data for the selected date range.</td></tr>`;
-        return;
-    }
-    tableBody.innerHTML = payData.map(item => {
-        const giftAmount = payAdviceGifts[item.tutorEmail] || 0;
-        const finalPay = item.totalPay + giftAmount;
+    if (!tableBody) return;
+    
+    tableBody.innerHTML = currentPayData.map(d => {
+        const giftAmount = payAdviceGifts[d.tutorEmail] || 0;
+        const finalPay = d.totalPay + giftAmount;
         return `
-            <tr class="hover:bg-gray-50">
-                <td class="px-6 py-4 whitespace-nowrap font-medium">${item.tutorName}</td>
-                <td class="px-6 py-4 whitespace-nowrap">${item.studentCount}</td>
-                <td class="px-6 py-4 whitespace-nowrap">₦${item.totalStudentFees.toFixed(2)}</td>
-                <td class="px-6 py-4 whitespace-nowrap">₦${item.managementFee.toFixed(2)}</td>
-                <td class="px-6 py-4 whitespace-nowrap">₦${item.totalPay.toFixed(2)}</td>
-                <td class="px-6 py-4 whitespace-nowrap">
-                    <input type="number" class="gift-input w-24 p-1 border rounded" data-tutor-email="${item.tutorEmail}" value="${giftAmount}" min="0">
-                </td>
-                <td class="px-6 py-4 whitespace-nowrap font-bold">₦${finalPay.toFixed(2)}</td>
-                <td class="px-6 py-4 whitespace-nowrap">
-                    <button class="view-details-btn bg-blue-600 text-white px-3 py-1 rounded-full text-xs" data-tutor-email="${item.tutorEmail}">Details</button>
+            <tr>
+                <td class="px-6 py-4">${d.tutorName}</td>
+                <td class="px-6 py-4">${d.studentCount}</td>
+                <td class="px-6 py-4">₦${d.totalStudentFees.toFixed(2)}</td>
+                <td class="px-6 py-4">₦${d.managementFee.toFixed(2)}</td>
+                <td class="px-6 py-4">₦${d.totalPay.toFixed(2)}</td>
+                <td class="px-6 py-4 text-blue-600 font-bold">₦${giftAmount.toFixed(2)}</td>
+                <td class="px-6 py-4 font-bold">₦${finalPay.toFixed(2)}</td>
+                <td class="px-6 py-4">
+                    <button class="add-gift-btn bg-blue-500 text-white px-3 py-1 rounded text-xs" data-tutor-email="${d.tutorEmail}">Add Gift</button>
                 </td>
             </tr>
         `;
     }).join('');
-    document.querySelectorAll('.gift-input').forEach(input => {
-        input.addEventListener('change', (e) => {
+    document.querySelectorAll('.add-gift-btn').forEach(button => {
+        button.addEventListener('click', (e) => {
             const tutorEmail = e.target.dataset.tutorEmail;
-            const giftAmount = Number(e.target.value) || 0;
-            payAdviceGifts[tutorEmail] = giftAmount;
-            renderPayAdviceTable(currentPayData); // Re-render to update final pay
-        });
-    });
-    document.querySelectorAll('.view-details-btn').forEach(button => {
-        button.addEventListener('click', () => {
-            const tutorEmail = button.dataset.tutorEmail;
-            const tutorData = currentPayData.find(d => d.tutorEmail === tutorEmail);
-            if (tutorData) {
-                const giftAmount = payAdviceGifts[tutorEmail] || 0;
-                const finalPay = tutorData.totalPay + giftAmount;
-                const details = `
-                    <strong>${tutorData.tutorName}</strong><br>
-                    Students: ${tutorData.studentCount}<br>
-                    Total Student Fees: ₦${tutorData.totalStudentFees.toFixed(2)}<br>
-                    Management Fee (15%): ₦${tutorData.managementFee.toFixed(2)}<br>
-                    Total Pay: ₦${tutorData.totalPay.toFixed(2)}<br>
-                    Gift: ₦${giftAmount.toFixed(2)}<br>
-                    <strong>Final Pay: ₦${finalPay.toFixed(2)}</strong><br>
-                    Beneficiary Bank: ${tutorData.beneficiaryBank}<br>
-                    Beneficiary Account: ${tutorData.beneficiaryAccount}<br>
-                    Beneficiary Name: ${tutorData.beneficiaryName}
-                `;
-                alert(details);
+            const currentGift = payAdviceGifts[tutorEmail] || 0;
+            const giftInput = prompt(`Enter gift amount for this tutor:`, currentGift);
+            if (giftInput !== null) {
+                const giftAmount = parseFloat(giftInput);
+                if (!isNaN(giftAmount) && giftAmount >= 0) {
+                    payAdviceGifts[tutorEmail] = giftAmount;
+                    renderPayAdviceTable(); // Re-render the table with the new gift
+                } else {
+                    alert("Please enter a valid, non-negative number.");
+                }
             }
         });
     });
 }
 
-// --- Reports Panel ---
-async function renderReportsPanel(container) {
+// --- Tutor Reports Panel ---
+async function renderTutorReportsPanel(container) {
     container.innerHTML = `
-        <div class="bg-white p-6 rounded-lg shadow-md">
-            <h2 class="text-2xl font-bold text-green-700 mb-4">Reports</h2>
-            <div class="bg-green-50 p-4 rounded-lg mb-6">
-                <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
-                    <div><label for="start-date-report" class="block text-sm font-medium">Start Date</label><input type="date" id="start-date-report" class="mt-1 block w-full p-2 border rounded-md"></div>
-                    <div><label for="end-date-report" class="block text-sm font-medium">End Date</label><input type="date" id="end-date-report" class="mt-1 block w-full p-2 border rounded-md"></div>
-                    <div class="flex items-end">
-                        <button id="generate-report-btn" class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 w-full">Generate Report</button>
-                    </div>
-                    <div class="flex items-end">
-                        <button id="export-report-btn" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 w-full">Export CSV</button>
-                    </div>
+        <div class="bg-white p-6 rounded-lg shadow-md mb-6">
+            <div class="flex justify-between items-center mb-4 flex-wrap gap-4">
+                <h2 class="text-2xl font-bold text-green-700">Tutor Reports</h2>
+                <button id="refresh-reports-btn" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Refresh</button>
+            </div>
+            <div class="flex space-x-4 mb-4">
+                <div class="bg-green-100 p-3 rounded-lg text-center shadow w-full">
+                    <h4 class="font-bold text-green-800 text-sm">Unique Tutors Submitted</h4>
+                    <p id="report-tutor-count" class="text-2xl font-extrabold">0</p>
+                </div>
+                <div class="bg-yellow-100 p-3 rounded-lg text-center shadow w-full">
+                    <h4 class="font-bold text-yellow-800 text-sm">Total Reports Submitted</h4>
+                    <p id="report-total-count" class="text-2xl font-extrabold">0</p>
                 </div>
             </div>
-            <div id="reports-table-container" class="overflow-x-auto">
-                <table class="min-w-full divide-y divide-gray-200">
-                    <thead class="bg-gray-50">
-                        <tr>
-                            <th class="px-6 py-3 text-left text-xs font-medium uppercase">Tutor</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium uppercase">Students</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium uppercase">Student Fees</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium uppercase">Mgmt. Fee</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium uppercase">Total Pay</th>
-                        </tr>
-                    </thead>
-                    <tbody id="reports-table-body" class="divide-y"><tr><td colspan="5" class="text-center py-4">Select a date range and generate report.</td></tr></tbody>
-                </table>
+            <div id="tutor-reports-list" class="space-y-4"><p class="text-center">Loading reports...</p></div>
+        </div>
+    `;
+    document.getElementById('refresh-reports-btn').addEventListener('click', () => fetchAndRenderTutorReports(true));
+    fetchAndRenderTutorReports();
+}
+
+async function fetchAndRenderTutorReports(forceRefresh = false) {
+    if (forceRefresh) invalidateCache('reports');
+    const reportsListContainer = document.getElementById('tutor-reports-list');
+    
+    try {
+        if (!sessionCache.reports) {
+            reportsListContainer.innerHTML = `<p class="text-center text-gray-500 py-10">Fetching reports from server...</p>`;
+            const snapshot = await getDocs(query(collection(db, "tutor_submissions"), orderBy("submittedAt", "desc")));
+            saveToLocalStorage('reports', snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+        }
+        renderTutorReportsFromCache();
+    } catch(error) {
+        console.error("Error fetching reports:", error);
+        reportsListContainer.innerHTML = `<p class="text-center text-red-500 py-10">Failed to load reports.</p>`;
+    }
+}
+
+function renderTutorReportsFromCache() {
+    const reports = sessionCache.reports || [];
+    const reportsListContainer = document.getElementById('tutor-reports-list');
+    if (!reportsListContainer) return;
+
+    if (reports.length === 0) {
+        reportsListContainer.innerHTML = `<p class="text-center text-gray-500">No reports found. Click Refresh to fetch from server.</p>`;
+        return;
+    }
+    
+    const reportsByTutor = {};
+    reports.forEach(report => {
+        if (!reportsByTutor[report.tutorEmail]) {
+            reportsByTutor[report.tutorEmail] = { name: report.tutorName || report.tutorEmail, reports: [] };
+        }
+        reportsByTutor[report.tutorEmail].reports.push(report);
+    });
+
+    document.getElementById('report-tutor-count').textContent = Object.keys(reportsByTutor).length;
+    document.getElementById('report-total-count').textContent = reports.length;
+
+    const canDownload = window.userData.permissions?.actions?.canDownloadReports === true;
+    reportsListContainer.innerHTML = Object.values(reportsByTutor).map(tutorData => {
+        const reportLinks = tutorData.reports.map(report => {
+            const buttonHTML = canDownload
+                ? `<button class="download-report-btn bg-green-500 text-white px-3 py-1 text-sm rounded" data-report-id="${report.id}">Download</button>`
+                : `<button class="view-report-btn bg-gray-500 text-white px-3 py-1 text-sm rounded" data-report-id="${report.id}">View</button>`;
+            return `<li class="flex justify-between items-center p-2 bg-gray-50 rounded">${report.studentName}<span>${buttonHTML}</span></li>`;
+        }).join('');
+        
+        const zipButtonHTML = canDownload
+            ? `<div class="p-4 border-t"><button class="zip-reports-btn bg-blue-600 text-white px-4 py-2 text-sm rounded w-full hover:bg-blue-700" data-tutor-email="${tutorData.reports[0].tutorEmail}">Zip & Download All Reports</button></div>`
+            : '';
+
+        return `<details class="border rounded-lg">
+                    <summary class="p-4 cursor-pointer font-semibold">${tutorData.name} (${tutorData.reports.length} reports)</summary>
+                    <div class="p-4 border-t"><ul class="space-y-2">${reportLinks}</ul></div>
+                    ${zipButtonHTML}
+                </details>`;
+    }).join('');
+
+    document.querySelectorAll('.download-report-btn').forEach(button => button.addEventListener('click', (e) => { e.stopPropagation(); viewReportInNewTab(e.target.dataset.reportId, true); }));
+    document.querySelectorAll('.view-report-btn').forEach(button => button.addEventListener('click', (e) => { e.stopPropagation(); viewReportInNewTab(e.target.dataset.reportId, false); }));
+    document.querySelectorAll('.zip-reports-btn').forEach(button => button.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        const tutorEmail = e.target.dataset.tutorEmail;
+        const tutorData = reportsByTutor[tutorEmail];
+        if (tutorData) await zipAndDownloadTutorReports(tutorData.reports, tutorData.name, e.target);
+    }));
+}
+
+// --- Pending Approvals Panel ---
+async function renderPendingApprovalsPanel(container) {
+    container.innerHTML = `
+        <div class="bg-white p-6 rounded-lg shadow-md">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-2xl font-bold text-green-700">Pending Approvals</h2>
+                <button id="refresh-pending-btn" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Refresh</button>
+            </div>
+            <div id="pending-approvals-list" class="space-y-4">
+                <p class="text-center text-gray-500 py-10">Loading pending students...</p>
             </div>
         </div>
     `;
-    document.getElementById('generate-report-btn').addEventListener('click', generateReport);
-    document.getElementById('export-report-btn').addEventListener('click', exportReportToCSV);
+    document.getElementById('refresh-pending-btn').addEventListener('click', () => fetchAndRenderPendingApprovals(true));
+    fetchAndRenderPendingApprovals();
 }
 
-async function generateReport() {
-    const startDateInput = document.getElementById('start-date-report').value;
-    const endDateInput = document.getElementById('end-date-report').value;
-    if (!startDateInput || !endDateInput) {
-        alert("Please select both start and end dates.");
-        return;
-    }
-    const startDate = new Date(startDateInput);
-    const endDate = new Date(endDateInput);
-    endDate.setHours(23, 59, 59, 999);
+async function fetchAndRenderPendingApprovals(forceRefresh = false) {
+    if (forceRefresh) invalidateCache('pendingStudents');
+    const listContainer = document.getElementById('pending-approvals-list');
+    
     try {
-        const tutorsSnapshot = await getDocs(query(collection(db, "tutors"), orderBy("name")));
-        const studentsSnapshot = await getDocs(query(
-            collection(db, "students"),
-            where("createdAt", ">=", Timestamp.fromDate(startDate)),
-            where("createdAt", "<=", Timestamp.fromDate(endDate))
-        ));
-        const students = studentsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        const studentsByTutor = {};
-        students.forEach(student => {
-            if (!studentsByTutor[student.tutorEmail]) {
-                studentsByTutor[student.tutorEmail] = [];
-            }
-            studentsByTutor[student.tutorEmail].push(student);
-        });
-        const reportData = tutorsSnapshot.docs.map(doc => {
-            const tutor = doc.data();
-            const assignedStudents = studentsByTutor[tutor.email] || [];
-            const totalStudentFees = assignedStudents.reduce((sum, s) => sum + (s.studentFee || 0), 0);
-            const managementFee = totalStudentFees * 0.15;
-            const totalPay = totalStudentFees - managementFee;
-            return {
-                tutorName: tutor.name,
-                studentCount: assignedStudents.length,
-                totalStudentFees,
-                managementFee,
-                totalPay
-            };
-        });
-        saveToLocalStorage('reports', reportData);
-        renderReportsTable(reportData);
-    } catch (error) {
-        console.error("Error generating report:", error);
-        document.getElementById('reports-table-body').innerHTML = `<tr><td colspan="5" class="text-center py-4 text-red-500">Failed to generate report.</td></tr>`;
+        if (!sessionCache.pendingStudents) {
+            listContainer.innerHTML = `<p class="text-center text-gray-500 py-10">Fetching pending students...</p>`;
+            const snapshot = await getDocs(query(collection(db, "pending_students")));
+            saveToLocalStorage('pendingStudents', snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+        }
+        renderPendingApprovalsFromCache();
+    } catch(error) {
+        console.error("Error fetching pending students:", error);
+        listContainer.innerHTML = `<p class="text-center text-red-500 py-10">Failed to load data.</p>`;
     }
 }
 
-function renderReportsTable(reportData) {
-    const tableBody = document.getElementById('reports-table-body');
-    if (reportData.length === 0) {
-        tableBody.innerHTML = `<tr><td colspan="5" class="text-center py-4">No data for the selected date range.</td></tr>`;
+function renderPendingApprovalsFromCache() {
+    const pendingStudents = sessionCache.pendingStudents || [];
+    const listContainer = document.getElementById('pending-approvals-list');
+    if (!listContainer) return;
+
+    if (pendingStudents.length === 0) {
+        listContainer.innerHTML = `<p class="text-center text-gray-500">No students are awaiting approval.</p>`;
         return;
     }
-    tableBody.innerHTML = reportData.map(item => `
-        <tr class="hover:bg-gray-50">
-            <td class="px-6 py-4 whitespace-nowrap font-medium">${item.tutorName}</td>
-            <td class="px-6 py-4 whitespace-nowrap">${item.studentCount}</td>
-            <td class="px-6 py-4 whitespace-nowrap">₦${item.totalStudentFees.toFixed(2)}</td>
-            <td class="px-6 py-4 whitespace-nowrap">₦${item.managementFee.toFixed(2)}</td>
-            <td class="px-6 py-4 whitespace-nowrap">₦${item.totalPay.toFixed(2)}</td>
-        </tr>
+
+    listContainer.innerHTML = pendingStudents.map(student => `
+        <div class="border p-4 rounded-lg flex justify-between items-center bg-gray-50">
+            <div>
+                <p><strong>Student:</strong> ${student.studentName}</p>
+                <p><strong>Fee:</strong> ₦${(student.studentFee || 0).toFixed(2)}</p>
+                <p><strong>Submitted by Tutor:</strong> ${student.tutorEmail || 'N/A'}</p>
+            </div>
+            <div class="flex items-center space-x-2">
+                <button class="edit-pending-btn bg-blue-500 text-white px-3 py-1 text-sm rounded-full" data-student-id="${student.id}">Edit</button>
+                <button class="approve-btn bg-green-600 text-white px-3 py-1 text-sm rounded-full" data-student-id="${student.id}">Approve</button>
+                <button class="reject-btn bg-red-600 text-white px-3 py-1 text-sm rounded-full" data-student-id="${student.id}">Reject</button>
+            </div>
+        </div>
     `).join('');
-}
-
-function exportReportToCSV() {
-    const reportData = sessionCache.reports;
-    if (!reportData || reportData.length === 0) {
-        alert("No report data to export. Generate a report first.");
-        return;
-    }
-    const header = ['Tutor Name', 'Student Count', 'Total Student Fees (₦)', 'Management Fee (₦)', 'Total Pay (₦)'];
-    const rows = reportData.map(item => [
-        `"${item.tutorName}"`,
-        item.studentCount,
-        item.totalStudentFees,
-        item.managementFee,
-        item.totalPay
-    ]);
-    const csv = [header.join(','), ...rows.map(row => row.join(','))].join('\n');
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    const start = document.getElementById('start-date-report').value;
-    const end = document.getElementById('end-date-report').value;
-    const filename = `report_${start}_to_${end}.csv`;
-    link.href = URL.createObjectURL(blob);
-    link.download = filename;
-    link.click();
+    document.querySelectorAll('.edit-pending-btn').forEach(button => button.addEventListener('click', () => handleEditPendingStudent(button.dataset.studentId)));
+    document.querySelectorAll('.approve-btn').forEach(button => button.addEventListener('click', () => handleApproveStudent(button.dataset.studentId)));
+    document.querySelectorAll('.reject-btn').forEach(button => button.addEventListener('click', () => handleRejectStudent(button.dataset.studentId)));
 }
 
 // --- Summer Break Panel ---
 async function renderSummerBreakPanel(container) {
     container.innerHTML = `
         <div class="bg-white p-6 rounded-lg shadow-md">
-            <h2 class="text-2xl font-bold text-green-700 mb-4">Summer Break Management</h2>
-            <div class="bg-yellow-50 p-4 rounded-lg mb-6">
-                <p class="text-yellow-700">Students on summer break will be temporarily hidden from the active directory and will not appear in pay advice calculations until they resume.</p>
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-2xl font-bold text-green-700">Students on Summer Break</h2>
+                <button id="refresh-break-btn" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Refresh</button>
             </div>
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                    <h3 class="text-lg font-semibold mb-3">Active Students</h3>
-                    <div id="active-students-list" class="space-y-2 max-h-96 overflow-y-auto">
-                        <p class="text-center text-gray-500 py-4">Loading active students...</p>
-                    </div>
-                </div>
-                <div>
-                    <h3 class="text-lg font-semibold mb-3">Students on Break</h3>
-                    <div id="break-students-list" class="space-y-2 max-h-96 overflow-y-auto">
-                        <p class="text-center text-gray-500 py-4">Loading students on break...</p>
-                    </div>
-                </div>
+            <div id="break-status-message" class="text-center font-semibold mb-4 hidden"></div>
+            <div id="break-students-list" class="space-y-4">
+                <p class="text-center">Loading...</p>
             </div>
         </div>
     `;
-    fetchAndRenderSummerBreakLists();
+    document.getElementById('refresh-break-btn').addEventListener('click', () => fetchAndRenderBreakStudents(true));
+    fetchAndRenderBreakStudents();
 }
 
-async function fetchAndRenderSummerBreakLists() {
+async function fetchAndRenderBreakStudents(forceRefresh = false) {
+    if (forceRefresh) invalidateCache('breakStudents');
+    const listContainer = document.getElementById('break-students-list');
+
     try {
-        const [activeStudentsSnapshot, breakStudentsSnapshot] = await Promise.all([
-            getDocs(query(collection(db, "students"), where("summerBreak", "==", false))),
-            getDocs(query(collection(db, "students"), where("summerBreak", "==", true)))
-        ]);
-        const activeStudents = activeStudentsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        const breakStudents = breakStudentsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        saveToLocalStorage('students', [...activeStudents, ...breakStudents]);
-        saveToLocalStorage('breakStudents', breakStudents);
-        renderSummerBreakLists(activeStudents, breakStudents);
-    } catch (error) {
-        console.error("Error fetching summer break data:", error);
-        document.getElementById('active-students-list').innerHTML = `<p class="text-center text-red-500 py-4">Failed to load data.</p>`;
-        document.getElementById('break-students-list').innerHTML = `<p class="text-center text-red-500 py-4">Failed to load data.</p>`;
+        if (!sessionCache.breakStudents) {
+            listContainer.innerHTML = `<p class="text-center text-gray-500 py-10">Fetching student break status...</p>`;
+            const snapshot = await getDocs(query(collection(db, "students"), where("summerBreak", "==", true)));
+            saveToLocalStorage('breakStudents', snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+        }
+        renderBreakStudentsFromCache();
+    } catch(error) {
+        console.error("Error fetching break students:", error);
+        listContainer.innerHTML = `<p class="text-center text-red-500 py-10">Failed to load data.</p>`;
     }
 }
 
-function renderSummerBreakLists(activeStudents, breakStudents) {
-    const activeList = document.getElementById('active-students-list');
-    const breakList = document.getElementById('break-students-list');
-    activeList.innerHTML = activeStudents.length > 0 ? activeStudents.map(student => `
-        <div class="border border-green-200 p-3 rounded-lg bg-green-50 flex justify-between items-center">
-            <div>
-                <p class="font-semibold text-green-800">${student.studentName}</p>
-                <p class="text-sm text-green-600">${student.tutorName} • ${student.grade}</p>
-            </div>
-            <button class="move-to-break-btn bg-yellow-500 text-white px-3 py-1 rounded-full text-xs" data-student-id="${student.id}">Move to Break</button>
-        </div>
-    `).join('') : `<p class="text-center text-gray-500 py-4">No active students.</p>`;
-    breakList.innerHTML = breakStudents.length > 0 ? breakStudents.map(student => `
-        <div class="border border-yellow-200 p-3 rounded-lg bg-yellow-50 flex justify-between items-center">
-            <div>
-                <p class="font-semibold text-yellow-800">${student.studentName}</p>
-                <p class="text-sm text-yellow-600">${student.tutorName} • ${student.grade}</p>
-            </div>
-            <button class="move-to-active-btn bg-green-500 text-white px-3 py-1 rounded-full text-xs" data-student-id="${student.id}">Move to Active</button>
-        </div>
-    `).join('') : `<p class="text-center text-gray-500 py-4">No students on break.</p>`;
-    document.querySelectorAll('.move-to-break-btn').forEach(button => button.addEventListener('click', () => handleMoveToBreak(button.dataset.studentId)));
-    document.querySelectorAll('.move-to-active-btn').forEach(button => button.addEventListener('click', () => handleMoveToActive(button.dataset.studentId)));
-}
+function renderBreakStudentsFromCache() {
+    const breakStudents = sessionCache.breakStudents || [];
+    const listContainer = document.getElementById('break-students-list');
+    if (!listContainer) return;
 
-async function handleMoveToBreak(studentId) {
-    try {
-        await updateDoc(doc(db, "students", studentId), { summerBreak: true });
-        alert("Student moved to summer break successfully!");
-        invalidateCache('students');
-        invalidateCache('breakStudents');
-        fetchAndRenderSummerBreakLists();
-    } catch (error) {
-        console.error("Error moving student to break:", error);
-        alert("Failed to move student to break. Check the console for details.");
+    const canEndBreak = window.userData.permissions?.actions?.canEndBreak === true;
+    if (breakStudents.length === 0) {
+        listContainer.innerHTML = `<p class="text-center text-gray-500">No students are on break.</p>`;
+        return;
     }
-}
-
-async function handleMoveToActive(studentId) {
-    try {
-        await updateDoc(doc(db, "students", studentId), { summerBreak: false });
-        alert("Student moved back to active successfully!");
-        invalidateCache('students');
-        invalidateCache('breakStudents');
-        fetchAndRenderSummerBreakLists();
-    } catch (error) {
-        console.error("Error moving student to active:", error);
-        alert("Failed to move student to active. Check the console for details.");
+    
+    listContainer.innerHTML = breakStudents.map(student => {
+        const endBreakButton = canEndBreak 
+            ? `<button class="end-break-btn bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700 transition-colors" data-student-id="${student.id}">End Break</button>`
+            : '';
+        return `
+            <div class="border p-4 rounded-lg flex justify-between items-center bg-gray-50">
+                <div>
+                    <p><strong>Student:</strong> ${student.studentName}</p>
+                    <p><strong>Tutor:</strong> ${student.tutorEmail}</p>
+                </div>
+                <div class="flex items-center space-x-2">
+                    <span class="text-yellow-600 font-semibold px-3 py-1 bg-yellow-100 rounded-full text-sm">On Break</span>
+                     ${endBreakButton}
+                </div>
+            </div>
+        `;
+    }).join('');
+    if (canEndBreak) {
+        document.querySelectorAll('.end-break-btn').forEach(button => {
+            button.addEventListener('click', async (e) => {
+                const studentId = e.target.dataset.studentId;
+                if (confirm("Are you sure you want to end the summer break for this student?")) {
+                    try {
+                        await updateDoc(doc(db, "students", studentId), { summerBreak: false, lastBreakEnd: Timestamp.now() });
+                        document.getElementById('break-status-message').textContent = `Break ended successfully.`;
+                        document.getElementById('break-status-message').className = 'text-center font-semibold mb-4 text-green-600';
+                        invalidateCache('breakStudents'); // Invalidate cache
+                        fetchAndRenderBreakStudents(); // Re-render list
+                    } catch (error) {
+                        console.error("Error ending summer break:", error);
+                        document.getElementById('break-status-message').textContent = "Failed to end summer break.";
+                        document.getElementById('break-status-message').className = 'text-center font-semibold mb-4 text-red-600';
+                    }
+                }
+            });
+        });
     }
 }
 
@@ -1022,270 +937,591 @@ async function handleMoveToActive(studentId) {
 async function renderParentFeedbackPanel(container) {
     container.innerHTML = `
         <div class="bg-white p-6 rounded-lg shadow-md">
-            <h2 class="text-2xl font-bold text-green-700 mb-4">Parent Feedback</h2>
-            <div class="bg-blue-50 p-4 rounded-lg mb-6">
-                <p class="text-blue-700">View and manage feedback submitted by parents.</p>
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-2xl font-bold text-green-700">Parent Feedback & Requests</h2>
+                <button id="refresh-feedback-btn" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Refresh</button>
             </div>
-            <div id="feedback-list" class="space-y-4">
-                <p class="text-center text-gray-500 py-10">Loading feedback...</p>
+            <div class="flex space-x-4 mb-4">
+                <div class="bg-green-100 p-3 rounded-lg text-center shadow w-full">
+                    <h4 class="font-bold text-green-800 text-sm">Total Messages</h4>
+                    <p id="feedback-total-count" class="text-2xl font-extrabold">0</p>
+                </div>
+                <div class="bg-yellow-100 p-3 rounded-lg text-center shadow w-full">
+                    <h4 class="font-bold text-yellow-800 text-sm">Unread Messages</h4>
+                    <p id="feedback-unread-count" class="text-2xl font-extrabold">0</p>
+                </div>
+            </div>
+            <div id="parent-feedback-list" class="space-y-4">
+                <p class="text-center text-gray-500 py-10">Loading feedback messages...</p>
             </div>
         </div>
     `;
+    
+    document.getElementById('refresh-feedback-btn').addEventListener('click', () => fetchAndRenderParentFeedback(true));
     fetchAndRenderParentFeedback();
 }
 
-async function fetchAndRenderParentFeedback() {
+async function fetchAndRenderParentFeedback(forceRefresh = false) {
+    if (forceRefresh) invalidateCache('parentFeedback');
+    const listContainer = document.getElementById('parent-feedback-list');
+    
     try {
-        const feedbackSnapshot = await getDocs(query(collection(db, "parent_feedback"), orderBy("submittedAt", "desc")));
-        const feedback = feedbackSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        saveToLocalStorage('parentFeedback', feedback);
-        renderParentFeedbackList(feedback);
-    } catch (error) {
+        if (!sessionCache.parentFeedback) {
+            listContainer.innerHTML = `<p class="text-center text-gray-500 py-10">Fetching feedback messages...</p>`;
+            
+            // Get all feedback messages
+            const feedbackSnapshot = await getDocs(query(collection(db, "parent_feedback"), orderBy("timestamp", "desc")));
+            const feedbackData = feedbackSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            
+            // Get all tutor submissions to find parent names
+            const submissionsSnapshot = await getDocs(collection(db, "tutor_submissions"));
+            const submissionsData = submissionsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            
+            // Create a map of student names to parent names
+            const studentParentMap = {};
+            submissionsData.forEach(submission => {
+                if (submission.studentName && submission.parentName) {
+                    studentParentMap[submission.studentName] = submission.parentName;
+                }
+            });
+            
+            // Enhance feedback data with proper timestamps and parent names
+            const enhancedFeedbackData = feedbackData.map(feedback => {
+                // Convert timestamp to Firestore Timestamp format for submittedAt
+                let submittedAt = feedback.submittedAt;
+                if (feedback.timestamp && !submittedAt) {
+                    // Convert your timestamp string to Firestore Timestamp
+                    const date = new Date(feedback.timestamp);
+                    submittedAt = Timestamp.fromDate(date);
+                }
+                
+                // Get parent name from tutor submissions if available
+                let parentName = feedback.parentName;
+                if ((!parentName || parentName === "Unknown Parent") && feedback.studentName) {
+                    parentName = studentParentMap[feedback.studentName] || feedback.parentName;
+                }
+                
+                return {
+                    ...feedback,
+                    submittedAt: submittedAt || Timestamp.now(),
+                    parentName: parentName || 'Unknown Parent',
+                    // Ensure all required fields have defaults
+                    read: feedback.read || false,
+                    message: feedback.message || '',
+                    parentEmail: feedback.parentEmail || '',
+                    parentPhone: feedback.parentPhone || '',
+                    responses: feedback.responses || [] // Initialize responses array if not exists
+                };
+            });
+            
+            saveToLocalStorage('parentFeedback', enhancedFeedbackData);
+        }
+        renderParentFeedbackFromCache();
+    } catch(error) {
         console.error("Error fetching parent feedback:", error);
-        document.getElementById('feedback-list').innerHTML = `<p class="text-center text-red-500 py-10">Failed to load feedback.</p>`;
+        listContainer.innerHTML = `<p class="text-center text-red-500 py-10">Failed to load feedback messages.</p>`;
     }
 }
 
-function renderParentFeedbackList(feedback) {
-    const feedbackList = document.getElementById('feedback-list');
-    if (feedback.length === 0) {
-        feedbackList.innerHTML = `<p class="text-center text-gray-500 py-10">No feedback submitted yet.</p>`;
+function renderParentFeedbackFromCache() {
+    const feedbackMessages = sessionCache.parentFeedback || [];
+    const listContainer = document.getElementById('parent-feedback-list');
+    if (!listContainer) return;
+
+    if (feedbackMessages.length === 0) {
+        listContainer.innerHTML = `<p class="text-center text-gray-500">No feedback messages found.</p>`;
+        document.getElementById('feedback-total-count').textContent = '0';
+        document.getElementById('feedback-unread-count').textContent = '0';
         return;
     }
-    feedbackList.innerHTML = feedback.map(item => {
-        const date = item.submittedAt?.toDate ? item.submittedAt.toDate().toLocaleDateString() : 'Unknown date';
+
+    const unreadCount = feedbackMessages.filter(msg => !msg.read).length;
+    
+    document.getElementById('feedback-total-count').textContent = feedbackMessages.length;
+    document.getElementById('feedback-unread-count').textContent = unreadCount;
+
+    listContainer.innerHTML = feedbackMessages.map(message => {
+        // Handle both timestamp formats
+        let submittedDate = 'Unknown date';
+        if (message.submittedAt) {
+            if (message.submittedAt.toDate) {
+                // It's a Firestore Timestamp
+                submittedDate = message.submittedAt.toDate().toLocaleDateString();
+            } else if (message.submittedAt.seconds) {
+                // It's a Timestamp object
+                submittedDate = new Date(message.submittedAt.seconds * 1000).toLocaleDateString();
+            } else if (message.timestamp) {
+                // Use the original timestamp field
+                submittedDate = new Date(message.timestamp).toLocaleDateString();
+            }
+        } else if (message.timestamp) {
+            submittedDate = new Date(message.timestamp).toLocaleDateString();
+        }
+        
+        const readStatus = message.read ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800';
+        const readText = message.read ? 'Read' : 'Unread';
+
+        // Display existing responses
+        const responsesHTML = message.responses && message.responses.length > 0 ? `
+            <div class="mt-4 border-t pt-4">
+                <h4 class="font-semibold text-gray-700 mb-2">Responses:</h4>
+                ${message.responses.map(response => `
+                    <div class="bg-blue-50 p-3 rounded-lg mb-2">
+                        <div class="flex justify-between items-start mb-1">
+                            <span class="font-medium text-blue-800">${response.responderName || 'Staff'}</span>
+                            <span class="text-xs text-gray-500">${new Date(response.responseDate?.seconds * 1000).toLocaleDateString()}</span>
+                        </div>
+                        <p class="text-gray-700 text-sm">${response.responseText}</p>
+                    </div>
+                `).join('')}
+            </div>
+        ` : '';
+
         return `
-            <div class="border border-blue-200 p-4 rounded-lg bg-blue-50">
-                <div class="flex justify-between items-start mb-2">
-                    <h3 class="font-semibold text-blue-800">${item.parentName || 'Anonymous Parent'}</h3>
-                    <span class="text-sm text-blue-600">${date}</span>
+            <div class="border rounded-lg p-4 bg-white shadow-sm hover:shadow-md transition-shadow ${message.read ? '' : 'border-l-4 border-l-yellow-500'}">
+                <div class="flex justify-between items-start mb-3">
+                    <div>
+                        <h3 class="font-bold text-lg text-gray-800">${message.parentName || 'Anonymous Parent'}</h3>
+                        <p class="text-sm text-gray-600">Student: ${message.studentName || 'N/A'}</p>
+                    </div>
+                    <div class="text-right">
+                        <span class="text-xs text-gray-500 block">${submittedDate}</span>
+                        <span class="text-xs px-2 py-1 rounded-full ${readStatus}">${readText}</span>
+                    </div>
                 </div>
-                <p class="text-blue-700 mb-3">${item.feedback}</p>
-                <div class="text-sm text-gray-600">
-                    <p>Tutor: ${item.tutorName || 'N/A'}</p>
-                    <p>Email: ${item.parentEmail || 'N/A'}</p>
+                
+                <div class="mb-3">
+                    <p class="text-gray-700 whitespace-pre-wrap">${message.message || 'No message content'}</p>
+                </div>
+                
+                ${responsesHTML}
+
+                <div class="flex justify-between items-center text-sm text-gray-600">
+                    <div>
+                        ${message.parentEmail ? `<span class="mr-3">📧 ${message.parentEmail}</span>` : ''}
+                        ${message.parentPhone ? `<span>📞 ${message.parentPhone}</span>` : ''}
+                    </div>
+                    <div class="flex space-x-2">
+                        ${!message.read ? `
+                            <button class="mark-read-btn bg-blue-500 text-white px-3 py-1 rounded text-xs hover:bg-blue-600" data-message-id="${message.id}">
+                                Mark as Read
+                            </button>
+                        ` : ''}
+                        <button class="respond-btn bg-green-500 text-white px-3 py-1 rounded text-xs hover:bg-green-600" data-message-id="${message.id}">
+                            Respond
+                        </button>
+                        <button class="delete-feedback-btn bg-red-500 text-white px-3 py-1 rounded text-xs hover:bg-red-600" data-message-id="${message.id}">
+                            Delete
+                        </button>
+                    </div>
                 </div>
             </div>
         `;
     }).join('');
-}
 
-// --- Pending Approvals Panel ---
-async function renderPendingApprovalsPanel(container) {
-    container.innerHTML = `
-        <div class="bg-white p-6 rounded-lg shadow-md">
-            <h2 class="text-2xl font-bold text-green-700 mb-4">Pending Approvals</h2>
-            <div class="bg-yellow-50 p-4 rounded-lg mb-6">
-                <p class="text-yellow-700">Approve or reject new student applications and referrals submitted by parents.</p>
-            </div>
-            <div id="pending-approvals-content">
-                <p class="text-center text-gray-500 py-10">Loading pending approvals...</p>
-            </div>
-        </div>
-    `;
-    fetchAndRenderPendingApprovals();
-}
-
-// ### UPDATED FUNCTION ###
-async function fetchAndRenderPendingApprovals() {
-    try {
-        // Fetch both pending students and pending referrals
-        const [pendingStudents, pendingReferrals] = await Promise.all([
-            fetchPendingStudents(),
-            fetchPendingReferrals()
-        ]);
-        
-        const contentDiv = document.getElementById('pending-approvals-content');
-        
-        let html = '';
-        
-        // Render pending students section
-        if (pendingStudents.length > 0) {
-            html += `
-                <div>
-                    <h3 class="text-xl font-bold text-yellow-700 mb-4">Pending Students (${pendingStudents.length})</h3>
-                    <div class="space-y-4">
-                        ${pendingStudents.map(student => {
-                            const date = student.createdAt?.toDate 
-                                ? student.createdAt.toDate().toLocaleDateString() 
-                                : 'Unknown date';
-                            const subjects = student.subjects && Array.isArray(student.subjects) 
-                                ? student.subjects.join(', ') 
-                                : 'N/A';
-                            
-                            return `
-                                <div class="border border-yellow-200 p-4 rounded-lg bg-yellow-50 flex justify-between items-center">
-                                    <div class="flex-1">
-                                        <div class="flex justify-between items-start mb-2">
-                                            <p class="font-semibold text-yellow-800">${student.studentName}</p>
-                                            <span class="text-sm text-yellow-600">${date}</span>
-                                        </div>
-                                        <div class="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
-                                            <p><span class="font-medium">Grade:</span> ${student.grade}</p>
-                                            <p><span class="font-medium">Days/Week:</span> ${student.days}</p>
-                                            <p><span class="font-medium">Subjects:</span> ${subjects}</p>
-                                            <p><span class="font-medium">Fee:</span> ₦${(student.studentFee || 0).toFixed(2)}</p>
-                                            <p><span class="font-medium">Parent:</span> ${student.parentName || 'N/A'}</p>
-                                            <p><span class="font-medium">Phone:</span> ${student.parentPhone || 'N/A'}</p>
-                                        </div>
-                                    </div>
-                                    <div class="flex flex-col space-y-2 ml-4">
-                                        <button class="edit-pending-student-btn bg-blue-500 text-white px-3 py-1 rounded-full text-xs" data-student-id="${student.id}">Edit</button>
-                                        <button class="approve-student-btn bg-green-600 text-white px-3 py-1 rounded-full text-xs" data-student-id="${student.id}">Approve</button>
-                                        <button class="reject-student-btn bg-red-600 text-white px-3 py-1 rounded-full text-xs" data-student-id="${student.id}">Reject</button>
-                                    </div>
-                                </div>
-                            `;
-                        }).join('')}
-                    </div>
-                </div>
-            `;
-        } else {
-            html += `
-                <div>
-                    <h3 class="text-xl font-bold text-yellow-700 mb-4">Pending Students</h3>
-                    <div class="bg-yellow-50 p-6 rounded-lg text-center">
-                        <p class="text-yellow-600">No pending students to approve.</p>
-                    </div>
-                </div>
-            `;
-        }
-        
-        // Render pending referrals section
-        html += renderPendingReferralsSection(pendingReferrals);
-        
-        contentDiv.innerHTML = html;
-        
-        // Attach event listeners for student actions
-        if (pendingStudents.length > 0) {
-            document.querySelectorAll('.edit-pending-student-btn').forEach(button => 
-                button.addEventListener('click', () => handleEditPendingStudent(button.dataset.studentId))
-            );
-            document.querySelectorAll('.approve-student-btn').forEach(button => 
-                button.addEventListener('click', () => handleApproveStudent(button.dataset.studentId))
-            );
-            document.querySelectorAll('.reject-student-btn').forEach(button => 
-                button.addEventListener('click', () => handleRejectStudent(button.dataset.studentId))
-            );
-        }
-        
-        // Attach event listeners for referral actions
-        if (pendingReferrals.length > 0) {
-            document.querySelectorAll('.approve-referral-btn').forEach(button => 
-                button.addEventListener('click', () => 
-                    handleApproveReferral(button.dataset.referralId, button.dataset.referrerEmail)
-                )
-            );
-            document.querySelectorAll('.reject-referral-btn').forEach(button => 
-                button.addEventListener('click', () => 
-                    handleRejectReferral(button.dataset.referralId)
-                )
-            );
-        }
-        
-    } catch (error) {
-        console.error("Error fetching pending approvals:", error);
-        document.getElementById('pending-approvals-content').innerHTML = 
-            `<p class="text-center text-red-500 py-10">Failed to load pending approvals.</p>`;
-    }
-}
-
-async function fetchPendingStudents() {
-    try {
-        const snapshot = await getDocs(query(collection(db, "pending_students"), orderBy("createdAt", "desc")));
-        const students = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        saveToLocalStorage('pendingStudents', students);
-        return students;
-    } catch (error) {
-        console.error("Error fetching pending students:", error);
-        return [];
-    }
-}
-
-// ##################################
-// # MAIN APP INITIALIZATION
-// ##################################
-
-function initializeManagementApp() {
-    const mainContent = document.getElementById('main-content');
-    const navLinks = document.querySelectorAll('.nav-link');
-    const logoutBtn = document.getElementById('logout-btn');
-
-    // Set initial view
-    renderManagementTutorView(mainContent);
-
-    // Navigation event listeners
-    navLinks.forEach(link => {
-        link.addEventListener('click', (e) => {
-            e.preventDefault();
-            const targetPanel = link.dataset.panel;
-            navLinks.forEach(l => l.classList.remove('active'));
-            link.classList.add('active');
-            switch (targetPanel) {
-                case 'directory':
-                    renderManagementTutorView(mainContent);
-                    break;
-                case 'pay-advice':
-                    renderPayAdvicePanel(mainContent);
-                    break;
-                case 'reports':
-                    renderReportsPanel(mainContent);
-                    break;
-                case 'summer-break':
-                    renderSummerBreakPanel(mainContent);
-                    break;
-                case 'parent-feedback':
-                    renderParentFeedbackPanel(mainContent);
-                    break;
-                case 'pending-approvals':
-                    renderPendingApprovalsPanel(mainContent);
-                    break;
-            }
+    // Add event listeners for the buttons
+    document.querySelectorAll('.mark-read-btn').forEach(button => {
+        button.addEventListener('click', (e) => {
+            e.stopPropagation();
+            handleMarkAsRead(e.target.dataset.messageId);
         });
     });
 
-    // Logout event listener
-    logoutBtn.addEventListener('click', async () => {
-        if (confirm("Are you sure you want to log out?")) {
-            try {
-                await signOut(auth);
-                window.location.href = 'login.html';
-            } catch (error) {
-                console.error("Error signing out:", error);
-                alert("Error signing out. Check the console for details.");
-            }
-        }
+    document.querySelectorAll('.respond-btn').forEach(button => {
+        button.addEventListener('click', (e) => {
+            e.stopPropagation();
+            showResponseModal(e.target.dataset.messageId);
+        });
+    });
+
+    document.querySelectorAll('.delete-feedback-btn').forEach(button => {
+        button.addEventListener('click', (e) => {
+            e.stopPropagation();
+            handleDeleteFeedback(e.target.dataset.messageId);
+        });
     });
 }
 
-// Wait for DOM and auth state
-document.addEventListener('DOMContentLoaded', () => {
-    onAuthStateChanged(auth, (user) => {
-        if (user) {
-            // Check if user has admin role
-            getDoc(doc(db, "admins", user.email)).then((docSnap) => {
-                if (docSnap.exists()) {
-                    const userData = docSnap.data();
-                    window.userData = userData; // Store for permission checks
-                    document.getElementById('admin-name').textContent = userData.name || 'Admin';
-                    initializeManagementApp();
-                } else {
-                    alert("You are not authorized to access the management dashboard.");
-                    signOut(auth).then(() => {
-                        window.location.href = 'login.html';
-                    });
-                }
-            }).catch((error) => {
-                console.error("Error checking admin status:", error);
-                alert("Error verifying admin access.");
-                signOut(auth).then(() => {
-                    window.location.href = 'login.html';
-                });
-            });
-        } else {
-            window.location.href = 'login.html';
-        }
+// New function to show response modal
+function showResponseModal(messageId) {
+    const message = sessionCache.parentFeedback?.find(msg => msg.id === messageId);
+    if (!message) {
+        alert("Message not found!");
+        return;
+    }
+
+    const modalHtml = `
+        <div id="response-modal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-center justify-center">
+            <div class="relative p-8 bg-white w-96 max-w-2xl rounded-lg shadow-xl">
+                <button class="absolute top-2 right-2 text-gray-500 hover:text-gray-800 text-2xl font-bold" onclick="document.getElementById('response-modal').remove()">&times;</button>
+                <h3 class="text-xl font-bold mb-4">Respond to Parent Feedback</h3>
+                <div class="mb-4 p-4 bg-gray-50 rounded-lg">
+                    <p><strong>From:</strong> ${message.parentName || 'Anonymous Parent'}</p>
+                    <p><strong>Student:</strong> ${message.studentName || 'N/A'}</p>
+                    <p><strong>Message:</strong> ${message.message}</p>
+                </div>
+                <form id="response-form">
+                    <input type="hidden" id="response-message-id" value="${messageId}">
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium mb-2">Your Response</label>
+                        <textarea id="response-text" rows="6" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent" placeholder="Type your response here..."></textarea>
+                    </div>
+                    <div class="flex justify-end space-x-3">
+                        <button type="button" onclick="document.getElementById('response-modal').remove()" class="px-4 py-2 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400">Cancel</button>
+                        <button type="submit" class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700">Send Response</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    `;
+    
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+    
+    document.getElementById('response-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        await handleSendResponse(messageId);
     });
+}
+
+// New function to handle sending responses
+async function handleSendResponse(messageId) {
+    const responseText = document.getElementById('response-text').value.trim();
+    const modal = document.getElementById('response-modal');
+    
+    if (!responseText) {
+        alert("Please enter a response message.");
+        return;
+    }
+
+    try {
+        const messageRef = doc(db, "parent_feedback", messageId);
+        const messageDoc = await getDoc(messageRef);
+        
+        if (!messageDoc.exists()) {
+            alert("Message not found!");
+            return;
+        }
+
+        const currentData = messageDoc.data();
+        const currentResponses = currentData.responses || [];
+        
+        const newResponse = {
+            responseText: responseText,
+            responderName: window.userData?.name || 'Management Staff',
+            responderEmail: window.userData?.email || 'management',
+            responseDate: Timestamp.now()
+        };
+
+        // Update the message with the new response
+        await updateDoc(messageRef, {
+            responses: [...currentResponses, newResponse],
+            read: true, // Mark as read when responding
+            readAt: Timestamp.now()
+        });
+
+        // Update cache
+        if (sessionCache.parentFeedback) {
+            const messageIndex = sessionCache.parentFeedback.findIndex(msg => msg.id === messageId);
+            if (messageIndex !== -1) {
+                sessionCache.parentFeedback[messageIndex].responses = [...currentResponses, newResponse];
+                sessionCache.parentFeedback[messageIndex].read = true;
+                saveToLocalStorage('parentFeedback', sessionCache.parentFeedback);
+            }
+        }
+
+        alert("Response sent successfully!");
+        modal.remove();
+        renderParentFeedbackFromCache(); // Refresh the display
+
+    } catch (error) {
+        console.error("Error sending response:", error);
+        alert("Failed to send response. Please try again.");
+    }
+}
+
+async function handleMarkAsRead(messageId) {
+    try {
+        await updateDoc(doc(db, "parent_feedback", messageId), {
+            read: true,
+            readAt: Timestamp.now()
+        });
+        
+        // Update cache and re-render
+        if (sessionCache.parentFeedback) {
+            const messageIndex = sessionCache.parentFeedback.findIndex(msg => msg.id === messageId);
+            if (messageIndex !== -1) {
+                sessionCache.parentFeedback[messageIndex].read = true;
+                saveToLocalStorage('parentFeedback', sessionCache.parentFeedback);
+            }
+        }
+        
+        renderParentFeedbackFromCache();
+    } catch (error) {
+        console.error("Error marking message as read:", error);
+        alert("Failed to mark message as read. Please try again.");
+    }
+}
+
+async function handleDeleteFeedback(messageId) {
+    if (confirm("Are you sure you want to delete this feedback message? This action cannot be undone.")) {
+        try {
+            await deleteDoc(doc(db, "parent_feedback", messageId));
+            
+            // Update cache and re-render
+            if (sessionCache.parentFeedback) {
+                sessionCache.parentFeedback = sessionCache.parentFeedback.filter(msg => msg.id !== messageId);
+                saveToLocalStorage('parentFeedback', sessionCache.parentFeedback);
+            }
+            
+            renderParentFeedbackFromCache();
+        } catch (error) {
+            console.error("Error deleting feedback message:", error);
+            alert("Failed to delete message. Please try again.");
+        }
+    }
+}
+
+// ##################################
+// # REPORT GENERATION & ZIPPING
+// ##################################
+
+// ##### CORRECTED AND FINALIZED FUNCTION #####
+async function generateReportHTML(reportId) {
+    const reportDoc = await getDoc(doc(db, "tutor_submissions", reportId));
+    if (!reportDoc.exists()) throw new Error("Report not found!");
+    const reportData = reportDoc.data();
+
+    // Define the sections to be displayed in the report
+    const reportSections = {
+        "INTRODUCTION": reportData.introduction,
+        "TOPICS & REMARKS": reportData.topics,
+        "PROGRESS & ACHIEVEMENTS": reportData.progress,
+        "STRENGTHS AND WEAKNESSES": reportData.strengthsWeaknesses,
+        "RECOMMENDATIONS": reportData.recommendations,
+        "GENERAL TUTOR'S COMMENTS": reportData.generalComments
+    };
+
+    // Generate the HTML for each section, ensuring "N/A" for empty content
+    const sectionsHTML = Object.entries(reportSections).map(([title, content]) => {
+        // Sanitize content to prevent HTML injection and format newlines
+        const sanitizedContent = content ? String(content).replace(/</g, "&lt;").replace(/>/g, "&gt;") : '';
+        const displayContent = (sanitizedContent && sanitizedContent.trim() !== '') ? sanitizedContent.replace(/\n/g, '<br>') : 'N/A';
+        return `
+            <div class="report-section">
+                <h2>${title}</h2>
+                <p>${displayContent}</p>
+            </div>
+        `;
+    }).join('');
+
+    const logoUrl = "https://res.cloudinary.com/dy2hxcyaf/image/upload/v1757700806/newbhlogo_umwqzy.svg";
+    const reportTemplate = `
+        <html>
+        <head>
+            <style>
+                body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; color: #333; }
+                .report-container { max-width: 800px; margin: auto; padding: 20px; }
+                .header { text-align: center; margin-bottom: 40px; }
+                .header img { height: 80px; }
+                .header h1 { color: #166534; margin: 0; font-size: 24px; }
+                .header h2 { color: #15803d; margin: 10px 0; font-size: 28px; }
+                .header p { margin: 5px 0; color: #555; }
+                .student-info { 
+                    display: grid; 
+                    grid-template-columns: 1fr 1fr; 
+                    gap: 10px 20px; 
+                    margin-bottom: 30px; 
+                    background-color: #f9f9f9;
+                    border: 1px solid #eee;
+                    padding: 15px;
+                    border-radius: 8px;
+                }
+                .student-info p { margin: 5px 0; }
+                .report-section {
+                    page-break-inside: avoid; /* CRITICAL: Prevents section from splitting across pages */
+                    margin-bottom: 20px;
+                    border: 1px solid #e5e7eb;
+                    padding: 15px;
+                    border-radius: 8px;
+                }
+                .report-section h2 { 
+                    font-size: 18px; 
+                    font-weight: bold; 
+                    color: #16a34a; 
+                    margin-top: 0; 
+                    padding-bottom: 8px;
+                    border-bottom: 2px solid #d1fae5;
+                }
+                .report-section p { line-height: 1.6; white-space: pre-wrap; margin-top: 0; }
+                .footer { text-align: right; margin-top: 40px; }
+            </style>
+        </head>
+        <body>
+            <div class="report-container">
+                <div class="header">
+                    <img src="${logoUrl}" alt="Company Logo">
+                    <h2>Blooming Kids House</h2>
+                    <h1>MONTHLY LEARNING REPORT</h1>
+                    <p>Date: ${new Date(reportData.submittedAt.seconds * 1000).toLocaleDateString()}</p>
+                </div>
+                <div class="student-info">
+                    <p><strong>Student's Name:</strong> ${reportData.studentName || 'N/A'}</p>
+                    <p><strong>Parent's Name:</strong> ${reportData.parentName || 'N/A'}</p>
+                    <p><strong>Parent's Phone:</strong> ${reportData.parentPhone || 'N/A'}</p>
+                    <p><strong>Grade:</strong> ${reportData.grade || 'N/A'}</p>
+                    <p><strong>Tutor's Name:</strong> ${reportData.tutorName || 'N/A'}</p>
+                </div>
+                ${sectionsHTML}
+                <div class="footer">
+                    <p>Best regards,</p>
+                    <p><strong>${reportData.tutorName || 'N/A'}</strong></p>
+                </div>
+            </div>
+        </body>
+        </html>
+    `;
+    return { html: reportTemplate, reportData: reportData };
+}
+
+async function viewReportInNewTab(reportId, shouldDownload = false) {
+    try {
+        const { html, reportData } = await generateReportHTML(reportId);
+
+        if (shouldDownload) {
+             const options = {
+                margin:       0.5,
+                filename:     `${reportData.studentName}_report.pdf`,
+                image:        { type: 'jpeg', quality: 0.98 },
+                html2canvas:  { scale: 2, useCORS: true },
+                jsPDF:        { unit: 'in', format: 'letter', orientation: 'portrait' }
+            };
+            html2pdf().from(html).set(options).save();
+        } else {
+            const newWindow = window.open();
+            newWindow.document.write(html);
+            newWindow.document.close();
+        }
+    } catch (error) {
+        console.error("Error viewing/downloading report:", error);
+        alert(`Error: ${error.message}`);
+    }
+}
+
+async function zipAndDownloadTutorReports(reports, tutorName, buttonElement) {
+    const originalButtonText = buttonElement.textContent;
+    buttonElement.textContent = 'Zipping... (0%)';
+    buttonElement.disabled = true;
+
+    try {
+        const zip = new JSZip();
+        let filesGenerated = 0;
+        const reportGenerationPromises = reports.map(async (report) => {
+            const { html, reportData } = await generateReportHTML(report.id);
+            // Use the same improved options for consistency
+            const options = {
+                image:        { type: 'jpeg', quality: 0.98 },
+                html2canvas:  { scale: 2, useCORS: true },
+                jsPDF:        { unit: 'in', format: 'letter', orientation: 'portrait' }
+            };
+            const pdfBlob = await html2pdf().from(html).set(options).output('blob');
+            filesGenerated++;
+            buttonElement.textContent = `Zipping... (${Math.round((filesGenerated / reports.length) * 100)}%)`;
+            return { name: `${reportData.studentName}_Report_${report.id.substring(0,5)}.pdf`, blob: pdfBlob };
+        });
+        const generatedPdfs = await Promise.all(reportGenerationPromises);
+        generatedPdfs.forEach(pdf => zip.file(pdf.name, pdf.blob));
+        const zipBlob = await zip.generateAsync({ type: "blob" });
+        saveAs(zipBlob, `${tutorName}_All_Reports.zip`);
+    } catch (error) {
+        console.error("Error creating zip file:", error);
+        alert("Failed to create zip file. See console for details.");
+    } finally {
+        buttonElement.textContent = originalButtonText;
+        buttonElement.disabled = false;
+    }
+}
+
+// ##################################
+// # AUTHENTICATION & INITIALIZATION
+// ##################################
+
+onAuthStateChanged(auth, async (user) => {
+    const mainContent = document.getElementById('main-content');
+    const logoutBtn = document.getElementById('logoutBtn');
+    if (user) {
+        const staffDocRef = doc(db, "staff", user.email);
+        onSnapshot(staffDocRef, (docSnap) => {
+            if (docSnap.exists() && docSnap.data().role !== 'pending') {
+                const staffData = docSnap.data();
+                window.userData = staffData;
+                
+                document.getElementById('welcome-message').textContent = `Welcome, ${staffData.name}`;
+                document.getElementById('user-role').textContent = `Role: ${capitalize(staffData.role)}`;
+
+                const allNavItems = {
+                    navTutorManagement: { fn: renderManagementTutorView, perm: 'viewTutorManagement' },
+                    navPayAdvice: { fn: renderPayAdvicePanel, perm: 'viewPayAdvice' },
+                    navTutorReports: { fn: renderTutorReportsPanel, perm: 'viewTutorReports' },
+                    navSummerBreak: { fn: renderSummerBreakPanel, perm: 'viewSummerBreak' },
+                    navPendingApprovals: { fn: renderPendingApprovalsPanel, perm: 'viewPendingApprovals' },
+                    navParentFeedback: { fn: renderParentFeedbackPanel, perm: 'viewParentFeedback' }
+                };
+
+                const navContainer = document.querySelector('nav');
+                const originalNavButtons = {};
+                if(navContainer) {
+                    navContainer.querySelectorAll('.nav-btn').forEach(btn => originalNavButtons[btn.id] = btn.textContent);
+                    navContainer.innerHTML = '';
+                    let firstVisibleTab = null;
+
+                    Object.entries(allNavItems).forEach(([id, item]) => {
+                        if (window.userData.permissions?.tabs?.[item.perm]) {
+                            if (!firstVisibleTab) firstVisibleTab = id;
+                            const button = document.createElement('button');
+                            button.id = id;
+                            button.className = 'nav-btn text-lg font-semibold text-gray-500 hover:text-green-700';
+                            button.textContent = originalNavButtons[id];
+                            navContainer.appendChild(button);
+                            
+                            button.addEventListener('click', () => {
+                                document.querySelectorAll('.nav-btn').forEach(btn => btn.classList.remove('active'));
+                                button.classList.add('active');
+                                item.fn(mainContent);
+                            });
+                        }
+                    });
+
+                    if (firstVisibleTab) {
+                        const activeNav = document.querySelector('.nav-btn.active');
+                        const activeNavId = activeNav?.id;
+                        if (!activeNav || !document.getElementById(activeNavId)) {
+                            document.getElementById(firstVisibleTab).click();
+                        } else {
+                            const currentItem = allNavItems[activeNavId];
+                            if(currentItem) currentItem.fn(mainContent);
+                        }
+                    } else {
+                        if (mainContent) mainContent.innerHTML = `<p class="text-center">You have no permissions assigned.</p>`;
+                    }
+                }
+            } else {
+                if (document.getElementById('welcome-message')) document.getElementById('welcome-message').textContent = `Hello, ${docSnap.data()?.name}`;
+                if (document.getElementById('user-role')) document.getElementById('user-role').textContent = 'Status: Pending Approval';
+                if (mainContent) mainContent.innerHTML = `<p class="text-center mt-12 text-yellow-600 font-semibold">Your account is awaiting approval.</p>`;
+            }
+        });
+
+        const staffDocSnap = await getDoc(staffDocRef);
+        if (!staffDocSnap.exists()) {
+            if (mainContent) mainContent.innerHTML = `<p class="text-center mt-12 text-red-600">Account not registered in staff directory.</p>`;
+            if (logoutBtn) logoutBtn.classList.add('hidden');
+        }
+
+        if(logoutBtn) logoutBtn.addEventListener('click', () => signOut(auth).then(() => window.location.href = "management-auth.html"));
+    } else {
+        window.location.href = "management-auth.html";
+    }
 });
 
 // [End Updated management.js File]
+
