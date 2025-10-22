@@ -1,3 +1,5 @@
+[file name]: parent.html
+[file content begin]
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -405,6 +407,24 @@
             </div>
         </div>
 
+        <!-- Rewards Dashboard Modal -->
+        <div id="rewardsModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden z-50 p-4">
+            <div class="bg-white rounded-2xl shadow-xl w-full max-w-4xl mx-4 max-h-[90vh] overflow-hidden">
+                <div class="bg-gradient-to-r from-purple-600 to-green-600 p-6 text-white">
+                    <div class="flex justify-between items-center">
+                        <h2 class="text-2xl font-bold">🎁 Your Rewards Dashboard</h2>
+                        <button onclick="hideRewardsDashboard()" class="text-white hover:text-gray-200 text-2xl font-bold">&times;</button>
+                    </div>
+                    <p class="mt-2 opacity-90">Track your referrals and earnings</p>
+                </div>
+                <div class="p-6 overflow-y-auto max-h-[calc(90vh-120px)]">
+                    <div id="rewardsContent">
+                        <!-- Rewards content will be loaded here -->
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <!-- Password Reset Modal -->
         <div id="passwordResetModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden z-50 p-4">
             <div class="bg-white rounded-2xl p-6 md:p-8 max-w-md w-full mx-auto card-glow">
@@ -453,3 +473,4 @@
     <script src="parent.js"></script>
 </body>
 </html>
+[file content end]
