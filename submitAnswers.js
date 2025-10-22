@@ -35,26 +35,19 @@ export async function submitTestToFirebase(subject, grade, studentName, parentEm
             const textResponse = questionBlock.querySelector("textarea, input[type='text']");
             const hasTextAnswer = textResponse && textResponse.value.trim() !== '';
             
-            // Check for griddable question selection and input
+            // Check for griddable question selection
             const isGriddableSelected = selectedOption && selectedOption.value === "Gridable question";
-            const gridInputs = questionBlock.querySelectorAll('.grid-input, .bubble-input, .math-grid-input, input[type="number"]');
-            const hasGridAnswer = Array.from(gridInputs).some(input => input.value.trim() !== '');
             
-            // Check if either MC option OR text response OR griddable answer is provided
-            if (!selectedOption && !hasTextAnswer && !hasGridAnswer) {
-                alert("Please answer all questions before submitting. You can provide multiple-choice answers, text responses, or griddable answers.");
+            // Check if either MC option OR text response OR griddable option is selected
+            if (!selectedOption && !hasTextAnswer) {
+                alert("Please answer all questions before submitting. You can provide multiple-choice answers, text responses, or select 'Gridable question'.");
                 questionBlock.scrollIntoView({ behavior: 'smooth', block: 'center' });
                 questionBlock.style.border = "2px solid red";
                 throw new Error("All questions must be answered (either multiple-choice, text, or griddable).");
             }
             
-            // Special validation for griddable questions
-            if (isGriddableSelected && !hasGridAnswer) {
-                alert("You selected 'Gridable question' but haven't provided a griddable answer. Please fill in the grid or choose a different option.");
-                questionBlock.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                questionBlock.style.border = "2px solid red";
-                throw new Error("Griddable question selected but no grid answer provided.");
-            }
+            // No special validation requiring grid input for griddable questions
+            // It will pass as long as "Gridable question" radio is selected
         }
     }
 
@@ -99,16 +92,18 @@ export async function submitTestToFirebase(subject, grade, studentName, parentEm
         let isCorrect = false;
         let griddableAnswers = null;
 
-        if (isGriddableSelected && hasGridAnswer) {
-            // Handle griddable question
+        if (isGriddableSelected) {
+            // Handle griddable question - even if no grid inputs are filled
             answerType = 'griddable';
-            griddableAnswers = gridAnswers;
-            studentAnswer = `Griddable: ${gridAnswers.map(g => g.value).join(', ')}`;
+            griddableAnswers = gridAnswers; // This could be empty array
+            studentAnswer = hasGridAnswer 
+                ? `Griddable: ${gridAnswers.map(g => g.value).join(', ')}`
+                : 'Griddable question selected (no grid input)';
             totalScoreableQuestions++;
             
-            // Griddable questions need manual grading, so mark as pending review
+            // Griddable questions need manual grading
             isCorrect = false; // Will be graded manually by tutor
-            console.log(`🔢 Griddable answer: ${studentAnswer}`);
+            console.log(`🔢 Griddable option selected: ${studentAnswer}`);
             
         } else if (selectedOption && !isGriddableSelected) {
             // Handle regular multiple-choice question
@@ -196,7 +191,13 @@ export async function submitTestToFirebase(subject, grade, studentName, parentEm
         // Auto-register student after test submission
         await autoRegisterStudentAfterTest(subject, grade, studentName, parentEmail, tutorEmail, studentCountry);
         
-        alert("Test results submitted successfully. Griddable questions will be manually graded.");
+        // Show appropriate alert based on griddable questions
+        const griddableCount = answers.filter(a => a.answerType === 'griddable').length;
+        if (griddableCount > 0) {
+            alert(`Test results submitted successfully! ${griddableCount} griddable question(s) will be manually graded.`);
+        } else {
+            alert("Test results submitted successfully!");
+        }
     } catch (err) {
         console.error("❌ Error submitting test results to Firebase:", err);
         alert("Failed to submit test results. Please try again.");
