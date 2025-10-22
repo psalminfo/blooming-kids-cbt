@@ -27,253 +27,152 @@ let currentUserData = null;
 let userChildren = [];
 let unreadResponsesCount = 0; // Track unread responses
 
-// Referral System Functions
-function generateReferralCode() {
-    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-    let code = 'BKH';
-    for (let i = 0; i < 6; i++) {
-        code += chars.charAt(Math.floor(Math.random() * chars.length));
+// -------------------------------------------------------------------
+// START: NEW REFERRAL SYSTEM FUNCTIONS (PHASE 1 & 3)
+// -------------------------------------------------------------------
+
+/**
+ * Generates a unique, alphanumeric referral code prefixed with 'BKH'.
+ * Checks for uniqueness in the parent_users collection.
+ * @returns {string} A unique referral code (e.g., BKH7A3X9M)
+ */
+async function generateReferralCode() {
+    const chars = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+    const prefix = 'BKH';
+    let code;
+    let isUnique = false;
+
+    while (!isUnique) {
+        let suffix = '';
+        for (let i = 0; i < 6; i++) {
+            suffix += chars.charAt(Math.floor(Math.random() * chars.length));
+        }
+        code = prefix + suffix;
+
+        // Check uniqueness in Firestore
+        const snapshot = await db.collection('parent_users').where('referralCode', '==', code).limit(1).get();
+        if (snapshot.empty) {
+            isUnique = true;
+        }
     }
     return code;
 }
 
-async function ensureReferralCode(userId, userData) {
-    try {
-        const userDoc = await db.collection('parent_users').doc(userId).get();
-        
-        if (userDoc.exists) {
-            const existingData = userDoc.data();
-            // If referral code already exists, return it
-            if (existingData.referralCode) {
-                return existingData.referralCode;
-            }
-        }
-        
-        // Generate new referral code
-        let referralCode;
-        let isUnique = false;
-        
-        // Ensure code is unique
-        while (!isUnique) {
-            referralCode = generateReferralCode();
-            const codeCheck = await db.collection('parent_users')
-                .where('referralCode', '==', referralCode)
-                .limit(1)
-                .get();
-            isUnique = codeCheck.empty;
-        }
-        
-        // Initialize referral data
-        const referralData = {
-            referralCode: referralCode,
-            referralEarnings: 0,
-            referrals: [],
-            totalEarned: 0,
-            totalPaid: 0,
-            pendingBalance: 0
-        };
-        
-        // Update user document with referral data
-        await db.collection('parent_users').doc(userId).set({
-            ...userData,
-            ...referralData
-        }, { merge: true });
-        
-        console.log("Referral code generated:", referralCode);
-        return referralCode;
-        
-    } catch (error) {
-        console.error("Error ensuring referral code:", error);
-        return null;
-    }
-}
-
-// Rewards Dashboard Functions
-function showRewardsDashboard() {
-    document.getElementById('rewardsModal').classList.remove('hidden');
-    loadRewardsData();
-}
-
-function hideRewardsDashboard() {
-    document.getElementById('rewardsModal').classList.add('hidden');
-}
-
-async function loadRewardsData() {
+/**
+ * Loads the parent's referral data for the Rewards Dashboard.
+ * @param {string} parentUid The UID of the current parent user.
+ */
+async function loadReferralRewards(parentUid) {
     const rewardsContent = document.getElementById('rewardsContent');
     rewardsContent.innerHTML = '<div class="text-center py-8"><div class="loading-spinner mx-auto" style="width: 40px; height: 40px;"></div><p class="text-green-600 font-semibold mt-4">Loading rewards data...</p></div>';
 
     try {
-        const user = auth.currentUser;
-        if (!user) {
-            throw new Error('Please sign in to view rewards');
-        }
-
-        const userDoc = await db.collection('parent_users').doc(user.uid).get();
+        // 1. Get the parent's referral code and current earnings
+        const userDoc = await db.collection('parent_users').doc(parentUid).get();
         if (!userDoc.exists) {
-            throw new Error('User data not found');
+            rewardsContent.innerHTML = '<p class="text-red-500 text-center py-8">User data not found. Please sign in again.</p>';
+            return;
         }
-
         const userData = userDoc.data();
-        const referralCode = userData.referralCode;
-        const referralEarnings = userData.referralEarnings || 0;
-        const referrals = userData.referrals || [];
-        const pendingBalance = userData.pendingBalance || 0;
-        const totalEarned = userData.totalEarned || 0;
-        const totalPaid = userData.totalPaid || 0;
+        const referralCode = userData.referralCode || 'N/A';
+        const totalEarnings = userData.referralEarnings || 0;
+        
+        // 2. Query the referral_transactions collection for all transactions belonging to this code owner
+        const transactionsSnapshot = await db.collection('referral_transactions')
+            .where('ownerUid', '==', parentUid)
+            .orderBy('timestamp', 'desc')
+            .get();
 
-        // Build rewards dashboard HTML
-        let rewardsHTML = `
-            <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-6">
-                <h3 class="text-xl font-bold text-green-800 mb-4">Your Referral Code</h3>
-                <div class="flex items-center justify-between bg-green-50 p-4 rounded-lg border border-green-200">
-                    <span class="text-2xl font-mono font-bold text-green-700">${referralCode}</span>
-                    <button onclick="copyReferralCode('${referralCode}')" class="bg-green-600 text-white px-4 py-2 rounded-lg font-semibold hover:bg-green-700 transition-all duration-200 flex items-center">
-                        <span class="mr-2">📋</span> Copy Code
-                    </button>
-                </div>
-                <p class="text-gray-600 mt-3 text-sm">Share this code with friends and earn ₦5,000 when they join Blooming Kids House!</p>
-            </div>
+        let referralsHtml = '';
+        let pendingCount = 0;
+        let approvedCount = 0;
+        let paidCount = 0;
 
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-                <div class="bg-green-50 border border-green-200 rounded-xl p-4 text-center">
-                    <div class="text-2xl font-bold text-green-700">₦${pendingBalance.toLocaleString()}</div>
-                    <div class="text-green-600 font-semibold">Pending Balance</div>
-                    <div class="text-xs text-gray-500 mt-1">Available for payout</div>
-                </div>
-                <div class="bg-blue-50 border border-blue-200 rounded-xl p-4 text-center">
-                    <div class="text-2xl font-bold text-blue-700">₦${totalEarned.toLocaleString()}</div>
-                    <div class="text-blue-600 font-semibold">Total Earned</div>
-                    <div class="text-xs text-gray-500 mt-1">All time earnings</div>
-                </div>
-                <div class="bg-purple-50 border border-purple-200 rounded-xl p-4 text-center">
-                    <div class="text-2xl font-bold text-purple-700">${referrals.length}</div>
-                    <div class="text-purple-600 font-semibold">Total Referrals</div>
-                    <div class="text-xs text-gray-500 mt-1">Successful referrals</div>
-                </div>
-            </div>
-        `;
-
-        if (referrals.length > 0) {
-            rewardsHTML += `
-                <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-                    <h3 class="text-xl font-bold text-green-800 mb-4">Your Referrals</h3>
-                    <div class="overflow-x-auto">
-                        <table class="w-full text-sm">
-                            <thead class="bg-gray-50">
-                                <tr>
-                                    <th class="px-4 py-2 text-left font-semibold text-gray-700">Student Name</th>
-                                    <th class="px-4 py-2 text-left font-semibold text-gray-700">Date Referred</th>
-                                    <th class="px-4 py-2 text-left font-semibold text-gray-700">Status</th>
-                                    <th class="px-4 py-2 text-left font-semibold text-gray-700">Reward</th>
-                                </tr>
-                            </thead>
-                            <tbody class="divide-y divide-gray-200">
+        if (transactionsSnapshot.empty) {
+            referralsHtml = `
+                <tr><td colspan="4" class="text-center py-4 text-gray-500">No one has used your referral code yet.</td></tr>
             `;
+        } else {
+            transactionsSnapshot.forEach(doc => {
+                const data = doc.data();
+                const status = data.status || 'pending';
+                const statusColor = status === 'paid' ? 'bg-green-100 text-green-800' : 
+                                    status === 'approved' ? 'bg-blue-100 text-blue-800' : 
+                                    'bg-yellow-100 text-yellow-800';
+                
+                if (status === 'pending') pendingCount++;
+                if (status === 'approved') approvedCount++;
+                if (status === 'paid') paidCount++;
 
-            referrals.forEach((referral, index) => {
-                const referredDate = referral.timestamp?.toDate ? referral.timestamp.toDate() : new Date();
-                const formattedDate = referredDate.toLocaleDateString('en-US', {
-                    year: 'numeric',
-                    month: 'short',
-                    day: 'numeric'
-                });
+                const referredName = capitalize(data.referredStudentName || data.referredStudentPhone);
+                const rewardAmount = data.rewardAmount ? `₦${data.rewardAmount.toLocaleString()}` : '₦5,000';
+                const referralDate = data.timestamp?.toDate().toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }) || 'N/A';
 
-                const statusColors = {
-                    'pending': 'bg-yellow-100 text-yellow-800',
-                    'approved': 'bg-green-100 text-green-800',
-                    'paid': 'bg-blue-100 text-blue-800'
-                };
-
-                rewardsHTML += `
-                    <tr class="${index % 2 === 0 ? 'bg-gray-50' : 'bg-white'}">
-                        <td class="px-4 py-3 font-medium text-gray-900">${referral.studentName}</td>
-                        <td class="px-4 py-3 text-gray-600">${formattedDate}</td>
-                        <td class="px-4 py-3">
-                            <span class="inline-block px-2 py-1 rounded-full text-xs font-semibold ${statusColors[referral.status] || 'bg-gray-100 text-gray-800'}">
-                                ${referral.status?.charAt(0).toUpperCase() + referral.status?.slice(1) || 'Pending'}
+                referralsHtml += `
+                    <tr class="hover:bg-gray-50">
+                        <td class="px-4 py-3 text-sm font-medium text-gray-900">${referredName}</td>
+                        <td class="px-4 py-3 text-sm text-gray-500">${referralDate}</td>
+                        <td class="px-4 py-3 text-sm">
+                            <span class="inline-flex items-center px-3 py-0.5 rounded-full text-xs font-medium ${statusColor}">
+                                ${capitalize(status)}
                             </span>
                         </td>
-                        <td class="px-4 py-3 font-semibold ${referral.status === 'paid' ? 'text-green-600' : 'text-gray-600'}">
-                            ${referral.status === 'paid' ? '₦5,000' : 'Pending'}
-                        </td>
+                        <td class="px-4 py-3 text-sm text-gray-900 font-bold">${rewardAmount}</td>
                     </tr>
                 `;
             });
-
-            rewardsHTML += `
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            `;
-        } else {
-            rewardsHTML += `
-                <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-8 text-center">
-                    <div class="text-6xl mb-4">👥</div>
-                    <h3 class="text-xl font-bold text-gray-700 mb-2">No Referrals Yet</h3>
-                    <p class="text-gray-500 max-w-md mx-auto mb-6">Share your referral code with friends and family to start earning rewards!</p>
-                    <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-4 max-w-md mx-auto">
-                        <h4 class="font-semibold text-yellow-800 mb-2">How it works:</h4>
-                        <ul class="text-sm text-yellow-700 text-left space-y-1">
-                            <li>• Share your unique referral code</li>
-                            <li>• Friend signs up using your code</li>
-                            <li>• Earn ₦5,000 when they receive their first monthly report</li>
-                            <li>• Get paid after approval</li>
-                        </ul>
-                    </div>
-                </div>
-            `;
         }
-
-        rewardsContent.innerHTML = rewardsHTML;
-
-    } catch (error) {
-        console.error('Error loading rewards data:', error);
+        
+        // Display the dashboard
         rewardsContent.innerHTML = `
-            <div class="text-center py-8">
-                <div class="text-4xl mb-4">❌</div>
-                <h3 class="text-xl font-bold text-red-700 mb-2">Error Loading Rewards</h3>
-                <p class="text-gray-500">Unable to load rewards data at this time. Please try again later.</p>
+            <div class="bg-blue-50 border-l-4 border-blue-600 p-4 rounded-lg mb-8 shadow-md">
+                <h2 class="text-2xl font-bold text-blue-800 mb-1">Your Referral Code</h2>
+                <p class="text-xl font-mono text-blue-600 tracking-wider p-2 bg-white inline-block rounded-lg border border-dashed border-blue-300 select-all">${referralCode}</p>
+                <p class="text-blue-700 mt-2">Share this code with other parents. They use it when registering their child, and you earn **₦5,000** once their child completes their first month!</p>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                <div class="bg-green-100 p-6 rounded-xl shadow-lg border-b-4 border-green-600">
+                    <p class="text-sm font-medium text-green-700">Total Earnings</p>
+                    <p class="text-3xl font-extrabold text-green-900 mt-1">₦${totalEarnings.toLocaleString()}</p>
+                </div>
+                <div class="bg-yellow-100 p-6 rounded-xl shadow-lg border-b-4 border-yellow-600">
+                    <p class="text-sm font-medium text-yellow-700">Approved Rewards (Awaiting Payment)</p>
+                    <p class="text-3xl font-extrabold text-yellow-900 mt-1">${approvedCount}</p>
+                </div>
+                <div class="bg-gray-100 p-6 rounded-xl shadow-lg border-b-4 border-gray-600">
+                    <p class="text-sm font-medium text-gray-700">Total Successful Referrals (Paid)</p>
+                    <p class="text-3xl font-extrabold text-gray-900 mt-1">${paidCount}</p>
+                </div>
+            </div>
+
+            <h3 class="text-xl font-bold text-gray-800 mb-4">Referral History</h3>
+            <div class="overflow-x-auto bg-white rounded-lg shadow">
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Referred Parent/Student</th>
+                            <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date Used</th>
+                            <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                            <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Reward</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-200">
+                        ${referralsHtml}
+                    </tbody>
+                </table>
             </div>
         `;
+        
+    } catch (error) {
+        console.error('Error loading referral rewards:', error);
+        rewardsContent.innerHTML = '<p class="text-red-500 text-center py-8">An error occurred while loading your rewards data. Please try again later.</p>';
     }
 }
 
-function copyReferralCode(code) {
-    navigator.clipboard.writeText(code).then(() => {
-        showMessage('Referral code copied to clipboard!', 'success');
-    }).catch(() => {
-        // Fallback for older browsers
-        const textArea = document.createElement('textarea');
-        textArea.value = code;
-        document.body.appendChild(textArea);
-        textArea.select();
-        document.execCommand('copy');
-        document.body.removeChild(textArea);
-        showMessage('Referral code copied to clipboard!', 'success');
-    });
-}
-
-// Add Rewards button to the welcome section
-function addRewardsButton() {
-    const welcomeSection = document.querySelector('.bg-green-50');
-    if (!welcomeSection) return;
-    
-    const buttonContainer = welcomeSection.querySelector('.flex.gap-2');
-    if (!buttonContainer) return;
-    
-    // Check if button already exists
-    if (document.getElementById('rewardsBtn')) return;
-    
-    const rewardsBtn = document.createElement('button');
-    rewardsBtn.id = 'rewardsBtn';
-    rewardsBtn.onclick = showRewardsDashboard;
-    rewardsBtn.className = 'bg-purple-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-purple-700 transition-all duration-200 btn-glow flex items-center justify-center';
-    rewardsBtn.innerHTML = '<span class="mr-2">🎁</span> Rewards';
-    
-    // Insert before the logout button
-    buttonContainer.insertBefore(rewardsBtn, buttonContainer.lastElementChild);
-}
+// -------------------------------------------------------------------
+// END: NEW REFERRAL SYSTEM FUNCTIONS
+// -------------------------------------------------------------------
 
 // Remember Me Functionality
 function setupRememberMe() {
@@ -490,17 +389,22 @@ async function handleSignUp() {
 
         // Find parent name from existing data (SAME SOURCE AS TUTOR.JS)
         const parentName = await findParentNameFromStudents(cleanedPhone);
+        
+        // --- START: REFERRAL SYSTEM INTEGRATION (PHASE 1) ---
+        const referralCode = await generateReferralCode();
+        // --- END: REFERRAL SYSTEM INTEGRATION (PHASE 1) ---
 
-        // Prepare user data
-        const userData = {
+        // Store user data in Firestore for easy retrieval
+        await db.collection('parent_users').doc(user.uid).set({
             phone: cleanedPhone,
             email: email,
             parentName: parentName || 'Parent', // Use found name or default
-            createdAt: firebase.firestore.FieldValue.serverTimestamp()
-        };
-
-        // Store user data in Firestore with referral code
-        await ensureReferralCode(user.uid, userData);
+            createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+            // --- START: REFERRAL SYSTEM INTEGRATION (PHASE 1) ---
+            referralCode: referralCode, // Store the unique code
+            referralEarnings: 0,        // Initialize earnings
+            // --- END: REFERRAL SYSTEM INTEGRATION (PHASE 1) ---
+        });
 
         showMessage('Account created successfully!', 'success');
         
@@ -589,12 +493,6 @@ async function handleSignIn() {
         
         // Handle Remember Me
         handleRememberMe();
-        
-        // Ensure referral code exists for existing users
-        const userDoc = await db.collection('parent_users').doc(userId).get();
-        if (userDoc.exists && !userDoc.data().referralCode) {
-            await ensureReferralCode(userId, userDoc.data());
-        }
         
         // Load all reports for the parent using the exact phone number as stored
         await loadAllReportsForParent(userPhone, userId);
@@ -942,26 +840,24 @@ function updateNotificationBadge(count) {
 }
 
 function resetNotificationCount() {
-    unreadResponsesCount = 0;
+    // When user views responses, mark them as read and reset counter
     updateNotificationBadge(0);
+    unreadResponsesCount = 0;
 }
 
-// Utility Functions
 function getCategoryColor(category) {
     const colors = {
-        'Academic Progress': 'bg-blue-100 text-blue-800',
-        'Behavior': 'bg-orange-100 text-orange-800',
-        'Communication': 'bg-purple-100 text-purple-800',
-        'Scheduling': 'bg-green-100 text-green-800',
-        'Technical Issue': 'bg-red-100 text-red-800',
-        'General Feedback': 'bg-gray-100 text-gray-800'
+        'Feedback': 'bg-blue-100 text-blue-800',
+        'Request': 'bg-green-100 text-green-800',
+        'Complaint': 'bg-red-100 text-red-800',
+        'Suggestion': 'bg-purple-100 text-purple-800'
     };
     return colors[category] || 'bg-gray-100 text-gray-800';
 }
 
 function getPriorityColor(priority) {
     const colors = {
-        'Low': 'bg-green-100 text-green-800',
+        'Low': 'bg-gray-100 text-gray-800',
         'Medium': 'bg-yellow-100 text-yellow-800',
         'High': 'bg-orange-100 text-orange-800',
         'Urgent': 'bg-red-100 text-red-800'
@@ -969,316 +865,660 @@ function getPriorityColor(priority) {
     return colors[priority] || 'bg-gray-100 text-gray-800';
 }
 
-function showMessage(message, type) {
-    const messageDiv = document.getElementById('message');
-    messageDiv.textContent = message;
-    messageDiv.className = `fixed top-4 left-1/2 transform -translate-x-1/2 z-50 px-6 py-3 rounded-lg font-semibold shadow-lg transition-all duration-300 ${
-        type === 'success' ? 'bg-green-500 text-white' : 'bg-red-500 text-white'
-    }`;
-    messageDiv.classList.remove('hidden');
+// Add View Responses button to the welcome section with notification badge
+function addViewResponsesButton() {
+    const welcomeSection = document.querySelector('.bg-green-50');
+    if (!welcomeSection) return;
     
+    const buttonContainer = welcomeSection.querySelector('.flex.gap-2');
+    if (!buttonContainer) return;
+    
+    // Check if button already exists
+    if (document.getElementById('viewResponsesBtn')) return;
+    
+    const viewResponsesBtn = document.createElement('button');
+    viewResponsesBtn.id = 'viewResponsesBtn';
+    viewResponsesBtn.onclick = showResponsesModal;
+    viewResponsesBtn.className = 'bg-blue-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-blue-700 transition-all duration-200 btn-glow flex items-center justify-center relative';
+    viewResponsesBtn.innerHTML = '<span class="mr-2">📨</span> View Responses';
+    
+    // Insert before the logout button
+    buttonContainer.insertBefore(viewResponsesBtn, buttonContainer.lastElementChild);
+    
+    // Check for responses to show notification
     setTimeout(() => {
-        messageDiv.classList.add('hidden');
-    }, 5000);
+        checkForNewResponses();
+    }, 1000);
 }
 
-function toggleAuthMode() {
-    const container = document.getElementById('authContainer');
-    const toggleBtn = document.getElementById('authToggleBtn');
-    const isLogin = container.classList.contains('login-mode');
-    
-    if (isLogin) {
-        // Switch to signup
-        container.classList.remove('login-mode');
-        container.classList.add('signup-mode');
-        toggleBtn.textContent = 'Already have an account? Sign In';
-        document.getElementById('authTitle').textContent = 'Create Parent Account';
-    } else {
-        // Switch to login
-        container.classList.remove('signup-mode');
-        container.classList.add('login-mode');
-        toggleBtn.textContent = "Don't have an account? Sign Up";
-        document.getElementById('authTitle').textContent = 'Parent Portal Sign In';
-    }
-}
-
-function showPasswordResetModal() {
-    document.getElementById('passwordResetModal').classList.remove('hidden');
-}
-
-function hidePasswordResetModal() {
-    document.getElementById('passwordResetModal').classList.add('hidden');
-}
-
-function togglePasswordVisibility(inputId) {
-    const input = document.getElementById(inputId);
-    const type = input.type === 'password' ? 'text' : 'password';
-    input.type = type;
-}
-
-// Report Loading Functions
+// MAIN REPORT LOADING FUNCTION - FIXED COLLECTION NAME AND VARIABLE DECLARATION
 async function loadAllReportsForParent(parentPhone, userId) {
-    const reportsContainer = document.getElementById('reportsContainer');
-    const welcomeSection = document.getElementById('welcomeSection');
-    const authSection = document.getElementById('authSection');
-    
-    // Show loading state
-    reportsContainer.innerHTML = `
-        <div class="text-center py-12">
-            <div class="loading-spinner mx-auto" style="width: 50px; height: 50px;"></div>
-            <p class="text-green-600 font-semibold mt-4">Loading your child's reports...</p>
-        </div>
-    `;
-    
+    const reportArea = document.getElementById("reportArea");
+    const reportContent = document.getElementById("reportContent");
+    const authArea = document.getElementById("authArea");
+    const authLoader = document.getElementById("authLoader");
+    const welcomeMessage = document.getElementById("welcomeMessage");
+
+    authLoader.classList.remove("hidden");
+
     try {
-        // Get user data for welcome message
-        const userDoc = await db.collection('parent_users').doc(userId).get();
-        if (userDoc.exists) {
-            currentUserData = userDoc.data();
+        // --- CACHE IMPLEMENTATION ---
+        const cacheKey = `reportCache_${parentPhone}`;
+        const twoWeeksInMillis = 14 * 24 * 60 * 60 * 1000;
+        
+        try {
+            const cachedItem = localStorage.getItem(cacheKey);
+            if (cachedItem) {
+                const { timestamp, html, chartConfigs, userData } = JSON.parse(cachedItem);
+                if (Date.now() - timestamp < twoWeeksInMillis) {
+                    console.log("Loading reports from cache.");
+                    reportContent.innerHTML = html;
+                    
+                    // Set welcome message from cache
+                    if (userData && userData.parentName) {
+                        welcomeMessage.textContent = `Welcome, ${userData.parentName}!`;
+                        currentUserData = userData;
+                    } else {
+                        welcomeMessage.textContent = `Welcome!`;
+                    }
+                    
+                    // Re-initialize charts from cached configuration
+                    if (chartConfigs && chartConfigs.length > 0) {
+                        setTimeout(() => {
+                            chartConfigs.forEach(chart => {
+                                const ctx = document.getElementById(chart.canvasId);
+                                if (ctx) new Chart(ctx, chart.config);
+                            });
+                        }, 0);
+                    }
+
+                    authArea.classList.add("hidden");
+                    reportArea.classList.remove("hidden");
+                    
+                    // Add View Responses button to welcome section
+                    addViewResponsesButton();
+                    return;
+                }
+            }
+        } catch (e) {
+            console.error("Could not read from cache:", e);
+            localStorage.removeItem(cacheKey);
         }
+        // --- END CACHE IMPLEMENTATION ---
+
+        // FIND PARENT NAME FROM SAME SOURCES AS TUTOR.JS
+        let parentName = await findParentNameFromStudents(parentPhone);
         
-        // Build welcome message
-        const welcomeName = currentUserData?.parentName || 'Parent';
-        document.getElementById('welcomeName').textContent = welcomeName;
-        
-        // Show welcome section, hide auth
-        welcomeSection.classList.remove('hidden');
-        authSection.classList.add('hidden');
-        
-        // Add Rewards button to welcome section
-        addRewardsButton();
-        
-        // Query for all reports for this parent's phone number
-        const reportsQuery = db.collection("tutor_submissions")
-            .where("parentPhone", "==", parentPhone)
-            .orderBy("submissionDate", "desc");
+        // If not found in students collections, try user document
+        if (!parentName && userId) {
+            const userDoc = await db.collection('parent_users').doc(userId).get();
+            if (userDoc.exists) {
+                const userData = userDoc.data();
+                parentName = userData.parentName;
+            }
+        }
+
+        // Final fallback
+        if (!parentName) {
+            parentName = 'Parent';
+        }
+
+        // Store user data globally
+        currentUserData = {
+            parentName: parentName,
+            parentPhone: parentPhone
+        };
+
+        // UPDATE WELCOME MESSAGE WITH PARENT NAME
+        welcomeMessage.textContent = `Welcome, ${currentUserData.parentName}!`;
+
+        // Update parent name in user document if we found a better one
+        if (userId && parentName && parentName !== 'Parent') {
+            try {
+                await db.collection('parent_users').doc(userId).update({
+                    parentName: parentName
+                });
+            } catch (error) {
+                console.error('Error updating parent name:', error);
+            }
+        }
+
+        // Get parent's email from their account
+        const userDoc = await db.collection('parent_users').doc(userId).get();
+        const userData = userDoc.data();
+        const parentEmail = userData.email;
+
+        console.log("🔍 Searching reports with:", { parentPhone, parentEmail });
+
+        // --- FIXED: PRIORITY SEARCH WITH CORRECT COLLECTION NAME ---
+        // Try phone search first (newer tests), fall back to email search only if needed
+        let assessmentSnapshot;
+
+        try {
+            // First try phone search (newer tests) - FIXED COLLECTION NAME
+            assessmentSnapshot = await db.collection("student_results").where("parentPhone", "==", parentPhone).get();
+            console.log("📊 Assessment results (phone search):", assessmentSnapshot.size);
             
-        const querySnapshot = await reportsQuery.get();
-        
-        if (querySnapshot.empty) {
-            reportsContainer.innerHTML = `
-                <div class="text-center py-12">
-                    <div class="text-6xl mb-4">📊</div>
-                    <h3 class="text-xl font-bold text-gray-700 mb-2">No Reports Yet</h3>
-                    <p class="text-gray-500 max-w-md mx-auto">Assessment reports for your children will appear here once they are completed by our tutors.</p>
-                </div>
-            `;
+            // If no results from phone search, try email search (older tests) - FIXED COLLECTION NAME
+            if (assessmentSnapshot.empty) {
+                console.log("🔍 No results from phone search, trying email search...");
+                assessmentSnapshot = await db.collection("student_results").where("parentEmail", "==", parentEmail).get();
+                console.log("📊 Assessment results (email search):", assessmentSnapshot.size);
+            }
+        } catch (error) {
+            console.error("Error searching assessments:", error);
+            assessmentSnapshot = { empty: true, forEach: () => {} };
+        }
+
+        // FIX: Declare studentResults array
+        let studentResults = [];
+        assessmentSnapshot.forEach(doc => {
+            const data = doc.data();
+            studentResults.push({ 
+                id: doc.id,
+                ...data,
+                timestamp: data.submittedAt?.seconds || Date.now() / 1000,
+                type: 'assessment'
+            });
+        });
+
+        // Monthly reports: search by phone only
+        const monthlySnapshot = await db.collection("tutor_submissions").where("parentPhone", "==", parentPhone).get();
+        const monthlyReports = [];
+        monthlySnapshot.forEach(doc => {
+            const data = doc.data();
+            monthlyReports.push({ 
+                id: doc.id,
+                ...data,
+                timestamp: data.submittedAt?.seconds || Date.now() / 1000,
+                type: 'monthly'
+            });
+        });
+
+        console.log("📊 Assessment results (unique):", studentResults.length);
+        console.log("📊 Monthly reports:", monthlySnapshot.size);
+
+        if (studentResults.length === 0 && monthlyReports.length === 0) {
+            showMessage(`No reports found for your account. Please contact Blooming Kids House if you believe this is an error.`, 'info');
+            authLoader.classList.add("hidden");
             return;
         }
         
-        // Group reports by student name
-        const reportsByStudent = {};
-        
-        querySnapshot.forEach((doc) => {
-            const reportData = doc.data();
-            const studentName = reportData.studentName;
-            
-            if (!reportsByStudent[studentName]) {
-                reportsByStudent[studentName] = [];
+        reportContent.innerHTML = "";
+        const chartConfigsToCache = [];
+
+        // Group reports by student name and extract parent name
+        const studentsMap = new Map();
+
+        // Process assessment reports
+        studentResults.forEach(result => {
+            const studentName = result.studentName;
+            if (!studentsMap.has(studentName)) {
+                studentsMap.set(studentName, { assessments: [], monthly: [] });
             }
-            
-            reportsByStudent[studentName].push({
-                id: doc.id,
-                ...reportData
-            });
+            studentsMap.get(studentName).assessments.push(result);
         });
-        
-        // Display reports grouped by student
-        reportsContainer.innerHTML = '';
-        
-        for (const [studentName, reports] of Object.entries(reportsByStudent)) {
-            const studentSection = document.createElement('div');
-            studentSection.className = 'mb-8';
+
+        // Process monthly reports
+        monthlyReports.forEach(report => {
+            const studentName = report.studentName;
+            if (!studentsMap.has(studentName)) {
+                studentsMap.set(studentName, { assessments: [], monthly: [] });
+            }
+            studentsMap.get(studentName).monthly.push(report);
+        });
+
+        userChildren = Array.from(studentsMap.keys());
+
+        // Display reports for each student
+        let studentIndex = 0;
+        for (const [studentName, reports] of studentsMap) {
+            const fullName = capitalize(studentName);
             
-            // Student header
-            studentSection.innerHTML = `
-                <div class="bg-green-100 border border-green-300 rounded-xl p-4 mb-4">
-                    <h2 class="text-xl font-bold text-green-800">${studentName}'s Assessment Reports</h2>
-                </div>
-                <div class="space-y-4">
-                    ${reports.map(report => createReportCard(report)).join('')}
+            // Add student header
+            const studentHeader = `
+                <div class="bg-green-100 border-l-4 border-green-600 p-4 rounded-lg mb-6">
+                    <h2 class="text-xl font-bold text-green-800">${fullName}</h2>
+                    <p class="text-green-600">Showing all reports for ${fullName}</p>
                 </div>
             `;
-            
-            reportsContainer.appendChild(studentSection);
-        }
-        
-        // Start checking for new responses
-        setInterval(checkForNewResponses, 30000); // Check every 30 seconds
-        await checkForNewResponses(); // Initial check
-        
-    } catch (error) {
-        console.error("Error loading reports:", error);
-        reportsContainer.innerHTML = `
-            <div class="text-center py-8">
-                <div class="text-4xl mb-4">❌</div>
-                <h3 class="text-xl font-bold text-red-700 mb-2">Error Loading Reports</h3>
-                <p class="text-gray-500">Unable to load assessment reports at this time. Please try again later.</p>
-            </div>
-        `;
-    }
-}
+            reportContent.innerHTML += studentHeader;
 
-function createReportCard(report) {
-    const submissionDate = report.submissionDate?.toDate() || new Date();
-    const formattedDate = submissionDate.toLocaleDateString('en-US', {
-        year: 'numeric',
-        month: 'long',
-        day: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit'
-    });
-    
-    // Calculate overall performance
-    const totalQuestions = report.results.reduce((sum, result) => sum + result.total, 0);
-    const totalCorrect = report.results.reduce((sum, result) => sum + result.correct, 0);
-    const overallPercentage = totalQuestions > 0 ? Math.round((totalCorrect / totalQuestions) * 100) : 0;
-    
-    // Get performance label and color
-    const performance = getPerformanceLabel(overallPercentage);
-    
-    // Generate recommendation
-    const recommendation = generateTemplatedRecommendation(
-        report.studentName,
-        report.tutorName,
-        report.results
-    );
-    
-    return `
-        <div class="bg-white border border-gray-200 rounded-xl p-6 shadow-sm hover:shadow-md transition-all duration-200">
-            <div class="flex flex-wrap justify-between items-start gap-4 mb-4">
-                <div>
-                    <h3 class="text-lg font-semibold text-gray-800">Assessment Report</h3>
-                    <p class="text-gray-600 text-sm">Submitted by ${report.tutorName} on ${formattedDate}</p>
-                </div>
-                <div class="text-right">
-                    <div class="text-2xl font-bold ${performance.color}">${overallPercentage}%</div>
-                    <div class="text-sm font-semibold ${performance.color}">${performance.label}</div>
-                </div>
-            </div>
+            // Display Assessment Reports for this student - NO DUPLICATES
+            if (reports.assessments.length > 0) {
+                // Group by unique test sessions using timestamp
+                const uniqueSessions = new Map();
+                
+                reports.assessments.forEach((result) => {
+                    const sessionKey = Math.floor(result.timestamp / 86400); // Group by day
+                    if (!uniqueSessions.has(sessionKey)) {
+                        uniqueSessions.set(sessionKey, []);
+                    }
+                    uniqueSessions.get(sessionKey).push(result);
+                });
+
+                let assessmentIndex = 0;
+                for (const [sessionKey, session] of uniqueSessions) {
+                    const tutorEmail = session[0].tutorEmail || 'N/A';
+                    const studentCountry = session[0].studentCountry || 'N/A';
+                    const formattedDate = new Date(session[0].timestamp * 1000).toLocaleString('en-US', {
+                        dateStyle: 'long',
+                        timeStyle: 'short'
+                    });
+
+                    let tutorName = 'N/A';
+                    if (tutorEmail && tutorEmail !== 'N/A') {
+                        try {
+                            const tutorDoc = await db.collection("tutors").doc(tutorEmail).get();
+                            if (tutorDoc.exists) {
+                                tutorName = tutorDoc.data().name;
+                            }
+                        } catch (error) {
+                            // Silent fail - tutor name will remain 'N/A'
+                        }
+                    }
+
+                    const results = session.map(testResult => {
+                        const topics = [...new Set(testResult.answers?.map(a => a.topic).filter(t => t))] || [];
+                        return {
+                            subject: testResult.subject,
+                            correct: testResult.score !== undefined ? testResult.score : 0,
+                            total: testResult.totalScoreableQuestions !== undefined ? testResult.totalScoreableQuestions : 0,
+                            topics: topics,
+                        };
+                    });
+
+                    const tableRows = results.map(res => `<tr><td class="border px-2 py-1">${res.subject.toUpperCase()}</td><td class="border px-2 py-1 text-center">${res.correct} / ${res.total}</td></tr>`).join("");
+                    const topicsTableRows = results.map(res => `<tr><td class="border px-2 py-1 font-semibold">${res.subject.toUpperCase()}</td><td class="border px-2 py-1">${res.topics.join(', ') || 'N/A'}</td></tr>`).join("");
+
+                    const recommendation = generateTemplatedRecommendation(fullName, tutorName, results);
+                    const creativeWritingAnswer = session[0].answers?.find(a => a.type === 'creative-writing');
+                    const tutorReport = creativeWritingAnswer?.tutorReport || 'Pending review.';
+
+                    const assessmentBlock = `
+                        <div class="border rounded-lg shadow mb-8 p-6 bg-white" id="assessment-block-${studentIndex}-${assessmentIndex}">
+                            <div class="text-center mb-6 border-b pb-4">
+                                <img src="https://res.cloudinary.com/dy2hxcyaf/image/upload/v1757700806/newbhlogo_umwqzy.svg" 
+                                     alt="Blooming Kids House Logo" 
+                                     class="h-16 w-auto mx-auto mb-3">
+                                <h2 class="text-2xl font-bold text-green-800">Assessment Report</h2>
+                                <p class="text-gray-600">Date: ${formattedDate}</p>
+                            </div>
+
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6 bg-green-50 p-4 rounded-lg">
+                                <div>
+                                    <p><strong>Student's Name:</strong> ${fullName}</p>
+                                    <p><strong>Parent's Phone:</strong> ${session[0].parentPhone || 'N/A'}</p>
+                                    <p><strong>Grade:</strong> ${session[0].grade}</p>
+                                </div>
+                                <div>
+                                    <p><strong>Tutor:</strong> ${tutorName || 'N/A'}</p>
+                                    <p><strong>Location:</strong> ${studentCountry || 'N/A'}</p>
+                                </div>
+                            </div>
+                            
+                            <h3 class="text-lg font-semibold mt-4 mb-2 text-green-700">Performance Summary</h3>
+                            <table class="w-full text-sm mb-4 border border-collapse">
+                                <thead class="bg-gray-100"><tr><th class="border px-2 py-1 text-left">Subject</th><th class="border px-2 py-1 text-center">Score</th></tr></thead>
+                                <tbody>${tableRows}</tbody>
+                            </table>
+                            
+                            <h3 class="text-lg font-semibold mt-4 mb-2 text-green-700">Knowledge & Skill Analysis</h3>
+                            <table class="w-full text-sm mb-4 border border-collapse">
+                                <thead class="bg-gray-100"><tr><th class="border px-2 py-1 text-left">Subject</th><th class="border px-2 py-1 text-left">Topics Covered</th></tr></thead>
+                                <tbody>${topicsTableRows}</tbody>
+                            </table>
+                            
+                            <h3 class="text-lg font-semibold mt-4 mb-2 text-green-700">Tutor's Recommendation</h3>
+                            <p class="mb-2 text-gray-700 leading-relaxed">${recommendation}</p>
+
+                            ${creativeWritingAnswer ? `
+                            <h3 class="text-lg font-semibold mt-4 mb-2 text-green-700">Creative Writing Feedback</h3>
+                            <p class="mb-2 text-gray-700"><strong>Tutor's Report:</strong> ${tutorReport}</p>
+                            ` : ''}
+
+                            ${results.length > 0 ? `
+                            <canvas id="chart-${studentIndex}-${assessmentIndex}" class="w-full h-48 mb-4"></canvas>
+                            ` : ''}
+                            
+                            <div class="bg-yellow-50 p-4 rounded-lg mt-6">
+                                <h3 class="text-lg font-semibold mb-1 text-green-700">Director's Message</h3>
+                                <p class="italic text-sm text-gray-700">At Blooming Kids House, we are committed to helping every child succeed. We believe that with personalized support from our tutors, ${fullName} will unlock their full potential. Keep up the great work!<br/>– Mrs. Yinka Isikalu, Director</p>
+                            </div>
+                            
+                            <div class="mt-6 text-center">
+                                <button onclick="downloadSessionReport(${studentIndex}, ${assessmentIndex}, '${fullName}', 'assessment')" class="bg-green-600 text-white px-6 py-2 rounded-lg font-semibold hover:bg-green-700 transition-all duration-200">
+                                    Download Assessment PDF
+                                </button>
+                            </div>
+                        </div>
+                    `;
+
+                    reportContent.innerHTML += assessmentBlock;
+
+                    if (results.length > 0) {
+                        const ctx = document.getElementById(`chart-${studentIndex}-${assessmentIndex}`);
+                        if (ctx) {
+                            const chartConfig = {
+                                type: 'bar',
+                                data: {
+                                    labels: results.map(r => r.subject.toUpperCase()),
+                                    datasets: [
+                                        { label: 'Correct Answers', data: results.map(s => s.correct), backgroundColor: '#4CAF50' }, 
+                                        { label: 'Incorrect/Unanswered', data: results.map(s => s.total - s.correct), backgroundColor: '#FFCD56' }
+                                    ]
+                                },
+                                options: {
+                                    responsive: true,
+                                    scales: { x: { stacked: true }, y: { stacked: true, beginAtZero: true } },
+                                    plugins: { title: { display: true, text: 'Score Distribution by Subject' } }
+                                }
+                            };
+                            new Chart(ctx, chartConfig);
+                            chartConfigsToCache.push({ canvasId: `chart-${studentIndex}-${assessmentIndex}`, config: chartConfig });
+                        }
+                    }
+                    assessmentIndex++;
+                }
+            }
             
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-4">
-                <div>
-                    <h4 class="font-semibold text-gray-700 mb-2">Subject Performance</h4>
-                    <div class="space-y-2">
-                        ${report.results.map(result => {
-                            const percentage = result.total > 0 ? Math.round((result.correct / result.total) * 100) : 0;
-                            const subjectPerformance = getPerformanceLabel(percentage);
-                            return `
-                                <div class="flex justify-between items-center">
-                                    <span class="text-sm font-medium text-gray-600">${result.subject}</span>
-                                    <div class="flex items-center gap-2">
-                                        <span class="text-sm font-semibold ${subjectPerformance.color}">${percentage}%</span>
-                                        <div class="w-16 bg-gray-200 rounded-full h-2">
-                                            <div class="h-2 rounded-full ${subjectPerformance.color.split(' ')[0]}" style="width: ${percentage}%"></div>
-                                        </div>
+            // Display Monthly Reports for this student
+            if (reports.monthly.length > 0) {
+                const groupedMonthly = {};
+                reports.monthly.forEach((result) => {
+                    const sessionKey = Math.floor(result.timestamp / 86400); 
+                    if (!groupedMonthly[sessionKey]) groupedMonthly[sessionKey] = [];
+                    groupedMonthly[sessionKey].push(result);
+                });
+
+                let monthlyIndex = 0;
+                for (const key in groupedMonthly) {
+                    const session = groupedMonthly[key];
+                    const formattedDate = new Date(session[0].timestamp * 1000).toLocaleString('en-US', {
+                        dateStyle: 'long',
+                        timeStyle: 'short'
+                    });
+
+                    session.forEach((monthlyReport, reportIndex) => {
+                        const monthlyBlock = `
+                            <div class="border rounded-lg shadow mb-8 p-6 bg-white" id="monthly-block-${studentIndex}-${monthlyIndex}">
+                                <div class="text-center mb-6 border-b pb-4">
+                                    <img src="https://res.cloudinary.com/dy2hxcyaf/image/upload/v1757700806/newbhlogo_umwqzy.svg" 
+                                         alt="Blooming Kids House Logo" 
+                                         class="h-16 w-auto mx-auto mb-3">
+                                    <h2 class="text-2xl font-bold text-green-800">MONTHLY LEARNING REPORT</h2>
+                                    <p class="text-gray-600">Date: ${formattedDate}</p>
+                                </div>
+                                
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6 bg-green-50 p-4 rounded-lg">
+                                    <div>
+                                        <p><strong>Student's Name:</strong> ${monthlyReport.studentName || 'N/A'}</p>
+                                        <p><strong>Parent's Name:</strong> ${monthlyReport.parentName || 'N/A'}</p>
+                                        <p><strong>Parent's Phone:</strong> ${monthlyReport.parentPhone || 'N/A'}</p>
+                                    </div>
+                                    <div>
+                                        <p><strong>Grade:</strong> ${monthlyReport.grade || 'N/A'}</p>
+                                        <p><strong>Tutor's Name:</strong> ${monthlyReport.tutorName || 'N/A'}</p>
                                     </div>
                                 </div>
-                            `;
-                        }).join('')}
-                    </div>
-                </div>
-                
-                <div>
-                    <h4 class="font-semibold text-gray-700 mb-2">Recommendation</h4>
-                    <p class="text-gray-600 text-sm leading-relaxed">${recommendation}</p>
-                </div>
-            </div>
+
+                                ${monthlyReport.introduction ? `
+                                <div class="mb-6">
+                                    <h3 class="text-lg font-semibold text-green-700 mb-2 border-b pb-1">INTRODUCTION</h3>
+                                    <p class="text-gray-700 leading-relaxed preserve-whitespace">${monthlyReport.introduction}</p>
+                                </div>
+                                ` : ''}
+
+                                ${monthlyReport.topics ? `
+                                <div class="mb-6">
+                                    <h3 class="text-lg font-semibold text-green-700 mb-2 border-b pb-1">TOPICS & REMARKS</h3>
+                                    <p class="text-gray-700 leading-relaxed preserve-whitespace">${monthlyReport.topics}</p>
+                                </div>
+                                ` : ''}
+
+                                ${monthlyReport.progress ? `
+                                <div class="mb-6">
+                                    <h3 class="text-lg font-semibold text-green-700 mb-2 border-b pb-1">PROGRESS & ACHIEVEMENTS</h3>
+                                    <p class="text-gray-700 leading-relaxed preserve-whitespace">${monthlyReport.progress}</p>
+                                </div>
+                                ` : ''}
+
+                                ${monthlyReport.strengthsWeaknesses ? `
+                                <div class="mb-6">
+                                    <h3 class="text-lg font-semibold text-green-700 mb-2 border-b pb-1">STRENGTHS AND WEAKNESSES</h3>
+                                    <p class="text-gray-700 leading-relaxed preserve-whitespace">${monthlyReport.strengthsWeaknesses}</p>
+                                </div>
+                                ` : ''}
+
+                                ${monthlyReport.recommendations ? `
+                                <div class="mb-6">
+                                    <h3 class="text-lg font-semibold text-green-700 mb-2 border-b pb-1">RECOMMENDATIONS</h3>
+                                    <p class="text-gray-700 leading-relaxed preserve-whitespace">${monthlyReport.recommendations}</p>
+                                </div>
+                                ` : ''}
+
+                                ${monthlyReport.generalComments ? `
+                                <div class="mb-6">
+                                    <h3 class="text-lg font-semibold text-green-700 mb-2 border-b pb-1">GENERAL TUTOR'S COMMENTS</h3>
+                                    <p class="text-gray-700 leading-relaxed preserve-whitespace">${monthlyReport.generalComments}</p>
+                                </div>
+                                ` : ''}
+
+                                <div class="text-right mt-8 pt-4 border-t">
+                                    <p class="text-gray-600">Best regards,</p>
+                                    <p class="font-semibold text-green-800">${monthlyReport.tutorName || 'N/A'}</p>
+                                </div>
+
+                                <div class="mt-6 text-center">
+                                    <button onclick="downloadMonthlyReport(${studentIndex}, ${monthlyIndex}, '${fullName}')" class="bg-green-600 text-white px-6 py-2 rounded-lg font-semibold hover:bg-green-700 transition-all duration-200">
+                                        Download Monthly Report PDF
+                                    </button>
+                                </div>
+                            </div>
+                        `;
+                        reportContent.innerHTML += monthlyBlock;
+                        monthlyIndex++;
+                    });
+                }
+            }
             
-            ${report.additionalNotes ? `
-                <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                    <h4 class="font-semibold text-blue-700 mb-1">Additional Notes from Tutor</h4>
-                    <p class="text-blue-600 text-sm">${report.additionalNotes}</p>
-                </div>
-            ` : ''}
-        </div>
-    `;
+            studentIndex++;
+        }
+        
+        // --- CACHE SAVING LOGIC ---
+        try {
+            const dataToCache = {
+                timestamp: Date.now(),
+                html: reportContent.innerHTML,
+                chartConfigs: chartConfigsToCache,
+                userData: currentUserData
+            };
+            localStorage.setItem(cacheKey, JSON.stringify(dataToCache));
+            console.log("Report data cached successfully.");
+        } catch (e) {
+            console.error("Could not write to cache:", e);
+        }
+        // --- END CACHE SAVING ---
+
+        authArea.classList.add("hidden");
+        reportArea.classList.remove("hidden");
+
+        // Add View Responses button to welcome section
+        addViewResponsesButton();
+        
+        // Load initial referral data for the rewards dashboard tab
+        // Note: This function will only run when the user is authenticated and the reports load successfully.
+        loadReferralRewards(userId);
+
+    } catch (error) {
+        console.error("Error loading reports:", error);
+        showMessage("Sorry, there was an error loading the reports. Please try again.", "error");
+    } finally {
+        authLoader.classList.add("hidden");
+    }
 }
 
-function getPerformanceLabel(percentage) {
-    if (percentage >= 90) return { label: 'Excellent', color: 'text-green-600' };
-    if (percentage >= 80) return { label: 'Very Good', color: 'text-green-500' };
-    if (percentage >= 70) return { label: 'Good', color: 'text-blue-500' };
-    if (percentage >= 60) return { label: 'Satisfactory', color: 'text-yellow-500' };
-    if (percentage >= 50) return { label: 'Needs Improvement', color: 'text-orange-500' };
-    return { label: 'Requires Attention', color: 'text-red-500' };
+function downloadSessionReport(studentIndex, sessionIndex, studentName, type) {
+    const element = document.getElementById(`${type}-block-${studentIndex}-${sessionIndex}`);
+    const safeStudentName = studentName.replace(/ /g, '_');
+    const fileName = `${type === 'assessment' ? 'Assessment' : 'Monthly'}_Report_${safeStudentName}.pdf`;
+    const opt = { margin: 0.5, filename: fileName, image: { type: 'jpeg', quality: 0.98 }, html2canvas: { scale: 2, useCORS: true }, jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' } };
+    html2pdf().from(element).set(opt).save();
 }
 
-function signOut() {
+function downloadMonthlyReport(studentIndex, monthlyIndex, studentName) {
+    downloadSessionReport(studentIndex, monthlyIndex, studentName, 'monthly');
+}
+
+function logout() {
+    // Clear remember me on logout
+    localStorage.removeItem('rememberMe');
+    localStorage.removeItem('savedEmail');
+    
     auth.signOut().then(() => {
-        // Reset UI
-        document.getElementById('welcomeSection').classList.add('hidden');
-        document.getElementById('authSection').classList.remove('hidden');
-        document.getElementById('reportsContainer').innerHTML = '';
-        
-        // Reset form
-        document.getElementById('loginIdentifier').value = '';
-        document.getElementById('loginPassword').value = '';
-        
-        // Hide any modals
-        document.getElementById('feedbackModal').classList.add('hidden');
-        document.getElementById('responsesModal').classList.add('hidden');
-        document.getElementById('rewardsModal').classList.add('hidden');
-        
-        showMessage('Signed out successfully', 'success');
-    }).catch((error) => {
-        console.error('Sign out error:', error);
+        window.location.reload();
     });
 }
 
-// Initialize the application
+function showMessage(message, type) {
+    // Remove any existing message
+    const existingMessage = document.querySelector('.message-toast');
+    if (existingMessage) {
+        existingMessage.remove();
+    }
+
+    const messageDiv = document.createElement('div');
+    messageDiv.className = `message-toast fixed top-4 right-4 p-4 rounded-lg shadow-lg z-50 max-w-sm ${
+        type === 'error' ? 'bg-red-500 text-white' : 
+        type === 'success' ? 'bg-green-500 text-white' : 
+        'bg-blue-500 text-white'
+    }`;
+    messageDiv.textContent = `BKH says: ${message}`;
+    
+    document.body.appendChild(messageDiv);
+    
+    // Auto remove after 5 seconds
+    setTimeout(() => {
+        messageDiv.remove();
+    }, 5000);
+}
+
+function switchTab(tab) {
+    const signInTab = document.getElementById('signInTab');
+    const signUpTab = document.getElementById('signUpTab');
+    const signInForm = document.getElementById('signInForm');
+    const signUpForm = document.getElementById('signUpForm');
+
+    if (tab === 'signin') {
+        signInTab.classList.remove('tab-inactive');
+        signInTab.classList.add('tab-active');
+        signUpTab.classList.remove('tab-active');
+        signUpTab.classList.add('tab-inactive');
+        signInForm.classList.remove('hidden');
+        signUpForm.classList.add('hidden');
+    } else {
+        signUpTab.classList.remove('tab-inactive');
+        signUpTab.classList.add('tab-active');
+        signInTab.classList.remove('tab-active');
+        signInTab.classList.add('tab-inactive');
+        signUpForm.classList.remove('hidden');
+        signInForm.classList.add('hidden');
+    }
+}
+
+function switchMainTab(tab) {
+    const reportTab = document.getElementById('reportTab');
+    const rewardsTab = document.getElementById('rewardsTab');
+    
+    const reportContentArea = document.getElementById('reportContentArea');
+    const rewardsContentArea = document.getElementById('rewardsContentArea');
+    
+    // Deactivate all tabs
+    reportTab?.classList.remove('tab-active-main');
+    reportTab?.classList.add('tab-inactive-main');
+    rewardsTab?.classList.remove('tab-active-main');
+    rewardsTab?.classList.add('tab-inactive-main');
+    
+    // Hide all content areas
+    reportContentArea?.classList.add('hidden');
+    rewardsContentArea?.classList.add('hidden');
+    
+    // Activate selected tab and show content
+    if (tab === 'reports') {
+        reportTab?.classList.remove('tab-inactive-main');
+        reportTab?.classList.add('tab-active-main');
+        reportContentArea?.classList.remove('hidden');
+    } else if (tab === 'rewards') {
+        rewardsTab?.classList.remove('tab-inactive-main');
+        rewardsTab?.classList.add('tab-active-main');
+        rewardsContentArea?.classList.remove('hidden');
+        
+        // Reload rewards data when the tab is clicked to ensure it's up-to-date
+        const user = auth.currentUser;
+        if (user) {
+            loadReferralRewards(user.uid);
+        }
+    }
+}
+
+
+// Initialize the page
 document.addEventListener('DOMContentLoaded', function() {
-    // Set up Remember Me
+    // Setup Remember Me
     setupRememberMe();
     
-    // Listen for auth state changes
+    // Check authentication state
     auth.onAuthStateChanged((user) => {
         if (user) {
-            // User is signed in
-            console.log("User signed in:", user.uid);
-            
-            // Get user data and ensure referral code exists
-            db.collection('parent_users').doc(user.uid).get().then((doc) => {
-                if (doc.exists) {
-                    const userData = doc.data();
-                    if (!userData.referralCode) {
-                        ensureReferralCode(user.uid, userData);
+            // User is signed in, load their reports
+            // Get phone from Firestore user document
+            db.collection('parent_users').doc(user.uid).get()
+                .then((doc) => {
+                    if (doc.exists) {
+                        const userPhone = doc.data().phone;
+                        loadAllReportsForParent(userPhone, user.uid);
                     }
-                }
-            });
-            
-        } else {
-            // User is signed out
-            console.log("User signed out");
+                })
+                .catch((error) => {
+                    console.error('Error getting user data:', error);
+                });
         }
     });
-});
 
-// Add Rewards Modal to the DOM
-document.addEventListener('DOMContentLoaded', function() {
-    // Create Rewards Modal if it doesn't exist
-    if (!document.getElementById('rewardsModal')) {
-        const rewardsModal = document.createElement('div');
-        rewardsModal.id = 'rewardsModal';
-        rewardsModal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden';
-        rewardsModal.innerHTML = `
-            <div class="bg-white rounded-2xl shadow-xl w-full max-w-4xl mx-4 max-h-[90vh] overflow-hidden">
-                <div class="bg-gradient-to-r from-purple-600 to-green-600 p-6 text-white">
-                    <div class="flex justify-between items-center">
-                        <h2 class="text-2xl font-bold">🎁 Your Rewards Dashboard</h2>
-                        <button onclick="hideRewardsDashboard()" class="text-white hover:text-gray-200 text-2xl font-bold">&times;</button>
-                    </div>
-                    <p class="mt-2 opacity-90">Track your referrals and earnings</p>
-                </div>
-                <div class="p-6 overflow-y-auto max-h-[calc(90vh-120px)]">
-                    <div id="rewardsContent">
-                        <!-- Rewards content will be loaded here -->
-                    </div>
-                </div>
-            </div>
-        `;
-        document.body.appendChild(rewardsModal);
-    }
-});
-[file content end]
+    // Set up event listeners
+    document.getElementById("signInBtn").addEventListener("click", handleSignIn);
+    document.getElementById("signUpBtn").addEventListener("click", handleSignUp);
+    document.getElementById("sendResetBtn").addEventListener("click", handlePasswordReset);
+    document.getElementById("submitFeedbackBtn").addEventListener("click", submitFeedback);
+    
+    document.getElementById("signInTab").addEventListener("click", () => switchTab('signin'));
+    document.getElementById("signUpTab").addEventListener("click", () => switchTab('signup'));
+    
+    document.getElementById("forgotPasswordBtn").addEventListener("click", () => {
+        document.getElementById("passwordResetModal").classList.remove("hidden");
+    });
+    
+    document.getElementById("cancelResetBtn").addEventListener("click", () => {
+        document.getElementById("passwordResetModal").classList.add("hidden");
+    });
 
+    document.getElementById("rememberMe").addEventListener("change", handleRememberMe);
+
+    // Allow Enter key to submit forms
+    document.getElementById('loginPassword').addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') handleSignIn();
+    });
+    
+    document.getElementById('signupConfirmPassword').addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') handleSignUp();
+    });
+    
+    document.getElementById('resetEmail').addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') handlePasswordReset();
+    });
+    
+    // --- START: NEW MAIN TAB SWITCHING LISTENERS (PHASE 3) ---
+    document.getElementById("reportTab")?.addEventListener("click", () => switchMainTab('reports'));
+    document.getElementById("rewardsTab")?.addEventListener("click", () => switchMainTab('rewards'));
+    // --- END: NEW MAIN TAB SWITCHING LISTENERS (PHASE 3) ---
+});
