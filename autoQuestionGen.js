@@ -21,33 +21,54 @@ function getAdminQuestionsSubject(testSubject) {
 }
 
 /**
- * Generate unique session ID scoped to current test only
+ * Generate unique session ID scoped to current test AND state
  */
 function generateSessionId(grade, subject, state) {
     const params = new URLSearchParams(window.location.search);
     const studentName = params.get('studentName');
     const parentEmail = params.get('parentEmail');
     
-    // Create a unique session ID for THIS SPECIFIC TEST
-    const testSessionKey = `test-${grade}-${subject}-${studentName}-${parentEmail}`;
+    // Create a unique session ID for THIS SPECIFIC TEST AND STATE
+    const testSessionKey = `test-${grade}-${subject}-${state}-${studentName}-${parentEmail}`;
     
-    // Try to get existing session for THIS TEST
+    // Try to get existing session for THIS TEST AND STATE
     const existingSessionId = sessionStorage.getItem('currentTestSession');
     
-    // Only reuse session if it's for the EXACT same test
+    // Only reuse session if it's for the EXACT same test AND state
     if (existingSessionId && existingSessionId === testSessionKey) {
-        console.log("Reusing session for current test:", testSessionKey);
+        console.log("Reusing session for current test and state:", testSessionKey);
         return existingSessionId;
     }
     
-    // New test session - clear any old sessions
-    clearAllTestSessions();
+    // New test session - clear any old sessions for different states
+    clearOtherStateSessions(testSessionKey);
     
-    // Set new session for current test
+    // Set new session for current test and state
     sessionStorage.setItem('currentTestSession', testSessionKey);
-    console.log("Started new test session:", testSessionKey);
+    console.log("Started new test session for state:", testSessionKey);
     
     return testSessionKey;
+}
+
+/**
+ * Clear sessions for other states but keep current one
+ */
+function clearOtherStateSessions(currentSessionKey) {
+    const keysToRemove = [];
+    for (let i = 0; i < sessionStorage.length; i++) {
+        const key = sessionStorage.key(i);
+        if (key && (key.startsWith('test-') || key.startsWith('session-') || key.includes('-answers') || key === 'currentSessionId' || key === 'currentTestSession' || key === 'justCompletedCreativeWriting')) {
+            // Only remove if it's NOT the current session
+            if (key !== currentSessionKey && key !== `currentTestSession` && !key.includes(`${currentSessionKey}-answers`)) {
+                keysToRemove.push(key);
+            }
+        }
+    }
+    
+    keysToRemove.forEach(key => {
+        sessionStorage.removeItem(key);
+        console.log("Cleared other state session:", key);
+    });
 }
 
 /**
@@ -122,13 +143,13 @@ export async function loadQuestions(subject, grade, state) {
         submitBtnContainer.style.display = 'none';
     }
 
-    // Generate session ID for current test
+    // Generate session ID for current test AND STATE
     currentSessionId = generateSessionId(grade, subject, state);
 
-    // Check if we have saved questions for THIS SPECIFIC TEST
+    // Check if we have saved questions for THIS SPECIFIC TEST AND STATE
     const savedSession = getSavedSession();
     if (savedSession && savedSession.questions && savedSession.questions.length > 0) {
-        console.log("Loading questions from saved session for current test");
+        console.log("Loading questions from saved session for current test and state");
         loadedQuestions = savedSession.questions;
         displayQuestionsBasedOnState(loadedQuestions, state);
         restoreSavedAnswers();
@@ -146,7 +167,7 @@ export async function loadQuestions(subject, grade, state) {
     let creativeWritingQuestion = null;
 
     try {
-        console.log(`🔄 FETCHING QUESTIONS FOR: ${grade} ${subject.toUpperCase()}`);
+        console.log(`🔄 FETCHING QUESTIONS FOR: ${grade} ${subject.toUpperCase()} - STATE: ${state}`);
 
         // 1. FETCH FROM BOTH FIREBASE COLLECTIONS SIMULTANEOUSLY
         const [testsSnapshot, adminSnapshot] = await Promise.all([
@@ -273,7 +294,7 @@ export async function loadQuestions(subject, grade, state) {
             }
         });
 
-        console.log(`🎯 FINAL: ${allQuestions.length} ${subject.toUpperCase()} questions ready for ${grade}`);
+        console.log(`🎯 FINAL: ${allQuestions.length} ${subject.toUpperCase()} questions ready for ${grade} - STATE: ${state}`);
         console.log("📚 Passages count:", allPassages.length);
 
         if (allQuestions.length === 0) {
@@ -723,7 +744,7 @@ export function clearTestSession(forceClear = false) {
     }
 }
 
-// Continue to MCQ handler for creative writing submissions - FIXED REDIRECT
+// Continue to MCQ handler for creative writing submissions - UPDATED WITH SEPARATE SESSIONS
 window.continueToMCQ = async (questionId, studentName, parentEmail, tutorEmail, grade) => {
     const CLOUDINARY_URL = 'https://api.cloudinary.com/v1_1/dy2hxcyaf/upload';
     const CLOUDINARY_UPLOAD_PRESET = 'bkh_assessments';
@@ -818,10 +839,15 @@ window.continueToMCQ = async (questionId, studentName, parentEmail, tutorEmail, 
         const docRef = doc(db, "tutor_submissions", `${parentEmail}-${questionId}-${Date.now()}`);
         await setDoc(docRef, submittedData);
         
-        console.log("Creative writing submitted successfully, now redirecting...");
+        console.log("Creative writing submitted successfully, now redirecting to MCQ...");
         
-        // CRITICAL FIX: Set flag to clear session when loading MCQ
-        sessionStorage.setItem('justCompletedCreativeWriting', 'true');
+        // CRITICAL FIX: Clear creative writing session before redirecting to MCQ
+        // This ensures MCQ loads fresh questions instead of reusing creative writing session
+        if (currentSessionId) {
+            sessionStorage.removeItem(currentSessionId);
+            sessionStorage.removeItem(`${currentSessionId}-answers`);
+            console.log("Cleared creative writing session before MCQ load");
+        }
         
         // FIXED REDIRECT LOGIC
         setTimeout(() => {
@@ -840,8 +866,7 @@ window.continueToMCQ = async (questionId, studentName, parentEmail, tutorEmail, 
                 newUrl = url.toString();
             }
             
-            console.log("Redirecting from:", currentUrl);
-            console.log("Redirecting to:", newUrl);
+            console.log("Redirecting from creative writing to MCQ:", newUrl);
             
             // Force redirect
             window.location.href = newUrl;
