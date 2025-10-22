@@ -114,23 +114,23 @@ function generateTemplatedRecommendation(studentName, tutorName, results) {
 
     let praiseClause = "";
     if (uniqueStrengths.length > 2) {
-        praiseClause = `It was great to see ₦{studentName} demonstrate a solid understanding of several key concepts, particularly in areas like ₦{uniqueStrengths[0]} and ₦{uniqueStrengths[1]}. `;
+        praiseClause = `It was great to see ${studentName} demonstrate a solid understanding of several key concepts, particularly in areas like ${uniqueStrengths[0]} and ${uniqueStrengths[1]}. `;
     } else if (uniqueStrengths.length > 0) {
-        praiseClause = `₦{studentName} showed strong potential, especially in the topic of ₦{uniqueStrengths.join(', ')}. `;
+        praiseClause = `${studentName} showed strong potential, especially in the topic of ${uniqueStrengths.join(', ')}. `;
     } else {
-        praiseClause = `₦{studentName} has put in a commendable effort on this initial assessment. `;
+        praiseClause = `${studentName} has put in a commendable effort on this initial assessment. `;
     }
 
     let improvementClause = "";
     if (uniqueWeaknesses.length > 2) {
-        improvementClause = `Our next step will be to focus on building more confidence in a few areas, such as ₦{uniqueWeaknesses[0]} and ₦{uniqueWeaknesses[1]}. `;
+        improvementClause = `Our next step will be to focus on building more confidence in a few areas, such as ${uniqueWeaknesses[0]} and ${uniqueWeaknesses[1]}. `;
     } else if (uniqueWeaknesses.length > 0) {
-        improvementClause = `To continue this positive progress, our focus will be on the topic of ₦{uniqueWeaknesses.join(', ')}. `;
+        improvementClause = `To continue this positive progress, our focus will be on the topic of ${uniqueWeaknesses.join(', ')}. `;
     } else {
         improvementClause = "We will continue to build on these fantastic results and explore more advanced topics. ";
     }
 
-    const closingStatement = `With personalized support from their tutor, ₦{tutorName}, at Blooming Kids House, we are very confident that ₦{studentName} will master these skills and unlock their full potential.`;
+    const closingStatement = `With personalized support from their tutor, ${tutorName}, at Blooming Kids House, we are very confident that ${studentName} will master these skills and unlock their full potential.`;
 
     return praiseClause + improvementClause + closingStatement;
 }
@@ -633,27 +633,27 @@ async function loadAdminResponses() {
                 responseElement.innerHTML = `
                     <div class="flex justify-between items-start mb-4">
                         <div class="flex flex-wrap gap-2">
-                            <span class="inline-block px-3 py-1 rounded-full text-sm font-semibold ₦{getCategoryColor(feedback.category)}">
-                                ₦{feedback.category}
+                            <span class="inline-block px-3 py-1 rounded-full text-sm font-semibold ${getCategoryColor(feedback.category)}">
+                                ${feedback.category}
                             </span>
-                            <span class="inline-block px-3 py-1 rounded-full text-sm font-semibold ₦{getPriorityColor(feedback.priority)}">
-                                ₦{feedback.priority} Priority
+                            <span class="inline-block px-3 py-1 rounded-full text-sm font-semibold ${getPriorityColor(feedback.priority)}">
+                                ${feedback.priority} Priority
                             </span>
                         </div>
-                        <span class="text-sm text-gray-500">₦{formattedDate}</span>
+                        <span class="text-sm text-gray-500">${formattedDate}</span>
                     </div>
                     
                     <div class="mb-4">
-                        <h4 class="font-semibold text-gray-800 mb-2">Regarding: ₦{feedback.studentName}</h4>
-                        <p class="text-gray-700 bg-gray-50 p-4 rounded-lg border">₦{feedback.message}</p>
+                        <h4 class="font-semibold text-gray-800 mb-2">Regarding: ${feedback.studentName}</h4>
+                        <p class="text-gray-700 bg-gray-50 p-4 rounded-lg border">${feedback.message}</p>
                     </div>
                     
                     <div class="response-bubble">
-                        <div class="response-header">📨 Response from ₦{response.responderName || 'Admin'}:</div>
-                        <p class="text-gray-700 mt-2">₦{response.responseText}</p>
+                        <div class="response-header">📨 Response from ${response.responderName || 'Admin'}:</div>
+                        <p class="text-gray-700 mt-2">${response.responseText}</p>
                         <div class="text-sm text-gray-500 mt-2">
-                            Responded by: ₦{response.responderName || 'Admin Staff'} 
-                            ₦{response.responderEmail ? `(₦{response.responderEmail})` : ''}
+                            Responded by: ${response.responderName || 'Admin Staff'} 
+                            ${response.responderEmail ? `(${response.responderEmail})` : ''}
                         </div>
                     </div>
                 `;
@@ -810,7 +810,7 @@ async function loadReferralRewards(parentUid) {
                 const referredStudent = data.referredStudentName || 'N/A';
                 const date = data.timestamp?.toDate()?.toLocaleDateString() || 'N/A';
                 const status = data.status || 'Pending';
-                const earning = data.earningAmount ? `₦₦{data.earningAmount.toFixed(2)}` : '₦0.00';
+                const earning = data.earningAmount ? `$${data.earningAmount.toFixed(2)}` : '$0.00';
                 
                 let statusColor = 'bg-yellow-100 text-yellow-800';
                 if (status === 'Approved') {
@@ -821,12 +821,12 @@ async function loadReferralRewards(parentUid) {
 
                 return `
                     <tr class="border-t">
-                        <td class="px-4 py-2">₦{referredStudent}</td>
-                        <td class="px-4 py-2">₦{date}</td>
-                        <td class="px-4 py-2 text-center">₦{earning}</td>
+                        <td class="px-4 py-2">${referredStudent}</td>
+                        <td class="px-4 py-2">${date}</td>
+                        <td class="px-4 py-2 text-center">${earning}</td>
                         <td class="px-4 py-2 text-center">
-                            <span class="inline-block px-3 py-1 rounded-full text-sm font-semibold ₦{statusColor}">
-                                ₦{status}
+                            <span class="inline-block px-3 py-1 rounded-full text-sm font-semibold ${statusColor}">
+                                ${status}
                             </span>
                         </td>
                     </tr>
@@ -845,7 +845,7 @@ async function loadReferralRewards(parentUid) {
                             </tr>
                         </thead>
                         <tbody class="text-gray-600 text-sm font-light">
-                            ₦{tableRows}
+                            ${tableRows}
                         </tbody>
                     </table>
                 </div>
@@ -857,8 +857,8 @@ async function loadReferralRewards(parentUid) {
                 <div class="bg-green-50 p-6 rounded-xl border border-green-200">
                     <h3 class="text-xl font-bold text-green-800 mb-2">Your Referral Code</h3>
                     <div class="flex flex-col sm:flex-row items-center justify-between">
-                        <p class="text-3xl font-extrabold text-green-600 tracking-wider p-2 bg-white rounded-lg border-2 border-dashed border-green-400 mb-4 sm:mb-0">₦{referralCode}</p>
-                        <button onclick="navigator.clipboard.writeText('₦{referralCode}'); showMessage('Code copied!', 'success');"
+                        <p class="text-3xl font-extrabold text-green-600 tracking-wider p-2 bg-white rounded-lg border-2 border-dashed border-green-400 mb-4 sm:mb-0">${referralCode}</p>
+                        <button onclick="navigator.clipboard.writeText('${referralCode}'); showMessage('Code copied!', 'success');"
                                 class="bg-green-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-green-700 transition-all duration-200">
                             Copy Code
                         </button>
@@ -868,12 +868,12 @@ async function loadReferralRewards(parentUid) {
                 
                 <div class="bg-blue-50 p-6 rounded-xl border border-blue-200">
                     <h3 class="text-xl font-bold text-blue-800 mb-2">Total Estimated Earnings</h3>
-                    <p class="text-4xl font-extrabold text-blue-600">₦₦{referralEarnings.toFixed(2)}</p>
+                    <p class="text-4xl font-extrabold text-blue-600">$${referralEarnings.toFixed(2)}</p>
                     <p class="text-sm text-gray-500 mt-2">This amount reflects earnings from approved referrals. Payments are processed monthly.</p>
                 </div>
                 
                 <h3 class="text-xl font-bold text-gray-800 border-b pb-2">Referral History</h3>
-                ₦{transactionsHtml}
+                ${transactionsHtml}
             </div>
         `;
 
@@ -948,7 +948,7 @@ async function loadAllReportsForParent(parentPhone, userId) {
 
     try {
         // --- CACHE IMPLEMENTATION ---
-        const cacheKey = `reportCache_₦{parentPhone}`;
+        const cacheKey = `reportCache_${parentPhone}`;
         const twoWeeksInMillis = 14 * 24 * 60 * 60 * 1000;
         
         try {
@@ -961,7 +961,7 @@ async function loadAllReportsForParent(parentPhone, userId) {
                     
                     // Set welcome message from cache
                     if (userData && userData.parentName) {
-                        welcomeMessage.textContent = `Welcome, ₦{userData.parentName}!`;
+                        welcomeMessage.textContent = `Welcome, ${userData.parentName}!`;
                         currentUserData = userData;
                     } else {
                         welcomeMessage.textContent = `Welcome!`;
@@ -1009,14 +1009,14 @@ async function loadAllReportsForParent(parentPhone, userId) {
             // Retroactively generate code if missing (NEW LOGIC)
             if (!userData.referralCode) {
                 const newCode = await generateReferralCode(); // Await added here
-                console.log(`Retroactively generating referral code for user ₦{userId}: ₦{newCode}`);
+                console.log(`Retroactively generating referral code for user ${userId}: ${newCode}`);
                 await db.collection('parent_users').doc(userId).update({
                     referralCode: newCode,
                     referralEarnings: userData.referralEarnings || 0 // Ensure earnings field exists
                 });
                 userData.referralCode = newCode; // Update local copy
                 userData.referralEarnings = userData.referralEarnings || 0; // Update local copy
-                showMessage(`Referral code generated: ₦{newCode}`, 'info');
+                showMessage(`Referral code generated: ${newCode}`, 'info');
             }
             
             // If parentName was not found in students collection, use name from user doc
@@ -1039,7 +1039,7 @@ async function loadAllReportsForParent(parentPhone, userId) {
         };
 
         // UPDATE WELCOME MESSAGE WITH PARENT NAME
-        welcomeMessage.textContent = `Welcome, ₦{currentUserData.parentName}!`;
+        welcomeMessage.textContent = `Welcome, ${currentUserData.parentName}!`;
 
         // Update parent name in user document if we found a better one
         if (userId && parentName && parentName !== 'Parent' && userData?.parentName !== parentName) {
@@ -1151,8 +1151,8 @@ async function loadAllReportsForParent(parentPhone, userId) {
             // Add student header
             const studentHeader = `
                 <div class="bg-green-100 border-l-4 border-green-600 p-4 rounded-lg mb-6">
-                    <h2 class="text-xl font-bold text-green-800">₦{fullName}</h2>
-                    <p class="text-green-600">Showing all reports for ₦{fullName}</p>
+                    <h2 class="text-xl font-bold text-green-800">${fullName}</h2>
+                    <p class="text-green-600">Showing all reports for ${fullName}</p>
                 </div>
             `;
             reportContent.innerHTML += studentHeader;
@@ -1201,66 +1201,66 @@ async function loadAllReportsForParent(parentPhone, userId) {
                         };
                     });
 
-                    const tableRows = results.map(res => `<tr><td class="border px-2 py-1">₦{res.subject.toUpperCase()}</td><td class="border px-2 py-1 text-center">₦{res.correct} / ₦{res.total}</td></tr>`).join("");
-                    const topicsTableRows = results.map(res => `<tr><td class="border px-2 py-1 font-semibold">₦{res.subject.toUpperCase()}</td><td class="border px-2 py-1">₦{res.topics.join(', ') || 'N/A'}</td></tr>`).join("");
+                    const tableRows = results.map(res => `<tr><td class="border px-2 py-1">${res.subject.toUpperCase()}</td><td class="border px-2 py-1 text-center">${res.correct} / ${res.total}</td></tr>`).join("");
+                    const topicsTableRows = results.map(res => `<tr><td class="border px-2 py-1 font-semibold">${res.subject.toUpperCase()}</td><td class="border px-2 py-1">${res.topics.join(', ') || 'N/A'}</td></tr>`).join("");
 
                     const recommendation = generateTemplatedRecommendation(fullName, tutorName, results);
                     const creativeWritingAnswer = session[0].answers?.find(a => a.type === 'creative-writing');
                     const tutorReport = creativeWritingAnswer?.tutorReport || 'Pending review.';
 
                     const assessmentBlock = `
-                        <div class="border rounded-lg shadow mb-8 p-6 bg-white" id="assessment-block-₦{studentIndex}-₦{assessmentIndex}">
+                        <div class="border rounded-lg shadow mb-8 p-6 bg-white" id="assessment-block-${studentIndex}-${assessmentIndex}">
                             <div class="text-center mb-6 border-b pb-4">
                                 <img src="https://res.cloudinary.com/dy2hxcyaf/image/upload/v1757700806/newbhlogo_umwqzy.svg" 
                                      alt="Blooming Kids House Logo" 
                                      class="h-16 w-auto mx-auto mb-3">
                                 <h2 class="text-2xl font-bold text-green-800">Assessment Report</h2>
-                                <p class="text-gray-600">Date: ₦{formattedDate}</p>
+                                <p class="text-gray-600">Date: ${formattedDate}</p>
                             </div>
 
                             <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6 bg-green-50 p-4 rounded-lg">
                                 <div>
-                                    <p><strong>Student's Name:</strong> ₦{fullName}</p>
-                                    <p><strong>Parent's Phone:</strong> ₦{session[0].parentPhone || 'N/A'}</p>
-                                    <p><strong>Grade:</strong> ₦{session[0].grade}</p>
+                                    <p><strong>Student's Name:</strong> ${fullName}</p>
+                                    <p><strong>Parent's Phone:</strong> ${session[0].parentPhone || 'N/A'}</p>
+                                    <p><strong>Grade:</strong> ${session[0].grade}</p>
                                 </div>
                                 <div>
-                                    <p><strong>Tutor:</strong> ₦{tutorName || 'N/A'}</p>
-                                    <p><strong>Location:</strong> ₦{studentCountry || 'N/A'}</p>
+                                    <p><strong>Tutor:</strong> ${tutorName || 'N/A'}</p>
+                                    <p><strong>Location:</strong> ${studentCountry || 'N/A'}</p>
                                 </div>
                             </div>
                             
                             <h3 class="text-lg font-semibold mt-4 mb-2 text-green-700">Performance Summary</h3>
                             <table class="w-full text-sm mb-4 border border-collapse">
                                 <thead class="bg-gray-100"><tr><th class="border px-2 py-1 text-left">Subject</th><th class="border px-2 py-1 text-center">Score</th></tr></thead>
-                                <tbody>₦{tableRows}</tbody>
+                                <tbody>${tableRows}</tbody>
                             </table>
                             
                             <h3 class="text-lg font-semibold mt-4 mb-2 text-green-700">Knowledge & Skill Analysis</h3>
                             <table class="w-full text-sm mb-4 border border-collapse">
                                 <thead class="bg-gray-100"><tr><th class="border px-2 py-1 text-left">Subject</th><th class="border px-2 py-1 text-left">Topics Covered</th></tr></thead>
-                                <tbody>₦{topicsTableRows}</tbody>
+                                <tbody>${topicsTableRows}</tbody>
                             </table>
                             
                             <h3 class="text-lg font-semibold mt-4 mb-2 text-green-700">Tutor's Recommendation</h3>
-                            <p class="mb-2 text-gray-700 leading-relaxed">₦{recommendation}</p>
+                            <p class="mb-2 text-gray-700 leading-relaxed">${recommendation}</p>
 
-                            ₦{creativeWritingAnswer ? `
+                            ${creativeWritingAnswer ? `
                             <h3 class="text-lg font-semibold mt-4 mb-2 text-green-700">Creative Writing Feedback</h3>
-                            <p class="mb-2 text-gray-700"><strong>Tutor's Report:</strong> ₦{tutorReport}</p>
+                            <p class="mb-2 text-gray-700"><strong>Tutor's Report:</strong> ${tutorReport}</p>
                             ` : ''}
 
-                            ₦{results.length > 0 ? `
-                            <canvas id="chart-₦{studentIndex}-₦{assessmentIndex}" class="w-full h-48 mb-4"></canvas>
+                            ${results.length > 0 ? `
+                            <canvas id="chart-${studentIndex}-${assessmentIndex}" class="w-full h-48 mb-4"></canvas>
                             ` : ''}
                             
                             <div class="bg-yellow-50 p-4 rounded-lg mt-6">
                                 <h3 class="text-lg font-semibold mb-1 text-green-700">Director's Message</h3>
-                                <p class="italic text-sm text-gray-700">At Blooming Kids House, we are committed to helping every child succeed. We believe that with personalized support from our tutors, ₦{fullName} will unlock their full potential. Keep up the great work!<br/>– Mrs. Yinka Isikalu, Director</p>
+                                <p class="italic text-sm text-gray-700">At Blooming Kids House, we are committed to helping every child succeed. We believe that with personalized support from our tutors, ${fullName} will unlock their full potential. Keep up the great work!<br/>– Mrs. Yinka Isikalu, Director</p>
                             </div>
                             
                             <div class="mt-6 text-center">
-                                <button onclick="downloadSessionReport(₦{studentIndex}, ₦{assessmentIndex}, '₦{fullName}', 'assessment')" class="bg-green-600 text-white px-6 py-2 rounded-lg font-semibold hover:bg-green-700 transition-all duration-200">
+                                <button onclick="downloadSessionReport(${studentIndex}, ${assessmentIndex}, '${fullName}', 'assessment')" class="bg-green-600 text-white px-6 py-2 rounded-lg font-semibold hover:bg-green-700 transition-all duration-200">
                                     Download Assessment PDF
                                 </button>
                             </div>
@@ -1270,7 +1270,7 @@ async function loadAllReportsForParent(parentPhone, userId) {
                     reportContent.innerHTML += assessmentBlock;
 
                     if (results.length > 0) {
-                        const ctx = document.getElementById(`chart-₦{studentIndex}-₦{assessmentIndex}`);
+                        const ctx = document.getElementById(`chart-${studentIndex}-${assessmentIndex}`);
                         if (ctx) {
                             const chartConfig = {
                                 type: 'bar',
@@ -1288,7 +1288,7 @@ async function loadAllReportsForParent(parentPhone, userId) {
                                 }
                             };
                             new Chart(ctx, chartConfig);
-                            chartConfigsToCache.push({ canvasId: `chart-₦{studentIndex}-₦{assessmentIndex}`, config: chartConfig });
+                            chartConfigsToCache.push({ canvasId: `chart-${studentIndex}-${assessmentIndex}`, config: chartConfig });
                         }
                     }
                     assessmentIndex++;
@@ -1314,76 +1314,76 @@ async function loadAllReportsForParent(parentPhone, userId) {
 
                     session.forEach((monthlyReport, reportIndex) => {
                         const monthlyBlock = `
-                            <div class="border rounded-lg shadow mb-8 p-6 bg-white" id="monthly-block-₦{studentIndex}-₦{monthlyIndex}">
+                            <div class="border rounded-lg shadow mb-8 p-6 bg-white" id="monthly-block-${studentIndex}-${monthlyIndex}">
                                 <div class="text-center mb-6 border-b pb-4">
                                     <img src="https://res.cloudinary.com/dy2hxcyaf/image/upload/v1757700806/newbhlogo_umwqzy.svg" 
                                          alt="Blooming Kids House Logo" 
                                          class="h-16 w-auto mx-auto mb-3">
                                     <h2 class="text-2xl font-bold text-green-800">MONTHLY LEARNING REPORT</h2>
-                                    <p class="text-gray-600">Date: ₦{formattedDate}</p>
+                                    <p class="text-gray-600">Date: ${formattedDate}</p>
                                 </div>
                                 
                                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6 bg-green-50 p-4 rounded-lg">
                                     <div>
-                                        <p><strong>Student's Name:</strong> ₦{monthlyReport.studentName || 'N/A'}</p>
-                                        <p><strong>Parent's Name:</strong> ₦{monthlyReport.parentName || 'N/A'}</p>
-                                        <p><strong>Parent's Phone:</strong> ₦{monthlyReport.parentPhone || 'N/A'}</p>
+                                        <p><strong>Student's Name:</strong> ${monthlyReport.studentName || 'N/A'}</p>
+                                        <p><strong>Parent's Name:</strong> ${monthlyReport.parentName || 'N/A'}</p>
+                                        <p><strong>Parent's Phone:</strong> ${monthlyReport.parentPhone || 'N/A'}</p>
                                     </div>
                                     <div>
-                                        <p><strong>Grade:</strong> ₦{monthlyReport.grade || 'N/A'}</p>
-                                        <p><strong>Tutor's Name:</strong> ₦{monthlyReport.tutorName || 'N/A'}</p>
+                                        <p><strong>Grade:</strong> ${monthlyReport.grade || 'N/A'}</p>
+                                        <p><strong>Tutor's Name:</strong> ${monthlyReport.tutorName || 'N/A'}</p>
                                     </div>
                                 </div>
 
-                                ₦{monthlyReport.introduction ? `
+                                ${monthlyReport.introduction ? `
                                 <div class="mb-6">
                                     <h3 class="text-lg font-semibold text-green-700 mb-2 border-b pb-1">INTRODUCTION</h3>
-                                    <p class="text-gray-700 leading-relaxed preserve-whitespace">₦{monthlyReport.introduction}</p>
+                                    <p class="text-gray-700 leading-relaxed preserve-whitespace">${monthlyReport.introduction}</p>
                                 </div>
                                 ` : ''}
 
-                                ₦{monthlyReport.topics ? `
+                                ${monthlyReport.topics ? `
                                 <div class="mb-6">
                                     <h3 class="text-lg font-semibold text-green-700 mb-2 border-b pb-1">TOPICS & REMARKS</h3>
-                                    <p class="text-gray-700 leading-relaxed preserve-whitespace">₦{monthlyReport.topics}</p>
+                                    <p class="text-gray-700 leading-relaxed preserve-whitespace">${monthlyReport.topics}</p>
                                 </div>
                                 ` : ''}
 
-                                ₦{monthlyReport.progress ? `
+                                ${monthlyReport.progress ? `
                                 <div class="mb-6">
                                     <h3 class="text-lg font-semibold text-green-700 mb-2 border-b pb-1">PROGRESS & ACHIEVEMENTS</h3>
-                                    <p class="text-gray-700 leading-relaxed preserve-whitespace">₦{monthlyReport.progress}</p>
+                                    <p class="text-gray-700 leading-relaxed preserve-whitespace">${monthlyReport.progress}</p>
                                 </div>
                                 ` : ''}
 
-                                ₦{monthlyReport.strengthsWeaknesses ? `
+                                ${monthlyReport.strengthsWeaknesses ? `
                                 <div class="mb-6">
                                     <h3 class="text-lg font-semibold text-green-700 mb-2 border-b pb-1">STRENGTHS AND WEAKNESSES</h3>
-                                    <p class="text-gray-700 leading-relaxed preserve-whitespace">₦{monthlyReport.strengthsWeaknesses}</p>
+                                    <p class="text-gray-700 leading-relaxed preserve-whitespace">${monthlyReport.strengthsWeaknesses}</p>
                                 </div>
                                 ` : ''}
 
-                                ₦{monthlyReport.recommendations ? `
+                                ${monthlyReport.recommendations ? `
                                 <div class="mb-6">
                                     <h3 class="text-lg font-semibold text-green-700 mb-2 border-b pb-1">RECOMMENDATIONS</h3>
-                                    <p class="text-gray-700 leading-relaxed preserve-whitespace">₦{monthlyReport.recommendations}</p>
+                                    <p class="text-gray-700 leading-relaxed preserve-whitespace">${monthlyReport.recommendations}</p>
                                 </div>
                                 ` : ''}
 
-                                ₦{monthlyReport.generalComments ? `
+                                ${monthlyReport.generalComments ? `
                                 <div class="mb-6">
                                     <h3 class="text-lg font-semibold text-green-700 mb-2 border-b pb-1">GENERAL TUTOR'S COMMENTS</h3>
-                                    <p class="text-gray-700 leading-relaxed preserve-whitespace">₦{monthlyReport.generalComments}</p>
+                                    <p class="text-gray-700 leading-relaxed preserve-whitespace">${monthlyReport.generalComments}</p>
                                 </div>
                                 ` : ''}
 
                                 <div class="text-right mt-8 pt-4 border-t">
                                     <p class="text-gray-600">Best regards,</p>
-                                    <p class="font-semibold text-green-800">₦{monthlyReport.tutorName || 'N/A'}</p>
+                                    <p class="font-semibold text-green-800">${monthlyReport.tutorName || 'N/A'}</p>
                                 </div>
 
                                 <div class="mt-6 text-center">
-                                    <button onclick="downloadMonthlyReport(₦{studentIndex}, ₦{monthlyIndex}, '₦{fullName}')" class="bg-green-600 text-white px-6 py-2 rounded-lg font-semibold hover:bg-green-700 transition-all duration-200">
+                                    <button onclick="downloadMonthlyReport(${studentIndex}, ${monthlyIndex}, '${fullName}')" class="bg-green-600 text-white px-6 py-2 rounded-lg font-semibold hover:bg-green-700 transition-all duration-200">
                                         Download Monthly Report PDF
                                     </button>
                                 </div>
@@ -1432,9 +1432,9 @@ async function loadAllReportsForParent(parentPhone, userId) {
 }
 
 function downloadSessionReport(studentIndex, sessionIndex, studentName, type) {
-    const element = document.getElementById(`₦{type}-block-₦{studentIndex}-₦{sessionIndex}`);
+    const element = document.getElementById(`${type}-block-${studentIndex}-${sessionIndex}`);
     const safeStudentName = studentName.replace(/ /g, '_');
-    const fileName = `₦{type === 'assessment' ? 'Assessment' : 'Monthly'}_Report_₦{safeStudentName}.pdf`;
+    const fileName = `${type === 'assessment' ? 'Assessment' : 'Monthly'}_Report_${safeStudentName}.pdf`;
     const opt = { margin: 0.5, filename: fileName, image: { type: 'jpeg', quality: 0.98 }, html2canvas: { scale: 2, useCORS: true }, jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' } };
     html2pdf().from(element).set(opt).save();
 }
@@ -1461,12 +1461,12 @@ function showMessage(message, type) {
     }
 
     const messageDiv = document.createElement('div');
-    messageDiv.className = `message-toast fixed top-4 right-4 p-4 rounded-lg shadow-lg z-50 max-w-sm ₦{
+    messageDiv.className = `message-toast fixed top-4 right-4 p-4 rounded-lg shadow-lg z-50 max-w-sm ${
         type === 'error' ? 'bg-red-500 text-white' : 
         type === 'success' ? 'bg-green-500 text-white' : 
         'bg-blue-500 text-white'
     }`;
-    messageDiv.textContent = `BKH says: ₦{message}`;
+    messageDiv.textContent = `BKH says: ${message}`;
     
     document.body.appendChild(messageDiv);
     
@@ -1560,4 +1560,3 @@ document.addEventListener('DOMContentLoaded', function() {
     document.getElementById("rewardsTab")?.addEventListener("click", () => switchMainTab('rewards'));
     // --- END: NEW MAIN TAB SWITCHING LISTENERS (PHASE 3) ---
 });
-
