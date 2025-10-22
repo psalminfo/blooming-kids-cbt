@@ -48,6 +48,7 @@
         .hidden { 
             display: none !important; 
         }
+        /* Auth Tabs */
         .tab-active {
             background-color: #059669;
             color: white;
@@ -55,6 +56,15 @@
         .tab-inactive {
             background-color: #d1fae5;
             color: #065f46;
+        }
+        /* NEW: Main Content Tabs */
+        .tab-active-main {
+            background-color: #10b981;
+            color: white;
+        }
+        .tab-inactive-main {
+            background-color: #ecfdf5;
+            color: #059669;
         }
         .fade-in {
             animation: fadeIn 0.5s ease-in;
@@ -118,12 +128,9 @@
     </style>
 </head>
 <body class="flex flex-col items-center p-4">
-    <!-- Toast Notifications -->
     <div id="toastContainer"></div>
 
-    <!-- Main Container -->
     <div class="w-full max-w-6xl">
-        <!-- Logo Header -->
         <div class="text-center mb-8">
             <img src="https://res.cloudinary.com/dy2hxcyaf/image/upload/v1757700806/newbhlogo_umwqzy.svg" 
                  alt="Blooming Kids House Logo" 
@@ -132,9 +139,7 @@
             <p class="text-green-600 text-lg">Secure Access to Your Children's Progress Reports</p>
         </div>
 
-        <!-- Authentication Area -->
         <div id="authArea" class="bg-white rounded-2xl card-glow p-8 mb-8 fade-in">
-            <!-- Tab Navigation -->
             <div class="flex mb-6 rounded-xl overflow-hidden border border-green-200">
                 <button id="signInTab" class="flex-1 py-3 font-semibold tab-active transition-all duration-200">
                     Sign In
@@ -144,7 +149,6 @@
                 </button>
             </div>
 
-            <!-- Sign In Form -->
             <div id="signInForm">
                 <h2 class="text-2xl font-bold text-gray-800 mb-6 text-center">Welcome Back</h2>
                 
@@ -171,7 +175,6 @@
                                required>
                     </div>
 
-                    <!-- Remember Me Checkbox -->
                     <div class="flex items-center">
                         <input id="rememberMe" type="checkbox" class="h-4 w-4 text-green-600 focus:ring-green-500 border-gray-300 rounded">
                         <label for="rememberMe" class="ml-2 block text-sm text-gray-700">
@@ -193,7 +196,6 @@
                 </div>
             </div>
 
-            <!-- Sign Up Form -->
             <div id="signUpForm" class="hidden">
                 <h2 class="text-2xl font-bold text-gray-800 mb-6 text-center">Create Account</h2>
                 
@@ -256,9 +258,7 @@
             </div>
         </div>
 
-        <!-- Report Area -->
         <div id="reportArea" class="hidden fade-in">
-            <!-- Welcome Message and Navigation -->
             <div class="bg-green-50 border-l-4 border-green-600 p-6 rounded-lg mb-6">
                 <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                     <div>
@@ -278,25 +278,40 @@
                 </div>
             </div>
 
-            <h2 class="text-2xl font-bold text-green-800 mb-6">Your Children's Reports</h2>
-            
-            <!-- Loading State for Reports -->
-            <div id="reportsLoading" class="hidden text-center py-8">
-                <div class="loading-spinner mx-auto" style="width: 40px; height: 40px;"></div>
-                <p class="text-green-600 font-semibold mt-4">Loading reports...</p>
+            <div class="flex mb-6 rounded-xl overflow-hidden shadow-lg border border-green-200">
+                <button id="reportTab" class="flex-1 py-3 font-semibold tab-active-main hover:bg-green-500 transition-all duration-200">
+                    <span class="mr-2">📄</span> Progress Reports
+                </button>
+                <button id="rewardsTab" class="flex-1 py-3 font-semibold tab-inactive-main hover:bg-green-100 transition-all duration-200">
+                    <span class="mr-2">🎁</span> Rewards Dashboard
+                </button>
+            </div>
+
+            <div id="reportContentArea">
+                <h2 class="text-2xl font-bold text-green-800 mb-6">Your Children's Reports</h2>
+                
+                <div id="reportsLoading" class="hidden text-center py-8">
+                    <div class="loading-spinner mx-auto" style="width: 40px; height: 40px;"></div>
+                    <p class="text-green-600 font-semibold mt-4">Loading reports...</p>
+                </div>
+                
+                <div id="reportsEmpty" class="hidden text-center py-12 bg-white rounded-xl card-glow">
+                    <div class="text-6xl mb-4">📬</div>
+                    <h3 class="text-xl font-bold text-gray-700 mb-2">No Reports Available</h3>
+                    <p class="text-gray-500 max-w-md mx-auto">No progress reports are available for your children at this time. Please check back later.</p>
+                </div>
+                
+                <div id="reportContent" class="space-y-6">
+                    </div>
             </div>
             
-            <!-- Empty State for Reports -->
-            <div id="reportsEmpty" class="hidden text-center py-12 bg-white rounded-xl card-glow">
-                <div class="text-6xl mb-4">📊</div>
-                <h3 class="text-xl font-bold text-gray-700 mb-2">No Reports Available</h3>
-                <p class="text-gray-500 max-w-md mx-auto">No progress reports are available for your children at this time. Please check back later.</p>
+            <div id="rewardsContentArea" class="hidden">
+                <h2 class="text-2xl font-bold text-green-800 mb-6">Parent Referral Rewards</h2>
+                <div id="rewardsContent" class="bg-white rounded-xl card-glow p-6 min-h-[400px]">
+                    </div>
             </div>
-            
-            <div id="reportContent" class="space-y-6"></div>
         </div>
 
-        <!-- Feedback Modal -->
         <div id="feedbackModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden z-50 p-4">
             <div class="bg-white rounded-2xl p-6 md:p-8 max-w-2xl w-full mx-auto card-glow max-h-[90vh] overflow-y-auto">
                 <div class="flex justify-between items-center mb-6">
@@ -382,7 +397,6 @@
             </div>
         </div>
 
-        <!-- View Responses Modal -->
         <div id="responsesModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden z-50 p-4">
             <div class="bg-white rounded-2xl p-6 md:p-8 max-w-4xl w-full mx-auto card-glow max-h-[90vh] overflow-y-auto">
                 <div class="flex justify-between items-center mb-6">
@@ -393,8 +407,7 @@
                 </div>
                 
                 <div id="responsesContent" class="space-y-4">
-                    <!-- Responses will be loaded here -->
-                </div>
+                    </div>
 
                 <div class="mt-6 text-center">
                     <button onclick="hideResponsesModal()" 
@@ -405,25 +418,6 @@
             </div>
         </div>
 
-        <!-- Rewards Dashboard Modal -->
-        <div id="rewardsModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden z-50 p-4">
-            <div class="bg-white rounded-2xl shadow-xl w-full max-w-4xl mx-4 max-h-[90vh] overflow-hidden">
-                <div class="bg-gradient-to-r from-purple-600 to-green-600 p-6 text-white">
-                    <div class="flex justify-between items-center">
-                        <h2 class="text-2xl font-bold">🎁 Your Rewards Dashboard</h2>
-                        <button onclick="hideRewardsDashboard()" class="text-white hover:text-gray-200 text-2xl font-bold">&times;</button>
-                    </div>
-                    <p class="mt-2 opacity-90">Track your referrals and earnings</p>
-                </div>
-                <div class="p-6 overflow-y-auto max-h-[calc(90vh-120px)]">
-                    <div id="rewardsContent">
-                        <!-- Rewards content will be loaded here -->
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Password Reset Modal -->
         <div id="passwordResetModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden z-50 p-4">
             <div class="bg-white rounded-2xl p-6 md:p-8 max-w-md w-full mx-auto card-glow">
                 <h3 class="text-2xl font-bold text-gray-800 mb-4 text-center">Reset Password</h3>
@@ -461,7 +455,6 @@
             </div>
         </div>
 
-        <!-- Footer -->
         <div class="text-center mt-12">
             <p class="text-green-800 font-semibold">BLOOMING KIDS HOUSE</p>
             <p class="text-green-600 text-sm">Where Every Child Blossoms</p>
@@ -471,4 +464,3 @@
     <script src="parent.js"></script>
 </body>
 </html>
-[file content end]
