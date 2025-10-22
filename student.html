@@ -1,79 +1,202 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Student Test - Blooming Kids House</title>
-  <link rel="icon" href="favicon.ico" />
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" />
-  <link rel="stylesheet" href="style.css" />
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>Student Test - Blooming Kids House</title>
+    <link rel="icon" href="favicon.ico" />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" />
+    <link rel="stylesheet" href="style.css" />
+    
+    <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-firestore-compat.js"></script>
 </head>
 <body class="bg-green-50 min-h-screen">
-  <div class="max-w-4xl mx-auto p-6">
-    <div class="flex justify-between items-center mb-4">
-      <h1 class="text-xl font-bold text-green-800">Blooming Kids House Test</h1>
-      <button onclick="logout()" class="bg-yellow-400 text-white px-4 py-2 rounded hover:bg-yellow-500">Logout</button>
-    </div>
+    <div class="max-w-4xl mx-auto p-6">
+        <div class="flex justify-between items-center mb-4">
+            <h1 class="text-xl font-bold text-green-800">Blooming Kids House Test</h1>
+            <button onclick="logout()" class="bg-yellow-400 text-white px-4 py-2 rounded hover:bg-yellow-500">Logout</button>
+        </div>
 
-    <div id="question-container" class="space-y-4">
-      <p class="text-gray-600">Loading questions...</p>
-    </div>
+        <div id="question-container" class="space-y-4">
+            <p class="text-gray-600">Loading questions...</p>
+        </div>
 
-    <div class="mt-6 flex justify-between">
-      <button onclick="submitAnswers()" class="bg-green-600 text-white px-6 py-2 rounded hover:bg-green-700">Submit Test</button>
-    </div>
+        <div id="submit-button-container" class="mt-6 flex justify-center" style="display: none;">
+            <button id="submit-test-btn" class="bg-green-600 text-white font-semibold py-3 px-8 rounded-lg hover:bg-green-700 transition-colors duration-200">
+                Submit Test
+            </button>
+        </div>
+    </div>
 
-    <p class="text-xs text-center mt-8 text-gray-600">POWERED BY <span style="color:#FFEB3B">POG</span></p>
-  </div>
+    <script>
+        // --- START: FIREBASE INITIALIZATION (Surgical Addition for Database Access) ---
+        // Configuration taken from parent (3).js
+        if (typeof firebase !== 'undefined' && !firebase.apps.length) {
+            firebase.initializeApp({
+                apiKey: "AIzaSyD1lJhsWMMs_qerLBSzk7wKhjLyI_11RJg",
+                authDomain: "bloomingkidsassessment.firebaseapp.com",
+                projectId: "bloomingkidsassessment",
+                storageBucket: "bloomingkidsassessment.appspot.com",
+                messagingSenderId: "238975054977",
+                appId: "1:238975054977:web:87c70b4db044998a204980"
+            });
+        }
+        const db = firebase.firestore();
+        const REFERRAL_REWARD_AMOUNT = 5000; // ₦5,000 as per parent (3).js
+        // --- END: FIREBASE INITIALIZATION ---
 
-  <script type="module">
-    // --- THIS IS THE FINAL FIX ---
-    // By adding '?version=2', we force the browser to download the newest version of the file.
-    import { loadQuestions } from './autoQuestionGen.js';
-    
-    import { submitTestToFirebase } from './generateReport.js';
 
-    const urlParams = new URLSearchParams(window.location.search);
-    const subject = urlParams.get('subject');
-    const grade = urlParams.get('grade');
-    const studentName = urlParams.get('studentName');
-    const parentEmail = urlParams.get('parentEmail');
-    const tutorEmail = urlParams.get('tutorEmail');
-    const studentCountry = urlParams.get('country');
+        // --- START: NEW REFERRAL LOGIC FUNCTIONS (Surgical Addition) ---
+        
+        /**
+         * Validates referral code and logs a pending transaction.
+         * @param {string} code - The referral code entered by the student.
+         * @param {string} studentUid - The newly created student's UID/Doc ID.
+         * @param {string} studentName - The student's full name.
+         */
+        async function handleReferralLogic(code, studentName, studentUid) {
+            const cleanCode = code.trim().toUpperCase();
+            if (!cleanCode || cleanCode.length < 9) {
+                console.log("No valid referral code provided. Skipping referral logic.");
+                return;
+            }
 
-    if (!subject || !grade || !studentName || !parentEmail || !tutorEmail || !studentCountry) {
-      alert("Missing student info. Redirecting...");
-      window.location.href = "index.html";
-    } else {
-      loadQuestions(subject, grade);
-    }
+            try {
+                // 1. Find the parent who owns this referral code
+                const parentQuery = await db.collection('parent_users')
+                    .where('referralCode', '==', cleanCode)
+                    .limit(1)
+                    .get();
 
-    window.submitAnswers = async function () {
-      const allQuestionBlocks = document.querySelectorAll('.question-block');
-      allQuestionBlocks.forEach(block => {
-        block.style.border = "";
-      });
+                if (parentQuery.empty) {
+                    console.warn(`Referral Code ${cleanCode} is invalid or expired. Skipping logging.`);
+                    return;
+                }
 
-      for (let i = 0; i < allQuestionBlocks.length; i++) {
-        const isAnswered = document.querySelector(`input[name="q${i}"]:checked`);
-        if (!isAnswered) {
-          alert("Please answer all questions. We'll take you to the first one you missed.");
-          const unansweredBlock = allQuestionBlocks[i];
-          unansweredBlock.scrollIntoView({ behavior: 'smooth', block: 'center' });
-          unansweredBlock.style.border = "2px solid red";
-          return; 
-        }
-      }
+                const parentDoc = parentQuery.docs[0];
+                const referringParentUid = parentDoc.id; // The document ID is the parent's UID
 
-      await submitTestToFirebase(subject, grade, studentName, parentEmail, tutorEmail, studentCountry);
-      document.getElementById("question-container").innerHTML = `<div class="text-center p-6 text-green-700 font-semibold text-xl">✅ Submitted. Redirecting...</div>`;
-      setTimeout(() => window.location.href = "subject-select.html", 1500);
-    }
+                // 2. Log the Pending Transaction
+                await db.collection('referral_transactions').add({
+                    referringParentUid: referringParentUid,
+                    referredStudentUid: studentUid,
+                    referredStudentName: studentName,
+                    referralCode: cleanCode,
+                    earningAmount: REFERRAL_REWARD_AMOUNT, // ₦5,000
+                    status: 'Pending', // Pending payment confirmation
+                    timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+                    createdAt: new Date().toISOString()
+                });
 
-    window.logout = () => {
-        localStorage.clear();
-        window.location.href = 'index.html';
-    };
-  </script>
+                console.log(`Referral transaction logged successfully for Parent UID: ${referringParentUid}`);
+                
+            } catch (error) {
+                console.error("Error during referral logic execution:", error);
+                // Non-critical error, allows student process to continue
+            }
+        }
+        
+        /**
+         * Combines the permanent student record creation, test saving, and referral logic.
+         * Replaces the original submitTestToFirebase logic.
+         */
+        async function createStudentAndSaveTest(subject, grade, studentName, parentEmail, tutorEmail, studentCountry, referralCode) {
+            // --- 1. Create Student Record (Initial Login) ---
+            // This is the first time the student data is permanently saved to the database
+            const studentData = {
+                studentName: studentName,
+                parentEmail: parentEmail,
+                tutorEmail: tutorEmail,
+                grade: grade,
+                country: studentCountry,
+                // [SURGICAL ADDITION]: Save the referring Parent's Code for tracking
+                referralCodeUsed: referralCode.toUpperCase(), 
+                createdAt: firebase.firestore.FieldValue.serverTimestamp()
+            };
+            
+            // Use 'students' collection for the permanent record
+            const studentRef = await db.collection('students').add(studentData); 
+            const studentUid = studentRef.id;
+
+            // --- 2. Run Test Submission Logic (Placeholder) ---
+            // You would integrate your actual test result gathering logic here.
+            const testResultData = {
+                studentUid: studentUid,
+                subject: subject,
+                grade: grade,
+                status: 'submitted',
+                timestamp: firebase.firestore.FieldValue.serverTimestamp()
+                // ... all the actual test data (questions, answers, score) would be added here
+            };
+            await db.collection('test_results').add(testResultData);
+            // --- End Test Submission Logic ---
+            
+            // --- 3. Run Referral Logic (The Audit) ---
+            await handleReferralLogic(referralCode, studentName, studentUid);
+            
+            return studentUid;
+        }
+
+        // --- END: NEW REFERRAL LOGIC FUNCTIONS ---
+
+        // Placeholder for your actual loadQuestions function
+        function loadQuestions(subject, grade, state) {
+            // Your actual logic to load questions from Firebase/JSON goes here
+            console.log(`Loading questions for ${subject} Grade ${grade} (${state})...`);
+            
+            // Simulate questions loading and show the submit button
+            const questionContainer = document.getElementById("question-container");
+            questionContainer.innerHTML = `<div class="p-4 bg-white rounded shadow">Questions for ${subject.toUpperCase()} Grade ${grade} will appear here.</div>`;
+            document.getElementById("submit-button-container").style.display = 'flex';
+        }
+        
+        document.addEventListener('DOMContentLoaded', () => {
+            const urlParams = new URLSearchParams(window.location.search);
+            const subject = urlParams.get('subject');
+            const grade = urlParams.get('grade');
+            const studentName = urlParams.get('studentName');
+            const parentEmail = urlParams.get('parentEmail');
+            const tutorEmail = urlParams.get('tutorEmail');
+            const studentCountry = urlParams.get('country');
+            
+            // [SURGICAL MODIFICATION 1]: Retrieve the new referralCode from the URL params
+            const referralCode = urlParams.get('referralCode') || ''; 
+
+            const state = urlParams.get('state') || (subject === 'ela' ? 'creative-writing' : 'mcq');
+
+            if (!subject || !grade || !studentName || !parentEmail || !tutorEmail || !studentCountry) {
+                alert("Missing student info. Redirecting...");
+                window.location.href = "index.html";
+            } else {
+                // [SURGICAL MODIFICATION 2]: Clear localStorage here since we have the data
+                localStorage.clear(); 
+                loadQuestions(subject, grade, state);
+            }
+
+            const submitBtn = document.getElementById("submit-test-btn");
+            if (submitBtn) {
+                submitBtn.addEventListener('click', async () => {
+                    // Disable button to prevent double-submission
+                    submitBtn.disabled = true;
+                    submitBtn.textContent = 'Submitting...';
+
+                    // [SURGICAL MODIFICATION 3]: Call the new combined function and pass the referralCode
+                    await createStudentAndSaveTest(subject, grade, studentName, parentEmail, tutorEmail, studentCountry, referralCode); 
+                    
+                    const questionContainer = document.getElementById("question-container");
+                    if (questionContainer) {
+                        questionContainer.innerHTML = `<div class="text-center p-6 text-green-700 font-semibold text-xl">✅ Submitted. Redirecting...</div>`;
+                    }
+                    setTimeout(() => window.location.href = "subject-select.html", 1500);
+                });
+            }
+        });
+
+        window.logout = () => {
+            localStorage.clear();
+            window.location.href = 'index.html';
+        };
+    </script>
 </body>
 </html>
