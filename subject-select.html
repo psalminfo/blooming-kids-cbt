@@ -17,52 +17,41 @@
     </div>
 
     <div id="subjectButtons" class="space-y-4">
-      <!-- Subjects will be dynamically loaded here based on grade -->
-    </div>
+      </div>
     <p class="text-xs text-center mt-8 text-gray-600">POWERED BY <span style="color:#FFEB3B">POG</span></p>
   </div>
 
-  <script>
-    const studentDataString = localStorage.getItem('studentData');
-    const studentData = JSON.parse(studentDataString);
+<script>
+    // Global variable to hold student data
+    let studentData = null;
 
-    if (!studentData || !studentData.grade) {
-      alert("Missing student info. Please log in again.");
-      window.location.href = "index.html";
-    }
+    // Subject data array
+    const allSubjects = [
+        { id: 'math', name: 'Mathematics' },
+        { id: 'ela', name: 'English Language Arts' },
+        { id: 'science', name: 'Science' },
+        { id: 'history', name: 'History' },
+        { id: 'geography', name: 'Geography' }
+    ];
 
-    function loadSubjectsBasedOnGrade() {
+    // Function to load subjects based on grade
+    function loadSubjects(grade) {
       const subjectButtons = document.getElementById('subjectButtons');
-      const grade = parseInt(studentData.grade);
-      
-      // Always show Math and ELA for all grades
-      let subjects = [
-        { id: 'math', name: 'Math' },
-        { id: 'ela', name: 'English Language Arts' }
-      ];
+      subjectButtons.innerHTML = ''; // Clear previous buttons
 
-      // Add Science for grades 5-7
-      if (grade >= 5 && grade <= 7) {
-        subjects.push({ id: 'science', name: 'Science' });
+      // Filter subjects based on grade
+      let availableSubjects = allSubjects;
+      if (grade <= 4) {
+        availableSubjects = allSubjects.filter(s => s.id === 'math' || s.id === 'ela');
+      } else if (grade >= 5 && grade <= 7) {
+        availableSubjects = allSubjects.filter(s => s.id === 'math' || s.id === 'ela' || s.id === 'science');
       }
-      
-      // Add all Science subjects for grades 8 and above
-      if (grade >= 8) {
-        subjects.push(
-          { id: 'biology', name: 'Biology' },
-          { id: 'physics', name: 'Physics' },
-          { id: 'chemistry', name: 'Chemistry' }
-        );
-      }
+      // Grades 8-12 get all subjects
 
-      // Clear existing buttons
-      subjectButtons.innerHTML = '';
-
-      // Create buttons for each subject
-      subjects.forEach(subject => {
+      availableSubjects.forEach(subject => {
         const button = document.createElement('button');
+        button.className = 'w-full bg-green-500 text-white py-3 rounded-lg font-semibold hover:bg-green-600 transition-colors duration-200';
         button.textContent = subject.name;
-        button.className = 'bg-green-600 text-white w-full py-2 rounded hover:bg-green-700 transition-colors duration-200';
         button.onclick = () => goToSubject(subject.id);
         subjectButtons.appendChild(button);
       });
@@ -80,6 +69,7 @@
       subjectButtons.appendChild(infoText);
     }
 
+    // CRITICAL UPDATE: Function to pass data to student.html
     function goToSubject(subject) {
       const params = new URLSearchParams({
         subject: subject,
@@ -87,7 +77,9 @@
         parentEmail: studentData.parentEmail,
         grade: studentData.grade,
         tutorEmail: studentData.tutorEmail,
-        country: studentData.country
+        country: studentData.country,
+        // CRITICAL ADDITION: This line ensures the referral code is passed!
+        referralCode: studentData.referralCode || '' 
       });
       
       // AUTO-ADD creative-writing state for ELA
@@ -98,15 +90,24 @@
       window.location.href = `student.html?${params.toString()}`;
     }
 
+    // Initial load logic
+    document.addEventListener('DOMContentLoaded', () => {
+        const storedData = localStorage.getItem('studentData');
+        if (storedData) {
+            studentData = JSON.parse(storedData);
+            loadSubjects(parseInt(studentData.grade));
+        } else {
+            // If no data is found, redirect to login
+            alert("Session expired or missing data. Please log in again.");
+            window.location.href = 'index.html';
+        }
+    });
+
     // The logout function
     window.logout = function() {
       localStorage.clear(); // Clears the student's login data
       window.location.href = 'index.html';
-    }
-
-    // Load subjects when page loads
-    document.addEventListener('DOMContentLoaded', loadSubjectsBasedOnGrade);
-  </script>
-
+    };
+</script>
 </body>
 </html>
