@@ -5,9 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
     <title>Student Login - Blooming Kids House</title>
     <link rel="icon" href="favicon.ico" />
-    <!-- Tailwind CSS for styling -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Google Fonts for better typography -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700;800&display=swap" rel="stylesheet">
@@ -34,21 +32,16 @@
 </head>
 <body class="min-h-screen flex items-center justify-center p-4">
 
-    <!-- Main Login Card -->
     <div class="bg-white p-8 md:p-10 rounded-2xl shadow-2xl w-full max-w-md transform transition-all hover:scale-105 duration-300">
 
-        <!-- Your Logo Here -->
         <div class="text-center mb-6">
-            <!-- This now points to your permanent Cloudinary logo URL -->
             <img src="https://res.cloudinary.com/dy2hxcyaf/image/upload/v1755632720/Untitled_design_6_ypmacf.png" alt="Blooming Kids House Logo" class="mx-auto h-20 w-auto">
         </div>
 
-        <!-- Updated Original Headings -->
         <h1 class="text-3xl brand-heading text-green-900 text-center mb-6">BLOOMING KIDS HOUSE</h1>
         <h2 class="text-2xl font-bold text-green-800 text-center mb-8">Student Login</h2>
 
         <form id="studentLoginForm" class="space-y-5">
-            <!-- Input fields with better styling -->
             <input type="text" id="studentName" placeholder="Full Name" required class="w-full px-4 py-3 border border-gray-200 rounded-lg form-input transition-colors duration-300 focus:border-green-500" />
             <input type="email" id="parentEmail" placeholder="Parent's Email" required class="w-full px-4 py-3 border border-gray-200 rounded-lg form-input transition-colors duration-300 focus:border-green-500" />
             <input type="tel" id="parentPhone" placeholder="Parent's Phone Number" required class="w-full px-4 py-3 border border-gray-200 rounded-lg form-input transition-colors duration-300 focus:border-green-500" />
@@ -75,21 +68,30 @@
                 <option value="Switzerland">Switzerland</option>
                 <option value="Germany">Germany</option>
             </select>
+            
+            <div class="mb-4">
+                <label for="referralCode" class="block text-gray-700 font-medium mb-2">Referral Code (Optional)</label>
+                <input type="text"
+                       id="referralCode"
+                       name="referralCode"
+                       placeholder="Enter Parent's Referral Code (e.g., BKH4X8T2Y)"
+                       class="w-full px-4 py-3 border border-gray-200 rounded-lg form-input transition-colors duration-300 focus:border-green-500"
+                       maxlength="9"
+                       style="text-transform: uppercase;"> 
+                <p class="text-xs text-gray-500 mt-1">If you were referred by an existing parent, enter their code here.</p>
+            </div>
             <input type="text" id="accessCode" placeholder="Access Code (e.g., bkh2025)" required class="w-full px-4 py-3 border border-gray-200 rounded-lg form-input transition-colors duration-300 focus:border-green-500" />
             
-            <!-- Enhanced Login Button -->
             <button type="submit" class="w-full py-3 font-semibold text-white bg-green-600 rounded-lg hover:bg-green-700 focus:outline-none focus:ring-4 focus:ring-green-300 transition-all duration-300 transform hover:scale-105">
                 Login
             </button>
         </form>
 
-        <!-- Footer -->
         <p class="text-xs text-center mt-8 text-gray-500">
             POWERED BY <span class="font-bold text-yellow-500">POG</span>
         </p>
     </div>
 
-    <!-- The login logic remains the same -->
     <script type="module" src="student-login.js"></script>
 </body>
 </html>
