@@ -25,30 +25,65 @@
     // Global variable to hold student data
     let studentData = null;
 
-    // Subject data array
+    // Define all subjects, including specific high school sciences (from original subject-select.html logic)
     const allSubjects = [
         { id: 'math', name: 'Mathematics' },
         { id: 'ela', name: 'English Language Arts' },
-        { id: 'science', name: 'Science' },
-        { id: 'history', name: 'History' },
+        { id: 'science', name: 'Science' },         // General science (used for grades 5-7)
+        { id: 'biology', name: 'Biology' },         // Specific science (used for grades 8+)
+        { id: 'physics', name: 'Physics' },         // Specific science (used for grades 8+)
+        { id: 'chemistry', name: 'Chemistry' },     // Specific science (used for grades 8+)
+        // Additional subjects from subject-select1.html:
+        { id: 'history', name: 'History' },         
         { id: 'geography', name: 'Geography' }
     ];
 
-    // Function to load subjects based on grade
+    /**
+     * Filters and displays subject buttons based on the student's grade.
+     * @param {number} grade The student's grade level.
+     */
     function loadSubjects(grade) {
       const subjectButtons = document.getElementById('subjectButtons');
       subjectButtons.innerHTML = ''; // Clear previous buttons
 
-      // Filter subjects based on grade
-      let availableSubjects = allSubjects;
-      if (grade <= 4) {
-        availableSubjects = allSubjects.filter(s => s.id === 'math' || s.id === 'ela');
-      } else if (grade >= 5 && grade <= 7) {
-        availableSubjects = allSubjects.filter(s => s.id === 'math' || s.id === 'ela' || s.id === 'science');
-      }
-      // Grades 8-12 get all subjects
+      let subjectsToDisplay = [];
+      let infoTextContent = '';
 
-      availableSubjects.forEach(subject => {
+      if (grade <= 4) {
+        // Grades <= 4: Math and ELA
+        subjectsToDisplay = allSubjects.filter(s => s.id === 'math' || s.id === 'ela');
+        infoTextContent = `Grade ${grade}: Math and English available`;
+      } else if (grade >= 5 && grade <= 7) {
+        // Grades 5-7: Math, ELA, and General Science
+        subjectsToDisplay = allSubjects.filter(s => s.id === 'math' || s.id === 'ela' || s.id === 'science');
+        infoTextContent = `Grade ${grade}: Math, English, and Science available`;
+      } else {
+        // Grades >= 8: Math, ELA, and specific sciences (Biology, Physics, Chemistry)
+        // This combines the high-grade subject lists to offer the most specialized options.
+        subjectsToDisplay = allSubjects.filter(s => 
+            s.id === 'math' || 
+            s.id === 'ela' || 
+            s.id === 'biology' || 
+            s.id === 'physics' || 
+            s.id === 'chemistry' || 
+            s.id === 'history' || 
+            s.id === 'geography'
+        );
+        infoTextContent = `Grade ${grade}: All advanced subjects available`;
+      }
+      
+      // Ensure only unique subjects are displayed
+      const uniqueSubjects = [];
+      const subjectIds = new Set();
+      subjectsToDisplay.forEach(subject => {
+        if (!subjectIds.has(subject.id)) {
+            subjectIds.add(subject.id);
+            uniqueSubjects.push(subject);
+        }
+      });
+      
+      // Create buttons
+      uniqueSubjects.forEach(subject => {
         const button = document.createElement('button');
         button.className = 'w-full bg-green-500 text-white py-3 rounded-lg font-semibold hover:bg-green-600 transition-colors duration-200';
         button.textContent = subject.name;
@@ -59,17 +94,15 @@
       // Show grade info
       const infoText = document.createElement('p');
       infoText.className = 'text-sm text-gray-600 text-center mt-4';
-      if (grade <= 4) {
-        infoText.textContent = `Grade ${grade}: Math and English available`;
-      } else if (grade >= 5 && grade <= 7) {
-        infoText.textContent = `Grade ${grade}: Math, English, and Science available`;
-      } else {
-        infoText.textContent = `Grade ${grade}: All subjects available`;
-      }
+      infoText.textContent = infoTextContent;
       subjectButtons.appendChild(infoText);
     }
 
-    // CRITICAL UPDATE: Function to pass data to student.html
+    /**
+     * Prepares data and redirects to student.html.
+     * *** CRITICAL: Includes referralCode from subject-select1.html logic. ***
+     * @param {string} subject The selected subject ID.
+     */
     function goToSubject(subject) {
       const params = new URLSearchParams({
         subject: subject,
@@ -90,12 +123,21 @@
       window.location.href = `student.html?${params.toString()}`;
     }
 
-    // Initial load logic
+    // Initial load logic (robust checking using DOMContentLoaded)
     document.addEventListener('DOMContentLoaded', () => {
         const storedData = localStorage.getItem('studentData');
         if (storedData) {
-            studentData = JSON.parse(storedData);
-            loadSubjects(parseInt(studentData.grade));
+            try {
+                studentData = JSON.parse(storedData);
+                // Ensure grade is a number for comparison
+                const grade = parseInt(studentData.grade);
+                if (isNaN(grade)) throw new Error("Invalid grade data.");
+                loadSubjects(grade);
+            } catch (e) {
+                console.error("Error parsing student data:", e);
+                alert("Session data is corrupted. Please log in again.");
+                window.location.href = 'index.html';
+            }
         } else {
             // If no data is found, redirect to login
             alert("Session expired or missing data. Please log in again.");
