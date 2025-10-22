@@ -857,7 +857,7 @@ async function loadReferralRewards(parentUid) {
                 <div class="bg-green-50 p-6 rounded-xl border border-green-200">
                     <h3 class="text-xl font-bold text-green-800 mb-2">Your Referral Code</h3>
                     <div class="flex flex-col sm:flex-row items-center justify-between">
-                        <p class="text-3xl font-extrabold text-green-600 tracking-wider p-2 bg-white rounded-lg border-2 border-dashed border-green-400 mb-4 sm:mb-0">${referralCode}</p>
+                        <p class="text-3xl font-extrabold text-green-600 tracking-wider p-2 bg-white rounded-lg border-2 border-dashed border-green-400 mb-4 sm:mb-0">₦{referralCode}</p>
                         <button onclick="navigator.clipboard.writeText('${referralCode}'); showMessage('Code copied!', 'success');"
                                 class="bg-green-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-green-700 transition-all duration-200">
                             Copy Code
@@ -868,7 +868,7 @@ async function loadReferralRewards(parentUid) {
                 
                 <div class="bg-blue-50 p-6 rounded-xl border border-blue-200">
                     <h3 class="text-xl font-bold text-blue-800 mb-2">Total Estimated Earnings</h3>
-                    <p class="text-4xl font-extrabold text-blue-600">$${referralEarnings.toFixed(2)}</p>
+                    <p class="text-4xl font-extrabold text-blue-600">₦{referralEarnings.toFixed(2)}</p>
                     <p class="text-sm text-gray-500 mt-2">This amount reflects earnings from approved referrals. Payments are processed monthly.</p>
                 </div>
                 
@@ -1560,3 +1560,4 @@ document.addEventListener('DOMContentLoaded', function() {
     document.getElementById("rewardsTab")?.addEventListener("click", () => switchMainTab('rewards'));
     // --- END: NEW MAIN TAB SWITCHING LISTENERS (PHASE 3) ---
 });
+
