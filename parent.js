@@ -937,6 +937,10 @@ async function loadAllReportsForParent(parentPhone, userId) {
                     
                     // Add View Responses button to welcome section
                     addViewResponsesButton();
+                    
+                    // Load initial referral data for the rewards dashboard tab (must be done after auth/cache check)
+                    loadReferralRewards(userId);
+
                     return;
                 }
             }
@@ -949,11 +953,38 @@ async function loadAllReportsForParent(parentPhone, userId) {
         // FIND PARENT NAME FROM SAME SOURCES AS TUTOR.JS
         let parentName = await findParentNameFromStudents(parentPhone);
         
-        // If not found in students collections, try user document
+        // Get parent's email and latest user data from their account document
+        const userDocRef = db.collection('parent_users').doc(userId);
+        let userDoc = await userDocRef.get();
+        let userData = userDoc.data();
+        const parentEmail = userData.email;
+
+        // --- START: REFERRAL CODE CHECK/GENERATION FOR EXISTING USERS (FIX) ---
+        if (!userData.referralCode) {
+            console.log("Existing user detected without a referral code. Generating and assigning now.");
+            try {
+                const newReferralCode = await generateReferralCode();
+                await userDocRef.update({
+                    referralCode: newReferralCode,
+                    referralEarnings: userData.referralEarnings || 0 // Initialize if missing
+                });
+                
+                // Re-fetch updated user data
+                userDoc = await userDocRef.get();
+                userData = userDoc.data();
+                console.log("Referral code assigned successfully:", newReferralCode);
+                
+            } catch (error) {
+                console.error('Error auto-assigning referral code:', error);
+                // Non-critical failure, continue loading reports
+            }
+        }
+        // --- END: REFERRAL CODE CHECK/GENERATION FOR EXISTING USERS (FIX) ---
+
+
+        // If not found in students collections, use name from user document
         if (!parentName && userId) {
-            const userDoc = await db.collection('parent_users').doc(userId).get();
             if (userDoc.exists) {
-                const userData = userDoc.data();
                 parentName = userData.parentName;
             }
         }
@@ -973,20 +1004,15 @@ async function loadAllReportsForParent(parentPhone, userId) {
         welcomeMessage.textContent = `Welcome, ${currentUserData.parentName}!`;
 
         // Update parent name in user document if we found a better one
-        if (userId && parentName && parentName !== 'Parent') {
+        if (userId && parentName && parentName !== 'Parent' && userData.parentName !== parentName) {
             try {
-                await db.collection('parent_users').doc(userId).update({
+                await userDocRef.update({
                     parentName: parentName
                 });
             } catch (error) {
                 console.error('Error updating parent name:', error);
             }
         }
-
-        // Get parent's email from their account
-        const userDoc = await db.collection('parent_users').doc(userId).get();
-        const userData = userDoc.data();
-        const parentEmail = userData.email;
 
         console.log("🔍 Searching reports with:", { parentPhone, parentEmail });
 
@@ -1041,6 +1067,10 @@ async function loadAllReportsForParent(parentPhone, userId) {
         if (studentResults.length === 0 && monthlyReports.length === 0) {
             showMessage(`No reports found for your account. Please contact Blooming Kids House if you believe this is an error.`, 'info');
             authLoader.classList.add("hidden");
+            
+            // Load initial referral data for the rewards dashboard tab even if no reports
+            loadReferralRewards(userId);
+
             return;
         }
         
