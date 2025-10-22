@@ -8,6 +8,9 @@ document.getElementById("studentLoginForm").addEventListener("submit", function 
   const tutorEmail = document.getElementById("tutorEmail").value;
   const country = document.getElementById("country").value;
   const accessCode = document.getElementById("accessCode").value;
+  
+  // [SURGICAL ADDITION 1]: Safely retrieve and clean the new Referral Code input value.
+  const referralCode = document.getElementById("referralCode")?.value.trim() || ''; 
 
   if (accessCode !== "bkh2025") {
     alert("Invalid access code");
@@ -20,7 +23,9 @@ document.getElementById("studentLoginForm").addEventListener("submit", function 
     parentPhone,
     grade,
     tutorEmail,
-    country
+    country,
+    // [SURGICAL ADDITION 2]: Add the referral code to the student data object for tracking.
+    referralCode 
   };
 
   // Save the single studentData object to localStorage
