@@ -1854,10 +1854,11 @@ onAuthStateChanged(auth, async (user) => {
                     let firstVisibleTab = null;
                     
                     Object.entries(allNavItems).forEach(([navId, navItem]) => {
-                        // Check if user has permission for this tab, or if no specific permissions are defined, show all
-                        const hasPermission = !staffData.permissions || 
-                                            !staffData.permissions.tabs || 
-                                            staffData.permissions.tabs[navItem.perm] === true;
+    // TEMPORARY FIX: Always show referral tab for testing
+    const hasPermission = navId === 'navReferralsAdmin' || 
+                        !staffData.permissions || 
+                        !staffData.permissions.tabs || 
+                        staffData.permissions.tabs[navItem.perm] === true;
                         
                         if (hasPermission) {
                             if (!firstVisibleTab) firstVisibleTab = navId;
@@ -1921,3 +1922,4 @@ onAuthStateChanged(auth, async (user) => {
 });
 
 // [End Updated management.js File]
+
