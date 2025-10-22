@@ -32,36 +32,146 @@ let unreadResponsesCount = 0; // Track unread responses
 // -------------------------------------------------------------------
 
 /**
- * PHASE 1: Generates a unique, alphanumeric referral code prefixed with 'BKH'.
- * Checks for uniqueness in the parent_users collection before returning.
- * @returns {string} The referral code (e.g., BKH4X8T2Y).
+ * Generates a unique, alphanumeric referral code prefixed with 'BKH'.
+ * Checks for uniqueness in the parent_users collection.
+ * @returns {string} A unique referral code (e.g., BKH7A3X9M)
  */
 async function generateReferralCode() {
-    const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-    let result = '';
+    const chars = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+    const prefix = 'BKH';
+    let code;
     let isUnique = false;
 
-    // Loop until a unique code is generated (highly unlikely to take more than 1 try)
     while (!isUnique) {
-        result = 'BKH'; // Prefix for Blooming Kids House
+        let suffix = '';
         for (let i = 0; i < 6; i++) {
-            result += characters.charAt(Math.floor(Math.random() * characters.length));
+            suffix += chars.charAt(Math.floor(Math.random() * chars.length));
         }
+        code = prefix + suffix;
 
-        const snapshot = await db.collection('parent_users')
-            .where('referralCode', '==', result)
-            .limit(1)
-            .get();
-
+        // Check uniqueness in Firestore
+        const snapshot = await db.collection('parent_users').where('referralCode', '==', code).limit(1).get();
         if (snapshot.empty) {
             isUnique = true;
         }
     }
-    return result;
+    return code;
+}
+
+/**
+ * Loads the parent's referral data for the Rewards Dashboard.
+ * @param {string} parentUid The UID of the current parent user.
+ */
+async function loadReferralRewards(parentUid) {
+    const rewardsContent = document.getElementById('rewardsContent');
+    rewardsContent.innerHTML = '<div class="text-center py-8"><div class="loading-spinner mx-auto" style="width: 40px; height: 40px;"></div><p class="text-green-600 font-semibold mt-4">Loading rewards data...</p></div>';
+
+    try {
+        // 1. Get the parent's referral code and current earnings
+        const userDoc = await db.collection('parent_users').doc(parentUid).get();
+        if (!userDoc.exists) {
+            rewardsContent.innerHTML = '<p class="text-red-500 text-center py-8">User data not found. Please sign in again.</p>';
+            return;
+        }
+        const userData = userDoc.data();
+        const referralCode = userData.referralCode || 'N/A';
+        const totalEarnings = userData.referralEarnings || 0;
+        
+        // 2. Query the referral_transactions collection for all transactions belonging to this code owner
+        const transactionsSnapshot = await db.collection('referral_transactions')
+            .where('ownerUid', '==', parentUid)
+            .orderBy('timestamp', 'desc')
+            .get();
+
+        let referralsHtml = '';
+        let pendingCount = 0;
+        let approvedCount = 0;
+        let paidCount = 0;
+
+        if (transactionsSnapshot.empty) {
+            referralsHtml = `
+                <tr><td colspan="4" class="text-center py-4 text-gray-500">No one has used your referral code yet.</td></tr>
+            `;
+        } else {
+            transactionsSnapshot.forEach(doc => {
+                const data = doc.data();
+                const status = data.status || 'pending';
+                const statusColor = status === 'paid' ? 'bg-green-100 text-green-800' : 
+                                    status === 'approved' ? 'bg-blue-100 text-blue-800' : 
+                                    'bg-yellow-100 text-yellow-800';
+                
+                if (status === 'pending') pendingCount++;
+                if (status === 'approved') approvedCount++;
+                if (status === 'paid') paidCount++;
+
+                const referredName = capitalize(data.referredStudentName || data.referredStudentPhone);
+                const rewardAmount = data.rewardAmount ? `₦${data.rewardAmount.toLocaleString()}` : '₦5,000';
+                const referralDate = data.timestamp?.toDate().toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }) || 'N/A';
+
+                referralsHtml += `
+                    <tr class="hover:bg-gray-50">
+                        <td class="px-4 py-3 text-sm font-medium text-gray-900">${referredName}</td>
+                        <td class="px-4 py-3 text-sm text-gray-500">${referralDate}</td>
+                        <td class="px-4 py-3 text-sm">
+                            <span class="inline-flex items-center px-3 py-0.5 rounded-full text-xs font-medium ${statusColor}">
+                                ${capitalize(status)}
+                            </span>
+                        </td>
+                        <td class="px-4 py-3 text-sm text-gray-900 font-bold">${rewardAmount}</td>
+                    </tr>
+                `;
+            });
+        }
+        
+        // Display the dashboard
+        rewardsContent.innerHTML = `
+            <div class="bg-blue-50 border-l-4 border-blue-600 p-4 rounded-lg mb-8 shadow-md">
+                <h2 class="text-2xl font-bold text-blue-800 mb-1">Your Referral Code</h2>
+                <p class="text-xl font-mono text-blue-600 tracking-wider p-2 bg-white inline-block rounded-lg border border-dashed border-blue-300 select-all">${referralCode}</p>
+                <p class="text-blue-700 mt-2">Share this code with other parents. They use it when registering their child, and you earn **₦5,000** once their child completes their first month!</p>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                <div class="bg-green-100 p-6 rounded-xl shadow-lg border-b-4 border-green-600">
+                    <p class="text-sm font-medium text-green-700">Total Earnings</p>
+                    <p class="text-3xl font-extrabold text-green-900 mt-1">₦${totalEarnings.toLocaleString()}</p>
+                </div>
+                <div class="bg-yellow-100 p-6 rounded-xl shadow-lg border-b-4 border-yellow-600">
+                    <p class="text-sm font-medium text-yellow-700">Approved Rewards (Awaiting Payment)</p>
+                    <p class="text-3xl font-extrabold text-yellow-900 mt-1">${approvedCount}</p>
+                </div>
+                <div class="bg-gray-100 p-6 rounded-xl shadow-lg border-b-4 border-gray-600">
+                    <p class="text-sm font-medium text-gray-700">Total Successful Referrals (Paid)</p>
+                    <p class="text-3xl font-extrabold text-gray-900 mt-1">${paidCount}</p>
+                </div>
+            </div>
+
+            <h3 class="text-xl font-bold text-gray-800 mb-4">Referral History</h3>
+            <div class="overflow-x-auto bg-white rounded-lg shadow">
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Referred Parent/Student</th>
+                            <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date Used</th>
+                            <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                            <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Reward</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-200">
+                        ${referralsHtml}
+                    </tbody>
+                </table>
+            </div>
+        `;
+        
+    } catch (error) {
+        console.error('Error loading referral rewards:', error);
+        rewardsContent.innerHTML = '<p class="text-red-500 text-center py-8">An error occurred while loading your rewards data. Please try again later.</p>';
+    }
 }
 
 // -------------------------------------------------------------------
-// END: NEW REFERRAL SYSTEM FUNCTIONS (PHASE 1 & 3)
+// END: NEW REFERRAL SYSTEM FUNCTIONS
 // -------------------------------------------------------------------
 
 // Remember Me Functionality
@@ -279,9 +389,10 @@ async function handleSignUp() {
 
         // Find parent name from existing data (SAME SOURCE AS TUTOR.JS)
         const parentName = await findParentNameFromStudents(cleanedPhone);
-
-        // PHASE 1: Generate Referral Code
-        const referralCode = await generateReferralCode(); // Await added here
+        
+        // --- START: REFERRAL SYSTEM INTEGRATION (PHASE 1) ---
+        const referralCode = await generateReferralCode();
+        // --- END: REFERRAL SYSTEM INTEGRATION (PHASE 1) ---
 
         // Store user data in Firestore for easy retrieval
         await db.collection('parent_users').doc(user.uid).set({
@@ -289,8 +400,10 @@ async function handleSignUp() {
             email: email,
             parentName: parentName || 'Parent', // Use found name or default
             createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-            referralCode: referralCode, // NEW: Save code
-            referralEarnings: 0 // NEW: Initialize earnings
+            // --- START: REFERRAL SYSTEM INTEGRATION (PHASE 1) ---
+            referralCode: referralCode, // Store the unique code
+            referralEarnings: 0,        // Initialize earnings
+            // --- END: REFERRAL SYSTEM INTEGRATION (PHASE 1) ---
         });
 
         showMessage('Account created successfully!', 'success');
@@ -778,164 +891,6 @@ function addViewResponsesButton() {
     }, 1000);
 }
 
-// PHASE 3: Load Referral Rewards Dashboard Data
-async function loadReferralRewards(parentUid) {
-    const rewardsContent = document.getElementById('rewardsContent');
-    rewardsContent.innerHTML = `<div class="text-center py-8"><div class="loading-spinner mx-auto" style="width: 40px; height: 40px;"></div><p class="text-green-600 font-semibold mt-4">Loading rewards data...</p></div>`;
-
-    try {
-        const userDoc = await db.collection('parent_users').doc(parentUid).get();
-        const userData = userDoc.data();
-        const referralCode = userData?.referralCode || 'N/A';
-        const referralEarnings = userData?.referralEarnings || 0;
-
-        // Query referral transactions for this parent, sorted by timestamp
-        // NOTE: This query requires a composite index on (ownerUid, timestamp)
-        const transactionsSnapshot = await db.collection('referral_transactions')
-            .where('ownerUid', '==', parentUid)
-            .orderBy('timestamp', 'desc')
-            .get();
-
-        let transactionsHtml = '';
-
-        if (transactionsSnapshot.empty) {
-            transactionsHtml = `
-                <div class="text-center py-8 bg-gray-50 rounded-lg">
-                    <p class="text-gray-500 font-semibold">No referrals have signed up yet. Share your code to start earning!</p>
-                </div>
-            `;
-        } else {
-            const tableRows = transactionsSnapshot.docs.map(doc => {
-                const data = doc.data();
-                const referredStudent = data.referredStudentName || 'N/A';
-                const date = data.timestamp?.toDate()?.toLocaleDateString() || 'N/A';
-                const status = data.status || 'Pending';
-                const earning = data.earningAmount ? `$${data.earningAmount.toFixed(2)}` : '$0.00';
-                
-                let statusColor = 'bg-yellow-100 text-yellow-800';
-                if (status === 'Approved') {
-                    statusColor = 'bg-green-100 text-green-800';
-                } else if (status === 'Paid') {
-                    statusColor = 'bg-blue-100 text-blue-800';
-                }
-
-                return `
-                    <tr class="border-t">
-                        <td class="px-4 py-2">${referredStudent}</td>
-                        <td class="px-4 py-2">${date}</td>
-                        <td class="px-4 py-2 text-center">${earning}</td>
-                        <td class="px-4 py-2 text-center">
-                            <span class="inline-block px-3 py-1 rounded-full text-sm font-semibold ${statusColor}">
-                                ${status}
-                            </span>
-                        </td>
-                    </tr>
-                `;
-            }).join('');
-
-            transactionsHtml = `
-                <div class="overflow-x-auto">
-                    <table class="min-w-full bg-white border border-gray-200 rounded-lg shadow-sm">
-                        <thead>
-                            <tr class="bg-gray-100 text-gray-600 uppercase text-sm leading-normal">
-                                <th class="py-3 px-4 text-left">Referred Student</th>
-                                <th class="py-3 px-4 text-left">Date</th>
-                                <th class="py-3 px-4 text-center">Earning</th>
-                                <th class="py-3 px-4 text-center">Status</th>
-                            </tr>
-                        </thead>
-                        <tbody class="text-gray-600 text-sm font-light">
-                            ${tableRows}
-                        </tbody>
-                    </table>
-                </div>
-            `;
-        }
-        
-        rewardsContent.innerHTML = `
-            <div class="space-y-6">
-                <div class="bg-green-50 p-6 rounded-xl border border-green-200">
-                    <h3 class="text-xl font-bold text-green-800 mb-2">Your Referral Code</h3>
-                    <div class="flex flex-col sm:flex-row items-center justify-between">
-                        <p class="text-3xl font-extrabold text-green-600 tracking-wider p-2 bg-white rounded-lg border-2 border-dashed border-green-400 mb-4 sm:mb-0">₦{referralCode}</p>
-                        <button onclick="navigator.clipboard.writeText('${referralCode}'); showMessage('Code copied!', 'success');"
-                                class="bg-green-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-green-700 transition-all duration-200">
-                            Copy Code
-                        </button>
-                    </div>
-                    <p class="text-sm text-gray-500 mt-3">Share this code with other parents! They use it when signing up their children.</p>
-                </div>
-                
-                <div class="bg-blue-50 p-6 rounded-xl border border-blue-200">
-                    <h3 class="text-xl font-bold text-blue-800 mb-2">Total Estimated Earnings</h3>
-                    <p class="text-4xl font-extrabold text-blue-600">₦{referralEarnings.toFixed(2)}</p>
-                    <p class="text-sm text-gray-500 mt-2">This amount reflects earnings from approved referrals. Payments are processed monthly.</p>
-                </div>
-                
-                <h3 class="text-xl font-bold text-gray-800 border-b pb-2">Referral History</h3>
-                ${transactionsHtml}
-            </div>
-        `;
-
-    } catch (error) {
-        console.error('Error loading referral rewards:', error);
-        // Display a more specific error message related to the index
-        if (error.code === 'failed-precondition' && error.message.includes('The query requires an index')) {
-            rewardsContent.innerHTML = `
-                <div class="text-center py-12 bg-red-50 border border-red-200 rounded-xl">
-                    <div class="text-4xl mb-4">⚠️</div>
-                    <h3 class="text-xl font-bold text-red-700 mb-2">Database Configuration Error</h3>
-                    <p class="text-red-600 max-w-lg mx-auto">
-                        To view your referral history, you must create a **Composite Index** in your Firebase Console. 
-                        Please check your browser's console for the exact link to create the index for 
-                        <code>referral_transactions</code> (on <code>ownerUid</code> and <code>timestamp</code> fields).
-                    </p>
-                </div>
-            `;
-        } else {
-            rewardsContent.innerHTML = `
-                <div class="text-center py-12 bg-red-50 border border-red-200 rounded-xl">
-                    <div class="text-4xl mb-4">❌</div>
-                    <h3 class="text-xl font-bold text-red-700 mb-2">Error Loading Data</h3>
-                    <p class="text-gray-500">Could not load referral rewards at this time.</p>
-                </div>
-            `;
-        }
-    }
-}
-
-// Function to switch between main tabs (Reports / Rewards)
-function switchMainTab(tabName) {
-    const reportContentArea = document.getElementById('reportContentArea');
-    const rewardsContentArea = document.getElementById('rewardsContentArea');
-    const reportTab = document.getElementById('reportTab');
-    const rewardsTab = document.getElementById('rewardsTab');
-
-    if (tabName === 'reports') {
-        reportContentArea.classList.remove('hidden');
-        rewardsContentArea.classList.add('hidden');
-        if (reportTab) {
-            reportTab.classList.add('tab-active-main');
-            reportTab.classList.remove('tab-inactive-main');
-        }
-        if (rewardsTab) {
-            rewardsTab.classList.add('tab-inactive-main');
-            rewardsTab.classList.remove('tab-active-main');
-        }
-    } else if (tabName === 'rewards') {
-        reportContentArea.classList.add('hidden');
-        rewardsContentArea.classList.remove('hidden');
-        if (rewardsTab) {
-            rewardsTab.classList.add('tab-active-main');
-            rewardsTab.classList.remove('tab-inactive-main');
-        }
-        if (reportTab) {
-            reportTab.classList.add('tab-inactive-main');
-            reportTab.classList.remove('tab-active-main');
-        }
-    }
-}
-
 // MAIN REPORT LOADING FUNCTION - FIXED COLLECTION NAME AND VARIABLE DECLARATION
 async function loadAllReportsForParent(parentPhone, userId) {
     const reportArea = document.getElementById("reportArea");
@@ -982,11 +937,6 @@ async function loadAllReportsForParent(parentPhone, userId) {
                     
                     // Add View Responses button to welcome section
                     addViewResponsesButton();
-                    
-                    // PHASE 3: Load rewards data and default to reports tab
-                    await loadReferralRewards(userId);
-                    switchMainTab('reports');
-                    
                     return;
                 }
             }
@@ -996,32 +946,15 @@ async function loadAllReportsForParent(parentPhone, userId) {
         }
         // --- END CACHE IMPLEMENTATION ---
 
-        // Find PARENT NAME FROM SAME SOURCES AS TUTOR.JS
+        // FIND PARENT NAME FROM SAME SOURCES AS TUTOR.JS
         let parentName = await findParentNameFromStudents(parentPhone);
         
-        // --- START NEW/UPDATED: FETCH USER DATA, RETRO-GENERATE CODE, AND UPDATE PARENT NAME ---
-        let userData;
-        const userDoc = await db.collection('parent_users').doc(userId).get();
-        
-        if (userDoc.exists) {
-            userData = userDoc.data();
-            
-            // Retroactively generate code if missing (NEW LOGIC)
-            if (!userData.referralCode) {
-                const newCode = await generateReferralCode(); // Await added here
-                console.log(`Retroactively generating referral code for user ${userId}: ${newCode}`);
-                await db.collection('parent_users').doc(userId).update({
-                    referralCode: newCode,
-                    referralEarnings: userData.referralEarnings || 0 // Ensure earnings field exists
-                });
-                userData.referralCode = newCode; // Update local copy
-                userData.referralEarnings = userData.referralEarnings || 0; // Update local copy
-                showMessage(`Referral code generated: ${newCode}`, 'info');
-            }
-            
-            // If parentName was not found in students collection, use name from user doc
-            if (!parentName && userData.parentName) {
-                 parentName = userData.parentName;
+        // If not found in students collections, try user document
+        if (!parentName && userId) {
+            const userDoc = await db.collection('parent_users').doc(userId).get();
+            if (userDoc.exists) {
+                const userData = userDoc.data();
+                parentName = userData.parentName;
             }
         }
 
@@ -1033,16 +966,14 @@ async function loadAllReportsForParent(parentPhone, userId) {
         // Store user data globally
         currentUserData = {
             parentName: parentName,
-            parentPhone: parentPhone,
-            referralCode: userData?.referralCode, // Added code
-            referralEarnings: userData?.referralEarnings
+            parentPhone: parentPhone
         };
 
         // UPDATE WELCOME MESSAGE WITH PARENT NAME
         welcomeMessage.textContent = `Welcome, ${currentUserData.parentName}!`;
 
         // Update parent name in user document if we found a better one
-        if (userId && parentName && parentName !== 'Parent' && userData?.parentName !== parentName) {
+        if (userId && parentName && parentName !== 'Parent') {
             try {
                 await db.collection('parent_users').doc(userId).update({
                     parentName: parentName
@@ -1051,10 +982,11 @@ async function loadAllReportsForParent(parentPhone, userId) {
                 console.error('Error updating parent name:', error);
             }
         }
-        // --- END NEW/UPDATED LOGIC ---
 
         // Get parent's email from their account
-        const parentEmail = userData?.email;
+        const userDoc = await db.collection('parent_users').doc(userId).get();
+        const userData = userDoc.data();
+        const parentEmail = userData.email;
 
         console.log("🔍 Searching reports with:", { parentPhone, parentEmail });
 
@@ -1108,13 +1040,8 @@ async function loadAllReportsForParent(parentPhone, userId) {
 
         if (studentResults.length === 0 && monthlyReports.length === 0) {
             showMessage(`No reports found for your account. Please contact Blooming Kids House if you believe this is an error.`, 'info');
-            document.getElementById('reportsEmpty').classList.remove('hidden');
-            document.getElementById('reportsLoading').classList.add('hidden');
             authLoader.classList.add("hidden");
             return;
-        } else {
-            document.getElementById('reportsEmpty').classList.add('hidden');
-            document.getElementById('reportsLoading').classList.add('hidden');
         }
         
         reportContent.innerHTML = "";
@@ -1419,9 +1346,9 @@ async function loadAllReportsForParent(parentPhone, userId) {
         // Add View Responses button to welcome section
         addViewResponsesButton();
         
-        // PHASE 3: Load rewards data and default to reports tab
-        await loadReferralRewards(userId);
-        switchMainTab('reports'); // Default to reports tab on login
+        // Load initial referral data for the rewards dashboard tab
+        // Note: This function will only run when the user is authenticated and the reports load successfully.
+        loadReferralRewards(userId);
 
     } catch (error) {
         console.error("Error loading reports:", error);
@@ -1499,6 +1426,42 @@ function switchTab(tab) {
     }
 }
 
+function switchMainTab(tab) {
+    const reportTab = document.getElementById('reportTab');
+    const rewardsTab = document.getElementById('rewardsTab');
+    
+    const reportContentArea = document.getElementById('reportContentArea');
+    const rewardsContentArea = document.getElementById('rewardsContentArea');
+    
+    // Deactivate all tabs
+    reportTab?.classList.remove('tab-active-main');
+    reportTab?.classList.add('tab-inactive-main');
+    rewardsTab?.classList.remove('tab-active-main');
+    rewardsTab?.classList.add('tab-inactive-main');
+    
+    // Hide all content areas
+    reportContentArea?.classList.add('hidden');
+    rewardsContentArea?.classList.add('hidden');
+    
+    // Activate selected tab and show content
+    if (tab === 'reports') {
+        reportTab?.classList.remove('tab-inactive-main');
+        reportTab?.classList.add('tab-active-main');
+        reportContentArea?.classList.remove('hidden');
+    } else if (tab === 'rewards') {
+        rewardsTab?.classList.remove('tab-inactive-main');
+        rewardsTab?.classList.add('tab-active-main');
+        rewardsContentArea?.classList.remove('hidden');
+        
+        // Reload rewards data when the tab is clicked to ensure it's up-to-date
+        const user = auth.currentUser;
+        if (user) {
+            loadReferralRewards(user.uid);
+        }
+    }
+}
+
+
 // Initialize the page
 document.addEventListener('DOMContentLoaded', function() {
     // Setup Remember Me
@@ -1513,7 +1476,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 .then((doc) => {
                     if (doc.exists) {
                         const userPhone = doc.data().phone;
-                        // loadAllReportsForParent now handles the retroactive code generation
                         loadAllReportsForParent(userPhone, user.uid);
                     }
                 })
@@ -1560,4 +1522,3 @@ document.addEventListener('DOMContentLoaded', function() {
     document.getElementById("rewardsTab")?.addEventListener("click", () => switchMainTab('rewards'));
     // --- END: NEW MAIN TAB SWITCHING LISTENERS (PHASE 3) ---
 });
-
