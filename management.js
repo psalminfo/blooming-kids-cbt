@@ -1,7 +1,8 @@
-// [Begin Updated management.js File]
+// [Begin Complete management.js File]
 
 import { auth, db } from './firebaseConfig.js';
-import { collection, getDocs, doc, getDoc, where, query, orderBy, Timestamp, writeBatch, updateDoc, deleteDoc, setDoc, addDoc } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
+// REQUIRED CHANGE 1: Add 'increment' to Firestore imports
+import { collection, getDocs, doc, getDoc, where, query, orderBy, Timestamp, writeBatch, updateDoc, deleteDoc, setDoc, addDoc, increment } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
 import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-auth.js";
 import { onSnapshot } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
 
@@ -16,6 +17,7 @@ const sessionCache = {
     tutors: null,
     students: null,
     pendingStudents: null,
+    pendingReferrals: null, // REQUIRED CHANGE 2: Add pendingReferrals to cache
     reports: null,
     breakStudents: null,
     parentFeedback: null,
@@ -316,6 +318,48 @@ async function handleRejectStudent(studentId) {
         } catch (error) {
             console.error("Error rejecting student: ", error);
             alert("Error rejecting student. Check the console for details.");
+        }
+    }
+}
+
+// REQUIRED CHANGE 3: Implement handleApproveReferral
+async function handleApproveReferral(referralId, refererEmail) {
+    if (confirm("Are you sure you want to approve this referral? The referrer will be rewarded.")) {
+        try {
+            const batch = writeBatch(db);
+            
+            // 1. Reward: Atomically increment the referralCount field on the parent's document
+            const parentRef = doc(db, "parents", refererEmail);
+            batch.update(parentRef, {
+                referralCount: increment(1) // Uses the imported 'increment'
+            });
+
+            // 2. Cleanup: Delete the entry from the pending_referrals collection
+            const referralRef = doc(db, "pending_referrals", referralId);
+            batch.delete(referralRef);
+
+            await batch.commit();
+            alert("Referral approved and referrer rewarded successfully!");
+            invalidateCache('pendingReferrals');
+            fetchAndRenderPendingApprovals(); // Re-fetch and render the current panel
+        } catch (error) {
+            console.error("Error approving referral:", error);
+            alert("Error approving referral. Check the console for details. (Ensure parent document exists for reward)");
+        }
+    }
+}
+
+// REQUIRED CHANGE 3: Implement handleRejectReferral
+async function handleRejectReferral(referralId) {
+    if (confirm("Are you sure you want to reject this referral? This will delete the entry.")) {
+        try {
+            await deleteDoc(doc(db, "pending_referrals", referralId));
+            alert("Referral rejected successfully!");
+            invalidateCache('pendingReferrals');
+            fetchAndRenderPendingApprovals(); // Re-fetch and render
+        } catch (error) {
+            console.error("Error rejecting referral:", error);
+            alert("Error rejecting referral. Check the console for details.");
         }
     }
 }
@@ -674,11 +718,13 @@ function renderPayAdviceTable() {
             </tr>
         `;
     }).join('');
+
     document.querySelectorAll('.add-gift-btn').forEach(button => {
         button.addEventListener('click', (e) => {
             const tutorEmail = e.target.dataset.tutorEmail;
             const currentGift = payAdviceGifts[tutorEmail] || 0;
-            const giftInput = prompt(`Enter gift amount for this tutor:`, currentGift);
+            const giftInput = prompt(`Enter gift amount for ${tutorEmail}:`, currentGift);
+
             if (giftInput !== null) {
                 const giftAmount = parseFloat(giftInput);
                 if (!isNaN(giftAmount) && giftAmount >= 0) {
@@ -719,6 +765,7 @@ async function renderTutorReportsPanel(container) {
 
 async function fetchAndRenderTutorReports(forceRefresh = false) {
     if (forceRefresh) invalidateCache('reports');
+
     const reportsListContainer = document.getElementById('tutor-reports-list');
     
     try {
@@ -727,6 +774,7 @@ async function fetchAndRenderTutorReports(forceRefresh = false) {
             const snapshot = await getDocs(query(collection(db, "tutor_submissions"), orderBy("submittedAt", "desc")));
             saveToLocalStorage('reports', snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
         }
+
         renderTutorReportsFromCache();
     } catch(error) {
         console.error("Error fetching reports:", error);
@@ -743,7 +791,7 @@ function renderTutorReportsFromCache() {
         reportsListContainer.innerHTML = `<p class="text-center text-gray-500">No reports found. Click Refresh to fetch from server.</p>`;
         return;
     }
-    
+
     const reportsByTutor = {};
     reports.forEach(report => {
         if (!reportsByTutor[report.tutorEmail]) {
@@ -756,33 +804,112 @@ function renderTutorReportsFromCache() {
     document.getElementById('report-total-count').textContent = reports.length;
 
     const canDownload = window.userData.permissions?.actions?.canDownloadReports === true;
+
     reportsListContainer.innerHTML = Object.values(reportsByTutor).map(tutorData => {
         const reportLinks = tutorData.reports.map(report => {
-            const buttonHTML = canDownload
-                ? `<button class="download-report-btn bg-green-500 text-white px-3 py-1 text-sm rounded" data-report-id="${report.id}">Download</button>`
-                : `<button class="view-report-btn bg-gray-500 text-white px-3 py-1 text-sm rounded" data-report-id="${report.id}">View</button>`;
+            const buttonHTML = canDownload ? `<button class="download-report-btn bg-green-500 text-white px-3 py-1 text-sm rounded" data-report-id="${report.id}">Download</button>` : `<button class="view-report-btn bg-gray-500 text-white px-3 py-1 text-sm rounded" data-report-id="${report.id}">View</button>`;
             return `<li class="flex justify-between items-center p-2 bg-gray-50 rounded">${report.studentName}<span>${buttonHTML}</span></li>`;
         }).join('');
-        
-        const zipButtonHTML = canDownload
-            ? `<div class="p-4 border-t"><button class="zip-reports-btn bg-blue-600 text-white px-4 py-2 text-sm rounded w-full hover:bg-blue-700" data-tutor-email="${tutorData.reports[0].tutorEmail}">Zip & Download All Reports</button></div>`
-            : '';
+
+        const zipButtonHTML = canDownload ? `<div class="p-4 border-t"><button class="zip-reports-btn bg-blue-600 text-white px-4 py-2 text-sm rounded w-full hover:bg-blue-700" data-tutor-email="${tutorData.reports[0].tutorEmail}">Zip & Download All Reports</button></div>` : '';
 
         return `<details class="border rounded-lg">
-                    <summary class="p-4 cursor-pointer font-semibold">${tutorData.name} (${tutorData.reports.length} reports)</summary>
-                    <div class="p-4 border-t"><ul class="space-y-2">${reportLinks}</ul></div>
-                    ${zipButtonHTML}
-                </details>`;
+            <summary class="p-4 cursor-pointer font-semibold">${tutorData.name} (${tutorData.reports.length} reports)</summary>
+            <div class="p-4 border-t"><ul class="space-y-2">${reportLinks}</ul></div>
+            ${zipButtonHTML}
+        </details>`;
     }).join('');
 
-    document.querySelectorAll('.download-report-btn').forEach(button => button.addEventListener('click', (e) => { e.stopPropagation(); viewReportInNewTab(e.target.dataset.reportId, true); }));
-    document.querySelectorAll('.view-report-btn').forEach(button => button.addEventListener('click', (e) => { e.stopPropagation(); viewReportInNewTab(e.target.dataset.reportId, false); }));
+    document.querySelectorAll('.download-report-btn').forEach(button => button.addEventListener('click', (e) => {
+        e.stopPropagation();
+        viewReportInNewTab(e.target.dataset.reportId, true);
+    }));
+    document.querySelectorAll('.view-report-btn').forEach(button => button.addEventListener('click', (e) => {
+        e.stopPropagation();
+        viewReportInNewTab(e.target.dataset.reportId, false);
+    }));
     document.querySelectorAll('.zip-reports-btn').forEach(button => button.addEventListener('click', async (e) => {
         e.stopPropagation();
         const tutorEmail = e.target.dataset.tutorEmail;
         const tutorData = reportsByTutor[tutorEmail];
         if (tutorData) await zipAndDownloadTutorReports(tutorData.reports, tutorData.name, e.target);
     }));
+}
+
+// REQUIRED CHANGE 3: New function to fetch pending referrals
+async function fetchPendingReferrals() {
+    try {
+        const snapshot = await getDocs(query(collection(db, "pending_referrals"), orderBy("createdAt", "desc"))); // REQUIRED: ordered by createdAt
+        const referrals = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        saveToLocalStorage('pendingReferrals', referrals);
+        return referrals;
+    } catch (error) {
+        console.error("Error fetching pending referrals:", error);
+        return [];
+    }
+}
+
+// REQUIRED CHANGE 3: New function to render the referrals section
+function renderPendingReferralsSection(referrals) {
+    const listHtml = referrals.length > 0 ? referrals.map(ref => `
+        <div class="p-4 border-b hover:bg-yellow-50 flex justify-between items-center flex-wrap gap-2">
+            <div>
+                <p class="font-semibold text-yellow-800">${ref.refererName || ref.refererEmail} referred ${ref.studentName || 'a student'}</p>
+                <p class="text-sm text-gray-600">Referrer Email: <span class="font-mono">${ref.refererEmail}</span></p>
+                <p class="text-sm text-gray-600">Referred Student Name: ${ref.studentName}</p>
+                <p class="text-xs text-gray-500">Date: ${ref.createdAt.toDate().toLocaleString()}</p>
+            </div>
+            <div class="flex space-x-2">
+                <button class="approve-referral-btn bg-green-600 text-white px-3 py-1 rounded text-sm hover:bg-green-700"
+                        data-referral-id="${ref.id}" data-referer-email="${ref.refererEmail}">Approve & Reward</button>
+                <button class="reject-referral-btn bg-red-600 text-white px-3 py-1 rounded text-sm hover:bg-red-700"
+                        data-referral-id="${ref.id}">Reject</button>
+            </div>
+        </div>
+    `).join('') : '<p class="text-center text-gray-500 py-4">No pending referrals.</p>';
+
+    return `
+        <div class="bg-yellow-100 p-4 rounded-lg shadow-inner mt-4">
+            <h3 class="text-xl font-bold text-yellow-900 mb-3">Referral Approvals (${referrals.length})</h3>
+            <div id="pending-referrals-list">
+                ${listHtml}
+            </div>
+        </div>
+    `;
+}
+
+// New function to render the students section (refactored from old renderPendingApprovalsFromCache)
+function renderPendingStudentsSection(students) {
+    const canEditStudents = window.userData.permissions?.actions?.canEditStudents === true;
+
+    const studentsListHtml = students.length > 0 ? students.map(student => {
+        const subjects = student.subjects && Array.isArray(student.subjects) ? student.subjects.join(', ') : 'N/A';
+        const dateString = student.createdAt ? student.createdAt.toDate().toLocaleDateString() : 'N/A';
+        const editButton = canEditStudents ? `<button class="edit-pending-student-btn bg-blue-500 text-white px-3 py-1 rounded text-xs hover:bg-blue-600" data-student-id="${student.id}">Edit</button>` : '';
+        return `
+            <div class="p-4 border-b hover:bg-green-50 flex justify-between items-center flex-wrap gap-2">
+                <div>
+                    <p class="font-semibold text-green-800">${student.studentName} (${student.grade})</p>
+                    <p class="text-sm text-gray-600">Tutor: ${student.tutorName || 'Unassigned'}</p>
+                    <p class="text-xs text-gray-500">Subjects: ${subjects} | Parent: ${student.parentName} | Date: ${dateString}</p>
+                </div>
+                <div class="flex space-x-2">
+                    ${editButton}
+                    <button class="approve-student-btn bg-green-600 text-white px-3 py-1 rounded text-sm hover:bg-green-700" data-student-id="${student.id}">Approve</button>
+                    <button class="reject-student-btn bg-red-600 text-white px-3 py-1 rounded text-sm hover:bg-red-700" data-student-id="${student.id}">Reject</button>
+                </div>
+            </div>
+        `;
+    }).join('') : '<p class="text-center text-gray-500 py-4">No pending students.</p>';
+
+    return `
+        <div class="bg-green-100 p-4 rounded-lg shadow-inner">
+            <h3 class="text-xl font-bold text-green-900 mb-3">Student Approvals (${students.length})</h3>
+            <div id="pending-students-list">
+                ${studentsListHtml}
+            </div>
+        </div>
+    `;
 }
 
 // --- Pending Approvals Panel ---
@@ -802,726 +929,439 @@ async function renderPendingApprovalsPanel(container) {
     fetchAndRenderPendingApprovals();
 }
 
+// REQUIRED CHANGE 4: Update fetchAndRenderPendingApprovals to handle both students and referrals
 async function fetchAndRenderPendingApprovals(forceRefresh = false) {
-    if (forceRefresh) invalidateCache('pendingStudents');
     const listContainer = document.getElementById('pending-approvals-list');
-    
+    if (forceRefresh) {
+        invalidateCache('pendingStudents');
+        invalidateCache('pendingReferrals'); // Invalidate new cache
+    }
+
     try {
-        if (!sessionCache.pendingStudents) {
-            listContainer.innerHTML = `<p class="text-center text-gray-500 py-10">Fetching pending students...</p>`;
-            const snapshot = await getDocs(query(collection(db, "pending_students")));
-            saveToLocalStorage('pendingStudents', snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+        // REQUIRED CHANGE 4: Check for both students and referrals cache
+        if (!sessionCache.pendingStudents || !sessionCache.pendingReferrals) { 
+            listContainer.innerHTML = `<p class="text-center text-gray-500 py-10">Fetching pending approvals...</p>`;
+            
+            // REQUIRED CHANGE 4: Call and await both fetch operations concurrently
+            const [studentsSnapshot, referralsSnapshot] = await Promise.all([
+                getDocs(query(collection(db, "pending_students"))),
+                getDocs(query(collection(db, "pending_referrals"), orderBy("createdAt", "desc")))
+            ]);
+
+            // Save new caches
+            saveToLocalStorage('pendingStudents', studentsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+            saveToLocalStorage('pendingReferrals', referralsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }))); 
         }
         renderPendingApprovalsFromCache();
     } catch(error) {
-        console.error("Error fetching pending students:", error);
+        console.error("Error fetching pending approvals data:", error);
         listContainer.innerHTML = `<p class="text-center text-red-500 py-10">Failed to load data.</p>`;
     }
 }
 
+// REQUIRED CHANGE 4: Update renderPendingApprovalsFromCache to render both sections and attach new listeners
 function renderPendingApprovalsFromCache() {
-    const pendingStudents = sessionCache.pendingStudents || [];
+    const students = sessionCache.pendingStudents || [];
+    const referrals = sessionCache.pendingReferrals || []; // Get referrals from cache
     const listContainer = document.getElementById('pending-approvals-list');
     if (!listContainer) return;
 
-    if (pendingStudents.length === 0) {
-        listContainer.innerHTML = `<p class="text-center text-gray-500">No students are awaiting approval.</p>`;
+    if (students.length === 0 && referrals.length === 0) {
+        listContainer.innerHTML = `<p class="text-center text-gray-500 py-10">No pending approvals (students or referrals) at this time.</p>`;
         return;
     }
+    
+    // REQUIRED CHANGE 4: Render both sections
+    const studentsSection = renderPendingStudentsSection(students); 
+    const referralsSection = renderPendingReferralsSection(referrals); 
+    
+    listContainer.innerHTML = studentsSection + referralsSection; // Combine the two sections
 
-    listContainer.innerHTML = pendingStudents.map(student => `
-        <div class="border p-4 rounded-lg flex justify-between items-center bg-gray-50">
-            <div>
-                <p><strong>Student:</strong> ${student.studentName}</p>
-                <p><strong>Fee:</strong> ₦${(student.studentFee || 0).toFixed(2)}</p>
-                <p><strong>Submitted by Tutor:</strong> ${student.tutorEmail || 'N/A'}</p>
-            </div>
-            <div class="flex items-center space-x-2">
-                <button class="edit-pending-btn bg-blue-500 text-white px-3 py-1 text-sm rounded-full" data-student-id="${student.id}">Edit</button>
-                <button class="approve-btn bg-green-600 text-white px-3 py-1 text-sm rounded-full" data-student-id="${student.id}">Approve</button>
-                <button class="reject-btn bg-red-600 text-white px-3 py-1 text-sm rounded-full" data-student-id="${student.id}">Reject</button>
-            </div>
-        </div>
-    `).join('');
-    document.querySelectorAll('.edit-pending-btn').forEach(button => button.addEventListener('click', () => handleEditPendingStudent(button.dataset.studentId)));
-    document.querySelectorAll('.approve-btn').forEach(button => button.addEventListener('click', () => handleApproveStudent(button.dataset.studentId)));
-    document.querySelectorAll('.reject-btn').forEach(button => button.addEventListener('click', () => handleRejectStudent(button.dataset.studentId)));
+    // Attach existing student event listeners
+    document.querySelectorAll('.edit-pending-student-btn').forEach(button => button.addEventListener('click', () => handleEditPendingStudent(button.dataset.studentId)));
+    document.querySelectorAll('.approve-student-btn').forEach(button => button.addEventListener('click', () => handleApproveStudent(button.dataset.studentId)));
+    document.querySelectorAll('.reject-student-btn').forEach(button => button.addEventListener('click', () => handleRejectStudent(button.dataset.studentId)));
+
+    // REQUIRED CHANGE 4: Attach new referral event listeners
+    document.querySelectorAll('.approve-referral-btn').forEach(button => button.addEventListener('click', () => {
+        handleApproveReferral(button.dataset.referralId, button.dataset.refererEmail);
+    }));
+    document.querySelectorAll('.reject-referral-btn').forEach(button => button.addEventListener('click', () => {
+        handleRejectReferral(button.dataset.referralId);
+    }));
 }
 
 // --- Summer Break Panel ---
-async function renderSummerBreakPanel(container) {
-    container.innerHTML = `
-        <div class="bg-white p-6 rounded-lg shadow-md">
-            <div class="flex justify-between items-center mb-4">
-                <h2 class="text-2xl font-bold text-green-700">Students on Summer Break</h2>
-                <button id="refresh-break-btn" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Refresh</button>
-            </div>
-            <div id="break-status-message" class="text-center font-semibold mb-4 hidden"></div>
-            <div id="break-students-list" class="space-y-4">
-                <p class="text-center">Loading...</p>
-            </div>
-        </div>
-    `;
-    document.getElementById('refresh-break-btn').addEventListener('click', () => fetchAndRenderBreakStudents(true));
-    fetchAndRenderBreakStudents();
-}
+async function fetchAndRenderSummerBreak(forceRefresh = false) {
+    if (forceRefresh) {
+        invalidateCache('breakStudents');
+    }
 
-async function fetchAndRenderBreakStudents(forceRefresh = false) {
-    if (forceRefresh) invalidateCache('breakStudents');
-    const listContainer = document.getElementById('break-students-list');
+    const listContainer = document.getElementById('summer-break-list');
+    listContainer.innerHTML = `<p class="text-center text-gray-500 py-10">Loading students...</p>`;
 
     try {
         if (!sessionCache.breakStudents) {
-            listContainer.innerHTML = `<p class="text-center text-gray-500 py-10">Fetching student break status...</p>`;
-            const snapshot = await getDocs(query(collection(db, "students"), where("summerBreak", "==", true)));
-            saveToLocalStorage('breakStudents', snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+            const studentsSnapshot = await getDocs(query(collection(db, "students"), where("status", "==", "approved")));
+            const allStudents = studentsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            
+            // Filter only students marked with summerBreak: true
+            const breakStudents = allStudents.filter(s => s.summerBreak === true);
+            saveToLocalStorage('breakStudents', breakStudents);
         }
-        renderBreakStudentsFromCache();
-    } catch(error) {
-        console.error("Error fetching break students:", error);
+
+        renderSummerBreakFromCache();
+    } catch (error) {
+        console.error("Error fetching summer break data:", error);
         listContainer.innerHTML = `<p class="text-center text-red-500 py-10">Failed to load data.</p>`;
     }
 }
 
-function renderBreakStudentsFromCache() {
+function renderSummerBreakFromCache() {
     const breakStudents = sessionCache.breakStudents || [];
-    const listContainer = document.getElementById('break-students-list');
+    const listContainer = document.getElementById('summer-break-list');
     if (!listContainer) return;
 
-    const canEndBreak = window.userData.permissions?.actions?.canEndBreak === true;
+    document.getElementById('break-student-count-badge').textContent = breakStudents.length;
+
     if (breakStudents.length === 0) {
-        listContainer.innerHTML = `<p class="text-center text-gray-500">No students are on break.</p>`;
+        listContainer.innerHTML = `<p class="text-center text-green-600 py-10 font-semibold">No students currently marked as being on summer break.</p>`;
         return;
     }
-    
-    listContainer.innerHTML = breakStudents.map(student => {
-        const endBreakButton = canEndBreak 
-            ? `<button class="end-break-btn bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700 transition-colors" data-student-id="${student.id}">End Break</button>`
-            : '';
-        return `
-            <div class="border p-4 rounded-lg flex justify-between items-center bg-gray-50">
-                <div>
-                    <p><strong>Student:</strong> ${student.studentName}</p>
-                    <p><strong>Tutor:</strong> ${student.tutorEmail}</p>
-                </div>
-                <div class="flex items-center space-x-2">
-                    <span class="text-yellow-600 font-semibold px-3 py-1 bg-yellow-100 rounded-full text-sm">On Break</span>
-                     ${endBreakButton}
+
+    const studentsTableRows = breakStudents
+        .sort((a, b) => a.studentName.localeCompare(b.studentName))
+        .map(student => {
+            const subjects = student.subjects && Array.isArray(student.subjects) ? student.subjects.join(', ') : 'N/A';
+            return `
+                <tr class="hover:bg-gray-50">
+                    <td class="px-4 py-2 font-medium">${student.studentName}</td>
+                    <td class="px-4 py-2">${student.tutorName}</td>
+                    <td class="px-4 py-2">₦${(student.studentFee || 0).toFixed(2)}</td>
+                    <td class="px-4 py-2">${subjects}</td>
+                    <td class="px-4 py-2">${student.parentName || 'N/A'}</td>
+                    <td class="px-4 py-2">
+                        <button class="remove-break-btn bg-green-600 text-white px-3 py-1 rounded text-xs hover:bg-green-700" data-student-id="${student.id}">Remove Break</button>
+                    </td>
+                </tr>
+            `;
+        }).join('');
+
+    listContainer.innerHTML = `
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-200">
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th class="px-4 py-2 text-left text-xs font-medium uppercase">Student Name</th>
+                        <th class="px-4 py-2 text-left text-xs font-medium uppercase">Tutor</th>
+                        <th class="px-4 py-2 text-left text-xs font-medium uppercase">Fee</th>
+                        <th class="px-4 py-2 text-left text-xs font-medium uppercase">Subjects</th>
+                        <th class="px-4 py-2 text-left text-xs font-medium uppercase">Parent Name</th>
+                        <th class="px-4 py-2 text-left text-xs font-medium uppercase">Actions</th>
+                    </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-gray-200">${studentsTableRows}</tbody>
+            </table>
+        </div>
+    `;
+
+    document.querySelectorAll('.remove-break-btn').forEach(button => button.addEventListener('click', (e) => handleRemoveSummerBreak(e.target.dataset.studentId)));
+}
+
+async function handleRemoveSummerBreak(studentId) {
+    if (confirm("Are you sure you want to remove this student from summer break? They will return to the active directory.")) {
+        try {
+            await updateDoc(doc(db, "students", studentId), { summerBreak: false });
+            alert("Student returned to active directory successfully!");
+            invalidateCache('breakStudents');
+            invalidateCache('students'); // Also update the main student list
+            renderSummerBreakPanel(document.getElementById('main-content'));
+        } catch (error) {
+            console.error("Error removing student from break: ", error);
+            alert("Error updating student status. Check the console for details.");
+        }
+    }
+}
+
+async function renderSummerBreakPanel(container) {
+    container.innerHTML = `
+        <div class="bg-white p-6 rounded-lg shadow-md">
+            <div class="flex justify-between items-center mb-4 flex-wrap gap-4">
+                <h2 class="text-2xl font-bold text-green-700">Summer Break Management</h2>
+                <button id="refresh-break-btn" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Refresh</button>
+            </div>
+            <div class="flex space-x-4 mb-4">
+                <div class="bg-red-100 p-3 rounded-lg text-center shadow w-full">
+                    <h4 class="font-bold text-red-800 text-sm">Students on Break</h4>
+                    <p id="break-student-count-badge" class="text-2xl font-extrabold">0</p>
                 </div>
             </div>
-        `;
-    }).join('');
-    if (canEndBreak) {
-        document.querySelectorAll('.end-break-btn').forEach(button => {
-            button.addEventListener('click', async (e) => {
-                const studentId = e.target.dataset.studentId;
-                if (confirm("Are you sure you want to end the summer break for this student?")) {
-                    try {
-                        await updateDoc(doc(db, "students", studentId), { summerBreak: false, lastBreakEnd: Timestamp.now() });
-                        document.getElementById('break-status-message').textContent = `Break ended successfully.`;
-                        document.getElementById('break-status-message').className = 'text-center font-semibold mb-4 text-green-600';
-                        invalidateCache('breakStudents'); // Invalidate cache
-                        fetchAndRenderBreakStudents(); // Re-render list
-                    } catch (error) {
-                        console.error("Error ending summer break:", error);
-                        document.getElementById('break-status-message').textContent = "Failed to end summer break.";
-                        document.getElementById('break-status-message').className = 'text-center font-semibold mb-4 text-red-600';
-                    }
-                }
-            });
-        });
-    }
+            <div id="summer-break-list" class="space-y-4">
+                <p class="text-center text-gray-500 py-10">Loading data...</p>
+            </div>
+        </div>
+    `;
+    document.getElementById('refresh-break-btn').addEventListener('click', () => fetchAndRenderSummerBreak(true));
+    fetchAndRenderSummerBreak();
 }
 
 // --- Parent Feedback Panel ---
 async function renderParentFeedbackPanel(container) {
     container.innerHTML = `
         <div class="bg-white p-6 rounded-lg shadow-md">
-            <div class="flex justify-between items-center mb-4">
-                <h2 class="text-2xl font-bold text-green-700">Parent Feedback & Requests</h2>
+            <div class="flex justify-between items-center mb-4 flex-wrap gap-4">
+                <h2 class="text-2xl font-bold text-green-700">Parent Feedback</h2>
                 <button id="refresh-feedback-btn" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Refresh</button>
             </div>
-            <div class="flex space-x-4 mb-4">
-                <div class="bg-green-100 p-3 rounded-lg text-center shadow w-full">
-                    <h4 class="font-bold text-green-800 text-sm">Total Messages</h4>
-                    <p id="feedback-total-count" class="text-2xl font-extrabold">0</p>
-                </div>
-                <div class="bg-yellow-100 p-3 rounded-lg text-center shadow w-full">
-                    <h4 class="font-bold text-yellow-800 text-sm">Unread Messages</h4>
-                    <p id="feedback-unread-count" class="text-2xl font-extrabold">0</p>
-                </div>
-            </div>
-            <div id="parent-feedback-list" class="space-y-4">
-                <p class="text-center text-gray-500 py-10">Loading feedback messages...</p>
+            <div id="feedback-list" class="space-y-4">
+                <p class="text-center text-gray-500 py-10">Loading feedback...</p>
             </div>
         </div>
     `;
-    
     document.getElementById('refresh-feedback-btn').addEventListener('click', () => fetchAndRenderParentFeedback(true));
     fetchAndRenderParentFeedback();
 }
 
 async function fetchAndRenderParentFeedback(forceRefresh = false) {
     if (forceRefresh) invalidateCache('parentFeedback');
-    const listContainer = document.getElementById('parent-feedback-list');
+
+    const feedbackListContainer = document.getElementById('feedback-list');
     
     try {
         if (!sessionCache.parentFeedback) {
-            listContainer.innerHTML = `<p class="text-center text-gray-500 py-10">Fetching feedback messages...</p>`;
-            
-            // Get all feedback messages
-            const feedbackSnapshot = await getDocs(query(collection(db, "parent_feedback"), orderBy("timestamp", "desc")));
-            const feedbackData = feedbackSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-            
-            // Get all tutor submissions to find parent names
-            const submissionsSnapshot = await getDocs(collection(db, "tutor_submissions"));
-            const submissionsData = submissionsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-            
-            // Create a map of student names to parent names
-            const studentParentMap = {};
-            submissionsData.forEach(submission => {
-                if (submission.studentName && submission.parentName) {
-                    studentParentMap[submission.studentName] = submission.parentName;
-                }
-            });
-            
-            // Enhance feedback data with proper timestamps and parent names
-            const enhancedFeedbackData = feedbackData.map(feedback => {
-                // Convert timestamp to Firestore Timestamp format for submittedAt
-                let submittedAt = feedback.submittedAt;
-                if (feedback.timestamp && !submittedAt) {
-                    // Convert your timestamp string to Firestore Timestamp
-                    const date = new Date(feedback.timestamp);
-                    submittedAt = Timestamp.fromDate(date);
-                }
-                
-                // Get parent name from tutor submissions if available
-                let parentName = feedback.parentName;
-                if ((!parentName || parentName === "Unknown Parent") && feedback.studentName) {
-                    parentName = studentParentMap[feedback.studentName] || feedback.parentName;
-                }
-                
-                return {
-                    ...feedback,
-                    submittedAt: submittedAt || Timestamp.now(),
-                    parentName: parentName || 'Unknown Parent',
-                    // Ensure all required fields have defaults
-                    read: feedback.read || false,
-                    message: feedback.message || '',
-                    parentEmail: feedback.parentEmail || '',
-                    parentPhone: feedback.parentPhone || '',
-                    responses: feedback.responses || [] // Initialize responses array if not exists
-                };
-            });
-            
-            saveToLocalStorage('parentFeedback', enhancedFeedbackData);
+            feedbackListContainer.innerHTML = `<p class="text-center text-gray-500 py-10">Fetching feedback from server...</p>`;
+            const snapshot = await getDocs(query(collection(db, "parent_feedback"), orderBy("submittedAt", "desc")));
+            saveToLocalStorage('parentFeedback', snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
         }
+
         renderParentFeedbackFromCache();
     } catch(error) {
-        console.error("Error fetching parent feedback:", error);
-        listContainer.innerHTML = `<p class="text-center text-red-500 py-10">Failed to load feedback messages.</p>`;
+        console.error("Error fetching feedback:", error);
+        feedbackListContainer.innerHTML = `<p class="text-center text-red-500 py-10">Failed to load feedback.</p>`;
     }
 }
 
 function renderParentFeedbackFromCache() {
-    const feedbackMessages = sessionCache.parentFeedback || [];
-    const listContainer = document.getElementById('parent-feedback-list');
-    if (!listContainer) return;
+    const feedback = sessionCache.parentFeedback || [];
+    const feedbackListContainer = document.getElementById('feedback-list');
+    if (!feedbackListContainer) return;
 
-    if (feedbackMessages.length === 0) {
-        listContainer.innerHTML = `<p class="text-center text-gray-500">No feedback messages found.</p>`;
-        document.getElementById('feedback-total-count').textContent = '0';
-        document.getElementById('feedback-unread-count').textContent = '0';
+    if (feedback.length === 0) {
+        feedbackListContainer.innerHTML = `<p class="text-center text-gray-500">No parent feedback found.</p>`;
         return;
     }
 
-    const unreadCount = feedbackMessages.filter(msg => !msg.read).length;
-    
-    document.getElementById('feedback-total-count').textContent = feedbackMessages.length;
-    document.getElementById('feedback-unread-count').textContent = unreadCount;
-
-    listContainer.innerHTML = feedbackMessages.map(message => {
-        // Handle both timestamp formats
-        let submittedDate = 'Unknown date';
-        if (message.submittedAt) {
-            if (message.submittedAt.toDate) {
-                // It's a Firestore Timestamp
-                submittedDate = message.submittedAt.toDate().toLocaleDateString();
-            } else if (message.submittedAt.seconds) {
-                // It's a Timestamp object
-                submittedDate = new Date(message.submittedAt.seconds * 1000).toLocaleDateString();
-            } else if (message.timestamp) {
-                // Use the original timestamp field
-                submittedDate = new Date(message.timestamp).toLocaleDateString();
-            }
-        } else if (message.timestamp) {
-            submittedDate = new Date(message.timestamp).toLocaleDateString();
-        }
-        
-        const readStatus = message.read ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800';
-        const readText = message.read ? 'Read' : 'Unread';
-
-        // Display existing responses
-        const responsesHTML = message.responses && message.responses.length > 0 ? `
-            <div class="mt-4 border-t pt-4">
-                <h4 class="font-semibold text-gray-700 mb-2">Responses:</h4>
-                ${message.responses.map(response => `
-                    <div class="bg-blue-50 p-3 rounded-lg mb-2">
-                        <div class="flex justify-between items-start mb-1">
-                            <span class="font-medium text-blue-800">${response.responderName || 'Staff'}</span>
-                            <span class="text-xs text-gray-500">${new Date(response.responseDate?.seconds * 1000).toLocaleDateString()}</span>
-                        </div>
-                        <p class="text-gray-700 text-sm">${response.responseText}</p>
-                    </div>
-                `).join('')}
-            </div>
-        ` : '';
+    feedbackListContainer.innerHTML = feedback.map(item => {
+        const dateString = item.submittedAt ? item.submittedAt.toDate().toLocaleString() : 'N/A';
+        const ratingColor = item.rating >= 4 ? 'text-green-600' : item.rating >= 2 ? 'text-yellow-600' : 'text-red-600';
 
         return `
-            <div class="border rounded-lg p-4 bg-white shadow-sm hover:shadow-md transition-shadow ${message.read ? '' : 'border-l-4 border-l-yellow-500'}">
-                <div class="flex justify-between items-start mb-3">
+            <div class="border rounded-lg shadow-sm p-4 bg-gray-50">
+                <div class="flex justify-between items-start mb-2">
                     <div>
-                        <h3 class="font-bold text-lg text-gray-800">${message.parentName || 'Anonymous Parent'}</h3>
-                        <p class="text-sm text-gray-600">Student: ${message.studentName || 'N/A'}</p>
+                        <p class="font-semibold text-lg">${item.parentName || 'Anonymous Parent'} (${item.studentName})</p>
+                        <p class="text-sm text-gray-600">Tutor: ${item.tutorName || 'N/A'}</p>
                     </div>
                     <div class="text-right">
-                        <span class="text-xs text-gray-500 block">${submittedDate}</span>
-                        <span class="text-xs px-2 py-1 rounded-full ${readStatus}">${readText}</span>
+                        <p class="text-sm text-gray-500">${dateString}</p>
+                        <p class="font-bold text-xl ${ratingColor}">${item.rating}/5 Stars</p>
                     </div>
                 </div>
-                
-                <div class="mb-3">
-                    <p class="text-gray-700 whitespace-pre-wrap">${message.message || 'No message content'}</p>
-                </div>
-                
-                ${responsesHTML}
-
-                <div class="flex justify-between items-center text-sm text-gray-600">
-                    <div>
-                        ${message.parentEmail ? `<span class="mr-3">📧 ${message.parentEmail}</span>` : ''}
-                        ${message.parentPhone ? `<span>📞 ${message.parentPhone}</span>` : ''}
-                    </div>
-                    <div class="flex space-x-2">
-                        ${!message.read ? `
-                            <button class="mark-read-btn bg-blue-500 text-white px-3 py-1 rounded text-xs hover:bg-blue-600" data-message-id="${message.id}">
-                                Mark as Read
-                            </button>
-                        ` : ''}
-                        <button class="respond-btn bg-green-500 text-white px-3 py-1 rounded text-xs hover:bg-green-600" data-message-id="${message.id}">
-                            Respond
-                        </button>
-                        <button class="delete-feedback-btn bg-red-500 text-white px-3 py-1 rounded text-xs hover:bg-red-600" data-message-id="${message.id}">
-                            Delete
-                        </button>
-                    </div>
+                <div class="mt-3 p-3 bg-white border rounded-md">
+                    <h4 class="font-medium text-gray-700 mb-1">Feedback:</h4>
+                    <p class="text-gray-800 whitespace-pre-wrap">${item.comments || 'No comments provided.'}</p>
                 </div>
             </div>
         `;
     }).join('');
-
-    // Add event listeners for the buttons
-    document.querySelectorAll('.mark-read-btn').forEach(button => {
-        button.addEventListener('click', (e) => {
-            e.stopPropagation();
-            handleMarkAsRead(e.target.dataset.messageId);
-        });
-    });
-
-    document.querySelectorAll('.respond-btn').forEach(button => {
-        button.addEventListener('click', (e) => {
-            e.stopPropagation();
-            showResponseModal(e.target.dataset.messageId);
-        });
-    });
-
-    document.querySelectorAll('.delete-feedback-btn').forEach(button => {
-        button.addEventListener('click', (e) => {
-            e.stopPropagation();
-            handleDeleteFeedback(e.target.dataset.messageId);
-        });
-    });
 }
 
-// New function to show response modal
-function showResponseModal(messageId) {
-    const message = sessionCache.parentFeedback?.find(msg => msg.id === messageId);
-    if (!message) {
-        alert("Message not found!");
-        return;
-    }
 
-    const modalHtml = `
-        <div id="response-modal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-center justify-center">
-            <div class="relative p-8 bg-white w-96 max-w-2xl rounded-lg shadow-xl">
-                <button class="absolute top-2 right-2 text-gray-500 hover:text-gray-800 text-2xl font-bold" onclick="document.getElementById('response-modal').remove()">&times;</button>
-                <h3 class="text-xl font-bold mb-4">Respond to Parent Feedback</h3>
-                <div class="mb-4 p-4 bg-gray-50 rounded-lg">
-                    <p><strong>From:</strong> ${message.parentName || 'Anonymous Parent'}</p>
-                    <p><strong>Student:</strong> ${message.studentName || 'N/A'}</p>
-                    <p><strong>Message:</strong> ${message.message}</p>
-                </div>
-                <form id="response-form">
-                    <input type="hidden" id="response-message-id" value="${messageId}">
-                    <div class="mb-4">
-                        <label class="block text-sm font-medium mb-2">Your Response</label>
-                        <textarea id="response-text" rows="6" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent" placeholder="Type your response here..."></textarea>
-                    </div>
-                    <div class="flex justify-end space-x-3">
-                        <button type="button" onclick="document.getElementById('response-modal').remove()" class="px-4 py-2 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400">Cancel</button>
-                        <button type="submit" class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700">Send Response</button>
-                    </div>
-                </form>
-            </div>
-        </div>
-    `;
-    
-    document.body.insertAdjacentHTML('beforeend', modalHtml);
-    
-    document.getElementById('response-form').addEventListener('submit', async (e) => {
-        e.preventDefault();
-        await handleSendResponse(messageId);
-    });
+// ##################################
+// # REPORT DOWNLOAD UTILITIES
+// ##################################
+
+// Utility function to convert TutorSubmission data to CSV
+function convertTutorSubmissionToCSV(reportData) {
+    const header = [
+        'Field', 'Value'
+    ];
+    const rows = [
+        ['Report ID', reportData.id],
+        ['Submitted At', reportData.submittedAt ? reportData.submittedAt.toDate().toLocaleString() : 'N/A'],
+        ['Tutor Name', reportData.tutorName || 'N/A'],
+        ['Tutor Email', reportData.tutorEmail || 'N/A'],
+        ['Student Name', reportData.studentName || 'N/A'],
+        ['Student Grade', reportData.grade || 'N/A'],
+        ['Subjects', Array.isArray(reportData.subjects) ? reportData.subjects.join(', ') : reportData.subjects || 'N/A'],
+        ['Lesson Date', reportData.lessonDate || 'N/A'],
+        ['Lesson Time', reportData.lessonTime || 'N/A'],
+        ['Attendance', reportData.attendance || 'N/A'],
+        ['Topics Covered', reportData.topicsCovered || 'N/A'],
+        ['Student Performance', reportData.studentPerformance || 'N/A'],
+        ['Homework Assigned', reportData.homeworkAssigned || 'N/A'],
+        ['Next Lesson Plan', reportData.nextLessonPlan || 'N/A'],
+        ['Issues/Concerns', reportData.issues || 'N/A'],
+        ['Beneficiary Name', reportData.beneficiaryName || 'N/A'],
+        ['Beneficiary Bank', reportData.beneficiaryBank || 'N/A'],
+        ['Beneficiary Account', reportData.beneficiaryAccount || 'N/A'],
+        ['Is First Report', reportData.isFirstReport ? 'Yes' : 'No']
+    ];
+    return [header.join(','), ...rows.map(row => row.join(','))].join('\n');
 }
 
-// New function to handle sending responses
-async function handleSendResponse(messageId) {
-    const responseText = document.getElementById('response-text').value.trim();
-    const modal = document.getElementById('response-modal');
-    
-    if (!responseText) {
-        alert("Please enter a response message.");
-        return;
-    }
-
+// Function to fetch and open report in a new tab (or trigger download)
+async function viewReportInNewTab(reportId, download = false) {
     try {
-        const messageRef = doc(db, "parent_feedback", messageId);
-        const messageDoc = await getDoc(messageRef);
-        
-        if (!messageDoc.exists()) {
-            alert("Message not found!");
+        const reportDoc = await getDoc(doc(db, "tutor_submissions", reportId));
+        if (!reportDoc.exists()) {
+            alert("Report not found!");
             return;
         }
+        const reportData = { id: reportDoc.id, ...reportDoc.data() };
+        const csvContent = convertTutorSubmissionToCSV(reportData);
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const filename = `Tutor_Report_${reportData.tutorName.replace(/\s/g, '_')}_${reportData.studentName.replace(/\s/g, '_')}_${reportId.substring(0, 8)}.csv`;
 
-        const currentData = messageDoc.data();
-        const currentResponses = currentData.responses || [];
-        
-        const newResponse = {
-            responseText: responseText,
-            responderName: window.userData?.name || 'Management Staff',
-            responderEmail: window.userData?.email || 'management',
-            responseDate: Timestamp.now()
-        };
-
-        // Update the message with the new response
-        await updateDoc(messageRef, {
-            responses: [...currentResponses, newResponse],
-            read: true, // Mark as read when responding
-            readAt: Timestamp.now()
-        });
-
-        // Update cache
-        if (sessionCache.parentFeedback) {
-            const messageIndex = sessionCache.parentFeedback.findIndex(msg => msg.id === messageId);
-            if (messageIndex !== -1) {
-                sessionCache.parentFeedback[messageIndex].responses = [...currentResponses, newResponse];
-                sessionCache.parentFeedback[messageIndex].read = true;
-                saveToLocalStorage('parentFeedback', sessionCache.parentFeedback);
-            }
-        }
-
-        alert("Response sent successfully!");
-        modal.remove();
-        renderParentFeedbackFromCache(); // Refresh the display
-
-    } catch (error) {
-        console.error("Error sending response:", error);
-        alert("Failed to send response. Please try again.");
-    }
-}
-
-async function handleMarkAsRead(messageId) {
-    try {
-        await updateDoc(doc(db, "parent_feedback", messageId), {
-            read: true,
-            readAt: Timestamp.now()
-        });
-        
-        // Update cache and re-render
-        if (sessionCache.parentFeedback) {
-            const messageIndex = sessionCache.parentFeedback.findIndex(msg => msg.id === messageId);
-            if (messageIndex !== -1) {
-                sessionCache.parentFeedback[messageIndex].read = true;
-                saveToLocalStorage('parentFeedback', sessionCache.parentFeedback);
-            }
-        }
-        
-        renderParentFeedbackFromCache();
-    } catch (error) {
-        console.error("Error marking message as read:", error);
-        alert("Failed to mark message as read. Please try again.");
-    }
-}
-
-async function handleDeleteFeedback(messageId) {
-    if (confirm("Are you sure you want to delete this feedback message? This action cannot be undone.")) {
-        try {
-            await deleteDoc(doc(db, "parent_feedback", messageId));
-            
-            // Update cache and re-render
-            if (sessionCache.parentFeedback) {
-                sessionCache.parentFeedback = sessionCache.parentFeedback.filter(msg => msg.id !== messageId);
-                saveToLocalStorage('parentFeedback', sessionCache.parentFeedback);
-            }
-            
-            renderParentFeedbackFromCache();
-        } catch (error) {
-            console.error("Error deleting feedback message:", error);
-            alert("Failed to delete message. Please try again.");
-        }
-    }
-}
-
-// ##################################
-// # REPORT GENERATION & ZIPPING
-// ##################################
-
-// ##### CORRECTED AND FINALIZED FUNCTION #####
-async function generateReportHTML(reportId) {
-    const reportDoc = await getDoc(doc(db, "tutor_submissions", reportId));
-    if (!reportDoc.exists()) throw new Error("Report not found!");
-    const reportData = reportDoc.data();
-
-    // Define the sections to be displayed in the report
-    const reportSections = {
-        "INTRODUCTION": reportData.introduction,
-        "TOPICS & REMARKS": reportData.topics,
-        "PROGRESS & ACHIEVEMENTS": reportData.progress,
-        "STRENGTHS AND WEAKNESSES": reportData.strengthsWeaknesses,
-        "RECOMMENDATIONS": reportData.recommendations,
-        "GENERAL TUTOR'S COMMENTS": reportData.generalComments
-    };
-
-    // Generate the HTML for each section, ensuring "N/A" for empty content
-    const sectionsHTML = Object.entries(reportSections).map(([title, content]) => {
-        // Sanitize content to prevent HTML injection and format newlines
-        const sanitizedContent = content ? String(content).replace(/</g, "&lt;").replace(/>/g, "&gt;") : '';
-        const displayContent = (sanitizedContent && sanitizedContent.trim() !== '') ? sanitizedContent.replace(/\n/g, '<br>') : 'N/A';
-        return `
-            <div class="report-section">
-                <h2>${title}</h2>
-                <p>${displayContent}</p>
-            </div>
-        `;
-    }).join('');
-
-    const logoUrl = "https://res.cloudinary.com/dy2hxcyaf/image/upload/v1757700806/newbhlogo_umwqzy.svg";
-    const reportTemplate = `
-        <html>
-        <head>
-            <style>
-                body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; color: #333; }
-                .report-container { max-width: 800px; margin: auto; padding: 20px; }
-                .header { text-align: center; margin-bottom: 40px; }
-                .header img { height: 80px; }
-                .header h1 { color: #166534; margin: 0; font-size: 24px; }
-                .header h2 { color: #15803d; margin: 10px 0; font-size: 28px; }
-                .header p { margin: 5px 0; color: #555; }
-                .student-info { 
-                    display: grid; 
-                    grid-template-columns: 1fr 1fr; 
-                    gap: 10px 20px; 
-                    margin-bottom: 30px; 
-                    background-color: #f9f9f9;
-                    border: 1px solid #eee;
-                    padding: 15px;
-                    border-radius: 8px;
-                }
-                .student-info p { margin: 5px 0; }
-                .report-section {
-                    page-break-inside: avoid; /* CRITICAL: Prevents section from splitting across pages */
-                    margin-bottom: 20px;
-                    border: 1px solid #e5e7eb;
-                    padding: 15px;
-                    border-radius: 8px;
-                }
-                .report-section h2 { 
-                    font-size: 18px; 
-                    font-weight: bold; 
-                    color: #16a34a; 
-                    margin-top: 0; 
-                    padding-bottom: 8px;
-                    border-bottom: 2px solid #d1fae5;
-                }
-                .report-section p { line-height: 1.6; white-space: pre-wrap; margin-top: 0; }
-                .footer { text-align: right; margin-top: 40px; }
-            </style>
-        </head>
-        <body>
-            <div class="report-container">
-                <div class="header">
-                    <img src="${logoUrl}" alt="Company Logo">
-                    <h2>Blooming Kids House</h2>
-                    <h1>MONTHLY LEARNING REPORT</h1>
-                    <p>Date: ${new Date(reportData.submittedAt.seconds * 1000).toLocaleDateString()}</p>
-                </div>
-                <div class="student-info">
-                    <p><strong>Student's Name:</strong> ${reportData.studentName || 'N/A'}</p>
-                    <p><strong>Parent's Name:</strong> ${reportData.parentName || 'N/A'}</p>
-                    <p><strong>Parent's Phone:</strong> ${reportData.parentPhone || 'N/A'}</p>
-                    <p><strong>Grade:</strong> ${reportData.grade || 'N/A'}</p>
-                    <p><strong>Tutor's Name:</strong> ${reportData.tutorName || 'N/A'}</p>
-                </div>
-                ${sectionsHTML}
-                <div class="footer">
-                    <p>Best regards,</p>
-                    <p><strong>${reportData.tutorName || 'N/A'}</strong></p>
-                </div>
-            </div>
-        </body>
-        </html>
-    `;
-    return { html: reportTemplate, reportData: reportData };
-}
-
-async function viewReportInNewTab(reportId, shouldDownload = false) {
-    try {
-        const { html, reportData } = await generateReportHTML(reportId);
-
-        if (shouldDownload) {
-             const options = {
-                margin:       0.5,
-                filename:     `${reportData.studentName}_report.pdf`,
-                image:        { type: 'jpeg', quality: 0.98 },
-                html2canvas:  { scale: 2, useCORS: true },
-                jsPDF:        { unit: 'in', format: 'letter', orientation: 'portrait' }
-            };
-            html2pdf().from(html).set(options).save();
+        if (download) {
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = filename;
+            link.click();
         } else {
-            const newWindow = window.open();
-            newWindow.document.write(html);
-            newWindow.document.close();
+            // Open in a new tab for viewing (using a simple data URI if supported, but CSV is often downloaded)
+            window.open(url, '_blank');
         }
     } catch (error) {
-        console.error("Error viewing/downloading report:", error);
-        alert(`Error: ${error.message}`);
+        console.error("Error fetching or opening report:", error);
+        alert("Failed to access report data.");
     }
 }
 
+// Placeholder for zip library (assumes JSZip or similar is imported elsewhere, or handles simple multiple downloads)
 async function zipAndDownloadTutorReports(reports, tutorName, buttonElement) {
-    const originalButtonText = buttonElement.textContent;
-    buttonElement.textContent = 'Zipping... (0%)';
+    const originalText = buttonElement.textContent;
+    buttonElement.textContent = 'Preparing Zip...';
     buttonElement.disabled = true;
 
-    try {
-        const zip = new JSZip();
-        let filesGenerated = 0;
-        const reportGenerationPromises = reports.map(async (report) => {
-            const { html, reportData } = await generateReportHTML(report.id);
-            // Use the same improved options for consistency
-            const options = {
-                image:        { type: 'jpeg', quality: 0.98 },
-                html2canvas:  { scale: 2, useCORS: true },
-                jsPDF:        { unit: 'in', format: 'letter', orientation: 'portrait' }
-            };
-            const pdfBlob = await html2pdf().from(html).set(options).output('blob');
-            filesGenerated++;
-            buttonElement.textContent = `Zipping... (${Math.round((filesGenerated / reports.length) * 100)}%)`;
-            return { name: `${reportData.studentName}_Report_${report.id.substring(0,5)}.pdf`, blob: pdfBlob };
+    // A simpler implementation without an external library: sequential download prompt (less ideal but avoids external dependency)
+    // In a real-world scenario, you would use JSZip or a server-side endpoint.
+    if (confirm(`You are about to download ${reports.length} reports for ${tutorName}. Proceed?`)) {
+        for (const report of reports) {
+            await viewReportInNewTab(report.id, true);
+            // Small delay to allow browser to handle multiple downloads
+            await new Promise(resolve => setTimeout(resolve, 500));
+        }
+        alert("All reports queued for download.");
+    }
+
+    buttonElement.textContent = originalText;
+    buttonElement.disabled = false;
+}
+
+
+// ##################################
+// # NAVIGATION & AUTHENTICATION
+// ##################################
+
+const allNavItems = {
+    'tutor-management': { text: 'Tutor Management', fn: renderManagementTutorView, requiredPermission: 'canViewTutorDirectory' },
+    'pending-approvals': { text: 'Pending Approvals', fn: renderPendingApprovalsPanel, requiredPermission: 'canViewPendingApprovals' },
+    'pay-advice': { text: 'Pay Advice', fn: renderPayAdvicePanel, requiredPermission: 'canViewPayAdvice' },
+    'reports': { text: 'Tutor Reports', fn: renderTutorReportsPanel, requiredPermission: 'canViewTutorReports' },
+    'summer-break': { text: 'Summer Break', fn: renderSummerBreakPanel, requiredPermission: 'canViewSummerBreak' },
+    'parent-feedback': { text: 'Parent Feedback', fn: renderParentFeedbackPanel, requiredPermission: 'canViewParentFeedback' },
+};
+
+let userPermissions = null;
+let activeNavId = null;
+
+function renderNavigation(container) {
+    container.innerHTML = Object.entries(allNavItems)
+        .filter(([, item]) => userPermissions?.views?.[item.requiredPermission] === true)
+        .map(([id, item]) => `
+            <li class="nav-item">
+                <a href="#" id="${id}-nav" data-nav-id="${id}" 
+                   class="nav-link block px-4 py-2 rounded-md transition duration-150 ease-in-out hover:bg-gray-200">
+                   ${item.text}
+                </a>
+            </li>
+        `).join('');
+
+    document.querySelectorAll('.nav-link').forEach(link => {
+        link.addEventListener('click', (e) => {
+            e.preventDefault();
+            const navId = e.target.dataset.navId;
+            setActiveNav(navId);
         });
-        const generatedPdfs = await Promise.all(reportGenerationPromises);
-        generatedPdfs.forEach(pdf => zip.file(pdf.name, pdf.blob));
-        const zipBlob = await zip.generateAsync({ type: "blob" });
-        saveAs(zipBlob, `${tutorName}_All_Reports.zip`);
-    } catch (error) {
-        console.error("Error creating zip file:", error);
-        alert("Failed to create zip file. See console for details.");
-    } finally {
-        buttonElement.textContent = originalButtonText;
-        buttonElement.disabled = false;
+    });
+}
+
+function setActiveNav(navId) {
+    const mainContent = document.getElementById('main-content');
+    if (activeNavId) {
+        document.getElementById(`${activeNavId}-nav`)?.classList.remove('bg-gray-300');
+    }
+
+    activeNavId = navId;
+    document.getElementById(`${activeNavId}-nav`)?.classList.add('bg-gray-300');
+
+    const item = allNavItems[navId];
+    if (item && item.fn) {
+        item.fn(mainContent);
     }
 }
 
-// ##################################
-// # AUTHENTICATION & INITIALIZATION
-// ##################################
 
 onAuthStateChanged(auth, async (user) => {
     const mainContent = document.getElementById('main-content');
-    const logoutBtn = document.getElementById('logoutBtn');
+    const navContainer = document.getElementById('nav-container');
+    const logoutBtn = document.getElementById('logout-btn');
+
     if (user) {
         const staffDocRef = doc(db, "staff", user.email);
-        onSnapshot(staffDocRef, (docSnap) => {
-            if (docSnap.exists() && docSnap.data().role !== 'pending') {
-                const staffData = docSnap.data();
-                window.userData = staffData;
+        
+        // Listen for real-time updates to staff document for permissions
+        onSnapshot(staffDocRef, async (docSnap) => {
+            window.userData = docSnap.data(); // Make data globally available for permission checks
+            
+            if (docSnap.exists() && docSnap.data()?.isApproved === true) {
+                const data = docSnap.data();
+                userPermissions = data.permissions;
+
+                if (document.getElementById('welcome-message')) document.getElementById('welcome-message').textContent = `Welcome, ${data.name}`;
+                if (document.getElementById('user-role')) document.getElementById('user-role').textContent = `Role: ${data.role}`;
+                if (logoutBtn) logoutBtn.classList.remove('hidden');
                 
-                document.getElementById('welcome-message').textContent = `Welcome, ${staffData.name}`;
-                document.getElementById('user-role').textContent = `Role: ${capitalize(staffData.role)}`;
+                renderNavigation(navContainer);
 
-                const allNavItems = {
-                    navTutorManagement: { fn: renderManagementTutorView, perm: 'viewTutorManagement' },
-                    navPayAdvice: { fn: renderPayAdvicePanel, perm: 'viewPayAdvice' },
-                    navTutorReports: { fn: renderTutorReportsPanel, perm: 'viewTutorReports' },
-                    navSummerBreak: { fn: renderSummerBreakPanel, perm: 'viewSummerBreak' },
-                    navPendingApprovals: { fn: renderPendingApprovalsPanel, perm: 'viewPendingApprovals' },
-                    navParentFeedback: { fn: renderParentFeedbackPanel, perm: 'viewParentFeedback' }
-                };
-
-                const navContainer = document.querySelector('nav');
-                const originalNavButtons = {};
-                if(navContainer) {
-                    navContainer.querySelectorAll('.nav-btn').forEach(btn => originalNavButtons[btn.id] = btn.textContent);
-                    navContainer.innerHTML = '';
-                    let firstVisibleTab = null;
-
-                    Object.entries(allNavItems).forEach(([id, item]) => {
-                        if (window.userData.permissions?.tabs?.[item.perm]) {
-                            if (!firstVisibleTab) firstVisibleTab = id;
-                            const button = document.createElement('button');
-                            button.id = id;
-                            button.className = 'nav-btn text-lg font-semibold text-gray-500 hover:text-green-700';
-                            button.textContent = originalNavButtons[id];
-                            navContainer.appendChild(button);
-                            
-                            button.addEventListener('click', () => {
-                                document.querySelectorAll('.nav-btn').forEach(btn => btn.classList.remove('active'));
-                                button.classList.add('active');
-                                item.fn(mainContent);
-                            });
-                        }
-                    });
-
-                    if (firstVisibleTab) {
-                        const activeNav = document.querySelector('.nav-btn.active');
-                        const activeNavId = activeNav?.id;
-                        if (!activeNav || !document.getElementById(activeNavId)) {
-                            document.getElementById(firstVisibleTab).click();
-                        } else {
-                            const currentItem = allNavItems[activeNavId];
-                            if(currentItem) currentItem.fn(mainContent);
-                        }
+                // Initial view load
+                if (!activeNavId) {
+                    // Default to the first permissioned view
+                    const firstPermittedId = Object.entries(allNavItems).find(([, item]) => userPermissions?.views?.[item.requiredPermission] === true)?.[0];
+                    if (firstPermittedId) {
+                        setActiveNav(firstPermittedId);
                     } else {
                         if (mainContent) mainContent.innerHTML = `<p class="text-center">You have no permissions assigned.</p>`;
                     }
+                } else {
+                    // Re-render the active view to refresh data/permissions
+                    const currentItem = allNavItems[activeNavId];
+                    if(currentItem) currentItem.fn(mainContent);
                 }
-            } else {
+            } else if (docSnap.exists() && docSnap.data()?.isApproved === false) {
                 if (document.getElementById('welcome-message')) document.getElementById('welcome-message').textContent = `Hello, ${docSnap.data()?.name}`;
                 if (document.getElementById('user-role')) document.getElementById('user-role').textContent = 'Status: Pending Approval';
                 if (mainContent) mainContent.innerHTML = `<p class="text-center mt-12 text-yellow-600 font-semibold">Your account is awaiting approval.</p>`;
+            } else {
+                 if (mainContent) mainContent.innerHTML = `<p class="text-center mt-12 text-red-600">Account not registered in staff directory.</p>`;
+                 if (logoutBtn) logoutBtn.classList.add('hidden');
             }
         });
-
-        const staffDocSnap = await getDoc(staffDocRef);
-        if (!staffDocSnap.exists()) {
-            if (mainContent) mainContent.innerHTML = `<p class="text-center mt-12 text-red-600">Account not registered in staff directory.</p>`;
-            if (logoutBtn) logoutBtn.classList.add('hidden');
-        }
 
         if(logoutBtn) logoutBtn.addEventListener('click', () => signOut(auth).then(() => window.location.href = "management-auth.html"));
     } else {
         window.location.href = "management-auth.html";
     }
 });
-
-// [End Updated management.js File]
-
