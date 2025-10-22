@@ -1,7 +1,6 @@
-// [Begin Updated management.js File]
-
 import { auth, db } from './firebaseConfig.js';
-import { collection, getDocs, doc, getDoc, where, query, orderBy, Timestamp, writeBatch, updateDoc, deleteDoc, setDoc, addDoc } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
+// 1. UPDATED IMPORT: Added 'increment' for atomic field updates
+import { collection, getDocs, doc, getDoc, where, query, orderBy, Timestamp, writeBatch, updateDoc, deleteDoc, setDoc, addDoc, increment } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
 import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-auth.js";
 import { onSnapshot } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
 
@@ -16,6 +15,7 @@ const sessionCache = {
     tutors: null,
     students: null,
     pendingStudents: null,
+    pendingReferrals: null, // <-- NEW: Added for referral system
     reports: null,
     breakStudents: null,
     parentFeedback: null,
@@ -198,7 +198,6 @@ function showAssignStudentModal() {
         alert("Tutor list is not available. Please refresh the directory and try again.");
         return;
     }
-
     const tutorOptions = tutors
         .sort((a, b) => a.name.localeCompare(b.name))
         .map(tutor => `<option value='${JSON.stringify({email: tutor.email, name: tutor.name})}'>${tutor.name} (${tutor.email})</option>`)
@@ -221,9 +220,9 @@ function showAssignStudentModal() {
                     <div class="mb-2"><label class="block text-sm font-medium">Student Grade</label><input type="text" id="assign-grade" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2"></div>
                     <div class="mb-2"><label class="block text-sm font-medium">Days/Week</label><input type="text" id="assign-days" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2"></div>
                     <div class="mb-2"><label class="block text-sm font-medium">Subjects (comma-separated)</label><input type="text" id="assign-subjects" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2"></div>
-                    <div class="mb-2"><label class="block text-sm font-medium">Parent Name</label><input type="text" id="assign-parentName" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2"></div>
-                    <div class="mb-2"><label class="block text-sm font-medium">Parent Phone</label><input type="text" id="assign-parentPhone" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2"></div>
-                    <div class="mb-2"><label class="block text-sm font-medium">Student Fee (₦)</label><input type="number" id="assign-studentFee" required value="0" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2"></div>
+                    <div class="mb-2"><label class="block text-sm font-medium">Parent Name</label><input type="text" id="assign-parentName" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2"></div>
+                    <div class="mb-2"><label class="block text-sm font-medium">Parent Phone</label><input type="text" id="assign-parentPhone" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2"></div>
+                    <div class="mb-2"><label class="block text-sm font-medium">Student Fee (₦)</label><input type="number" id="assign-studentFee" value="0" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2"></div>
                     <div class="flex justify-end mt-4">
                         <button type="button" onclick="document.getElementById('assign-modal').remove()" class="mr-2 px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300">Cancel</button>
                         <button type="submit" class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700">Assign Student</button>
@@ -233,12 +232,13 @@ function showAssignStudentModal() {
         </div>
     `;
     document.body.insertAdjacentHTML('beforeend', modalHtml);
+
     document.getElementById('assign-student-form').addEventListener('submit', async (e) => {
         e.preventDefault();
         const form = e.target;
-        const selectedTutorData = JSON.parse(form.elements['assign-tutor'].value);
+        const tutorData = JSON.parse(form.elements['assign-tutor'].value);
 
-        const newStudentData = {
+        const studentData = {
             studentName: form.elements['assign-studentName'].value,
             grade: form.elements['assign-grade'].value,
             days: form.elements['assign-days'].value,
@@ -246,1257 +246,1158 @@ function showAssignStudentModal() {
             parentName: form.elements['assign-parentName'].value,
             parentPhone: form.elements['assign-parentPhone'].value,
             studentFee: Number(form.elements['assign-studentFee'].value) || 0,
-            tutorEmail: selectedTutorData.email,
-            tutorName: selectedTutorData.name,
-            status: 'approved',
-            summerBreak: false,
-            createdAt: Timestamp.now()
+            tutorEmail: tutorData.email,
+            tutorName: tutorData.name,
+            status: 'active',
+            createdAt: Timestamp.now(),
         };
 
         try {
-            await addDoc(collection(db, "students"), newStudentData);
-            alert(`Student "${newStudentData.studentName}" assigned successfully to ${newStudentData.tutorName}!`);
+            await addDoc(collection(db, "students"), studentData);
+            alert(`Student ${studentData.studentName} successfully assigned to ${tutorData.name}!`);
             document.getElementById('assign-modal').remove();
             invalidateCache('students');
-            fetchAndRenderDirectory(true);
+            renderManagementTutorView(document.getElementById('main-content'));
         } catch (error) {
-            console.error("Error assigning student: ", error);
+            console.error("Error adding document: ", error);
             alert("Failed to assign student. Check the console for details.");
         }
     });
 }
 
-async function handleDeleteStudent(studentId) {
-    if (confirm("Are you sure you want to delete this student? This action cannot be undone.")) {
-        try {
-            await deleteDoc(doc(db, "students", studentId));
-            alert("Student deleted successfully!");
-            invalidateCache('students'); // Invalidate cache
-            renderManagementTutorView(document.getElementById('main-content')); // Rerender
-        } catch (error) {
-            console.error("Error removing student: ", error);
-            alert("Error deleting student. Check the console for details.");
-        }
-    }
-}
+async function handleSetTutorActiveStatus(tutorEmail, isActive) {
+    if (!confirm(`Are you sure you want to set ${tutorEmail} to ${isActive ? 'Active' : 'Inactive'}?`)) return;
 
-async function handleApproveStudent(studentId) {
-    if (confirm("Are you sure you want to approve this student?")) {
-        try {
-            const studentRef = doc(db, "pending_students", studentId);
-            const studentDoc = await getDoc(studentRef);
-            if (!studentDoc.exists()) {
-                alert("Student not found.");
-                return;
-            }
-            const studentData = studentDoc.data();
-            const batch = writeBatch(db);
-            const newStudentRef = doc(db, "students", studentId);
-            batch.set(newStudentRef, { ...studentData, status: 'approved' });
-            batch.delete(studentRef);
-            await batch.commit();
-            alert("Student approved successfully!");
-            invalidateCache('pendingStudents'); // Invalidate cache
-            invalidateCache('students');
-            fetchAndRenderPendingApprovals(); // Re-fetch and render the current panel
-        } catch (error) {
-            console.error("Error approving student: ", error);
-            alert("Error approving student. Check the console for details.");
-        }
-    }
-}
-
-async function handleRejectStudent(studentId) {
-    if (confirm("Are you sure you want to reject this student? This will delete their entry.")) {
-        try {
-            await deleteDoc(doc(db, "pending_students", studentId));
-            alert("Student rejected successfully!");
-            invalidateCache('pendingStudents'); // Invalidate cache
-            fetchAndRenderPendingApprovals(); // Re-fetch and render
-        } catch (error) {
-            console.error("Error rejecting student: ", error);
-            alert("Error rejecting student. Check the console for details.");
-        }
-    }
-}
-
-// ##################################
-// # PANEL RENDERING FUNCTIONS
-// ##################################
-
-// --- Tutor & Student Directory Panel ---
-async function renderManagementTutorView(container) {
-    container.innerHTML = `
-        <div class="bg-white p-6 rounded-lg shadow-md">
-            <div class="flex justify-between items-center mb-4 flex-wrap gap-4">
-                <h2 class="text-2xl font-bold text-green-700">Tutor & Student Directory</h2>
-                <div class="flex items-center gap-4 flex-wrap">
-                    <input type="search" id="directory-search" placeholder="Search Tutors, Students, Parents..." class="p-2 border rounded-md w-64">
-                    <button id="assign-student-btn" class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700">Assign New Student</button>
-                    <button id="refresh-directory-btn" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Refresh</button>
-                </div>
-            </div>
-            <div class="flex space-x-4 mb-4">
-                <div class="bg-green-100 p-3 rounded-lg text-center shadow w-full">
-                    <h4 class="font-bold text-green-800 text-sm">Total Tutors</h4>
-                    <p id="tutor-count-badge" class="text-2xl font-extrabold">0</p>
-                </div>
-                <div class="bg-yellow-100 p-3 rounded-lg text-center shadow w-full">
-                    <h4 class="font-bold text-yellow-800 text-sm">Total Students</h4>
-                    <p id="student-count-badge" class="text-2xl font-extrabold">0</p>
-                </div>
-            </div>
-            <div id="directory-list" class="space-y-4">
-                <p class="text-center text-gray-500 py-10">Loading directory...</p>
-            </div>
-        </div>
-    `;
-    document.getElementById('assign-student-btn').addEventListener('click', showAssignStudentModal);
-    document.getElementById('refresh-directory-btn').addEventListener('click', () => fetchAndRenderDirectory(true));
-    document.getElementById('directory-search').addEventListener('input', (e) => renderDirectoryFromCache(e.target.value));
-    fetchAndRenderDirectory();
-}
-
-async function fetchAndRenderDirectory(forceRefresh = false) {
-    if (forceRefresh) {
+    try {
+        await updateDoc(doc(db, "tutors", tutorEmail), {
+            active: isActive,
+            updatedAt: Timestamp.now()
+        });
+        alert(`Tutor ${tutorEmail} status updated to ${isActive ? 'Active' : 'Inactive'}.`);
         invalidateCache('tutors');
+        renderManagementTutorView(document.getElementById('main-content'));
+    } catch (error) {
+        console.error("Error setting tutor status: ", error);
+        alert("Failed to update tutor status. Check the console for details.");
+    }
+}
+
+async function handleSetStudentStatus(studentId, newStatus) {
+    if (!confirm(`Are you sure you want to set this student's status to ${newStatus}?`)) return;
+
+    try {
+        await updateDoc(doc(db, "students", studentId), {
+            status: newStatus,
+            updatedAt: Timestamp.now()
+        });
+        alert(`Student status updated to ${newStatus}.`);
         invalidateCache('students');
+        renderManagementTutorView(document.getElementById('main-content'));
+    } catch (error) {
+        console.error("Error setting student status: ", error);
+        alert("Failed to update student status. Check the console for details.");
+    }
+}
+
+async function handleMoveStudentToBreak(studentId, studentName) {
+    if (!confirm(`Are you sure you want to move student ${studentName} to Summer Break?`)) return;
+
+    try {
+        const studentDoc = await getDoc(doc(db, "students", studentId));
+        if (!studentDoc.exists()) {
+            alert("Student not found!");
+            return;
+        }
+
+        const studentData = studentDoc.data();
+        const breakData = {
+            ...studentData,
+            originalStudentId: studentId,
+            breakStart: Timestamp.now(),
+        };
+
+        const batch = writeBatch(db);
+        // 1. Add to break_students
+        const newBreakRef = doc(collection(db, "break_students"));
+        batch.set(newBreakRef, breakData);
+
+        // 2. Delete from students
+        batch.delete(doc(db, "students", studentId));
+
+        await batch.commit();
+
+        alert(`Student ${studentName} successfully moved to Summer Break.`);
+        invalidateCache('students');
+        invalidateCache('breakStudents');
+        renderManagementTutorView(document.getElementById('main-content'));
+
+    } catch (error) {
+        console.error("Error moving student to break: ", error);
+        alert("Failed to move student. Check the console for details.");
+    }
+}
+
+async function handleMoveStudentOffBreak(breakStudentId, studentName) {
+    if (!confirm(`Are you sure you want to move student ${studentName} OFF Summer Break and back to active students?`)) return;
+
+    try {
+        const breakDoc = await getDoc(doc(db, "break_students", breakStudentId));
+        if (!breakDoc.exists()) {
+            alert("Break student record not found!");
+            return;
+        }
+
+        const breakData = breakDoc.data();
+        const studentData = {
+            studentName: breakData.studentName,
+            grade: breakData.grade,
+            days: breakData.days,
+            subjects: breakData.subjects,
+            parentName: breakData.parentName,
+            parentPhone: breakData.parentPhone,
+            studentFee: breakData.studentFee,
+            tutorEmail: breakData.tutorEmail,
+            tutorName: breakData.tutorName,
+            status: 'active', // Set back to active
+            createdAt: breakData.createdAt, // Preserve original creation date
+            updatedAt: Timestamp.now(),
+        };
+
+        const batch = writeBatch(db);
+        // 1. Add back to students (using a new ID if originalStudentId isn't reliable for existing doc)
+        // For simplicity and safety, we'll create a new document in 'students'.
+        const newStudentRef = doc(collection(db, "students"));
+        batch.set(newStudentRef, studentData);
+
+        // 2. Delete from break_students
+        batch.delete(doc(db, "break_students", breakStudentId));
+
+        await batch.commit();
+
+        alert(`Student ${studentName} successfully moved back to Active Students.`);
+        invalidateCache('breakStudents');
+        invalidateCache('students');
+        renderSummerBreakPanel(document.getElementById('main-content'));
+
+    } catch (error) {
+        console.error("Error moving student off break: ", error);
+        alert("Failed to move student. Check the console for details.");
+    }
+}
+
+// ##################################
+// # DATA FETCHING & PROCESSING
+// ##################################
+
+/**
+ * Fetches all tutors and their bank details.
+ * @returns {Array} List of tutor objects.
+ */
+async function fetchTutors() {
+    if (sessionCache.tutors) {
+        return sessionCache.tutors;
     }
 
     try {
-        // If cache is empty, fetch from server. Otherwise, the existing cache (from localStorage) will be used.
-        if (!sessionCache.tutors || !sessionCache.students) {
-            document.getElementById('directory-list').innerHTML = `<p class="text-center text-gray-500 py-10">Fetching data from server...</p>`;
-            const [tutorsSnapshot, studentsSnapshot] = await Promise.all([
-                getDocs(query(collection(db, "tutors"), orderBy("name"))),
-                getDocs(collection(db, "students"))
-            ]);
-            // Save newly fetched data to localStorage
-            saveToLocalStorage('tutors', tutorsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-            saveToLocalStorage('students', studentsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-        }
-        renderDirectoryFromCache();
+        const q = query(collection(db, "tutors"), where("approved", "==", true), orderBy("name", "asc"));
+        const querySnapshot = await getDocs(q);
+        const tutors = querySnapshot.docs.map(doc => ({
+            email: doc.id,
+            ...doc.data()
+        }));
+        saveToLocalStorage('tutors', tutors);
+        return tutors;
     } catch (error) {
-        console.error("Error fetching directory data:", error);
-        document.getElementById('directory-list').innerHTML = `<p class="text-center text-red-500 py-10">Failed to load data.</p>`;
+        console.error("Error fetching tutors:", error);
+        return [];
     }
 }
 
-function renderDirectoryFromCache(searchTerm = '') {
-    const tutors = sessionCache.tutors || [];
-    const students = sessionCache.students || [];
-    const directoryList = document.getElementById('directory-list');
-    if (!directoryList) return;
-
-    if (tutors.length === 0 && students.length === 0) {
-        directoryList.innerHTML = `<p class="text-center text-gray-500 py-10">No directory data found. Click Refresh to fetch from the server.</p>`;
-        return;
+/**
+ * Fetches all active students.
+ * @returns {Array} List of student objects.
+ */
+async function fetchStudents() {
+    if (sessionCache.students) {
+        return sessionCache.students;
     }
 
-    const lowerCaseSearchTerm = searchTerm.toLowerCase();
-    const studentsByTutor = {};
-    students.forEach(student => {
-        if (!studentsByTutor[student.tutorEmail]) {
-            studentsByTutor[student.tutorEmail] = [];
+    try {
+        const q = query(collection(db, "students"), orderBy("tutorName", "asc"), orderBy("studentName", "asc"));
+        const querySnapshot = await getDocs(q);
+        const students = querySnapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data()
+        }));
+        saveToLocalStorage('students', students);
+        return students;
+    } catch (error) {
+        console.error("Error fetching students:", error);
+        return [];
+    }
+}
+
+/**
+ * Fetches all students currently marked for summer break.
+ * @returns {Array} List of break student objects.
+ */
+async function fetchBreakStudents() {
+    if (sessionCache.breakStudents) {
+        return sessionCache.breakStudents;
+    }
+    try {
+        const q = query(collection(db, "break_students"), orderBy("tutorName", "asc"), orderBy("studentName", "asc"));
+        const querySnapshot = await getDocs(q);
+        const breakStudents = querySnapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data(),
+            breakStart: doc.data().breakStart ? doc.data().breakStart.toDate().toLocaleDateString() : 'N/A'
+        }));
+        saveToLocalStorage('breakStudents', breakStudents);
+        return breakStudents;
+    } catch (error) {
+        console.error("Error fetching break students:", error);
+        return [];
+    }
+}
+
+/**
+ * Fetches pending students for approval.
+ * @returns {Array} List of pending student objects.
+ */
+async function fetchPendingStudents() {
+    if (sessionCache.pendingStudents) {
+        return sessionCache.pendingStudents;
+    }
+
+    try {
+        const q = query(collection(db, "pending_students"), orderBy("createdAt", "asc"));
+        const querySnapshot = await getDocs(q);
+        const students = querySnapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data(),
+            createdAt: doc.data().createdAt ? doc.data().createdAt.toDate().toLocaleDateString() : 'N/A'
+        }));
+        saveToLocalStorage('pendingStudents', students);
+        return students;
+    } catch (error) {
+        console.error("Error fetching pending students:", error);
+        return [];
+    }
+}
+
+/**
+ * Approves a pending student: moves record from pending_students to students.
+ * @param {string} studentId The ID of the pending student document.
+ * @param {string} tutorEmail The email of the assigned tutor.
+ */
+async function handleApproveStudent(studentId, tutorEmail) {
+    if (!confirm("Are you sure you want to APPROVE this student?")) return;
+
+    try {
+        const pendingDoc = await getDoc(doc(db, "pending_students", studentId));
+        if (!pendingDoc.exists()) {
+            alert("Pending student record not found!");
+            return;
         }
-        studentsByTutor[student.tutorEmail].push(student);
-    });
 
-    const filteredTutors = tutors.filter(tutor => {
-        const assignedStudents = studentsByTutor[tutor.email] || [];
-        const tutorMatch = tutor.name.toLowerCase().includes(lowerCaseSearchTerm);
-        const studentMatch = assignedStudents.some(s =>
-            s.studentName.toLowerCase().includes(lowerCaseSearchTerm) ||
-            (s.parentName && s.parentName.toLowerCase().includes(lowerCaseSearchTerm)) ||
-            // CORRECTED LINE: Safely converts phone number to a string before searching
-            (s.parentPhone && String(s.parentPhone).toLowerCase().includes(lowerCaseSearchTerm))
-        );
-        return tutorMatch || studentMatch;
-    });
+        const studentData = pendingDoc.data();
+        const tutor = sessionCache.tutors.find(t => t.email === tutorEmail);
 
-    if (filteredTutors.length === 0) {
-        directoryList.innerHTML = `<p class="text-center text-gray-500 py-10">No results found for "${searchTerm}".</p>`;
-        return;
+        if (!tutor) {
+            alert("Tutor not found in directory. Cannot approve student.");
+            return;
+        }
+
+        const newStudentData = {
+            ...studentData,
+            tutorEmail: tutor.email,
+            tutorName: tutor.name,
+            status: 'active',
+            createdAt: Timestamp.now(), // Override with fresh timestamp for active record
+        };
+
+        const batch = writeBatch(db);
+
+        // 1. Add to students collection
+        const newStudentRef = doc(collection(db, "students"));
+        batch.set(newStudentRef, newStudentData);
+
+        // 2. Delete from pending_students collection
+        batch.delete(doc(db, "pending_students", studentId));
+
+        await batch.commit();
+
+        alert(`Student ${newStudentData.studentName} approved and assigned to ${tutor.name}.`);
+        invalidateCache('pendingStudents');
+        invalidateCache('students'); // Also invalidate active students cache
+        renderPendingApprovalsPanel(document.getElementById('main-content'));
+
+    } catch (error) {
+        console.error("Error approving student: ", error);
+        alert("Failed to approve student. Check the console for details.");
+    }
+}
+
+/**
+ * Rejects a pending student: deletes the record.
+ * @param {string} studentId The ID of the pending student document.
+ */
+async function handleRejectStudent(studentId) {
+    if (!confirm("Are you sure you want to REJECT this student? The record will be permanently deleted.")) return;
+
+    try {
+        await deleteDoc(doc(db, "pending_students", studentId));
+        alert(`Student record ${studentId} rejected and removed.`);
+
+        invalidateCache('pendingStudents');
+        renderPendingApprovalsPanel(document.getElementById('main-content'));
+
+    } catch (error) {
+        console.error("Error rejecting student: ", error);
+        alert("Failed to reject student. Check the console for details.");
+    }
+}
+
+// ##################################
+// # NEW REFERRAL SYSTEM LOGIC
+// ##################################
+
+/**
+ * Fetches pending referrals from Firestore.
+ * @returns {Array} List of pending referral objects.
+ */
+async function fetchPendingReferrals() {
+    if (sessionCache.pendingReferrals) {
+        return sessionCache.pendingReferrals;
     }
 
-    document.getElementById('tutor-count-badge').textContent = tutors.length;
-    document.getElementById('student-count-badge').textContent = students.length;
+    try {
+        const q = query(collection(db, "pending_referrals"), orderBy("createdAt", "asc"));
+        const querySnapshot = await getDocs(q);
+        const referrals = querySnapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data(),
+            createdAt: doc.data().createdAt ? doc.data().createdAt.toDate().toLocaleDateString() : 'N/A'
+        }));
+        saveToLocalStorage('pendingReferrals', referrals);
+        return referrals;
+    } catch (error) {
+        console.error("Error fetching pending referrals:", error);
+        return [];
+    }
+}
 
-    const canEditStudents = window.userData.permissions?.actions?.canEditStudents === true;
-    const canDeleteStudents = window.userData.permissions?.actions?.canDeleteStudents === true;
-    const showActionsColumn = canEditStudents || canDeleteStudents;
+/**
+ * Approves a referral: increments parent's referralCount and deletes the referral record.
+ * @param {string} referralId The ID of the referral document.
+ * @param {string} refererEmail The email of the parent who made the referral (the parent's doc ID).
+ */
+async function handleApproveReferral(referralId, refererEmail) {
+    if (!confirm("Are you sure you want to APPROVE this referral? The referrer will be rewarded.")) return;
 
-    directoryList.innerHTML = filteredTutors.map(tutor => {
-        const assignedStudents = (studentsByTutor[tutor.email] || [])
-            .filter(s =>
-                searchTerm === '' || // show all students if no search term
-                tutor.name.toLowerCase().includes(lowerCaseSearchTerm) || // show all if tutor name matches
-                s.studentName.toLowerCase().includes(lowerCaseSearchTerm) ||
-                (s.parentName && s.parentName.toLowerCase().includes(lowerCaseSearchTerm)) ||
-                // CORRECTED LINE: Safely converts phone number to a string before searching
-                (s.parentPhone && String(s.parentPhone).toLowerCase().includes(lowerCaseSearchTerm))
-            );
+    try {
+        const batch = writeBatch(db);
 
-        const studentsTableRows = assignedStudents
-            .sort((a, b) => a.studentName.localeCompare(b.studentName))
-            .map(student => {
-                const subjects = student.subjects && Array.isArray(student.subjects) ? student.subjects.join(', ') : 'N/A';
-                const actionButtons = `
-                    ${canEditStudents ? `<button class="edit-student-btn bg-blue-500 text-white px-3 py-1 rounded-full text-xs" data-student-id="${student.id}">Edit</button>` : ''}
-                    ${canDeleteStudents ? `<button class="delete-student-btn bg-red-500 text-white px-3 py-1 rounded-full text-xs" data-student-id="${student.id}">Delete</button>` : ''}
-                `;
-                return `
-                    <tr class="hover:bg-gray-50">
-                        <td class="px-4 py-2 font-medium">${student.studentName}</td>
-                        <td class="px-4 py-2">₦${(student.studentFee || 0).toFixed(2)}</td>
-                        <td class="px-4 py-2">${student.grade}</td>
-                        <td class="px-4 py-2">${student.days}</td>
-                        <td class="px-4 py-2">${subjects}</td>
-                        <td class="px-4 py-2">${student.parentName || 'N/A'}</td>
-                        <td class="px-4 py-2">${student.parentPhone || 'N/A'}</td>
-                        ${showActionsColumn ? `<td class="px-4 py-2">${actionButtons}</td>` : ''}
-                    </tr>
-                `;
-            }).join('');
+        // 1. Reward: Atomically increment referralCount on the parent's document
+        // Assumes parent's document ID in the 'parents' collection is their email
+        const parentDocRef = doc(db, "parents", refererEmail);
+        batch.update(parentDocRef, {
+            referralCount: increment(1)
+        });
 
-        return `
-            <div class="border rounded-lg shadow-sm">
-                <details open>
-                    <summary class="p-4 cursor-pointer flex justify-between items-center font-semibold text-lg">
-                        ${tutor.name}
-                        <span class="ml-2 text-sm font-normal text-gray-500">(${assignedStudents.length} students shown)</span>
-                    </summary>
-                    <div class="border-t p-2">
-                        <table class="min-w-full text-sm">
-                            <thead class="bg-gray-50 text-left"><tr>
-                                <th class="px-4 py-2 font-medium">Student Name</th><th class="px-4 py-2 font-medium">Fee</th>
-                                <th class="px-4 py-2 font-medium">Grade</th><th class="px-4 py-2 font-medium">Days/Week</th>
-                                <th class="px-4 py-2 font-medium">Subject</th><th class="px-4 py-2 font-medium">Parent's Name</th>
-                                <th class="px-4 py-2 font-medium">Parent's Phone</th>
-                                ${showActionsColumn ? `<th class="px-4 py-2 font-medium">Actions</th>` : ''}
-                            </tr></thead>
-                            <tbody class="bg-white divide-y divide-gray-200">${studentsTableRows}</tbody>
-                        </table>
-                    </div>
-                </details>
+        // 2. Cleanup: Delete the referral from the pending_referrals collection
+        const referralDocRef = doc(db, "pending_referrals", referralId);
+        batch.delete(referralDocRef);
+
+        await batch.commit();
+
+        alert(`Referral ${referralId} approved. Parent (${refererEmail}) reward applied!`);
+        invalidateCache('pendingReferrals');
+        // Re-render the pending approvals panel
+        renderPendingApprovalsPanel(document.getElementById('main-content'));
+
+    } catch (error) {
+        console.error("Error approving referral: ", error);
+        alert(`Failed to approve referral. Check the console for details. Error: ${error.message}`);
+    }
+}
+
+/**
+ * Rejects a referral: deletes the referral record without rewarding the parent.
+ * @param {string} referralId The ID of the referral document.
+ */
+async function handleRejectReferral(referralId) {
+    if (!confirm("Are you sure you want to REJECT this referral?")) return;
+
+    try {
+        await deleteDoc(doc(db, "pending_referrals", referralId));
+        alert(`Referral ${referralId} rejected and removed.`);
+
+        invalidateCache('pendingReferrals');
+        // Re-render the pending approvals panel
+        renderPendingApprovalsPanel(document.getElementById('main-content'));
+
+    } catch (error) {
+        console.error("Error rejecting referral: ", error);
+        alert(`Failed to reject referral. Check the console for details. Error: ${error.message}`);
+    }
+}
+
+/**
+ * Renders the section for pending referral approvals.
+ * @param {Array} referrals List of pending referral objects.
+ * @returns {string} HTML string for the referrals section.
+ */
+function renderPendingReferralsSection(referrals) {
+    let referralsHtml = `<h3 class="text-2xl font-semibold text-blue-700 mb-4">Pending Referral Approvals (${referrals.length})</h3>`;
+
+    if (referrals.length === 0) {
+        referralsHtml += `<p class="text-gray-500">No pending referrals at this time.</p>`;
+        return referralsHtml;
+    }
+
+    referralsHtml += `<div class="space-y-4">`;
+
+    referrals.forEach(ref => {
+        referralsHtml += `
+            <div class="bg-blue-100 p-4 rounded-lg shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center">
+                <div class="mb-2 md:mb-0">
+                    <p class="font-bold text-blue-800">Referrer (Parent): <span class="text-blue-900">${ref.refererName || 'N/A'}</span></p>
+                    <p class="text-sm text-blue-600">Email: ${ref.refererEmail}</p>
+                    <p class="text-sm text-blue-600">Referred Student: ${ref.referredStudentName}</p>
+                    <p class="text-xs text-blue-500 mt-1">Date: ${ref.createdAt}</p>
+                </div>
+                <div class="flex space-x-2">
+                    <button data-id="${ref.id}" data-email="${ref.refererEmail}" class="approve-referral-btn px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition duration-150 text-sm">Approve</button>
+                    <button data-id="${ref.id}" class="reject-referral-btn px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition duration-150 text-sm">Reject</button>
+                </div>
             </div>
         `;
-    }).join('');
+    });
 
-    if (canEditStudents) {
-        document.querySelectorAll('.edit-student-btn').forEach(button => button.addEventListener('click', () => handleEditStudent(button.dataset.studentId)));
+    referralsHtml += `</div><hr class="my-6 border-blue-300">`;
+    return referralsHtml;
+}
+
+
+// ##################################
+// # REPORT FETCHING & PROCESSING
+// ##################################
+
+/**
+ * Fetches all reports and groups them by tutor.
+ * @returns {Object} Reports grouped by tutor email.
+ */
+async function fetchReports() {
+    if (sessionCache.reports) {
+        return sessionCache.reports;
     }
-    if (canDeleteStudents) {
-        document.querySelectorAll('.delete-student-btn').forEach(button => button.addEventListener('click', () => handleDeleteStudent(button.dataset.studentId)));
+
+    try {
+        const q = query(collection(db, "reports"), orderBy("tutorEmail", "asc"), orderBy("submissionDate", "desc"));
+        const querySnapshot = await getDocs(q);
+
+        const reportsByTutor = {};
+        querySnapshot.docs.forEach(doc => {
+            const report = {
+                id: doc.id,
+                ...doc.data(),
+                submissionDate: doc.data().submissionDate ? doc.data().submissionDate.toDate().toLocaleDateString() : 'N/A'
+            };
+            const tutorEmail = report.tutorEmail;
+            if (!reportsByTutor[tutorEmail]) {
+                reportsByTutor[tutorEmail] = {
+                    tutorName: report.tutorName || 'Unknown Tutor',
+                    reports: []
+                };
+            }
+            reportsByTutor[tutorEmail].reports.push(report);
+        });
+
+        saveToLocalStorage('reports', reportsByTutor);
+        return reportsByTutor;
+    } catch (error) {
+        console.error("Error fetching reports:", error);
+        return {};
     }
 }
 
-// --- Pay Advice Panel ---
-async function renderPayAdvicePanel(container) {
-    const canExport = window.userData.permissions?.actions?.canExportPayAdvice === true;
-    container.innerHTML = `
-        <div class="bg-white p-6 rounded-lg shadow-md">
-            <h2 class="text-2xl font-bold text-green-700 mb-4">Tutor Pay Advice</h2>
-            <div class="bg-green-50 p-4 rounded-lg mb-6 grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
-                <div>
-                    <label for="start-date" class="block text-sm font-medium">Start Date</label>
-                    <input type="date" id="start-date" class="mt-1 block w-full p-2 border rounded-md">
-                </div>
-                <div>
-                    <label for="end-date" class="block text-sm font-medium">End Date</label>
-                    <input type="date" id="end-date" class="mt-1 block w-full p-2 border rounded-md">
-                </div>
-                <div class="flex items-center space-x-4 col-span-2">
-                    <div class="bg-green-100 p-3 rounded-lg text-center shadow w-full"><h4 class="font-bold text-green-800 text-sm">Active Tutors</h4><p id="pay-tutor-count" class="text-2xl font-extrabold">0</p></div>
-                    <div class="bg-yellow-100 p-3 rounded-lg text-center shadow w-full"><h4 class="font-bold text-yellow-800 text-sm">Total Students</h4><p id="pay-student-count" class="text-2xl font-extrabold">0</p></div>
-                    ${canExport ? `<button id="export-pay-csv-btn" class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 h-full">Export CSV</button>` : ''}
+/**
+ * Fetches all parent feedback.
+ * @returns {Array} List of feedback objects.
+ */
+async function fetchParentFeedback() {
+    if (sessionCache.parentFeedback) {
+        return sessionCache.parentFeedback;
+    }
+    try {
+        const q = query(collection(db, "parent_feedback"), orderBy("timestamp", "desc"));
+        const querySnapshot = await getDocs(q);
+        const feedback = querySnapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data(),
+            timestamp: doc.data().timestamp ? doc.data().timestamp.toDate().toLocaleString() : 'N/A',
+            isRead: doc.data().isRead || false, // Ensure isRead exists
+        }));
+
+        saveToLocalStorage('parentFeedback', feedback);
+        return feedback;
+    } catch (error) {
+        console.error("Error fetching parent feedback:", error);
+        return [];
+    }
+}
+
+async function handleMarkFeedbackAsRead(feedbackId) {
+    try {
+        await updateDoc(doc(db, "parent_feedback", feedbackId), {
+            isRead: true,
+        });
+        invalidateCache('parentFeedback');
+        renderParentFeedbackPanel(document.getElementById('main-content'));
+    } catch (error) {
+        console.error("Error marking feedback as read: ", error);
+        alert("Failed to mark feedback as read. Check the console for details.");
+    }
+}
+
+// ##################################
+// # RENDERING FUNCTIONS
+// ##################################
+
+/**
+ * Renders the section for pending student approvals.
+ * @param {Array} students List of pending student objects.
+ * @returns {string} HTML string for the students section.
+ */
+function renderPendingStudentsSection(students) {
+    const tutors = sessionCache.tutors || [];
+    const tutorOptions = tutors
+        .sort((a, b) => a.name.localeCompare(b.name))
+        .map(tutor => `<option value="${tutor.email}">${tutor.name} (${tutor.email})</option>`)
+        .join('');
+
+    let studentsHtml = `<h3 class="text-2xl font-semibold text-orange-700 mb-4">Pending Student Approvals (${students.length})</h3>`;
+
+    if (students.length === 0) {
+        studentsHtml += `<p class="text-gray-500">No pending students at this time.</p>`;
+        return studentsHtml;
+    }
+
+    studentsHtml += `<div class="space-y-4 mb-8">`;
+
+    students.forEach(student => {
+        studentsHtml += `
+            <div class="bg-orange-100 p-4 rounded-lg shadow-sm">
+                <div class="flex flex-col md:flex-row justify-between items-start md:items-center">
+                    <div class="mb-2 md:mb-0">
+                        <p class="font-bold text-orange-800">${student.studentName} (Grade ${student.grade})</p>
+                        <p class="text-sm text-orange-600">Parent: ${student.parentName || 'N/A'}</p>
+                        <p class="text-xs text-orange-500 mt-1">Date: ${student.createdAt}</p>
+                        <button data-id="${student.id}" class="edit-pending-student-btn text-xs text-blue-500 hover:text-blue-700 mt-1">Edit Details</button>
+                    </div>
+                    <div class="flex items-center space-x-2 mt-2 md:mt-0">
+                        <select id="tutor-assign-${student.id}" class="w-48 p-2 border border-gray-300 rounded-md text-sm">
+                            <option value="" disabled selected>Assign Tutor...</option>
+                            ${tutorOptions}
+                        </select>
+                        <button data-id="${student.id}" class="approve-student-btn px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition duration-150 text-sm">Approve</button>
+                        <button data-id="${student.id}" class="reject-student-btn px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition duration-150 text-sm">Reject</button>
+                    </div>
                 </div>
             </div>
-            <div class="overflow-x-auto">
+        `;
+    });
+
+    studentsHtml += `</div><hr class="my-6 border-orange-300">`;
+    return studentsHtml;
+}
+
+/**
+ * Fetches and renders both pending students and pending referrals.
+ */
+async function fetchAndRenderPendingApprovals(container) {
+    container.innerHTML = `<h2 class="text-3xl font-bold text-green-700 mb-6">Pending Approvals Dashboard</h2><div class="flex justify-center items-center h-48"><div class="loading-spinner"></div><p class="ml-4 text-gray-600">Loading pending items...</p></div>`;
+
+    await fetchTutors(); // Ensure tutors are cached for assignment dropdowns
+
+    // 1. Fetch data
+    const students = await fetchPendingStudents();
+    const referrals = await fetchPendingReferrals(); // <-- NEW: Fetch referrals
+
+    container.innerHTML = `
+        <h2 class="text-3xl font-bold text-green-700 mb-6">Pending Approvals Dashboard</h2>
+        <div id="pending-students-section"></div>
+        <div id="pending-referrals-section"></div>
+    `;
+
+    // 2. Render sections
+    document.getElementById('pending-students-section').innerHTML = renderPendingStudentsSection(students);
+    document.getElementById('pending-referrals-section').innerHTML = renderPendingReferralsSection(referrals); // <-- NEW: Render referrals
+
+    // 3. Attach Event Listeners for Students
+    container.querySelectorAll('.edit-pending-student-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => handleEditPendingStudent(e.target.dataset.id));
+    });
+
+    container.querySelectorAll('.approve-student-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            const studentId = e.target.dataset.id;
+            const selectElement = document.getElementById(`tutor-assign-${studentId}`);
+            const tutorEmail = selectElement.value;
+            if (!tutorEmail) {
+                alert("Please select a tutor before approving.");
+                return;
+            }
+            handleApproveStudent(studentId, tutorEmail);
+        });
+    });
+
+    container.querySelectorAll('.reject-student-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => handleRejectStudent(e.target.dataset.id));
+    });
+
+    // 4. Attach Event Listeners for Referrals <-- NEW
+    container.querySelectorAll('.approve-referral-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            const referralId = e.target.dataset.id;
+            const refererEmail = e.target.dataset.email;
+            handleApproveReferral(referralId, refererEmail);
+        });
+    });
+
+    container.querySelectorAll('.reject-referral-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            const referralId = e.target.dataset.id;
+            handleRejectReferral(referralId);
+        });
+    });
+}
+
+function renderManagementTutorView(container) {
+    container.innerHTML = `<h2 class="text-3xl font-bold text-green-700 mb-6">Tutor & Student Management</h2><div class="flex justify-start space-x-4 mb-4"><button id="addStudentBtn" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">Assign New Student</button></div><div class="flex justify-center items-center h-48"><div class="loading-spinner"></div><p class="ml-4 text-gray-600">Loading directory data...</p></div>`;
+
+    const renderData = async () => {
+        const tutors = await fetchTutors();
+        const students = await fetchStudents();
+
+        let html = `
+            <h2 class="text-3xl font-bold text-green-700 mb-6">Tutor & Student Management</h2>
+            <div class="flex justify-start space-x-4 mb-8">
+                <button id="addStudentBtn" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 shadow-md transition duration-150">Assign New Student</button>
+            </div>
+            <div class="space-y-8">
+        `;
+
+        // Group students by tutor
+        const studentsByTutor = students.reduce((acc, student) => {
+            const key = student.tutorEmail || 'unassigned';
+            if (!acc[key]) {
+                acc[key] = [];
+            }
+            acc[key].push(student);
+            return acc;
+        }, {});
+
+        // Combine tutors with their students
+        tutors.forEach(tutor => {
+            const tutorStudents = studentsByTutor[tutor.email] || [];
+            const activeStudents = tutorStudents.filter(s => s.status === 'active');
+            const inactiveStudents = tutorStudents.filter(s => s.status === 'inactive' || s.status === 'suspended');
+
+            html += `
+                <div class="bg-white p-6 rounded-xl shadow-lg border border-gray-200">
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="text-2xl font-bold text-gray-800">${tutor.name} (${tutor.email})</h3>
+                        <div class="flex space-x-2">
+                            <span class="px-3 py-1 text-sm font-semibold rounded-full ${tutor.active ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}">
+                                ${tutor.active ? 'Active' : 'Inactive'}
+                            </span>
+                            <button data-email="${tutor.email}" data-status="${!tutor.active}" class="set-tutor-status-btn px-3 py-1 text-sm bg-yellow-500 text-white rounded-full hover:bg-yellow-600 transition duration-150">
+                                ${tutor.active ? 'Set Inactive' : 'Set Active'}
+                            </button>
+                        </div>
+                    </div>
+
+                    <p class="text-gray-600 mb-2">Total Students: ${tutorStudents.length} (Active: ${activeStudents.length})</p>
+
+                    ${renderStudentList(activeStudents, 'Active', 'green')}
+                    ${renderStudentList(inactiveStudents, 'Inactive/Suspended', 'red')}
+
+                </div>
+            `;
+            delete studentsByTutor[tutor.email]; // Remove processed tutor
+        });
+
+        // Handle unassigned students
+        const unassignedStudents = studentsByTutor['unassigned'] || [];
+        if (unassignedStudents.length > 0) {
+            html += `
+                <div class="bg-red-50 p-6 rounded-xl shadow-lg border border-red-200">
+                    <h3 class="text-2xl font-bold text-red-800">Unassigned Students (${unassignedStudents.length})</h3>
+                    ${renderStudentList(unassignedStudents, 'Unassigned', 'red')}
+                </div>
+            `;
+        }
+
+        html += `</div>`;
+        container.innerHTML = html;
+
+        // Attach event listeners
+        document.getElementById('addStudentBtn').addEventListener('click', showAssignStudentModal);
+        container.querySelectorAll('.edit-student-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => handleEditStudent(e.target.dataset.id));
+        });
+        container.querySelectorAll('.set-tutor-status-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => handleSetTutorActiveStatus(e.target.dataset.email, e.target.dataset.status === 'true'));
+        });
+        container.querySelectorAll('.set-student-status-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => handleSetStudentStatus(e.target.dataset.id, e.target.dataset.status));
+        });
+        container.querySelectorAll('.move-to-break-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => handleMoveStudentToBreak(e.target.dataset.id, e.target.dataset.name));
+        });
+    };
+
+    renderData();
+}
+
+function renderStudentList(students, title, color) {
+    if (students.length === 0) {
+        return `<p class="text-sm text-gray-500 mt-2">${title} Students: None</p>`;
+    }
+
+    let listHtml = `
+        <h4 class="text-lg font-semibold text-${color}-700 mt-4 mb-2">${title} Students (${students.length})</h4>
+        <div class="space-y-3 border-l-2 border-${color}-400 pl-4">
+    `;
+
+    students.forEach(student => {
+        const studentFee = student.studentFee ? `₦${student.studentFee.toLocaleString()}` : 'N/A';
+        const isSuspended = student.status === 'suspended';
+        const isInactive = student.status === 'inactive';
+        const isUnassigned = student.tutorEmail === 'unassigned';
+
+        let statusToggleBtn = '';
+        if (isSuspended || isInactive) {
+            statusToggleBtn = `<button data-id="${student.id}" data-status="active" class="set-student-status-btn px-3 py-1 text-xs bg-green-500 text-white rounded-full hover:bg-green-600 transition duration-150">Set Active</button>`;
+        } else if (student.status === 'active') {
+            statusToggleBtn = `<button data-id="${student.id}" data-status="suspended" class="set-student-status-btn px-3 py-1 text-xs bg-red-500 text-white rounded-full hover:bg-red-600 transition duration-150">Set Suspended</button>`;
+        }
+
+        listHtml += `
+            <div class="p-3 bg-${color}-50 rounded-lg flex flex-col sm:flex-row justify-between items-start sm:items-center">
+                <div class="flex-1 min-w-0">
+                    <p class="font-medium text-${color}-800 truncate">${student.studentName} (Grade ${student.grade})</p>
+                    <p class="text-xs text-gray-600">Subjects: ${student.subjects.join(', ')} | Days: ${student.days}</p>
+                    <p class="text-xs text-gray-600">Parent: ${student.parentName || 'N/A'} (${student.parentPhone || 'N/A'}) | Fee: ${studentFee}</p>
+                </div>
+                <div class="flex space-x-2 mt-2 sm:mt-0 sm:ml-4 flex-shrink-0">
+                    <button data-id="${student.id}" class="edit-student-btn px-3 py-1 text-xs bg-blue-500 text-white rounded-full hover:bg-blue-600 transition duration-150">Edit</button>
+                    ${statusToggleBtn}
+                    ${student.status === 'active' && !isUnassigned ?
+                        `<button data-id="${student.id}" data-name="${student.studentName}" class="move-to-break-btn px-3 py-1 text-xs bg-purple-500 text-white rounded-full hover:bg-purple-600 transition duration-150">Break</button>`
+                        : ''}
+                </div>
+            </div>
+        `;
+    });
+
+    listHtml += `</div>`;
+    return listHtml;
+}
+
+function renderPayAdvicePanel(container) {
+    container.innerHTML = `<h2 class="text-3xl font-bold text-green-700 mb-6">Tutor Pay Advice Generation</h2><div class="flex justify-center items-center h-48"><div class="loading-spinner"></div><p class="ml-4 text-gray-600">Calculating pay advice...</p></div>`;
+
+    const calculatePay = async () => {
+        const tutors = await fetchTutors();
+        const students = await fetchStudents();
+
+        const payAdvice = tutors.map(tutor => {
+            const tutorStudents = students.filter(s => s.tutorEmail === tutor.email && s.status === 'active');
+            const studentCount = tutorStudents.length;
+
+            const totalStudentFees = tutorStudents.reduce((sum, s) => sum + (Number(s.studentFee) || 0), 0);
+            const managementFee = totalStudentFees * 0.4; // 40% management fee
+            const totalPay = totalStudentFees - managementFee;
+
+            return {
+                tutorName: tutor.name,
+                tutorEmail: tutor.email,
+                studentCount: studentCount,
+                totalStudentFees: totalStudentFees.toFixed(2),
+                managementFee: managementFee.toFixed(2),
+                totalPay: totalPay.toFixed(2),
+                beneficiaryBank: tutor.beneficiaryBank || 'N/A',
+                beneficiaryAccount: tutor.beneficiaryAccount || 'N/A',
+                beneficiaryName: tutor.beneficiaryName || 'N/A',
+            };
+        });
+
+        currentPayData = payAdvice; // Store data globally for CSV export
+
+        let html = `
+            <h2 class="text-3xl font-bold text-green-700 mb-6">Tutor Pay Advice Generation</h2>
+            <div class="mb-4 flex justify-between items-center">
+                <p class="text-lg text-gray-600 font-semibold">Total Tutors: ${payAdvice.length}</p>
+                <button id="exportPayAdviceBtn" class="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 shadow-md transition duration-150">Export to CSV</button>
+            </div>
+            <div class="overflow-x-auto bg-white p-4 rounded-xl shadow-lg">
                 <table class="min-w-full divide-y divide-gray-200">
                     <thead class="bg-gray-50">
                         <tr>
-                            <th class="px-6 py-3 text-left text-xs font-medium uppercase">Tutor</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium uppercase">Students</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium uppercase">Student Fees</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium uppercase">Mgmt. Fee</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium uppercase">Total Pay</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium uppercase">Gift (₦)</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium uppercase">Final Pay</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium uppercase">Actions</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tutor Name</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Students</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total Fee (₦)</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Mgt Fee (₦)</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tutor Pay (₦)</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Gift (₦)</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Final Pay (₦)</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Bank Details</th>
                         </tr>
                     </thead>
-                    <tbody id="pay-advice-table-body" class="divide-y"><tr><td colspan="8" class="text-center py-4">Select a date range.</td></tr></tbody>
+                    <tbody class="bg-white divide-y divide-gray-200">
+                        ${payAdvice.map(item => {
+                            const giftAmount = payAdviceGifts[item.tutorEmail] || 0;
+                            const finalPay = (parseFloat(item.totalPay) + giftAmount).toFixed(2);
+                            return `
+                                <tr class="hover:bg-gray-50">
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">${item.tutorName}</td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${item.studentCount}</td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${item.totalStudentFees}</td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${item.managementFee}</td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-green-700 font-semibold">${item.totalPay}</td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm">
+                                        <input type="number" value="${giftAmount}" data-email="${item.tutorEmail}" class="gift-input w-20 p-1 border rounded text-right text-sm">
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-blue-700 font-bold final-pay-cell" data-email="${item.tutorEmail}">${finalPay}</td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-xs text-gray-500">
+                                        <p>Name: ${item.beneficiaryName}</p>
+                                        <p>Acc: ${item.beneficiaryAccount}</p>
+                                        <p>Bank: ${item.beneficiaryBank}</p>
+                                    </td>
+                                </tr>
+                            `;
+                        }).join('')}
+                    </tbody>
                 </table>
             </div>
-        </div>
-    `;
-    const startDateInput = document.getElementById('start-date');
-    const endDateInput = document.getElementById('end-date');
-    const handleDateChange = () => {
-        const startDate = startDateInput.value ? new Date(startDateInput.value) : null;
-        const endDate = endDateInput.value ? new Date(endDateInput.value) : null;
-        if (startDate && endDate) {
-            payAdviceGifts = {}; // Reset gifts on new date range
-            currentPayData = []; // Reset data
-            endDate.setHours(23, 59, 59, 999);
-            loadPayAdviceData(startDate, endDate);
-        }
-    };
-    startDateInput.addEventListener('change', handleDateChange);
-    endDateInput.addEventListener('change', handleDateChange);
+        `;
+        container.innerHTML = html;
 
-    const exportBtn = document.getElementById('export-pay-csv-btn');
-    if (exportBtn) {
-        exportBtn.onclick = () => {
+        // Attach event listeners for gifts
+        container.querySelectorAll('.gift-input').forEach(input => {
+            input.addEventListener('input', (e) => {
+                const email = e.target.dataset.email;
+                const gift = parseFloat(e.target.value) || 0;
+                payAdviceGifts[email] = gift;
+                updateFinalPay(email, gift);
+            });
+        });
+
+        // Attach event listener for CSV export
+        document.getElementById('exportPayAdviceBtn').addEventListener('click', () => {
             const csv = convertPayAdviceToCSV(currentPayData);
             const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-            const link = document.createElement('a');
-            const start = document.getElementById('start-date').value;
-            const end = document.getElementById('end-date').value;
-            link.href = URL.createObjectURL(blob);
-            link.download = `Pay_Advice_${start}_to_${end}.csv`;
-            link.click();
-        };
-    }
-}
-
-async function loadPayAdviceData(startDate, endDate) {
-    const tableBody = document.getElementById('pay-advice-table-body');
-    if (!tableBody) return;
-    tableBody.innerHTML = `<tr><td colspan="8" class="text-center py-4">Loading pay data...</td></tr>`;
-
-    const startTimestamp = Timestamp.fromDate(startDate);
-    const endTimestamp = Timestamp.fromDate(endDate);
-    const reportsQuery = query(collection(db, "tutor_submissions"), where("submittedAt", ">=", startTimestamp), where("submittedAt", "<=", endTimestamp));
-    try {
-        const reportsSnapshot = await getDocs(reportsQuery);
-        const activeTutorEmails = [...new Set(reportsSnapshot.docs.map(doc => doc.data().tutorEmail))];
-
-        if (activeTutorEmails.length === 0) {
-            tableBody.innerHTML = `<tr><td colspan="8" class="text-center py-4">No active tutors in this period.</td></tr>`;
-            document.getElementById('pay-tutor-count').textContent = 0;
-            document.getElementById('pay-student-count').textContent = 0;
-            currentPayData = [];
-            return;
-        }
-
-        const tutorBankDetails = {};
-        reportsSnapshot.docs.forEach(doc => {
-            const data = doc.data();
-            if (data.beneficiaryBank && data.beneficiaryAccount) {
-                tutorBankDetails[data.tutorEmail] = {
-                    beneficiaryBank: data.beneficiaryBank,
-                    beneficiaryAccount: data.beneficiaryAccount,
-                    beneficiaryName: data.beneficiaryName || 'N/A',
-                };
-            }
+            saveAs(blob, `PayAdvice_${new Date().toISOString().slice(0, 10)}.csv`);
         });
-        
-        // ### FIXED SECTION ###
-        // Firestore 'in' queries are limited to 30 values. This function fetches tutors by chunking the email list.
-        const fetchTutorsInChunks = async (emails) => {
-            if (emails.length === 0) return [];
-            const chunks = [];
-            for (let i = 0; i < emails.length; i += 30) {
-                chunks.push(emails.slice(i, i + 30));
-            }
-
-            const queryPromises = chunks.map(chunk =>
-                getDocs(query(collection(db, "tutors"), where("email", "in", chunk)))
-            );
-
-            const querySnapshots = await Promise.all(queryPromises);
-            // Combine the docs from all snapshot results into a single array
-            return querySnapshots.flatMap(snapshot => snapshot.docs);
-        };
-
-        // Fetch both tutors (in chunks) and all students concurrently.
-        const [tutorDocs, studentsSnapshot] = await Promise.all([
-            fetchTutorsInChunks(activeTutorEmails),
-            getDocs(collection(db, "students"))
-        ]);
-        // ### END FIXED SECTION ###
-
-        const allStudents = studentsSnapshot.docs.map(doc => doc.data());
-        let totalStudentCount = 0;
-        const payData = [];
-        
-        // Iterate over the combined array of tutor documents
-        tutorDocs.forEach(doc => {
-            const tutor = doc.data();
-            const assignedStudents = allStudents.filter(s => s.tutorEmail === tutor.email);
-            const totalStudentFees = assignedStudents.reduce((sum, s) => sum + (s.studentFee || 0), 0);
-            const managementFee = (tutor.isManagementStaff && tutor.managementFee) ? tutor.managementFee : 0;
-            totalStudentCount += assignedStudents.length;
-            const bankDetails = tutorBankDetails[tutor.email] || { beneficiaryBank: 'N/A', beneficiaryAccount: 'N/A', beneficiaryName: 'N/A' };
-
-            payData.push({
-                tutorName: tutor.name,
-                tutorEmail: tutor.email,
-                studentCount: assignedStudents.length,
-                totalStudentFees: totalStudentFees,
-                managementFee: managementFee,
-                totalPay: totalStudentFees + managementFee,
-                ...bankDetails
-            });
-        });
-        currentPayData = payData; // Store for reuse
-        document.getElementById('pay-tutor-count').textContent = payData.length;
-        document.getElementById('pay-student-count').textContent = totalStudentCount;
-        renderPayAdviceTable();
-
-    } catch (error) {
-        console.error("Error loading pay advice data:", error);
-        tableBody.innerHTML = `<tr><td colspan="8" class="text-center py-4 text-red-500">Failed to load data.</td></tr>`;
-    }
-}
-
-function renderPayAdviceTable() {
-    const tableBody = document.getElementById('pay-advice-table-body');
-    if (!tableBody) return;
-    
-    tableBody.innerHTML = currentPayData.map(d => {
-        const giftAmount = payAdviceGifts[d.tutorEmail] || 0;
-        const finalPay = d.totalPay + giftAmount;
-        return `
-            <tr>
-                <td class="px-6 py-4">${d.tutorName}</td>
-                <td class="px-6 py-4">${d.studentCount}</td>
-                <td class="px-6 py-4">₦${d.totalStudentFees.toFixed(2)}</td>
-                <td class="px-6 py-4">₦${d.managementFee.toFixed(2)}</td>
-                <td class="px-6 py-4">₦${d.totalPay.toFixed(2)}</td>
-                <td class="px-6 py-4 text-blue-600 font-bold">₦${giftAmount.toFixed(2)}</td>
-                <td class="px-6 py-4 font-bold">₦${finalPay.toFixed(2)}</td>
-                <td class="px-6 py-4">
-                    <button class="add-gift-btn bg-blue-500 text-white px-3 py-1 rounded text-xs" data-tutor-email="${d.tutorEmail}">Add Gift</button>
-                </td>
-            </tr>
-        `;
-    }).join('');
-    document.querySelectorAll('.add-gift-btn').forEach(button => {
-        button.addEventListener('click', (e) => {
-            const tutorEmail = e.target.dataset.tutorEmail;
-            const currentGift = payAdviceGifts[tutorEmail] || 0;
-            const giftInput = prompt(`Enter gift amount for this tutor:`, currentGift);
-            if (giftInput !== null) {
-                const giftAmount = parseFloat(giftInput);
-                if (!isNaN(giftAmount) && giftAmount >= 0) {
-                    payAdviceGifts[tutorEmail] = giftAmount;
-                    renderPayAdviceTable(); // Re-render the table with the new gift
-                } else {
-                    alert("Please enter a valid, non-negative number.");
-                }
-            }
-        });
-    });
-}
-
-// --- Tutor Reports Panel ---
-async function renderTutorReportsPanel(container) {
-    container.innerHTML = `
-        <div class="bg-white p-6 rounded-lg shadow-md mb-6">
-            <div class="flex justify-between items-center mb-4 flex-wrap gap-4">
-                <h2 class="text-2xl font-bold text-green-700">Tutor Reports</h2>
-                <button id="refresh-reports-btn" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Refresh</button>
-            </div>
-            <div class="flex space-x-4 mb-4">
-                <div class="bg-green-100 p-3 rounded-lg text-center shadow w-full">
-                    <h4 class="font-bold text-green-800 text-sm">Unique Tutors Submitted</h4>
-                    <p id="report-tutor-count" class="text-2xl font-extrabold">0</p>
-                </div>
-                <div class="bg-yellow-100 p-3 rounded-lg text-center shadow w-full">
-                    <h4 class="font-bold text-yellow-800 text-sm">Total Reports Submitted</h4>
-                    <p id="report-total-count" class="text-2xl font-extrabold">0</p>
-                </div>
-            </div>
-            <div id="tutor-reports-list" class="space-y-4"><p class="text-center">Loading reports...</p></div>
-        </div>
-    `;
-    document.getElementById('refresh-reports-btn').addEventListener('click', () => fetchAndRenderTutorReports(true));
-    fetchAndRenderTutorReports();
-}
-
-async function fetchAndRenderTutorReports(forceRefresh = false) {
-    if (forceRefresh) invalidateCache('reports');
-    const reportsListContainer = document.getElementById('tutor-reports-list');
-    
-    try {
-        if (!sessionCache.reports) {
-            reportsListContainer.innerHTML = `<p class="text-center text-gray-500 py-10">Fetching reports from server...</p>`;
-            const snapshot = await getDocs(query(collection(db, "tutor_submissions"), orderBy("submittedAt", "desc")));
-            saveToLocalStorage('reports', snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-        }
-        renderTutorReportsFromCache();
-    } catch(error) {
-        console.error("Error fetching reports:", error);
-        reportsListContainer.innerHTML = `<p class="text-center text-red-500 py-10">Failed to load reports.</p>`;
-    }
-}
-
-function renderTutorReportsFromCache() {
-    const reports = sessionCache.reports || [];
-    const reportsListContainer = document.getElementById('tutor-reports-list');
-    if (!reportsListContainer) return;
-
-    if (reports.length === 0) {
-        reportsListContainer.innerHTML = `<p class="text-center text-gray-500">No reports found. Click Refresh to fetch from server.</p>`;
-        return;
-    }
-    
-    const reportsByTutor = {};
-    reports.forEach(report => {
-        if (!reportsByTutor[report.tutorEmail]) {
-            reportsByTutor[report.tutorEmail] = { name: report.tutorName || report.tutorEmail, reports: [] };
-        }
-        reportsByTutor[report.tutorEmail].reports.push(report);
-    });
-
-    document.getElementById('report-tutor-count').textContent = Object.keys(reportsByTutor).length;
-    document.getElementById('report-total-count').textContent = reports.length;
-
-    const canDownload = window.userData.permissions?.actions?.canDownloadReports === true;
-    reportsListContainer.innerHTML = Object.values(reportsByTutor).map(tutorData => {
-        const reportLinks = tutorData.reports.map(report => {
-            const buttonHTML = canDownload
-                ? `<button class="download-report-btn bg-green-500 text-white px-3 py-1 text-sm rounded" data-report-id="${report.id}">Download</button>`
-                : `<button class="view-report-btn bg-gray-500 text-white px-3 py-1 text-sm rounded" data-report-id="${report.id}">View</button>`;
-            return `<li class="flex justify-between items-center p-2 bg-gray-50 rounded">${report.studentName}<span>${buttonHTML}</span></li>`;
-        }).join('');
-        
-        const zipButtonHTML = canDownload
-            ? `<div class="p-4 border-t"><button class="zip-reports-btn bg-blue-600 text-white px-4 py-2 text-sm rounded w-full hover:bg-blue-700" data-tutor-email="${tutorData.reports[0].tutorEmail}">Zip & Download All Reports</button></div>`
-            : '';
-
-        return `<details class="border rounded-lg">
-                    <summary class="p-4 cursor-pointer font-semibold">${tutorData.name} (${tutorData.reports.length} reports)</summary>
-                    <div class="p-4 border-t"><ul class="space-y-2">${reportLinks}</ul></div>
-                    ${zipButtonHTML}
-                </details>`;
-    }).join('');
-
-    document.querySelectorAll('.download-report-btn').forEach(button => button.addEventListener('click', (e) => { e.stopPropagation(); viewReportInNewTab(e.target.dataset.reportId, true); }));
-    document.querySelectorAll('.view-report-btn').forEach(button => button.addEventListener('click', (e) => { e.stopPropagation(); viewReportInNewTab(e.target.dataset.reportId, false); }));
-    document.querySelectorAll('.zip-reports-btn').forEach(button => button.addEventListener('click', async (e) => {
-        e.stopPropagation();
-        const tutorEmail = e.target.dataset.tutorEmail;
-        const tutorData = reportsByTutor[tutorEmail];
-        if (tutorData) await zipAndDownloadTutorReports(tutorData.reports, tutorData.name, e.target);
-    }));
-}
-
-// --- Pending Approvals Panel ---
-async function renderPendingApprovalsPanel(container) {
-    container.innerHTML = `
-        <div class="bg-white p-6 rounded-lg shadow-md">
-            <div class="flex justify-between items-center mb-4">
-                <h2 class="text-2xl font-bold text-green-700">Pending Approvals</h2>
-                <button id="refresh-pending-btn" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Refresh</button>
-            </div>
-            <div id="pending-approvals-list" class="space-y-4">
-                <p class="text-center text-gray-500 py-10">Loading pending students...</p>
-            </div>
-        </div>
-    `;
-    document.getElementById('refresh-pending-btn').addEventListener('click', () => fetchAndRenderPendingApprovals(true));
-    fetchAndRenderPendingApprovals();
-}
-
-async function fetchAndRenderPendingApprovals(forceRefresh = false) {
-    if (forceRefresh) invalidateCache('pendingStudents');
-    const listContainer = document.getElementById('pending-approvals-list');
-    
-    try {
-        if (!sessionCache.pendingStudents) {
-            listContainer.innerHTML = `<p class="text-center text-gray-500 py-10">Fetching pending students...</p>`;
-            const snapshot = await getDocs(query(collection(db, "pending_students")));
-            saveToLocalStorage('pendingStudents', snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-        }
-        renderPendingApprovalsFromCache();
-    } catch(error) {
-        console.error("Error fetching pending students:", error);
-        listContainer.innerHTML = `<p class="text-center text-red-500 py-10">Failed to load data.</p>`;
-    }
-}
-
-function renderPendingApprovalsFromCache() {
-    const pendingStudents = sessionCache.pendingStudents || [];
-    const listContainer = document.getElementById('pending-approvals-list');
-    if (!listContainer) return;
-
-    if (pendingStudents.length === 0) {
-        listContainer.innerHTML = `<p class="text-center text-gray-500">No students are awaiting approval.</p>`;
-        return;
-    }
-
-    listContainer.innerHTML = pendingStudents.map(student => `
-        <div class="border p-4 rounded-lg flex justify-between items-center bg-gray-50">
-            <div>
-                <p><strong>Student:</strong> ${student.studentName}</p>
-                <p><strong>Fee:</strong> ₦${(student.studentFee || 0).toFixed(2)}</p>
-                <p><strong>Submitted by Tutor:</strong> ${student.tutorEmail || 'N/A'}</p>
-            </div>
-            <div class="flex items-center space-x-2">
-                <button class="edit-pending-btn bg-blue-500 text-white px-3 py-1 text-sm rounded-full" data-student-id="${student.id}">Edit</button>
-                <button class="approve-btn bg-green-600 text-white px-3 py-1 text-sm rounded-full" data-student-id="${student.id}">Approve</button>
-                <button class="reject-btn bg-red-600 text-white px-3 py-1 text-sm rounded-full" data-student-id="${student.id}">Reject</button>
-            </div>
-        </div>
-    `).join('');
-    document.querySelectorAll('.edit-pending-btn').forEach(button => button.addEventListener('click', () => handleEditPendingStudent(button.dataset.studentId)));
-    document.querySelectorAll('.approve-btn').forEach(button => button.addEventListener('click', () => handleApproveStudent(button.dataset.studentId)));
-    document.querySelectorAll('.reject-btn').forEach(button => button.addEventListener('click', () => handleRejectStudent(button.dataset.studentId)));
-}
-
-// --- Summer Break Panel ---
-async function renderSummerBreakPanel(container) {
-    container.innerHTML = `
-        <div class="bg-white p-6 rounded-lg shadow-md">
-            <div class="flex justify-between items-center mb-4">
-                <h2 class="text-2xl font-bold text-green-700">Students on Summer Break</h2>
-                <button id="refresh-break-btn" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Refresh</button>
-            </div>
-            <div id="break-status-message" class="text-center font-semibold mb-4 hidden"></div>
-            <div id="break-students-list" class="space-y-4">
-                <p class="text-center">Loading...</p>
-            </div>
-        </div>
-    `;
-    document.getElementById('refresh-break-btn').addEventListener('click', () => fetchAndRenderBreakStudents(true));
-    fetchAndRenderBreakStudents();
-}
-
-async function fetchAndRenderBreakStudents(forceRefresh = false) {
-    if (forceRefresh) invalidateCache('breakStudents');
-    const listContainer = document.getElementById('break-students-list');
-
-    try {
-        if (!sessionCache.breakStudents) {
-            listContainer.innerHTML = `<p class="text-center text-gray-500 py-10">Fetching student break status...</p>`;
-            const snapshot = await getDocs(query(collection(db, "students"), where("summerBreak", "==", true)));
-            saveToLocalStorage('breakStudents', snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-        }
-        renderBreakStudentsFromCache();
-    } catch(error) {
-        console.error("Error fetching break students:", error);
-        listContainer.innerHTML = `<p class="text-center text-red-500 py-10">Failed to load data.</p>`;
-    }
-}
-
-function renderBreakStudentsFromCache() {
-    const breakStudents = sessionCache.breakStudents || [];
-    const listContainer = document.getElementById('break-students-list');
-    if (!listContainer) return;
-
-    const canEndBreak = window.userData.permissions?.actions?.canEndBreak === true;
-    if (breakStudents.length === 0) {
-        listContainer.innerHTML = `<p class="text-center text-gray-500">No students are on break.</p>`;
-        return;
-    }
-    
-    listContainer.innerHTML = breakStudents.map(student => {
-        const endBreakButton = canEndBreak 
-            ? `<button class="end-break-btn bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700 transition-colors" data-student-id="${student.id}">End Break</button>`
-            : '';
-        return `
-            <div class="border p-4 rounded-lg flex justify-between items-center bg-gray-50">
-                <div>
-                    <p><strong>Student:</strong> ${student.studentName}</p>
-                    <p><strong>Tutor:</strong> ${student.tutorEmail}</p>
-                </div>
-                <div class="flex items-center space-x-2">
-                    <span class="text-yellow-600 font-semibold px-3 py-1 bg-yellow-100 rounded-full text-sm">On Break</span>
-                     ${endBreakButton}
-                </div>
-            </div>
-        `;
-    }).join('');
-    if (canEndBreak) {
-        document.querySelectorAll('.end-break-btn').forEach(button => {
-            button.addEventListener('click', async (e) => {
-                const studentId = e.target.dataset.studentId;
-                if (confirm("Are you sure you want to end the summer break for this student?")) {
-                    try {
-                        await updateDoc(doc(db, "students", studentId), { summerBreak: false, lastBreakEnd: Timestamp.now() });
-                        document.getElementById('break-status-message').textContent = `Break ended successfully.`;
-                        document.getElementById('break-status-message').className = 'text-center font-semibold mb-4 text-green-600';
-                        invalidateCache('breakStudents'); // Invalidate cache
-                        fetchAndRenderBreakStudents(); // Re-render list
-                    } catch (error) {
-                        console.error("Error ending summer break:", error);
-                        document.getElementById('break-status-message').textContent = "Failed to end summer break.";
-                        document.getElementById('break-status-message').className = 'text-center font-semibold mb-4 text-red-600';
-                    }
-                }
-            });
-        });
-    }
-}
-
-// --- Parent Feedback Panel ---
-async function renderParentFeedbackPanel(container) {
-    container.innerHTML = `
-        <div class="bg-white p-6 rounded-lg shadow-md">
-            <div class="flex justify-between items-center mb-4">
-                <h2 class="text-2xl font-bold text-green-700">Parent Feedback & Requests</h2>
-                <button id="refresh-feedback-btn" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Refresh</button>
-            </div>
-            <div class="flex space-x-4 mb-4">
-                <div class="bg-green-100 p-3 rounded-lg text-center shadow w-full">
-                    <h4 class="font-bold text-green-800 text-sm">Total Messages</h4>
-                    <p id="feedback-total-count" class="text-2xl font-extrabold">0</p>
-                </div>
-                <div class="bg-yellow-100 p-3 rounded-lg text-center shadow w-full">
-                    <h4 class="font-bold text-yellow-800 text-sm">Unread Messages</h4>
-                    <p id="feedback-unread-count" class="text-2xl font-extrabold">0</p>
-                </div>
-            </div>
-            <div id="parent-feedback-list" class="space-y-4">
-                <p class="text-center text-gray-500 py-10">Loading feedback messages...</p>
-            </div>
-        </div>
-    `;
-    
-    document.getElementById('refresh-feedback-btn').addEventListener('click', () => fetchAndRenderParentFeedback(true));
-    fetchAndRenderParentFeedback();
-}
-
-async function fetchAndRenderParentFeedback(forceRefresh = false) {
-    if (forceRefresh) invalidateCache('parentFeedback');
-    const listContainer = document.getElementById('parent-feedback-list');
-    
-    try {
-        if (!sessionCache.parentFeedback) {
-            listContainer.innerHTML = `<p class="text-center text-gray-500 py-10">Fetching feedback messages...</p>`;
-            
-            // Get all feedback messages
-            const feedbackSnapshot = await getDocs(query(collection(db, "parent_feedback"), orderBy("timestamp", "desc")));
-            const feedbackData = feedbackSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-            
-            // Get all tutor submissions to find parent names
-            const submissionsSnapshot = await getDocs(collection(db, "tutor_submissions"));
-            const submissionsData = submissionsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-            
-            // Create a map of student names to parent names
-            const studentParentMap = {};
-            submissionsData.forEach(submission => {
-                if (submission.studentName && submission.parentName) {
-                    studentParentMap[submission.studentName] = submission.parentName;
-                }
-            });
-            
-            // Enhance feedback data with proper timestamps and parent names
-            const enhancedFeedbackData = feedbackData.map(feedback => {
-                // Convert timestamp to Firestore Timestamp format for submittedAt
-                let submittedAt = feedback.submittedAt;
-                if (feedback.timestamp && !submittedAt) {
-                    // Convert your timestamp string to Firestore Timestamp
-                    const date = new Date(feedback.timestamp);
-                    submittedAt = Timestamp.fromDate(date);
-                }
-                
-                // Get parent name from tutor submissions if available
-                let parentName = feedback.parentName;
-                if ((!parentName || parentName === "Unknown Parent") && feedback.studentName) {
-                    parentName = studentParentMap[feedback.studentName] || feedback.parentName;
-                }
-                
-                return {
-                    ...feedback,
-                    submittedAt: submittedAt || Timestamp.now(),
-                    parentName: parentName || 'Unknown Parent',
-                    // Ensure all required fields have defaults
-                    read: feedback.read || false,
-                    message: feedback.message || '',
-                    parentEmail: feedback.parentEmail || '',
-                    parentPhone: feedback.parentPhone || '',
-                    responses: feedback.responses || [] // Initialize responses array if not exists
-                };
-            });
-            
-            saveToLocalStorage('parentFeedback', enhancedFeedbackData);
-        }
-        renderParentFeedbackFromCache();
-    } catch(error) {
-        console.error("Error fetching parent feedback:", error);
-        listContainer.innerHTML = `<p class="text-center text-red-500 py-10">Failed to load feedback messages.</p>`;
-    }
-}
-
-function renderParentFeedbackFromCache() {
-    const feedbackMessages = sessionCache.parentFeedback || [];
-    const listContainer = document.getElementById('parent-feedback-list');
-    if (!listContainer) return;
-
-    if (feedbackMessages.length === 0) {
-        listContainer.innerHTML = `<p class="text-center text-gray-500">No feedback messages found.</p>`;
-        document.getElementById('feedback-total-count').textContent = '0';
-        document.getElementById('feedback-unread-count').textContent = '0';
-        return;
-    }
-
-    const unreadCount = feedbackMessages.filter(msg => !msg.read).length;
-    
-    document.getElementById('feedback-total-count').textContent = feedbackMessages.length;
-    document.getElementById('feedback-unread-count').textContent = unreadCount;
-
-    listContainer.innerHTML = feedbackMessages.map(message => {
-        // Handle both timestamp formats
-        let submittedDate = 'Unknown date';
-        if (message.submittedAt) {
-            if (message.submittedAt.toDate) {
-                // It's a Firestore Timestamp
-                submittedDate = message.submittedAt.toDate().toLocaleDateString();
-            } else if (message.submittedAt.seconds) {
-                // It's a Timestamp object
-                submittedDate = new Date(message.submittedAt.seconds * 1000).toLocaleDateString();
-            } else if (message.timestamp) {
-                // Use the original timestamp field
-                submittedDate = new Date(message.timestamp).toLocaleDateString();
-            }
-        } else if (message.timestamp) {
-            submittedDate = new Date(message.timestamp).toLocaleDateString();
-        }
-        
-        const readStatus = message.read ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800';
-        const readText = message.read ? 'Read' : 'Unread';
-
-        // Display existing responses
-        const responsesHTML = message.responses && message.responses.length > 0 ? `
-            <div class="mt-4 border-t pt-4">
-                <h4 class="font-semibold text-gray-700 mb-2">Responses:</h4>
-                ${message.responses.map(response => `
-                    <div class="bg-blue-50 p-3 rounded-lg mb-2">
-                        <div class="flex justify-between items-start mb-1">
-                            <span class="font-medium text-blue-800">${response.responderName || 'Staff'}</span>
-                            <span class="text-xs text-gray-500">${new Date(response.responseDate?.seconds * 1000).toLocaleDateString()}</span>
-                        </div>
-                        <p class="text-gray-700 text-sm">${response.responseText}</p>
-                    </div>
-                `).join('')}
-            </div>
-        ` : '';
-
-        return `
-            <div class="border rounded-lg p-4 bg-white shadow-sm hover:shadow-md transition-shadow ${message.read ? '' : 'border-l-4 border-l-yellow-500'}">
-                <div class="flex justify-between items-start mb-3">
-                    <div>
-                        <h3 class="font-bold text-lg text-gray-800">${message.parentName || 'Anonymous Parent'}</h3>
-                        <p class="text-sm text-gray-600">Student: ${message.studentName || 'N/A'}</p>
-                    </div>
-                    <div class="text-right">
-                        <span class="text-xs text-gray-500 block">${submittedDate}</span>
-                        <span class="text-xs px-2 py-1 rounded-full ${readStatus}">${readText}</span>
-                    </div>
-                </div>
-                
-                <div class="mb-3">
-                    <p class="text-gray-700 whitespace-pre-wrap">${message.message || 'No message content'}</p>
-                </div>
-                
-                ${responsesHTML}
-
-                <div class="flex justify-between items-center text-sm text-gray-600">
-                    <div>
-                        ${message.parentEmail ? `<span class="mr-3">📧 ${message.parentEmail}</span>` : ''}
-                        ${message.parentPhone ? `<span>📞 ${message.parentPhone}</span>` : ''}
-                    </div>
-                    <div class="flex space-x-2">
-                        ${!message.read ? `
-                            <button class="mark-read-btn bg-blue-500 text-white px-3 py-1 rounded text-xs hover:bg-blue-600" data-message-id="${message.id}">
-                                Mark as Read
-                            </button>
-                        ` : ''}
-                        <button class="respond-btn bg-green-500 text-white px-3 py-1 rounded text-xs hover:bg-green-600" data-message-id="${message.id}">
-                            Respond
-                        </button>
-                        <button class="delete-feedback-btn bg-red-500 text-white px-3 py-1 rounded text-xs hover:bg-red-600" data-message-id="${message.id}">
-                            Delete
-                        </button>
-                    </div>
-                </div>
-            </div>
-        `;
-    }).join('');
-
-    // Add event listeners for the buttons
-    document.querySelectorAll('.mark-read-btn').forEach(button => {
-        button.addEventListener('click', (e) => {
-            e.stopPropagation();
-            handleMarkAsRead(e.target.dataset.messageId);
-        });
-    });
-
-    document.querySelectorAll('.respond-btn').forEach(button => {
-        button.addEventListener('click', (e) => {
-            e.stopPropagation();
-            showResponseModal(e.target.dataset.messageId);
-        });
-    });
-
-    document.querySelectorAll('.delete-feedback-btn').forEach(button => {
-        button.addEventListener('click', (e) => {
-            e.stopPropagation();
-            handleDeleteFeedback(e.target.dataset.messageId);
-        });
-    });
-}
-
-// New function to show response modal
-function showResponseModal(messageId) {
-    const message = sessionCache.parentFeedback?.find(msg => msg.id === messageId);
-    if (!message) {
-        alert("Message not found!");
-        return;
-    }
-
-    const modalHtml = `
-        <div id="response-modal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-center justify-center">
-            <div class="relative p-8 bg-white w-96 max-w-2xl rounded-lg shadow-xl">
-                <button class="absolute top-2 right-2 text-gray-500 hover:text-gray-800 text-2xl font-bold" onclick="document.getElementById('response-modal').remove()">&times;</button>
-                <h3 class="text-xl font-bold mb-4">Respond to Parent Feedback</h3>
-                <div class="mb-4 p-4 bg-gray-50 rounded-lg">
-                    <p><strong>From:</strong> ${message.parentName || 'Anonymous Parent'}</p>
-                    <p><strong>Student:</strong> ${message.studentName || 'N/A'}</p>
-                    <p><strong>Message:</strong> ${message.message}</p>
-                </div>
-                <form id="response-form">
-                    <input type="hidden" id="response-message-id" value="${messageId}">
-                    <div class="mb-4">
-                        <label class="block text-sm font-medium mb-2">Your Response</label>
-                        <textarea id="response-text" rows="6" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent" placeholder="Type your response here..."></textarea>
-                    </div>
-                    <div class="flex justify-end space-x-3">
-                        <button type="button" onclick="document.getElementById('response-modal').remove()" class="px-4 py-2 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400">Cancel</button>
-                        <button type="submit" class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700">Send Response</button>
-                    </div>
-                </form>
-            </div>
-        </div>
-    `;
-    
-    document.body.insertAdjacentHTML('beforeend', modalHtml);
-    
-    document.getElementById('response-form').addEventListener('submit', async (e) => {
-        e.preventDefault();
-        await handleSendResponse(messageId);
-    });
-}
-
-// New function to handle sending responses
-async function handleSendResponse(messageId) {
-    const responseText = document.getElementById('response-text').value.trim();
-    const modal = document.getElementById('response-modal');
-    
-    if (!responseText) {
-        alert("Please enter a response message.");
-        return;
-    }
-
-    try {
-        const messageRef = doc(db, "parent_feedback", messageId);
-        const messageDoc = await getDoc(messageRef);
-        
-        if (!messageDoc.exists()) {
-            alert("Message not found!");
-            return;
-        }
-
-        const currentData = messageDoc.data();
-        const currentResponses = currentData.responses || [];
-        
-        const newResponse = {
-            responseText: responseText,
-            responderName: window.userData?.name || 'Management Staff',
-            responderEmail: window.userData?.email || 'management',
-            responseDate: Timestamp.now()
-        };
-
-        // Update the message with the new response
-        await updateDoc(messageRef, {
-            responses: [...currentResponses, newResponse],
-            read: true, // Mark as read when responding
-            readAt: Timestamp.now()
-        });
-
-        // Update cache
-        if (sessionCache.parentFeedback) {
-            const messageIndex = sessionCache.parentFeedback.findIndex(msg => msg.id === messageId);
-            if (messageIndex !== -1) {
-                sessionCache.parentFeedback[messageIndex].responses = [...currentResponses, newResponse];
-                sessionCache.parentFeedback[messageIndex].read = true;
-                saveToLocalStorage('parentFeedback', sessionCache.parentFeedback);
-            }
-        }
-
-        alert("Response sent successfully!");
-        modal.remove();
-        renderParentFeedbackFromCache(); // Refresh the display
-
-    } catch (error) {
-        console.error("Error sending response:", error);
-        alert("Failed to send response. Please try again.");
-    }
-}
-
-async function handleMarkAsRead(messageId) {
-    try {
-        await updateDoc(doc(db, "parent_feedback", messageId), {
-            read: true,
-            readAt: Timestamp.now()
-        });
-        
-        // Update cache and re-render
-        if (sessionCache.parentFeedback) {
-            const messageIndex = sessionCache.parentFeedback.findIndex(msg => msg.id === messageId);
-            if (messageIndex !== -1) {
-                sessionCache.parentFeedback[messageIndex].read = true;
-                saveToLocalStorage('parentFeedback', sessionCache.parentFeedback);
-            }
-        }
-        
-        renderParentFeedbackFromCache();
-    } catch (error) {
-        console.error("Error marking message as read:", error);
-        alert("Failed to mark message as read. Please try again.");
-    }
-}
-
-async function handleDeleteFeedback(messageId) {
-    if (confirm("Are you sure you want to delete this feedback message? This action cannot be undone.")) {
-        try {
-            await deleteDoc(doc(db, "parent_feedback", messageId));
-            
-            // Update cache and re-render
-            if (sessionCache.parentFeedback) {
-                sessionCache.parentFeedback = sessionCache.parentFeedback.filter(msg => msg.id !== messageId);
-                saveToLocalStorage('parentFeedback', sessionCache.parentFeedback);
-            }
-            
-            renderParentFeedbackFromCache();
-        } catch (error) {
-            console.error("Error deleting feedback message:", error);
-            alert("Failed to delete message. Please try again.");
-        }
-    }
-}
-
-// ##################################
-// # REPORT GENERATION & ZIPPING
-// ##################################
-
-// ##### CORRECTED AND FINALIZED FUNCTION #####
-async function generateReportHTML(reportId) {
-    const reportDoc = await getDoc(doc(db, "tutor_submissions", reportId));
-    if (!reportDoc.exists()) throw new Error("Report not found!");
-    const reportData = reportDoc.data();
-
-    // Define the sections to be displayed in the report
-    const reportSections = {
-        "INTRODUCTION": reportData.introduction,
-        "TOPICS & REMARKS": reportData.topics,
-        "PROGRESS & ACHIEVEMENTS": reportData.progress,
-        "STRENGTHS AND WEAKNESSES": reportData.strengthsWeaknesses,
-        "RECOMMENDATIONS": reportData.recommendations,
-        "GENERAL TUTOR'S COMMENTS": reportData.generalComments
     };
 
-    // Generate the HTML for each section, ensuring "N/A" for empty content
-    const sectionsHTML = Object.entries(reportSections).map(([title, content]) => {
-        // Sanitize content to prevent HTML injection and format newlines
-        const sanitizedContent = content ? String(content).replace(/</g, "&lt;").replace(/>/g, "&gt;") : '';
-        const displayContent = (sanitizedContent && sanitizedContent.trim() !== '') ? sanitizedContent.replace(/\n/g, '<br>') : 'N/A';
+    function updateFinalPay(email, newGift) {
+        const row = currentPayData.find(d => d.tutorEmail === email);
+        if (row) {
+            const finalPay = (parseFloat(row.totalPay) + newGift).toFixed(2);
+            document.querySelector(`.final-pay-cell[data-email="${email}"]`).textContent = finalPay;
+        }
+    }
+
+    calculatePay();
+}
+
+function renderTutorReportsPanel(container) {
+    container.innerHTML = `<h2 class="text-3xl font-bold text-green-700 mb-6">Tutor Reports</h2><div class="flex justify-center items-center h-48"><div class="loading-spinner"></div><p class="ml-4 text-gray-600">Loading reports...</p></div>`;
+
+    const renderReports = async () => {
+        const reportsByTutor = await fetchReports();
+        const tutorEmails = Object.keys(reportsByTutor).sort();
+
+        let html = `
+            <h2 class="text-3xl font-bold text-green-700 mb-6">Tutor Reports</h2>
+            <div class="space-y-8">
+        `;
+
+        if (tutorEmails.length === 0) {
+            html += `<p class="text-gray-500">No tutor reports found.</p>`;
+        } else {
+            tutorEmails.forEach(email => {
+                const tutorData = reportsByTutor[email];
+                html += `
+                    <div class="bg-white p-6 rounded-xl shadow-lg border border-gray-200">
+                        <h3 class="text-2xl font-bold text-gray-800 mb-4">${tutorData.tutorName} (${email})</h3>
+                        <div class="space-y-3">
+                            ${tutorData.reports.map(report => `
+                                <div class="p-3 bg-indigo-50 rounded-lg flex justify-between items-center report-item">
+                                    <div>
+                                        <p class="font-medium text-indigo-800">${report.studentName} - ${capitalize(report.subject)} Test</p>
+                                        <p class="text-xs text-gray-600">Submitted: ${report.submissionDate} | Score: ${report.score}</p>
+                                    </div>
+                                    <button data-report='${JSON.stringify(report)}' class="view-report-btn px-4 py-2 text-xs bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition duration-150">View Details</button>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                `;
+            });
+        }
+
+        html += `</div>`;
+        container.innerHTML = html;
+
+        container.querySelectorAll('.view-report-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const reportData = JSON.parse(e.target.dataset.report);
+                showReportDetailModal(reportData);
+            });
+        });
+    };
+
+    renderReports();
+}
+
+function showReportDetailModal(report) {
+    const questionsHtml = report.questions.map((q, index) => {
+        const isCorrect = q.selectedAnswer === q.correctAnswer;
+        const resultClass = isCorrect ? 'text-green-600' : 'text-red-600';
+        const resultIcon = isCorrect ? '✅' : '❌';
+        const correction = isCorrect ? '' : `<p class="text-sm text-red-500 mt-1">Correct Answer: ${q.correctAnswer}</p>`;
+
         return `
-            <div class="report-section">
-                <h2>${title}</h2>
-                <p>${displayContent}</p>
+            <div class="p-3 border-b border-gray-100 last:border-b-0">
+                <p class="font-semibold text-gray-700">Q${index + 1}: ${q.questionText}</p>
+                <p class="text-sm">Selected: <span class="${resultClass}">${q.selectedAnswer} ${resultIcon}</span></p>
+                ${correction}
             </div>
         `;
     }).join('');
 
-    const logoUrl = "https://res.cloudinary.com/dy2hxcyaf/image/upload/v1757700806/newbhlogo_umwqzy.svg";
-    const reportTemplate = `
-        <html>
-        <head>
-            <style>
-                body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; color: #333; }
-                .report-container { max-width: 800px; margin: auto; padding: 20px; }
-                .header { text-align: center; margin-bottom: 40px; }
-                .header img { height: 80px; }
-                .header h1 { color: #166534; margin: 0; font-size: 24px; }
-                .header h2 { color: #15803d; margin: 10px 0; font-size: 28px; }
-                .header p { margin: 5px 0; color: #555; }
-                .student-info { 
-                    display: grid; 
-                    grid-template-columns: 1fr 1fr; 
-                    gap: 10px 20px; 
-                    margin-bottom: 30px; 
-                    background-color: #f9f9f9;
-                    border: 1px solid #eee;
-                    padding: 15px;
-                    border-radius: 8px;
-                }
-                .student-info p { margin: 5px 0; }
-                .report-section {
-                    page-break-inside: avoid; /* CRITICAL: Prevents section from splitting across pages */
-                    margin-bottom: 20px;
-                    border: 1px solid #e5e7eb;
-                    padding: 15px;
-                    border-radius: 8px;
-                }
-                .report-section h2 { 
-                    font-size: 18px; 
-                    font-weight: bold; 
-                    color: #16a34a; 
-                    margin-top: 0; 
-                    padding-bottom: 8px;
-                    border-bottom: 2px solid #d1fae5;
-                }
-                .report-section p { line-height: 1.6; white-space: pre-wrap; margin-top: 0; }
-                .footer { text-align: right; margin-top: 40px; }
-            </style>
-        </head>
-        <body>
-            <div class="report-container">
-                <div class="header">
-                    <img src="${logoUrl}" alt="Company Logo">
-                    <h2>Blooming Kids House</h2>
-                    <h1>MONTHLY LEARNING REPORT</h1>
-                    <p>Date: ${new Date(reportData.submittedAt.seconds * 1000).toLocaleDateString()}</p>
+    const modalHtml = `
+        <div id="report-modal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-center justify-center">
+            <div class="relative p-8 bg-white w-full max-w-2xl rounded-lg shadow-xl">
+                <button class="absolute top-2 right-2 text-gray-500 hover:text-gray-800 text-2xl font-bold" onclick="document.getElementById('report-modal').remove()">&times;</button>
+                <h3 class="text-xl font-bold mb-4 text-green-700">Tutor Report Details</h3>
+
+                <div class="grid grid-cols-2 gap-4 mb-4 text-sm">
+                    <p><strong>Student:</strong> ${report.studentName}</p>
+                    <p><strong>Tutor:</strong> ${report.tutorName}</p>
+                    <p><strong>Subject:</strong> ${capitalize(report.subject)}</p>
+                    <p><strong>Grade:</strong> ${report.grade}</p>
+                    <p><strong>Score:</strong> <span class="text-green-600 font-bold">${report.score}</span></p>
+                    <p><strong>Date:</strong> ${report.submissionDate}</p>
                 </div>
-                <div class="student-info">
-                    <p><strong>Student's Name:</strong> ${reportData.studentName || 'N/A'}</p>
-                    <p><strong>Parent's Name:</strong> ${reportData.parentName || 'N/A'}</p>
-                    <p><strong>Parent's Phone:</strong> ${reportData.parentPhone || 'N/A'}</p>
-                    <p><strong>Grade:</strong> ${reportData.grade || 'N/A'}</p>
-                    <p><strong>Tutor's Name:</strong> ${reportData.tutorName || 'N/A'}</p>
+
+                <h4 class="text-lg font-semibold mt-6 mb-3 border-t pt-3">Questions & Answers</h4>
+                <div class="max-h-96 overflow-y-auto border rounded-lg p-2 bg-gray-50">
+                    ${questionsHtml}
                 </div>
-                ${sectionsHTML}
-                <div class="footer">
-                    <p>Best regards,</p>
-                    <p><strong>${reportData.tutorName || 'N/A'}</strong></p>
-                </div>
+
             </div>
-        </body>
-        </html>
+        </div>
     `;
-    return { html: reportTemplate, reportData: reportData };
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
 }
 
-async function viewReportInNewTab(reportId, shouldDownload = false) {
-    try {
-        const { html, reportData } = await generateReportHTML(reportId);
+function renderSummerBreakPanel(container) {
+    container.innerHTML = `<h2 class="text-3xl font-bold text-green-700 mb-6">Summer Break Management</h2><div class="flex justify-center items-center h-48"><div class="loading-spinner"></div><p class="ml-4 text-gray-600">Loading break list...</p></div>`;
 
-        if (shouldDownload) {
-             const options = {
-                margin:       0.5,
-                filename:     `${reportData.studentName}_report.pdf`,
-                image:        { type: 'jpeg', quality: 0.98 },
-                html2canvas:  { scale: 2, useCORS: true },
-                jsPDF:        { unit: 'in', format: 'letter', orientation: 'portrait' }
-            };
-            html2pdf().from(html).set(options).save();
+    const renderBreakList = async () => {
+        const breakStudents = await fetchBreakStudents();
+
+        let html = `
+            <h2 class="text-3xl font-bold text-green-700 mb-6">Summer Break Management</h2>
+            <p class="text-lg text-gray-600 font-semibold mb-4">Students on Break: ${breakStudents.length}</p>
+            <div class="space-y-4">
+        `;
+
+        if (breakStudents.length === 0) {
+            html += `<p class="text-gray-500">No students are currently on a summer break status.</p>`;
         } else {
-            const newWindow = window.open();
-            newWindow.document.write(html);
-            newWindow.document.close();
+            breakStudents.forEach(student => {
+                html += `
+                    <div class="bg-purple-100 p-4 rounded-lg shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center">
+                        <div class="mb-2 md:mb-0">
+                            <p class="font-bold text-purple-800">${student.studentName} (Grade ${student.grade})</p>
+                            <p class="text-sm text-purple-600">Tutor: ${student.tutorName}</p>
+                            <p class="text-xs text-purple-500 mt-1">Break Start: ${student.breakStart}</p>
+                        </div>
+                        <button data-id="${student.id}" data-name="${student.studentName}" class="move-off-break-btn px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition duration-150 text-sm">Move to Active</button>
+                    </div>
+                `;
+            });
         }
-    } catch (error) {
-        console.error("Error viewing/downloading report:", error);
-        alert(`Error: ${error.message}`);
-    }
-}
 
-async function zipAndDownloadTutorReports(reports, tutorName, buttonElement) {
-    const originalButtonText = buttonElement.textContent;
-    buttonElement.textContent = 'Zipping... (0%)';
-    buttonElement.disabled = true;
+        html += `</div>`;
+        container.innerHTML = html;
 
-    try {
-        const zip = new JSZip();
-        let filesGenerated = 0;
-        const reportGenerationPromises = reports.map(async (report) => {
-            const { html, reportData } = await generateReportHTML(report.id);
-            // Use the same improved options for consistency
-            const options = {
-                image:        { type: 'jpeg', quality: 0.98 },
-                html2canvas:  { scale: 2, useCORS: true },
-                jsPDF:        { unit: 'in', format: 'letter', orientation: 'portrait' }
-            };
-            const pdfBlob = await html2pdf().from(html).set(options).output('blob');
-            filesGenerated++;
-            buttonElement.textContent = `Zipping... (${Math.round((filesGenerated / reports.length) * 100)}%)`;
-            return { name: `${reportData.studentName}_Report_${report.id.substring(0,5)}.pdf`, blob: pdfBlob };
+        container.querySelectorAll('.move-off-break-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => handleMoveStudentOffBreak(e.target.dataset.id, e.target.dataset.name));
         });
-        const generatedPdfs = await Promise.all(reportGenerationPromises);
-        generatedPdfs.forEach(pdf => zip.file(pdf.name, pdf.blob));
-        const zipBlob = await zip.generateAsync({ type: "blob" });
-        saveAs(zipBlob, `${tutorName}_All_Reports.zip`);
-    } catch (error) {
-        console.error("Error creating zip file:", error);
-        alert("Failed to create zip file. See console for details.");
-    } finally {
-        buttonElement.textContent = originalButtonText;
-        buttonElement.disabled = false;
-    }
+    };
+
+    renderBreakList();
+}
+
+function renderParentFeedbackPanel(container) {
+    container.innerHTML = `<h2 class="text-3xl font-bold text-green-700 mb-6">Parent Feedback</h2><div class="flex justify-center items-center h-48"><div class="loading-spinner"></div><p class="ml-4 text-gray-600">Loading feedback...</p></div>`;
+
+    const renderFeedback = async () => {
+        const feedback = await fetchParentFeedback();
+        const unreadCount = feedback.filter(f => !f.isRead).length;
+
+        let html = `
+            <h2 class="text-3xl font-bold text-green-700 mb-6">Parent Feedback</h2>
+            <p class="text-lg text-gray-600 font-semibold mb-4">Total Feedback: ${feedback.length} | Unread: <span class="text-red-600">${unreadCount}</span></p>
+            <div class="space-y-4">
+        `;
+
+        if (feedback.length === 0) {
+            html += `<p class="text-gray-500">No parent feedback found.</p>`;
+        } else {
+            feedback.forEach(f => {
+                const bgColor = f.isRead ? 'bg-gray-50' : 'bg-yellow-100 border-yellow-400';
+                const statusText = f.isRead ? 'Read' : 'Unread';
+                const statusColor = f.isRead ? 'text-gray-500' : 'text-red-600 font-bold';
+                const markAsReadButton = f.isRead ? '' : `<button data-id="${f.id}" class="mark-as-read-btn px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition duration-150 text-sm">Mark as Read</button>`;
+
+                html += `
+                    <div class="p-4 rounded-lg shadow-sm border ${bgColor}">
+                        <div class="flex justify-between items-start mb-2">
+                            <p class="font-bold text-gray-800">${f.parentName || 'Anonymous Parent'} - <span class="text-sm ${statusColor}">${statusText}</span></p>
+                            <p class="text-xs text-gray-500">${f.timestamp}</p>
+                        </div>
+                        <p class="text-sm text-gray-700 mb-2">Tutor: ${f.tutorName || 'N/A'}</p>
+                        <p class="text-gray-700 italic border-l-4 border-yellow-500 pl-3 py-1">"${f.feedback}"</p>
+                        <div class="mt-3 flex justify-end">
+                            ${markAsReadButton}
+                        </div>
+                    </div>
+                `;
+            });
+        }
+
+        html += `</div>`;
+        container.innerHTML = html;
+
+        container.querySelectorAll('.mark-as-read-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => handleMarkFeedbackAsRead(e.target.dataset.id));
+        });
+    };
+
+    renderFeedback();
 }
 
 // ##################################
-// # AUTHENTICATION & INITIALIZATION
+// # INITIALIZATION & NAVIGATION
 // ##################################
 
-onAuthStateChanged(auth, async (user) => {
+// Map navigation IDs to their rendering functions
+const allNavItems = {
+    'navTutorManagement': { fn: renderManagementTutorView, requiredRoles: ['admin', 'manager'] },
+    'navPayAdvice': { fn: renderPayAdvicePanel, requiredRoles: ['admin', 'manager'] },
+    'navTutorReports': { fn: renderTutorReportsPanel, requiredRoles: ['admin', 'manager'] },
+    'navSummerBreak': { fn: renderSummerBreakPanel, requiredRoles: ['admin', 'manager'] },
+    'navPendingApprovals': { fn: fetchAndRenderPendingApprovals, requiredRoles: ['admin', 'manager'] },
+    'navParentFeedback': { fn: renderParentFeedbackPanel, requiredRoles: ['admin', 'manager'] }
+    // Add other nav items here as they are created
+};
+
+let activeNavId = 'navTutorManagement'; // Default view
+
+function setActiveNavButton(id) {
+    document.querySelectorAll('.nav-btn').forEach(btn => {
+        if (btn.id === id) {
+            btn.classList.remove('text-gray-500', 'hover:text-white');
+            btn.classList.add('bg-green-600', 'text-white', 'shadow-lg');
+            btn.style.setProperty('background-color', '#10B981', 'important'); // Tailwind emerald-500
+        } else {
+            btn.classList.remove('bg-green-600', 'text-white', 'shadow-lg');
+            btn.classList.add('text-gray-500', 'hover:text-white');
+            btn.style.removeProperty('background-color');
+        }
+    });
+}
+
+// Setup navigation event listeners
+document.addEventListener('DOMContentLoaded', async () => {
     const mainContent = document.getElementById('main-content');
-    const logoutBtn = document.getElementById('logoutBtn');
-    if (user) {
-        const staffDocRef = doc(db, "staff", user.email);
-        onSnapshot(staffDocRef, (docSnap) => {
-            if (docSnap.exists() && docSnap.data().role !== 'pending') {
-                const staffData = docSnap.data();
-                window.userData = staffData;
-                
-                document.getElementById('welcome-message').textContent = `Welcome, ${staffData.name}`;
-                document.getElementById('user-role').textContent = `Role: ${capitalize(staffData.role)}`;
+    const navButtons = document.querySelectorAll('.nav-btn');
 
-                const allNavItems = {
-                    navTutorManagement: { fn: renderManagementTutorView, perm: 'viewTutorManagement' },
-                    navPayAdvice: { fn: renderPayAdvicePanel, perm: 'viewPayAdvice' },
-                    navTutorReports: { fn: renderTutorReportsPanel, perm: 'viewTutorReports' },
-                    navSummerBreak: { fn: renderSummerBreakPanel, perm: 'viewSummerBreak' },
-                    navPendingApprovals: { fn: renderPendingApprovalsPanel, perm: 'viewPendingApprovals' },
-                    navParentFeedback: { fn: renderParentFeedbackPanel, perm: 'viewParentFeedback' }
-                };
+    navButtons.forEach(button => {
+        button.addEventListener('click', (e) => {
+            activeNavId = e.target.id;
+            setActiveNavButton(activeNavId);
+            const navItem = allNavItems[activeNavId];
+            if (navItem) {
+                // Execute the rendering function
+                navItem.fn(mainContent);
+                // Save the active view ID to localStorage
+                localStorage.setItem('activeManagementView', activeNavId);
+            }
+        });
+    });
 
-                const navContainer = document.querySelector('nav');
-                const originalNavButtons = {};
-                if(navContainer) {
-                    navContainer.querySelectorAll('.nav-btn').forEach(btn => originalNavButtons[btn.id] = btn.textContent);
-                    navContainer.innerHTML = '';
-                    let firstVisibleTab = null;
+    // Check Firebase Auth state
+    onAuthStateChanged(auth, async (user) => {
+        const logoutBtn = document.getElementById('logoutBtn');
+        const staffDocRef = user ? doc(db, "tutors", user.email) : null;
 
-                    Object.entries(allNavItems).forEach(([id, item]) => {
-                        if (window.userData.permissions?.tabs?.[item.perm]) {
-                            if (!firstVisibleTab) firstVisibleTab = id;
-                            const button = document.createElement('button');
-                            button.id = id;
-                            button.className = 'nav-btn text-lg font-semibold text-gray-500 hover:text-green-700';
-                            button.textContent = originalNavButtons[id];
-                            navContainer.appendChild(button);
-                            
-                            button.addEventListener('click', () => {
-                                document.querySelectorAll('.nav-btn').forEach(btn => btn.classList.remove('active'));
-                                button.classList.add('active');
-                                item.fn(mainContent);
-                            });
-                        }
-                    });
+        if (user && staffDocRef) {
+            // Check staff directory for existing user
+            const unsub = onSnapshot(staffDocRef, async (docSnap) => {
+                if (!docSnap.exists() || !docSnap.data().approved) {
+                    if (document.getElementById('welcome-message')) document.getElementById('welcome-message').textContent = `Hello, ${docSnap.data()?.name || user.email}`;
+                    if (document.getElementById('user-role')) document.getElementById('user-role').textContent = 'Status: Pending Approval';
+                    if (mainContent) mainContent.innerHTML = `<p class="text-center mt-12 text-yellow-600 font-semibold">Your account is awaiting approval.</p>`;
+                    return;
+                }
 
-                    if (firstVisibleTab) {
-                        const activeNav = document.querySelector('.nav-btn.active');
-                        const activeNavId = activeNav?.id;
-                        if (!activeNav || !document.getElementById(activeNavId)) {
-                            document.getElementById(firstVisibleTab).click();
+                const userData = docSnap.data();
+                const userRole = userData.role || 'tutor';
+                const userName = userData.name || user.email;
+                const userPermissions = userData.permissions || [];
+
+                if (document.getElementById('welcome-message')) document.getElementById('welcome-message').textContent = `Hello, ${userName}`;
+                if (document.getElementById('user-role')) document.getElementById('user-role').textContent = `Role: ${capitalize(userRole)}`;
+
+                // Filter navigation based on user role/permissions
+                const availableNavIds = Object.keys(allNavItems).filter(navId => {
+                    const item = allNavItems[navId];
+                    if (item.requiredRoles.includes(userRole)) return true;
+                    // Additional logic for specific permissions if needed later
+                    return false;
+                });
+
+                navButtons.forEach(btn => {
+                    if (availableNavIds.includes(btn.id)) {
+                        btn.classList.remove('hidden');
+                    } else {
+                        btn.classList.add('hidden');
+                    }
+                });
+
+                // Load the last active view or the default view
+                if (mainContent) {
+                    if (availableNavIds.length > 0) {
+                        const lastActiveView = localStorage.getItem('activeManagementView');
+                        if (lastActiveView && availableNavIds.includes(lastActiveView)) {
+                            activeNavId = lastActiveView;
+                            setActiveNavButton(activeNavId);
+                            allNavItems[activeNavId].fn(mainContent);
                         } else {
+                            // Default to the first available nav item
+                            activeNavId = availableNavIds[0];
+                            setActiveNavButton(activeNavId);
                             const currentItem = allNavItems[activeNavId];
                             if(currentItem) currentItem.fn(mainContent);
                         }
@@ -1504,24 +1405,13 @@ onAuthStateChanged(auth, async (user) => {
                         if (mainContent) mainContent.innerHTML = `<p class="text-center">You have no permissions assigned.</p>`;
                     }
                 }
-            } else {
-                if (document.getElementById('welcome-message')) document.getElementById('welcome-message').textContent = `Hello, ${docSnap.data()?.name}`;
-                if (document.getElementById('user-role')) document.getElementById('user-role').textContent = 'Status: Pending Approval';
-                if (mainContent) mainContent.innerHTML = `<p class="text-center mt-12 text-yellow-600 font-semibold">Your account is awaiting approval.</p>`;
-            }
-        });
+            });
 
-        const staffDocSnap = await getDoc(staffDocRef);
-        if (!staffDocSnap.exists()) {
-            if (mainContent) mainContent.innerHTML = `<p class="text-center mt-12 text-red-600">Account not registered in staff directory.</p>`;
-            if (logoutBtn) logoutBtn.classList.add('hidden');
+        } else {
+            window.location.href = "management-auth.html";
         }
 
         if(logoutBtn) logoutBtn.addEventListener('click', () => signOut(auth).then(() => window.location.href = "management-auth.html"));
-    } else {
-        window.location.href = "management-auth.html";
-    }
+    });
 });
-
-// [End Updated management.js File]
 
