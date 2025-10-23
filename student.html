@@ -31,8 +31,7 @@
     </div>
 
     <script type="module">
-        // --- START: FIREBASE INITIALIZATION (Surgical Addition for Database Access) ---
-        // Configuration taken from parent (3).js
+        // --- START: FIREBASE INITIALIZATION ---
         if (typeof firebase !== 'undefined' && !firebase.apps.length) {
             firebase.initializeApp({
                 apiKey: "AIzaSyD1lJhsWMMs_qerLBSzk7wKhjLyI_11RJg",
@@ -44,15 +43,15 @@
             });
         }
         const db = firebase.firestore();
-        const REFERRAL_REWARD_AMOUNT = 5000; // ₦5,000 as per parent (3).js
+        const REFERRAL_REWARD_AMOUNT = 5000;
         // --- END: FIREBASE INITIALIZATION ---
 
-        // --- START: MODULE IMPORTS FOR QUESTION LOADING AND SUBMISSION ---
+        // --- START: MODULE IMPORTS (KEEP submitAnswers.js) ---
         import { loadQuestions, getAnswerData, getAllLoadedQuestions, clearTestSession } from './autoQuestionGen.js';
         import { submitTestToFirebase } from './submitAnswers.js';
         // --- END: MODULE IMPORTS ---
 
-        // --- START: REFERRAL LOGIC FUNCTION ONLY (No test submission) ---
+        // --- START: NEW REFERRAL & STUDENT REGISTRATION LOGIC ---
         
         /**
          * Validates referral code and logs a pending transaction.
@@ -85,21 +84,49 @@
                     referredStudentUid: studentUid,
                     referredStudentName: studentName,
                     referralCode: cleanCode,
-                    rewardAmount: REFERRAL_REWARD_AMOUNT, // ₦5,000
-                    status: 'pending', // Pending payment confirmation
+                    rewardAmount: REFERRAL_REWARD_AMOUNT,
+                    status: 'pending',
                     timestamp: firebase.firestore.FieldValue.serverTimestamp(),
-                    ownerUid: referringParentUid // For easy querying in parent portal
+                    ownerUid: referringParentUid
                 });
 
                 console.log(`Referral transaction logged successfully for Parent UID: ${referringParentUid}`);
                 
             } catch (error) {
                 console.error("Error during referral logic execution:", error);
-                // Non-critical error, allows student process to continue
             }
         }
-        
-        // --- END: REFERRAL LOGIC FUNCTION ---
+
+        /**
+         * Creates permanent student record in Firebase (NEW ADDITION)
+         */
+        async function createPermanentStudentRecord(studentName, parentEmail, parentPhone, tutorEmail, grade, country, referralCode) {
+            try {
+                const studentData = {
+                    studentName: studentName,
+                    parentEmail: parentEmail,
+                    parentPhone: parentPhone,
+                    tutorEmail: tutorEmail,
+                    grade: grade,
+                    country: country,
+                    referralCodeUsed: referralCode.toUpperCase(),
+                    createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                    lastActive: firebase.firestore.FieldValue.serverTimestamp()
+                };
+                
+                // Create permanent student record
+                const studentRef = await db.collection('students').add(studentData);
+                const studentUid = studentRef.id;
+                
+                console.log("Permanent student record created with ID:", studentUid);
+                return studentUid;
+                
+            } catch (error) {
+                console.error("Error creating student record:", error);
+                throw error;
+            }
+        }
+        // --- END: NEW REFERRAL & STUDENT REGISTRATION LOGIC ---
 
         document.addEventListener('DOMContentLoaded', async () => {
             const urlParams = new URLSearchParams(window.location.search);
@@ -118,60 +145,63 @@
                 return;
             }
 
-            // REMOVED: localStorage.clear() - This was causing the "Missing student info" error
-            // Now localStorage persists properly for submitAnswers.js
-
-            // Store student data in localStorage for submitAnswers.js to use
-            const studentData = {
-                studentName: studentName,
-                parentEmail: parentEmail,
-                tutorEmail: tutorEmail,
-                grade: grade,
-                country: studentCountry,
-                parentPhone: '', // You might want to capture this elsewhere
-                referralCodeUsed: referralCode
-            };
-            localStorage.setItem("studentData", JSON.stringify(studentData));
-
+            // Get parentPhone from localStorage (from the login form)
+            let parentPhone = '';
             try {
-                // Load questions using the imported function
-                await loadQuestions(subject, grade, state);
-                document.getElementById("submit-button-container").style.display = 'flex';
-            } catch (error) {
-                console.error("Error loading questions:", error);
-                document.getElementById("question-container").innerHTML = 
-                    `<p class="text-red-600">Error loading questions. Please try again.</p>`;
+                const studentData = JSON.parse(localStorage.getItem("studentData") || '{}');
+                parentPhone = studentData.parentPhone || '';
+            } catch (e) {
+                console.log("Could not retrieve parentPhone from localStorage");
             }
 
-            // Setup submit button - NOW USING submitAnswers.js
+            try {
+                // STEP 1: Create permanent student record FIRST
+                const studentUid = await createPermanentStudentRecord(
+                    studentName, parentEmail, parentPhone, tutorEmail, grade, studentCountry, referralCode
+                );
+
+                // Store studentUid for submitAnswers.js to use
+                const existingData = JSON.parse(localStorage.getItem("studentData") || '{}');
+                existingData.studentUid = studentUid;
+                localStorage.setItem("studentData", JSON.stringify(existingData));
+
+                // STEP 2: Load questions using existing system
+                await loadQuestions(subject, grade, state);
+                document.getElementById("submit-button-container").style.display = 'flex';
+
+            } catch (error) {
+                console.error("Error during setup:", error);
+                document.getElementById("question-container").innerHTML = 
+                    `<p class="text-red-600">Error loading test. Please try again.</p>`;
+            }
+
+            // Setup submit button - USING ORIGINAL submitAnswers.js SYSTEM
             const submitBtn = document.getElementById("submit-test-btn");
             if (submitBtn) {
                 submitBtn.addEventListener('click', async () => {
-                    // Disable button to prevent double-submission
                     submitBtn.disabled = true;
                     submitBtn.textContent = 'Submitting...';
 
                     try {
-                        // Use the proper submission function from submitAnswers.js
+                        // STEP 3: Use ORIGINAL submitAnswers.js for test answers
                         await submitTestToFirebase(
                             subject, grade, studentName, parentEmail, 
                             tutorEmail, studentCountry, parentPhone
                         );
                         
-                        // Handle referral logic separately after successful test submission
+                        // STEP 4: Handle referral logic after successful submission
                         if (referralCode) {
                             try {
-                                // Note: This would need studentUid from the submission
-                                // You might need to adjust this based on how submitTestToFirebase works
-                                await handleReferralLogic(referralCode, studentName, 'student-uid-placeholder');
+                                const studentData = JSON.parse(localStorage.getItem("studentData") || '{}');
+                                const studentUid = studentData.studentUid;
+                                await handleReferralLogic(referralCode, studentName, studentUid);
                             } catch (referralError) {
                                 console.error("Referral logic failed (non-critical):", referralError);
-                                // Don't block test submission if referral fails
                             }
                         }
                         
                         // Clear test session but keep student data
-                        clearTestSession(false); // Pass false to keep student data
+                        clearTestSession(false);
                         
                         // Show success and redirect
                         document.getElementById("question-container").innerHTML = 
@@ -189,12 +219,9 @@
         });
 
         window.logout = () => {
-            // Only clear test session data, keep student info
             clearTestSession(true);
             window.location.href = 'index.html';
         };
     </script>
 </body>
 </html>
-
-
