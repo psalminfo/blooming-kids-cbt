@@ -1,133 +1,112 @@
 import { db } from './firebaseConfig.js';
 import { collection, addDoc, Timestamp } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
+// Ensure this path points to your question loading file, likely 'autoQuestionGen.js'
 import { getLoadedQuestions } from './autoQuestionGen.js';
 
-/**
- * Submits the multiple-choice test results to Firebase.
- * @param {string} subject The test subject.
- * @param {string} grade The student's grade.
- * @param {string} studentName The student's name.
- * @param {string} parentEmail The parent's email.
- * @param {string} tutorEmail The tutor's email.
- * @param {string} studentCountry The student's country.
- */
+const CLOUDINARY_CLOUD_NAME = 'dy2hxcyaf';
+const CLOUDINARY_UPLOAD_PRESET = 'bkh_assessments';
+const CLOUDINARY_UPLOAD_URL = `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`;
+
+async function uploadCreativeWritingFile(file) {
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('upload_preset', CLOUDINARY_UPLOAD_PRESET);
+
+    const res = await fetch(CLOUDINARY_UPLOAD_URL, {
+        method: 'POST',
+        body: formData,
+    });
+
+    if (!res.ok) {
+        console.error("File upload failed with status:", res.status);
+        throw new Error("File upload failed");
+    }
+
+    const data = await res.json();
+    return data.secure_url;
+}
+
+
 export async function submitTestToFirebase(subject, grade, studentName, parentEmail, tutorEmail, studentCountry) {
     const loadedQuestions = getLoadedQuestions();
     const answers = [];
+    let creativeWritingContent = null;
+    let creativeWritingFileUrl = null;
     let score = 0;
     let totalScoreableQuestions = 0;
 
-    // Get parentPhone from student data
-    const studentData = JSON.parse(localStorage.getItem("studentData") || "{}");
-    const parentPhone = studentData.parentPhone || '';
+    const creativeWritingQuestion = loadedQuestions.find(q => q.type === 'creative-writing');
+    const creativeWritingBlock = creativeWritingQuestion ? document.querySelector(`.question-block[data-question-id="${creativeWritingQuestion.id}"]`) : null;
 
-    console.log("🚀 Starting test submission...");
-    console.log("📋 Loaded questions:", loadedQuestions.length);
-    console.log("👤 Student:", studentName);
+    if (creativeWritingBlock) {
+        creativeWritingContent = creativeWritingBlock.querySelector('textarea').value.trim();
+        const creativeWritingFile = creativeWritingBlock.querySelector('input[type="file"]').files[0];
 
-    // Validation to ensure all questions are answered (either MC or text)
-    for (let i = 0; i < loadedQuestions.length; i++) {
-        const questionBlock = document.querySelector(`.question-block[data-question-id="${loadedQuestions[i].id}"]`);
-        if (questionBlock) {
-            const selectedOption = questionBlock.querySelector("input[type='radio']:checked");
-            const textResponse = questionBlock.querySelector("textarea, input[type='text']");
-            const hasTextAnswer = textResponse && textResponse.value.trim() !== '';
-            
-            // Check if either MC option OR text response is provided
-            if (!selectedOption && !hasTextAnswer) {
-                alert("Please answer all questions before submitting. You can provide multiple-choice answers or text responses.");
-                questionBlock.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                questionBlock.style.border = "2px solid red";
-                throw new Error("All questions must be answered (either multiple-choice or text).");
-            }
+        if (!creativeWritingContent && !creativeWritingFile) {
+            alert("Please provide a response or upload a file for the creative writing question.");
+            throw new Error("Creative writing submission required.");
+        }
+        if (creativeWritingFile) {
+            creativeWritingFileUrl = await uploadCreativeWritingFile(creativeWritingFile);
         }
     }
 
-    // Process all questions (both MC and text)
     const questionBlocks = document.querySelectorAll(".question-block");
-    console.log("🔍 Found question blocks:", questionBlocks.length);
-
     for (const block of questionBlocks) {
         const questionId = block.getAttribute('data-question-id');
-        
-        // FIXED: Use loose equality instead of parseInt for question matching
-        const originalQuestion = loadedQuestions.find(q => q.id == questionId);
+        const originalQuestion = loadedQuestions.find(q => q.id === parseInt(questionId));
 
-        console.log(`📝 Processing question ${questionId}:`, {
-            foundOriginal: !!originalQuestion,
-            questionText: originalQuestion?.question?.substring(0, 50) + '...',
-            hasOptions: originalQuestion?.options?.length > 0
-        });
+        // =================================================================
+        // ===== THIS IS THE DIAGNOSTIC LINE I HAVE ADDED FOR YOU ==========
+        // =================================================================
+        console.log("Final Check - Question Data:", originalQuestion);
+        // =================================================================
 
-        if (!originalQuestion) {
-            console.warn(`❌ No original question found for ID: ${questionId}`);
+        if (!originalQuestion) continue;
+
+        if (originalQuestion.type === 'creative-writing') {
+            answers.push({
+                questionText: originalQuestion.question,
+                type: 'creative-writing',
+                studentResponse: creativeWritingContent || null,
+                fileUrl: creativeWritingFileUrl || null,
+                tutorGrade: 'Pending',
+                tutorReport: null
+            });
             continue;
         }
 
+        totalScoreableQuestions++;
         const selectedOption = block.querySelector("input[type='radio']:checked");
-        const textResponse = block.querySelector("textarea, input[type='text']");
-        const hasTextAnswer = textResponse && textResponse.value.trim() !== '';
 
-        let studentAnswer = '';
-        let answerType = '';
-        let isCorrect = false;
-
-        if (selectedOption) {
-            studentAnswer = selectedOption.value.trim();
-            answerType = 'multiple_choice';
-            totalScoreableQuestions++;
-            
-            // Get the correct answer from the question data
-            const correctAnswer = originalQuestion.correctAnswer || originalQuestion.correct_answer;
-            
-            if (!correctAnswer) {
-                console.warn(`❌ No correct answer found for question: ${originalQuestion.question}`);
-                // Don't score if no correct answer exists
-                totalScoreableQuestions--; 
-            } else {
-                // Normalize both answers for case-insensitive comparison
-                const normalizedStudent = studentAnswer.toLowerCase().trim();
-                const normalizedCorrect = correctAnswer.toString().toLowerCase().trim();
-                
-                console.log(`🎯 Scoring: Student: "${studentAnswer}", Correct: "${correctAnswer}"`);
-                
-                if (normalizedStudent === normalizedCorrect) {
-                    score++;
-                    isCorrect = true;
-                    console.log(`✅ CORRECT! Score: ${score}/${totalScoreableQuestions}`);
-                } else {
-                    console.log(`❌ INCORRECT: "${studentAnswer}" vs "${correctAnswer}"`);
-                }
-            }
-        } else if (hasTextAnswer) {
-            studentAnswer = textResponse.value.trim();
-            answerType = 'text_response';
-            console.log(`📄 Text answer: ${studentAnswer.substring(0, 30)}...`);
-            // Text responses are not scored
-        } else {
-            console.warn(`⚠️ No answer provided for question ${questionId}`);
+        if (!selectedOption) {
+            alert("Please answer all multiple-choice questions before submitting.");
+            throw new Error("All multiple-choice questions must be answered.");
         }
 
-        // Ensure we have valid topic data
-        const topic = originalQuestion.topic || originalQuestion.subject || 'General';
-        const questionText = originalQuestion.question || 'No question text';
+        const studentAnswer = selectedOption.value;
+
+        // --- THIS IS THE FINAL, ROBUST FIX ---
+        // It checks for both 'correctAnswer' (camelCase) and 'correct_answer' (snake_case)
+        // to guarantee it finds the property from your JSON file.
+        const correctAnswer = originalQuestion.correctAnswer || originalQuestion.correct_answer || null;
+        const topic = originalQuestion.topic || null;
+        const imageUrl = originalQuestion.imageUrl || null;
+        const imagePosition = originalQuestion.imagePosition || null;
+
+        if (studentAnswer === correctAnswer) {
+            score++;
+        }
 
         answers.push({
-            questionText: questionText,
+            questionText: originalQuestion.question || null,
             studentAnswer: studentAnswer,
-            correctAnswer: originalQuestion.correctAnswer || originalQuestion.correct_answer || null,
-            answerType: answerType,
-            isCorrect: isCorrect,
+            correctAnswer: correctAnswer, // This will now be saved correctly
             topic: topic,
-            imageUrl: originalQuestion.imageUrl || null,
-            imagePosition: originalQuestion.imagePosition || null
+            imageUrl: imageUrl,
+            imagePosition: imagePosition
         });
     }
-
-    console.log("📊 FINAL SCORING SUMMARY:");
-    console.log(`✅ Score: ${score}/${totalScoreableQuestions}`);
-    console.log(`📝 Total answers: ${answers.length}`);
-    console.log(`🏷️ Topics found:`, [...new Set(answers.map(a => a.topic))]);
 
     const resultData = {
         subject,
@@ -136,21 +115,17 @@ export async function submitTestToFirebase(subject, grade, studentName, parentEm
         parentEmail,
         tutorEmail,
         studentCountry,
-        parentPhone,
         answers,
         score: score,
         totalScoreableQuestions: totalScoreableQuestions,
         submittedAt: Timestamp.now()
     };
 
-    console.log("🔥 Saving to Firebase:", resultData);
-
     try {
         await addDoc(collection(db, "student_results"), resultData);
-        console.log("✅ Test results submitted successfully!");
-        alert("Test results submitted successfully.");
+        console.log("Test results submitted successfully.");
     } catch (err) {
-        console.error("❌ Error submitting test results to Firebase:", err);
-        alert("Failed to submit test results. Please try again.");
+        console.error("Error submitting test results to Firebase:", err);
+        throw new Error("Failed to submit test results.");
     }
 }
