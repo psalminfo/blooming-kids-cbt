@@ -1,5 +1,3 @@
-[file name]: submitAnswers.js
-[file content begin]
 import { db } from './firebaseConfig.js';
 import { collection, addDoc, Timestamp } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
 import { getLoadedQuestions } from './autoQuestionGen.js';
@@ -27,7 +25,7 @@ export async function submitTestToFirebase(subject, grade, studentName, parentEm
     console.log("📋 Loaded questions:", loadedQuestions.length);
     console.log("👤 Student:", studentName);
 
-    // Validation to ensure all questions are answered (either MC, text, or griddable)
+    // Validation to ensure all questions are answered (either MC or text)
     for (let i = 0; i < loadedQuestions.length; i++) {
         const questionBlock = document.querySelector(`.question-block[data-question-id="${loadedQuestions[i].id}"]`);
         if (questionBlock) {
@@ -35,37 +33,24 @@ export async function submitTestToFirebase(subject, grade, studentName, parentEm
             const textResponse = questionBlock.querySelector("textarea, input[type='text']");
             const hasTextAnswer = textResponse && textResponse.value.trim() !== '';
             
-            // Check for griddable question selection and input
-            const isGriddableSelected = selectedOption && selectedOption.value === "Gridable question";
-            const gridInputs = questionBlock.querySelectorAll('.grid-input, .bubble-input, .math-grid-input, input[type="number"]');
-            const hasGridAnswer = Array.from(gridInputs).some(input => input.value.trim() !== '');
-            
-            // Check if either MC option OR text response OR griddable answer is provided
-            if (!selectedOption && !hasTextAnswer && !hasGridAnswer) {
-                alert("Please answer all questions before submitting. You can provide multiple-choice answers, text responses, or griddable answers.");
+            // Check if either MC option OR text response is provided
+            if (!selectedOption && !hasTextAnswer) {
+                alert("Please answer all questions before submitting. You can provide multiple-choice answers or text responses.");
                 questionBlock.scrollIntoView({ behavior: 'smooth', block: 'center' });
                 questionBlock.style.border = "2px solid red";
-                throw new Error("All questions must be answered (either multiple-choice, text, or griddable).");
-            }
-            
-            // Special validation for griddable questions
-            if (isGriddableSelected && !hasGridAnswer) {
-                alert("You selected 'Gridable question' but haven't provided a griddable answer. Please fill in the grid or choose a different option.");
-                questionBlock.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                questionBlock.style.border = "2px solid red";
-                throw new Error("Griddable question selected but no grid answer provided.");
+                throw new Error("All questions must be answered (either multiple-choice or text).");
             }
         }
     }
 
-    // Process all questions (MC, text, and griddable)
+    // Process all questions (both MC and text)
     const questionBlocks = document.querySelectorAll(".question-block");
     console.log("🔍 Found question blocks:", questionBlocks.length);
 
     for (const block of questionBlocks) {
         const questionId = block.getAttribute('data-question-id');
         
-        // Use loose equality for question matching
+        // FIXED: Use loose equality instead of parseInt for question matching
         const originalQuestion = loadedQuestions.find(q => q.id == questionId);
 
         console.log(`📝 Processing question ${questionId}:`, {
@@ -82,36 +67,12 @@ export async function submitTestToFirebase(subject, grade, studentName, parentEm
         const selectedOption = block.querySelector("input[type='radio']:checked");
         const textResponse = block.querySelector("textarea, input[type='text']");
         const hasTextAnswer = textResponse && textResponse.value.trim() !== '';
-        
-        // Check for griddable inputs
-        const gridInputs = block.querySelectorAll('.grid-input, .bubble-input, .math-grid-input, input[type="number"]');
-        const gridAnswers = Array.from(gridInputs).map(input => ({
-            id: input.id || input.name,
-            value: input.value.trim(),
-            type: input.type || input.className
-        })).filter(item => item.value !== '');
-        
-        const hasGridAnswer = gridAnswers.length > 0;
-        const isGriddableSelected = selectedOption && selectedOption.value === "Gridable question";
 
         let studentAnswer = '';
         let answerType = '';
         let isCorrect = false;
-        let griddableAnswers = null;
 
-        if (isGriddableSelected && hasGridAnswer) {
-            // Handle griddable question
-            answerType = 'griddable';
-            griddableAnswers = gridAnswers;
-            studentAnswer = `Griddable: ${gridAnswers.map(g => g.value).join(', ')}`;
-            totalScoreableQuestions++;
-            
-            // Griddable questions need manual grading, so mark as pending review
-            isCorrect = false; // Will be graded manually by tutor
-            console.log(`🔢 Griddable answer: ${studentAnswer}`);
-            
-        } else if (selectedOption && !isGriddableSelected) {
-            // Handle regular multiple-choice question
+        if (selectedOption) {
             studentAnswer = selectedOption.value.trim();
             answerType = 'multiple_choice';
             totalScoreableQuestions++;
@@ -121,6 +82,7 @@ export async function submitTestToFirebase(subject, grade, studentName, parentEm
             
             if (!correctAnswer) {
                 console.warn(`❌ No correct answer found for question: ${originalQuestion.question}`);
+                // Don't score if no correct answer exists
                 totalScoreableQuestions--; 
             } else {
                 // Normalize both answers for case-insensitive comparison
@@ -138,7 +100,6 @@ export async function submitTestToFirebase(subject, grade, studentName, parentEm
                 }
             }
         } else if (hasTextAnswer) {
-            // Handle text response
             studentAnswer = textResponse.value.trim();
             answerType = 'text_response';
             console.log(`📄 Text answer: ${studentAnswer.substring(0, 30)}...`);
@@ -159,16 +120,13 @@ export async function submitTestToFirebase(subject, grade, studentName, parentEm
             isCorrect: isCorrect,
             topic: topic,
             imageUrl: originalQuestion.imageUrl || null,
-            imagePosition: originalQuestion.imagePosition || null,
-            griddableAnswers: griddableAnswers, // Store structured grid data
-            needsManualGrading: answerType === 'griddable' // Flag for manual review
+            imagePosition: originalQuestion.imagePosition || null
         });
     }
 
     console.log("📊 FINAL SCORING SUMMARY:");
     console.log(`✅ Score: ${score}/${totalScoreableQuestions}`);
     console.log(`📝 Total answers: ${answers.length}`);
-    console.log(`🔢 Griddable questions: ${answers.filter(a => a.answerType === 'griddable').length}`);
     console.log(`🏷️ Topics found:`, [...new Set(answers.map(a => a.topic))]);
 
     const resultData = {
@@ -182,8 +140,6 @@ export async function submitTestToFirebase(subject, grade, studentName, parentEm
         answers,
         score: score,
         totalScoreableQuestions: totalScoreableQuestions,
-        hasGriddableQuestions: answers.some(a => a.answerType === 'griddable'),
-        needsManualGrading: answers.some(a => a.needsManualGrading),
         submittedAt: Timestamp.now()
     };
 
@@ -192,90 +148,9 @@ export async function submitTestToFirebase(subject, grade, studentName, parentEm
     try {
         await addDoc(collection(db, "student_results"), resultData);
         console.log("✅ Test results submitted successfully!");
-        
-        // Auto-register student after test submission
-        await autoRegisterStudentAfterTest(subject, grade, studentName, parentEmail, tutorEmail, studentCountry);
-        
-        alert("Test results submitted successfully. Griddable questions will be manually graded.");
+        alert("Test results submitted successfully.");
     } catch (err) {
         console.error("❌ Error submitting test results to Firebase:", err);
         alert("Failed to submit test results. Please try again.");
     }
 }
-
-// ##################################################################
-// # SECTION: AUTO STUDENT REGISTRATION
-// ##################################################################
-
-/**
- * Automatically registers student after test completion
- */
-async function autoRegisterStudentAfterTest(subject, grade, studentName, parentEmail, tutorEmail, studentCountry) {
-    try {
-        console.log("🚀 Starting auto-registration for student:", studentName);
-        
-        // Import additional Firebase functions needed
-        const { doc, getDoc, query, where, getDocs } = await import("https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js");
-        
-        // Get parentPhone from student data
-        const studentData = JSON.parse(localStorage.getItem("studentData") || "{}");
-        const parentPhone = studentData.parentPhone || '';
-        
-        // Check if student already exists to avoid duplicates
-        const studentsQuery = query(
-            collection(db, "students"), 
-            where("studentName", "==", studentName),
-            where("parentPhone", "==", parentPhone),
-            where("tutorEmail", "==", tutorEmail)
-        );
-        
-        const pendingQuery = query(
-            collection(db, "pending_students"), 
-            where("studentName", "==", studentName),
-            where("parentPhone", "==", parentPhone),
-            where("tutorEmail", "==", tutorEmail)
-        );
-
-        const [studentsSnapshot, pendingSnapshot] = await Promise.all([
-            getDocs(studentsQuery),
-            getDocs(pendingQuery)
-        ]);
-
-        // If student already exists, skip registration
-        if (!studentsSnapshot.empty || !pendingSnapshot.empty) {
-            console.log("📝 Student already exists, skipping auto-registration");
-            return;
-        }
-        
-        // Get settings to determine approval bypass
-        const settingsDoc = await getDoc(doc(db, "settings", "global_settings"));
-        const isBypassApprovalEnabled = settingsDoc.exists() ? settingsDoc.data().bypassPendingApproval : false;
-        
-        const studentRecord = {
-            studentName: studentName,
-            parentEmail: parentEmail,
-            parentPhone: parentPhone,
-            grade: grade,
-            country: studentCountry,
-            tutorEmail: tutorEmail,
-            subjects: ["Auto-Registered"], // Placeholder
-            days: 1, // Default
-            studentFee: 0, // To be set by tutor
-            autoRegistered: true,
-            registrationDate: Timestamp.now(),
-            needsCompletion: true, // Flag for tutors
-            testCompleted: true,
-            testSubject: subject
-        };
-
-        const targetCollection = isBypassApprovalEnabled ? "students" : "pending_students";
-        
-        await addDoc(collection(db, targetCollection), studentRecord);
-        console.log(`✅ Auto-registered student: ${studentName} in ${targetCollection}`);
-        
-    } catch (error) {
-        console.error("❌ Error auto-registering student:", error);
-        // Fail silently - don't affect test submission
-    }
-}
-[file content end]
