@@ -34,7 +34,9 @@ export async function submitTestToFirebase(subject, grade, studentName, parentEm
     console.log("👤 Student:", finalStudentName);
     console.log("📧 Parent Email:", finalParentEmail);
 
-    // Validation to ensure all questions are answered (either MC or text)
+    // FIXED VALIDATION: Find ALL unanswered questions first, then show the first one
+    let firstUnansweredBlock = null;
+
     for (let i = 0; i < loadedQuestions.length; i++) {
         const questionBlock = document.querySelector(`.question-block[data-question-id="${loadedQuestions[i].id}"]`);
         if (questionBlock) {
@@ -42,14 +44,38 @@ export async function submitTestToFirebase(subject, grade, studentName, parentEm
             const textResponse = questionBlock.querySelector("textarea, input[type='text']");
             const hasTextAnswer = textResponse && textResponse.value.trim() !== '';
             
-            // Check if either MC option OR text response is provided
+            // Check for griddable question selection
+            const isGriddableSelected = selectedOption && selectedOption.value === "Gridable question";
+            const gridInputs = questionBlock.querySelectorAll('.grid-input, .bubble-input, .math-grid-input, input[type="number"]');
+            const hasGridAnswer = Array.from(gridInputs).some(input => input.value.trim() !== '');
+            
+            // If it's a griddable question, check if either option is selected OR grid is filled
+            if (isGriddableSelected) {
+                // Griddable question is considered answered if the option is selected
+                // We don't require the grid to be filled for validation
+                console.log(`✅ Griddable question ${loadedQuestions[i].id} is answered (option selected)`);
+                continue; // Skip to next question
+            }
+            
+            // For regular questions, check if either MC option OR text response is provided
             if (!selectedOption && !hasTextAnswer) {
-                alert("Please answer all questions before submitting. You can provide multiple-choice answers or text responses.");
-                questionBlock.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                questionBlock.style.border = "2px solid red";
-                throw new Error("All questions must be answered (either multiple-choice or text).");
+                console.log(`❌ Question ${loadedQuestions[i].id} is unanswered`);
+                // Store the first unanswered question we find
+                if (!firstUnansweredBlock) {
+                    firstUnansweredBlock = questionBlock;
+                }
+            } else {
+                console.log(`✅ Question ${loadedQuestions[i].id} is answered`);
             }
         }
+    }
+
+    // After checking ALL questions, show error for the first unanswered one
+    if (firstUnansweredBlock) {
+        alert("Please answer all questions before submitting. You can provide multiple-choice answers or text responses.");
+        firstUnansweredBlock.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        firstUnansweredBlock.style.border = "2px solid red";
+        throw new Error("All questions must be answered (either multiple-choice or text).");
     }
 
     // Process all questions (both MC and text)
@@ -77,11 +103,29 @@ export async function submitTestToFirebase(subject, grade, studentName, parentEm
         const textResponse = block.querySelector("textarea, input[type='text']");
         const hasTextAnswer = textResponse && textResponse.value.trim() !== '';
 
+        // Check for griddable inputs
+        const gridInputs = block.querySelectorAll('.grid-input, .bubble-input, .math-grid-input, input[type="number"]');
+        const gridAnswers = Array.from(gridInputs).map(input => input.value.trim()).filter(val => val !== '');
+        const hasGridAnswer = gridAnswers.length > 0;
+        const isGriddableSelected = selectedOption && selectedOption.value === "Gridable question";
+
         let studentAnswer = '';
         let answerType = '';
         let isCorrect = false;
 
-        if (selectedOption) {
+        if (isGriddableSelected) {
+            // Handle griddable question
+            answerType = 'griddable';
+            studentAnswer = hasGridAnswer 
+                ? `Griddable: ${gridAnswers.join(', ')}`
+                : 'Griddable question selected (no grid input)';
+            totalScoreableQuestions++;
+            
+            // Griddable questions need manual grading
+            isCorrect = false;
+            console.log(`🔢 Griddable answer: ${studentAnswer}`);
+            
+        } else if (selectedOption) {
             studentAnswer = selectedOption.value.trim();
             answerType = 'multiple_choice';
             totalScoreableQuestions++;
@@ -136,6 +180,7 @@ export async function submitTestToFirebase(subject, grade, studentName, parentEm
     console.log("📊 FINAL SCORING SUMMARY:");
     console.log(`✅ Score: ${score}/${totalScoreableQuestions}`);
     console.log(`📝 Total answers: ${answers.length}`);
+    console.log(`🔢 Griddable questions: ${answers.filter(a => a.answerType === 'griddable').length}`);
     console.log(`🏷️ Topics found:`, [...new Set(answers.map(a => a.topic))]);
 
     const resultData = {
