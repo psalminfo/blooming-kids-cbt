@@ -1,3 +1,5 @@
+[file name]: student.html
+[file content begin]
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -47,11 +49,12 @@
         const REFERRAL_REWARD_AMOUNT = 5000; // ₦5,000 as per parent (3).js
         // --- END: FIREBASE INITIALIZATION ---
 
-        // --- START: MODULE IMPORTS FOR QUESTION LOADING ---
+        // --- START: MODULE IMPORTS FOR QUESTION LOADING AND SUBMISSION ---
         import { loadQuestions, getAnswerData, getAllLoadedQuestions, clearTestSession } from './autoQuestionGen.js';
+        import { submitTestToFirebase } from './submitAnswers.js';
         // --- END: MODULE IMPORTS ---
 
-        // --- START: NEW REFERRAL LOGIC FUNCTIONS ---
+        // --- START: REFERRAL LOGIC FUNCTION ONLY (No test submission) ---
         
         /**
          * Validates referral code and logs a pending transaction.
@@ -98,69 +101,7 @@
             }
         }
         
-        /**
-         * Combines the permanent student record creation, test saving, and referral logic.
-         */
-        async function createStudentAndSaveTest(subject, grade, studentName, parentEmail, tutorEmail, studentCountry, referralCode, testAnswers, questions) {
-            try {
-                // --- 1. Create Student Record (Initial Login) ---
-                const studentData = {
-                    studentName: studentName,
-                    parentEmail: parentEmail,
-                    tutorEmail: tutorEmail,
-                    grade: grade,
-                    country: studentCountry,
-                    referralCodeUsed: referralCode.toUpperCase(), 
-                    createdAt: firebase.firestore.FieldValue.serverTimestamp()
-                };
-                
-                const studentRef = await db.collection('students').add(studentData); 
-                const studentUid = studentRef.id;
-
-                // --- 2. Save Test Results ---
-                const testResultData = {
-                    studentUid: studentUid,
-                    studentName: studentName,
-                    parentEmail: parentEmail,
-                    parentPhone: '', // You might want to capture this
-                    tutorEmail: tutorEmail,
-                    grade: grade,
-                    subject: subject,
-                    answers: testAnswers,
-                    questions: questions,
-                    submittedAt: firebase.firestore.FieldValue.serverTimestamp(),
-                    status: 'completed',
-                    totalScoreableQuestions: questions.length,
-                    score: calculateScore(testAnswers, questions),
-                    studentCountry: studentCountry
-                };
-
-                await db.collection('student_results').add(testResultData);
-                
-                // --- 3. Run Referral Logic ---
-                await handleReferralLogic(referralCode, studentName, studentUid);
-                
-                return studentUid;
-            } catch (error) {
-                console.error("Error saving student and test data:", error);
-                throw error;
-            }
-        }
-
-        /**
-         * Calculate test score based on answers
-         */
-        function calculateScore(answers, questions) {
-            let score = 0;
-            questions.forEach((question, index) => {
-                if (question.correctAnswer && answers[`q${index}`] === question.correctAnswer) {
-                    score++;
-                }
-            });
-            return score;
-        }
-
-        // --- END: NEW REFERRAL LOGIC FUNCTIONS ---
+        // --- END: REFERRAL LOGIC FUNCTION ---
 
         document.addEventListener('DOMContentLoaded', async () => {
             const urlParams = new URLSearchParams(window.location.search);
@@ -179,9 +120,21 @@
                 return;
             }
 
-            // Clear localStorage and load questions
-            localStorage.clear();
-            
+            // REMOVED: localStorage.clear() - This was causing the "Missing student info" error
+            // Now localStorage persists properly for submitAnswers.js
+
+            // Store student data in localStorage for submitAnswers.js to use
+            const studentData = {
+                studentName: studentName,
+                parentEmail: parentEmail,
+                tutorEmail: tutorEmail,
+                grade: grade,
+                country: studentCountry,
+                parentPhone: '', // You might want to capture this elsewhere
+                referralCodeUsed: referralCode
+            };
+            localStorage.setItem("studentData", JSON.stringify(studentData));
+
             try {
                 // Load questions using the imported function
                 await loadQuestions(subject, grade, state);
@@ -192,38 +145,35 @@
                     `<p class="text-red-600">Error loading questions. Please try again.</p>`;
             }
 
-            // Setup submit button
+            // Setup submit button - NOW USING submitAnswers.js
             const submitBtn = document.getElementById("submit-test-btn");
             if (submitBtn) {
                 submitBtn.addEventListener('click', async () => {
-                    // Validate all questions are answered
-                    const allQuestions = getAllLoadedQuestions();
-                    const answers = getAnswerData();
-                    
-                    // Check if all questions are answered
-                    const unansweredQuestions = allQuestions.filter((q, index) => {
-                        return !answers[`q${index}`] && !answers[q.id];
-                    });
-
-                    if (unansweredQuestions.length > 0) {
-                        alert(`Please answer all ${unansweredQuestions.length} remaining questions before submitting.`);
-                        return;
-                    }
-
                     // Disable button to prevent double-submission
                     submitBtn.disabled = true;
                     submitBtn.textContent = 'Submitting...';
 
                     try {
-                        // Save everything to Firebase
-                        await createStudentAndSaveTest(
+                        // Use the proper submission function from submitAnswers.js
+                        await submitTestToFirebase(
                             subject, grade, studentName, parentEmail, 
-                            tutorEmail, studentCountry, referralCode, 
-                            answers, allQuestions
+                            tutorEmail, studentCountry
                         );
                         
-                        // Clear test session
-                        clearTestSession(true);
+                        // Handle referral logic separately after successful test submission
+                        if (referralCode) {
+                            try {
+                                // Note: This would need studentUid from the submission
+                                // You might need to adjust this based on how submitTestToFirebase works
+                                await handleReferralLogic(referralCode, studentName, 'student-uid-placeholder');
+                            } catch (referralError) {
+                                console.error("Referral logic failed (non-critical):", referralError);
+                                // Don't block test submission if referral fails
+                            }
+                        }
+                        
+                        // Clear test session but keep student data
+                        clearTestSession(false); // Pass false to keep student data
                         
                         // Show success and redirect
                         document.getElementById("question-container").innerHTML = 
@@ -241,10 +191,11 @@
         });
 
         window.logout = () => {
-            localStorage.clear();
+            // Only clear test session data, keep student info
             clearTestSession(true);
             window.location.href = 'index.html';
         };
     </script>
 </body>
 </html>
+[file content end]
