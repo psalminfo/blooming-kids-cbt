@@ -19,13 +19,20 @@ export async function submitTestToFirebase(subject, grade, studentName, parentEm
     let score = 0;
     let totalScoreableQuestions = 0;
 
-    // Get parentPhone from student data
+    // Get student data with safe fallbacks
     const studentData = JSON.parse(localStorage.getItem("studentData") || "{}");
     const parentPhone = studentData.parentPhone || '';
+    
+    // Use provided parameters as primary, fall back to studentData if needed
+    const finalStudentName = studentName || studentData.studentName || 'Unknown Student';
+    const finalParentEmail = parentEmail || studentData.parentEmail || '';
+    const finalTutorEmail = tutorEmail || studentData.tutorEmail || '';
+    const finalStudentCountry = studentCountry || studentData.country || '';
 
     console.log("🚀 Starting test submission...");
     console.log("📋 Loaded questions:", loadedQuestions.length);
-    console.log("👤 Student:", studentName);
+    console.log("👤 Student:", finalStudentName);
+    console.log("📧 Parent Email:", finalParentEmail);
 
     // Validation to ensure all questions are answered (either MC or text)
     for (let i = 0; i < loadedQuestions.length; i++) {
@@ -132,13 +139,13 @@ export async function submitTestToFirebase(subject, grade, studentName, parentEm
     console.log(`🏷️ Topics found:`, [...new Set(answers.map(a => a.topic))]);
 
     const resultData = {
-        subject,
-        grade,
-        studentName,
-        parentEmail,
-        tutorEmail,
-        studentCountry,
-        parentPhone,
+        subject: subject || 'Unknown Subject',
+        grade: grade || 'Unknown Grade',
+        studentName: finalStudentName,
+        parentEmail: finalParentEmail,
+        tutorEmail: finalTutorEmail,
+        studentCountry: finalStudentCountry,
+        parentPhone: parentPhone,
         answers,
         score: score,
         totalScoreableQuestions: totalScoreableQuestions,
@@ -154,7 +161,7 @@ export async function submitTestToFirebase(subject, grade, studentName, parentEm
         // ==================================================
         // NEW: AUTO-REGISTER STUDENT AFTER TEST SUBMISSION
         // ==================================================
-        await autoRegisterStudentAfterTest(subject, grade, studentName, parentEmail, tutorEmail, studentCountry);
+        await autoRegisterStudentAfterTest(subject, grade, finalStudentName, finalParentEmail, finalTutorEmail, finalStudentCountry);
         
         // ==================================================
         // NEW: REDIRECT TO SUBJECT SELECT PAGE AFTER SUCCESS
@@ -224,8 +231,8 @@ async function autoRegisterStudentAfterTest(subject, grade, studentName, parentE
             studentName: studentName,
             parentEmail: parentEmail,
             parentPhone: parentPhone,
-            grade: grade,
-            country: studentCountry,
+            grade: grade || 'Unknown Grade',
+            country: studentCountry || '',
             tutorEmail: tutorEmail,
             subjects: ["Auto-Registered"], // Placeholder
             days: 1, // Default
@@ -234,7 +241,7 @@ async function autoRegisterStudentAfterTest(subject, grade, studentName, parentE
             registrationDate: Timestamp.now(),
             needsCompletion: true, // Flag for tutors
             testCompleted: true,
-            testSubject: subject
+            testSubject: subject || 'Unknown Subject'
         };
 
         const targetCollection = isBypassApprovalEnabled ? "students" : "pending_students";
