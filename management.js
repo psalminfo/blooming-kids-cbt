@@ -938,28 +938,45 @@ async function loadPayAdviceData(startDate, endDate) {
     const reportsQuery = query(collection(db, "tutor_submissions"), where("submittedAt", ">=", startTimestamp), where("submittedAt", "<=", endTimestamp));
     try {
         const reportsSnapshot = await getDocs(reportsQuery);
-        const activeTutorEmails = [...new Set(reportsSnapshot.docs.map(doc => doc.data().tutorEmail))];
-
-        if (activeTutorEmails.length === 0) {
-            tableBody.innerHTML = `<tr><td colspan="8" class="text-center py-4">No active tutors in this period.</td></tr>`;
+        
+        if (reportsSnapshot.empty) {
+            tableBody.innerHTML = `<tr><td colspan="8" class="text-center py-4">No reports found in this period.</td></tr>`;
             document.getElementById('pay-tutor-count').textContent = 0;
             document.getElementById('pay-student-count').textContent = 0;
             currentPayData = [];
             return;
         }
 
+        // FIXED: Get unique tutor-student pairs from ACTUAL REPORTS, not all assigned students
+        const tutorStudentPairs = {};
+        const activeTutorEmails = new Set();
         const tutorBankDetails = {};
+
         reportsSnapshot.docs.forEach(doc => {
             const data = doc.data();
+            const tutorEmail = data.tutorEmail;
+            const studentName = data.studentName;
+            
+            activeTutorEmails.add(tutorEmail);
+            
+            // Track unique students per tutor based on ACTUAL REPORTS
+            if (!tutorStudentPairs[tutorEmail]) {
+                tutorStudentPairs[tutorEmail] = new Set();
+            }
+            tutorStudentPairs[tutorEmail].add(studentName);
+            
+            // Get bank details from submissions
             if (data.beneficiaryBank && data.beneficiaryAccount) {
-                tutorBankDetails[data.tutorEmail] = {
+                tutorBankDetails[tutorEmail] = {
                     beneficiaryBank: data.beneficiaryBank,
                     beneficiaryAccount: data.beneficiaryAccount,
                     beneficiaryName: data.beneficiaryName || 'N/A',
                 };
             }
         });
-        
+
+        const activeTutorEmailsArray = Array.from(activeTutorEmails);
+
         // Firestore 'in' queries are limited to 30 values. This function fetches tutors by chunking the email list.
         const fetchTutorsInChunks = async (emails) => {
             if (emails.length === 0) return [];
@@ -979,7 +996,7 @@ async function loadPayAdviceData(startDate, endDate) {
 
         // Fetch both tutors (in chunks) and all students concurrently.
         const [tutorDocs, studentsSnapshot] = await Promise.all([
-            fetchTutorsInChunks(activeTutorEmails),
+            fetchTutorsInChunks(activeTutorEmailsArray),
             getDocs(collection(db, "students"))
         ]);
 
@@ -990,29 +1007,34 @@ async function loadPayAdviceData(startDate, endDate) {
         // Iterate over the combined array of tutor documents
         tutorDocs.forEach(doc => {
             const tutor = doc.data();
-            // FIX: Filter out students on break or inactive
-            const assignedStudents = allStudents.filter(s => 
-                s.tutorEmail === tutor.email && 
-                s.status !== "break" && 
-                s.status !== "on break" &&
-                s.status !== "inactive" &&
-                s.status !== "paused"
+            const tutorEmail = tutor.email;
+            
+            // FIXED: Only count students that actually had reports submitted
+            const reportedStudentNames = tutorStudentPairs[tutorEmail] || new Set();
+            
+            // Get student details for reported students only
+            const reportedStudents = allStudents.filter(s => 
+                s.tutorEmail === tutorEmail && 
+                reportedStudentNames.has(s.studentName) &&
+                s.summerBreak !== true // Exclude students on break
             );
-            const totalStudentFees = assignedStudents.reduce((sum, s) => sum + (s.studentFee || 0), 0);
+            
+            const totalStudentFees = reportedStudents.reduce((sum, s) => sum + (s.studentFee || 0), 0);
             const managementFee = (tutor.isManagementStaff && tutor.managementFee) ? tutor.managementFee : 0;
-            totalStudentCount += assignedStudents.length;
-            const bankDetails = tutorBankDetails[tutor.email] || { beneficiaryBank: 'N/A', beneficiaryAccount: 'N/A', beneficiaryName: 'N/A' };
+            totalStudentCount += reportedStudents.length;
+            const bankDetails = tutorBankDetails[tutorEmail] || { beneficiaryBank: 'N/A', beneficiaryAccount: 'N/A', beneficiaryName: 'N/A' };
 
             payData.push({
                 tutorName: tutor.name,
                 tutorEmail: tutor.email,
-                studentCount: assignedStudents.length,
+                studentCount: reportedStudents.length,
                 totalStudentFees: totalStudentFees,
                 managementFee: managementFee,
                 totalPay: totalStudentFees + managementFee,
                 ...bankDetails
             });
         });
+        
         currentPayData = payData; // Store for reuse
         document.getElementById('pay-tutor-count').textContent = payData.length;
         document.getElementById('pay-student-count').textContent = totalStudentCount;
@@ -1097,9 +1119,16 @@ async function fetchAndRenderTutorReports(forceRefresh = false) {
         if (!sessionCache.reports) {
             reportsListContainer.innerHTML = `<p class="text-center text-gray-500 py-10">Fetching reports from server...</p>`;
             const snapshot = await getDocs(query(collection(db, "tutor_submissions"), orderBy("submittedAt", "desc")));
-            saveToLocalStorage('reports', snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+            const reportsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            saveToLocalStorage('reports', reportsData);
+            
+            // FIXED: Wait for cache to be saved before rendering
+            setTimeout(() => {
+                renderTutorReportsFromCache();
+            }, 100);
+        } else {
+            renderTutorReportsFromCache();
         }
-        renderTutorReportsFromCache();
     } catch(error) {
         console.error("Error fetching reports:", error);
         reportsListContainer.innerHTML = `<p class="text-center text-red-500 py-10">Failed to load reports.</p>`;
@@ -1111,8 +1140,10 @@ function renderTutorReportsFromCache() {
     const reportsListContainer = document.getElementById('tutor-reports-list');
     if (!reportsListContainer) return;
 
-    if (reports.length === 0) {
+    if (!reports || reports.length === 0) {
         reportsListContainer.innerHTML = `<p class="text-center text-gray-500">No reports found. Click Refresh to fetch from server.</p>`;
+        document.getElementById('report-tutor-count').textContent = '0';
+        document.getElementById('report-total-count').textContent = '0';
         return;
     }
     
@@ -1128,6 +1159,12 @@ function renderTutorReportsFromCache() {
     document.getElementById('report-total-count').textContent = reports.length;
 
     const canDownload = window.userData?.permissions?.actions?.canDownloadReports === true;
+    
+    if (Object.keys(reportsByTutor).length === 0) {
+        reportsListContainer.innerHTML = `<p class="text-center text-gray-500">No tutor reports found.</p>`;
+        return;
+    }
+
     reportsListContainer.innerHTML = Object.values(reportsByTutor).map(tutorData => {
         const reportLinks = tutorData.reports.map(report => {
             const buttonHTML = canDownload
@@ -1930,5 +1967,3 @@ onAuthStateChanged(auth, async (user) => {
 });
 
 // [End Updated management.js File]
-
-
