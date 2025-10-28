@@ -930,8 +930,11 @@ async function loadPayAdviceData(startDate, endDate) {
     if (!tableBody) return;
     tableBody.innerHTML = `<tr><td colspan="8" class="text-center py-4">Loading pay data...</td></tr>`;
 
+    // Fix: Adjust end date BEFORE creating timestamps
+    endDate.setHours(23, 59, 59, 999);
     const startTimestamp = Timestamp.fromDate(startDate);
     const endTimestamp = Timestamp.fromDate(endDate);
+    
     const reportsQuery = query(collection(db, "tutor_submissions"), where("submittedAt", ">=", startTimestamp), where("submittedAt", "<=", endTimestamp));
     try {
         const reportsSnapshot = await getDocs(reportsQuery);
@@ -957,7 +960,6 @@ async function loadPayAdviceData(startDate, endDate) {
             }
         });
         
-        // ### FIXED SECTION ###
         // Firestore 'in' queries are limited to 30 values. This function fetches tutors by chunking the email list.
         const fetchTutorsInChunks = async (emails) => {
             if (emails.length === 0) return [];
@@ -980,7 +982,6 @@ async function loadPayAdviceData(startDate, endDate) {
             fetchTutorsInChunks(activeTutorEmails),
             getDocs(collection(db, "students"))
         ]);
-        // ### END FIXED SECTION ###
 
         const allStudents = studentsSnapshot.docs.map(doc => doc.data());
         let totalStudentCount = 0;
@@ -989,7 +990,14 @@ async function loadPayAdviceData(startDate, endDate) {
         // Iterate over the combined array of tutor documents
         tutorDocs.forEach(doc => {
             const tutor = doc.data();
-            const assignedStudents = allStudents.filter(s => s.tutorEmail === tutor.email);
+            // FIX: Filter out students on break or inactive
+            const assignedStudents = allStudents.filter(s => 
+                s.tutorEmail === tutor.email && 
+                s.status !== "break" && 
+                s.status !== "on break" &&
+                s.status !== "inactive" &&
+                s.status !== "paused"
+            );
             const totalStudentFees = assignedStudents.reduce((sum, s) => sum + (s.studentFee || 0), 0);
             const managementFee = (tutor.isManagementStaff && tutor.managementFee) ? tutor.managementFee : 0;
             totalStudentCount += assignedStudents.length;
@@ -1922,4 +1930,5 @@ onAuthStateChanged(auth, async (user) => {
 });
 
 // [End Updated management.js File]
+
 
