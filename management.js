@@ -1,7 +1,7 @@
 // [Begin Updated management.js File]
 
 import { auth, db } from './firebaseConfig.js';
-import { collection, getDocs, doc, getDoc, where, query, orderBy, Timestamp, writeBatch, updateDoc, deleteDoc, setDoc, addDoc } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
+import { collection, getDocs, doc, getDoc, where, query, orderBy, Timestamp, writeBatch, updateDoc, deleteDoc, setDoc, addDoc, limit, startAfter } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
 import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-auth.js";
 import { onSnapshot } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
 
@@ -28,6 +28,12 @@ const sessionCache = {
  * @param {any} data The data to store.
  */
 function saveToLocalStorage(key, data) {
+    // Don't cache reports to avoid quota issues
+    if (key === 'reports') {
+        sessionCache[key] = data; // Keep in memory only
+        return;
+    }
+    
     try {
         localStorage.setItem(CACHE_PREFIX + key, JSON.stringify(data));
         sessionCache[key] = data; // Also update the in-memory cache
@@ -68,6 +74,11 @@ loadFromLocalStorage();
 // Session-level state for the Pay Advice gift feature.
 let payAdviceGifts = {};
 let currentPayData = [];
+
+// Pagination state for reports
+let reportsLastVisible = null;
+let reportsFirstVisible = null;
+let currentReportsPage = 1;
 
 // Utility function to capitalize strings
 function capitalize(str) {
@@ -280,6 +291,149 @@ function showAssignStudentModal() {
         } catch (error) {
             console.error("Error assigning student: ", error);
             alert("Failed to assign student. Check the console for details.");
+        }
+    });
+}
+
+// NEW FUNCTION: Reassign Student Modal
+function showReassignStudentModal() {
+    const tutors = sessionCache.tutors || [];
+    if (tutors.length === 0) {
+        alert("Tutor list is not available. Please refresh the directory and try again.");
+        return;
+    }
+
+    const tutorOptions = tutors
+        .sort((a, b) => a.name.localeCompare(b.name))
+        .map(tutor => `<option value='${JSON.stringify({email: tutor.email, name: tutor.name})}'>${tutor.name} (${tutor.email})</option>`)
+        .join('');
+
+    const modalHtml = `
+        <div id="reassign-modal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-center justify-center">
+            <div class="relative p-8 bg-white w-96 max-w-lg rounded-lg shadow-xl">
+                <button class="absolute top-2 right-2 text-gray-500 hover:text-gray-800 text-2xl font-bold" onclick="closeManagementModal('reassign-modal')">&times;</button>
+                <h3 class="text-xl font-bold mb-4">Reassign Student to Different Tutor</h3>
+                <form id="reassign-student-form">
+                    <div class="mb-2">
+                        <label class="block text-sm font-medium">Search Student Name</label>
+                        <input type="text" id="reassign-student-search" placeholder="Enter student name..." class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2">
+                        <button type="button" id="search-student-btn" class="mt-2 bg-blue-500 text-white px-3 py-1 rounded text-sm">Search Student</button>
+                    </div>
+                    <div id="student-search-results" class="mb-4 max-h-40 overflow-y-auto border rounded-md p-2 hidden">
+                        <p class="text-sm text-gray-500">Search results will appear here...</p>
+                    </div>
+                    <div class="mb-2">
+                        <label class="block text-sm font-medium">Assign to New Tutor</label>
+                        <select id="reassign-tutor" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2">
+                            <option value="" disabled selected>Select new tutor...</option>
+                            ${tutorOptions}
+                        </select>
+                    </div>
+                    <input type="hidden" id="selected-student-id">
+                    <div class="flex justify-end mt-4">
+                        <button type="button" onclick="closeManagementModal('reassign-modal')" class="mr-2 px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300">Cancel</button>
+                        <button type="submit" class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700">Reassign Student</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    `;
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+
+    // Search student functionality
+    document.getElementById('search-student-btn').addEventListener('click', async () => {
+        const searchTerm = document.getElementById('reassign-student-search').value.trim();
+        if (!searchTerm) {
+            alert("Please enter a student name to search.");
+            return;
+        }
+
+        try {
+            const studentsSnapshot = await getDocs(collection(db, "students"));
+            const allStudents = studentsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            
+            const searchResults = allStudents.filter(student => 
+                student.studentName.toLowerCase().includes(searchTerm.toLowerCase())
+            );
+
+            const resultsContainer = document.getElementById('student-search-results');
+            resultsContainer.classList.remove('hidden');
+            
+            if (searchResults.length === 0) {
+                resultsContainer.innerHTML = '<p class="text-sm text-gray-500">No students found matching your search.</p>';
+                return;
+            }
+
+            resultsContainer.innerHTML = searchResults.map(student => `
+                <div class="p-2 border-b cursor-pointer hover:bg-gray-50 student-result" data-student-id="${student.id}" data-student-name="${student.studentName}" data-current-tutor="${student.tutorEmail}">
+                    <p class="font-medium">${student.studentName}</p>
+                    <p class="text-xs text-gray-500">Current Tutor: ${student.tutorEmail} | Grade: ${student.grade}</p>
+                </div>
+            `).join('');
+
+            // Add click handlers for search results
+            document.querySelectorAll('.student-result').forEach(result => {
+                result.addEventListener('click', () => {
+                    const studentId = result.dataset.studentId;
+                    const studentName = result.dataset.studentName;
+                    const currentTutor = result.dataset.currentTutor;
+                    
+                    document.getElementById('selected-student-id').value = studentId;
+                    document.getElementById('reassign-student-search').value = studentName;
+                    
+                    // Highlight selected result
+                    document.querySelectorAll('.student-result').forEach(r => r.classList.remove('bg-blue-100'));
+                    result.classList.add('bg-blue-100');
+                    
+                    alert(`Selected: ${studentName} (Currently with: ${currentTutor})`);
+                });
+            });
+
+        } catch (error) {
+            console.error("Error searching students:", error);
+            alert("Failed to search students. Check console for details.");
+        }
+    });
+
+    // Reassign form submission
+    document.getElementById('reassign-student-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const form = e.target;
+        const studentId = document.getElementById('selected-student-id').value;
+        const selectedTutorData = JSON.parse(form.elements['reassign-tutor'].value);
+
+        if (!studentId) {
+            alert("Please select a student from the search results.");
+            return;
+        }
+
+        try {
+            const studentRef = doc(db, "students", studentId);
+            const studentDoc = await getDoc(studentRef);
+            
+            if (!studentDoc.exists()) {
+                alert("Student not found!");
+                return;
+            }
+
+            const studentData = studentDoc.data();
+            const oldTutor = studentData.tutorEmail;
+            const newTutor = selectedTutorData.email;
+
+            await updateDoc(studentRef, {
+                tutorEmail: newTutor,
+                tutorName: selectedTutorData.name,
+                lastUpdated: Timestamp.now()
+            });
+
+            alert(`Student "${studentData.studentName}" reassigned from ${oldTutor} to ${selectedTutorData.name} successfully!`);
+            closeManagementModal('reassign-modal');
+            invalidateCache('students');
+            renderManagementTutorView(document.getElementById('main-content'));
+
+        } catch (error) {
+            console.error("Error reassigning student:", error);
+            alert("Failed to reassign student. Check the console for details.");
         }
     });
 }
@@ -697,7 +851,8 @@ async function renderManagementTutorView(container) {
                 <div class="flex items-center gap-4 flex-wrap">
                     <input type="search" id="directory-search" placeholder="Search Tutors, Students, Parents..." class="p-2 border rounded-md w-64">
                     <button id="assign-student-btn" class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700">Assign New Student</button>
-                    <button id="refresh-directory-btn" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Refresh</button>
+                    <button id="reassign-student-btn" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Reassign Student</button>
+                    <button id="refresh-directory-btn" class="bg-gray-600 text-white px-4 py-2 rounded hover:bg-gray-700">Refresh</button>
                 </div>
             </div>
             <div class="flex space-x-4 mb-4">
@@ -716,6 +871,7 @@ async function renderManagementTutorView(container) {
         </div>
     `;
     document.getElementById('assign-student-btn').addEventListener('click', showAssignStudentModal);
+    document.getElementById('reassign-student-btn').addEventListener('click', showReassignStudentModal);
     document.getElementById('refresh-directory-btn').addEventListener('click', () => fetchAndRenderDirectory(true));
     document.getElementById('directory-search').addEventListener('input', (e) => renderDirectoryFromCache(e.target.value));
     fetchAndRenderDirectory();
@@ -1096,39 +1252,122 @@ async function renderTutorReportsPanel(container) {
             </div>
             <div class="flex space-x-4 mb-4">
                 <div class="bg-green-100 p-3 rounded-lg text-center shadow w-full">
-                    <h4 class="font-bold text-green-800 text-sm">Unique Tutors Submitted</h4>
-                    <p id="report-tutor-count" class="text-2xl font-extrabold">0</p>
+                    <h4 class="font-bold text-green-800 text-sm">Reports Loaded</h4>
+                    <p id="report-total-count" class="text-2xl font-extrabold">0</p>
                 </div>
                 <div class="bg-yellow-100 p-3 rounded-lg text-center shadow w-full">
-                    <h4 class="font-bold text-yellow-800 text-sm">Total Reports Submitted</h4>
-                    <p id="report-total-count" class="text-2xl font-extrabold">0</p>
+                    <h4 class="font-bold text-yellow-800 text-sm">Page</h4>
+                    <p id="report-page-count" class="text-2xl font-extrabold">1</p>
+                </div>
+            </div>
+            <div class="flex justify-between items-center mb-4">
+                <div id="pagination-controls" class="flex space-x-2">
+                    <button id="prev-page-btn" class="bg-gray-500 text-white px-4 py-2 rounded hover:bg-gray-600 disabled:opacity-50" disabled>Previous</button>
+                    <button id="next-page-btn" class="bg-gray-500 text-white px-4 py-2 rounded hover:bg-gray-600">Next</button>
+                </div>
+                <div class="text-sm text-gray-600">
+                    Showing 50 reports per page
                 </div>
             </div>
             <div id="tutor-reports-list" class="space-y-4"><p class="text-center">Loading reports...</p></div>
         </div>
     `;
-    document.getElementById('refresh-reports-btn').addEventListener('click', () => fetchAndRenderTutorReports(true));
+    
+    document.getElementById('refresh-reports-btn').addEventListener('click', () => {
+        // Reset pagination on refresh
+        reportsLastVisible = null;
+        reportsFirstVisible = null;
+        currentReportsPage = 1;
+        fetchAndRenderTutorReports(true);
+    });
+    
+    document.getElementById('prev-page-btn').addEventListener('click', () => {
+        if (currentReportsPage > 1) {
+            currentReportsPage--;
+            fetchAndRenderTutorReports(false, 'prev');
+        }
+    });
+    
+    document.getElementById('next-page-btn').addEventListener('click', () => {
+        currentReportsPage++;
+        fetchAndRenderTutorReports(false, 'next');
+    });
+    
     fetchAndRenderTutorReports();
 }
 
-async function fetchAndRenderTutorReports(forceRefresh = false) {
-    if (forceRefresh) invalidateCache('reports');
+async function fetchAndRenderTutorReports(forceRefresh = false, direction = 'first') {
     const reportsListContainer = document.getElementById('tutor-reports-list');
+    const prevBtn = document.getElementById('prev-page-btn');
+    const nextBtn = document.getElementById('next-page-btn');
     
     try {
-        if (!sessionCache.reports) {
-            reportsListContainer.innerHTML = `<p class="text-center text-gray-500 py-10">Fetching reports from server...</p>`;
-            const snapshot = await getDocs(query(collection(db, "tutor_submissions"), orderBy("submittedAt", "desc")));
-            const reportsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-            saveToLocalStorage('reports', reportsData);
-            
-            // FIXED: Wait for cache to be saved before rendering
-            setTimeout(() => {
-                renderTutorReportsFromCache();
-            }, 100);
-        } else {
-            renderTutorReportsFromCache();
+        reportsListContainer.innerHTML = `<p class="text-center text-gray-500 py-10">Loading reports...</p>`;
+        
+        let reportsQuery;
+        
+        if (direction === 'first' || forceRefresh) {
+            // First page or refresh
+            reportsQuery = query(
+                collection(db, "tutor_submissions"), 
+                orderBy("submittedAt", "desc"),
+                limit(51) // Get 51 to check if there's a next page
+            );
+            reportsLastVisible = null;
+            reportsFirstVisible = null;
+            currentReportsPage = 1;
+        } else if (direction === 'next' && reportsLastVisible) {
+            // Next page
+            reportsQuery = query(
+                collection(db, "tutor_submissions"), 
+                orderBy("submittedAt", "desc"),
+                startAfter(reportsLastVisible),
+                limit(51)
+            );
+        } else if (direction === 'prev' && reportsFirstVisible) {
+            // Previous page (we'd need to store the first visible of each page for true bidirectional)
+            // For simplicity, we'll reset to first page if trying to go back from page 2+
+            reportsQuery = query(
+                collection(db, "tutor_submissions"), 
+                orderBy("submittedAt", "desc"),
+                limit(51)
+            );
+            currentReportsPage = 1;
         }
+
+        const snapshot = await getDocs(reportsQuery);
+        
+        if (snapshot.empty) {
+            reportsListContainer.innerHTML = `<p class="text-center text-gray-500">No reports found.</p>`;
+            document.getElementById('report-total-count').textContent = '0';
+            document.getElementById('report-page-count').textContent = '1';
+            prevBtn.disabled = true;
+            nextBtn.disabled = true;
+            return;
+        }
+
+        const reports = [];
+        snapshot.forEach((doc, index) => {
+            if (index < 50) { // Only take first 50 for display
+                reports.push({ id: doc.id, ...doc.data() });
+            }
+            // Store pagination markers
+            if (index === 0) reportsFirstVisible = doc;
+            if (index === 49) reportsLastVisible = doc;
+        });
+
+        const hasNextPage = snapshot.docs.length > 50;
+        
+        // Update pagination controls
+        document.getElementById('report-page-count').textContent = currentReportsPage;
+        prevBtn.disabled = currentReportsPage === 1;
+        nextBtn.disabled = !hasNextPage;
+
+        // Store in memory cache only (not localStorage to avoid quota issues)
+        sessionCache.reports = reports;
+        
+        renderTutorReportsFromCache();
+
     } catch(error) {
         console.error("Error fetching reports:", error);
         reportsListContainer.innerHTML = `<p class="text-center text-red-500 py-10">Failed to load reports.</p>`;
@@ -1141,8 +1380,7 @@ function renderTutorReportsFromCache() {
     if (!reportsListContainer) return;
 
     if (!reports || reports.length === 0) {
-        reportsListContainer.innerHTML = `<p class="text-center text-gray-500">No reports found. Click Refresh to fetch from server.</p>`;
-        document.getElementById('report-tutor-count').textContent = '0';
+        reportsListContainer.innerHTML = `<p class="text-center text-gray-500">No reports found.</p>`;
         document.getElementById('report-total-count').textContent = '0';
         return;
     }
@@ -1155,7 +1393,6 @@ function renderTutorReportsFromCache() {
         reportsByTutor[report.tutorEmail].reports.push(report);
     });
 
-    document.getElementById('report-tutor-count').textContent = Object.keys(reportsByTutor).length;
     document.getElementById('report-total-count').textContent = reports.length;
 
     const canDownload = window.userData?.permissions?.actions?.canDownloadReports === true;
@@ -1170,7 +1407,14 @@ function renderTutorReportsFromCache() {
             const buttonHTML = canDownload
                 ? `<button class="download-report-btn bg-green-500 text-white px-3 py-1 text-sm rounded" data-report-id="${report.id}">Download</button>`
                 : `<button class="view-report-btn bg-gray-500 text-white px-3 py-1 text-sm rounded" data-report-id="${report.id}">View</button>`;
-            return `<li class="flex justify-between items-center p-2 bg-gray-50 rounded">${report.studentName}<span>${buttonHTML}</span></li>`;
+            const reportDate = report.submittedAt ? new Date(report.submittedAt.seconds * 1000).toLocaleDateString() : 'Unknown date';
+            return `<li class="flex justify-between items-center p-2 bg-gray-50 rounded">
+                        <div>
+                            <span class="font-medium">${report.studentName}</span>
+                            <span class="text-xs text-gray-500 ml-2">${reportDate}</span>
+                        </div>
+                        <span>${buttonHTML}</span>
+                    </li>`;
         }).join('');
         
         const zipButtonHTML = canDownload
