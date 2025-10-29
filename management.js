@@ -1244,198 +1244,243 @@ function renderPayAdviceTable() {
 
 // --- Tutor Reports Panel ---
 async function renderTutorReportsPanel(container) {
+    const canDownload = window.userData?.permissions?.actions?.canDownloadReports === true;
+    const canExport = window.userData?.permissions?.actions?.canExportPayAdvice === true;
+    
     container.innerHTML = `
-        <div class="bg-white p-6 rounded-lg shadow-md mb-6">
-            <div class="flex justify-between items-center mb-4 flex-wrap gap-4">
-                <h2 class="text-2xl font-bold text-green-700">Tutor Reports</h2>
-                <button id="refresh-reports-btn" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Refresh</button>
+        <div class="bg-white p-6 rounded-lg shadow-md">
+            <h2 class="text-2xl font-bold text-green-700 mb-4">Tutor Reports</h2>
+            <div class="bg-green-50 p-4 rounded-lg mb-6 grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+                <div>
+                    <label for="reports-start-date" class="block text-sm font-medium">Start Date</label>
+                    <input type="date" id="reports-start-date" class="mt-1 block w-full p-2 border rounded-md">
+                </div>
+                <div>
+                    <label for="reports-end-date" class="block text-sm font-medium">End Date</label>
+                    <input type="date" id="reports-end-date" class="mt-1 block w-full p-2 border rounded-md">
+                </div>
+                <div class="flex items-center space-x-4 col-span-2">
+                    <div class="bg-green-100 p-3 rounded-lg text-center shadow w-full">
+                        <h4 class="font-bold text-green-800 text-sm">Tutors Submitted</h4>
+                        <p id="report-tutor-count" class="text-2xl font-extrabold">0</p>
+                    </div>
+                    <div class="bg-yellow-100 p-3 rounded-lg text-center shadow w-full">
+                        <h4 class="font-bold text-yellow-800 text-sm">Total Reports</h4>
+                        <p id="report-total-count" class="text-2xl font-extrabold">0</p>
+                    </div>
+                    ${canExport ? `<button id="export-reports-csv-btn" class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 h-full">Export CSV</button>` : ''}
+                    <button id="refresh-reports-btn" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 h-full">Refresh</button>
+                </div>
             </div>
-            <div class="flex space-x-4 mb-4">
-                <div class="bg-green-100 p-3 rounded-lg text-center shadow w-full">
-                    <h4 class="font-bold text-green-800 text-sm">Reports Loaded</h4>
-                    <p id="report-total-count" class="text-2xl font-extrabold">0</p>
-                </div>
-                <div class="bg-yellow-100 p-3 rounded-lg text-center shadow w-full">
-                    <h4 class="font-bold text-yellow-800 text-sm">Page</h4>
-                    <p id="report-page-count" class="text-2xl font-extrabold">1</p>
-                </div>
+            <div id="tutor-reports-list" class="space-y-4">
+                <p class="text-center text-gray-500 py-10">Select a date range to view reports.</p>
             </div>
-            <div class="flex justify-between items-center mb-4">
-                <div id="pagination-controls" class="flex space-x-2">
-                    <button id="prev-page-btn" class="bg-gray-500 text-white px-4 py-2 rounded hover:bg-gray-600 disabled:opacity-50" disabled>Previous</button>
-                    <button id="next-page-btn" class="bg-gray-500 text-white px-4 py-2 rounded hover:bg-gray-600">Next</button>
-                </div>
-                <div class="text-sm text-gray-600">
-                    Showing 50 reports per page
-                </div>
-            </div>
-            <div id="tutor-reports-list" class="space-y-4"><p class="text-center">Loading reports...</p></div>
         </div>
     `;
+
+    // Set default dates (current month)
+    const now = new Date();
+    const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
+    const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0);
     
-    document.getElementById('refresh-reports-btn').addEventListener('click', () => {
-        // Reset pagination on refresh
-        reportsLastVisible = null;
-        reportsFirstVisible = null;
-        currentReportsPage = 1;
-        fetchAndRenderTutorReports(true);
-    });
-    
-    document.getElementById('prev-page-btn').addEventListener('click', () => {
-        if (currentReportsPage > 1) {
-            currentReportsPage--;
-            fetchAndRenderTutorReports(false, 'prev');
+    document.getElementById('reports-start-date').value = firstDay.toISOString().split('T')[0];
+    document.getElementById('reports-end-date').value = lastDay.toISOString().split('T')[0];
+
+    // Date change handler
+    const handleDateChange = () => {
+        const startDateInput = document.getElementById('reports-start-date');
+        const endDateInput = document.getElementById('reports-end-date');
+        
+        const startDate = startDateInput.value ? new Date(startDateInput.value) : null;
+        const endDate = endDateInput.value ? new Date(endDateInput.value) : null;
+        
+        if (startDate && endDate) {
+            endDate.setHours(23, 59, 59, 999);
+            fetchAndRenderTutorReports(startDate, endDate);
         }
-    });
-    
-    document.getElementById('next-page-btn').addEventListener('click', () => {
-        currentReportsPage++;
-        fetchAndRenderTutorReports(false, 'next');
-    });
-    
-    fetchAndRenderTutorReports();
-}
+    };
 
-async function fetchAndRenderTutorReports(forceRefresh = false, direction = 'first') {
-    const reportsListContainer = document.getElementById('tutor-reports-list');
-    const prevBtn = document.getElementById('prev-page-btn');
-    const nextBtn = document.getElementById('next-page-btn');
-    
-    try {
-        reportsListContainer.innerHTML = `<p class="text-center text-gray-500 py-10">Loading reports...</p>`;
-        
-        let reportsQuery;
-        
-        if (direction === 'first' || forceRefresh) {
-            // First page or refresh
-            reportsQuery = query(
-                collection(db, "tutor_submissions"), 
-                orderBy("submittedAt", "desc"),
-                limit(51) // Get 51 to check if there's a next page
-            );
-            reportsLastVisible = null;
-            reportsFirstVisible = null;
-            currentReportsPage = 1;
-        } else if (direction === 'next' && reportsLastVisible) {
-            // Next page
-            reportsQuery = query(
-                collection(db, "tutor_submissions"), 
-                orderBy("submittedAt", "desc"),
-                startAfter(reportsLastVisible),
-                limit(51)
-            );
-        } else if (direction === 'prev' && reportsFirstVisible) {
-            // Previous page (we'd need to store the first visible of each page for true bidirectional)
-            // For simplicity, we'll reset to first page if trying to go back from page 2+
-            reportsQuery = query(
-                collection(db, "tutor_submissions"), 
-                orderBy("submittedAt", "desc"),
-                limit(51)
-            );
-            currentReportsPage = 1;
-        }
+    document.getElementById('reports-start-date').addEventListener('change', handleDateChange);
+    document.getElementById('reports-end-date').addEventListener('change', handleDateChange);
+    document.getElementById('refresh-reports-btn').addEventListener('click', handleDateChange);
 
-        const snapshot = await getDocs(reportsQuery);
-        
-        if (snapshot.empty) {
-            reportsListContainer.innerHTML = `<p class="text-center text-gray-500">No reports found.</p>`;
-            document.getElementById('report-total-count').textContent = '0';
-            document.getElementById('report-page-count').textContent = '1';
-            prevBtn.disabled = true;
-            nextBtn.disabled = true;
-            return;
-        }
-
-        const reports = [];
-        snapshot.forEach((doc, index) => {
-            if (index < 50) { // Only take first 50 for display
-                reports.push({ id: doc.id, ...doc.data() });
-            }
-            // Store pagination markers
-            if (index === 0) reportsFirstVisible = doc;
-            if (index === 49) reportsLastVisible = doc;
-        });
-
-        const hasNextPage = snapshot.docs.length > 50;
-        
-        // Update pagination controls
-        document.getElementById('report-page-count').textContent = currentReportsPage;
-        prevBtn.disabled = currentReportsPage === 1;
-        nextBtn.disabled = !hasNextPage;
-
-        // Store in memory cache only (not localStorage to avoid quota issues)
-        sessionCache.reports = reports;
-        
-        renderTutorReportsFromCache();
-
-    } catch(error) {
-        console.error("Error fetching reports:", error);
-        reportsListContainer.innerHTML = `<p class="text-center text-red-500 py-10">Failed to load reports.</p>`;
+    // Export button
+    const exportBtn = document.getElementById('export-reports-csv-btn');
+    if (exportBtn) {
+        exportBtn.onclick = () => {
+            // You can implement CSV export for reports if needed
+            alert('Reports CSV export would be implemented here');
+        };
     }
+
+    // Load initial data
+    handleDateChange();
 }
 
-function renderTutorReportsFromCache() {
-    const reports = sessionCache.reports || [];
+async function fetchAndRenderTutorReports(startDate, endDate) {
     const reportsListContainer = document.getElementById('tutor-reports-list');
     if (!reportsListContainer) return;
 
-    if (!reports || reports.length === 0) {
-        reportsListContainer.innerHTML = `<p class="text-center text-gray-500">No reports found.</p>`;
+    reportsListContainer.innerHTML = `<p class="text-center text-gray-500 py-10">Loading reports for selected period...</p>`;
+
+    try {
+        // Convert dates to Firestore timestamps
+        const startTimestamp = Timestamp.fromDate(startDate);
+        const endTimestamp = Timestamp.fromDate(endDate);
+
+        // Query reports within date range
+        const reportsQuery = query(
+            collection(db, "tutor_submissions"), 
+            where("submittedAt", ">=", startTimestamp),
+            where("submittedAt", "<=", endTimestamp),
+            orderBy("submittedAt", "desc")
+        );
+
+        const snapshot = await getDocs(reportsQuery);
+        console.log(`Found ${snapshot.size} reports in date range`);
+
+        if (snapshot.empty) {
+            reportsListContainer.innerHTML = `
+                <div class="text-center py-10">
+                    <p class="text-gray-500">No reports found for the selected period.</p>
+                    <p class="text-sm text-gray-400 mt-2">Date range: ${startDate.toLocaleDateString()} to ${endDate.toLocaleDateString()}</p>
+                </div>`;
+            document.getElementById('report-tutor-count').textContent = '0';
+            document.getElementById('report-total-count').textContent = '0';
+            return;
+        }
+
+        const reportsData = snapshot.docs.map(doc => ({ 
+            id: doc.id, 
+            ...doc.data() 
+        }));
+
+        // Save to cache and render
+        saveToLocalStorage('reports', reportsData);
+        renderTutorReportsFromCache(reportsData);
+
+    } catch (error) {
+        console.error("Error fetching reports:", error);
+        reportsListContainer.innerHTML = `
+            <div class="text-center py-10 text-red-600">
+                <p>Failed to load reports:</p>
+                <p class="text-sm">${error.message}</p>
+            </div>`;
+    }
+}
+
+function renderTutorReportsFromCache(reportsData = null) {
+    // Use provided data or fall back to cache
+    const reports = reportsData || sessionCache.reports || [];
+    const reportsListContainer = document.getElementById('tutor-reports-list');
+    if (!reportsListContainer) return;
+
+    console.log("Rendering reports:", reports.length);
+
+    if (reports.length === 0) {
+        reportsListContainer.innerHTML = `<p class="text-center text-gray-500 py-10">No reports to display.</p>`;
+        document.getElementById('report-tutor-count').textContent = '0';
         document.getElementById('report-total-count').textContent = '0';
         return;
     }
-    
+
+    // Group reports by tutor
     const reportsByTutor = {};
     reports.forEach(report => {
         if (!reportsByTutor[report.tutorEmail]) {
-            reportsByTutor[report.tutorEmail] = { name: report.tutorName || report.tutorEmail, reports: [] };
+            reportsByTutor[report.tutorEmail] = { 
+                name: report.tutorName || report.tutorEmail, 
+                reports: [] 
+            };
         }
         reportsByTutor[report.tutorEmail].reports.push(report);
     });
 
+    // Update statistics
+    document.getElementById('report-tutor-count').textContent = Object.keys(reportsByTutor).length;
     document.getElementById('report-total-count').textContent = reports.length;
 
     const canDownload = window.userData?.permissions?.actions?.canDownloadReports === true;
     
-    if (Object.keys(reportsByTutor).length === 0) {
-        reportsListContainer.innerHTML = `<p class="text-center text-gray-500">No tutor reports found.</p>`;
-        return;
-    }
-
-    reportsListContainer.innerHTML = Object.values(reportsByTutor).map(tutorData => {
+    // Render the reports
+    let html = '';
+    
+    Object.values(reportsByTutor).forEach(tutorData => {
         const reportLinks = tutorData.reports.map(report => {
             const buttonHTML = canDownload
-                ? `<button class="download-report-btn bg-green-500 text-white px-3 py-1 text-sm rounded" data-report-id="${report.id}">Download</button>`
-                : `<button class="view-report-btn bg-gray-500 text-white px-3 py-1 text-sm rounded" data-report-id="${report.id}">View</button>`;
-            const reportDate = report.submittedAt ? new Date(report.submittedAt.seconds * 1000).toLocaleDateString() : 'Unknown date';
-            return `<li class="flex justify-between items-center p-2 bg-gray-50 rounded">
-                        <div>
-                            <span class="font-medium">${report.studentName}</span>
-                            <span class="text-xs text-gray-500 ml-2">${reportDate}</span>
-                        </div>
-                        <span>${buttonHTML}</span>
-                    </li>`;
+                ? `<button class="download-report-btn bg-green-500 text-white px-3 py-1 text-sm rounded hover:bg-green-600" data-report-id="${report.id}">Download</button>`
+                : `<button class="view-report-btn bg-gray-500 text-white px-3 py-1 text-sm rounded hover:bg-gray-600" data-report-id="${report.id}">View</button>`;
+            
+            const reportDate = report.submittedAt ? 
+                new Date(report.submittedAt.seconds * 1000).toLocaleDateString() : 
+                'Unknown date';
+                
+            return `
+                <li class="flex justify-between items-center p-3 bg-gray-50 rounded-lg border">
+                    <div>
+                        <span class="font-medium">${report.studentName}</span>
+                        <span class="text-sm text-gray-500 ml-3">${reportDate}</span>
+                    </div>
+                    <div class="flex gap-2">
+                        ${buttonHTML}
+                    </div>
+                </li>
+            `;
         }).join('');
-        
+
         const zipButtonHTML = canDownload
-            ? `<div class="p-4 border-t"><button class="zip-reports-btn bg-blue-600 text-white px-4 py-2 text-sm rounded w-full hover:bg-blue-700" data-tutor-email="${tutorData.reports[0].tutorEmail}">Zip & Download All Reports</button></div>`
+            ? `<div class="p-4 border-t bg-blue-50">
+                 <button class="zip-reports-btn bg-blue-600 text-white px-4 py-2 text-sm rounded w-full hover:bg-blue-700 transition-colors" data-tutor-email="${tutorData.reports[0].tutorEmail}">
+                     📦 Zip & Download All Reports for ${tutorData.name}
+                 </button>
+               </div>`
             : '';
 
-        return `<details class="border rounded-lg">
-                    <summary class="p-4 cursor-pointer font-semibold">${tutorData.name} (${tutorData.reports.length} reports)</summary>
-                    <div class="p-4 border-t"><ul class="space-y-2">${reportLinks}</ul></div>
-                    ${zipButtonHTML}
-                </details>`;
-    }).join('');
+        html += `
+            <div class="border rounded-lg shadow-sm bg-white">
+                <details open>
+                    <summary class="p-4 cursor-pointer flex justify-between items-center font-semibold text-lg bg-green-50 hover:bg-green-100 rounded-t-lg">
+                        <span>${tutorData.name}</span>
+                        <span class="text-sm font-normal text-gray-500 bg-green-200 px-2 py-1 rounded-full">
+                            ${tutorData.reports.length} report${tutorData.reports.length !== 1 ? 's' : ''}
+                        </span>
+                    </summary>
+                    <div class="border-t">
+                        <ul class="space-y-2 p-4">${reportLinks}</ul>
+                        ${zipButtonHTML}
+                    </div>
+                </details>
+            </div>
+        `;
+    });
 
-    document.querySelectorAll('.download-report-btn').forEach(button => button.addEventListener('click', (e) => { e.stopPropagation(); viewReportInNewTab(e.target.dataset.reportId, true); }));
-    document.querySelectorAll('.view-report-btn').forEach(button => button.addEventListener('click', (e) => { e.stopPropagation(); viewReportInNewTab(e.target.dataset.reportId, false); }));
-    document.querySelectorAll('.zip-reports-btn').forEach(button => button.addEventListener('click', async (e) => {
-        e.stopPropagation();
-        const tutorEmail = e.target.dataset.tutorEmail;
-        const tutorData = reportsByTutor[tutorEmail];
-        if (tutorData) await zipAndDownloadTutorReports(tutorData.reports, tutorData.name, e.target);
-    }));
+    reportsListContainer.innerHTML = html;
+
+    // Add event listeners
+    document.querySelectorAll('.download-report-btn').forEach(button => {
+        button.addEventListener('click', (e) => { 
+            e.stopPropagation(); 
+            viewReportInNewTab(e.target.dataset.reportId, true); 
+        });
+    });
+    
+    document.querySelectorAll('.view-report-btn').forEach(button => {
+        button.addEventListener('click', (e) => { 
+            e.stopPropagation(); 
+            viewReportInNewTab(e.target.dataset.reportId, false); 
+        });
+    });
+    
+    document.querySelectorAll('.zip-reports-btn').forEach(button => {
+        button.addEventListener('click', async (e) => {
+            e.stopPropagation();
+            const tutorEmail = e.target.dataset.tutorEmail;
+            const tutorData = reportsByTutor[tutorEmail];
+            if (tutorData) {
+                await zipAndDownloadTutorReports(tutorData.reports, tutorData.name, e.target);
+            }
+        });
+    });
 }
 
 // --- Pending Approvals Panel ---
@@ -2211,3 +2256,4 @@ onAuthStateChanged(auth, async (user) => {
 });
 
 // [End Updated management.js File]
+
