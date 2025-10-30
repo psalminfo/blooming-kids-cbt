@@ -479,11 +479,11 @@ async function loadTutorReports(tutorEmail, parentName = null) {
 }
 
 // ==================================================================
-// TRANSITIONING STUDENT CORE LOGIC (LIFTED OUT OF renderStudentDatabase)
+// TRANSITIONING STUDENT CORE LOGIC (UPDATED FOR APPROVAL WORKFLOW)
 // ==================================================================
 
 /**
- * Handles the saving of a new transitioning student to the dedicated collection.
+ * Handles the saving of a new transitioning student to pending_approval collection
  */
 async function addNewTransitioningStudent(tutor, container, formPrefix) {
     const parentName = document.getElementById(`${formPrefix}-parent-name`).value.trim();
@@ -498,7 +498,6 @@ async function addNewTransitioningStudent(tutor, container, formPrefix) {
 
     const studentDays = document.getElementById(`${formPrefix}-student-days`).value.trim();
     const groupClass = document.getElementById(`${formPrefix}-student-group-class`) ? document.getElementById(`${formPrefix}-student-group-class`).checked : false;
-    // NOTE: For transitioning students, the fee input is used directly
     const studentFee = parseFloat(document.getElementById(`${formPrefix}-student-fee`).value);
 
     if (!parentName || !studentName || !studentGrade || isNaN(studentFee) || !parentPhone || !studentDays || selectedSubjects.length === 0) {
@@ -521,12 +520,10 @@ async function addNewTransitioningStudent(tutor, container, formPrefix) {
         grade: studentGrade,
         subjects: selectedSubjects,
         days: studentDays,
-        // Use suggested fee if it's calculated, otherwise use the manual input
         studentFee: suggestedFee > 0 ? suggestedFee : studentFee,
         tutorEmail: tutor.email,
         tutorName: tutor.name,
         isTransitioning: true, // KEY FLAG for this feature
-        transitionPaid: false, // NEW: Ensure initial state is not paid
         createdAt: new Date() // KEY TIMESTAMP for auto-deletion
     };
 
@@ -535,9 +532,9 @@ async function addNewTransitioningStudent(tutor, container, formPrefix) {
     }
 
     try {
-        // Save to the dedicated transitioning collection
-        await addDoc(collection(db, TRANSITIONING_COLLECTION), studentData);
-        showCustomAlert('Transitioning Student added successfully! Please proceed to Confirm Fee.');
+        // Save to pending_approval collection first (like regular students)
+        await addDoc(collection(db, "pending_students"), studentData);
+        showCustomAlert('Transitioning Student added successfully and is pending approval!');
         
         // Refresh the current view
         if (container.id === 'mainContent' && container.querySelector('#transitioning-classes-view')) {
@@ -554,7 +551,7 @@ async function addNewTransitioningStudent(tutor, container, formPrefix) {
 }
 
 /**
- * Simplified Fee Confirmation Modal for Transitioning Students (Replaces Enter Report flow)
+ * Simplified Fee Confirmation Modal for Approved Transitioning Students
  */
 function showTransitioningFeeConfirmationModal(student, container, tutor) {
     const feeConfirmationHTML = `
@@ -620,7 +617,6 @@ function showTransitioningFeeConfirmationModal(student, container, tutor) {
         }
     });
 }
-
 
 /**
  * Runs cleanup for transitioning students created in a previous month.
@@ -1043,11 +1039,12 @@ async function renderStudentDatabase(container, tutor) {
                 if (student.isTransitioning) {
                     // Transitioning Student Specific Logic
                     statusHTML = `<span class="status-indicator font-semibold text-orange-600">🔄 Transitioning Student</span>`;
-                    // The action button is now in the dedicated 'Transitioning Classes' tab, here we only display status
+                    
+                    // Show "Confirm Fee" button instead of "Enter Report" for approved transitioning students
                     if (hasSubmittedThisMonth) {
                          actionsHTML = `<span class="text-gray-400">Fee Confirmed/Paid</span>`;
                     } else {
-                         actionsHTML = `<span class="text-orange-400 font-bold">Action Needed (See Transition Tab)</span>`;
+                         actionsHTML = `<button class="confirm-fee-btn bg-orange-600 text-white px-3 py-1 rounded font-bold" data-student-id="${student.id}" data-collection="${student.collection}">Confirm Fee</button>`;
                     }
 
                 } else if (student.isPending) {
@@ -1084,7 +1081,6 @@ async function renderStudentDatabase(container, tutor) {
                     actionsHTML += `<button class="edit-student-btn-tutor bg-blue-500 text-white px-3 py-1 rounded" data-student-id="${student.id}" data-collection="${student.collection}">Edit</button>`;
                     actionsHTML += `<button class="delete-student-btn-tutor bg-red-500 text-white px-3 py-1 rounded" data-student-id="${student.id}" data-collection="${student.collection}">Delete</button>`;
                 }
-
 
                 studentsHTML += `
                     <tr class="${rowClasses}">
@@ -1315,7 +1311,6 @@ async function renderStudentDatabase(container, tutor) {
         }
     }
 
-
     function attachEventListeners() {
         // Group class toggle functionality for new student form
         const subjectsContainer = document.getElementById('new-student-subjects-container');
@@ -1415,6 +1410,18 @@ async function renderStudentDatabase(container, tutor) {
             });
         });
 
+        // NEW: Confirm Fee button for transitioning students
+        document.querySelectorAll('.confirm-fee-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const studentId = btn.getAttribute('data-student-id');
+                const collectionName = btn.getAttribute('data-collection');
+                const student = students.find(s => s.id === studentId && s.collection === collectionName);
+                if (student) {
+                    showTransitioningFeeConfirmationModal(student, container, tutor);
+                }
+            });
+        });
+
        document.querySelectorAll('.summer-break-btn').forEach(btn => {
             btn.addEventListener('click', async () => {
                 const studentId = btn.getAttribute('data-student-id');
@@ -1497,22 +1504,43 @@ async function renderTransitioningClasses(container, tutor) {
         return;
     }
     
-    // 1. Fetch all current transitioning students
-    const transitioningStudentQuery = query(collection(db, TRANSITIONING_COLLECTION), where("tutorEmail", "==", tutor.email));
-    const transitioningStudentsSnapshot = await getDocs(transitioningStudentQuery);
-    const transitioningStudents = transitioningStudentsSnapshot.docs.map(doc => ({ 
+    // 1. Fetch all current transitioning students (both pending and approved)
+    const pendingTransitioningQuery = query(collection(db, "pending_students"), 
+        where("tutorEmail", "==", tutor.email),
+        where("isTransitioning", "==", true));
+    
+    const approvedTransitioningQuery = query(collection(db, TRANSITIONING_COLLECTION), 
+        where("tutorEmail", "==", tutor.email));
+
+    const [pendingTransitioningSnapshot, approvedTransitioningSnapshot] = await Promise.all([
+        getDocs(pendingTransitioningQuery),
+        getDocs(approvedTransitioningQuery)
+    ]);
+
+    const pendingTransitioningStudents = pendingTransitioningSnapshot.docs.map(doc => ({ 
         id: doc.id, 
         ...doc.data(), 
+        isPending: true, 
+        isTransitioning: true, 
+        collection: "pending_students" 
+    }));
+
+    const approvedTransitioningStudents = approvedTransitioningSnapshot.docs.map(doc => ({ 
+        id: doc.id, 
+        ...doc.data(), 
+        isPending: false, 
         isTransitioning: true, 
         collection: TRANSITIONING_COLLECTION 
     }));
+
+    const allTransitioningStudents = [...pendingTransitioningStudents, ...approvedTransitioningStudents];
     
     const formPrefix = 'transition-form';
 
     // 2. Build the UI
     let studentsListHTML = '';
-    if (transitioningStudents.length === 0) {
-        studentsListHTML = `<p class="text-gray-500 italic mt-4">No transitioning students are currently awaiting fee confirmation.</p>`;
+    if (allTransitioningStudents.length === 0) {
+        studentsListHTML = `<p class="text-gray-500 italic mt-4">No transitioning students found.</p>`;
     } else {
         studentsListHTML = `
             <div class="overflow-x-auto mt-4">
@@ -1520,16 +1548,26 @@ async function renderTransitioningClasses(container, tutor) {
                     <thead>
                         <tr>
                             <th class="px-6 py-3 text-left text-xs font-medium text-orange-700 uppercase">Student Name</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-orange-700 uppercase">Fee Status</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-orange-700 uppercase">Status</th>
                             <th class="px-6 py-3 text-left text-xs font-medium text-orange-700 uppercase">Action</th>
                         </tr>
                     </thead>
                     <tbody class="bg-white divide-y divide-orange-200">
         `;
-        transitioningStudents.forEach(student => {
+        allTransitioningStudents.forEach(student => {
+            const isPending = student.isPending;
             const isPaid = student.transitionPaid;
-            const status = isPaid ? '✅ Paid' : '⏳ Action Required';
+            const status = isPending ? '⏳ Pending Approval' : (isPaid ? '✅ Paid' : '🔄 Approved - Action Required');
             const feeDisplay = `₦${(student.studentFee || 0).toLocaleString()}`;
+            
+            let actionButton = '';
+            if (isPending) {
+                actionButton = `<span class="text-gray-500">Waiting for admin approval</span>`;
+            } else if (isPaid) {
+                actionButton = `<span class="text-green-600 font-semibold">Fee Confirmed</span>`;
+            } else {
+                actionButton = `<button class="confirm-fee-btn-transitioning bg-orange-600 text-white px-3 py-1 rounded font-bold" data-student-id="${student.id}" data-collection="${student.collection}">Confirm Fee</button>`;
+            }
             
             studentsListHTML += `
                 <tr class="bg-orange-50">
@@ -1538,15 +1576,12 @@ async function renderTransitioningClasses(container, tutor) {
                         <div class="text-xs text-gray-500">${student.parentName} | Fee: ${feeDisplay}</div>
                     </td>
                     <td class="px-6 py-4 whitespace-nowrap">
-                        <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${isPaid ? 'bg-green-100 text-green-800' : 'bg-orange-100 text-orange-800'}">
+                        <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${isPending ? 'bg-yellow-100 text-yellow-800' : (isPaid ? 'bg-green-100 text-green-800' : 'bg-orange-100 text-orange-800')}">
                             ${status}
                         </span>
                     </td>
                     <td class="px-6 py-4 whitespace-nowrap">
-                        ${isPaid ? 
-                            `<span class="text-gray-500">Completed</span>` :
-                            `<button class="confirm-fee-btn-transitioning bg-orange-600 text-white px-3 py-1 rounded font-bold" data-student-id="${student.id}">Confirm Fee</button>`
-                        }
+                        ${actionButton}
                     </td>
                 </tr>
             `;
@@ -1561,8 +1596,8 @@ async function renderTransitioningClasses(container, tutor) {
                 🔄 Transitioning Classes: Temporary Registration
             </h2>
             <p class="text-sm text-gray-600 mb-6">
-                Use this tab to quickly register temporary students. They will be auto-deleted at the start of the next month.
-                After registration, **click 'Confirm Fee'** to finalize the temporary enrollment.
+                Use this tab to register temporary students. They will follow the same approval process as regular students but use fee confirmation instead of monthly reports.
+                After admin approval, click 'Confirm Fee' to finalize the temporary enrollment.
             </p>
 
             <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -1579,7 +1614,7 @@ async function renderTransitioningClasses(container, tutor) {
                 </div>
 
                 <div class="bg-white p-4 rounded-lg shadow border-2 border-orange-500">
-                    <h3 class="font-bold text-lg mb-2 text-orange-900">2. Fee Confirmation Area</h3>
+                    <h3 class="font-bold text-lg mb-2 text-orange-900">2. Student Status & Fee Confirmation</h3>
                     ${studentsListHTML}
                 </div>
             </div>
@@ -1613,8 +1648,11 @@ async function renderTransitioningClasses(container, tutor) {
     document.querySelectorAll('.confirm-fee-btn-transitioning').forEach(btn => {
         btn.addEventListener('click', () => {
             const studentId = btn.getAttribute('data-student-id');
-            const student = transitioningStudents.find(s => s.id === studentId);
-            showTransitioningFeeConfirmationModal(student, container, tutor);
+            const collectionName = btn.getAttribute('data-collection');
+            const student = allTransitioningStudents.find(s => s.id === studentId && s.collection === collectionName);
+            if (student) {
+                showTransitioningFeeConfirmationModal(student, container, tutor);
+            }
         });
     });
 }
