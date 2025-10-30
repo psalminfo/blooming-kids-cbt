@@ -602,7 +602,7 @@ function showTransitioningFeeConfirmationModal(student, container, tutor) {
             await updateDoc(studentRef, updatePayload); 
 
             feeModal.remove();
-            showCustomAlert(`${student.studentName}'s fee confirmed and marked as paid.`);
+            showCustomAlert(`${student.studentName}'s fee confirmed and marked as paid. This will be included in your pay advice.`);
             
             // Refresh the view
             if (container.id === 'mainContent' && container.querySelector('#transitioning-classes-view')) {
@@ -953,7 +953,15 @@ async function renderStudentDatabase(container, tutor) {
 
     let students = [...approvedStudents, ...pendingStudents, ...transitioningStudents]; // MERGE ALL
 
-    // 4. Duplicate Student Cleanup 
+    // 4. Count ALL transitioning students (both pending and approved)
+    const pendingTransitioningQuery = query(collection(db, "pending_students"), 
+        where("tutorEmail", "==", tutor.email),
+        where("isTransitioning", "==", true));
+    const pendingTransitioningSnapshot = await getDocs(pendingTransitioningQuery);
+    const pendingTransitioningCount = pendingTransitioningSnapshot.size;
+    const totalTransitioningCount = transitioningStudents.length + pendingTransitioningCount;
+
+    // 5. Duplicate Student Cleanup 
     const seenStudents = new Set();
     const duplicatesToDelete = [];
     students = students.filter(student => {
@@ -983,11 +991,10 @@ async function renderStudentDatabase(container, tutor) {
     const regularStudentsCount = approvedStudents.length + pendingStudents.length;
 
     function renderUI() {
-        // NOTE: The transitioning button is removed from this tab.
         let studentsHTML = `
             <h2 class="text-2xl font-bold text-green-700 mb-4">
                 My Students (${regularStudentsCount})
-                <span class="text-orange-600 text-xl font-bold ml-2"> + ${transitioningStudents.length} Transitioning</span>
+                <span class="text-orange-600 text-xl font-bold ml-2"> + ${totalTransitioningCount} Transitioning</span>
             </h2>
         `;
         
@@ -1022,10 +1029,10 @@ async function renderStudentDatabase(container, tutor) {
                 const isStudentOnBreak = student.summerBreak;
                 const isReportSaved = savedReports[student.id];
                 
-                // Determine row/cell styling for transitioning students
+                // Determine row/cell styling for transitioning students - ORANGE BACKGROUND
                 let rowClasses = '';
                 if (student.isTransitioning) {
-                     rowClasses = 'bg-orange-50 border-2 border-orange-400'; 
+                     rowClasses = 'bg-orange-50 border-l-4 border-orange-500'; 
                 }
 
                 const feeDisplay = showStudentFees ? `<div class="text-xs text-gray-500">Fee: ₦${(student.studentFee || 0).toLocaleString()}</div>` : '';
@@ -1037,12 +1044,12 @@ async function renderStudentDatabase(container, tutor) {
                 const days = student.days ? `${student.days} days/week` : 'N/A';
                 
                 if (student.isTransitioning) {
-                    // Transitioning Student Specific Logic
+                    // Transitioning Student Specific Logic - ORANGE TEXT and CONFIRM FEE BUTTON
                     statusHTML = `<span class="status-indicator font-semibold text-orange-600">🔄 Transitioning Student</span>`;
                     
                     // Show "Confirm Fee" button instead of "Enter Report" for approved transitioning students
                     if (hasSubmittedThisMonth) {
-                         actionsHTML = `<span class="text-gray-400">Fee Confirmed/Paid</span>`;
+                         actionsHTML = `<span class="text-green-600 font-semibold">Fee Confirmed</span>`;
                     } else {
                          actionsHTML = `<button class="confirm-fee-btn bg-orange-600 text-white px-3 py-1 rounded font-bold" data-student-id="${student.id}" data-collection="${student.collection}">Confirm Fee</button>`;
                     }
