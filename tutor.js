@@ -1031,23 +1031,19 @@ async function renderStudentDatabase(container, tutor) {
                 
                 // Determine row/cell styling for transitioning students - ORANGE BACKGROUND
                 let rowClasses = '';
-                if (student.isTransitioning) {
-                     rowClasses = 'bg-orange-50 border-l-4 border-orange-500'; 
-                }
-
-                const feeDisplay = showStudentFees ? `<div class="text-xs text-gray-500">Fee: ₦${(student.studentFee || 0).toLocaleString()}</div>` : '';
-                
                 let statusHTML = '';
                 let actionsHTML = '';
                 
                 const subjects = student.subjects ? student.subjects.join(', ') : 'N/A';
                 const days = student.days ? `${student.days} days/week` : 'N/A';
+                const feeDisplay = showStudentFees ? `<div class="text-xs text-gray-500">Fee: ₦${(student.studentFee || 0).toLocaleString()}</div>` : '';
                 
                 if (student.isTransitioning) {
-                    // Transitioning Student Specific Logic - ORANGE TEXT and CONFIRM FEE BUTTON
+                    // TRANSITIONING STUDENT - ORANGE STYLING, NO REPORTS, CONFIRM FEE ONLY
+                    rowClasses = 'bg-orange-50 border-l-4 border-orange-500'; 
                     statusHTML = `<span class="status-indicator font-semibold text-orange-600">🔄 Transitioning Student</span>`;
                     
-                    // Show "Confirm Fee" button instead of "Enter Report" for approved transitioning students
+                    // Show "Confirm Fee" button ONLY - NO REPORT OPTIONS
                     if (hasSubmittedThisMonth) {
                          actionsHTML = `<span class="text-green-600 font-semibold">Fee Confirmed</span>`;
                     } else {
@@ -1055,15 +1051,17 @@ async function renderStudentDatabase(container, tutor) {
                     }
 
                 } else if (student.isPending) {
+                    // PENDING STUDENT - REGULAR STYLING
                     statusHTML = `<span class="status-indicator text-yellow-600 font-semibold">Awaiting Approval</span>`;
                     actionsHTML = `<span class="text-gray-400">No actions available</span>`;
 
                 } else if (hasSubmittedThisMonth) {
+                    // APPROVED STUDENT - ALREADY SUBMITTED REPORT
                     statusHTML = `<span class="status-indicator text-blue-600 font-semibold">Report Sent</span>`;
                     actionsHTML = `<span class="text-gray-400">Submitted this month</span>`;
                     
                 } else {
-                    // Regular Approved Student Logic
+                    // APPROVED STUDENT - NEEDS REPORT
                     statusHTML = `<span class="status-indicator ${isReportSaved ? 'text-green-600 font-semibold' : 'text-gray-500'}">${isReportSaved ? 'Report Saved' : 'Pending Report'}</span>`;
 
                     if (isSummerBreakEnabled && !isStudentOnBreak) {
@@ -1136,6 +1134,7 @@ async function renderStudentDatabase(container, tutor) {
     }
 
     function showReportModal(student) {
+        // THIS FUNCTION IS ONLY FOR REGULAR STUDENTS - TRANSITIONING STUDENTS BYPASS THIS
         const existingReport = savedReports[student.id] || {};
         const isSingleApprovedStudent = approvedStudents.filter(s => !s.summerBreak && !submittedStudentIds.has(s.id)).length === 1;
         const currentMonthYear = getCurrentMonthYear();
@@ -1186,6 +1185,7 @@ async function renderStudentDatabase(container, tutor) {
     }
 
     function showFeeConfirmationModal(student, reportData) {
+        // THIS FUNCTION IS ONLY FOR REGULAR STUDENTS - TRANSITIONING STUDENTS BYPASS THIS
         const feeConfirmationHTML = `
             <h3 class="text-xl font-bold mb-4">Confirm Fee for ${student.studentName}</h3>
             <p class="text-sm text-gray-600 mb-4">Please verify the monthly fee for this student before saving the report. You can make corrections if needed.</p>
@@ -1400,29 +1400,33 @@ async function renderStudentDatabase(container, tutor) {
             });
         }
 
-        // Existing 'Enter Report' logic for regular students
+        // Existing 'Enter Report' logic for regular students ONLY
         document.querySelectorAll('.enter-report-btn').forEach(btn => {
             btn.addEventListener('click', () => {
                 const studentId = btn.getAttribute('data-student-id');
-                const student = students.find(s => s.id === studentId);
-                showReportModal(student);
+                const student = students.find(s => s.id === studentId && !s.isTransitioning);
+                if (student) {
+                    showReportModal(student);
+                }
             });
         });
 
         document.querySelectorAll('.submit-single-report-btn').forEach(btn => {
             btn.addEventListener('click', () => {
                 const studentId = btn.getAttribute('data-student-id');
-                const student = students.find(s => s.id === studentId);
-                showReportModal(student);
+                const student = students.find(s => s.id === studentId && !s.isTransitioning);
+                if (student) {
+                    showReportModal(student);
+                }
             });
         });
 
-        // NEW: Confirm Fee button for transitioning students
+        // NEW: Confirm Fee button for transitioning students ONLY - NO REPORTS
         document.querySelectorAll('.confirm-fee-btn').forEach(btn => {
             btn.addEventListener('click', () => {
                 const studentId = btn.getAttribute('data-student-id');
                 const collectionName = btn.getAttribute('data-collection');
-                const student = students.find(s => s.id === studentId && s.collection === collectionName);
+                const student = students.find(s => s.id === studentId && s.collection === collectionName && s.isTransitioning);
                 if (student) {
                     showTransitioningFeeConfirmationModal(student, container, tutor);
                 }
@@ -1432,7 +1436,7 @@ async function renderStudentDatabase(container, tutor) {
        document.querySelectorAll('.summer-break-btn').forEach(btn => {
             btn.addEventListener('click', async () => {
                 const studentId = btn.getAttribute('data-student-id');
-                const student = students.find(s => s.id === studentId);
+                const student = students.find(s => s.id === studentId && !s.isTransitioning);
                 
                 // Add confirmation dialog
                 if (confirm(`Are you sure you want to put ${student.studentName} on summer break?`)) {
