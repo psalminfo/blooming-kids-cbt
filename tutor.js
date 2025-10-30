@@ -1,3 +1,5 @@
+[file name]: tutor.js
+[file content begin]
 import { auth, db } from './firebaseConfig.js';
 import { collection, getDocs, doc, updateDoc, getDoc, where, query, addDoc, writeBatch, deleteDoc } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
 import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-auth.js";
@@ -691,6 +693,93 @@ function showEditStudentModal(student) {
     });
 }
 
+// Function to show add transitioning student modal
+function showAddTransitioningStudentModal(tutor) {
+    const transitioningFormHTML = `
+        <h3 class="text-xl font-bold mb-4">Add Transitioning Student</h3>
+        <p class="text-sm text-orange-600 mb-4">This student will be automatically deleted on the 1st of next month.</p>
+        <div class="space-y-4">
+            ${getNewStudentFormFields()}
+            <div class="flex justify-end space-x-2 mt-6">
+                <button id="cancel-transitioning-btn" class="bg-gray-500 text-white px-6 py-2 rounded">Cancel</button>
+                <button id="save-transitioning-btn" class="bg-orange-600 text-white px-6 py-2 rounded">Add Transitioning Student</button>
+            </div>
+        </div>`;
+
+    const transitioningModal = document.createElement('div');
+    transitioningModal.className = 'fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex items-center justify-center z-50';
+    transitioningModal.innerHTML = `<div class="relative bg-white p-8 rounded-lg shadow-xl w-full max-w-lg mx-auto">${transitioningFormHTML}</div>`;
+    document.body.appendChild(transitioningModal);
+
+    document.getElementById('cancel-transitioning-btn').addEventListener('click', () => transitioningModal.remove());
+    document.getElementById('save-transitioning-btn').addEventListener('click', async () => {
+        const parentName = document.getElementById('new-parent-name').value.trim();
+        const parentPhone = document.getElementById('new-parent-phone').value.trim();
+        const studentName = document.getElementById('new-student-name').value.trim();
+        const studentGrade = document.getElementById('new-student-grade').value.trim();
+        
+        const selectedSubjects = [];
+        document.querySelectorAll('input[name="subjects"]:checked').forEach(checkbox => {
+            selectedSubjects.push(checkbox.value);
+        });
+
+        const studentDays = document.getElementById('new-student-days').value.trim();
+        const groupClass = document.getElementById('new-student-group-class') ? document.getElementById('new-student-group-class').checked : false;
+        const studentFee = parseFloat(document.getElementById('new-student-fee').value);
+
+        if (!parentName || !studentName || !studentGrade || isNaN(studentFee) || !parentPhone || !studentDays || selectedSubjects.length === 0) {
+            showCustomAlert('Please fill in all parent and student details correctly, including at least one subject.');
+            return;
+        }
+
+        // Calculate suggested fee based on pay scheme
+        const payScheme = getTutorPayScheme(tutor);
+        const suggestedFee = calculateSuggestedFee({
+            grade: studentGrade,
+            days: studentDays,
+            subjects: selectedSubjects,
+            groupClass: groupClass
+        }, payScheme);
+
+        const studentData = {
+            parentName: parentName,
+            parentPhone: parentPhone,
+            studentName: studentName,
+            grade: studentGrade,
+            subjects: selectedSubjects,
+            days: studentDays,
+            studentFee: suggestedFee > 0 ? suggestedFee : studentFee,
+            tutorEmail: tutor.email,
+            tutorName: tutor.name,
+            isTransitioning: true,
+            createdAt: new Date()
+        };
+
+        // Add group class field if applicable
+        if (findSpecializedSubject(selectedSubjects)) {
+            studentData.groupClass = groupClass;
+        }
+
+        try {
+            if (isBypassApprovalEnabled) {
+                await addDoc(collection(db, "students"), studentData);
+                showCustomAlert('Transitioning student added successfully!');
+            } else {
+                await addDoc(collection(db, "pending_students"), studentData);
+                showCustomAlert('Transitioning student added and is pending approval.');
+            }
+            transitioningModal.remove();
+            
+            // Refresh the student database view
+            const mainContent = document.getElementById('mainContent');
+            renderStudentDatabase(mainContent, window.tutorData);
+        } catch (error) {
+            console.error("Error adding transitioning student:", error);
+            showCustomAlert(`An error occurred: ${error.message}`);
+        }
+    });
+}
+
 async function renderStudentDatabase(container, tutor) {
     if (!container) {
         console.error("Container element not found.");
@@ -757,7 +846,15 @@ async function renderStudentDatabase(container, tutor) {
     const studentsCount = students.length;
 
     function renderUI() {
-        let studentsHTML = `<h2 class="text-2xl font-bold text-green-700 mb-4">My Students (${studentsCount})</h2>`;
+        let studentsHTML = `
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-2xl font-bold text-green-700">My Students (${studentsCount})</h2>
+                <button id="add-transitioning-student-btn" class="bg-orange-600 text-white px-4 py-2 rounded hover:bg-orange-700 font-bold border-2 border-orange-800">
+                    Add Transitioning Student
+                </button>
+            </div>
+        `;
+        
         if (isTutorAddEnabled) {
             studentsHTML += `
                 <div class="bg-gray-100 p-4 rounded-lg shadow-inner mb-4">
@@ -784,6 +881,7 @@ async function renderStudentDatabase(container, tutor) {
                 const hasSubmittedThisMonth = submittedStudentIds.has(student.id);
                 const isStudentOnBreak = student.summerBreak;
                 const isReportSaved = savedReports[student.id];
+                const isTransitioning = student.isTransitioning;
 
                 const feeDisplay = showStudentFees ? `<div class="text-xs text-gray-500">Fee: ₦${(student.studentFee || 0).toLocaleString()}</div>` : '';
                 
@@ -792,6 +890,9 @@ async function renderStudentDatabase(container, tutor) {
                 
                 const subjects = student.subjects ? student.subjects.join(', ') : 'N/A';
                 const days = student.days ? `${student.days} days/week` : 'N/A';
+
+                // Apply orange background for transitioning students
+                const rowClass = isTransitioning ? 'bg-orange-50 border-l-4 border-orange-500' : '';
 
                 if (student.isPending) {
                     statusHTML = `<span class="status-indicator text-yellow-600 font-semibold">Awaiting Approval</span>`;
@@ -812,7 +913,12 @@ async function renderStudentDatabase(container, tutor) {
                         if (approvedStudents.length === 1) {
                             actionsHTML += `<button class="submit-single-report-btn bg-green-600 text-white px-3 py-1 rounded" data-student-id="${student.id}">Submit Report</button>`;
                         } else {
-                            actionsHTML += `<button class="enter-report-btn bg-green-600 text-white px-3 py-1 rounded" data-student-id="${student.id}">${isReportSaved ? 'Edit Report' : 'Enter Report'}</button>`;
+                            // For transitioning students, show "Confirm Fee" instead of "Enter Report"
+                            if (isTransitioning) {
+                                actionsHTML += `<button class="confirm-transitioning-fee-btn bg-orange-600 text-white px-3 py-1 rounded font-bold" data-student-id="${student.id}">Confirm Fee</button>`;
+                            } else {
+                                actionsHTML += `<button class="enter-report-btn bg-green-600 text-white px-3 py-1 rounded" data-student-id="${student.id}">${isReportSaved ? 'Edit Report' : 'Enter Report'}</button>`;
+                            }
                         }
                     } else if (!isStudentOnBreak) {
                         actionsHTML += `<span class="text-gray-400">Submission Disabled</span>`;
@@ -825,11 +931,12 @@ async function renderStudentDatabase(container, tutor) {
                 }
                 
                 studentsHTML += `
-                    <tr>
+                    <tr class="${rowClass}">
                         <td class="px-6 py-4 whitespace-nowrap">
                             ${student.studentName} (${cleanGradeString(student.grade)})
                             <div class="text-xs text-gray-500">Subjects: ${subjects} | Days: ${days}</div>
                             ${feeDisplay}
+                            ${isTransitioning ? '<div class="text-xs text-orange-600 font-semibold">🔄 Transitioning Student</div>' : ''}
                         </td>
                         <td class="px-6 py-4 whitespace-nowrap">${statusHTML}</td>
                         <td class="px-6 py-4 whitespace-nowrap space-x-2">${actionsHTML}</td>
@@ -852,7 +959,7 @@ async function renderStudentDatabase(container, tutor) {
             }
             
             if (approvedStudents.length > 1 && isSubmissionEnabled) {
-                const submittableStudents = approvedStudents.filter(s => !s.summerBreak && !submittedStudentIds.has(s.id)).length;
+                const submittableStudents = approvedStudents.filter(s => !s.summerBreak && !submittedStudentIds.has(s.id) && !s.isTransitioning).length;
                 const allReportsSaved = Object.keys(savedReports).length === submittableStudents && submittableStudents > 0;
                 
                 if (submittableStudents > 0) {
@@ -871,7 +978,7 @@ async function renderStudentDatabase(container, tutor) {
 
     function showReportModal(student) {
         const existingReport = savedReports[student.id] || {};
-        const isSingleApprovedStudent = approvedStudents.filter(s => !s.summerBreak && !submittedStudentIds.has(s.id)).length === 1;
+        const isSingleApprovedStudent = approvedStudents.filter(s => !s.summerBreak && !submittedStudentIds.has(s.id) && !s.isTransitioning).length === 1;
         const currentMonthYear = getCurrentMonthYear();
         
         const reportFormHTML = `
@@ -941,7 +1048,7 @@ async function renderStudentDatabase(container, tutor) {
         feeModal.innerHTML = `<div class="relative bg-white p-8 rounded-lg shadow-xl w-full max-w-lg mx-auto">${feeConfirmationHTML}</div>`;
         document.body.appendChild(feeModal);
 
-        const isSingleApprovedStudent = approvedStudents.filter(s => !s.summerBreak && !submittedStudentIds.has(s.id)).length === 1;
+        const isSingleApprovedStudent = approvedStudents.filter(s => !s.summerBreak && !submittedStudentIds.has(s.id) && !s.isTransitioning).length === 1;
 
         document.getElementById('cancel-fee-confirm-btn').addEventListener('click', () => feeModal.remove());
         document.getElementById('confirm-fee-btn').addEventListener('click', async () => {
@@ -1065,6 +1172,11 @@ async function renderStudentDatabase(container, tutor) {
     }
 
     function attachEventListeners() {
+        // Add transitioning student button
+        document.getElementById('add-transitioning-student-btn').addEventListener('click', () => {
+            showAddTransitioningStudentModal(tutor);
+        });
+
         // Group class toggle functionality for new student form
         const subjectsContainer = document.getElementById('new-student-subjects-container');
         const groupClassContainer = document.getElementById('group-class-container');
@@ -1157,6 +1269,17 @@ async function renderStudentDatabase(container, tutor) {
                 const studentId = btn.getAttribute('data-student-id');
                 const student = students.find(s => s.id === studentId);
                 showReportModal(student);
+            });
+        });
+
+        // Confirm fee button for transitioning students
+        document.querySelectorAll('.confirm-transitioning-fee-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const studentId = btn.getAttribute('data-student-id');
+                const student = students.find(s => s.id === studentId);
+                if (student) {
+                    showFeeConfirmationModal(student, {});
+                }
             });
         });
 
@@ -1407,3 +1530,4 @@ function renderAutoStudentsList(students) {
         });
     });
 }
+[file content end]
