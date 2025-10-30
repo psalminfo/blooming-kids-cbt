@@ -1337,7 +1337,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     // ##################################################################
     // # SECTION 5: TRANSITION STUDENTS NAVIGATION (NEW)
     // ##################################################################
-    document.getElementById('navTransitionStudents').addEventListener('click', () => {
+   const navTransitionStudents = document.getElementById('navTransitionStudents');
+if (navTransitionStudents) {
+    navTransitionStudents.addEventListener('click', () => {
         if (window.tutorData) {
             renderTransitionStudentForm(document.getElementById('mainContent'), window.tutorData);
         }
@@ -1808,3 +1810,4 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     });
 });
+
