@@ -12,6 +12,10 @@ let isBypassApprovalEnabled = false;
 let showStudentFees = false;
 let showEditDeleteButtons = false;
 
+// --- New Collection Name for Transitioning Students ---
+const TRANSITIONING_COLLECTION = "transitioning_students";
+const LOCAL_CLEANUP_KEY = "lastTransitioningCleanup";
+
 // --- Pay Scheme Configuration ---
 const PAY_SCHEMES = {
     NEW_TUTOR: {
@@ -452,6 +456,68 @@ async function loadTutorReports(tutorEmail, parentName = null) {
     }
 }
 
+// ==================================================================
+// NEW: TRANSITIONING STUDENT CLEANUP LOGIC
+// ==================================================================
+/**
+ * Runs cleanup for transitioning students created in a previous month.
+ * This runs on tutor login to ensure a clean list for the new month (1st day auto-delete logic).
+ */
+async function runTransitioningStudentCleanup(tutorEmail) {
+    const lastCleanupDate = localStorage.getItem(LOCAL_CLEANUP_KEY);
+    const now = new Date();
+    const currentMonthYear = now.toISOString().slice(0, 7); // YYYY-MM
+    
+    // Check if cleanup already ran this month/year
+    if (lastCleanupDate === currentMonthYear) {
+        return;
+    }
+
+    try {
+        const q = query(collection(db, TRANSITIONING_COLLECTION), 
+                        where("tutorEmail", "==", tutorEmail));
+        const snapshot = await getDocs(q);
+        
+        const batch = writeBatch(db);
+        let deletedCount = 0;
+        
+        snapshot.forEach(docSnap => {
+            const student = docSnap.data();
+            // Check if createdAt exists and is a Firestore Timestamp
+            if (student.createdAt && typeof student.createdAt.toDate === 'function') {
+                const createdAt = student.createdAt.toDate();
+                const createdMonthYear = createdAt.toISOString().slice(0, 7);
+            
+                // Delete if the student was created in a previous month
+                if (createdMonthYear !== currentMonthYear) {
+                    batch.delete(doc(db, TRANSITIONING_COLLECTION, docSnap.id));
+                    deletedCount++;
+                }
+            } else {
+                 // Safety net for records without createdAt or bad format: delete if old
+                 const createdMonthYear = (new Date()).toISOString().slice(0, 7); 
+                 if (createdMonthYear !== currentMonthYear) { // Simple check might fail, rely on cron for old, but try to delete.
+                    batch.delete(doc(db, TRANSITIONING_COLLECTION, docSnap.id));
+                    deletedCount++;
+                 }
+            }
+        });
+
+        if (deletedCount > 0) {
+            await batch.commit();
+            console.log(`Successfully deleted ${deletedCount} expired transitioning student(s).`);
+        }
+        
+        // Update local storage key only if we successfully checked/ran the logic
+        localStorage.setItem(LOCAL_CLEANUP_KEY, currentMonthYear);
+    } catch (error) {
+        console.error("Error during transitioning student cleanup:", error);
+    }
+}
+// ==================================================================
+// END NEW: TRANSITIONING STUDENT CLEANUP LOGIC
+// ==================================================================
+
 
 // ##################################################################
 // # SECTION 2: STUDENT DATABASE (MERGED FUNCTIONALITY)
@@ -691,6 +757,9 @@ function showEditStudentModal(student) {
     });
 }
 
+/**
+ * Renders the full student database view, including all student types.
+ */
 async function renderStudentDatabase(container, tutor) {
     if (!container) {
         console.error("Container element not found.");
@@ -699,21 +768,22 @@ async function renderStudentDatabase(container, tutor) {
 
     let savedReports = loadReportsFromLocalStorage(tutor.email);
 
-    // Fetch students and all of the tutor's historical submissions
+    // 1. Fetch all student types
     const studentQuery = query(collection(db, "students"), where("tutorEmail", "==", tutor.email));
     const pendingStudentQuery = query(collection(db, "pending_students"), where("tutorEmail", "==", tutor.email));
-    
-    // --- START: MODIFICATION (NO INDEX REQUIRED) ---
-    // This simple query only filters by one field and does NOT require a custom index.
+    const transitioningStudentQuery = query(collection(db, TRANSITIONING_COLLECTION), where("tutorEmail", "==", tutor.email)); // NEW
+
+    // Fetch all tutor's historical submissions for the monthly report check
     const allSubmissionsQuery = query(collection(db, "tutor_submissions"), where("tutorEmail", "==", tutor.email));
 
-    const [studentsSnapshot, pendingStudentsSnapshot, allSubmissionsSnapshot] = await Promise.all([
+    const [studentsSnapshot, pendingStudentsSnapshot, transitioningStudentsSnapshot, allSubmissionsSnapshot] = await Promise.all([
         getDocs(studentQuery),
         getDocs(pendingStudentQuery),
+        getDocs(transitioningStudentQuery), // NEW
         getDocs(allSubmissionsQuery)
     ]);
 
-    // Now, filter the submissions for the current month here in the code
+    // 2. Determine submitted students for the current month
     const now = new Date();
     const currentMonth = now.getMonth();
     const currentYear = now.getFullYear();
@@ -721,19 +791,20 @@ async function renderStudentDatabase(container, tutor) {
 
     allSubmissionsSnapshot.forEach(doc => {
         const submissionData = doc.data();
-        const submissionDate = submissionData.submittedAt.toDate(); // Convert Firestore Timestamp to JS Date
+        const submissionDate = submissionData.submittedAt.toDate(); 
         if (submissionDate.getMonth() === currentMonth && submissionDate.getFullYear() === currentYear) {
             submittedStudentIds.add(submissionData.studentId);
         }
     });
-    // --- END: MODIFICATION (NO INDEX REQUIRED) ---
 
-    const approvedStudents = studentsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data(), isPending: false, collection: "students" }));
-    const pendingStudents = pendingStudentsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data(), isPending: true, collection: "pending_students" }));
+    // 3. Map students and mark their type
+    const approvedStudents = studentsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data(), isPending: false, isTransitioning: false, collection: "students" }));
+    const pendingStudents = pendingStudentsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data(), isPending: true, isTransitioning: false, collection: "pending_students" }));
+    const transitioningStudents = transitioningStudentsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data(), isPending: false, isTransitioning: true, collection: TRANSITIONING_COLLECTION })); // NEW
 
-    let students = [...approvedStudents, ...pendingStudents];
+    let students = [...approvedStudents, ...pendingStudents, ...transitioningStudents]; // MERGE ALL
 
-    // Duplicate Student Cleanup
+    // 4. Duplicate Student Cleanup 
     const seenStudents = new Set();
     const duplicatesToDelete = [];
     students = students.filter(student => {
@@ -750,14 +821,29 @@ async function renderStudentDatabase(container, tutor) {
         duplicatesToDelete.forEach(dup => {
             batch.delete(doc(db, dup.collection, dup.id));
         });
-        await batch.commit();
-        console.log(`Cleaned up ${duplicatesToDelete.length} duplicate student entries.`);
+        try {
+             await batch.commit();
+             console.log(`Cleaned up ${duplicatesToDelete.length} duplicate student entries.`);
+        } catch (error) {
+            console.error("Error cleaning up duplicates:", error);
+        }
+       
     }
 
     const studentsCount = students.length;
+    const regularStudentsCount = approvedStudents.length + pendingStudents.length;
 
     function renderUI() {
-        let studentsHTML = `<h2 class="text-2xl font-bold text-green-700 mb-4">My Students (${studentsCount})</h2>`;
+        // Prepare the button HTML with the required orange styling
+        const transitioningButtonHTML = isTutorAddEnabled ? `
+            <button id="add-transitioning-student-btn" 
+                    class="bg-orange-600 border-4 border-orange-800 text-white px-4 py-2 rounded mt-3 hover:bg-orange-700 font-bold ml-2">
+                <span class="text-lg">🔄</span> Add Transitioning Student
+            </button>
+        ` : '';
+
+        let studentsHTML = `<h2 class="text-2xl font-bold text-green-700 mb-4">My Students (${regularStudentsCount})<span class="text-orange-600 text-xl font-bold ml-2"> + ${transitioningStudents.length} Transitioning</span></h2>`;
+        
         if (isTutorAddEnabled) {
             studentsHTML += `
                 <div class="bg-gray-100 p-4 rounded-lg shadow-inner mb-4">
@@ -765,7 +851,10 @@ async function renderStudentDatabase(container, tutor) {
                     <div class="space-y-2">
                         ${getNewStudentFormFields()}
                     </div>
-                    <button id="add-student-btn" class="bg-green-600 text-white px-4 py-2 rounded mt-3 hover:bg-green-700">Add Student</button>
+                    <div class="flex flex-wrap space-x-2 mt-3">
+                        <button id="add-student-btn" class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700">Add Regular Student</button>
+                        ${transitioningButtonHTML}
+                    </div>
                 </div>`;
         }
         
@@ -781,9 +870,16 @@ async function renderStudentDatabase(container, tutor) {
                         <tbody class="bg-white divide-y divide-gray-200">`;
             
             students.forEach(student => {
-                const hasSubmittedThisMonth = submittedStudentIds.has(student.id);
+                // Determine submission status based on student type
+                const hasSubmittedThisMonth = student.isTransitioning ? student.transitionPaid : submittedStudentIds.has(student.id);
                 const isStudentOnBreak = student.summerBreak;
                 const isReportSaved = savedReports[student.id];
+                
+                // Determine row/cell styling for transitioning students
+                let rowClasses = '';
+                if (student.isTransitioning) {
+                     rowClasses = 'bg-orange-50 border-4 border-orange-400'; // Thick orange color
+                }
 
                 const feeDisplay = showStudentFees ? `<div class="text-xs text-gray-500">Fee: ₦${(student.studentFee || 0).toLocaleString()}</div>` : '';
                 
@@ -792,14 +888,26 @@ async function renderStudentDatabase(container, tutor) {
                 
                 const subjects = student.subjects ? student.subjects.join(', ') : 'N/A';
                 const days = student.days ? `${student.days} days/week` : 'N/A';
+                
+                if (student.isTransitioning) {
+                    // NEW: Transitioning Student Specific Logic (Show Confirm Fee instead of Enter Report)
+                    statusHTML = `<span class="status-indicator font-semibold text-orange-600">🔄 Transitioning Student</span>`;
+                    if (hasSubmittedThisMonth) {
+                         actionsHTML = `<span class="text-gray-400">Fee Confirmed/Paid</span>`;
+                    } else {
+                         actionsHTML = `<button class="confirm-fee-btn-transitioning bg-orange-600 text-white px-3 py-1 rounded font-bold" data-student-id="${student.id}">Confirm Fee</button>`;
+                    }
 
-                if (student.isPending) {
+                } else if (student.isPending) {
                     statusHTML = `<span class="status-indicator text-yellow-600 font-semibold">Awaiting Approval</span>`;
                     actionsHTML = `<span class="text-gray-400">No actions available</span>`;
+
                 } else if (hasSubmittedThisMonth) {
                     statusHTML = `<span class="status-indicator text-blue-600 font-semibold">Report Sent</span>`;
                     actionsHTML = `<span class="text-gray-400">Submitted this month</span>`;
+                    
                 } else {
+                    // Regular Approved Student Logic
                     statusHTML = `<span class="status-indicator ${isReportSaved ? 'text-green-600 font-semibold' : 'text-gray-500'}">${isReportSaved ? 'Report Saved' : 'Pending Report'}</span>`;
 
                     if (isSummerBreakEnabled && !isStudentOnBreak) {
@@ -812,20 +920,23 @@ async function renderStudentDatabase(container, tutor) {
                         if (approvedStudents.length === 1) {
                             actionsHTML += `<button class="submit-single-report-btn bg-green-600 text-white px-3 py-1 rounded" data-student-id="${student.id}">Submit Report</button>`;
                         } else {
+                            // The original "Enter Report" button remains for regular students
                             actionsHTML += `<button class="enter-report-btn bg-green-600 text-white px-3 py-1 rounded" data-student-id="${student.id}">${isReportSaved ? 'Edit Report' : 'Enter Report'}</button>`;
                         }
                     } else if (!isStudentOnBreak) {
                         actionsHTML += `<span class="text-gray-400">Submission Disabled</span>`;
                     }
-                    
-                    if (showEditDeleteButtons && !isStudentOnBreak) {
-                        actionsHTML += `<button class="edit-student-btn-tutor bg-blue-500 text-white px-3 py-1 rounded" data-student-id="${student.id}" data-collection="${student.collection}">Edit</button>`;
-                        actionsHTML += `<button class="delete-student-btn-tutor bg-red-500 text-white px-3 py-1 rounded" data-student-id="${student.id}" data-collection="${student.collection}">Delete</button>`;
-                    }
                 }
                 
+                // Edit/Delete for all non-transitioning students (Transitioning students are temporary)
+                if (showEditDeleteButtons && !isStudentOnBreak && !student.isTransitioning) {
+                    actionsHTML += `<button class="edit-student-btn-tutor bg-blue-500 text-white px-3 py-1 rounded" data-student-id="${student.id}" data-collection="${student.collection}">Edit</button>`;
+                    actionsHTML += `<button class="delete-student-btn-tutor bg-red-500 text-white px-3 py-1 rounded" data-student-id="${student.id}" data-collection="${student.collection}">Delete</button>`;
+                }
+
+
                 studentsHTML += `
-                    <tr>
+                    <tr class="${rowClasses}">
                         <td class="px-6 py-4 whitespace-nowrap">
                             ${student.studentName} (${cleanGradeString(student.grade)})
                             <div class="text-xs text-gray-500">Subjects: ${subjects} | Days: ${days}</div>
@@ -837,6 +948,8 @@ async function renderStudentDatabase(container, tutor) {
             });
 
             studentsHTML += `</tbody></table></div>`;
+            
+            // Management Fee logic (remains the same)
             
             if (tutor.isManagementStaff) {
                 studentsHTML += `
@@ -851,18 +964,17 @@ async function renderStudentDatabase(container, tutor) {
                     </div>`;
             }
             
-            if (approvedStudents.length > 1 && isSubmissionEnabled) {
-                const submittableStudents = approvedStudents.filter(s => !s.summerBreak && !submittedStudentIds.has(s.id)).length;
-                const allReportsSaved = Object.keys(savedReports).length === submittableStudents && submittableStudents > 0;
-                
-                if (submittableStudents > 0) {
-                    studentsHTML += `
-                        <div class="mt-6 text-right">
-                            <button id="submit-all-reports-btn" class="bg-green-700 text-white px-6 py-3 rounded-lg font-bold ${!allReportsSaved ? 'opacity-50 cursor-not-allowed' : 'hover:bg-green-800'}" ${!allReportsSaved ? 'disabled' : ''}>
-                                Submit All Reports
-                            </button>
-                        </div>`;
-                }
+            const regularSubmittableStudents = approvedStudents.filter(s => !s.summerBreak && !submittedStudentIds.has(s.id)).length;
+            const allReportsSaved = Object.keys(savedReports).length === regularSubmittableStudents && regularSubmittableStudents > 0;
+            
+            // Only show submit all button for regular students when reports are enabled
+            if (regularSubmittableStudents > 0 && isSubmissionEnabled) {
+                studentsHTML += `
+                    <div class="mt-6 text-right">
+                        <button id="submit-all-reports-btn" class="bg-green-700 text-white px-6 py-3 rounded-lg font-bold ${!allReportsSaved ? 'opacity-50 cursor-not-allowed' : 'hover:bg-green-800'}" ${!allReportsSaved ? 'disabled' : ''}>
+                            Submit All Reports
+                        </button>
+                    </div>`;
             }
         }
         container.innerHTML = `<div id="student-list-view" class="bg-white p-6 rounded-lg shadow-md">${studentsHTML}</div>`;
@@ -1064,6 +1176,138 @@ async function renderStudentDatabase(container, tutor) {
         document.getElementById('alert-ok-btn').addEventListener('click', () => alertModal.remove());
     }
 
+    // ==================================================================
+    // NEW: TRANSITIONING STUDENT MODALS & SAVE LOGIC
+    // ==================================================================
+    /**
+     * Handles the saving of a new transitioning student to the dedicated collection.
+     */
+    async function addNewTransitioningStudent(tutor, container) {
+        const parentName = document.getElementById('new-parent-name').value.trim();
+        const parentPhone = document.getElementById('new-parent-phone').value.trim();
+        const studentName = document.getElementById('new-student-name').value.trim();
+        const studentGrade = document.getElementById('new-student-grade').value.trim();
+        
+        const selectedSubjects = [];
+        document.querySelectorAll('input[name="subjects"]:checked').forEach(checkbox => {
+            selectedSubjects.push(checkbox.value);
+        });
+
+        const studentDays = document.getElementById('new-student-days').value.trim();
+        const groupClass = document.getElementById('new-student-group-class') ? document.getElementById('new-student-group-class').checked : false;
+        const studentFee = parseFloat(document.getElementById('new-student-fee').value);
+
+        if (!parentName || !studentName || !studentGrade || isNaN(studentFee) || !parentPhone || !studentDays || selectedSubjects.length === 0) {
+            showCustomAlert('Please fill in all parent and student details correctly, including at least one subject.');
+            return;
+        }
+
+        const payScheme = getTutorPayScheme(tutor);
+        const suggestedFee = calculateSuggestedFee({
+            grade: studentGrade,
+            days: studentDays,
+            subjects: selectedSubjects,
+            groupClass: groupClass
+        }, payScheme);
+
+        const studentData = {
+            parentName: parentName,
+            parentPhone: parentPhone,
+            studentName: studentName,
+            grade: studentGrade,
+            subjects: selectedSubjects,
+            days: studentDays,
+            studentFee: suggestedFee > 0 ? suggestedFee : studentFee,
+            tutorEmail: tutor.email,
+            tutorName: tutor.name,
+            isTransitioning: true, // KEY FLAG for this feature
+            createdAt: new Date() // KEY TIMESTAMP for auto-deletion
+        };
+
+        if (findSpecializedSubject(selectedSubjects)) {
+            studentData.groupClass = groupClass;
+        }
+
+        try {
+            // Save to the dedicated transitioning collection
+            await addDoc(collection(db, TRANSITIONING_COLLECTION), studentData);
+            showCustomAlert('Transitioning Student added successfully! They will be automatically removed next month.');
+            renderStudentDatabase(container, tutor);
+        } catch (error) {
+            console.error("Error adding transitioning student:", error);
+            showCustomAlert(`An error occurred: ${error.message}`);
+        }
+    }
+    
+    /**
+     * Simplified Fee Confirmation Modal for Transitioning Students (Replaces Enter Report flow)
+     */
+    function showTransitioningFeeConfirmationModal(student) {
+        const feeConfirmationHTML = `
+            <h3 class="text-xl font-bold mb-4">Confirm Fee for Transitioning Student: ${student.studentName}</h3>
+            <p class="text-sm text-orange-600 mb-4 font-bold">This is a temporary action. The student will be auto-deleted on the 1st of next month.</p>
+            <div class="space-y-4">
+                <div>
+                    <label class="block font-semibold">Current Fee (₦)</label>
+                    <input type="number" id="confirm-student-fee" class="w-full mt-1 p-2 border rounded" 
+                           value="${student.studentFee || 0}" 
+                           placeholder="Enter fee amount">
+                </div>
+                <div class="flex justify-end space-x-2 mt-6">
+                    <button id="cancel-fee-confirm-btn" class="bg-gray-500 text-white px-6 py-2 rounded">Cancel</button>
+                    <button id="confirm-fee-btn" class="bg-orange-600 text-white px-6 py-2 rounded">Confirm Fee & Mark as Paid</button>
+                </div>
+            </div>`;
+
+        const feeModal = document.createElement('div');
+        feeModal.className = 'fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex items-center justify-center z-50';
+        feeModal.innerHTML = `<div class="relative bg-white p-8 rounded-lg shadow-xl w-full max-w-lg mx-auto">${feeConfirmationHTML}</div>`;
+        document.body.appendChild(feeModal);
+
+        document.getElementById('cancel-fee-confirm-btn').addEventListener('click', () => feeModal.remove());
+        document.getElementById('confirm-fee-btn').addEventListener('click', async () => {
+            const newFeeValue = document.getElementById('confirm-student-fee').value;
+            const newFee = parseFloat(newFeeValue);
+
+            if (isNaN(newFee) || newFee < 0) {
+                showCustomAlert('Please enter a valid, non-negative fee amount.');
+                return;
+            }
+
+            try {
+                const studentRef = doc(db, student.collection, student.id);
+                const updatePayload = {};
+
+                // 1. Update the fee if it changed
+                if (newFee !== student.studentFee) {
+                   updatePayload.studentFee = newFee;
+                }
+                
+                // 2. Mark the transitioning student as paid (to prevent re-action)
+                updatePayload.transitionPaid = true;
+                updatePayload.transitionPaidAt = new Date();
+                updatePayload.transitionPaidFee = newFee;
+
+                await updateDoc(studentRef, updatePayload); 
+
+                feeModal.remove();
+                showCustomAlert(`${student.studentName}'s fee confirmed and marked as paid.`);
+                
+                // Refresh the student database view
+                const mainContent = document.getElementById('mainContent');
+                renderStudentDatabase(mainContent, window.tutorData);
+
+            } catch (error) {
+                console.error("Error confirming transitioning fee:", error);
+                showCustomAlert(`Failed to confirm fee: ${error.message}`);
+            }
+        });
+    }
+    // ==================================================================
+    // END NEW: TRANSITIONING STUDENT MODALS & SAVE LOGIC
+    // ==================================================================
+
+
     function attachEventListeners() {
         // Group class toggle functionality for new student form
         const subjectsContainer = document.getElementById('new-student-subjects-container');
@@ -1082,6 +1326,7 @@ async function renderStudentDatabase(container, tutor) {
         }
 
         if (isTutorAddEnabled) {
+            // Existing 'Add Regular Student' logic
             document.getElementById('add-student-btn').addEventListener('click', async () => {
                 const parentName = document.getElementById('new-parent-name').value.trim();
                 const parentPhone = document.getElementById('new-parent-phone').value.trim();
@@ -1142,8 +1387,17 @@ async function renderStudentDatabase(container, tutor) {
                     showCustomAlert(`An error occurred: ${error.message}`);
                 }
             });
+            
+            // NEW: Event Listener for Transitioning Student Button
+            const addTransitioningBtn = document.getElementById('add-transitioning-student-btn');
+            if (addTransitioningBtn) {
+                addTransitioningBtn.addEventListener('click', () => {
+                    addNewTransitioningStudent(tutor, container);
+                });
+            }
         }
 
+        // Existing 'Enter Report' logic for regular students
         document.querySelectorAll('.enter-report-btn').forEach(btn => {
             btn.addEventListener('click', () => {
                 const studentId = btn.getAttribute('data-student-id');
@@ -1157,6 +1411,15 @@ async function renderStudentDatabase(container, tutor) {
                 const studentId = btn.getAttribute('data-student-id');
                 const student = students.find(s => s.id === studentId);
                 showReportModal(student);
+            });
+        });
+
+        // NEW: Event Listener for Confirm Fee Button (Transitioning Students)
+        document.querySelectorAll('.confirm-fee-btn-transitioning').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const studentId = btn.getAttribute('data-student-id');
+                const student = students.find(s => s.id === studentId);
+                showTransitioningFeeConfirmationModal(student);
             });
         });
 
@@ -1245,6 +1508,9 @@ document.addEventListener('DOMContentLoaded', async () => {
                 const tutorData = { id: tutorDoc.id, ...tutorDoc.data() };
                 window.tutorData = tutorData;
                 
+                // NEW: Run cleanup for expired transitioning students
+                await runTransitioningStudentCleanup(tutorData.email);
+
                 // Show employment date popup if needed
                 if (shouldShowEmploymentPopup(tutorData)) {
                     showEmploymentDatePopup(tutorData);
