@@ -488,15 +488,15 @@ async function runTransitioningStudentCleanup(tutorEmail) {
                 const createdAt = student.createdAt.toDate();
                 const createdMonthYear = createdAt.toISOString().slice(0, 7);
             
-                // Delete if the student was created in a previous month
-                if (createdMonthYear !== currentMonthYear) {
+                // Delete if the student was created in a previous month (i.e., createdMonthYear < currentMonthYear)
+                if (createdMonthYear < currentMonthYear) {
                     batch.delete(doc(db, TRANSITIONING_COLLECTION, docSnap.id));
                     deletedCount++;
                 }
             } else {
                  // Safety net for records without createdAt or bad format: delete if old
-                 const createdMonthYear = (new Date()).toISOString().slice(0, 7); 
-                 if (createdMonthYear !== currentMonthYear) { // Simple check might fail, rely on cron for old, but try to delete.
+                 // This check is rudimentary and relies on a lack of the field, so we default to deleting if the current day is past the 1st
+                 if (now.getDate() > 1) { 
                     batch.delete(doc(db, TRANSITIONING_COLLECTION, docSnap.id));
                     deletedCount++;
                  }
@@ -842,7 +842,13 @@ async function renderStudentDatabase(container, tutor) {
             </button>
         ` : '';
 
-        let studentsHTML = `<h2 class="text-2xl font-bold text-green-700 mb-4">My Students (${regularStudentsCount})<span class="text-orange-600 text-xl font-bold ml-2"> + ${transitioningStudents.length} Transitioning</span></h2>`;
+        let studentsHTML = `
+            <h2 class="text-2xl font-bold text-green-700 mb-4">
+                My Students (${regularStudentsCount})
+                <span class="text-orange-600 text-xl font-bold ml-2"> + ${transitioningStudents.length} Transitioning</span>
+                ${transitioningButtonHTML}
+            </h2>
+        `;
         
         if (isTutorAddEnabled) {
             studentsHTML += `
@@ -853,7 +859,6 @@ async function renderStudentDatabase(container, tutor) {
                     </div>
                     <div class="flex flex-wrap space-x-2 mt-3">
                         <button id="add-student-btn" class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700">Add Regular Student</button>
-                        ${transitioningButtonHTML}
                     </div>
                 </div>`;
         }
@@ -1391,6 +1396,7 @@ async function renderStudentDatabase(container, tutor) {
             // NEW: Event Listener for Transitioning Student Button
             const addTransitioningBtn = document.getElementById('add-transitioning-student-btn');
             if (addTransitioningBtn) {
+                // IMPORTANT: This uses the same form fields but calls the dedicated save function
                 addTransitioningBtn.addEventListener('click', () => {
                     addNewTransitioningStudent(tutor, container);
                 });
