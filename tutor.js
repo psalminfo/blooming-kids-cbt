@@ -1451,27 +1451,47 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     });
 
-    document.getElementById('logoutBtn').addEventListener('click', () => {
-        signOut(auth).then(() => {
-            window.location.href = 'tutor-auth.html';
-        }).catch(error => {
-            console.error("Error signing out:", error);
+    // SAFELY add event listeners - check if elements exist first
+    const logoutBtn = document.getElementById('logoutBtn');
+    if (logoutBtn) {
+        logoutBtn.addEventListener('click', () => {
+            signOut(auth).then(() => {
+                window.location.href = 'tutor-auth.html';
+            }).catch(error => {
+                console.error("Error signing out:", error);
+            });
         });
-    });
+    }
 
-    document.getElementById('navDashboard').addEventListener('click', async () => {
-        if (window.tutorData) {
-            renderTutorDashboard(document.getElementById('mainContent'), window.tutorData);
-        }
-    });
+    const navDashboard = document.getElementById('navDashboard');
+    if (navDashboard) {
+        navDashboard.addEventListener('click', async () => {
+            if (window.tutorData) {
+                renderTutorDashboard(document.getElementById('mainContent'), window.tutorData);
+            }
+        });
+    }
 
-    document.getElementById('navStudentDatabase').addEventListener('click', async () => {
-        if (window.tutorData) {
-            // Clean up transitioning students when navigating to student database
-            await cleanupTransitioningStudents(window.tutorData.email);
-            renderStudentDatabase(document.getElementById('mainContent'), window.tutorData);
-        }
-    });
+    const navStudentDatabase = document.getElementById('navStudentDatabase');
+    if (navStudentDatabase) {
+        navStudentDatabase.addEventListener('click', async () => {
+            if (window.tutorData) {
+                // Clean up transitioning students when navigating to student database
+                await cleanupTransitioningStudents(window.tutorData.email);
+                renderStudentDatabase(document.getElementById('mainContent'), window.tutorData);
+            }
+        });
+    }
+
+    const navAutoStudents = document.getElementById('navAutoStudents');
+    if (navAutoStudents) {
+        navAutoStudents.addEventListener('click', () => {
+            if (window.tutorData) {
+                renderAutoRegisteredStudents(document.getElementById('mainContent'), window.tutorData);
+            }
+        });
+    }
+});
 
     // ##################################################################
     // # SECTION 4: AUTO-REGISTERED STUDENTS NAVIGATION
@@ -1600,3 +1620,4 @@ function renderAutoStudentsList(students) {
         });
     });
 }
+
