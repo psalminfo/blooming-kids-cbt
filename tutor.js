@@ -145,61 +145,18 @@ function clearAllReportsFromLocalStorage(tutorEmail) {
     }
 }
 
-// --- Employment Date Functions ---
-function shouldShowEmploymentPopup(tutor) {
-    // Don't show if already has employment date
-    if (tutor.employmentDate) return false;
-    
-    // Show on first login each month until they provide it
-    const lastPopupShown = localStorage.getItem(`employmentPopup_${tutor.email}`);
-    const currentMonth = new Date().toISOString().slice(0, 7); // YYYY-MM
-    
-    return !lastPopupShown || lastPopupShown !== currentMonth;
-}
+// --- Utility Functions ---
 
-function showEmploymentDatePopup(tutor) {
-    const popupHTML = `
-        <div class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex items-center justify-center z-50">
-            <div class="relative bg-white p-8 rounded-lg shadow-xl w-full max-w-md mx-auto">
-                <h3 class="text-xl font-bold mb-4">Employment Information</h3>
-                <p class="text-sm text-gray-600 mb-4">Please provide your employment start date to help us calculate your payments accurately.</p>
-                <div class="space-y-4">
-                    <div>
-                        <label class="block font-semibold">Month & Year of Employment</label>
-                        <input type="month" id="employment-date" class="w-full mt-1 p-2 border rounded" 
-                               max="${new Date().toISOString().slice(0, 7)}">
-                    </div>
-                    <div class="flex justify-end space-x-2 mt-6">
-                        <button id="save-employment-btn" class="bg-green-600 text-white px-6 py-2 rounded">Save</button>
-                    </div>
-                </div>
-            </div>
-        </div>
-    `;
-    
-    const popup = document.createElement('div');
-    popup.innerHTML = popupHTML;
-    document.body.appendChild(popup);
-
-    document.getElementById('save-employment-btn').addEventListener('click', async () => {
-        const employmentDate = document.getElementById('employment-date').value;
-        if (!employmentDate) {
-            showCustomAlert('Please select your employment month and year.');
-            return;
-        }
-
-        try {
-            const tutorRef = doc(db, "tutors", tutor.id);
-            await updateDoc(tutorRef, { employmentDate: employmentDate });
-            localStorage.setItem(`employmentPopup_${tutor.email}`, new Date().toISOString().slice(0, 7));
-            popup.remove();
-            showCustomAlert('Employment date saved successfully!');
-            window.tutorData.employmentDate = employmentDate;
-        } catch (error) {
-            console.error("Error saving employment date:", error);
-            showCustomAlert('Error saving employment date. Please try again.');
-        }
-    });
+function showCustomAlert(message) {
+    const alertModal = document.createElement('div');
+    alertModal.className = 'fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex items-center justify-center z-50';
+    alertModal.innerHTML = `
+        <div class="relative bg-white p-8 rounded-lg shadow-xl w-full max-w-md mx-auto">
+            <p class="mb-4">${message}</p>
+            <button id="alert-ok-btn" class="bg-green-600 text-white px-6 py-2 rounded float-right">OK</button>
+        </div>`;
+    document.body.appendChild(alertModal);
+    document.getElementById('alert-ok-btn').addEventListener('click', () => alertModal.remove());
 }
 
 function getTutorPayScheme(tutor) {
@@ -259,10 +216,75 @@ function findSpecializedSubject(subjects) {
     return null;
 }
 
-// Function to get current month for reports
 function getCurrentMonthYear() {
     const now = new Date();
     return now.toLocaleString('default', { month: 'long', year: 'numeric' });
+}
+
+// Function to handle grade string formatting
+function cleanGradeString(grade) {
+    if (grade && grade.toLowerCase().includes("grade")) {
+        return grade;
+    } else {
+        return `Grade ${grade}`;
+    }
+}
+
+// --- Employment Date Functions ---
+function shouldShowEmploymentPopup(tutor) {
+    // Don't show if already has employment date
+    if (tutor.employmentDate) return false;
+    
+    // Show on first login each month until they provide it
+    const lastPopupShown = localStorage.getItem(`employmentPopup_${tutor.email}`);
+    const currentMonth = new Date().toISOString().slice(0, 7); // YYYY-MM
+    
+    return !lastPopupShown || lastPopupShown !== currentMonth;
+}
+
+function showEmploymentDatePopup(tutor) {
+    const popupHTML = `
+        <div class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex items-center justify-center z-50">
+            <div class="relative bg-white p-8 rounded-lg shadow-xl w-full max-w-md mx-auto">
+                <h3 class="text-xl font-bold mb-4">Employment Information</h3>
+                <p class="text-sm text-gray-600 mb-4">Please provide your employment start date to help us calculate your payments accurately.</p>
+                <div class="space-y-4">
+                    <div>
+                        <label class="block font-semibold">Month & Year of Employment</label>
+                        <input type="month" id="employment-date" class="w-full mt-1 p-2 border rounded" 
+                               max="${new Date().toISOString().slice(0, 7)}">
+                    </div>
+                    <div class="flex justify-end space-x-2 mt-6">
+                        <button id="save-employment-btn" class="bg-green-600 text-white px-6 py-2 rounded">Save</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    const popup = document.createElement('div');
+    popup.innerHTML = popupHTML;
+    document.body.appendChild(popup);
+
+    document.getElementById('save-employment-btn').addEventListener('click', async () => {
+        const employmentDate = document.getElementById('employment-date').value;
+        if (!employmentDate) {
+            showCustomAlert('Please select your employment month and year.');
+            return;
+        }
+
+        try {
+            const tutorRef = doc(db, "tutors", tutor.id);
+            await updateDoc(tutorRef, { employmentDate: employmentDate });
+            localStorage.setItem(`employmentPopup_${tutor.email}`, new Date().toISOString().slice(0, 7));
+            popup.remove();
+            showCustomAlert('Employment date saved successfully!');
+            window.tutorData.employmentDate = employmentDate;
+        } catch (error) {
+            console.error("Error saving employment date:", error);
+            showCustomAlert('Error saving employment date. Please try again.');
+        }
+    });
 }
 
 // Listen for changes to the admin settings in real-time
@@ -314,7 +336,7 @@ function renderTutorDashboard(container, tutor) {
     loadTutorReports(tutor.email);
 }
 
-// NEW: Function to sync creative writing comments to student_results
+// Function to sync creative writing comments to student_results
 async function syncCreativeWritingToStudentResults(submissionData, tutorReport) {
     try {
         console.log("Syncing creative writing comments to student_results...");
@@ -457,11 +479,151 @@ async function loadTutorReports(tutorEmail, parentName = null) {
 }
 
 // ==================================================================
-// NEW: TRANSITIONING STUDENT CLEANUP LOGIC
+// TRANSITIONING STUDENT CORE LOGIC (LIFTED OUT OF renderStudentDatabase)
 // ==================================================================
+
+/**
+ * Handles the saving of a new transitioning student to the dedicated collection.
+ */
+async function addNewTransitioningStudent(tutor, container, formPrefix) {
+    const parentName = document.getElementById(`${formPrefix}-parent-name`).value.trim();
+    const parentPhone = document.getElementById(`${formPrefix}-parent-phone`).value.trim();
+    const studentName = document.getElementById(`${formPrefix}-student-name`).value.trim();
+    const studentGrade = document.getElementById(`${formPrefix}-student-grade`).value.trim();
+    
+    const selectedSubjects = [];
+    document.querySelectorAll(`input[name="${formPrefix}-subjects"]:checked`).forEach(checkbox => {
+        selectedSubjects.push(checkbox.value);
+    });
+
+    const studentDays = document.getElementById(`${formPrefix}-student-days`).value.trim();
+    const groupClass = document.getElementById(`${formPrefix}-student-group-class`) ? document.getElementById(`${formPrefix}-student-group-class`).checked : false;
+    // NOTE: For transitioning students, the fee input is used directly
+    const studentFee = parseFloat(document.getElementById(`${formPrefix}-student-fee`).value);
+
+    if (!parentName || !studentName || !studentGrade || isNaN(studentFee) || !parentPhone || !studentDays || selectedSubjects.length === 0) {
+        showCustomAlert('Please fill in all parent and student details correctly, including at least one subject.');
+        return;
+    }
+
+    const payScheme = getTutorPayScheme(tutor);
+    const suggestedFee = calculateSuggestedFee({
+        grade: studentGrade,
+        days: studentDays,
+        subjects: selectedSubjects,
+        groupClass: groupClass
+    }, payScheme);
+
+    const studentData = {
+        parentName: parentName,
+        parentPhone: parentPhone,
+        studentName: studentName,
+        grade: studentGrade,
+        subjects: selectedSubjects,
+        days: studentDays,
+        // Use suggested fee if it's calculated, otherwise use the manual input
+        studentFee: suggestedFee > 0 ? suggestedFee : studentFee,
+        tutorEmail: tutor.email,
+        tutorName: tutor.name,
+        isTransitioning: true, // KEY FLAG for this feature
+        transitionPaid: false, // NEW: Ensure initial state is not paid
+        createdAt: new Date() // KEY TIMESTAMP for auto-deletion
+    };
+
+    if (findSpecializedSubject(selectedSubjects)) {
+        studentData.groupClass = groupClass;
+    }
+
+    try {
+        // Save to the dedicated transitioning collection
+        await addDoc(collection(db, TRANSITIONING_COLLECTION), studentData);
+        showCustomAlert('Transitioning Student added successfully! Please proceed to Confirm Fee.');
+        
+        // Refresh the current view
+        if (container.id === 'mainContent' && container.querySelector('#transitioning-classes-view')) {
+             renderTransitioningClasses(container, tutor);
+        } else {
+             // If somehow called from elsewhere, refresh the main view as fallback
+             renderStudentDatabase(container, tutor);
+        }
+       
+    } catch (error) {
+        console.error("Error adding transitioning student:", error);
+        showCustomAlert(`An error occurred: ${error.message}`);
+    }
+}
+
+/**
+ * Simplified Fee Confirmation Modal for Transitioning Students (Replaces Enter Report flow)
+ */
+function showTransitioningFeeConfirmationModal(student, container, tutor) {
+    const feeConfirmationHTML = `
+        <h3 class="text-xl font-bold mb-4">Confirm Fee for Transitioning Student: ${student.studentName}</h3>
+        <p class="text-sm text-orange-600 mb-4 font-bold">This confirms payment for the temporary period. The student will be auto-deleted on the 1st of next month.</p>
+        <div class="space-y-4">
+            <div>
+                <label class="block font-semibold">Current Fee (₦)</label>
+                <input type="number" id="confirm-student-fee" class="w-full mt-1 p-2 border rounded" 
+                       value="${student.studentFee || 0}" 
+                       placeholder="Enter fee amount">
+            </div>
+            <div class="flex justify-end space-x-2 mt-6">
+                <button id="cancel-fee-confirm-btn" class="bg-gray-500 text-white px-6 py-2 rounded">Cancel</button>
+                <button id="confirm-fee-btn" class="bg-orange-600 text-white px-6 py-2 rounded">Confirm Fee & Mark as Paid</button>
+            </div>
+        </div>`;
+
+    const feeModal = document.createElement('div');
+    feeModal.className = 'fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex items-center justify-center z-50';
+    feeModal.innerHTML = `<div class="relative bg-white p-8 rounded-lg shadow-xl w-full max-w-lg mx-auto">${feeConfirmationHTML}</div>`;
+    document.body.appendChild(feeModal);
+
+    document.getElementById('cancel-fee-confirm-btn').addEventListener('click', () => feeModal.remove());
+    document.getElementById('confirm-fee-btn').addEventListener('click', async () => {
+        const newFeeValue = document.getElementById('confirm-student-fee').value;
+        const newFee = parseFloat(newFeeValue);
+
+        if (isNaN(newFee) || newFee < 0) {
+            showCustomAlert('Please enter a valid, non-negative fee amount.');
+            return;
+        }
+
+        try {
+            const studentRef = doc(db, student.collection, student.id);
+            const updatePayload = {};
+
+            // 1. Update the fee if it changed
+            if (newFee !== student.studentFee) {
+               updatePayload.studentFee = newFee;
+            }
+            
+            // 2. Mark the transitioning student as paid (to prevent re-action)
+            updatePayload.transitionPaid = true;
+            updatePayload.transitionPaidAt = new Date();
+            updatePayload.transitionPaidFee = newFee;
+
+            await updateDoc(studentRef, updatePayload); 
+
+            feeModal.remove();
+            showCustomAlert(`${student.studentName}'s fee confirmed and marked as paid.`);
+            
+            // Refresh the view
+            if (container.id === 'mainContent' && container.querySelector('#transitioning-classes-view')) {
+                 renderTransitioningClasses(container, tutor);
+            } else {
+                 renderStudentDatabase(container, tutor);
+            }
+
+        } catch (error) {
+            console.error("Error confirming transitioning fee:", error);
+            showCustomAlert(`Failed to confirm fee: ${error.message}`);
+        }
+    });
+}
+
+
 /**
  * Runs cleanup for transitioning students created in a previous month.
- * This runs on tutor login to ensure a clean list for the new month (1st day auto-delete logic).
  */
 async function runTransitioningStudentCleanup(tutorEmail) {
     const lastCleanupDate = localStorage.getItem(LOCAL_CLEANUP_KEY);
@@ -495,7 +657,6 @@ async function runTransitioningStudentCleanup(tutorEmail) {
                 }
             } else {
                  // Safety net for records without createdAt or bad format: delete if old
-                 // This check is rudimentary and relies on a lack of the field, so we default to deleting if the current day is past the 1st
                  if (now.getDate() > 1) { 
                     batch.delete(doc(db, TRANSITIONING_COLLECTION, docSnap.id));
                     deletedCount++;
@@ -515,7 +676,7 @@ async function runTransitioningStudentCleanup(tutorEmail) {
     }
 }
 // ==================================================================
-// END NEW: TRANSITIONING STUDENT CLEANUP LOGIC
+// END TRANSITIONING STUDENT CORE LOGIC
 // ==================================================================
 
 
@@ -524,7 +685,8 @@ async function runTransitioningStudentCleanup(tutorEmail) {
 // ##################################################################
 
 // Helper function to generate the new student form fields
-function getNewStudentFormFields() {
+// NOTE: Takes an optional prefix to ensure unique IDs when reused
+function getNewStudentFormFields(prefix = 'new-student') {
     // Generate Grade Options
     const gradeOptions = `
         <option value="">Select Grade</option>
@@ -551,48 +713,39 @@ function getNewStudentFormFields() {
         "Support Programs": ["Bible study", "Counseling Programs", "Speech therapy", "Behavioral therapy", "Public speaking", "Adult education", "Communication skills", "English Proficiency"]
     };
 
-    let subjectsHTML = `<h4 class="font-semibold text-gray-700 mt-2">Subjects</h4><div id="new-student-subjects-container" class="space-y-2 border p-3 rounded bg-gray-50 max-h-48 overflow-y-auto">`;
+    let subjectsHTML = `<h4 class="font-semibold text-gray-700 mt-2">Subjects</h4><div id="${prefix}-subjects-container" class="space-y-2 border p-3 rounded bg-gray-50 max-h-48 overflow-y-auto">`;
     for (const category in subjectsByCategory) {
         subjectsHTML += `
             <details>
                 <summary class="font-semibold cursor-pointer text-sm">${category}</summary>
                 <div class="pl-4 grid grid-cols-2 sm:grid-cols-3 gap-2 mt-2">
-                    ${subjectsByCategory[category].map(subject => `<div><label class="text-sm font-normal"><input type="checkbox" name="subjects" value="${subject}"> ${subject}</label></div>`).join('')}
+                    ${subjectsByCategory[category].map(subject => `<div><label class="text-sm font-normal"><input type="checkbox" name="${prefix}-subjects" value="${subject}"> ${subject}</label></div>`).join('')}
                 </div>
             </details>
         `;
     }
     subjectsHTML += `
-        <div class="font-semibold pt-2 border-t"><label class="text-sm"><input type="checkbox" name="subjects" value="Music"> Music</label></div>
+        <div class="font-semibold pt-2 border-t"><label class="text-sm"><input type="checkbox" name="${prefix}-subjects" value="Music"> Music</label></div>
     </div>`;
 
     return `
-        <input type="text" id="new-parent-name" class="w-full mt-1 p-2 border rounded" placeholder="Parent Name">
-        <input type="tel" id="new-parent-phone" class="w-full mt-1 p-2 border rounded" placeholder="Parent Phone Number">
-        <input type="text" id="new-student-name" class="w-full mt-1 p-2 border rounded" placeholder="Student Name">
-        <select id="new-student-grade" class="w-full mt-1 p-2 border rounded">${gradeOptions}</select>
+        <input type="text" id="${prefix}-parent-name" class="w-full mt-1 p-2 border rounded" placeholder="Parent Name">
+        <input type="tel" id="${prefix}-parent-phone" class="w-full mt-1 p-2 border rounded" placeholder="Parent Phone Number">
+        <input type="text" id="${prefix}-student-name" class="w-full mt-1 p-2 border rounded" placeholder="Student Name">
+        <select id="${prefix}-student-grade" class="w-full mt-1 p-2 border rounded">${gradeOptions}</select>
         ${subjectsHTML}
-        <select id="new-student-days" class="w-full mt-1 p-2 border rounded">
+        <select id="${prefix}-student-days" class="w-full mt-1 p-2 border rounded">
             <option value="">Select Days per Week</option>
             ${Array.from({ length: 7 }, (_, i) => `<option value="${i + 1}">${i + 1}</option>`).join('')}
         </select>
-        <div id="group-class-container" class="hidden">
+        <div id="${prefix}-group-class-container" class="hidden">
             <label class="flex items-center space-x-2 mt-2">
-                <input type="checkbox" id="new-student-group-class" class="rounded">
+                <input type="checkbox" id="${prefix}-student-group-class" class="rounded">
                 <span class="text-sm font-semibold">Group Class</span>
             </label>
         </div>
-        <select id="new-student-fee" class="w-full mt-1 p-2 border rounded">${feeOptions}</select>
+        <select id="${prefix}-student-fee" class="w-full mt-1 p-2 border rounded">${feeOptions}</select>
     `;
-}
-
-// Function to handle grade string formatting
-function cleanGradeString(grade) {
-    if (grade && grade.toLowerCase().includes("grade")) {
-        return grade;
-    } else {
-        return `Grade ${grade}`;
-    }
 }
 
 // Function to show the edit student modal
@@ -771,7 +924,7 @@ async function renderStudentDatabase(container, tutor) {
     // 1. Fetch all student types
     const studentQuery = query(collection(db, "students"), where("tutorEmail", "==", tutor.email));
     const pendingStudentQuery = query(collection(db, "pending_students"), where("tutorEmail", "==", tutor.email));
-    const transitioningStudentQuery = query(collection(db, TRANSITIONING_COLLECTION), where("tutorEmail", "==", tutor.email)); // NEW
+    const transitioningStudentQuery = query(collection(db, TRANSITIONING_COLLECTION), where("tutorEmail", "==", tutor.email));
 
     // Fetch all tutor's historical submissions for the monthly report check
     const allSubmissionsQuery = query(collection(db, "tutor_submissions"), where("tutorEmail", "==", tutor.email));
@@ -779,7 +932,7 @@ async function renderStudentDatabase(container, tutor) {
     const [studentsSnapshot, pendingStudentsSnapshot, transitioningStudentsSnapshot, allSubmissionsSnapshot] = await Promise.all([
         getDocs(studentQuery),
         getDocs(pendingStudentQuery),
-        getDocs(transitioningStudentQuery), // NEW
+        getDocs(transitioningStudentQuery), 
         getDocs(allSubmissionsQuery)
     ]);
 
@@ -800,7 +953,7 @@ async function renderStudentDatabase(container, tutor) {
     // 3. Map students and mark their type
     const approvedStudents = studentsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data(), isPending: false, isTransitioning: false, collection: "students" }));
     const pendingStudents = pendingStudentsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data(), isPending: true, isTransitioning: false, collection: "pending_students" }));
-    const transitioningStudents = transitioningStudentsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data(), isPending: false, isTransitioning: true, collection: TRANSITIONING_COLLECTION })); // NEW
+    const transitioningStudents = transitioningStudentsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data(), isPending: false, isTransitioning: true, collection: TRANSITIONING_COLLECTION })); 
 
     let students = [...approvedStudents, ...pendingStudents, ...transitioningStudents]; // MERGE ALL
 
@@ -834,28 +987,20 @@ async function renderStudentDatabase(container, tutor) {
     const regularStudentsCount = approvedStudents.length + pendingStudents.length;
 
     function renderUI() {
-        // Prepare the button HTML with the required orange styling
-        const transitioningButtonHTML = isTutorAddEnabled ? `
-            <button id="add-transitioning-student-btn" 
-                    class="bg-orange-600 border-4 border-orange-800 text-white px-4 py-2 rounded mt-3 hover:bg-orange-700 font-bold ml-2">
-                <span class="text-lg">🔄</span> Add Transitioning Student
-            </button>
-        ` : '';
-
+        // NOTE: The transitioning button is removed from this tab.
         let studentsHTML = `
             <h2 class="text-2xl font-bold text-green-700 mb-4">
                 My Students (${regularStudentsCount})
                 <span class="text-orange-600 text-xl font-bold ml-2"> + ${transitioningStudents.length} Transitioning</span>
-                ${transitioningButtonHTML}
             </h2>
         `;
         
         if (isTutorAddEnabled) {
             studentsHTML += `
                 <div class="bg-gray-100 p-4 rounded-lg shadow-inner mb-4">
-                    <h3 class="font-bold text-lg mb-2">Add a New Student</h3>
+                    <h3 class="font-bold text-lg mb-2">Add a New Regular Student</h3>
                     <div class="space-y-2">
-                        ${getNewStudentFormFields()}
+                        ${getNewStudentFormFields('new-student')}
                     </div>
                     <div class="flex flex-wrap space-x-2 mt-3">
                         <button id="add-student-btn" class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700">Add Regular Student</button>
@@ -876,6 +1021,7 @@ async function renderStudentDatabase(container, tutor) {
             
             students.forEach(student => {
                 // Determine submission status based on student type
+                // Transitioning students use 'transitionPaid' field
                 const hasSubmittedThisMonth = student.isTransitioning ? student.transitionPaid : submittedStudentIds.has(student.id);
                 const isStudentOnBreak = student.summerBreak;
                 const isReportSaved = savedReports[student.id];
@@ -883,7 +1029,7 @@ async function renderStudentDatabase(container, tutor) {
                 // Determine row/cell styling for transitioning students
                 let rowClasses = '';
                 if (student.isTransitioning) {
-                     rowClasses = 'bg-orange-50 border-4 border-orange-400'; // Thick orange color
+                     rowClasses = 'bg-orange-50 border-2 border-orange-400'; 
                 }
 
                 const feeDisplay = showStudentFees ? `<div class="text-xs text-gray-500">Fee: ₦${(student.studentFee || 0).toLocaleString()}</div>` : '';
@@ -895,12 +1041,13 @@ async function renderStudentDatabase(container, tutor) {
                 const days = student.days ? `${student.days} days/week` : 'N/A';
                 
                 if (student.isTransitioning) {
-                    // NEW: Transitioning Student Specific Logic (Show Confirm Fee instead of Enter Report)
+                    // Transitioning Student Specific Logic
                     statusHTML = `<span class="status-indicator font-semibold text-orange-600">🔄 Transitioning Student</span>`;
+                    // The action button is now in the dedicated 'Transitioning Classes' tab, here we only display status
                     if (hasSubmittedThisMonth) {
                          actionsHTML = `<span class="text-gray-400">Fee Confirmed/Paid</span>`;
                     } else {
-                         actionsHTML = `<button class="confirm-fee-btn-transitioning bg-orange-600 text-white px-3 py-1 rounded font-bold" data-student-id="${student.id}">Confirm Fee</button>`;
+                         actionsHTML = `<span class="text-orange-400 font-bold">Action Needed (See Transition Tab)</span>`;
                     }
 
                 } else if (student.isPending) {
@@ -925,7 +1072,6 @@ async function renderStudentDatabase(container, tutor) {
                         if (approvedStudents.length === 1) {
                             actionsHTML += `<button class="submit-single-report-btn bg-green-600 text-white px-3 py-1 rounded" data-student-id="${student.id}">Submit Report</button>`;
                         } else {
-                            // The original "Enter Report" button remains for regular students
                             actionsHTML += `<button class="enter-report-btn bg-green-600 text-white px-3 py-1 rounded" data-student-id="${student.id}">${isReportSaved ? 'Edit Report' : 'Enter Report'}</button>`;
                         }
                     } else if (!isStudentOnBreak) {
@@ -933,7 +1079,7 @@ async function renderStudentDatabase(container, tutor) {
                     }
                 }
                 
-                // Edit/Delete for all non-transitioning students (Transitioning students are temporary)
+                // Edit/Delete for all non-transitioning students
                 if (showEditDeleteButtons && !isStudentOnBreak && !student.isTransitioning) {
                     actionsHTML += `<button class="edit-student-btn-tutor bg-blue-500 text-white px-3 py-1 rounded" data-student-id="${student.id}" data-collection="${student.collection}">Edit</button>`;
                     actionsHTML += `<button class="delete-student-btn-tutor bg-red-500 text-white px-3 py-1 rounded" data-student-id="${student.id}" data-collection="${student.collection}">Delete</button>`;
@@ -1169,154 +1315,11 @@ async function renderStudentDatabase(container, tutor) {
         }
     }
 
-    function showCustomAlert(message) {
-        const alertModal = document.createElement('div');
-        alertModal.className = 'fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex items-center justify-center z-50';
-        alertModal.innerHTML = `
-            <div class="relative bg-white p-8 rounded-lg shadow-xl w-full max-w-md mx-auto">
-                <p class="mb-4">${message}</p>
-                <button id="alert-ok-btn" class="bg-green-600 text-white px-6 py-2 rounded float-right">OK</button>
-            </div>`;
-        document.body.appendChild(alertModal);
-        document.getElementById('alert-ok-btn').addEventListener('click', () => alertModal.remove());
-    }
-
-    // ==================================================================
-    // NEW: TRANSITIONING STUDENT MODALS & SAVE LOGIC
-    // ==================================================================
-    /**
-     * Handles the saving of a new transitioning student to the dedicated collection.
-     */
-    async function addNewTransitioningStudent(tutor, container) {
-        const parentName = document.getElementById('new-parent-name').value.trim();
-        const parentPhone = document.getElementById('new-parent-phone').value.trim();
-        const studentName = document.getElementById('new-student-name').value.trim();
-        const studentGrade = document.getElementById('new-student-grade').value.trim();
-        
-        const selectedSubjects = [];
-        document.querySelectorAll('input[name="subjects"]:checked').forEach(checkbox => {
-            selectedSubjects.push(checkbox.value);
-        });
-
-        const studentDays = document.getElementById('new-student-days').value.trim();
-        const groupClass = document.getElementById('new-student-group-class') ? document.getElementById('new-student-group-class').checked : false;
-        const studentFee = parseFloat(document.getElementById('new-student-fee').value);
-
-        if (!parentName || !studentName || !studentGrade || isNaN(studentFee) || !parentPhone || !studentDays || selectedSubjects.length === 0) {
-            showCustomAlert('Please fill in all parent and student details correctly, including at least one subject.');
-            return;
-        }
-
-        const payScheme = getTutorPayScheme(tutor);
-        const suggestedFee = calculateSuggestedFee({
-            grade: studentGrade,
-            days: studentDays,
-            subjects: selectedSubjects,
-            groupClass: groupClass
-        }, payScheme);
-
-        const studentData = {
-            parentName: parentName,
-            parentPhone: parentPhone,
-            studentName: studentName,
-            grade: studentGrade,
-            subjects: selectedSubjects,
-            days: studentDays,
-            studentFee: suggestedFee > 0 ? suggestedFee : studentFee,
-            tutorEmail: tutor.email,
-            tutorName: tutor.name,
-            isTransitioning: true, // KEY FLAG for this feature
-            createdAt: new Date() // KEY TIMESTAMP for auto-deletion
-        };
-
-        if (findSpecializedSubject(selectedSubjects)) {
-            studentData.groupClass = groupClass;
-        }
-
-        try {
-            // Save to the dedicated transitioning collection
-            await addDoc(collection(db, TRANSITIONING_COLLECTION), studentData);
-            showCustomAlert('Transitioning Student added successfully! They will be automatically removed next month.');
-            renderStudentDatabase(container, tutor);
-        } catch (error) {
-            console.error("Error adding transitioning student:", error);
-            showCustomAlert(`An error occurred: ${error.message}`);
-        }
-    }
-    
-    /**
-     * Simplified Fee Confirmation Modal for Transitioning Students (Replaces Enter Report flow)
-     */
-    function showTransitioningFeeConfirmationModal(student) {
-        const feeConfirmationHTML = `
-            <h3 class="text-xl font-bold mb-4">Confirm Fee for Transitioning Student: ${student.studentName}</h3>
-            <p class="text-sm text-orange-600 mb-4 font-bold">This is a temporary action. The student will be auto-deleted on the 1st of next month.</p>
-            <div class="space-y-4">
-                <div>
-                    <label class="block font-semibold">Current Fee (₦)</label>
-                    <input type="number" id="confirm-student-fee" class="w-full mt-1 p-2 border rounded" 
-                           value="${student.studentFee || 0}" 
-                           placeholder="Enter fee amount">
-                </div>
-                <div class="flex justify-end space-x-2 mt-6">
-                    <button id="cancel-fee-confirm-btn" class="bg-gray-500 text-white px-6 py-2 rounded">Cancel</button>
-                    <button id="confirm-fee-btn" class="bg-orange-600 text-white px-6 py-2 rounded">Confirm Fee & Mark as Paid</button>
-                </div>
-            </div>`;
-
-        const feeModal = document.createElement('div');
-        feeModal.className = 'fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex items-center justify-center z-50';
-        feeModal.innerHTML = `<div class="relative bg-white p-8 rounded-lg shadow-xl w-full max-w-lg mx-auto">${feeConfirmationHTML}</div>`;
-        document.body.appendChild(feeModal);
-
-        document.getElementById('cancel-fee-confirm-btn').addEventListener('click', () => feeModal.remove());
-        document.getElementById('confirm-fee-btn').addEventListener('click', async () => {
-            const newFeeValue = document.getElementById('confirm-student-fee').value;
-            const newFee = parseFloat(newFeeValue);
-
-            if (isNaN(newFee) || newFee < 0) {
-                showCustomAlert('Please enter a valid, non-negative fee amount.');
-                return;
-            }
-
-            try {
-                const studentRef = doc(db, student.collection, student.id);
-                const updatePayload = {};
-
-                // 1. Update the fee if it changed
-                if (newFee !== student.studentFee) {
-                   updatePayload.studentFee = newFee;
-                }
-                
-                // 2. Mark the transitioning student as paid (to prevent re-action)
-                updatePayload.transitionPaid = true;
-                updatePayload.transitionPaidAt = new Date();
-                updatePayload.transitionPaidFee = newFee;
-
-                await updateDoc(studentRef, updatePayload); 
-
-                feeModal.remove();
-                showCustomAlert(`${student.studentName}'s fee confirmed and marked as paid.`);
-                
-                // Refresh the student database view
-                const mainContent = document.getElementById('mainContent');
-                renderStudentDatabase(mainContent, window.tutorData);
-
-            } catch (error) {
-                console.error("Error confirming transitioning fee:", error);
-                showCustomAlert(`Failed to confirm fee: ${error.message}`);
-            }
-        });
-    }
-    // ==================================================================
-    // END NEW: TRANSITIONING STUDENT MODALS & SAVE LOGIC
-    // ==================================================================
-
 
     function attachEventListeners() {
         // Group class toggle functionality for new student form
         const subjectsContainer = document.getElementById('new-student-subjects-container');
-        const groupClassContainer = document.getElementById('group-class-container');
+        const groupClassContainer = document.getElementById('new-student-group-class-container');
         
         if (subjectsContainer && groupClassContainer) {
             subjectsContainer.addEventListener('change', (e) => {
@@ -1333,19 +1336,20 @@ async function renderStudentDatabase(container, tutor) {
         if (isTutorAddEnabled) {
             // Existing 'Add Regular Student' logic
             document.getElementById('add-student-btn').addEventListener('click', async () => {
-                const parentName = document.getElementById('new-parent-name').value.trim();
-                const parentPhone = document.getElementById('new-parent-phone').value.trim();
-                const studentName = document.getElementById('new-student-name').value.trim();
-                const studentGrade = document.getElementById('new-student-grade').value.trim();
+                const formPrefix = 'new-student';
+                const parentName = document.getElementById(`${formPrefix}-parent-name`).value.trim();
+                const parentPhone = document.getElementById(`${formPrefix}-parent-phone`).value.trim();
+                const studentName = document.getElementById(`${formPrefix}-student-name`).value.trim();
+                const studentGrade = document.getElementById(`${formPrefix}-student-grade`).value.trim();
                 
                 const selectedSubjects = [];
-                document.querySelectorAll('input[name="subjects"]:checked').forEach(checkbox => {
+                document.querySelectorAll(`input[name="${formPrefix}-subjects"]:checked`).forEach(checkbox => {
                     selectedSubjects.push(checkbox.value);
                 });
 
-                const studentDays = document.getElementById('new-student-days').value.trim();
-                const groupClass = document.getElementById('new-student-group-class') ? document.getElementById('new-student-group-class').checked : false;
-                const studentFee = parseFloat(document.getElementById('new-student-fee').value);
+                const studentDays = document.getElementById(`${formPrefix}-student-days`).value.trim();
+                const groupClass = document.getElementById(`${formPrefix}-student-group-class`) ? document.getElementById(`${formPrefix}-student-group-class`).checked : false;
+                const studentFee = parseFloat(document.getElementById(`${formPrefix}-student-fee`).value);
 
                 if (!parentName || !studentName || !studentGrade || isNaN(studentFee) || !parentPhone || !studentDays || selectedSubjects.length === 0) {
                     showCustomAlert('Please fill in all parent and student details correctly, including at least one subject.');
@@ -1392,15 +1396,6 @@ async function renderStudentDatabase(container, tutor) {
                     showCustomAlert(`An error occurred: ${error.message}`);
                 }
             });
-            
-            // NEW: Event Listener for Transitioning Student Button
-            const addTransitioningBtn = document.getElementById('add-transitioning-student-btn');
-            if (addTransitioningBtn) {
-                // IMPORTANT: This uses the same form fields but calls the dedicated save function
-                addTransitioningBtn.addEventListener('click', () => {
-                    addNewTransitioningStudent(tutor, container);
-                });
-            }
         }
 
         // Existing 'Enter Report' logic for regular students
@@ -1420,29 +1415,20 @@ async function renderStudentDatabase(container, tutor) {
             });
         });
 
-        // NEW: Event Listener for Confirm Fee Button (Transitioning Students)
-        document.querySelectorAll('.confirm-fee-btn-transitioning').forEach(btn => {
-            btn.addEventListener('click', () => {
+       document.querySelectorAll('.summer-break-btn').forEach(btn => {
+            btn.addEventListener('click', async () => {
                 const studentId = btn.getAttribute('data-student-id');
                 const student = students.find(s => s.id === studentId);
-                showTransitioningFeeConfirmationModal(student);
+                
+                // Add confirmation dialog
+                if (confirm(`Are you sure you want to put ${student.studentName} on summer break?`)) {
+                    const studentRef = doc(db, "students", studentId);
+                    await updateDoc(studentRef, { summerBreak: true });
+                    showCustomAlert(`${student.studentName} has been marked as on summer break.`);
+                    renderStudentDatabase(container, tutor);
+                }
             });
         });
-
-       document.querySelectorAll('.summer-break-btn').forEach(btn => {
-    btn.addEventListener('click', async () => {
-        const studentId = btn.getAttribute('data-student-id');
-        const student = students.find(s => s.id === studentId);
-        
-        // Add confirmation dialog
-        if (confirm(`Are you sure you want to put ${student.studentName} on summer break?`)) {
-            const studentRef = doc(db, "students", studentId);
-            await updateDoc(studentRef, { summerBreak: true });
-            showCustomAlert(`${student.studentName} has been marked as on summer break.`);
-            renderStudentDatabase(container, tutor);
-        }
-    });
-});
 
         const submitAllBtn = document.getElementById('submit-all-reports-btn');
         if (submitAllBtn) {
@@ -1502,7 +1488,139 @@ async function renderStudentDatabase(container, tutor) {
 }
 
 // ##################################################################
-// # SECTION 3: MAIN APP INITIALIZATION
+// # SECTION 3: TRANSITIONING CLASSES (NEW DEDICATED TAB)
+// ##################################################################
+
+async function renderTransitioningClasses(container, tutor) {
+    if (!isTutorAddEnabled) {
+        container.innerHTML = `<p class="text-red-500 p-6">Student addition is currently disabled by the administrator.</p>`;
+        return;
+    }
+    
+    // 1. Fetch all current transitioning students
+    const transitioningStudentQuery = query(collection(db, TRANSITIONING_COLLECTION), where("tutorEmail", "==", tutor.email));
+    const transitioningStudentsSnapshot = await getDocs(transitioningStudentQuery);
+    const transitioningStudents = transitioningStudentsSnapshot.docs.map(doc => ({ 
+        id: doc.id, 
+        ...doc.data(), 
+        isTransitioning: true, 
+        collection: TRANSITIONING_COLLECTION 
+    }));
+    
+    const formPrefix = 'transition-form';
+
+    // 2. Build the UI
+    let studentsListHTML = '';
+    if (transitioningStudents.length === 0) {
+        studentsListHTML = `<p class="text-gray-500 italic mt-4">No transitioning students are currently awaiting fee confirmation.</p>`;
+    } else {
+        studentsListHTML = `
+            <div class="overflow-x-auto mt-4">
+                <table class="min-w-full divide-y divide-orange-200">
+                    <thead>
+                        <tr>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-orange-700 uppercase">Student Name</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-orange-700 uppercase">Fee Status</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-orange-700 uppercase">Action</th>
+                        </tr>
+                    </thead>
+                    <tbody class="bg-white divide-y divide-orange-200">
+        `;
+        transitioningStudents.forEach(student => {
+            const isPaid = student.transitionPaid;
+            const status = isPaid ? '✅ Paid' : '⏳ Action Required';
+            const feeDisplay = `₦${(student.studentFee || 0).toLocaleString()}`;
+            
+            studentsListHTML += `
+                <tr class="bg-orange-50">
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <div class="font-medium text-gray-900">${student.studentName} (${cleanGradeString(student.grade)})</div>
+                        <div class="text-xs text-gray-500">${student.parentName} | Fee: ${feeDisplay}</div>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${isPaid ? 'bg-green-100 text-green-800' : 'bg-orange-100 text-orange-800'}">
+                            ${status}
+                        </span>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        ${isPaid ? 
+                            `<span class="text-gray-500">Completed</span>` :
+                            `<button class="confirm-fee-btn-transitioning bg-orange-600 text-white px-3 py-1 rounded font-bold" data-student-id="${student.id}">Confirm Fee</button>`
+                        }
+                    </td>
+                </tr>
+            `;
+        });
+        studentsListHTML += `</tbody></table></div>`;
+    }
+
+    // 3. Render the page structure
+    container.innerHTML = `
+        <div id="transitioning-classes-view" class="bg-white p-6 rounded-lg shadow-md">
+            <h2 class="text-2xl font-bold text-orange-700 mb-4">
+                🔄 Transitioning Classes: Temporary Registration
+            </h2>
+            <p class="text-sm text-gray-600 mb-6">
+                Use this tab to quickly register temporary students. They will be auto-deleted at the start of the next month.
+                After registration, **click 'Confirm Fee'** to finalize the temporary enrollment.
+            </p>
+
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div class="bg-orange-50 p-4 rounded-lg shadow-inner border-2 border-orange-200">
+                    <h3 class="font-bold text-lg mb-2 text-orange-900">1. Register Temporary Student</h3>
+                    <div class="space-y-2">
+                        ${getNewStudentFormFields(formPrefix)}
+                    </div>
+                    <div class="flex flex-wrap space-x-2 mt-3">
+                        <button id="add-transitioning-student-btn" class="bg-orange-600 border-4 border-orange-800 text-white px-4 py-2 rounded mt-3 hover:bg-orange-700 font-bold">
+                            <span class="text-lg">➕</span> Register Transitioning Student
+                        </button>
+                    </div>
+                </div>
+
+                <div class="bg-white p-4 rounded-lg shadow border-2 border-orange-500">
+                    <h3 class="font-bold text-lg mb-2 text-orange-900">2. Fee Confirmation Area</h3>
+                    ${studentsListHTML}
+                </div>
+            </div>
+        </div>
+    `;
+
+    // 4. Attach Event Listeners
+
+    // Group class toggle for the new form
+    const subjectsContainer = document.getElementById(`${formPrefix}-subjects-container`);
+    const groupClassContainer = document.getElementById(`${formPrefix}-group-class-container`);
+    
+    if (subjectsContainer && groupClassContainer) {
+        subjectsContainer.addEventListener('change', (e) => {
+            if (e.target.type === 'checkbox' && e.target.checked) {
+                const subject = e.target.value;
+                const hasSpecializedSubject = findSpecializedSubject([subject]);
+                if (hasSpecializedSubject) {
+                    groupClassContainer.classList.remove('hidden');
+                }
+            }
+        });
+    }
+
+    // New Registration Button logic
+    document.getElementById('add-transitioning-student-btn').addEventListener('click', () => {
+        addNewTransitioningStudent(tutor, container, formPrefix);
+    });
+
+    // Confirmation Button logic
+    document.querySelectorAll('.confirm-fee-btn-transitioning').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const studentId = btn.getAttribute('data-student-id');
+            const student = transitioningStudents.find(s => s.id === studentId);
+            showTransitioningFeeConfirmationModal(student, container, tutor);
+        });
+    });
+}
+
+// ##################################################################
+// # SECTION 4: MAIN APP INITIALIZATION
 // ##################################################################
 document.addEventListener('DOMContentLoaded', async () => {
     onAuthStateChanged(auth, async (user) => {
@@ -1551,10 +1669,14 @@ document.addEventListener('DOMContentLoaded', async () => {
             renderStudentDatabase(document.getElementById('mainContent'), window.tutorData);
         }
     });
+    
+    // NEW: Transitioning Classes Navigation
+    document.getElementById('navTransitioningClasses').addEventListener('click', () => {
+        if (window.tutorData) {
+            renderTransitioningClasses(document.getElementById('mainContent'), window.tutorData);
+        }
+    });
 
-    // ##################################################################
-    // # SECTION 4: AUTO-REGISTERED STUDENTS NAVIGATION (NEW - ADDED AT BOTTOM)
-    // ##################################################################
     document.getElementById('navAutoStudents').addEventListener('click', () => {
         if (window.tutorData) {
             renderAutoRegisteredStudents(document.getElementById('mainContent'), window.tutorData);
@@ -1563,7 +1685,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 });
 
 // ##################################################################
-// # SECTION 5: AUTO-REGISTERED STUDENTS DISPLAY (NEW - ADDED AT BOTTOM)
+// # SECTION 5: AUTO-REGISTERED STUDENTS DISPLAY 
 // ##################################################################
 
 function renderAutoRegisteredStudents(container, tutor) {
