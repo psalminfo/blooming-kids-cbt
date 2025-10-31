@@ -12,10 +12,6 @@ let isBypassApprovalEnabled = false;
 let showStudentFees = false;
 let showEditDeleteButtons = false;
 
-// --- New Collection Name for Transitioning Students ---
-const TRANSITIONING_COLLECTION = "transitioning_students";
-const LOCAL_CLEANUP_KEY = "lastTransitioningCleanup";
-
 // --- Pay Scheme Configuration ---
 const PAY_SCHEMES = {
     NEW_TUTOR: {
@@ -145,18 +141,61 @@ function clearAllReportsFromLocalStorage(tutorEmail) {
     }
 }
 
-// --- Utility Functions ---
+// --- Employment Date Functions ---
+function shouldShowEmploymentPopup(tutor) {
+    // Don't show if already has employment date
+    if (tutor.employmentDate) return false;
+    
+    // Show on first login each month until they provide it
+    const lastPopupShown = localStorage.getItem(`employmentPopup_${tutor.email}`);
+    const currentMonth = new Date().toISOString().slice(0, 7); // YYYY-MM
+    
+    return !lastPopupShown || lastPopupShown !== currentMonth;
+}
 
-function showCustomAlert(message) {
-    const alertModal = document.createElement('div');
-    alertModal.className = 'fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex items-center justify-center z-50';
-    alertModal.innerHTML = `
-        <div class="relative bg-white p-8 rounded-lg shadow-xl w-full max-w-md mx-auto">
-            <p class="mb-4">${message}</p>
-            <button id="alert-ok-btn" class="bg-green-600 text-white px-6 py-2 rounded float-right">OK</button>
-        </div>`;
-    document.body.appendChild(alertModal);
-    document.getElementById('alert-ok-btn').addEventListener('click', () => alertModal.remove());
+function showEmploymentDatePopup(tutor) {
+    const popupHTML = `
+        <div class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex items-center justify-center z-50">
+            <div class="relative bg-white p-8 rounded-lg shadow-xl w-full max-w-md mx-auto">
+                <h3 class="text-xl font-bold mb-4">Employment Information</h3>
+                <p class="text-sm text-gray-600 mb-4">Please provide your employment start date to help us calculate your payments accurately.</p>
+                <div class="space-y-4">
+                    <div>
+                        <label class="block font-semibold">Month & Year of Employment</label>
+                        <input type="month" id="employment-date" class="w-full mt-1 p-2 border rounded" 
+                               max="${new Date().toISOString().slice(0, 7)}">
+                    </div>
+                    <div class="flex justify-end space-x-2 mt-6">
+                        <button id="save-employment-btn" class="bg-green-600 text-white px-6 py-2 rounded">Save</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    const popup = document.createElement('div');
+    popup.innerHTML = popupHTML;
+    document.body.appendChild(popup);
+
+    document.getElementById('save-employment-btn').addEventListener('click', async () => {
+        const employmentDate = document.getElementById('employment-date').value;
+        if (!employmentDate) {
+            showCustomAlert('Please select your employment month and year.');
+            return;
+        }
+
+        try {
+            const tutorRef = doc(db, "tutors", tutor.id);
+            await updateDoc(tutorRef, { employmentDate: employmentDate });
+            localStorage.setItem(`employmentPopup_${tutor.email}`, new Date().toISOString().slice(0, 7));
+            popup.remove();
+            showCustomAlert('Employment date saved successfully!');
+            window.tutorData.employmentDate = employmentDate;
+        } catch (error) {
+            console.error("Error saving employment date:", error);
+            showCustomAlert('Error saving employment date. Please try again.');
+        }
+    });
 }
 
 function getTutorPayScheme(tutor) {
@@ -216,75 +255,10 @@ function findSpecializedSubject(subjects) {
     return null;
 }
 
+// Function to get current month for reports
 function getCurrentMonthYear() {
     const now = new Date();
     return now.toLocaleString('default', { month: 'long', year: 'numeric' });
-}
-
-// Function to handle grade string formatting
-function cleanGradeString(grade) {
-    if (grade && grade.toLowerCase().includes("grade")) {
-        return grade;
-    } else {
-        return `Grade ${grade}`;
-    }
-}
-
-// --- Employment Date Functions ---
-function shouldShowEmploymentPopup(tutor) {
-    // Don't show if already has employment date
-    if (tutor.employmentDate) return false;
-    
-    // Show on first login each month until they provide it
-    const lastPopupShown = localStorage.getItem(`employmentPopup_${tutor.email}`);
-    const currentMonth = new Date().toISOString().slice(0, 7); // YYYY-MM
-    
-    return !lastPopupShown || lastPopupShown !== currentMonth;
-}
-
-function showEmploymentDatePopup(tutor) {
-    const popupHTML = `
-        <div class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex items-center justify-center z-50">
-            <div class="relative bg-white p-8 rounded-lg shadow-xl w-full max-w-md mx-auto">
-                <h3 class="text-xl font-bold mb-4">Employment Information</h3>
-                <p class="text-sm text-gray-600 mb-4">Please provide your employment start date to help us calculate your payments accurately.</p>
-                <div class="space-y-4">
-                    <div>
-                        <label class="block font-semibold">Month & Year of Employment</label>
-                        <input type="month" id="employment-date" class="w-full mt-1 p-2 border rounded" 
-                               max="${new Date().toISOString().slice(0, 7)}">
-                    </div>
-                    <div class="flex justify-end space-x-2 mt-6">
-                        <button id="save-employment-btn" class="bg-green-600 text-white px-6 py-2 rounded">Save</button>
-                    </div>
-                </div>
-            </div>
-        </div>
-    `;
-    
-    const popup = document.createElement('div');
-    popup.innerHTML = popupHTML;
-    document.body.appendChild(popup);
-
-    document.getElementById('save-employment-btn').addEventListener('click', async () => {
-        const employmentDate = document.getElementById('employment-date').value;
-        if (!employmentDate) {
-            showCustomAlert('Please select your employment month and year.');
-            return;
-        }
-
-        try {
-            const tutorRef = doc(db, "tutors", tutor.id);
-            await updateDoc(tutorRef, { employmentDate: employmentDate });
-            localStorage.setItem(`employmentPopup_${tutor.email}`, new Date().toISOString().slice(0, 7));
-            popup.remove();
-            showCustomAlert('Employment date saved successfully!');
-            window.tutorData.employmentDate = employmentDate;
-        } catch (error) {
-            console.error("Error saving employment date:", error);
-            showCustomAlert('Error saving employment date. Please try again.');
-        }
-    });
 }
 
 // Listen for changes to the admin settings in real-time
@@ -296,7 +270,7 @@ onSnapshot(settingsDocRef, (docSnap) => {
         isTutorAddEnabled = data.isTutorAddEnabled;
         isSummerBreakEnabled = data.isSummerBreakEnabled;
         isBypassApprovalEnabled = data.bypassPendingApproval;
-        // NEW: Update the new admin settings
+        // NEW: Update the new global settings
         showStudentFees = data.showStudentFees;
         showEditDeleteButtons = data.showEditDeleteButtons;
 
@@ -336,7 +310,7 @@ function renderTutorDashboard(container, tutor) {
     loadTutorReports(tutor.email);
 }
 
-// Function to sync creative writing comments to student_results
+// NEW: Function to sync creative writing comments to student_results
 async function syncCreativeWritingToStudentResults(submissionData, tutorReport) {
     try {
         console.log("Syncing creative writing comments to student_results...");
@@ -478,211 +452,13 @@ async function loadTutorReports(tutorEmail, parentName = null) {
     }
 }
 
-// ==================================================================
-// TRANSITIONING STUDENT CORE LOGIC (UPDATED FOR APPROVAL WORKFLOW)
-// ==================================================================
-
-/**
- * Handles the saving of a new transitioning student to pending_approval collection
- */
-async function addNewTransitioningStudent(tutor, container, formPrefix) {
-    const parentName = document.getElementById(`${formPrefix}-parent-name`).value.trim();
-    const parentPhone = document.getElementById(`${formPrefix}-parent-phone`).value.trim();
-    const studentName = document.getElementById(`${formPrefix}-student-name`).value.trim();
-    const studentGrade = document.getElementById(`${formPrefix}-student-grade`).value.trim();
-    
-    const selectedSubjects = [];
-    document.querySelectorAll(`input[name="${formPrefix}-subjects"]:checked`).forEach(checkbox => {
-        selectedSubjects.push(checkbox.value);
-    });
-
-    const studentDays = document.getElementById(`${formPrefix}-student-days`).value.trim();
-    const groupClass = document.getElementById(`${formPrefix}-student-group-class`) ? document.getElementById(`${formPrefix}-student-group-class`).checked : false;
-    const studentFee = parseFloat(document.getElementById(`${formPrefix}-student-fee`).value);
-
-    if (!parentName || !studentName || !studentGrade || isNaN(studentFee) || !parentPhone || !studentDays || selectedSubjects.length === 0) {
-        showCustomAlert('Please fill in all parent and student details correctly, including at least one subject.');
-        return;
-    }
-
-    const payScheme = getTutorPayScheme(tutor);
-    const suggestedFee = calculateSuggestedFee({
-        grade: studentGrade,
-        days: studentDays,
-        subjects: selectedSubjects,
-        groupClass: groupClass
-    }, payScheme);
-
-    const studentData = {
-        parentName: parentName,
-        parentPhone: parentPhone,
-        studentName: studentName,
-        grade: studentGrade,
-        subjects: selectedSubjects,
-        days: studentDays,
-        studentFee: suggestedFee > 0 ? suggestedFee : studentFee,
-        tutorEmail: tutor.email,
-        tutorName: tutor.name,
-        isTransitioning: true, // KEY FLAG for this feature
-        createdAt: new Date() // KEY TIMESTAMP for auto-deletion
-    };
-
-    if (findSpecializedSubject(selectedSubjects)) {
-        studentData.groupClass = groupClass;
-    }
-
-    try {
-        // Save to pending_approval collection first (like regular students)
-        await addDoc(collection(db, "pending_students"), studentData);
-        showCustomAlert('Transitioning Student added successfully and is pending approval!');
-        
-        // Refresh the current view
-        if (container.id === 'mainContent' && container.querySelector('#transitioning-classes-view')) {
-             renderTransitioningClasses(container, tutor);
-        } else {
-             // If somehow called from elsewhere, refresh the main view as fallback
-             renderStudentDatabase(container, tutor);
-        }
-       
-    } catch (error) {
-        console.error("Error adding transitioning student:", error);
-        showCustomAlert(`An error occurred: ${error.message}`);
-    }
-}
-
-/**
- * Simplified Fee Confirmation Modal for Approved Transitioning Students
- */
-function showTransitioningFeeConfirmationModal(student, container, tutor) {
-    const feeConfirmationHTML = `
-        <h3 class="text-xl font-bold mb-4">Confirm Fee for Transitioning Student: ${student.studentName}</h3>
-        <p class="text-sm text-orange-600 mb-4 font-bold">This confirms payment for the temporary period. The student will be auto-deleted on the 1st of next month.</p>
-        <div class="space-y-4">
-            <div>
-                <label class="block font-semibold">Current Fee (₦)</label>
-                <input type="number" id="confirm-student-fee" class="w-full mt-1 p-2 border rounded" 
-                       value="${student.studentFee || 0}" 
-                       placeholder="Enter fee amount">
-            </div>
-            <div class="flex justify-end space-x-2 mt-6">
-                <button id="cancel-fee-confirm-btn" class="bg-gray-500 text-white px-6 py-2 rounded">Cancel</button>
-                <button id="confirm-fee-btn" class="bg-orange-600 text-white px-6 py-2 rounded">Confirm Fee & Mark as Paid</button>
-            </div>
-        </div>`;
-
-    const feeModal = document.createElement('div');
-    feeModal.className = 'fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex items-center justify-center z-50';
-    feeModal.innerHTML = `<div class="relative bg-white p-8 rounded-lg shadow-xl w-full max-w-lg mx-auto">${feeConfirmationHTML}</div>`;
-    document.body.appendChild(feeModal);
-
-    document.getElementById('cancel-fee-confirm-btn').addEventListener('click', () => feeModal.remove());
-    document.getElementById('confirm-fee-btn').addEventListener('click', async () => {
-        const newFeeValue = document.getElementById('confirm-student-fee').value;
-        const newFee = parseFloat(newFeeValue);
-
-        if (isNaN(newFee) || newFee < 0) {
-            showCustomAlert('Please enter a valid, non-negative fee amount.');
-            return;
-        }
-
-        try {
-            const studentRef = doc(db, student.collection, student.id);
-            const updatePayload = {};
-
-            // 1. Update the fee if it changed
-            if (newFee !== student.studentFee) {
-               updatePayload.studentFee = newFee;
-            }
-            
-            // 2. Mark the transitioning student as paid (to prevent re-action)
-            updatePayload.transitionPaid = true;
-            updatePayload.transitionPaidAt = new Date();
-            updatePayload.transitionPaidFee = newFee;
-
-            await updateDoc(studentRef, updatePayload); 
-
-            feeModal.remove();
-            showCustomAlert(`${student.studentName}'s fee confirmed and marked as paid. This will be included in your pay advice.`);
-            
-            // Refresh the view
-            if (container.id === 'mainContent' && container.querySelector('#transitioning-classes-view')) {
-                 renderTransitioningClasses(container, tutor);
-            } else {
-                 renderStudentDatabase(container, tutor);
-            }
-
-        } catch (error) {
-            console.error("Error confirming transitioning fee:", error);
-            showCustomAlert(`Failed to confirm fee: ${error.message}`);
-        }
-    });
-}
-
-/**
- * Runs cleanup for transitioning students created in a previous month.
- */
-async function runTransitioningStudentCleanup(tutorEmail) {
-    const lastCleanupDate = localStorage.getItem(LOCAL_CLEANUP_KEY);
-    const now = new Date();
-    const currentMonthYear = now.toISOString().slice(0, 7); // YYYY-MM
-    
-    // Check if cleanup already ran this month/year
-    if (lastCleanupDate === currentMonthYear) {
-        return;
-    }
-
-    try {
-        const q = query(collection(db, TRANSITIONING_COLLECTION), 
-                        where("tutorEmail", "==", tutorEmail));
-        const snapshot = await getDocs(q);
-        
-        const batch = writeBatch(db);
-        let deletedCount = 0;
-        
-        snapshot.forEach(docSnap => {
-            const student = docSnap.data();
-            // Check if createdAt exists and is a Firestore Timestamp
-            if (student.createdAt && typeof student.createdAt.toDate === 'function') {
-                const createdAt = student.createdAt.toDate();
-                const createdMonthYear = createdAt.toISOString().slice(0, 7);
-            
-                // Delete if the student was created in a previous month (i.e., createdMonthYear < currentMonthYear)
-                if (createdMonthYear < currentMonthYear) {
-                    batch.delete(doc(db, TRANSITIONING_COLLECTION, docSnap.id));
-                    deletedCount++;
-                }
-            } else {
-                 // Safety net for records without createdAt or bad format: delete if old
-                 if (now.getDate() > 1) { 
-                    batch.delete(doc(db, TRANSITIONING_COLLECTION, docSnap.id));
-                    deletedCount++;
-                 }
-            }
-        });
-
-        if (deletedCount > 0) {
-            await batch.commit();
-            console.log(`Successfully deleted ${deletedCount} expired transitioning student(s).`);
-        }
-        
-        // Update local storage key only if we successfully checked/ran the logic
-        localStorage.setItem(LOCAL_CLEANUP_KEY, currentMonthYear);
-    } catch (error) {
-        console.error("Error during transitioning student cleanup:", error);
-    }
-}
-// ==================================================================
-// END TRANSITIONING STUDENT CORE LOGIC
-// ==================================================================
-
 
 // ##################################################################
 // # SECTION 2: STUDENT DATABASE (MERGED FUNCTIONALITY)
 // ##################################################################
 
 // Helper function to generate the new student form fields
-// NOTE: Takes an optional prefix to ensure unique IDs when reused
-function getNewStudentFormFields(prefix = 'new-student') {
+function getNewStudentFormFields() {
     // Generate Grade Options
     const gradeOptions = `
         <option value="">Select Grade</option>
@@ -709,39 +485,48 @@ function getNewStudentFormFields(prefix = 'new-student') {
         "Support Programs": ["Bible study", "Counseling Programs", "Speech therapy", "Behavioral therapy", "Public speaking", "Adult education", "Communication skills", "English Proficiency"]
     };
 
-    let subjectsHTML = `<h4 class="font-semibold text-gray-700 mt-2">Subjects</h4><div id="${prefix}-subjects-container" class="space-y-2 border p-3 rounded bg-gray-50 max-h-48 overflow-y-auto">`;
+    let subjectsHTML = `<h4 class="font-semibold text-gray-700 mt-2">Subjects</h4><div id="new-student-subjects-container" class="space-y-2 border p-3 rounded bg-gray-50 max-h-48 overflow-y-auto">`;
     for (const category in subjectsByCategory) {
         subjectsHTML += `
             <details>
                 <summary class="font-semibold cursor-pointer text-sm">${category}</summary>
                 <div class="pl-4 grid grid-cols-2 sm:grid-cols-3 gap-2 mt-2">
-                    ${subjectsByCategory[category].map(subject => `<div><label class="text-sm font-normal"><input type="checkbox" name="${prefix}-subjects" value="${subject}"> ${subject}</label></div>`).join('')}
+                    ${subjectsByCategory[category].map(subject => `<div><label class="text-sm font-normal"><input type="checkbox" name="subjects" value="${subject}"> ${subject}</label></div>`).join('')}
                 </div>
             </details>
         `;
     }
     subjectsHTML += `
-        <div class="font-semibold pt-2 border-t"><label class="text-sm"><input type="checkbox" name="${prefix}-subjects" value="Music"> Music</label></div>
+        <div class="font-semibold pt-2 border-t"><label class="text-sm"><input type="checkbox" name="subjects" value="Music"> Music</label></div>
     </div>`;
 
     return `
-        <input type="text" id="${prefix}-parent-name" class="w-full mt-1 p-2 border rounded" placeholder="Parent Name">
-        <input type="tel" id="${prefix}-parent-phone" class="w-full mt-1 p-2 border rounded" placeholder="Parent Phone Number">
-        <input type="text" id="${prefix}-student-name" class="w-full mt-1 p-2 border rounded" placeholder="Student Name">
-        <select id="${prefix}-student-grade" class="w-full mt-1 p-2 border rounded">${gradeOptions}</select>
+        <input type="text" id="new-parent-name" class="w-full mt-1 p-2 border rounded" placeholder="Parent Name">
+        <input type="tel" id="new-parent-phone" class="w-full mt-1 p-2 border rounded" placeholder="Parent Phone Number">
+        <input type="text" id="new-student-name" class="w-full mt-1 p-2 border rounded" placeholder="Student Name">
+        <select id="new-student-grade" class="w-full mt-1 p-2 border rounded">${gradeOptions}</select>
         ${subjectsHTML}
-        <select id="${prefix}-student-days" class="w-full mt-1 p-2 border rounded">
+        <select id="new-student-days" class="w-full mt-1 p-2 border rounded">
             <option value="">Select Days per Week</option>
             ${Array.from({ length: 7 }, (_, i) => `<option value="${i + 1}">${i + 1}</option>`).join('')}
         </select>
-        <div id="${prefix}-group-class-container" class="hidden">
+        <div id="group-class-container" class="hidden">
             <label class="flex items-center space-x-2 mt-2">
-                <input type="checkbox" id="${prefix}-student-group-class" class="rounded">
+                <input type="checkbox" id="new-student-group-class" class="rounded">
                 <span class="text-sm font-semibold">Group Class</span>
             </label>
         </div>
-        <select id="${prefix}-student-fee" class="w-full mt-1 p-2 border rounded">${feeOptions}</select>
+        <select id="new-student-fee" class="w-full mt-1 p-2 border rounded">${feeOptions}</select>
     `;
+}
+
+// Function to handle grade string formatting
+function cleanGradeString(grade) {
+    if (grade && grade.toLowerCase().includes("grade")) {
+        return grade;
+    } else {
+        return `Grade ${grade}`;
+    }
 }
 
 // Function to show the edit student modal
@@ -906,9 +691,6 @@ function showEditStudentModal(student) {
     });
 }
 
-/**
- * Renders the full student database view, including all student types.
- */
 async function renderStudentDatabase(container, tutor) {
     if (!container) {
         console.error("Container element not found.");
@@ -917,22 +699,21 @@ async function renderStudentDatabase(container, tutor) {
 
     let savedReports = loadReportsFromLocalStorage(tutor.email);
 
-    // 1. Fetch all student types
+    // Fetch students and all of the tutor's historical submissions
     const studentQuery = query(collection(db, "students"), where("tutorEmail", "==", tutor.email));
     const pendingStudentQuery = query(collection(db, "pending_students"), where("tutorEmail", "==", tutor.email));
-    const transitioningStudentQuery = query(collection(db, TRANSITIONING_COLLECTION), where("tutorEmail", "==", tutor.email));
-
-    // Fetch all tutor's historical submissions for the monthly report check (FOR REGULAR STUDENTS ONLY)
+    
+    // --- START: MODIFICATION (NO INDEX REQUIRED) ---
+    // This simple query only filters by one field and does NOT require a custom index.
     const allSubmissionsQuery = query(collection(db, "tutor_submissions"), where("tutorEmail", "==", tutor.email));
 
-    const [studentsSnapshot, pendingStudentsSnapshot, transitioningStudentsSnapshot, allSubmissionsSnapshot] = await Promise.all([
+    const [studentsSnapshot, pendingStudentsSnapshot, allSubmissionsSnapshot] = await Promise.all([
         getDocs(studentQuery),
         getDocs(pendingStudentQuery),
-        getDocs(transitioningStudentQuery), 
         getDocs(allSubmissionsQuery)
     ]);
 
-    // 2. Determine submitted students for the current month (REGULAR STUDENTS ONLY)
+    // Now, filter the submissions for the current month here in the code
     const now = new Date();
     const currentMonth = now.getMonth();
     const currentYear = now.getFullYear();
@@ -940,28 +721,19 @@ async function renderStudentDatabase(container, tutor) {
 
     allSubmissionsSnapshot.forEach(doc => {
         const submissionData = doc.data();
-        const submissionDate = submissionData.submittedAt.toDate(); 
+        const submissionDate = submissionData.submittedAt.toDate(); // Convert Firestore Timestamp to JS Date
         if (submissionDate.getMonth() === currentMonth && submissionDate.getFullYear() === currentYear) {
             submittedStudentIds.add(submissionData.studentId);
         }
     });
+    // --- END: MODIFICATION (NO INDEX REQUIRED) ---
 
-    // 3. Map students and mark their type
-    const approvedStudents = studentsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data(), isPending: false, isTransitioning: false, collection: "students" }));
-    const pendingStudents = pendingStudentsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data(), isPending: true, isTransitioning: false, collection: "pending_students" }));
-    const transitioningStudents = transitioningStudentsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data(), isPending: false, isTransitioning: true, collection: TRANSITIONING_COLLECTION })); 
+    const approvedStudents = studentsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data(), isPending: false, collection: "students" }));
+    const pendingStudents = pendingStudentsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data(), isPending: true, collection: "pending_students" }));
 
-    let students = [...approvedStudents, ...pendingStudents, ...transitioningStudents]; // MERGE ALL
+    let students = [...approvedStudents, ...pendingStudents];
 
-    // 4. Count ALL transitioning students (both pending and approved)
-    const pendingTransitioningQuery = query(collection(db, "pending_students"), 
-        where("tutorEmail", "==", tutor.email),
-        where("isTransitioning", "==", true));
-    const pendingTransitioningSnapshot = await getDocs(pendingTransitioningQuery);
-    const pendingTransitioningCount = pendingTransitioningSnapshot.size;
-    const totalTransitioningCount = transitioningStudents.length + pendingTransitioningCount;
-
-    // 5. Duplicate Student Cleanup 
+    // Duplicate Student Cleanup
     const seenStudents = new Set();
     const duplicatesToDelete = [];
     students = students.filter(student => {
@@ -978,36 +750,22 @@ async function renderStudentDatabase(container, tutor) {
         duplicatesToDelete.forEach(dup => {
             batch.delete(doc(db, dup.collection, dup.id));
         });
-        try {
-             await batch.commit();
-             console.log(`Cleaned up ${duplicatesToDelete.length} duplicate student entries.`);
-        } catch (error) {
-            console.error("Error cleaning up duplicates:", error);
-        }
-       
+        await batch.commit();
+        console.log(`Cleaned up ${duplicatesToDelete.length} duplicate student entries.`);
     }
 
     const studentsCount = students.length;
-    const regularStudentsCount = approvedStudents.length + pendingStudents.length;
 
     function renderUI() {
-        let studentsHTML = `
-            <h2 class="text-2xl font-bold text-green-700 mb-4">
-                My Students (${regularStudentsCount})
-                <span class="text-orange-600 text-xl font-bold ml-2"> + ${totalTransitioningCount} Transitioning</span>
-            </h2>
-        `;
-        
+        let studentsHTML = `<h2 class="text-2xl font-bold text-green-700 mb-4">My Students (${studentsCount})</h2>`;
         if (isTutorAddEnabled) {
             studentsHTML += `
                 <div class="bg-gray-100 p-4 rounded-lg shadow-inner mb-4">
-                    <h3 class="font-bold text-lg mb-2">Add a New Regular Student</h3>
+                    <h3 class="font-bold text-lg mb-2">Add a New Student</h3>
                     <div class="space-y-2">
-                        ${getNewStudentFormFields('new-student')}
+                        ${getNewStudentFormFields()}
                     </div>
-                    <div class="flex flex-wrap space-x-2 mt-3">
-                        <button id="add-student-btn" class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700">Add Regular Student</button>
-                    </div>
+                    <button id="add-student-btn" class="bg-green-600 text-white px-4 py-2 rounded mt-3 hover:bg-green-700">Add Student</button>
                 </div>`;
         }
         
@@ -1022,81 +780,52 @@ async function renderStudentDatabase(container, tutor) {
                         <thead><tr><th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Student Name</th><th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th><th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th></tr></thead>
                         <tbody class="bg-white divide-y divide-gray-200">`;
             
-            // SEPARATE LOGIC PATHS FOR EACH STUDENT TYPE
             students.forEach(student => {
-                let rowClasses = '';
+                const hasSubmittedThisMonth = submittedStudentIds.has(student.id);
+                const isStudentOnBreak = student.summerBreak;
+                const isReportSaved = savedReports[student.id];
+
+                const feeDisplay = showStudentFees ? `<div class="text-xs text-gray-500">Fee: ₦${(student.studentFee || 0).toLocaleString()}</div>` : '';
+                
                 let statusHTML = '';
                 let actionsHTML = '';
                 
                 const subjects = student.subjects ? student.subjects.join(', ') : 'N/A';
                 const days = student.days ? `${student.days} days/week` : 'N/A';
-                const feeDisplay = showStudentFees ? `<div class="text-xs text-gray-500">Fee: ₦${(student.studentFee || 0).toLocaleString()}</div>` : '';
 
-                // =============================================
-                // TRANSITIONING STUDENTS - COMPLETELY SEPARATE
-                // =============================================
-                if (student.isTransitioning) {
-                    rowClasses = 'bg-orange-50 border-l-4 border-orange-500'; 
-                    
-                    // TRANSITIONING-ONLY LOGIC - NO REPORT CHECKS
-                    if (student.transitionPaid) {
-                        statusHTML = `<span class="status-indicator font-semibold text-green-600">✅ Fee Confirmed</span>`;
-                        actionsHTML = `<span class="text-green-600 font-semibold">Completed</span>`;
-                    } else {
-                        statusHTML = `<span class="status-indicator font-semibold text-orange-600">🔄 Confirm Fee Required</span>`;
-                        actionsHTML = `<button class="confirm-fee-btn bg-orange-600 text-white px-3 py-1 rounded font-bold" data-student-id="${student.id}" data-collection="${student.collection}">Confirm Fee</button>`;
-                    }
-                } 
-                // =============================================
-                // PENDING STUDENTS - SEPARATE PATH
-                // =============================================
-                else if (student.isPending) {
+                if (student.isPending) {
                     statusHTML = `<span class="status-indicator text-yellow-600 font-semibold">Awaiting Approval</span>`;
                     actionsHTML = `<span class="text-gray-400">No actions available</span>`;
-                } 
-                // =============================================
-                // REGULAR APPROVED STUDENTS - REPORT LOGIC ONLY
-                // =============================================
-                else {
-                    const hasSubmittedThisMonth = submittedStudentIds.has(student.id);
-                    const isStudentOnBreak = student.summerBreak;
-                    const isReportSaved = savedReports[student.id];
+                } else if (hasSubmittedThisMonth) {
+                    statusHTML = `<span class="status-indicator text-blue-600 font-semibold">Report Sent</span>`;
+                    actionsHTML = `<span class="text-gray-400">Submitted this month</span>`;
+                } else {
+                    statusHTML = `<span class="status-indicator ${isReportSaved ? 'text-green-600 font-semibold' : 'text-gray-500'}">${isReportSaved ? 'Report Saved' : 'Pending Report'}</span>`;
 
-                    if (hasSubmittedThisMonth) {
-                        statusHTML = `<span class="status-indicator text-blue-600 font-semibold">Report Sent</span>`;
-                        actionsHTML = `<span class="text-gray-400">Submitted this month</span>`;
-                    } else {
-                        statusHTML = `<span class="status-indicator ${isReportSaved ? 'text-green-600 font-semibold' : 'text-gray-500'}">${isReportSaved ? 'Report Saved' : 'Pending Report'}</span>`;
-
-                        if (isSummerBreakEnabled && !isStudentOnBreak) {
-                            actionsHTML += `<button class="summer-break-btn bg-yellow-500 text-white px-3 py-1 rounded" data-student-id="${student.id}">Summer Break</button>`;
-                        } else if (isStudentOnBreak) {
-                            actionsHTML += `<span class="text-gray-400">On Break</span>`;
-                        }
-
-                        if (isSubmissionEnabled && !isStudentOnBreak) {
-                            if (approvedStudents.length === 1) {
-                                actionsHTML += `<button class="submit-single-report-btn bg-green-600 text-white px-3 py-1 rounded" data-student-id="${student.id}">Submit Report</button>`;
-                            } else {
-                                actionsHTML += `<button class="enter-report-btn bg-green-600 text-white px-3 py-1 rounded" data-student-id="${student.id}">${isReportSaved ? 'Edit Report' : 'Enter Report'}</button>`;
-                            }
-                        } else if (!isStudentOnBreak) {
-                            actionsHTML += `<span class="text-gray-400">Submission Disabled</span>`;
-                        }
+                    if (isSummerBreakEnabled && !isStudentOnBreak) {
+                        actionsHTML += `<button class="summer-break-btn bg-yellow-500 text-white px-3 py-1 rounded" data-student-id="${student.id}">Summer Break</button>`;
+                    } else if (isStudentOnBreak) {
+                        actionsHTML += `<span class="text-gray-400">On Break</span>`;
                     }
-                }
-                
-                // Edit/Delete for all non-transitioning students
-                if (showEditDeleteButtons && !student.isTransitioning) {
-                    const isStudentOnBreak = student.summerBreak;
-                    if (!isStudentOnBreak) {
+
+                    if (isSubmissionEnabled && !isStudentOnBreak) {
+                        if (approvedStudents.length === 1) {
+                            actionsHTML += `<button class="submit-single-report-btn bg-green-600 text-white px-3 py-1 rounded" data-student-id="${student.id}">Submit Report</button>`;
+                        } else {
+                            actionsHTML += `<button class="enter-report-btn bg-green-600 text-white px-3 py-1 rounded" data-student-id="${student.id}">${isReportSaved ? 'Edit Report' : 'Enter Report'}</button>`;
+                        }
+                    } else if (!isStudentOnBreak) {
+                        actionsHTML += `<span class="text-gray-400">Submission Disabled</span>`;
+                    }
+                    
+                    if (showEditDeleteButtons && !isStudentOnBreak) {
                         actionsHTML += `<button class="edit-student-btn-tutor bg-blue-500 text-white px-3 py-1 rounded" data-student-id="${student.id}" data-collection="${student.collection}">Edit</button>`;
                         actionsHTML += `<button class="delete-student-btn-tutor bg-red-500 text-white px-3 py-1 rounded" data-student-id="${student.id}" data-collection="${student.collection}">Delete</button>`;
                     }
                 }
-
+                
                 studentsHTML += `
-                    <tr class="${rowClasses}">
+                    <tr>
                         <td class="px-6 py-4 whitespace-nowrap">
                             ${student.studentName} (${cleanGradeString(student.grade)})
                             <div class="text-xs text-gray-500">Subjects: ${subjects} | Days: ${days}</div>
@@ -1108,8 +837,6 @@ async function renderStudentDatabase(container, tutor) {
             });
 
             studentsHTML += `</tbody></table></div>`;
-            
-            // Management Fee logic (remains the same)
             
             if (tutor.isManagementStaff) {
                 studentsHTML += `
@@ -1124,17 +851,18 @@ async function renderStudentDatabase(container, tutor) {
                     </div>`;
             }
             
-            const regularSubmittableStudents = approvedStudents.filter(s => !s.summerBreak && !submittedStudentIds.has(s.id)).length;
-            const allReportsSaved = Object.keys(savedReports).length === regularSubmittableStudents && regularSubmittableStudents > 0;
-            
-            // Only show submit all button for regular students when reports are enabled
-            if (regularSubmittableStudents > 0 && isSubmissionEnabled) {
-                studentsHTML += `
-                    <div class="mt-6 text-right">
-                        <button id="submit-all-reports-btn" class="bg-green-700 text-white px-6 py-3 rounded-lg font-bold ${!allReportsSaved ? 'opacity-50 cursor-not-allowed' : 'hover:bg-green-800'}" ${!allReportsSaved ? 'disabled' : ''}>
-                            Submit All Reports
-                        </button>
-                    </div>`;
+            if (approvedStudents.length > 1 && isSubmissionEnabled) {
+                const submittableStudents = approvedStudents.filter(s => !s.summerBreak && !submittedStudentIds.has(s.id)).length;
+                const allReportsSaved = Object.keys(savedReports).length === submittableStudents && submittableStudents > 0;
+                
+                if (submittableStudents > 0) {
+                    studentsHTML += `
+                        <div class="mt-6 text-right">
+                            <button id="submit-all-reports-btn" class="bg-green-700 text-white px-6 py-3 rounded-lg font-bold ${!allReportsSaved ? 'opacity-50 cursor-not-allowed' : 'hover:bg-green-800'}" ${!allReportsSaved ? 'disabled' : ''}>
+                                Submit All Reports
+                            </button>
+                        </div>`;
+                }
             }
         }
         container.innerHTML = `<div id="student-list-view" class="bg-white p-6 rounded-lg shadow-md">${studentsHTML}</div>`;
@@ -1142,7 +870,6 @@ async function renderStudentDatabase(container, tutor) {
     }
 
     function showReportModal(student) {
-        // THIS FUNCTION IS ONLY FOR REGULAR STUDENTS
         const existingReport = savedReports[student.id] || {};
         const isSingleApprovedStudent = approvedStudents.filter(s => !s.summerBreak && !submittedStudentIds.has(s.id)).length === 1;
         const currentMonthYear = getCurrentMonthYear();
@@ -1193,7 +920,6 @@ async function renderStudentDatabase(container, tutor) {
     }
 
     function showFeeConfirmationModal(student, reportData) {
-        // THIS FUNCTION IS ONLY FOR REGULAR STUDENTS
         const feeConfirmationHTML = `
             <h3 class="text-xl font-bold mb-4">Confirm Fee for ${student.studentName}</h3>
             <p class="text-sm text-gray-600 mb-4">Please verify the monthly fee for this student before saving the report. You can make corrections if needed.</p>
@@ -1326,10 +1052,22 @@ async function renderStudentDatabase(container, tutor) {
         }
     }
 
+    function showCustomAlert(message) {
+        const alertModal = document.createElement('div');
+        alertModal.className = 'fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex items-center justify-center z-50';
+        alertModal.innerHTML = `
+            <div class="relative bg-white p-8 rounded-lg shadow-xl w-full max-w-md mx-auto">
+                <p class="mb-4">${message}</p>
+                <button id="alert-ok-btn" class="bg-green-600 text-white px-6 py-2 rounded float-right">OK</button>
+            </div>`;
+        document.body.appendChild(alertModal);
+        document.getElementById('alert-ok-btn').addEventListener('click', () => alertModal.remove());
+    }
+
     function attachEventListeners() {
         // Group class toggle functionality for new student form
         const subjectsContainer = document.getElementById('new-student-subjects-container');
-        const groupClassContainer = document.getElementById('new-student-group-class-container');
+        const groupClassContainer = document.getElementById('group-class-container');
         
         if (subjectsContainer && groupClassContainer) {
             subjectsContainer.addEventListener('change', (e) => {
@@ -1344,22 +1082,20 @@ async function renderStudentDatabase(container, tutor) {
         }
 
         if (isTutorAddEnabled) {
-            // Existing 'Add Regular Student' logic
             document.getElementById('add-student-btn').addEventListener('click', async () => {
-                const formPrefix = 'new-student';
-                const parentName = document.getElementById(`${formPrefix}-parent-name`).value.trim();
-                const parentPhone = document.getElementById(`${formPrefix}-parent-phone`).value.trim();
-                const studentName = document.getElementById(`${formPrefix}-student-name`).value.trim();
-                const studentGrade = document.getElementById(`${formPrefix}-student-grade`).value.trim();
+                const parentName = document.getElementById('new-parent-name').value.trim();
+                const parentPhone = document.getElementById('new-parent-phone').value.trim();
+                const studentName = document.getElementById('new-student-name').value.trim();
+                const studentGrade = document.getElementById('new-student-grade').value.trim();
                 
                 const selectedSubjects = [];
-                document.querySelectorAll(`input[name="${formPrefix}-subjects"]:checked`).forEach(checkbox => {
+                document.querySelectorAll('input[name="subjects"]:checked').forEach(checkbox => {
                     selectedSubjects.push(checkbox.value);
                 });
 
-                const studentDays = document.getElementById(`${formPrefix}-student-days`).value.trim();
-                const groupClass = document.getElementById(`${formPrefix}-student-group-class`) ? document.getElementById(`${formPrefix}-student-group-class`).checked : false;
-                const studentFee = parseFloat(document.getElementById(`${formPrefix}-student-fee`).value);
+                const studentDays = document.getElementById('new-student-days').value.trim();
+                const groupClass = document.getElementById('new-student-group-class') ? document.getElementById('new-student-group-class').checked : false;
+                const studentFee = parseFloat(document.getElementById('new-student-fee').value);
 
                 if (!parentName || !studentName || !studentGrade || isNaN(studentFee) || !parentPhone || !studentDays || selectedSubjects.length === 0) {
                     showCustomAlert('Please fill in all parent and student details correctly, including at least one subject.');
@@ -1408,55 +1144,36 @@ async function renderStudentDatabase(container, tutor) {
             });
         }
 
-        // PROPERLY FILTERED EVENT LISTENERS - SEPARATE PATHS
-        // Report buttons ONLY for regular students
         document.querySelectorAll('.enter-report-btn').forEach(btn => {
             btn.addEventListener('click', () => {
                 const studentId = btn.getAttribute('data-student-id');
-                const student = students.find(s => s.id === studentId && !s.isTransitioning && !s.isPending);
-                if (student) {
-                    showReportModal(student);
-                }
+                const student = students.find(s => s.id === studentId);
+                showReportModal(student);
             });
         });
 
         document.querySelectorAll('.submit-single-report-btn').forEach(btn => {
             btn.addEventListener('click', () => {
                 const studentId = btn.getAttribute('data-student-id');
-                const student = students.find(s => s.id === studentId && !s.isTransitioning && !s.isPending);
-                if (student) {
-                    showReportModal(student);
-                }
+                const student = students.find(s => s.id === studentId);
+                showReportModal(student);
             });
         });
 
-        // Confirm Fee buttons ONLY for transitioning students
-        document.querySelectorAll('.confirm-fee-btn').forEach(btn => {
-            btn.addEventListener('click', () => {
-                const studentId = btn.getAttribute('data-student-id');
-                const collectionName = btn.getAttribute('data-collection');
-                const student = students.find(s => s.id === studentId && s.collection === collectionName && s.isTransitioning);
-                if (student) {
-                    showTransitioningFeeConfirmationModal(student, container, tutor);
-                }
-            });
-        });
-
-        // Summer break buttons ONLY for regular students
-        document.querySelectorAll('.summer-break-btn').forEach(btn => {
-            btn.addEventListener('click', async () => {
-                const studentId = btn.getAttribute('data-student-id');
-                const student = students.find(s => s.id === studentId && !s.isTransitioning);
-                if (student) {
-                    if (confirm(`Are you sure you want to put ${student.studentName} on summer break?`)) {
-                        const studentRef = doc(db, "students", studentId);
-                        await updateDoc(studentRef, { summerBreak: true });
-                        showCustomAlert(`${student.studentName} has been marked as on summer break.`);
-                        renderStudentDatabase(container, tutor);
-                    }
-                }
-            });
-        });
+       document.querySelectorAll('.summer-break-btn').forEach(btn => {
+    btn.addEventListener('click', async () => {
+        const studentId = btn.getAttribute('data-student-id');
+        const student = students.find(s => s.id === studentId);
+        
+        // Add confirmation dialog
+        if (confirm(`Are you sure you want to put ${student.studentName} on summer break?`)) {
+            const studentRef = doc(db, "students", studentId);
+            await updateDoc(studentRef, { summerBreak: true });
+            showCustomAlert(`${student.studentName} has been marked as on summer break.`);
+            renderStudentDatabase(container, tutor);
+        }
+    });
+});
 
         const submitAllBtn = document.getElementById('submit-all-reports-btn');
         if (submitAllBtn) {
@@ -1516,170 +1233,7 @@ async function renderStudentDatabase(container, tutor) {
 }
 
 // ##################################################################
-// # SECTION 3: TRANSITIONING CLASSES (NEW DEDICATED TAB)
-// ##################################################################
-
-async function renderTransitioningClasses(container, tutor) {
-    if (!isTutorAddEnabled) {
-        container.innerHTML = `<p class="text-red-500 p-6">Student addition is currently disabled by the administrator.</p>`;
-        return;
-    }
-    
-    // 1. Fetch all current transitioning students (both pending and approved)
-    const pendingTransitioningQuery = query(collection(db, "pending_students"), 
-        where("tutorEmail", "==", tutor.email),
-        where("isTransitioning", "==", true));
-    
-    const approvedTransitioningQuery = query(collection(db, TRANSITIONING_COLLECTION), 
-        where("tutorEmail", "==", tutor.email));
-
-    const [pendingTransitioningSnapshot, approvedTransitioningSnapshot] = await Promise.all([
-        getDocs(pendingTransitioningQuery),
-        getDocs(approvedTransitioningQuery)
-    ]);
-
-    const pendingTransitioningStudents = pendingTransitioningSnapshot.docs.map(doc => ({ 
-        id: doc.id, 
-        ...doc.data(), 
-        isPending: true, 
-        isTransitioning: true, 
-        collection: "pending_students" 
-    }));
-
-    const approvedTransitioningStudents = approvedTransitioningSnapshot.docs.map(doc => ({ 
-        id: doc.id, 
-        ...doc.data(), 
-        isPending: false, 
-        isTransitioning: true, 
-        collection: TRANSITIONING_COLLECTION 
-    }));
-
-    const allTransitioningStudents = [...pendingTransitioningStudents, ...approvedTransitioningStudents];
-    
-    const formPrefix = 'transition-form';
-
-    // 2. Build the UI
-    let studentsListHTML = '';
-    if (allTransitioningStudents.length === 0) {
-        studentsListHTML = `<p class="text-gray-500 italic mt-4">No transitioning students found.</p>`;
-    } else {
-        studentsListHTML = `
-            <div class="overflow-x-auto mt-4">
-                <table class="min-w-full divide-y divide-orange-200">
-                    <thead>
-                        <tr>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-orange-700 uppercase">Student Name</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-orange-700 uppercase">Status</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-orange-700 uppercase">Action</th>
-                        </tr>
-                    </thead>
-                    <tbody class="bg-white divide-y divide-orange-200">
-        `;
-        allTransitioningStudents.forEach(student => {
-            const isPending = student.isPending;
-            const isPaid = student.transitionPaid;
-            const status = isPending ? '⏳ Pending Approval' : (isPaid ? '✅ Fee Confirmed' : '🔄 Confirm Fee Required');
-            const feeDisplay = `₦${(student.studentFee || 0).toLocaleString()}`;
-            
-            let actionButton = '';
-            if (isPending) {
-                actionButton = `<span class="text-gray-500">Waiting for admin approval</span>`;
-            } else if (isPaid) {
-                actionButton = `<span class="text-green-600 font-semibold">Completed</span>`;
-            } else {
-                actionButton = `<button class="confirm-fee-btn-transitioning bg-orange-600 text-white px-3 py-1 rounded font-bold" data-student-id="${student.id}" data-collection="${student.collection}">Confirm Fee</button>`;
-            }
-            
-            studentsListHTML += `
-                <tr class="bg-orange-50">
-                    <td class="px-6 py-4 whitespace-nowrap">
-                        <div class="font-medium text-gray-900">${student.studentName} (${cleanGradeString(student.grade)})</div>
-                        <div class="text-xs text-gray-500">${student.parentName} | Fee: ${feeDisplay}</div>
-                    </td>
-                    <td class="px-6 py-4 whitespace-nowrap">
-                        <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${isPending ? 'bg-yellow-100 text-yellow-800' : (isPaid ? 'bg-green-100 text-green-800' : 'bg-orange-100 text-orange-800')}">
-                            ${status}
-                        </span>
-                    </td>
-                    <td class="px-6 py-4 whitespace-nowrap">
-                        ${actionButton}
-                    </td>
-                </tr>
-            `;
-        });
-        studentsListHTML += `</tbody></table></div>`;
-    }
-
-    // 3. Render the page structure
-    container.innerHTML = `
-        <div id="transitioning-classes-view" class="bg-white p-6 rounded-lg shadow-md">
-            <h2 class="text-2xl font-bold text-orange-700 mb-4">
-                🔄 Transitioning Classes: Temporary Registration
-            </h2>
-            <p class="text-sm text-gray-600 mb-6">
-                Use this tab to register temporary students. They will follow the same approval process as regular students but use fee confirmation instead of monthly reports.
-                After admin approval, click 'Confirm Fee' to finalize the temporary enrollment.
-            </p>
-
-            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <div class="bg-orange-50 p-4 rounded-lg shadow-inner border-2 border-orange-200">
-                    <h3 class="font-bold text-lg mb-2 text-orange-900">1. Register Temporary Student</h3>
-                    <div class="space-y-2">
-                        ${getNewStudentFormFields(formPrefix)}
-                    </div>
-                    <div class="flex flex-wrap space-x-2 mt-3">
-                        <button id="add-transitioning-student-btn" class="bg-orange-600 border-4 border-orange-800 text-white px-4 py-2 rounded mt-3 hover:bg-orange-700 font-bold">
-                            <span class="text-lg">➕</span> Register Transitioning Student
-                        </button>
-                    </div>
-                </div>
-
-                <div class="bg-white p-4 rounded-lg shadow border-2 border-orange-500">
-                    <h3 class="font-bold text-lg mb-2 text-orange-900">2. Student Status & Fee Confirmation</h3>
-                    ${studentsListHTML}
-                </div>
-            </div>
-        </div>
-    `;
-
-    // 4. Attach Event Listeners
-
-    // Group class toggle for the new form
-    const subjectsContainer = document.getElementById(`${formPrefix}-subjects-container`);
-    const groupClassContainer = document.getElementById(`${formPrefix}-group-class-container`);
-    
-    if (subjectsContainer && groupClassContainer) {
-        subjectsContainer.addEventListener('change', (e) => {
-            if (e.target.type === 'checkbox' && e.target.checked) {
-                const subject = e.target.value;
-                const hasSpecializedSubject = findSpecializedSubject([subject]);
-                if (hasSpecializedSubject) {
-                    groupClassContainer.classList.remove('hidden');
-                }
-            }
-        });
-    }
-
-    // New Registration Button logic
-    document.getElementById('add-transitioning-student-btn').addEventListener('click', () => {
-        addNewTransitioningStudent(tutor, container, formPrefix);
-    });
-
-    // Confirmation Button logic
-    document.querySelectorAll('.confirm-fee-btn-transitioning').forEach(btn => {
-        btn.addEventListener('click', () => {
-            const studentId = btn.getAttribute('data-student-id');
-            const collectionName = btn.getAttribute('data-collection');
-            const student = allTransitioningStudents.find(s => s.id === studentId && s.collection === collectionName);
-            if (student) {
-                showTransitioningFeeConfirmationModal(student, container, tutor);
-            }
-        });
-    });
-}
-
-// ##################################################################
-// # SECTION 4: MAIN APP INITIALIZATION
+// # SECTION 3: MAIN APP INITIALIZATION
 // ##################################################################
 document.addEventListener('DOMContentLoaded', async () => {
     onAuthStateChanged(auth, async (user) => {
@@ -1691,9 +1245,6 @@ document.addEventListener('DOMContentLoaded', async () => {
                 const tutorData = { id: tutorDoc.id, ...tutorDoc.data() };
                 window.tutorData = tutorData;
                 
-                // NEW: Run cleanup for expired transitioning students
-                await runTransitioningStudentCleanup(tutorData.email);
-
                 // Show employment date popup if needed
                 if (shouldShowEmploymentPopup(tutorData)) {
                     showEmploymentDatePopup(tutorData);
@@ -1728,14 +1279,10 @@ document.addEventListener('DOMContentLoaded', async () => {
             renderStudentDatabase(document.getElementById('mainContent'), window.tutorData);
         }
     });
-    
-    // NEW: Transitioning Classes Navigation
-    document.getElementById('navTransitioningClasses').addEventListener('click', () => {
-        if (window.tutorData) {
-            renderTransitioningClasses(document.getElementById('mainContent'), window.tutorData);
-        }
-    });
 
+    // ##################################################################
+    // # SECTION 4: AUTO-REGISTERED STUDENTS NAVIGATION (NEW - ADDED AT BOTTOM)
+    // ##################################################################
     document.getElementById('navAutoStudents').addEventListener('click', () => {
         if (window.tutorData) {
             renderAutoRegisteredStudents(document.getElementById('mainContent'), window.tutorData);
@@ -1744,7 +1291,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 });
 
 // ##################################################################
-// # SECTION 5: AUTO-REGISTERED STUDENTS DISPLAY 
+// # SECTION 5: AUTO-REGISTERED STUDENTS DISPLAY (NEW - ADDED AT BOTTOM)
 // ##################################################################
 
 function renderAutoRegisteredStudents(container, tutor) {

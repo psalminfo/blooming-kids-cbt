@@ -393,6 +393,7 @@
 </head>
 <body>
 
+    <!-- Network Error Overlay - HIDDEN BY DEFAULT -->
     <div id="networkErrorOverlay">
         <div class="error-content">
             <div class="error-icon">
@@ -412,6 +413,7 @@
         </div>
     </div>
 
+    <!-- Network Warning Banner - HIDDEN BY DEFAULT -->
     <div id="networkWarning">
         <span id="warningMessage">You appear to be offline. Some features may not work properly.</span>
         <button class="close-btn" onclick="hideNetworkWarning()">×</button>
@@ -420,6 +422,7 @@
     <div class="wrapper">
         <div class="inner">
             <div class="max-w-7xl mx-auto">
+                <!-- Updated header with mobile-friendly classes -->
                 <div class="flex justify-between items-center mb-6 header-container">
                     <div class="flex items-center logo-title-container">
                         <img id="logoImg" src="https://res.cloudinary.com/dy2hxcyaf/image/upload/v1757700806/newbhlogo_umwqzy.svg" alt="Blooming Kids House Logo" class="h-16 w-auto mr-4 mobile-logo" style="filter: drop-shadow(0 0 5px rgba(0, 0, 0, 0.2));">
@@ -447,11 +450,11 @@
                     </div>
                 </div>
                 
+                <!-- Updated nav with mobile scrolling -->
                 <nav class="mb-6 border-b border-gray-200 dark:border-gray-700 nav-container">
                     <div class="flex space-x-4 nav-buttons">
                         <button id="navDashboard" class="nav-btn text-lg font-semibold active dashboard-header">Dashboard</button>
                         <button id="navStudentDatabase" class="nav-btn text-lg font-semibold text-gray-500 hover:text-green-600">Student Database</button>
-                        <button id="navTransitioningClasses" class="nav-btn text-lg font-semibold text-gray-500 hover:text-green-600">Transitioning Classes</button>
                     </div>
                 </nav>
 
