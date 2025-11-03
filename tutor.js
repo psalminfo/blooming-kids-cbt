@@ -3,6 +3,22 @@ import { collection, getDocs, doc, updateDoc, getDoc, where, query, addDoc, writ
 import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-auth.js";
 import { onSnapshot } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
 
+// --- Inject CSS for transitioning button ---
+const style = document.createElement('style');
+style.textContent = `
+    #add-transitioning-btn {
+        display: block !important;
+        background: orange !important;
+        color: white !important;
+        padding: 10px 20px !important;
+        border-radius: 5px !important;
+        border: none !important;
+        cursor: pointer !important;
+        margin: 5px !important;
+    }
+`;
+document.head.appendChild(style);
+
 // --- Global state to hold report submission status ---
 let isSubmissionEnabled = false;
 let isTutorAddEnabled = false;
@@ -13,7 +29,7 @@ let showStudentFees = false;
 let showEditDeleteButtons = false;
 
 // --- Pay Scheme Configuration ---
-const PAY_SCHEMES = {
+const PAY_SCHEMES 
     NEW_TUTOR: {
         academic: {
             "Preschool-Grade 2": {2: 50000, 3: 60000, 5: 100000},
@@ -1551,3 +1567,4 @@ function renderAutoStudentsList(students) {
         });
     });
 }
+
