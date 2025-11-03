@@ -29,7 +29,7 @@ let showStudentFees = false;
 let showEditDeleteButtons = false;
 
 // --- Pay Scheme Configuration ---
-const PAY_SCHEMES 
+const PAY_SCHEMES = {
     NEW_TUTOR: {
         academic: {
             "Preschool-Grade 2": {2: 50000, 3: 60000, 5: 100000},
@@ -1567,4 +1567,5 @@ function renderAutoStudentsList(students) {
         });
     });
 }
+
 
