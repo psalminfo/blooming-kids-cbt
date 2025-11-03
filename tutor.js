@@ -758,8 +758,6 @@ async function renderStudentDatabase(container, tutor) {
 
     function renderUI() {
         let studentsHTML = `<h2 class="text-2xl font-bold text-green-700 mb-4">My Students (${studentsCount})</h2>`;
-        
-        // --- START MODIFICATION 1: Add Transitioning Button HTML ---
         if (isTutorAddEnabled) {
             studentsHTML += `
                 <div class="bg-gray-100 p-4 rounded-lg shadow-inner mb-4">
@@ -767,13 +765,9 @@ async function renderStudentDatabase(container, tutor) {
                     <div class="space-y-2">
                         ${getNewStudentFormFields()}
                     </div>
-                    <div class="flex space-x-4 mt-3">
-                        <button id="add-student-btn" class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700">Add Student</button>
-                        <button id="add-transitioning-btn" class="bg-orange-600 text-white px-4 py-2 rounded hover:bg-orange-700">Add Transitioning Student</button>
-                    </div>
+                    <button id="add-student-btn" class="bg-green-600 text-white px-4 py-2 rounded mt-3 hover:bg-green-700">Add Student</button>
                 </div>`;
         }
-        // --- END MODIFICATION 1 ---
         
         studentsHTML += `<p class="text-sm text-gray-600 mb-4">Report submission is currently <strong class="${isSubmissionEnabled ? 'text-green-600' : 'text-red-500'}">${isSubmissionEnabled ? 'Enabled' : 'Disabled'}</strong> by the admin.</p>`;
 
@@ -798,9 +792,6 @@ async function renderStudentDatabase(container, tutor) {
                 
                 const subjects = student.subjects ? student.subjects.join(', ') : 'N/A';
                 const days = student.days ? `${student.days} days/week` : 'N/A';
-                
-                // --- START MODIFICATION 2: Transitioning Student Status and Actions ---
-                const isTransitioning = student.isTransitioning || false;
 
                 if (student.isPending) {
                     statusHTML = `<span class="status-indicator text-yellow-600 font-semibold">Awaiting Approval</span>`;
@@ -808,19 +799,7 @@ async function renderStudentDatabase(container, tutor) {
                 } else if (hasSubmittedThisMonth) {
                     statusHTML = `<span class="status-indicator text-blue-600 font-semibold">Report Sent</span>`;
                     actionsHTML = `<span class="text-gray-400">Submitted this month</span>`;
-                } else if (isTransitioning) {
-                    statusHTML = `<span class="status-indicator text-orange-600 font-semibold">Transitioning</span>`; // Orange Indicator
-                    if (isSubmissionEnabled && !isStudentOnBreak) {
-                         // New button for direct fee submission
-                        actionsHTML = `<button class="submit-transition-report-btn bg-orange-600 text-white px-3 py-1 rounded" data-student-id="${student.id}">Submit Fee</button>`;
-                    } else if (!isStudentOnBreak) {
-                        actionsHTML = `<span class="text-gray-400">Submission Disabled</span>`;
-                    }
-                }
-                // --- END MODIFICATION 2 ---
-                
-                else {
-                    // Existing logic for standard students
+                } else {
                     statusHTML = `<span class="status-indicator ${isReportSaved ? 'text-green-600 font-semibold' : 'text-gray-500'}">${isReportSaved ? 'Report Saved' : 'Pending Report'}</span>`;
 
                     if (isSummerBreakEnabled && !isStudentOnBreak) {
@@ -1102,10 +1081,8 @@ async function renderStudentDatabase(container, tutor) {
             });
         }
 
-        // --- START MODIFICATION 3: Refactored Student Addition and New Button Listener ---
         if (isTutorAddEnabled) {
-            // Helper function to encapsulate student addition logic, called by both buttons
-            const handleStudentAddition = async (isTransitioningStudent) => {
+            document.getElementById('add-student-btn').addEventListener('click', async () => {
                 const parentName = document.getElementById('new-parent-name').value.trim();
                 const parentPhone = document.getElementById('new-parent-phone').value.trim();
                 const studentName = document.getElementById('new-student-name').value.trim();
@@ -1118,8 +1095,7 @@ async function renderStudentDatabase(container, tutor) {
 
                 const studentDays = document.getElementById('new-student-days').value.trim();
                 const groupClass = document.getElementById('new-student-group-class') ? document.getElementById('new-student-group-class').checked : false;
-                const studentFeeInput = document.getElementById('new-student-fee').value;
-                const studentFee = parseFloat(studentFeeInput.replace(/,/g, '')); // Handle formatted input
+                const studentFee = parseFloat(document.getElementById('new-student-fee').value);
 
                 if (!parentName || !studentName || !studentGrade || isNaN(studentFee) || !parentPhone || !studentDays || selectedSubjects.length === 0) {
                     showCustomAlert('Please fill in all parent and student details correctly, including at least one subject.');
@@ -1144,8 +1120,7 @@ async function renderStudentDatabase(container, tutor) {
                     days: studentDays,
                     studentFee: suggestedFee > 0 ? suggestedFee : studentFee,
                     tutorEmail: tutor.email,
-                    tutorName: tutor.name,
-                    isTransitioning: isTransitioningStudent // NEW: Set the flag
+                    tutorName: tutor.name
                 };
 
                 // Add group class field if applicable
@@ -1156,35 +1131,18 @@ async function renderStudentDatabase(container, tutor) {
                 try {
                     if (isBypassApprovalEnabled) {
                         await addDoc(collection(db, "students"), studentData);
-                        showCustomAlert(`Student added successfully${isTransitioningStudent ? ' as Transitioning' : ''}!`);
+                        showCustomAlert('Student added successfully!');
                     } else {
                         await addDoc(collection(db, "pending_students"), studentData);
-                        showCustomAlert(`Student added and is pending approval${isTransitioningStudent ? ' as Transitioning' : ''}.`);
+                        showCustomAlert('Student added and is pending approval.');
                     }
                     renderStudentDatabase(container, tutor);
                 } catch (error) {
                     console.error("Error adding student:", error);
                     showCustomAlert(`An error occurred: ${error.message}`);
                 }
-            };
-            
-            // Standard Student Button
-            document.getElementById('add-student-btn').addEventListener('click', async () => {
-                await handleStudentAddition(false);
             });
-            
-            // NEW: Transitioning Student Button
-            const addTransitioningBtn = document.getElementById('add-transitioning-btn');
-            if (addTransitioningBtn) {
-                 addTransitioningBtn.addEventListener('click', () => {
-                    const confirmationMessage = "Transitioning students skip monthly report writing and go directly to fee confirmation. Continue?";
-                    if (confirm(confirmationMessage)) {
-                        handleStudentAddition(true);
-                    }
-                });
-            }
         }
-        // --- END MODIFICATION 3 ---
 
         document.querySelectorAll('.enter-report-btn').forEach(btn => {
             btn.addEventListener('click', () => {
@@ -1201,43 +1159,6 @@ async function renderStudentDatabase(container, tutor) {
                 showReportModal(student);
             });
         });
-        
-        // --- START MODIFICATION 4: New Listener for Transitioning Student Direct Submission ---
-        document.querySelectorAll('.submit-transition-report-btn').forEach(btn => {
-            btn.addEventListener('click', () => {
-                const studentId = btn.getAttribute('data-student-id');
-                const student = students.find(s => s.id === studentId);
-                
-                if (!student) {
-                    showCustomAlert('Student not found.');
-                    return;
-                }
-                
-                const placeholderReportData = {
-                    studentId: student.id, 
-                    studentName: student.studentName, 
-                    grade: student.grade,
-                    parentName: student.parentName, 
-                    parentPhone: student.parentPhone,
-                    reportMonth: getCurrentMonthYear(),
-                    introduction: 'N/A (Transitioning Student)',
-                    topics: 'N/A (Transitioning Student)',
-                    progress: 'N/A (Transitioning Student)',
-                    strengthsWeaknesses: 'N/A (Transitioning Student)',
-                    recommendations: 'N/A (Transitioning Student)',
-                    generalComments: 'N/A (Transitioning Student)',
-                    isTransitioning: true // CRITICAL: Flag the submission for admin.js bypass
-                };
-                
-                const confirmationMessage = `You are submitting the fee for the transitioning student: ${student.studentName}. Report writing is skipped. Proceed to fee confirmation?`;
-                
-                if (confirm(confirmationMessage)) {
-                     // Skip showReportModal and go directly to fee confirmation
-                    showFeeConfirmationModal(student, placeholderReportData); 
-                }
-            });
-        });
-        // --- END MODIFICATION 4 ---
 
        document.querySelectorAll('.summer-break-btn').forEach(btn => {
     btn.addEventListener('click', async () => {
