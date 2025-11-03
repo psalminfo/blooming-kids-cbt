@@ -758,19 +758,25 @@ async function renderStudentDatabase(container, tutor) {
 
     function renderUI() {
         let studentsHTML = `<h2 class="text-2xl font-bold text-green-700 mb-4">My Students (${studentsCount})</h2>`;
+        
+        // ALWAYS show the add student section, but conditionally show buttons
+        studentsHTML += `
+            <div class="bg-gray-100 p-4 rounded-lg shadow-inner mb-4">
+                <h3 class="font-bold text-lg mb-2">Add a New Student</h3>
+                <div class="space-y-2">
+                    ${getNewStudentFormFields()}
+                </div>
+                <div class="flex space-x-2 mt-3">`;
+        
+        // Show "Add Student" button only when admin enables it
         if (isTutorAddEnabled) {
-            studentsHTML += `
-                <div class="bg-gray-100 p-4 rounded-lg shadow-inner mb-4">
-                    <h3 class="font-bold text-lg mb-2">Add a New Student</h3>
-                    <div class="space-y-2">
-                        ${getNewStudentFormFields()}
-                    </div>
-                    <div class="flex space-x-2 mt-3">
-                        <button id="add-student-btn" class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700">Add Student</button>
-                        <button id="add-transitioning-btn" class="bg-orange-600 text-white px-4 py-2 rounded hover:bg-orange-700">Add Transitioning</button>
-                    </div>
-                </div>`;
+            studentsHTML += `<button id="add-student-btn" class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700">Add Student</button>`;
         }
+        
+        // ALWAYS show "Add Transitioning" button regardless of admin setting
+        studentsHTML += `<button id="add-transitioning-btn" class="bg-orange-600 text-white px-4 py-2 rounded hover:bg-orange-700">Add Transitioning</button>`;
+        
+        studentsHTML += `</div></div>`;
         
         studentsHTML += `<p class="text-sm text-gray-600 mb-4">Report submission is currently <strong class="${isSubmissionEnabled ? 'text-green-600' : 'text-red-500'}">${isSubmissionEnabled ? 'Enabled' : 'Disabled'}</strong> by the admin.</p>`;
 
@@ -1209,6 +1215,12 @@ async function renderStudentDatabase(container, tutor) {
             });
         }
 
+        // Add event listener for transitioning student button - ALWAYS available
+        document.getElementById('add-transitioning-btn').addEventListener('click', () => {
+            showTransitioningConfirmation();
+        });
+
+        // Add event listener for regular student button - only when admin enables it
         if (isTutorAddEnabled) {
             document.getElementById('add-student-btn').addEventListener('click', async () => {
                 const parentName = document.getElementById('new-parent-name').value.trim();
@@ -1269,11 +1281,6 @@ async function renderStudentDatabase(container, tutor) {
                     console.error("Error adding student:", error);
                     showCustomAlert(`An error occurred: ${error.message}`);
                 }
-            });
-
-            // Add event listener for transitioning student button
-            document.getElementById('add-transitioning-btn').addEventListener('click', () => {
-                showTransitioningConfirmation();
             });
         }
 
