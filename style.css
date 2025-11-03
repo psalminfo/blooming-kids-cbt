@@ -260,3 +260,50 @@ button:active::after {
 }
 /* --- END LOGO STYLING --- */
 
+/* === Add Transitioning Button Fix === */
+#add-transitioning-btn {
+    display: block !important;
+    background-color: #ea580c !important; /* orange-600 */
+    color: white !important;
+    padding: 0.5rem 1rem !important;
+    border-radius: 0.375rem !important;
+    font-weight: 500 !important;
+    border: none !important;
+    cursor: pointer !important;
+    margin: 0 !important;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif !important;
+    font-size: 0.875rem !important;
+    line-height: 1.25rem !important;
+    text-align: center !important;
+    transition: all 0.2s ease-in-out !important;
+    box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06) !important;
+}
+
+#add-transitioning-btn:hover {
+    background-color: #c2410c !important; /* orange-700 */
+    transform: translateY(-1px) !important;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06) !important;
+}
+
+#add-transitioning-btn:active {
+    transform: translateY(0) !important;
+}
+
+/* Ensure the button container has proper spacing */
+.flex.space-x-2 {
+    gap: 0.5rem !important;
+}
+
+/* Make sure the form section is visible */
+.bg-gray-100 {
+    background-color: #f9fafb !important;
+}
+
+/* Ensure the transitioning student indicator is visible */
+.bg-orange-100 {
+    background-color: #ffedd5 !important;
+}
+
+.text-orange-800 {
+    color: #9a3412 !important;
+}
