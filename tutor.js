@@ -1540,5 +1540,3 @@ function renderAutoStudentsList(students) {
         });
     });
 }
-[file content end]
-
