@@ -24,6 +24,12 @@ style.textContent = `
         cursor: pointer !important;
         margin: 5px !important;
         position: relative !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+    }
+    #talkToManagementBtn:hover {
+        background: #654321 !important;
     }
     .message-badge {
         position: absolute !important;
@@ -1447,23 +1453,28 @@ async function renderStudentDatabase(container, tutor) {
 
 // Function to inject the Talk to Management button
 function injectManagementButton() {
-    const techSupportBtn = document.getElementById('techSupportBtn');
-    if (techSupportBtn && !document.getElementById('talkToManagementBtn')) {
+    const whatsappBtn = document.getElementById('whatsappBtn');
+    
+    if (whatsappBtn && !document.getElementById('talkToManagementBtn')) {
         const managementBtn = document.createElement('button');
         managementBtn.id = 'talkToManagementBtn';
-        managementBtn.className = 'bg-brown-600 text-white px-4 py-2 rounded hover:bg-brown-700';
+        managementBtn.className = 'bg-brown-600 text-white px-4 py-2 rounded hover:bg-brown-700 ml-2 flex items-center';
         managementBtn.innerHTML = `
+            <i class="fas fa-comments mr-2"></i>
             Talk to Management
             ${unreadMessagesCount > 0 ? `<span class="message-badge">${unreadMessagesCount}</span>` : ''}
         `;
         
-        // Insert after the tech support button
-        techSupportBtn.parentNode.insertBefore(managementBtn, techSupportBtn.nextSibling);
+        // Insert after the WhatsApp button
+        whatsappBtn.parentNode.insertBefore(managementBtn, whatsappBtn.nextSibling);
         
-        // Add event listener
         managementBtn.addEventListener('click', () => {
             showMessageModal();
         });
+        
+        console.log('Management button injected successfully');
+    } else if (!whatsappBtn) {
+        console.warn('WhatsApp button not found - cannot inject management button');
     }
 }
 
@@ -1595,6 +1606,7 @@ function updateManagementButtonBadge() {
     const managementBtn = document.getElementById('talkToManagementBtn');
     if (managementBtn) {
         managementBtn.innerHTML = `
+            <i class="fas fa-comments mr-2"></i>
             Talk to Management
             ${unreadMessagesCount > 0 ? `<span class="message-badge">${unreadMessagesCount}</span>` : ''}
         `;
