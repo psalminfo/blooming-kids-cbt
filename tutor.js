@@ -1,8 +1,9 @@
 import { auth, db } from './firebaseConfig.js';
-import { collection, getDocs, doc, updateDoc, getDoc, where, query, addDoc, writeBatch, deleteDoc, orderBy, onSnapshot } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
+import { collection, getDocs, doc, updateDoc, getDoc, where, query, addDoc, writeBatch, deleteDoc } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
 import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-auth.js";
+import { onSnapshot } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
 
-// --- Inject CSS for transitioning button and management button ---
+// --- Inject CSS for transitioning button ---
 const style = document.createElement('style');
 style.textContent = `
     #add-transitioning-btn {
@@ -15,43 +16,6 @@ style.textContent = `
         cursor: pointer !important;
         margin: 5px !important;
     }
-    #talkToManagementBtn {
-        background: #8B4513 !important;
-        color: white !important;
-        padding: 10px 20px !important;
-        border-radius: 5px !important;
-        border: none !important;
-        cursor: pointer !important;
-        margin: 5px !important;
-        position: relative !important;
-        display: flex !important;
-        align-items: center !important;
-        justify-content: center !important;
-    }
-    #talkToManagementBtn:hover {
-        background: #654321 !important;
-    }
-    .message-badge {
-        position: absolute !important;
-        top: -5px !important;
-        right: -5px !important;
-        background: #ff4444 !important;
-        color: white !important;
-        border-radius: 50% !important;
-        width: 18px !important;
-        height: 18px !important;
-        font-size: 10px !important;
-        display: flex !important;
-        align-items: center !important;
-        justify-content: center !important;
-    }
-    .priority-urgent { border-left: 4px solid #dc2626 !important; }
-    .priority-high { border-left: 4px solid #ea580c !important; }
-    .priority-normal { border-left: 4px solid #2563eb !important; }
-    .status-open { color: #dc2626 !important; font-weight: bold !important; }
-    .status-in-progress { color: #ea580c !important; font-weight: bold !important; }
-    .status-resolved { color: #16a34a !important; font-weight: bold !important; }
-    .status-closed { color: #6b7280 !important; font-weight: bold !important; }
 `;
 document.head.appendChild(style);
 
@@ -63,10 +27,6 @@ let isBypassApprovalEnabled = false;
 // NEW: Global state for new admin settings
 let showStudentFees = false;
 let showEditDeleteButtons = false;
-
-// --- Message System Global State ---
-let unreadMessagesCount = 0;
-let messagesListener = null;
 
 // --- Pay Scheme Configuration ---
 const PAY_SCHEMES = {
@@ -140,7 +100,6 @@ const PAY_SCHEMES = {
                 "Native Language": 30000,
                 "Foreign Language": 35000,
                 "Coding": 40000,
-                "ICT": 12000,
                 "Chess": 35000,
                 "Public Speaking": 35000,
                 "English Proficiency": 35000,
@@ -164,21 +123,6 @@ const SUBJECT_CATEGORIES = {
     "Native Language": ["Yoruba", "Igbo", "Hausa"],
     "Foreign Language": ["French", "German", "Spanish", "Arabic"],
     "Specialized": ["Music", "Coding","ICT", "Chess", "Public Speaking", "English Proficiency", "Counseling Programs"]
-};
-
-// --- Message Categories ---
-const MESSAGE_CATEGORIES = {
-    "General Feedback": "general",
-    "Payment Questions": "payment", 
-    "Student Concerns": "students",
-    "Technical Issues": "technical"
-};
-
-// --- Priority Levels ---
-const PRIORITY_LEVELS = {
-    "Normal": "normal",
-    "High": "high", 
-    "Urgent": "urgent"
 };
 
 // --- Local Storage Functions for Report Persistence ---
@@ -523,6 +467,7 @@ async function loadTutorReports(tutorEmail, parentName = null) {
         if (gradedReportsContainer) gradedReportsContainer.innerHTML = `<p class="text-red-500">Failed to load reports.</p>`;
     }
 }
+
 
 // ##################################################################
 // # SECTION 2: STUDENT DATABASE (MERGED FUNCTIONALITY)
@@ -1448,366 +1393,7 @@ async function renderStudentDatabase(container, tutor) {
 }
 
 // ##################################################################
-// # SECTION 3: MESSAGING SYSTEM (NEW)
-// ##################################################################
-
-// Function to inject the Talk to Management button
-function injectManagementButton() {
-    const whatsappBtn = document.getElementById('whatsappBtn');
-    
-    if (whatsappBtn && !document.getElementById('talkToManagementBtn')) {
-        const managementBtn = document.createElement('button');
-        managementBtn.id = 'talkToManagementBtn';
-        managementBtn.className = 'bg-brown-600 text-white px-4 py-2 rounded hover:bg-brown-700 ml-2 flex items-center';
-        managementBtn.innerHTML = `
-            <i class="fas fa-comments mr-2"></i>
-            Talk to Management
-            ${unreadMessagesCount > 0 ? `<span class="message-badge">${unreadMessagesCount}</span>` : ''}
-        `;
-        
-        // Insert after the WhatsApp button
-        whatsappBtn.parentNode.insertBefore(managementBtn, whatsappBtn.nextSibling);
-        
-        managementBtn.addEventListener('click', () => {
-            showMessageModal();
-        });
-        
-        console.log('Management button injected successfully');
-    } else if (!whatsappBtn) {
-        console.warn('WhatsApp button not found - cannot inject management button');
-    }
-}
-
-// Function to show message modal
-function showMessageModal(messageToEdit = null) {
-    const isEdit = messageToEdit !== null;
-    
-    const messageFormHTML = `
-        <h3 class="text-xl font-bold mb-4">${isEdit ? 'Edit Message' : 'Talk to Management'}</h3>
-        <div class="space-y-4">
-            <div>
-                <label class="block font-semibold">Category</label>
-                <select id="message-category" class="w-full mt-1 p-2 border rounded">
-                    <option value="">Select Category</option>
-                    ${Object.keys(MESSAGE_CATEGORIES).map(category => 
-                        `<option value="${MESSAGE_CATEGORIES[category]}" ${isEdit && messageToEdit.category === MESSAGE_CATEGORIES[category] ? 'selected' : ''}>${category}</option>`
-                    ).join('')}
-                </select>
-            </div>
-            <div>
-                <label class="block font-semibold">Priority</label>
-                <select id="message-priority" class="w-full mt-1 p-2 border rounded">
-                    ${Object.keys(PRIORITY_LEVELS).map(priority => 
-                        `<option value="${PRIORITY_LEVELS[priority]}" ${isEdit && messageToEdit.priority === PRIORITY_LEVELS[priority] ? 'selected' : ''}>${priority}</option>`
-                    ).join('')}
-                </select>
-            </div>
-            <div>
-                <label class="block font-semibold">Message</label>
-                <textarea id="message-content" class="w-full mt-1 p-2 border rounded" rows="6" placeholder="Describe your issue or question in detail...">${isEdit ? messageToEdit.message : ''}</textarea>
-            </div>
-            <div class="flex justify-end space-x-2 mt-6">
-                <button id="cancel-message-btn" class="bg-gray-500 text-white px-6 py-2 rounded">Cancel</button>
-                <button id="send-message-btn" class="bg-green-600 text-white px-6 py-2 rounded">${isEdit ? 'Update Message' : 'Send Message'}</button>
-            </div>
-        </div>`;
-
-    const messageModal = document.createElement('div');
-    messageModal.className = 'fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex items-center justify-center z-50';
-    messageModal.innerHTML = `<div class="relative bg-white p-8 rounded-lg shadow-xl w-full max-w-2xl mx-auto">${messageFormHTML}</div>`;
-    document.body.appendChild(messageModal);
-
-    document.getElementById('cancel-message-btn').addEventListener('click', () => messageModal.remove());
-    document.getElementById('send-message-btn').addEventListener('click', async () => {
-        const category = document.getElementById('message-category').value;
-        const priority = document.getElementById('message-priority').value;
-        const message = document.getElementById('message-content').value.trim();
-
-        if (!category || !message) {
-            showCustomAlert('Please select a category and write your message.');
-            return;
-        }
-
-        messageModal.remove();
-
-        if (isEdit) {
-            await updateMessage(messageToEdit.id, { category, priority, message });
-        } else {
-            await sendMessageToManagement(category, priority, message);
-        }
-    });
-}
-
-// Function to send message to management
-async function sendMessageToManagement(category, priority, message) {
-    try {
-        const messageData = {
-            tutorId: window.tutorData.id,
-            tutorName: window.tutorData.name,
-            tutorEmail: window.tutorData.email,
-            category: category,
-            priority: priority,
-            message: message,
-            status: 'open',
-            createdAt: new Date(),
-            updatedAt: new Date(),
-            unread: true
-        };
-
-        await addDoc(collection(db, "tutor_messages"), messageData);
-        showCustomAlert('Your message has been sent to management successfully!');
-        
-        // Refresh messages count
-        loadUnreadMessagesCount();
-    } catch (error) {
-        console.error("Error sending message:", error);
-        showCustomAlert('Failed to send message. Please try again.');
-    }
-}
-
-// Function to update message
-async function updateMessage(messageId, updates) {
-    try {
-        const messageRef = doc(db, "tutor_messages", messageId);
-        await updateDoc(messageRef, {
-            ...updates,
-            updatedAt: new Date()
-        });
-        showCustomAlert('Message updated successfully!');
-    } catch (error) {
-        console.error("Error updating message:", error);
-        showCustomAlert('Failed to update message. Please try again.');
-    }
-}
-
-// Function to load unread messages count
-function loadUnreadMessagesCount() {
-    if (!window.tutorData) return;
-
-    // Clean up existing listener
-    if (messagesListener) {
-        messagesListener();
-    }
-
-    const messagesQuery = query(
-        collection(db, "tutor_messages"),
-        where("tutorId", "==", window.tutorData.id),
-        where("unread", "==", true)
-    );
-
-    messagesListener = onSnapshot(messagesQuery, (snapshot) => {
-        unreadMessagesCount = snapshot.size;
-        updateManagementButtonBadge();
-    });
-}
-
-// Function to update the badge on management button
-function updateManagementButtonBadge() {
-    const managementBtn = document.getElementById('talkToManagementBtn');
-    if (managementBtn) {
-        managementBtn.innerHTML = `
-            <i class="fas fa-comments mr-2"></i>
-            Talk to Management
-            ${unreadMessagesCount > 0 ? `<span class="message-badge">${unreadMessagesCount}</span>` : ''}
-        `;
-    }
-}
-
-// Function to show message history
-function showMessageHistory() {
-    if (!window.tutorData) return;
-
-    const messagesQuery = query(
-        collection(db, "tutor_messages"),
-        where("tutorId", "==", window.tutorData.id),
-        orderBy("createdAt", "desc")
-    );
-
-    getDocs(messagesQuery).then(snapshot => {
-        const messages = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        renderMessageHistoryModal(messages);
-    }).catch(error => {
-        console.error("Error loading message history:", error);
-        showCustomAlert('Failed to load message history.');
-    });
-}
-
-// Function to render message history modal
-function renderMessageHistoryModal(messages) {
-    let messagesHTML = '';
-    
-    if (messages.length === 0) {
-        messagesHTML = '<p class="text-gray-500 text-center py-8">No messages found.</p>';
-    } else {
-        messagesHTML = `
-            <div class="space-y-4 max-h-96 overflow-y-auto">
-                ${messages.map(message => `
-                    <div class="border rounded-lg p-4 ${getPriorityClass(message.priority)}">
-                        <div class="flex justify-between items-start">
-                            <div>
-                                <h4 class="font-semibold">${getCategoryDisplayName(message.category)}</h4>
-                                <p class="text-sm text-gray-600 mt-1">${message.message}</p>
-                                <div class="flex space-x-4 mt-2 text-xs text-gray-500">
-                                    <span>Priority: <strong>${getPriorityDisplayName(message.priority)}</strong></span>
-                                    <span>Status: <strong class="${getStatusClass(message.status)}">${message.status}</strong></span>
-                                    <span>Sent: ${message.createdAt.toDate().toLocaleDateString()}</span>
-                                </div>
-                            </div>
-                            <div class="flex space-x-2">
-                                ${message.status === 'open' ? `
-                                    <button class="edit-message-btn text-blue-600 text-sm" data-message-id="${message.id}">Edit</button>
-                                ` : ''}
-                                ${message.responses && message.responses.length > 0 ? `
-                                    <button class="view-responses-btn text-green-600 text-sm" data-message-id="${message.id}">View Responses (${message.responses.length})</button>
-                                ` : ''}
-                            </div>
-                        </div>
-                    </div>
-                `).join('')}
-            </div>
-        `;
-    }
-
-    const historyModalHTML = `
-        <h3 class="text-xl font-bold mb-4">Message History</h3>
-        ${messagesHTML}
-        <div class="flex justify-end space-x-2 mt-6">
-            <button id="close-history-btn" class="bg-gray-500 text-white px-6 py-2 rounded">Close</button>
-            <button id="new-message-btn" class="bg-green-600 text-white px-6 py-2 rounded">New Message</button>
-        </div>
-    `;
-
-    const historyModal = document.createElement('div');
-    historyModal.className = 'fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex items-center justify-center z-50';
-    historyModal.innerHTML = `<div class="relative bg-white p-8 rounded-lg shadow-xl w-full max-w-4xl mx-auto">${historyModalHTML}</div>`;
-    document.body.appendChild(historyModal);
-
-    document.getElementById('close-history-btn').addEventListener('click', () => historyModal.remove());
-    document.getElementById('new-message-btn').addEventListener('click', () => {
-        historyModal.remove();
-        showMessageModal();
-    });
-
-    // Add event listeners for edit buttons
-    document.querySelectorAll('.edit-message-btn').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-            const messageId = e.target.getAttribute('data-message-id');
-            const message = messages.find(m => m.id === messageId);
-            if (message) {
-                historyModal.remove();
-                showMessageModal(message);
-            }
-        });
-    });
-
-    // Add event listeners for view responses buttons
-    document.querySelectorAll('.view-responses-btn').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-            const messageId = e.target.getAttribute('data-message-id');
-            const message = messages.find(m => m.id === messageId);
-            if (message) {
-                historyModal.remove();
-                showMessageResponses(message);
-            }
-        });
-    });
-}
-
-// Function to show message responses
-function showMessageResponses(message) {
-    const responses = message.responses || [];
-    
-    const responsesHTML = `
-        <h3 class="text-xl font-bold mb-4">Responses for Your Message</h3>
-        <div class="bg-gray-50 p-4 rounded-lg mb-4">
-            <p class="font-semibold">Your original message:</p>
-            <p class="text-sm text-gray-600 mt-1">${message.message}</p>
-        </div>
-        <div class="space-y-4 max-h-96 overflow-y-auto">
-            ${responses.length > 0 ? responses.map(response => `
-                <div class="border-l-4 border-green-500 bg-green-50 p-4 rounded-r-lg">
-                    <div class="flex justify-between items-start">
-                        <div>
-                            <p class="font-semibold">Management Response</p>
-                            <p class="text-sm text-gray-600 mt-1">${response.message}</p>
-                            <p class="text-xs text-gray-500 mt-2">${response.createdAt.toDate().toLocaleString()}</p>
-                        </div>
-                    </div>
-                </div>
-            `).join('') : `
-                <p class="text-gray-500 text-center py-8">No responses yet. Management will respond soon.</p>
-            `}
-        </div>
-        <div class="flex justify-end space-x-2 mt-6">
-            <button id="close-responses-btn" class="bg-gray-500 text-white px-6 py-2 rounded">Close</button>
-            <button id="back-to-history-btn" class="bg-blue-600 text-white px-6 py-2 rounded">Back to History</button>
-        </div>
-    `;
-
-    const responsesModal = document.createElement('div');
-    responsesModal.className = 'fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex items-center justify-center z-50';
-    responsesModal.innerHTML = `<div class="relative bg-white p-8 rounded-lg shadow-xl w-full max-w-4xl mx-auto">${responsesHTML}</div>`;
-    document.body.appendChild(responsesModal);
-
-    document.getElementById('close-responses-btn').addEventListener('click', () => responsesModal.remove());
-    document.getElementById('back-to-history-btn').addEventListener('click', () => {
-        responsesModal.remove();
-        showMessageHistory();
-    });
-
-    // Mark message as read if there are unread responses
-    const unreadResponses = responses.filter(r => r.unread);
-    if (unreadResponses.length > 0) {
-        markMessageAsRead(message.id);
-    }
-}
-
-// Function to mark message as read
-async function markMessageAsRead(messageId) {
-    try {
-        const messageRef = doc(db, "tutor_messages", messageId);
-        await updateDoc(messageRef, { unread: false });
-    } catch (error) {
-        console.error("Error marking message as read:", error);
-    }
-}
-
-// Helper functions for message system
-function getPriorityClass(priority) {
-    switch (priority) {
-        case 'urgent': return 'priority-urgent';
-        case 'high': return 'priority-high';
-        case 'normal': return 'priority-normal';
-        default: return '';
-    }
-}
-
-function getStatusClass(status) {
-    switch (status) {
-        case 'open': return 'status-open';
-        case 'in-progress': return 'status-in-progress';
-        case 'resolved': return 'status-resolved';
-        case 'closed': return 'status-closed';
-        default: return '';
-    }
-}
-
-function getCategoryDisplayName(category) {
-    for (const [key, value] of Object.entries(MESSAGE_CATEGORIES)) {
-        if (value === category) return key;
-    }
-    return category;
-}
-
-function getPriorityDisplayName(priority) {
-    for (const [key, value] of Object.entries(PRIORITY_LEVELS)) {
-        if (value === priority) return key;
-    }
-    return priority;
-}
-
-// ##################################################################
-// # SECTION 4: MAIN APP INITIALIZATION
+// # SECTION 3: MAIN APP INITIALIZATION
 // ##################################################################
 document.addEventListener('DOMContentLoaded', async () => {
     onAuthStateChanged(auth, async (user) => {
@@ -1823,10 +1409,6 @@ document.addEventListener('DOMContentLoaded', async () => {
                 if (shouldShowEmploymentPopup(tutorData)) {
                     showEmploymentDatePopup(tutorData);
                 }
-                
-                // Inject management button and load messages
-                injectManagementButton();
-                loadUnreadMessagesCount();
                 
                 renderTutorDashboard(document.getElementById('mainContent'), tutorData);
             } else {
@@ -1859,23 +1441,17 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
 
     // ##################################################################
-    // # SECTION 5: AUTO-REGISTERED STUDENTS NAVIGATION
+    // # SECTION 4: AUTO-REGISTERED STUDENTS NAVIGATION (NEW - ADDED AT BOTTOM)
     // ##################################################################
     document.getElementById('navAutoStudents').addEventListener('click', () => {
         if (window.tutorData) {
             renderAutoRegisteredStudents(document.getElementById('mainContent'), window.tutorData);
         }
     });
-
-    // ##################################################################
-    // # SECTION 6: MESSAGE HISTORY NAVIGATION (NEW)
-    // ##################################################################
-    // We'll add this functionality to the management button in the navigation
-    // This will be handled by the injectManagementButton function
 });
 
 // ##################################################################
-// # SECTION 7: AUTO-REGISTERED STUDENTS DISPLAY
+// # SECTION 5: AUTO-REGISTERED STUDENTS DISPLAY (NEW - ADDED AT BOTTOM)
 // ##################################################################
 
 function renderAutoRegisteredStudents(container, tutor) {
@@ -1991,3 +1567,5 @@ function renderAutoStudentsList(students) {
         });
     });
 }
+
+
