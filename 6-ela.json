@@ -1,56 +1,46 @@
 {
   "tests": [
     {
-      "id": "staar_english_i_2019",
-      "subject": "English I",
-      "grade": "9",
+      "id": "staar_reading_6_2019",
+      "subject": "Reading",
+      "grade": "6",
       "year": "2019",
       "defaultQuestionType": "multiple-choice",
       "passages": [
         {
           "passageId": "p1",
-          "title": "The Great Barrier Reef",
-          "content": "[PASSAGE TEXT TO BE UPLOADED: Candice's paper on the Great Barrier Reef, sentences 1-35]"
+          "title": "A Picture of Peace",
+          "content": "[Full passage text from PDF pages 4-6]"
         },
         {
           "passageId": "p2",
-          "title": "The Case for a Mentoring Program",
-          "content": "[PASSAGE TEXT TO BE UPLOADED: Melody's essay on a mentoring program, sentences 1-23]"
+          "title": "Fire Birds",
+          "content": "[Full passage text from PDF pages 10-11]"
         },
         {
           "passageId": "p3",
-          "title": "Owner's Best Friend",
-          "content": "[PASSAGE TEXT TO BE UPLOADED: Gabriella's paper on owning a pet, sentences 1-31]"
+          "title": "Soaring to New Heights",
+          "content": "[Full passage text from PDF pages 14-15]"
         },
         {
           "passageId": "p4",
-          "title": "Flying to New Heights",
-          "content": "[PASSAGE TEXT TO BE UPLOADED: Gena's essay about Bessie Coleman, sentences 1-30]"
+          "title": "See It Through",
+          "content": "[Full passage text from PDF page 16]"
         },
         {
-          "passageId": "p5",
-          "title": "A Baseball School for Big-League Dreamers",
-          "content": "[PASSAGE TEXT TO BE UPLOADED: Article by Robert Benincasa, paragraphs 1-33]"
+          "passageId": "p5_paired",
+          "title": "Paired Passages: Soaring to New Heights & See It Through",
+          "content": "[This is a paired passage entry. The content is drawn from p3 and p4.]"
         },
         {
           "passageId": "p6",
-          "title": "I Believe in the Also-Rans",
-          "content": "[PASSAGE TEXT TO BE UPLOADED: Essay by Clive B., paragraphs 1-9]"
+          "title": "A Walk Through My Rain Forest",
+          "content": "[Full poem text from PDF page 23]"
         },
         {
-          "passageId": "p7_paired",
-          "title": "Paired Passages: A Baseball School for Big-League Dreamers & I Believe in the Also-Rans",
-          "content": "[This is a paired passage entry. The content is drawn from p5 and p6.]"
-        },
-        {
-          "passageId": "p8",
-          "title": "from Antaeus",
-          "content": "[PASSAGE TEXT TO BE UPLOADED: Excerpt from the story by Borden Deal, paragraphs 1-32]"
-        },
-        {
-          "passageId": "p9",
-          "title": "My Desk",
-          "content": "[PASSAGE TEXT TO BE UPLOADED: Poem by Debora Marsh, lines 1-35]"
+          "passageId": "p7",
+          "title": "Flying into History",
+          "content": "[Full passage text from PDF pages 26-28]"
         }
       ],
       "questions": [
@@ -58,359 +48,397 @@
           "questionId": "q1",
           "passageId": "p1",
           "type": "multiple-choice",
-          "question": "What transition would be the most appropriate to use at the beginning of sentence 6?",
+          "question": "Read this sentence from paragraph 14.\n\nZach, normally as active as a fly in a doughnut shop, was on his stomach sleeping quietly.\n\nThe author's use of a simile in this sentence conveys to the reader that Zach usually —",
           "options": [
-            "As a matter of concern",
-            "For further evidence",
-            "To wipe away any doubt",
-            "For this reason among others"
+            "has trouble falling asleep",
+            "feels sick from eating sweets",
+            "has a great amount of energy",
+            "likes to sleep late in the morning"
           ],
-          "correctAnswer": "For this reason among others"
+          "correctAnswer": "has a great amount of energy"
         },
         {
           "questionId": "q2",
           "passageId": "p1",
           "type": "multiple-choice",
-          "question": "Candice needs a more effective thesis statement for her paper. Which sentence should replace sentence 8 to serve as the thesis statement?",
+          "question": "What is the main theme of the story?",
           "options": [
-            "There are other barrier reefs in the oceans of the world, but only the Great Barrier Reef is so well known.",
-            "The Great Barrier Reef of Australia is a supreme example of the mysteries of the natural world because of its wide variety of plant and animal life.",
-            "Some scientists believe the Great Barrier Reef first began to grow about 18 million years ago.",
-            "A coral reef like the Great Barrier Reef can grow only in shallow, warm water because it needs light from the sun to survive."
+            "Recognizing an unexpected opportunity can have surprising results.",
+            "Enjoying an activity is more important than winning.",
+            "Younger siblings require a lot of patience and kindness.",
+            "It is more rewarding to work with others on a task than to work alone."
           ],
-          "correctAnswer": "The Great Barrier Reef of Australia is a supreme example of the mysteries of the natural world because of its wide variety of plant and animal life."
+          "correctAnswer": "Recognizing an unexpected opportunity can have surprising results."
         },
         {
           "questionId": "q3",
           "passageId": "p1",
           "type": "multiple-choice",
-          "question": "Candice needs a topic sentence for the third paragraph (sentences 19-21). Which of the following sentences should be inserted before sentence 19 to introduce the ideas in this paragraph?",
+          "question": "Read the dictionary entry.\n\ncapture \\{kap-chər\\ v\n1. to gain control by force 2. to hold someone's interest 3. to take an opponent's piece in a game 4. to preserve a mood, scene, or quality\n\nWhich definition most closely matches the way the word capture is used in paragraph 2?",
           "options": [
-            "Over time a vast array of creatures has come to inhabit the Great Barrier Reef.",
-            "Marine animal species that are threatened are protected by the Great Barrier Reef Marine Park Authority.",
-            "The biodiversity of the Great Barrier Reef ensures its long-term existence.",
-            "The waters along the Great Barrier Reef provide a habitat for marine animals that researchers study."
+            "Definition 1",
+            "Definition 2",
+            "Definition 3",
+            "Definition 4"
           ],
-          "correctAnswer": "Over time a vast array of creatures has come to inhabit the Great Barrier Reef."
+          "correctAnswer": "Definition 4"
         },
         {
           "questionId": "q4",
           "passageId": "p1",
           "type": "multiple-choice",
-          "question": "Candice may have a redundant sentence in the fourth paragraph (sentences 22-26). Which sentence, if any, should be deleted?",
+          "question": "What is the best summary of the story?",
           "options": [
-            "Sentence 24",
-            "Sentence 25",
-            "Sentence 26",
-            "No sentence should be deleted."
+            "Michelle has been interested in photography since she was seven years old. She decides to enter a photography contest hosted by a local photo shop and must take a picture to express the theme of the contest, which is tranquillity. She takes pictures of a sunset, a cat, a still pond, and her sleeping brother.",
+            "Michelle tries to take a photograph of a sunset for a contest. Her little brother is very interested in what she is doing, and he wants her to take a photograph of him. After she is satisfied with her sunset picture, Michelle photographs her brother while he is sleeping.",
+            "Michelle has difficulty photographing a sunset for a photography contest she wants to enter. She finally gets a good sunset picture, and she also takes a picture of her sleeping brother. At the last minute she selects the photo she thinks best illustrates the contest theme of tranquillity.",
+            "Michelle enters a photography contest that requires the use of a traditional camera. The theme of the contest is tranquillity. After getting the pictures developed at the photo shop, Michelle reviews her photos and selects the one she thinks will help her win the contest."
           ],
-          "correctAnswer": "Sentence 26"
+          "correctAnswer": "Michelle has difficulty photographing a sunset for a photography contest she wants to enter. She finally gets a good sunset picture, and she also takes a picture of her sleeping brother. At the last minute she selects the photo she thinks best illustrates the contest theme of tranquillity."
         },
         {
           "questionId": "q5",
           "passageId": "p1",
           "type": "multiple-choice",
-          "question": "Candice would like to improve her concluding sentence by summing up the ideas she has presented. Which sentence should she use to replace sentence 35?",
+          "question": "Read this sentence from paragraph 10.\n\nSoon the sky glowed orange, gold, and pink as the sun drifted toward the horizon.\n\nIn what way does the imagery in the sentence contribute to the story?",
           "options": [
-            "Finally, we must protect the Great Barrier Reef from being destroyed so future generations can enjoy it.",
-            "How much still remains to be discovered about the Great Barrier Reef of Australia is anybody's guess.",
-            "Researchers should explore the oceans further to try to find other natural wonders like the Great Barrier Reef.",
-            "Attracting visitors from around the world, the Great Barrier Reef has a beauty that is perhaps unequaled anywhere on Earth."
+            "It emphasizes how difficult it is to photograph the colors of a sunset.",
+            "It explains why Michelle thinks a sunset is a good subject for a photo.",
+            "It shows that nature is the best source of inspiration.",
+            "It suggests that Michelle is a talented photographer."
           ],
-          "correctAnswer": "Attracting visitors from around the world, the Great Barrier Reef has a beauty that is perhaps unequaled anywhere on Earth."
+          "correctAnswer": "It explains why Michelle thinks a sunset is a good subject for a photo."
         },
         {
           "questionId": "q6",
-          "passageId": "p2",
+          "passageId": "p1",
           "type": "multiple-choice",
-          "question": "Melody's opening sentence is unclear. What change should she make in sentence 1 to clarify her introductory paragraph?",
+          "question": "Why are the events in paragraph 14 important to the plot?",
           "options": [
-            "Change They to Teachers and leaders at our school",
-            "Change continually to always",
-            "Change telling us to instructing us",
-            "Change community to surrounding neighborhood"
+            "Michelle takes the photo she will decide to submit for the contest.",
+            "Michelle has more film available than she realizes.",
+            "Michelle takes a photo that will please her mother.",
+            "Michelle keeps her promise to her brother."
           ],
-          "correctAnswer": "Change They to Teachers and leaders at our school"
+          "correctAnswer": "Michelle takes the photo she will decide to submit for the contest."
         },
         {
           "questionId": "q7",
-          "passageId": "p2",
+          "passageId": "p1",
           "type": "multiple-choice",
-          "question": "What is the most effective way to combine sentences 6 and 7?",
+          "question": "Which sentence from the story best supports the idea that taking great photographs requires some effort?",
           "options": [
-            "My own sister is having a hard time in math attending one of the elementary schools that feeds into our high school.",
-            "My own sister attends one of the elementary schools that feeds into our high school although she is having a hard time in math.",
-            "My own sister, who attends one of the elementary schools that feeds into our high school, is having a hard time in math.",
-            "My own sister attends one of the elementary schools that feeds into our high school, she is having a hard time in math."
+            "When her father examined her blurred images and aimless shots, he advised Michelle to look through the lens and think about what the resulting picture would look like. (paragraph 1)",
+            "That picture still hangs on her bedroom wall. (paragraph 1)",
+            "\"We turn in the roll of film, it gets developed, and then we choose which picture we want to enter into the contest, just to make sure everything is fair.\" (paragraph 5)",
+            "\"I have to do my homework and think about something besides the contest.\" (paragraph 9)"
           ],
-          "correctAnswer": "My own sister, who attends one of the elementary schools that feeds into our high school, is having a hard time in math."
+          "correctAnswer": "When her father examined her blurred images and aimless shots, he advised Michelle to look through the lens and think about what the resulting picture would look like. (paragraph 1)"
         },
         {
           "questionId": "q8",
           "passageId": "p2",
           "type": "multiple-choice",
-          "question": "Melody needs a better transition into the third paragraph (sentences 12-17) of her essay. Which of the following could she add before sentence 12 to improve this transition?",
+          "question": "Based on information presented in the selection, what can the reader conclude about the black-backed woodpecker?",
           "options": [
-            "In researching mentoring programs, I learned of several promising results.",
-            "As I think about a mentoring program, I have many ideas on how it should work.",
-            "If struggling youngsters get the help they need, it could benefit teachers, too.",
-            "Because I believe in the mentoring concept, I'd like to see it at our school."
+            "It prefers to eat small insects but also consumes a variety of fruits and seeds.",
+            "It is better protected from danger when living in a burned forest than when living in an unburned forest.",
+            "It moves from forests in Canada to forests in the United States each year.",
+            "It leaves the burned forest because other birds invade its habitat."
           ],
-          "correctAnswer": "In researching mentoring programs, I learned of several promising results."
+          "correctAnswer": "It is better protected from danger when living in a burned forest than when living in an unburned forest."
         },
         {
           "questionId": "q9",
           "passageId": "p2",
           "type": "multiple-choice",
-          "question": "Melody would like to add the following counterargument to her essay. 'Some students may say that they don't have enough time to participate in a mentoring program because of other activities in which they are involved.' Where is the best place for her to insert this sentence?",
+          "question": "Read the origin of the word devastate.\n\nfrom Latin de- + vastare, meaning \"to lay waste\"\n\nThis information helps the reader understand that devastated in paragraph 1 means —",
           "options": [
-            "Before sentence 5",
-            "Before sentence 10",
-            "Before sentence 13",
-            "Before sentence 21"
+            "ruined",
+            "empty",
+            "harsh",
+            "remote"
           ],
-          "correctAnswer": "Before sentence 21"
+          "correctAnswer": "ruined"
         },
         {
           "questionId": "q10",
-          "passageId": "p3",
+          "passageId": "p2",
           "type": "multiple-choice",
-          "question": "What change, if any, needs to be made in sentence 4?",
+          "question": "The author wrote this selection most likely to —",
           "options": [
-            "Change benefitial to beneficial",
-            "Insert a comma after people",
-            "Change healthier to healthiest",
-            "No change is needed in sentence 4."
+            "describe ways that forest fires affect an area",
+            "explain how burned forests benefit from the black-backed woodpecker",
+            "convince the reader that the black-backed woodpecker is an unusual type of bird",
+            "demonstrate the ways animals survive in different types of forests"
           ],
-          "correctAnswer": "Change benefitial to beneficial"
+          "correctAnswer": "explain how burned forests benefit from the black-backed woodpecker"
         },
         {
           "questionId": "q11",
-          "passageId": "p3",
+          "passageId": "p2",
           "type": "multiple-choice",
-          "question": "What is the correct way to write sentence 9?",
+          "question": "Which sentence from the selection best explains why the black-backed woodpecker is able to build its unique type of home?",
           "options": [
-            "People feel safe when confiding in their pets; without being judgmental. A pet will often sit compassionately by its owner's side for as long as is needed.",
-            "People feel safe when confiding in their pets, without being judgmental; a pet will often sit compassionately by its owner's side for as long as is needed.",
-            "People feel safe when confiding in their pets. Without being judgmental, a pet will often sit compassionately; by its owner's side, for as long as is needed.",
-            "People feel safe when confiding in their pets; without being judgmental, a pet will often sit compassionately by its owner's side for as long as is needed."
+            "This woodpecker relies on the environment of the burned forest. (paragraph 2)",
+            "This nest is usually built inside a tree trunk or a fallen log. (paragraph 4)",
+            "It also has a very thick skull bone and a strong neck. (paragraph 4)",
+            "The woodpecker can move into the nest cavity as soon as it is drilled. (paragraph 4)"
           ],
-          "correctAnswer": "People feel safe when confiding in their pets; without being judgmental, a pet will often sit compassionately by its owner's side for as long as is needed."
+          "correctAnswer": "It also has a very thick skull bone and a strong neck. (paragraph 4)"
         },
         {
           "questionId": "q12",
-          "passageId": "p3",
+          "passageId": "p2",
           "type": "multiple-choice",
-          "question": "What change, if any, needs to be made in sentence 26?",
+          "question": "What can the reader conclude from paragraphs 5 through 8?",
           "options": [
-            "Change minimal to minamal",
-            "Change are to were",
-            "Delete the comma after appropriate",
-            "No change is necessary."
+            "The work of the black-backed woodpecker has a lasting impact on the survival of other forest birds and animals.",
+            "The black-backed woodpecker moves to another forest when it has difficulty finding food.",
+            "Plants on the forest floor produce fruits and seeds that attract black-backed woodpeckers to the burned forest.",
+            "The black-backed woodpecker is without a home when people try to clean up a burned forest."
           ],
-          "correctAnswer": "Delete the comma after appropriate"
+          "correctAnswer": "The work of the black-backed woodpecker has a lasting impact on the survival of other forest birds and animals."
         },
         {
           "questionId": "q13",
-          "passageId": "p3",
+          "passageId": "p2",
           "type": "multiple-choice",
-          "question": "What change should be made in sentence 30?",
+          "question": "The photograph and caption next to paragraphs 5 and 6 in the selection convey the idea that the nest cavity —",
           "options": [
-            "Change poet to Poet",
-            "Change until to Until",
-            "Change one's to ones'",
-            "Change remains to remained"
+            "extends beyond the tree",
+            "is fast and easy to construct",
+            "can only be used in certain seasons",
+            "provides a safe environment"
           ],
-          "correctAnswer": "Change until to Until"
+          "correctAnswer": "provides a safe environment"
         },
         {
           "questionId": "q14",
-          "passageId": "p4",
+          "passageId": "p3",
           "type": "multiple-choice",
-          "question": "What is the correct way to write sentence 8?",
+          "question": "Which sentence best expresses the main idea of paragraph 2?",
           "options": [
-            "She promised her mother that she would succeed consequently, she walked the four-mile distance daily, between her home and school.",
-            "She promised her mother that she would succeed consequently she walked the four-mile distance daily between her home and school.",
-            "She promised her mother that she would succeed. Consequently, she walked; the four-mile distance daily between her home and school.",
-            "She promised her mother that she would succeed. Consequently, she walked the four-mile distance daily between her home and school."
+            "Brown adapted her technique as her vision worsened.",
+            "Brown believed that being a junior in high school was easy.",
+            "Brown succeeded at pole vaulting despite her disability.",
+            "Brown competed in the Texas state championships twice."
           ],
-          "correctAnswer": "She promised her mother that she would succeed. Consequently, she walked the four-mile distance daily between her home and school."
+          "correctAnswer": "Brown adapted her technique as her vision worsened."
         },
         {
           "questionId": "q15",
-          "passageId": "p4",
+          "passageId": "p3",
           "type": "multiple-choice",
-          "question": "What change, if any, needs to be made in sentence 10?",
+          "question": "The photograph and caption below paragraph 1 help the reader understand that —",
           "options": [
-            "Change have run to ran",
-            "Delete the comma after year",
-            "Change was forced to is forced",
-            "Make no change"
+            "Brown requires special tools to compete",
+            "Brown needs to confirm her placement on the track",
+            "Brown is becoming more successful at pole vaulting",
+            "Brown appreciates the support of her coach"
           ],
-          "correctAnswer": "Change have run to ran"
+          "correctAnswer": "Brown needs to confirm her placement on the track"
         },
         {
           "questionId": "q16",
-          "passageId": "p4",
+          "passageId": "p3",
           "type": "multiple-choice",
-          "question": "What change should Gena make in sentence 17?",
+          "question": "Which sentence from the selection best highlights that the author is impressed with Brown?",
           "options": [
-            "Insert a comma after September",
-            "Change whom to who",
-            "Change proficient to proficiant",
-            "Change came to comes"
+            "Because she could distinguish between light and dark, she and her coach developed a system that enabled Brown to vault competitively.",
+            "She had made it back to the state championships in the pole vault.",
+            "She has even considered competing in the Olympics.",
+            "With these goals in mind, Brown will surely continue to soar to new heights."
           ],
-          "correctAnswer": "Change whom to who"
+          "correctAnswer": "With these goals in mind, Brown will surely continue to soar to new heights."
         },
         {
           "questionId": "q17",
-          "passageId": "p4",
+          "passageId": "p3",
           "type": "multiple-choice",
-          "question": "What change, if any, needs to be made in sentence 25?",
+          "question": "In paragraph 3, what does the word diminished mean?",
           "options": [
-            "Insert a comma after performance",
-            "Change the comma after 1926 to a semicolon",
-            "Change mechanical to machanical",
-            "No change should be made."
+            "Changed constantly",
+            "Been reduced",
+            "Caused defeat",
+            "Produced confusion"
           ],
-          "correctAnswer": "No change should be made."
+          "correctAnswer": "Been reduced"
         },
         {
           "questionId": "q18",
-          "passageId": "p4",
+          "passageId": "p3",
           "type": "multiple-choice",
-          "question": "How does sentence 28 need to be changed?",
+          "question": "The organization of paragraphs 1 and 2 contributes to the author's main idea by —",
           "options": [
-            "Change Similar to Similarly",
-            "Change female to females",
-            "Change started to would start",
-            "Insert a comma after Club"
+            "comparing Brown with the other athletes she competes against",
+            "explaining how Brown overcame her challenges over time",
+            "highlighting the competitions Brown has participated in",
+            "showing the cause of Brown's disability and its effects on her activities"
           ],
-          "correctAnswer": "Change Similar to Similarly"
+          "correctAnswer": "explaining how Brown overcame her challenges over time"
         },
         {
           "questionId": "q19",
-          "passageId": "p5",
+          "passageId": "p4",
           "type": "multiple-choice",
-          "question": "Which sentence from \"A Baseball School for Big-League Dreamers\" best supports the main idea of the article?",
+          "question": "What is one message the author conveys in the selection?",
           "options": [
-            "Tuition, room and board here for the combined academic and sports program is about $70,000 a year.",
-            "Most players here won't ever put on a big-league uniform, but they come to IMG trying to find and reach their potential.",
-            "He remembers being fascinated by how the players and coaches talked and how fans reacted to the game.",
-            "Ketch doesn't think about the numbers."
+            "Plan ahead for difficult times.",
+            "Be honest with those you love.",
+            "Take risks in order to be successful.",
+            "Treat others as you would like to be treated."
           ],
-          "correctAnswer": "Most players here won't ever put on a big-league uniform, but they come to IMG trying to find and reach their potential."
+          "correctAnswer": "Take risks in order to be successful."
         },
         {
           "questionId": "q20",
-          "passageId": "p5",
+          "passageId": "p4",
           "type": "multiple-choice",
-          "question": "Based on the article, the coaches at IMG can best be described as",
+          "question": "The author admires her mother mostly because her mother —",
           "options": [
-            "concerned about the effectiveness of their coaching ability",
-            "focused on becoming coaches at a professional level",
-            "dismissive of the mistakes students make",
-            "caring about the future success of the students"
+            "offers advice on a variety of topics",
+            "exposes the author to many new experiences",
+            "has been in a wheelchair for the author's entire life",
+            "lives in a way that demonstrates perseverance"
           ],
-          "correctAnswer": "caring about the future success of the students"
+          "correctAnswer": "lives in a way that demonstrates perseverance"
         },
         {
           "questionId": "q21",
-          "passageId": "p5",
+          "passageId": "p4",
           "type": "multiple-choice",
-          "question": "Read this quotation from paragraph 13. '\"Ketchum Marsh is one of the most successful stories that will come out of IMG,\" Bolek says, focusing not just on baseball, but on life.' What evidence does the author present in the article to support the opinion expressed in this quotation?",
+          "question": "What is the most likely reason the author does not tell her friends that her mother is paralyzed?",
           "options": [
-            "A reference to Marsh's work ethic",
-            "An anecdote about Marsh's time as a batboy",
-            "A description of Marsh's training regimen",
-            "Information about Marsh's future plans"
+            "She does not want people to judge her mother because of her disability.",
+            "She prefers to let her mother explain her own situation to others.",
+            "She does not think it is an important characteristic of her mother.",
+            "She thinks that most people already know her mother uses a wheelchair."
           ],
-          "correctAnswer": "A reference to Marsh's work ethic"
+          "correctAnswer": "She does not think it is an important characteristic of her mother."
         },
         {
           "questionId": "q22",
-          "passageId": "p5",
+          "passageId": "p4",
           "type": "multiple-choice",
-          "question": "The author wrote \"A Baseball School for Big-League Dreamers\" primarily to",
+          "question": "The author compares her mother with other mothers in order to show that —",
           "options": [
-            "highlight the reasons people pursue a career in sports",
-            "persuade readers to support schools that specialize in training student-athletes",
-            "inform readers about a unique school and the students who attend it",
-            "convince student-athletes to enroll in a specialized school for sports"
+            "her mother is more supportive than other mothers",
+            "her mother does many of the positive things that other mothers do",
+            "other mothers help the author as much as her own mother does",
+            "other mothers do not understand the difficulties her mother experiences"
           ],
-          "correctAnswer": "inform readers about a unique school and the students who attend it"
+          "correctAnswer": "her mother does many of the positive things that other mothers do"
         },
         {
           "questionId": "q23",
-          "passageId": "p5",
+          "passageId": "p4",
           "type": "multiple-choice",
-          "question": "Read paragraph 21. 'Baseball folklore tells us that the scrappiest kid on the sandlot has a shot at going to \"the show.\"' What does this sentence suggest?",
+          "question": "Which sentence from the selection best establishes how the author's mother approaches her situation?",
           "options": [
-            "Baseball players understand their potential at an early age.",
-            "Determination and grit could get a player to the big leagues.",
-            "Legends about baseball frequently inspire players to improve.",
-            "Most major-league players come from humble circumstances."
+            "Like most mothers, my mom wants the best for me.",
+            "She has been paralyzed from the waist down for most of her life, and all of mine.",
+            "She couldn't hike the volcano in Hawaii with the rest of the family or go cliff-jumping in Mexico.",
+            "No matter how good or bad the chances are of something working out in her favor, she always tries."
           ],
-          "correctAnswer": "Determination and grit could get a player to the big leagues."
+          "correctAnswer": "No matter how good or bad the chances are of something working out in her favor, she always tries."
         },
         {
           "questionId": "q24",
-          "passageId": "p5",
+          "passageId": "p4",
           "type": "multiple-choice",
-          "imagePlaceholder": "baseball_competition_pyramid.png",
-          "question": "What does the graphic best suggest about the different levels of baseball competition?",
+          "question": "Paragraph 4 shows that the author's family —",
           "options": [
-            "More athletes prefer playing college baseball than minor-league baseball.",
-            "Most Little League baseball players participate in multiple sports when they reach high school.",
-            "Playing Little League baseball is necessary to becoming a major-league player.",
-            "Baseball leagues become more selective as players advance."
+            "comforts the mother when she is unable to participate",
+            "supports the mother in her efforts to enjoy life to the fullest",
+            "wants to prevent the mother from taking unnecessary risks",
+            "thinks the mother should try activities designed specifically for people in wheelchairs"
           ],
-          "correctAnswer": "Baseball leagues become more selective as players advance."
+          "correctAnswer": "supports the mother in her efforts to enjoy life to the fullest"
         },
         {
           "questionId": "q25",
-          "passageId": "p5",
+          "passageId": "p5_paired",
           "type": "multiple-choice",
-          "question": "What can the reader conclude from the interaction between the pitching coach and Cameron Varga in paragraphs 17 through 20?",
+          "question": "The authors of the two selections most likely think their subject is someone who exhibits —",
           "options": [
-            "The pitching coach wants his players to always strive to improve.",
-            "The pitching coach is mainly concerned about winning games quickly.",
-            "Varga is confident in his ability to succeed in Florida.",
-            "Varga's number of pitches will decrease as his speed increases."
+            "bravery",
+            "humor",
+            "sympathy",
+            "forgiveness"
           ],
-          "correctAnswer": "The pitching coach wants his players to always strive to improve."
+          "correctAnswer": "bravery"
         },
         {
           "questionId": "q26",
-          "passageId": "p6",
+          "passageId": "p5_paired",
           "type": "multiple-choice",
-          "question": "What is the author's purpose for mentioning the children's race through the house?",
+          "question": "Read this sentence from \"Soaring to New Heights.\"\n\nHer coach now uses a whistle to keep her centered, and Brown uses a beeper that alerts her when to plant her pole.\n\nWhich phrase from \"See It Through\" illustrates that the mother also accomplishes tasks in a creative way?",
           "options": [
-            "To illustrate that some children value fun above competition",
-            "To emphasize that his child is athletically superior to her friends",
-            "To highlight that children often disregard household rules",
-            "To show that children lack concerns about safety when competing"
+            "mention that my mom is in a wheelchair",
+            "a cheerleader on the sideline of my soccer games",
+            "strapping herself to some stranger's lap in order to zip-line",
+            "mother showed me how to live outside of limits"
           ],
-          "correctAnswer": "To illustrate that some children value fun above competition"
+          "correctAnswer": "strapping herself to some stranger's lap in order to zip-line"
         },
         {
           "questionId": "q27",
-          "passageId": "p6",
+          "passageId": "p5_paired",
           "type": "multiple-choice",
-          "question": "Based on the information presented in the essay, what is one message the reader can infer?",
+          "question": "One difference between \"Soaring to New Heights\" and \"See It Through\" is that only \"See It Through\" —",
           "options": [
-            "Avoiding competition is better than participating when failure is certain.",
-            "Being rewarded simply for participating belittles the efforts of the winners.",
-            "Persistence ensures that a loser will eventually become a winner.",
-            "Satisfaction comes from being dedicated and doing your best."
+            "shows how problems caused by a physical challenge become less important over time",
+            "illustrates how certain activities can enhance the quality of a person's life",
+            "tells of the athletic accomplishments of a person who has limited mobility",
+            "describes a personal experience of living with someone who is disabled"
           ],
-          "correctAnswer": "Satisfaction comes from being dedicated and doing your best."
+          "correctAnswer": "describes a personal experience of living with someone who is disabled"
         },
         {
           "questionId": "q28",
+          "passageId": "p5_paired",
+          "type": "multiple-choice",
+          "question": "What does Charlotte Brown in \"Soaring to New Heights\" have in common with the author's mother in \"See It Through\"?",
+          "options": [
+            "They both want people to ignore the fact that they sometimes need assistance.",
+            "They both believe that their situation will improve someday.",
+            "They both are unwilling to use special accommodations.",
+            "They both refuse to let their circumstances limit their goals."
+          ],
+          "correctAnswer": "They both refuse to let their circumstances limit their goals."
+        },
+        {
+          "questionId": "q29",
           "passageId": "p6",
           "type": "multiple-choice",
-          "question": "Read the following dictionary entry. validate \\'va-lə-,dāt\\ v 1. declare or make legal 2. prove or confirm to be true 3. approve an expressed agreement 4. mark with an indication of being official. Which definition best matches the use of the word validated in paragraph 3?",
+          "question": "Which line from the poem best helps the reader imagine the flowers and fruits of the rain forest?",
+          "options": [
+            "Is more than can be described.",
+            "Its ponds are crowded",
+            "A palace of fragrance and tastes",
+            "Is pure paradise."
+          ],
+          "correctAnswer": "A palace of fragrance and tastes"
+        },
+        {
+          "questionId": "q30",
+          "passageId": "p6",
+          "type": "multiple-choice",
+          "question": "In stanza 3, the phrase \"Everywhere there is music\" indicates that the speaker —",
+          "options": [
+            "is distracted by the different sounds of nature",
+            "finds the sounds of the rain forest enchanting",
+            "wishes he could imitate the sounds he hears",
+            "can recognize certain birds by the sounds they make"
+          ],
+          "correctAnswer": "finds the sounds of the rain forest enchanting"
+        },
+        {
+          "questionId": "q31",
+          "passageId": "p6",
+          "type": "multiple-choice",
+          "question": "Read this dictionary entry.\n\nbrilliant \\'bril-yant\\ adj\n1. showing great intelligence\n2. vivid in appearance 3. full of light 4. excellent or superior in performance\n\nWhich definition best matches the way the word brilliant is used in line 4?",
           "options": [
             "Definition 1",
             "Definition 2",
@@ -420,323 +448,121 @@
           "correctAnswer": "Definition 2"
         },
         {
-          "questionId": "q29",
-          "passageId": "p6",
-          "type": "multiple-choice",
-          "question": "The author includes quotations in paragraph 8 primarily to",
-          "options": [
-            "highlight that Naomi and Kean rarely agree",
-            "emphasize Cyrus's noncompetitive nature",
-            "point out the author's concern for Cyrus",
-            "reveal Naomi's and Kean's athletic abilities"
-          ],
-          "correctAnswer": "emphasize Cyrus's noncompetitive nature"
-        },
-        {
-          "questionId": "q30",
-          "passageId": "p6",
-          "type": "multiple-choice",
-          "question": "Which quotation best expresses the author's viewpoint about being an \"also-ran\"?",
-          "options": [
-            "At school I was fortunate to win enough to balance all the times I lost, and I began to believe in this idea.",
-            "Our family enjoys a large house with a great running track.",
-            "Naomi and Kean have always been fast runners and very evenly matched, too.",
-            "I believe in celebrating those that finish third in a three-horse race."
-          ],
-          "correctAnswer": "I believe in celebrating those that finish third in a three-horse race."
-        },
-        {
-          "questionId": "q31",
-          "passageId": "p6",
-          "type": "multiple-choice",
-          "question": "What can the reader conclude from paragraph 3?",
-          "options": [
-            "The author's education did not fully prepare him for living in the real world.",
-            "The author was better at sports than at academics while growing up.",
-            "Educational priorities at elite schools differ from those in public schools.",
-            "Students in England are required to attend school through the university level."
-          ],
-          "correctAnswer": "The author's education did not fully prepare him for living in the real world."
-        },
-        {
           "questionId": "q32",
           "passageId": "p6",
           "type": "multiple-choice",
-          "question": "What is the main idea of the selection?",
+          "question": "Throughout the poem, the rain forest is presented as a place that is —",
           "options": [
-            "Children usually develop friendships with others who have similar abilities.",
-            "Parents should encourage their children to be active because fitness is important.",
-            "People should celebrate their best efforts even if they don't always succeed.",
-            "People who consistently win competitions as children have lifelong advantages over those who don't."
+            "attractive to many visitors",
+            "highly adaptable to change",
+            "without any imperfections",
+            "best experienced early in the morning"
           ],
-          "correctAnswer": "People should celebrate their best efforts even if they don't always succeed."
+          "correctAnswer": "without any imperfections"
         },
         {
           "questionId": "q33",
-          "passageId": "p7_paired",
+          "passageId": "p6",
           "type": "multiple-choice",
-          "question": "Both Ketchum Marsh in \"A Baseball School for Big-League Dreamers\" and the author of \"I Believe in the Also-Rans\"",
+          "question": "The poem's structure helps the reader —",
           "options": [
-            "are frustrated by their limited athletic abilities",
-            "are natives of the same geographic location",
-            "have families that emphasize the importance of athletics",
-            "have attended exclusive schools that focus on achievement"
+            "picture what a trip to the rain forest is like for the speaker",
+            "understand how much time the speaker spends in the rain forest",
+            "examine how the speaker's emotions about the rain forest change",
+            "realize how the speaker feels about the rain forest compared with other places"
           ],
-          "correctAnswer": "have attended exclusive schools that focus on achievement"
+          "correctAnswer": "picture what a trip to the rain forest is like for the speaker"
         },
         {
           "questionId": "q34",
-          "passageId": "p7_paired",
+          "passageId": "p6",
           "type": "multiple-choice",
-          "question": "Read this sentence from paragraph 2 of \"I Believe in the Also-Rans.\" 'As an English teenager I was schooled in an elite school where I was fed the idea that I was better than others and that achievement and winning were all-important.' Which sentence from \"A Baseball School for Big-League Dreamers\" contrasts with the attitude expressed in the sentence from \"I Believe in the Also-Rans\"?",
+          "question": "Read this line from the poem.\n\nIts greatness makes me feel very small.\n\nThis line helps the reader understand that the speaker —",
           "options": [
-            "\"You kind of just don't want to leave the field at the end of the night,\" he says.",
-            "\"We are not sending the message that every one of our players are going to wind up playing shortstop for the Mets.\"",
-            "Bolek, who has coached in the minors, the majors and college, says his job is not always about baseball.",
-            "And there's something else: Many of the coaches have given years to the game."
+            "feels unpleasantly overwhelmed by his surroundings",
+            "would prefer to visit the rain forest with a group of people",
+            "has a deep appreciation for his surroundings",
+            "wants to view the rain forest from a higher location"
           ],
-          "correctAnswer": "\"We are not sending the message that every one of our players are going to wind up playing shortstop for the Mets.\""
+          "correctAnswer": "has a deep appreciation for his surroundings"
         },
         {
           "questionId": "q35",
-          "passageId": "p7_paired",
+          "passageId": "p7",
           "type": "multiple-choice",
-          "question": "Which sentence correctly describes the organizational pattern used by the authors of the two selections?",
+          "question": "Which idea is supported throughout the selection?",
           "options": [
-            "Both selections provide definitions of key terms to add meaning to the texts.",
-            "Both selections include anecdotes as examples to support their main ideas.",
-            "Both selections use quotations from experts to support the main ideas in the texts.",
-            "Both selections use cause-and-effect to highlight the relationships between key ideas."
+            "Lindbergh was younger than most pilots hoping to fly from New York to Paris.",
+            "Airplanes with multiple engines were safest for crossing the Atlantic Ocean.",
+            "It took Lindbergh years to get the money he needed to build his plane.",
+            "Lindbergh believed a new strategy was needed to fly from New York to Paris."
           ],
-          "correctAnswer": "Both selections include anecdotes as examples to support their main ideas."
+          "correctAnswer": "Lindbergh believed a new strategy was needed to fly from New York to Paris."
         },
         {
           "questionId": "q36",
-          "passageId": "p7_paired",
+          "passageId": "p7",
           "type": "multiple-choice",
-          "question": "What do Ketchum Marsh in \"A Baseball School for Big-League Dreamers\" and Cyrus in \"I Believe in the Also-Rans\" have in common?",
+          "question": "Which detail about Lindbergh's flight supports the idea that he flew the plane low in the sky?",
           "options": [
-            "Neither is a natural-born athlete.",
-            "Both become easily frustrated by failure.",
-            "Neither has supportive adults in his life.",
-            "Both hope to play professional sports."
+            "Lindbergh used the stars to guide him.",
+            "Lindbergh called out to fishermen for directions.",
+            "The plane traveled through poor weather conditions.",
+            "The plane was equipped with hundreds of gallons of fuel."
           ],
-          "correctAnswer": "Neither is a natural-born athlete."
+          "correctAnswer": "Lindbergh called out to fishermen for directions."
         },
         {
           "questionId": "q37",
-          "passageId": "p7_paired",
+          "passageId": "p7",
           "type": "multiple-choice",
-          "question": "What is the purpose of paragraph 32 in \"A Baseball School for Big-League Dreamers\" and paragraph 3 in \"I Believe in the Also-Rans\"?",
+          "question": "The map of Lindbergh's flight path helps the reader understand —",
           "options": [
-            "To explain that early disappointment can often lead to long-term failure",
-            "To point out the educational advantages of attending elite schools",
-            "To emphasize that the realities of adult life often differ from early experiences",
-            "To specify the most important qualities needed to become a successful adult"
+            "that the hotel owner wanted Lindbergh to be the first pilot to reach Paris",
+            "why people were able to see the plane when Lindbergh flew over the ocean",
+            "that Lindbergh had to fly over a large body of water in order to get to Paris",
+            "why Lindbergh made so many test flights over land before his flight across the ocean"
           ],
-          "correctAnswer": "To emphasize that the realities of adult life often differ from early experiences"
+          "correctAnswer": "that Lindbergh had to fly over a large body of water in order to get to Paris"
         },
         {
           "questionId": "q38",
-          "passageId": "p8",
+          "passageId": "p7",
           "type": "multiple-choice",
-          "question": "What does the point of view used in the excerpt help the reader understand?",
+          "question": "What is the most likely reason the author wrote this selection?",
           "options": [
-            "How the adults found the garden",
-            "How T. J.'s reactions differ from the reactions of the other boys",
-            "How long the boys worked on the garden",
-            "How the boys agreed to help T. J. plant the garden"
+            "To give the history of pilots who have been honored for their contributions to air travel",
+            "To explain how businesses have impacted the production of planes throughout history",
+            "To provide information about how the design of planes has changed throughout history",
+            "To relate the details of an important event in the history of air travel"
           ],
-          "correctAnswer": "How T. J.'s reactions differ from the reactions of the other boys"
+          "correctAnswer": "To relate the details of an important event in the history of air travel"
         },
         {
           "questionId": "q39",
-          "passageId": "p8",
+          "passageId": "p7",
           "type": "multiple-choice",
-          "question": "How is the first sentence of the excerpt important to the plot?",
+          "question": "What is the best summary of the section titled \"The Flight\"?",
           "options": [
-            "It foreshadows the resolution.",
-            "It introduces the main character.",
-            "It initiates the main conflict.",
-            "It presents an unanswered question."
+            "Charles Lindbergh asked people for directions as he flew over fishing boats on his long flight to Paris, France.",
+            "Charles Lindbergh received awards from royalty and the president of the United States after he flew from New York to Paris.",
+            "Charles Lindbergh was the first pilot to complete the difficult nonstop flight from New York to Paris and became an international hero.",
+            "Charles Lindbergh flew across the Atlantic Ocean with only a compass and the stars to help him navigate through fog and darkness."
           ],
-          "correctAnswer": "It initiates the main conflict."
+          "correctAnswer": "Charles Lindbergh flew across the Atlantic Ocean with only a compass and the stars to help him navigate through fog and darkness."
         },
         {
           "questionId": "q40",
-          "passageId": "p8",
+          "passageId": "p7",
           "type": "multiple-choice",
-          "question": "In paragraph 30, what does the word laboriously mean?",
+          "question": "The main idea of paragraphs 4 and 5 is that the Spirit of St. Louis was —",
           "options": [
-            "At great cost",
-            "For good reason",
-            "Quietly and in secrecy",
-            "Slowly and with difficulty"
+            "rejected by most manufacturers Lindbergh approached",
+            "sponsored by local businessmen",
+            "completed in a short period of time",
+            "constructed specifically to satisfy Lindbergh's requirements"
           ],
-          "correctAnswer": "Slowly and with difficulty"
-        },
-        {
-          "questionId": "q41",
-          "passageId": "p8",
-          "type": "multiple-choice",
-          "question": "Read this quotation from paragraph 20. '\"It's our earth. It's our land. Can't nobody touch a man's own land.\"' The irony of this quotation is that it calls attention to",
-          "options": [
-            "the love T. J. has for the outdoors while he is on a man-made structure",
-            "the rooftop being abandoned and the men still caring about its welfare",
-            "the fact that T. J. does not have the right to use the rooftop despite creating the garden",
-            "the effort used to create a garden when it can be easily destroyed"
-          ],
-          "correctAnswer": "the fact that T. J. does not have the right to use the rooftop despite creating the garden"
-        },
-        {
-          "questionId": "q42",
-          "passageId": "p8",
-          "type": "multiple-choice",
-          "question": "What is a central theme of the excerpt?",
-          "options": [
-            "Adults often lose their sense of accomplishment as they age.",
-            "People take pride in their work.",
-            "People rely on authority figures to maintain order.",
-            "It is important to recognize the value of green spaces."
-          ],
-          "correctAnswer": "People take pride in their work."
-        },
-        {
-          "questionId": "q43",
-          "passageId": "p8",
-          "type": "multiple-choice",
-          "question": "What does T. J.'s climb back up the fire escape in paragraph 28 reveal about him?",
-          "options": [
-            "He has difficulty following rules.",
-            "He enjoys being the leader of a group.",
-            "He behaves in ways that others consider immature.",
-            "He takes action once he makes up his mind."
-          ],
-          "correctAnswer": "He takes action once he makes up his mind."
-        },
-        {
-          "questionId": "q44",
-          "passageId": "p8",
-          "type": "multiple-choice",
-          "question": "In paragraph 25, why does Blackie say, \"They own the building\"?",
-          "options": [
-            "To help the men by supporting their claim",
-            "To rally the boys to go against what T. J. has planned",
-            "To indicate the limitations of what the men can do",
-            "To convince T. J. that it is pointless to resist"
-          ],
-          "correctAnswer": "To convince T. J. that it is pointless to resist"
-        },
-        {
-          "questionId": "q45",
-          "passageId": "p8",
-          "type": "multiple-choice",
-          "question": "In paragraph 32, what does the blade of grass represent for T. J.?",
-          "options": [
-            "A final remnant of something precious",
-            "The harvest he anticipated",
-            "The new home he has found",
-            "His friendship with the other boys"
-          ],
-          "correctAnswer": "A final remnant of something precious"
-        },
-        {
-          "questionId": "q46",
-          "passageId": "p9",
-          "type": "multiple-choice",
-          "question": "Read lines 15 and 16. 'He sanded down the finish, erasing the indentations of the letters and numbers he had etched over time.' In line 16, the word etched most closely means",
-          "options": [
-            "perfected",
-            "imprinted",
-            "remembered",
-            "tarnished"
-          ],
-          "correctAnswer": "imprinted"
-        },
-        {
-          "questionId": "q47",
-          "passageId": "p9",
-          "type": "multiple-choice",
-          "question": "What is a theme of the poem?",
-          "options": [
-            "Children desire what their parents value.",
-            "Cherished objects can create connections between family members.",
-            "What is extraordinary to some may seem ordinary to others.",
-            "Old objects can be made new again by using imagination."
-          ],
-          "correctAnswer": "Cherished objects can create connections between family members."
-        },
-        {
-          "questionId": "q48",
-          "passageId": "p9",
-          "type": "multiple-choice",
-          "question": "What does the desk represent in the poem?",
-          "options": [
-            "The changes in style that happen over time",
-            "The pride that is found in caring for possessions",
-            "The new beginnings that come with each generation",
-            "The different ways creativity can be inspired in individuals"
-          ],
-          "correctAnswer": "The new beginnings that come with each generation"
-        },
-        {
-          "questionId": "q49",
-          "passageId": "p9",
-          "type": "multiple-choice",
-          "question": "Which line from the poem best indicates that the speaker is ready to relinquish ownership of the desk?",
-          "options": [
-            "Older than you by far, it sits in your room (line 28)",
-            "piled high with crayon drawings, coins, trolls, and hot wheels cars. (line 29)",
-            "You're still too young to do algebra homework. (line 30)",
-            "and paint it to match your bright green and lavender dreams. (line 35)"
-          ],
-          "correctAnswer": "and paint it to match your bright green and lavender dreams. (line 35)"
-        },
-        {
-          "questionId": "q50",
-          "passageId": "p9",
-          "type": "multiple-choice",
-          "question": "What tone is established in lines 22 through 25?",
-          "options": [
-            "Intellectual, because the speaker refers to academic matters",
-            "Playful, because the speaker quickly lists random details",
-            "Nostalgic, because the speaker warmly remembers the past",
-            "Hopeful, because the speaker refers to her childhood dreams"
-          ],
-          "correctAnswer": "Nostalgic, because the speaker warmly remembers the past"
-        },
-        {
-          "questionId": "q51",
-          "passageId": "p9",
-          "type": "multiple-choice",
-          "question": "What do the speaker's comments in lines 31 through 35 suggest?",
-          "options": [
-            "The speaker wants her child to find his or her own identity.",
-            "The speaker wants her child to select a new color for the desk.",
-            "The speaker believes her child deserves a new piece of furniture.",
-            "The speaker believes her child will refuse to accept her offer."
-          ],
-          "correctAnswer": "The speaker wants her child to find his or her own identity."
-        },
-        {
-          "questionId": "q52",
-          "passageId": "p9",
-          "type": "multiple-choice",
-          "question": "The repetition in lines 19 through 21 is used to emphasize that the desk",
-          "options": [
-            "contains messages written long ago",
-            "is worth a great amount of money",
-            "is outdated in its appearance",
-            "creates a timeless bond"
-          ],
-          "correctAnswer": "creates a timeless bond"
-        },
-        {
-          "questionId": "q_composition_1",
-          "passageId": null,
-          "type": "creative-writing",
-          "writing_type": "Expository",
-          "question": "Read the information in the box below.\n\nA Gallup poll found that Americans are 20 percent happier on weekends than on workdays. Americans also ranked working as one of their least pleasurable activities, while socializing after work was one of their most pleasurable activities.\n\nAlthough most people must structure their days around school or work, they still prefer their free time.\n\nThink carefully about this statement.\n\nWrite an essay explaining the importance of making time for both work and play."
+          "correctAnswer": "constructed specifically to satisfy Lindbergh's requirements"
         }
       ]
     }
