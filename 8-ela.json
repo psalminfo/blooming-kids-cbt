@@ -1,41 +1,46 @@
 {
   "tests": [
     {
-      "id": "staar_reading_3_2022",
+      "id": "staar_reading_8_2018",
       "subject": "Reading",
-      "grade": "3",
-      "year": "2022",
+      "grade": "8",
+      "year": "2018",
       "defaultQuestionType": "multiple-choice",
       "passages": [
         {
           "passageId": "p1",
-          "title": "The Unwelcome Neighbor",
-          "subtitle": "A tale from the Panchatantra¹",
-          "author": "Retold by Santhini Govindan",
-          "content": "[PASSAGE TEXT TO BE UPLOADED: The Unwelcome Neighbor, paragraphs 1-13]"
+          "title": "The Road Almost Taken",
+          "content": "[Full passage text from PDF pages 4-5]"
         },
         {
           "passageId": "p2",
-          "title": "Mission Blue",
-          "content": "[PASSAGE TEXT TO BE UPLOADED: Mission Blue, paragraphs 1-12]"
+          "title": "Talking to Technology",
+          "content": "[Full passage text from PDF pages 9-10]"
         },
         {
           "passageId": "p3",
-          "title": "Cheese for Dinner",
-          "subtitle": "A Tale from Mexico",
-          "author": "by Judy Goldman",
-          "content": "[PASSAGE TEXT TO BE UPLOADED: Cheese for Dinner, paragraphs 1-18]"
+          "title": "Starting from Scratch",
+          "content": "[Full passage text from PDF pages 12-13]"
         },
         {
           "passageId": "p4",
-          "title": "Book Clubs Are for Everyone!",
-          "content": "[PASSAGE TEXT TO BE UPLOADED: Book Clubs Are for Everyone!, paragraphs 1-7]"
+          "title": "Homemade Hot Sauce",
+          "content": "[Full poem text from PDF page 14]"
         },
         {
-          "passageId": "p5",
-          "title": "The Rescue",
-          "author": "by Laura Sassi",
-          "content": "[PASSAGE TEXT TO BE UPLOADED: The Rescue, lines 1-16]"
+          "passageId": "p5_paired",
+          "title": "Paired Passages: Starting from Scratch & Homemade Hot Sauce",
+          "content": "[This is a paired passage entry. The content is drawn from p3 and p4.]"
+        },
+        {
+          "passageId": "p6",
+          "title": "Adventuring on the Nile",
+          "content": "[Full passage text from PDF pages 23-24]"
+        },
+        {
+          "passageId": "p7",
+          "title": "False Start",
+          "content": "[Full passage text from PDF pages 26-28]"
         }
       ],
       "questions": [
@@ -43,446 +48,576 @@
           "questionId": "q1",
           "passageId": "p1",
           "type": "multiple-choice",
-          "question": "What does the word snatched mean in paragraph 11?",
+          "question": "Read the following dictionary entry.\n\nstretch \\ˈstrech\\ n\n1. something that seems beyond what is normal 2. the length or extent of an area 3. a continuous period of time 4. the amount of elasticity of something\n\nWhich definition best matches the way the word stretch is used in paragraph 9?",
           "options": [
-            "Hid",
-            "Tossed",
-            "Broke",
-            "Grabbed"
+            "Definition 1",
+            "Definition 2",
+            "Definition 3",
+            "Definition 4"
           ],
-          "correctAnswer": "Grabbed"
+          "correctAnswer": "Definition 2"
         },
         {
           "questionId": "q2",
           "passageId": "p1",
           "type": "multiple-choice",
-          "question": "Why is the fox's plan important to the resolution of the story?",
+          "question": "What does the sensory language in paragraph 7 help the reader understand?",
           "options": [
-            "The plan helps the crows learn how much they like their home.",
-            "The plan causes the snake to move away from the tree.",
-            "The plan gives the snake a chance to find an important necklace.",
-            "The plan proves to the crows that they like attention."
+            "The doubts the author had about being able to complete his adventure",
+            "The difficulty the author had pushing his wagon along the street",
+            "The distance between the author's house and the store",
+            "The details that the author remembers most vividly about that day"
           ],
-          "correctAnswer": "The plan causes the snake to move away from the tree."
+          "correctAnswer": "The details that the author remembers most vividly about that day"
         },
         {
           "questionId": "q3",
           "passageId": "p1",
           "type": "multiple-choice",
-          "question": "What can the reader infer about the crows based on their actions after Father Crow talks to the fox?",
+          "question": "Paragraphs 8 and 9 are mainly a description of —",
           "options": [
-            "They worry that the snake will harm the servants.",
-            "They often visit the royal ladies and servants at the river.",
-            "They want to give the necklace to the fox.",
-            "They trust the fox and the plan he shares."
+            "the way the author and Kenny worked together to push the wagon along",
+            "the typical routine the author followed when he went to the grocery store",
+            "the different neighbors the author saw on the way to the grocery store",
+            "the safety measures the author took when walking along the shoulder of the road"
           ],
-          "correctAnswer": "They trust the fox and the plan he shares."
+          "correctAnswer": "the typical routine the author followed when he went to the grocery store"
         },
         {
           "questionId": "q4",
           "passageId": "p1",
           "type": "multiple-choice",
-          "question": "What key idea about Mother Crow do the details in paragraphs 7 and 8 best support?",
+          "question": "Why did the author tell Kenny to turn the wagon around in paragraph 12?",
           "options": [
-            "Mother Crow is worried about the snake that is living in the tree.",
-            "Mother Crow is afraid that she will not find enough food for her babies.",
-            "Mother Crow is sad because the nest is getting too crowded.",
-            "Mother Crow is upset because no one is listening to her."
+            "He noticed that the groceries were not in the wagon with Kenny.",
+            "He was satisfied seeing only a small part of the other street.",
+            "He remembered that his mother was waiting for them to come home.",
+            "He decided that the new experience was not worth getting in trouble."
           ],
-          "correctAnswer": "Mother Crow is worried about the snake that is living in the tree."
+          "correctAnswer": "He decided that the new experience was not worth getting in trouble."
         },
         {
           "questionId": "q5",
           "passageId": "p1",
           "type": "multiple-choice",
-          "question": "How is the setting of the river important to the plot of the story?",
+          "question": "The author describes his experience in a way that highlights —",
           "options": [
-            "The river is where Mother Crow wants to build a nest.",
-            "The river is where Father Crow meets with the fox.",
-            "The river is where Mother Crow picks up the necklace.",
-            "The river is where Father Crow wants the snake to live."
+            "how significant he thought going to the next street was when he was five years old",
+            "how long it took him to push the wagon to the neighborhood store when he was a boy",
+            "how important it was for him to take care of his little brother when they were younger",
+            "how much he worried about following his mother's rules when he was a child"
           ],
-          "correctAnswer": "The river is where Mother Crow picks up the necklace."
+          "correctAnswer": "how significant he thought going to the next street was when he was five years old"
         },
         {
           "questionId": "q6",
           "passageId": "p1",
           "type": "multiple-choice",
-          "imagePlaceholder": "unwelcome_neighbor_illustration.png",
-          "question": "Look at this illustration. What is the most likely reason the author includes this illustration in the story?",
+          "question": "What is the main theme of the selection?",
           "options": [
-            "To show an important part of the fox's plan",
-            "To show how the crows build their nest in the banyan tree",
-            "To show why the snake moves into the banyan tree",
-            "To show that the crows need the fox's help in order to stay safe"
+            "Breaking the rules usually leads to a negative outcome.",
+            "People often have a strong desire to explore the unknown.",
+            "People tend to forget things when they are in a hurry.",
+            "Going to a new location can be an exciting experience."
           ],
-          "correctAnswer": "To show an important part of the fox's plan"
+          "correctAnswer": "People often have a strong desire to explore the unknown."
         },
         {
           "questionId": "q7",
-          "passageId": "p2",
+          "passageId": "p1",
           "type": "multiple-choice",
-          "question": "Which key idea do the details in paragraphs 11 and 12 support about the goals of Mission Blue?",
+          "question": "What is the best summary of the selection?",
           "options": [
-            "Young people can do their part to help oceans.",
-            "Storms may cause some problems for oceans.",
-            "Schools should teach young people about oceans.",
-            "Taking care of oceans requires several talents."
+            "When he was five years old, the author decided to venture down a forbidden street after buying some groceries for his mother. The author went partway down the new street but turned around because he was afraid of getting caught. When the shopkeeper waved him down on the way home, the author was sure his mother knew what he had done. Even though he wasn't in trouble, the author went straight home.",
+            "As a five-year-old, the author had wanted to explore the next street over, even though his mother thought the street was dangerous. One day, after he shopped for groceries at the corner store for his mother, he pushed his wagon down the forbidden street. He then turned around after only a few minutes.",
+            "When the author was five years old, his mother often asked him to take his wagon to the corner store down the street and pick up groceries for her. On one occasion the author tried to explore a different street on his way home. But because he forgot to take the groceries with him, he had to go back to the store, where the clerk was waiting outside for him.",
+            "One day when he was five, the author made a plan to explore a street after getting groceries for his mother. He took his wagon along his normal route to the store, but then he traveled down the other street after he bought the groceries. When he reached a vacant field, he thought he would be caught, so he returned home."
           ],
-          "correctAnswer": "Young people can do their part to help oceans."
+          "correctAnswer": "When he was five years old, the author decided to venture down a forbidden street after buying some groceries for his mother. The author went partway down the new street but turned around because he was afraid of getting caught. When the shopkeeper waved him down on the way home, the author was sure his mother knew what he had done. Even though he wasn't in trouble, the author went straight home."
         },
         {
           "questionId": "q8",
           "passageId": "p2",
           "type": "multiple-choice",
-          "question": "In paragraph 6, the prefix un- helps the reader understand that unharmed means —",
+          "question": "The details in paragraph 5 support the idea that —",
           "options": [
-            "harmed again",
-            "able to harm",
-            "full of harm",
-            "not harmed"
+            "humans use a lot of sarcasm and humor in everyday speech",
+            "miscommunication between humans is more likely when they cannot see facial expressions",
+            "language software is designed for communicating information rather than making jokes",
+            "human communication involves features that cannot easily be replicated by computers"
           ],
-          "correctAnswer": "not harmed"
+          "correctAnswer": "human communication involves features that cannot easily be replicated by computers"
         },
         {
           "questionId": "q9",
           "passageId": "p2",
           "type": "multiple-choice",
-          "question": "What can the reader conclude about Mission Blue from information throughout the selection?",
+          "question": "What is the main idea of paragraphs 7 and 8?",
           "options": [
-            "Mission Blue wants more people to travel to oceans.",
-            "Mission Blue plans to stop people from fishing in oceans.",
-            "Mission Blue wants all its volunteers to be scientists.",
-            "Mission Blue values teaching people about oceans."
+            "When people use speech-recognition applications, their privacy may be invaded.",
+            "As people talk more to computers, they may become less able to interact with humans.",
+            "Advances in technology may cause humans to lose their jobs to computers.",
+            "The use of speech-recognition technology poses a variety of potential problems."
           ],
-          "correctAnswer": "Mission Blue values teaching people about oceans."
+          "correctAnswer": "The use of speech-recognition technology poses a variety of potential problems."
         },
         {
           "questionId": "q10",
           "passageId": "p2",
           "type": "multiple-choice",
-          "question": "In paragraphs 5 and 6, which key idea do the details support about why Mission Blue divides the ocean into small areas called \"hope spots\"?",
+          "question": "According to the selection, speech-software developers are still striving to develop speech-recognition technology that —",
           "options": [
-            "These areas are easier to reach by boat.",
-            "These areas have the deepest waters.",
-            "These areas are easier to care for.",
-            "These areas have very few visitors."
+            "can comprehend language as quickly as people speak it",
+            "helps people complete simple tasks on electronic devices",
+            "makes people feel as if they are speaking to a human",
+            "minimizes the need for most types of human interaction"
           ],
-          "correctAnswer": "These areas are easier to care for."
+          "correctAnswer": "makes people feel as if they are speaking to a human"
         },
         {
           "questionId": "q11",
           "passageId": "p2",
           "type": "multiple-choice",
-          "question": "What is the most likely reason the author wrote this selection?",
+          "question": "Which idea does the author emphasize throughout the selection?",
           "options": [
-            "To inform the reader about the work of Mission Blue members",
-            "To persuade the reader to visit oceans",
-            "To teach the reader about plant life in oceans",
-            "To tell the reader where Mission Blue members meet"
+            "Speech-recognition technology saves companies time and money.",
+            "The technology for speech-recognition systems is constantly improving.",
+            "Virtual personal assistants are an important achievement in talking computers.",
+            "The earliest speech-recognition systems had limited capabilities."
           ],
-          "correctAnswer": "To inform the reader about the work of Mission Blue members"
+          "correctAnswer": "The technology for speech-recognition systems is constantly improving."
         },
         {
           "questionId": "q12",
           "passageId": "p2",
           "type": "multiple-choice",
-          "question": "Based on the information in paragraph 9, what can the reader infer about why members of Mission Blue enjoy working with scientists?",
+          "question": "The author's main purpose in writing this selection is to —",
           "options": [
-            "Scientists care more about protecting oceans than other people do.",
-            "Scientists take the best pictures of animals and plants.",
-            "Scientists know how to use boats and machines.",
-            "Scientists have knowledge about which ocean plants or animals need help."
+            "describe the history of and advances in speech-recognition technology",
+            "share concerns about problems with speech-recognition technology",
+            "suggest that consumers rely too much on speech-recognition technology",
+            "explain how speech-recognition technology understands human language"
           ],
-          "correctAnswer": "Scientists have knowledge about which ocean plants or animals need help."
+          "correctAnswer": "describe the history of and advances in speech-recognition technology"
         },
         {
           "questionId": "q13",
           "passageId": "p2",
           "type": "multiple-choice",
-          "question": "How does the author organize the selection?",
+          "question": "Which sentence from the selection best explains why some people may prefer human-to-human communication?",
           "options": [
-            "By explaining problems happening in oceans and the work Mission Blue does to solve the problems",
-            "By describing in chronological order the actions that Mission Blue has taken to help oceans",
-            "By providing the causes of problems in the ocean and effects of the different ways Mission Blue helped with the problems",
-            "By describing mysteries of the oceans and how Mission Blue plans to learn more about oceans"
+            "Despite the efficiency of these systems, many people find them impersonal, stilted, and sometimes frustrating.",
+            "Even the advanced human-machine interfaces used today are unable to trick the judge consistently into thinking a computer is a human.",
+            "Simply put, the reason is that human beings rely on more than words to produce utterances and derive meaning from them.",
+            "While the potential for spontaneous communication between a human and a machine may seem exciting, this possibility concerns some people."
           ],
-          "correctAnswer": "By explaining problems happening in oceans and the work Mission Blue does to solve the problems"
+          "correctAnswer": "Despite the efficiency of these systems, many people find them impersonal, stilted, and sometimes frustrating."
         },
         {
           "questionId": "q14",
           "passageId": "p2",
           "type": "multiple-choice",
-          "question": "Based on the section \"Beyond the Ocean,\" what can the reader infer about Mission Blue members?",
+          "question": "The author organizes the information in the selection mainly by —",
           "options": [
-            "They are more interested in events for students than events for scientists.",
-            "They want more people to help with the team's goals.",
-            "They plan to start identifying hope spots on land.",
-            "They are famous because of the organization's successes."
+            "explaining the development of speech-recognition technology over time",
+            "describing advancements in speech-recognition technology as well as some concerns about it",
+            "providing details about the technical processes that computers use to understand speech and construct a response",
+            "comparing the ways humans and computers interpret spoken language"
           ],
-          "correctAnswer": "They want more people to help with the team's goals."
+          "correctAnswer": "describing advancements in speech-recognition technology as well as some concerns about it"
         },
         {
           "questionId": "q15",
           "passageId": "p2",
           "type": "multiple-choice",
-          "question": "What is the central idea of the selection?",
+          "imagePlaceholder": "vpa_workflow_diagram.jpg",
+          "question": "Which sentence from the selection reflects the author's opinion?",
           "options": [
-            "Oceans are in trouble because sea life is disappearing.",
-            "Sylvia Earle is a scientist who loves studying all ocean life.",
-            "The group Mission Blue works in different ways to care for oceans.",
-            "The group Mission Blue wants to save the plants in the oceans."
+            "Today many voice systems can understand language when spoken at a normal conversational rate.",
+            "Others fear that machines will take over functions that were traditionally performed by humans, such as customer service.",
+            "This digital trail may lead to data mining, or the collection of large quantities of personal data.",
+            "For now, however, the continuing evolution of speech-recognition software is thrilling to behold."
           ],
-          "correctAnswer": "The group Mission Blue works in different ways to care for oceans."
+          "correctAnswer": "For now, however, the continuing evolution of speech-recognition software is thrilling to behold."
         },
         {
           "questionId": "q16",
           "passageId": "p3",
           "type": "multiple-choice",
-          "question": "How can Conejo's relationship with Coyote best be described in paragraphs 6 through 11?",
+          "question": "Which phrase from paragraph 1 best serves as an antonym context clue for the word refined?",
           "options": [
-            "Conejo pretends to want to help Coyote.",
-            "Conejo is unsure if he should trust Coyote.",
-            "Conejo is worried that Coyote is unhealthy.",
-            "Conejo enjoys spending time with Coyote."
+            "weeding his garden",
+            "who loved numbers",
+            "let his hair run wild",
+            "sold his house"
           ],
-          "correctAnswer": "Conejo pretends to want to help Coyote."
+          "correctAnswer": "let his hair run wild"
         },
         {
           "questionId": "q17",
           "passageId": "p3",
           "type": "multiple-choice",
-          "question": "What is the meaning of the word sly in paragraph 16?",
+          "question": "Paragraphs 1 through 3 are important to the story because they establish that Anthony —",
           "options": [
-            "Small",
-            "Quick",
-            "Clever",
-            "Friendly"
+            "prefers talking to the serious Grandpa he has always known",
+            "is surprised to learn about Grandpa's change in behavior",
+            "thinks that Mom should not worry about Grandpa's new activities",
+            "wants Grandpa to teach him how to maintain a garden"
           ],
-          "correctAnswer": "Clever"
+          "correctAnswer": "is surprised to learn about Grandpa's change in behavior"
         },
         {
           "questionId": "q18",
           "passageId": "p3",
           "type": "multiple-choice",
-          "question": "What key idea about Coyote is supported by the details in paragraphs 10 through 12?",
+          "question": "In paragraph 5, Anthony chooses not to mention the ready-made pesto most likely because he —",
           "options": [
-            "Coyote believes that he will enjoy eating a giant wheel of cheese.",
-            "Coyote is tired of chasing Conejo.",
-            "Coyote howls at the moon when he is hungry.",
-            "Coyote likes to sneak up on Conejo."
+            "believes that Grandpa's homemade pesto will be more flavorful",
+            "realizes that Grandpa is excited about making homemade pesto",
+            "thinks it does not look as good as the kind he usually buys at the grocery store",
+            "knows that using a ready-made pesto means he would not get to spend time with Grandpa"
           ],
-          "correctAnswer": "Coyote believes that he will enjoy eating a giant wheel of cheese."
+          "correctAnswer": "realizes that Grandpa is excited about making homemade pesto"
         },
         {
           "questionId": "q19",
           "passageId": "p3",
           "type": "multiple-choice",
-          "imagePlaceholder": "cheese_for_dinner_illustration.png",
-          "question": "Look at this illustration. What is the most likely reason the author includes this illustration in the story?",
+          "question": "By telling the story from the first-person point of view, the author helps the reader understand —",
           "options": [
-            "To help the reader understand that Conejo is worried about Coyote",
-            "To show that Coyote has chased Conejo many times",
-            "To help the reader understand why Coyote believes there is cheese in the lake",
-            "To show that Conejo is just as hungry as Coyote"
+            "how Grandpa feels about living by himself in the old cottage",
+            "why Grandpa's life is different from that of his parents",
+            "why Anthony enjoys Grandpa's cooking despite the taste",
+            "how all the characters feel about their Italian heritage"
           ],
-          "correctAnswer": "To help the reader understand why Coyote believes there is cheese in the lake"
+          "correctAnswer": "why Anthony enjoys Grandpa's cooking despite the taste"
         },
         {
           "questionId": "q20",
           "passageId": "p3",
           "type": "multiple-choice",
-          "question": "Based on the events at the end of the story, what can the reader predict about Coyote?",
+          "question": "What can the reader conclude about Grandpa from his actions in the story?",
           "options": [
-            "Coyote will not trust Conejo again.",
-            "Coyote will no longer try to swim in the lake.",
-            "Coyote will find a way to get the cheese.",
-            "Coyote will discover Conejo in his burrow."
+            "He regrets his career working as a banker.",
+            "He misses living and working in the suburbs.",
+            "He wants to reconnect with his Italian roots.",
+            "He wishes his daughter would cook Italian food for him."
           ],
-          "correctAnswer": "Coyote will not trust Conejo again."
+          "correctAnswer": "He wants to reconnect with his Italian roots."
         },
         {
           "questionId": "q21",
-          "passageId": "p3",
+          "passageId": "p4",
           "type": "multiple-choice",
-          "question": "In paragraph 1, the word cloudless includes the suffix -less. The suffix helps the reader understand that cloudless means —",
+          "question": "Read this information about the origin of the word perennial.\n\nfrom Latin per-, meaning \"throughout,\" + annus, meaning \"year\"\n\nThis information helps the reader determine that the word perennial in line 9 means —",
           "options": [
-            "close",
-            "clear",
-            "dark",
-            "scary"
+            "not measurable",
+            "highly desirable",
+            "not easily avoided",
+            "continually present"
           ],
-          "correctAnswer": "clear"
+          "correctAnswer": "continually present"
         },
         {
           "questionId": "q22",
-          "passageId": "p3",
+          "passageId": "p4",
           "type": "multiple-choice",
-          "question": "Which sentence best describes Coyote's relationship with Conejo by the end of the story?",
+          "question": "In the first stanza, the poet uses the metaphor of a hunt to emphasize that Mother is —",
           "options": [
-            "Coyote is eager to find Conejo so they can become better friends.",
-            "Coyote is grateful to Conejo for showing where to find cheese.",
-            "Coyote is angry with Conejo because he has a comfortable place to live.",
-            "Coyote is upset with Conejo for saying something that was untrue."
+            "eager to finish her shopping and begin preparing the hot sauce",
+            "competing with other shoppers at the market for the best produce",
+            "determined to find just the right peppers to use in her hot sauce",
+            "skillful at combining many different ingredients in her recipes"
           ],
-          "correctAnswer": "Coyote is upset with Conejo for saying something that was untrue."
+          "correctAnswer": "determined to find just the right peppers to use in her hot sauce"
         },
         {
           "questionId": "q23",
           "passageId": "p4",
           "type": "multiple-choice",
-          "question": "In paragraph 4, the prefix un- in the word unknown helps the reader understand that the meaning of unknown is –",
+          "question": "The words \"patiently,\" \"pounds,\" and \"promptly\" in the second stanza highlight Mother's —",
           "options": [
-            "known again",
-            "known by many",
-            "not known",
-            "wrongly known"
+            "desire to improve",
+            "devotion to her task",
+            "need for assistance",
+            "eagerness to finish her work"
           ],
-          "correctAnswer": "not known"
+          "correctAnswer": "devotion to her task"
         },
         {
           "questionId": "q24",
           "passageId": "p4",
           "type": "multiple-choice",
-          "question": "Which audience is the author addressing in this selection?",
+          "question": "The poet uses present tense throughout the poem to convey that —",
           "options": [
-            "Students",
-            "Parents",
-            "Teachers",
-            "Librarians"
+            "the speaker wants to visit the market again soon",
+            "the speaker wishes she were young again",
+            "the memory is vivid to the speaker",
+            "the memory makes the speaker feel childlike"
           ],
-          "correctAnswer": "Students"
+          "correctAnswer": "the memory is vivid to the speaker"
         },
         {
           "questionId": "q25",
           "passageId": "p4",
           "type": "multiple-choice",
-          "question": "Based on the information in paragraphs 1 through 4, what can the reader conclude about students who join a book club?",
+          "question": "Based on the details in the poem, the reader can conclude that Mother —",
           "options": [
-            "The students want to start a new book club.",
-            "The students belong to several book clubs.",
-            "The students develop good reading habits.",
-            "The students read more than their parents."
+            "takes making hot sauce for her family seriously",
+            "spends the entire day making hot sauce",
+            "makes hot sauce for her family every day",
+            "wants her daughter to learn to make hot sauce"
           ],
-          "correctAnswer": "The students develop good reading habits."
+          "correctAnswer": "takes making hot sauce for her family seriously"
         },
         {
           "questionId": "q26",
-          "passageId": "p4",
+          "passageId": "p5_paired",
           "type": "multiple-choice",
-          "imagePlaceholder": "book_club_photographs.png",
-          "question": "Look at these photographs. What is the most likely reason the author includes these photographs in the selection?",
+          "question": "In what way are the topics of the story and the poem similar?",
           "options": [
-            "To show that book-club members have good reading skills",
-            "To show that book clubs can meet at different places",
-            "To show that book clubs help members choose popular books",
-            "To show that book clubs are mainly for adults"
+            "Both describe how to select a variety of ingredients when planning a meal.",
+            "Both highlight that young people know less about preparing food than adults.",
+            "Both show that homemade food tastes better than ready-made food.",
+            "Both provide details about preparing food in a traditional way."
           ],
-          "correctAnswer": "To show that book clubs can meet at different places"
+          "correctAnswer": "Both provide details about preparing food in a traditional way."
         },
         {
           "questionId": "q27",
-          "passageId": "p4",
+          "passageId": "p5_paired",
           "type": "multiple-choice",
-          "question": "What sentence supports the idea that joining a book club could help someone make friends?",
+          "question": "How does Anthony in the story differ from the speaker in the poem?",
           "options": [
-            "Today more young people are forming their own book clubs. (paragraph 1)",
-            "In many book clubs, each member takes a turn selecting the book for the group to read. (paragraph 4)",
-            "In many ways, book clubs allow their members to think about new ideas. (paragraph 4)",
-            "By spending time with them at book-club meetings, you will get to know all the members better. (paragraph 6)"
+            "Anthony is amused by Grandpa's actions, while the speaker in the poem is concerned about Mother's behavior.",
+            "Anthony is thankful for Grandpa's efforts, while the speaker in the poem seems indifferent to Mother's work.",
+            "Anthony is surprised that Grandpa is cooking, while the speaker in the poem expects Mother to act the way she does.",
+            "Anthony is encouraging of Grandpa's new interests, while the speaker in the poem worries about Mother's traditional ways."
           ],
-          "correctAnswer": "By spending time with them at book-club meetings, you will get to know all the members better. (paragraph 6)"
+          "correctAnswer": "Anthony is surprised that Grandpa is cooking, while the speaker in the poem expects Mother to act the way she does."
         },
         {
           "questionId": "q28",
-          "passageId": "p4",
+          "passageId": "p5_paired",
           "type": "multiple-choice",
-          "question": "What opinion does the author include to explain why some students avoid book clubs?",
+          "question": "Unlike Grandpa in the story, Mother in the poem —",
           "options": [
-            "Members read the same book. (paragraph 1)",
-            "It also helps you understand their meanings. (paragraph 2)",
-            "After all the reading you do in school, you may think you don't want to join a book club. (paragraph 4)",
-            "Being in a book club allows members to share their thoughts and consider the views of others. (paragraph 5)"
+            "prepares the hot sauce to be used for dinner that night",
+            "makes her homemade sauce with freshly picked produce",
+            "uses special equipment to make her homemade sauce",
+            "seems very experienced at preparing her own sauce"
           ],
-          "correctAnswer": "After all the reading you do in school, you may think you don't want to join a book club. (paragraph 4)"
+          "correctAnswer": "seems very experienced at preparing her own sauce"
         },
         {
           "questionId": "q29",
-          "passageId": "p4",
+          "passageId": "p5_paired",
           "type": "multiple-choice",
-          "question": "Which sentence best explains why members of a book club are likely to read a whole book?",
+          "question": "The ending of the story and the ending of the poem are similar because both Anthony and the speaker —",
           "options": [
-            "Reading helps you learn to say new words. (paragraph 2)",
-            "The desire to be prepared will encourage you to finish reading what you started. (paragraph 3)",
-            "You might already know some members in your book club. (paragraph 6)",
-            "All you need are some other members and a place to meet. (paragraph 7)"
+            "wish they could help their family member perform a routine chore",
+            "take comfort in observing a family member doing something with love",
+            "learn how to do something interesting by watching a family member",
+            "understand the significance of a specific cultural tradition"
           ],
-          "correctAnswer": "The desire to be prepared will encourage you to finish reading what you started. (paragraph 3)"
+          "correctAnswer": "take comfort in observing a family member doing something with love"
         },
         {
           "questionId": "q30",
-          "passageId": "p5",
+          "passageId": "p5_paired",
           "type": "multiple-choice",
-          "question": "What is the most likely reason the poet includes lines 9 through 14?",
+          "question": "Grandpa in the story and Mother in the poem would most likely agree that —",
           "options": [
-            "To show that the mother squirrel looks like her babies",
-            "To describe why the mother squirrel often changes her mind",
-            "To show that the mother squirrel likes to run",
-            "To emphasize that the mother squirrel values all of her babies"
+            "cooking meals with others takes too much time",
+            "living in the country is better than living in the city",
+            "making food from scratch can be very satisfying",
+            "doing something the old way is always better"
           ],
-          "correctAnswer": "To emphasize that the mother squirrel values all of her babies"
+          "correctAnswer": "making food from scratch can be very satisfying"
         },
         {
           "questionId": "q31",
-          "passageId": "p5",
+          "passageId": "p6",
           "type": "multiple-choice",
-          "question": "Read lines 6 and 7. What is the most likely reason the poet includes this imagery?",
+          "question": "Scaturro and Brown filmed their adventure most likely because they —",
           "options": [
-            "To show that the baby squirrel will grow to look like its mother",
-            "To suggest that the baby squirrel is sick",
-            "To suggest that the baby squirrel is small and helpless",
-            "To show that the baby squirrel likes to play games"
+            "believed their journey down the Nile River would bring them more fame",
+            "hoped it would help promote efforts to clean and protect the areas along the Nile River",
+            "wanted people around the world to appreciate the beauty and diversity of the Nile River",
+            "thought the publicity would encourage more tourists to visit the Nile River"
           ],
-          "correctAnswer": "To suggest that the baby squirrel is small and helpless"
+          "correctAnswer": "wanted people around the world to appreciate the beauty and diversity of the Nile River"
         },
         {
           "questionId": "q32",
-          "passageId": "p5",
+          "passageId": "p6",
           "type": "multiple-choice",
-          "question": "What is the most likely reason the poet includes lines 15 and 16?",
+          "question": "Which detail from paragraph 2 supports the idea that the Nile River spans diverse areas?",
           "options": [
-            "To show that the baby squirrels are safe at last",
-            "To show that the baby squirrels need a larger home",
-            "To show that the baby squirrels are tired of climbing",
-            "To show that the baby squirrels like one another"
+            "The Nile River is the longest river in the world, measuring about 4,100 miles in length.",
+            "The White Nile begins in Rwanda, and the Blue Nile begins in Ethiopia.",
+            "The two main tributaries of the Nile River meet in Sudan to form one river.",
+            "The Nile River flows through cities as well as remote deserts and mountain regions."
           ],
-          "correctAnswer": "To show that the baby squirrels are safe at last"
+          "correctAnswer": "The Nile River flows through cities as well as remote deserts and mountain regions."
         },
         {
           "questionId": "q33",
-          "passageId": "p5",
+          "passageId": "p6",
           "type": "multiple-choice",
-          "question": "How does the windy setting contribute to the poem?",
+          "question": "Based on paragraphs 3 and 4, what can the reader infer about navigating the Nile River?",
           "options": [
-            "The windy setting causes the mother squirrel to become afraid of storms.",
-            "The windy setting makes a squirrel family leave the woods.",
-            "The windy setting adds a feeling of mystery to the plot.",
-            "The windy setting causes a problem the mother squirrel must solve."
+            "Many explorers have failed in their attempts to complete the trip.",
+            "It is a challenging endeavor even for experienced adventurers.",
+            "Preparing for the journey can take many months of planning.",
+            "It is best to make the expedition with a small crew."
           ],
-          "correctAnswer": "The windy setting causes a problem the mother squirrel must solve."
+          "correctAnswer": "It is a challenging endeavor even for experienced adventurers."
         },
         {
           "questionId": "q34",
-          "passageId": "p5",
+          "passageId": "p6",
           "type": "multiple-choice",
-          "question": "Which line from the poem best shows that the mother squirrel is kind?",
+          "question": "Based on paragraph 5, the reader can infer that for Scaturro and Brown —",
           "options": [
-            "A gust of wind blew down her nest. (line 2)",
-            "With pulsing tail and twitching nose, (line 3)",
-            "A baby squirrel just half her size (line 7)",
-            "She gently tucks her baby in (line 11)"
+            "the satisfaction of traveling the Nile River outweighed the dangers it presented",
+            "the Nile River provided a place to get away from modern life",
+            "the journey along the Nile River was a challenging test of their survival skills",
+            "the sights along the Nile River were better experienced on film than in person"
           ],
-          "correctAnswer": "She gently tucks her baby in (line 11)"
+          "correctAnswer": "the satisfaction of traveling the Nile River outweighed the dangers it presented"
+        },
+        {
+          "questionId": "q35",
+          "passageId": "p6",
+          "type": "multiple-choice",
+          "question": "The details in paragraph 6 support the idea that —",
+          "options": [
+            "the Nile River and its main tributaries flow through many African countries",
+            "population growth along the Nile has caused the river to become polluted",
+            "the Nile River serves as a shared foundation for many diverse African cultures",
+            "the largest cities along the Nile River are located in Egypt"
+          ],
+          "correctAnswer": "the Nile River serves as a shared foundation for many diverse African cultures"
+        },
+        {
+          "questionId": "q36",
+          "passageId": "p6",
+          "type": "multiple-choice",
+          "imagePlaceholder": "nile_river_map.jpg",
+          "question": "The map of the Nile River Valley is included in the selection to —",
+          "options": [
+            "indicate why the Blue Nile is considered the primary source of the river",
+            "show the long and winding course of the river",
+            "emphasize that the river is important to all the countries it flows through",
+            "highlight the most popular locations along the river"
+          ],
+          "correctAnswer": "show the long and winding course of the river"
+        },
+        {
+          "questionId": "q37",
+          "passageId": "p6",
+          "type": "multiple-choice",
+          "question": "The author organizes the information in the selection mainly by —",
+          "options": [
+            "explaining why Scaturro and Brown wanted to explore the Nile River and then giving details about how they prepared for the journey",
+            "comparing the Nile River with other rivers around the world and then discussing Scaturro and Brown's journey along the Blue Nile",
+            "stating that the Nile River is challenging to navigate and then sharing details about the difficulties Scaturro and Brown encountered on their journey",
+            "providing background information about the Nile River and then describing Scaturro and Brown's expedition"
+          ],
+          "correctAnswer": "providing background information about the Nile River and then describing Scaturro and Brown's expedition"
+        },
+        {
+          "questionId": "q38",
+          "passageId": "p6",
+          "type": "multiple-choice",
+          "imagePlaceholder": "scaturro_brown_egypt.jpg",
+          "question": "The author's main purpose for writing this selection is to —",
+          "options": [
+            "explain how the Nile River brings together a variety of cultures",
+            "describe the first expedition to travel the full length of the Nile River",
+            "discuss the dangers that travelers have encountered along the Nile River",
+            "provide information about the history of the Nile River"
+          ],
+          "correctAnswer": "describe the first expedition to travel the full length of the Nile River"
+        },
+        {
+          "questionId": "q39",
+          "passageId": "p6",
+          "type": "multiple-choice",
+          "question": "What is the best summary of the selection?",
+          "options": [
+            "Explorers Pasquale Scaturro and Gordon Brown traveled the length of the Nile River by boat. On their trip they saw mountains, deserts, gorges, waterfalls, and large cities. Their journey began in Ethiopia and ended in Egypt at the Mediterranean Sea. Some of the areas they traveled through were unsafe because of the harsh rapids, extreme heat, and hostile wildlife.",
+            "The Nile River flows through 11 African countries. The river is the world's longest and has been important to many civilizations for thousands of years. In 2004 explorers Pasquale Scaturro and Gordon Brown paddled the river and made a film about their trip. Sometimes their boats flipped in the water, and they were even attacked by a crocodile.",
+            "In 2004, Pasquale Scaturro and Gordon Brown became the first people to travel the entire Nile River by boat. Their 3,250-mile journey on the longest river in the world took four months. Though awed by the river's beauty, they also endured menacing conditions. Their trip helped them understand the significance of the Nile River to many African cultures.",
+            "A geophysicist and explorer named Pasquale Scaturro paddled the Nile River with filmmaker Gordon Brown in 2004. The river measures more than 4,100 miles and flows past a variety of landscapes as well as ancient cities and the Egyptian pyramids. An IMAX film was made about their journey."
+          ],
+          "correctAnswer": "In 2004, Pasquale Scaturro and Gordon Brown became the first people to travel the entire Nile River by boat. Their 3,250-mile journey on the longest river in the world took four months. Though awed by the river's beauty, they also endured menacing conditions. Their trip helped them understand the significance of the Nile River to many African cultures."
+        },
+        {
+          "questionId": "q40",
+          "passageId": "p7",
+          "type": "multiple-choice",
+          "question": "Coach Wilson calls Teresa's mother before the tryout most likely to —",
+          "options": [
+            "inform her that Teresa's tryout is probably going to be unsuccessful",
+            "tell her that Teresa will have to adjust to working with a new coach",
+            "persuade Teresa's mother to talk Teresa out of attending the tryout",
+            "give Teresa's mother directions to the training facility in Grand Prairie"
+          ],
+          "correctAnswer": "inform her that Teresa's tryout is probably going to be unsuccessful"
+        },
+        {
+          "questionId": "q41",
+          "passageId": "p7",
+          "type": "multiple-choice",
+          "question": "Read paragraph 3.\n\n\"But I was born to do the long jump. My instinct is to jump,\" Teresa said as she sat on a bench. \"When I'm on the Olympic team, you'll see what I mean.\"\n\nTeresa's comments influence the theme of the story because they show that she —",
+          "options": [
+            "does not know a lot about long jumping",
+            "thinks that her coach does not give her useful advice",
+            "believes that she is a better long jumper than she actually is",
+            "feels as though she has to prove her abilities to others"
+          ],
+          "correctAnswer": "believes that she is a better long jumper than she actually is"
+        },
+        {
+          "questionId": "q42",
+          "passageId": "p7",
+          "type": "multiple-choice",
+          "question": "Which event in the story causes Teresa to reevaluate her talent as a long jumper?",
+          "options": [
+            "Teresa watches another girl jump a long distance.",
+            "Teresa's mother suggests that she practice more.",
+            "Teresa's first jump does not impress Coach Jennings.",
+            "Teresa declines to take her second jump."
+          ],
+          "correctAnswer": "Teresa watches another girl jump a long distance."
+        },
+        {
+          "questionId": "q43",
+          "passageId": "p7",
+          "type": "multiple-choice",
+          "question": "The dialogue between Teresa and her mother after the tryout indicates that her mother —",
+          "options": [
+            "believes that Teresa can make the Olympic team if she practices enough",
+            "knows that taking Teresa to the tryouts was a waste of time",
+            "thinks it was necessary to trick Teresa into taking long-jump practice seriously",
+            "wants Teresa to be honest with herself about her skill as a long jumper"
+          ],
+          "correctAnswer": "wants Teresa to be honest with herself about her skill as a long jumper"
+        },
+        {
+          "questionId": "q44",
+          "passageId": "p7",
+          "type": "multiple-choice",
+          "question": "The story's third-person limited point of view gives the reader insight into —",
+          "options": [
+            "the doubts Teresa's mother has about Teresa attending the tryout",
+            "Coach Jennings's thoughts about Teresa's jump at the tryout",
+            "the feelings Teresa has about her performance at the tryout",
+            "Coach Wilson's hesitation about sending Teresa to the tryout"
+          ],
+          "correctAnswer": "the feelings Teresa has about her performance at the tryout"
         }
       ]
     }
