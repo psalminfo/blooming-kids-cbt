@@ -104,6 +104,76 @@ export function getAllLoadedQuestions() {
 }
 
 /**
+ * Select ELA questions prioritizing one passage with its questions, then fill to 15 total
+ */
+function selectELAQuestions(allQuestions, passagesMap) {
+    const questionsWithPassages = [];
+    const questionsWithoutPassages = [];
+    
+    // Separate questions with and without passages
+    allQuestions.forEach(question => {
+        if (question.passageId && passagesMap[question.passageId]) {
+            questionsWithPassages.push(question);
+        } else {
+            questionsWithoutPassages.push(question);
+        }
+    });
+    
+    // Group questions by passage
+    const questionsByPassage = {};
+    questionsWithPassages.forEach(question => {
+        if (!questionsByPassage[question.passageId]) {
+            questionsByPassage[question.passageId] = [];
+        }
+        questionsByPassage[question.passageId].push(question);
+    });
+    
+    const selectedQuestions = [];
+    
+    // Step 1: Select one random passage with all its questions
+    const passageIds = Object.keys(questionsByPassage);
+    let selectedPassageId = null;
+    if (passageIds.length > 0) {
+        selectedPassageId = passageIds[Math.floor(Math.random() * passageIds.length)];
+        selectedQuestions.push(...questionsByPassage[selectedPassageId]);
+        console.log(`Selected passage ${selectedPassageId} with ${questionsByPassage[selectedPassageId].length} questions`);
+    }
+    
+    // Step 2: If we have less than 15 questions, add random questions without passages
+    if (selectedQuestions.length < 15) {
+        const remainingSlots = 15 - selectedQuestions.length;
+        const shuffledRemaining = questionsWithoutPassages.sort(() => 0.5 - Math.random());
+        const additionalQuestions = shuffledRemaining.slice(0, remainingSlots);
+        selectedQuestions.push(...additionalQuestions);
+        console.log(`Added ${additionalQuestions.length} additional questions without passages`);
+    }
+    
+    // Step 3: If still less than 15, add questions from other passages
+    if (selectedQuestions.length < 15 && selectedPassageId) {
+        const remainingSlots = 15 - selectedQuestions.length;
+        const otherPassageQuestions = [];
+        
+        // Collect questions from other passages (excluding the one we already selected)
+        Object.keys(questionsByPassage).forEach(passageId => {
+            if (passageId !== selectedPassageId) {
+                otherPassageQuestions.push(...questionsByPassage[passageId]);
+            }
+        });
+        
+        const shuffledOtherPassage = otherPassageQuestions.sort(() => 0.5 - Math.random());
+        const finalQuestions = shuffledOtherPassage.slice(0, remainingSlots);
+        selectedQuestions.push(...finalQuestions);
+        console.log(`Added ${finalQuestions.length} questions from other passages to reach 15 total`);
+    }
+    
+    // Final shuffle to mix passage questions with others
+    const finalSelection = selectedQuestions.sort(() => 0.5 - Math.random()).slice(0, 15);
+    console.log(`Final ELA selection: ${finalSelection.length} questions (includes one full passage)`);
+    
+    return finalSelection;
+}
+
+/**
  * The entry point to load and display questions for a test.
  * @param {string} subject The subject of the test (e.g., 'ela').
  * @param {string} grade The grade level of the test (e.g., 'grade4').
@@ -327,8 +397,18 @@ export async function loadQuestions(subject, grade, state) {
                 return;
             }
             
-            const shuffledQuestions = filteredQuestions.sort(() => 0.5 - Math.random()).slice(0, 30);
-            loadedQuestions = shuffledQuestions.map((q, index) => ({ 
+            // NEW LOGIC: Different handling for ELA vs other subjects
+            let selectedQuestions = [];
+            
+            if (subject.toLowerCase() === 'ela') {
+                // For ELA: Prioritize one passage with its questions, then fill with others
+                selectedQuestions = selectELAQuestions(filteredQuestions, passagesMap);
+            } else {
+                // For other subjects: Just take 15 random questions
+                selectedQuestions = filteredQuestions.sort(() => 0.5 - Math.random()).slice(0, 15);
+            }
+            
+            loadedQuestions = selectedQuestions.map((q, index) => ({ 
                 ...q, 
                 id: q.firebaseId || q.id || `question-${index}`
             }));
