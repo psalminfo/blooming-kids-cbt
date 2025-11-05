@@ -242,7 +242,63 @@ async function renderAdminPanel(container) {
     setupDashboardListeners();
 }
 
-// Add these new functions to handle bulk question upload
+// Single question submission handler
+async function handleAddQuestionSubmit(e) {
+    e.preventDefault();
+    const form = e.target;
+    const message = document.getElementById('formMessage');
+    message.textContent = "Saving...";
+    const imageFile = document.getElementById('imageUpload').files[0];
+
+    try {
+        let imageUrl = null;
+        if (imageFile) {
+            message.textContent = "Uploading image...";
+            imageUrl = await uploadImageToCloudinary(imageFile);
+        }
+        message.textContent = "Saving question...";
+
+        const questionType = form.questionType.value;
+        let newQuestion = {
+            topic: form.topic.value,
+            subject: form.subject.value,
+            grade: form.grade.value,
+            type: questionType,
+            image_url: imageUrl,
+        };
+        if (questionType === 'comprehension') {
+            newQuestion.passage = form.passage.value;
+            newQuestion.sub_questions = [];
+            form.querySelectorAll('.question-group').forEach(group => {
+                newQuestion.sub_questions.push({
+                    question: group.querySelector('.comp-question').value,
+                    options: Array.from(group.querySelectorAll('.comp-option')).map(i => i.value).filter(v => v),
+                    correct_answer: group.querySelector('.comp-correct-answer').value,
+                    type: 'multiple-choice',
+                });
+            });
+        } else {
+            newQuestion.question = form.questionText.value;
+            if (questionType === 'creative-writing') {
+                newQuestion.writing_type = form.writingType.value;
+            } else { // multiple-choice
+                newQuestion.options = Array.from(form.querySelectorAll('.option-input')).map(i => i.value).filter(v => v);
+                newQuestion.correct_answer = form.correctAnswer.value;
+            }
+        }
+
+        await addDoc(collection(db, "admin_questions"), newQuestion);
+        message.textContent = "Question saved successfully!";
+        message.style.color = 'green';
+        form.reset();
+    } catch (error) {
+        console.error("Error adding question:", error);
+        message.textContent = `Error: ${error.message}`;
+        message.style.color = 'red';
+    }
+}
+
+// Bulk question upload functionality
 async function setupBulkQuestionUpload() {
     const bulkQuestionJsonUpload = document.getElementById('bulk-question-json-upload');
     const bulkQuestionJsonTextarea = document.getElementById('bulk-question-json-textarea');
@@ -407,7 +463,7 @@ async function setupBulkQuestionUpload() {
                         type: question.type,
                         question: question.question,
                         options: question.options || [],
-                        correctAnswer: question.correctAnswer || '',
+                        correct_answer: question.correctAnswer || '',
                         image_url: imageUrl,
                         createdAt: new Date()
                     };
@@ -472,7 +528,7 @@ async function setupBulkQuestionUpload() {
     }
 }
 
-// Update the setupDashboardListeners function to include bulk upload
+// Dashboard setup with bulk upload integration
 async function setupDashboardListeners() {
     const addQuestionForm = document.getElementById('addQuestionForm');
     const questionTypeDropdown = document.getElementById('questionType');
@@ -2279,6 +2335,7 @@ onAuthStateChanged(auth, async (user) => {
 
 
 // [End Updated admin.js File]
+
 
 
 
