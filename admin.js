@@ -355,7 +355,7 @@ async function loadAndRenderReport(docId) {
 }
 
 // ##################################################################
-// # SECTION 2: CONTENT MANAGER (WITH CORRECTED BULK UPLOAD)
+// # SECTION 2: CONTENT MANAGER (WITH BULK PASSAGE UPLOAD)
 // ##################################################################
 
 async function renderContentManagerPanel(container) {
@@ -377,15 +377,56 @@ async function renderContentManagerPanel(container) {
             </div>
             <div id="manager-workspace" style="display:none;">
                  <h3 class="text-gray-800 font-bold mb-4 text-lg" id="loaded-file-name"></h3>
+                
+                <!-- Single Passage Editing Section -->
                 <div class="mb-8 p-4 border rounded-md">
-                    <h4 class="text-xl font-semibold mb-2">2. Edit Incomplete Passages</h4>
+                    <h4 class="text-xl font-semibold mb-2">2. Edit Incomplete Passages (Single)</h4>
                     <select id="passage-select" class="w-full p-2 border rounded mt-1 mb-2"></select>
                     <textarea id="passage-content" placeholder="Passage content..." class="w-full p-2 border rounded h-40"></textarea>
                     <button id="update-passage-btn" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 mt-2">Save Passage to Firestore</button>
                 </div>
                 
+                <!-- Bulk Passage Upload Section -->
+                <div class="p-4 border rounded-md mb-6 bg-purple-50">
+                    <h4 class="text-xl font-semibold mb-2">3. Bulk ELA Passage Upload</h4>
+                    <p class="text-sm text-gray-600 mb-4">
+                        Upload all ELA passages at once. The system will automatically match passages by their titles.
+                    </p>
+                    
+                    <div class="mb-4">
+                        <label class="font-bold">Upload JSON with Passage Content:</label>
+                        <input type="file" id="bulk-passage-json-upload" class="w-full mt-1 border p-2 rounded" accept=".json">
+                        <p class="text-xs text-gray-500 mt-1">
+                            Upload a JSON file with passage content structured like your test file
+                        </p>
+                    </div>
+                    
+                    <div class="mb-4">
+                        <label class="font-bold">Or Paste Passage Content JSON:</label>
+                        <textarea id="bulk-passage-json-textarea" class="w-full p-2 border rounded h-40 mt-1 font-mono text-sm" placeholder='Paste JSON like: {
+  "passages": [
+    {
+      "title": "A Picture of Peace",
+      "content": "Full passage content here..."
+    }
+  ]
+}'></textarea>
+                    </div>
+                    
+                    <div id="bulk-passage-match-preview" class="mb-4" style="display:none;">
+                        <p class="font-semibold mb-2">Passage Matching Preview:</p>
+                        <div id="bulk-passage-match-list" class="space-y-2 max-h-60 overflow-y-auto border rounded p-2 bg-white"></div>
+                    </div>
+                    
+                    <button id="bulk-passage-json-upload-btn" class="bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700 w-full">
+                        Upload All Passages to Firestore
+                    </button>
+                    <div id="bulk-passage-json-upload-status" class="mt-2 text-sm"></div>
+                </div>
+                
+                <!-- Single Image Upload Section -->
                 <div class="p-4 border rounded-md mb-6">
-                    <h4 class="text-xl font-semibold mb-2">3. Add Missing Images (Single)</h4>
+                    <h4 class="text-xl font-semibold mb-2">4. Add Missing Images (Single)</h4>
                     <select id="image-select" class="w-full p-2 border rounded mt-1 mb-2"></select>
                     <div id="image-preview-container" class="my-2" style="display:none;">
                         <p class="font-semibold text-sm">Image to be replaced:</p>
@@ -396,9 +437,9 @@ async function renderContentManagerPanel(container) {
                     <button id="update-image-btn" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 mt-2">Upload & Save Image to Firestore</button>
                 </div>
 
-                <!-- CORRECTED: Bulk Image Upload Section - One-to-One Mapping -->
+                <!-- Bulk Image Upload Section -->
                 <div class="p-4 border rounded-md bg-blue-50">
-                    <h4 class="text-xl font-semibold mb-2">4. Bulk Image Upload (One-to-One Matching)</h4>
+                    <h4 class="text-xl font-semibold mb-2">5. Bulk Image Upload (One-to-One Matching)</h4>
                     <p class="text-sm text-gray-600 mb-4">
                         Upload multiple images at once. Each numbered image matches ONE specific question:<br>
                         • <strong>1.jpg</strong> → matches <strong>m4_2022_q1</strong><br>
@@ -584,7 +625,15 @@ async function setupContentManager() {
     const imagePreviewContainer = document.getElementById('image-preview-container');
     const imagePreview = document.getElementById('image-preview');
 
-    // CORRECTED: Bulk upload elements
+    // Bulk passage upload elements
+    const bulkPassageJsonUpload = document.getElementById('bulk-passage-json-upload');
+    const bulkPassageJsonTextarea = document.getElementById('bulk-passage-json-textarea');
+    const bulkPassageMatchPreview = document.getElementById('bulk-passage-match-preview');
+    const bulkPassageMatchList = document.getElementById('bulk-passage-match-list');
+    const bulkPassageJsonUploadBtn = document.getElementById('bulk-passage-json-upload-btn');
+    const bulkPassageJsonUploadStatus = document.getElementById('bulk-passage-json-upload-status');
+
+    // Bulk image upload elements
     const bulkImageUploadInput = document.getElementById('bulk-image-upload-input');
     const overwriteExistingCheckbox = document.getElementById('overwrite-existing-checkbox');
     const bulkUploadPreview = document.getElementById('bulk-upload-preview');
@@ -700,7 +749,308 @@ async function setupContentManager() {
         }
     });
 
-    // CORRECTED: Bulk Image Upload - One-to-One Mapping
+    // ==================== BULK PASSAGE UPLOAD FUNCTIONALITY ====================
+    
+    // Function to find passages that need content
+    function findPassagesNeedingContent() {
+        const passagesNeedingContent = [];
+        
+        if (!loadedTestData || !loadedTestData.tests) return passagesNeedingContent;
+        
+        loadedTestData.tests.forEach((test, testIndex) => {
+            (test.passages || []).forEach((passage, passageIndex) => {
+                // Look for passages that have placeholder content or need real content
+                if (passage.content && (
+                    passage.content.includes("[Full passage text from PDF") || 
+                    passage.content.includes("TO BE UPLOADED") ||
+                    passage.content.includes("[This is a paired passage entry") ||
+                    passage.content.length < 100 // Very short content likely needs replacement
+                )) {
+                    passagesNeedingContent.push({
+                        testIndex,
+                        passageIndex,
+                        passageId: passage.passageId,
+                        title: passage.title,
+                        currentContent: passage.content,
+                        testSubject: test.subject,
+                        testGrade: test.grade
+                    });
+                }
+            });
+        });
+        
+        return passagesNeedingContent;
+    }
+
+    // Function to match uploaded passages with existing passages by title
+    function matchPassagesByTitle(uploadedPassages, existingPassages) {
+        const matches = [];
+        const usedUploadedIndices = new Set();
+        
+        existingPassages.forEach(existingPassage => {
+            let bestMatch = null;
+            let bestMatchIndex = -1;
+            
+            // Try to find exact title match first
+            uploadedPassages.forEach((uploadedPassage, uploadedIndex) => {
+                if (usedUploadedIndices.has(uploadedIndex)) return;
+                
+                if (uploadedPassage.title === existingPassage.title) {
+                    bestMatch = uploadedPassage;
+                    bestMatchIndex = uploadedIndex;
+                    return;
+                }
+            });
+            
+            // If no exact match, try partial match
+            if (!bestMatch) {
+                uploadedPassages.forEach((uploadedPassage, uploadedIndex) => {
+                    if (usedUploadedIndices.has(uploadedIndex)) return;
+                    
+                    if (existingPassage.title.includes(uploadedPassage.title) || 
+                        uploadedPassage.title.includes(existingPassage.title)) {
+                        bestMatch = uploadedPassage;
+                        bestMatchIndex = uploadedIndex;
+                        return;
+                    }
+                });
+            }
+            
+            if (bestMatch) {
+                usedUploadedIndices.add(bestMatchIndex);
+                matches.push({
+                    existingPassage,
+                    uploadedPassage: bestMatch,
+                    matchType: 'title'
+                });
+            } else {
+                matches.push({
+                    existingPassage,
+                    uploadedPassage: null,
+                    matchType: 'no-match'
+                });
+            }
+        });
+        
+        return matches;
+    }
+
+    // Handle bulk passage JSON input
+    function handleBulkPassageJsonInput() {
+        const file = bulkPassageJsonUpload.files[0];
+        const jsonText = bulkPassageJsonTextarea.value.trim();
+        
+        const existingPassages = findPassagesNeedingContent();
+        
+        if (existingPassages.length === 0) {
+            bulkPassageMatchPreview.style.display = 'none';
+            bulkPassageJsonUploadStatus.textContent = 'No passages found that need content updates.';
+            bulkPassageJsonUploadStatus.style.color = 'orange';
+            return;
+        }
+        
+        let uploadedPassages = [];
+        
+        try {
+            if (file) {
+                // Read from file
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    try {
+                        const jsonData = JSON.parse(e.target.result);
+                        uploadedPassages = extractPassagesFromJson(jsonData);
+                        displayPassageMatches(uploadedPassages, existingPassages);
+                    } catch (error) {
+                        bulkPassageJsonUploadStatus.textContent = `Error parsing JSON file: ${error.message}`;
+                        bulkPassageJsonUploadStatus.style.color = 'red';
+                    }
+                };
+                reader.readAsText(file);
+            } else if (jsonText) {
+                // Read from textarea
+                const jsonData = JSON.parse(jsonText);
+                uploadedPassages = extractPassagesFromJson(jsonData);
+                displayPassageMatches(uploadedPassages, existingPassages);
+            } else {
+                bulkPassageMatchPreview.style.display = 'none';
+                bulkPassageJsonUploadStatus.textContent = 'Please provide passage content JSON.';
+                bulkPassageJsonUploadStatus.style.color = 'orange';
+            }
+        } catch (error) {
+            bulkPassageJsonUploadStatus.textContent = `Error: ${error.message}`;
+            bulkPassageJsonUploadStatus.style.color = 'red';
+        }
+    }
+
+    // Extract passages from various JSON structures
+    function extractPassagesFromJson(jsonData) {
+        let passages = [];
+        
+        // Handle different JSON structures
+        if (Array.isArray(jsonData)) {
+            // Direct array of passages
+            passages = jsonData;
+        } else if (jsonData.passages && Array.isArray(jsonData.passages)) {
+            // Object with passages array
+            passages = jsonData.passages;
+        } else if (jsonData.tests && Array.isArray(jsonData.tests)) {
+            // Full test structure - extract passages from all tests
+            jsonData.tests.forEach(test => {
+                if (test.passages && Array.isArray(test.passages)) {
+                    passages = passages.concat(test.passages);
+                }
+            });
+        }
+        
+        return passages;
+    }
+
+    // Display matching preview
+    function displayPassageMatches(uploadedPassages, existingPassages) {
+        const matches = matchPassagesByTitle(uploadedPassages, existingPassages);
+        
+        bulkPassageMatchList.innerHTML = '';
+        
+        let matchedCount = 0;
+        let unmatchedCount = 0;
+        
+        matches.forEach((match, index) => {
+            const matchItem = document.createElement('div');
+            matchItem.className = 'flex justify-between items-start p-2 bg-gray-50 rounded text-sm';
+            
+            let statusHtml = '';
+            let statusColor = 'text-gray-500';
+            
+            if (match.uploadedPassage) {
+                matchedCount++;
+                statusHtml = `
+                    <div class="text-green-600 font-semibold">✓ MATCHED</div>
+                    <div class="text-xs text-gray-600 mt-1">Content length: ${match.uploadedPassage.content?.length || 0} chars</div>
+                `;
+                statusColor = 'text-green-600';
+            } else {
+                unmatchedCount++;
+                statusHtml = '<div class="text-orange-600 font-semibold">✗ NO MATCH</div>';
+                statusColor = 'text-orange-600';
+            }
+            
+            matchItem.innerHTML = `
+                <div class="flex-1">
+                    <div class="font-semibold">${match.existingPassage.title}</div>
+                    <div class="text-xs text-gray-600">${match.existingPassage.testSubject} G${match.existingPassage.testGrade} • ${match.existingPassage.passageId}</div>
+                    <div class="text-xs text-gray-500 mt-1 truncate">Current: "${match.existingPassage.currentContent.substring(0, 50)}..."</div>
+                </div>
+                <div class="ml-4 text-right ${statusColor}">
+                    ${statusHtml}
+                </div>
+            `;
+            bulkPassageMatchList.appendChild(matchItem);
+        });
+        
+        bulkPassageMatchPreview.style.display = 'block';
+        bulkPassageJsonUploadStatus.textContent = `Found ${matchedCount} matches out of ${existingPassages.length} passages needing content.`;
+        bulkPassageJsonUploadStatus.style.color = matchedCount > 0 ? 'blue' : 'orange';
+    }
+
+    // Main bulk passage upload function
+    bulkPassageJsonUploadBtn.addEventListener('click', async () => {
+        const existingPassages = findPassagesNeedingContent();
+        
+        if (existingPassages.length === 0) {
+            bulkPassageJsonUploadStatus.textContent = 'No passages found that need content updates.';
+            bulkPassageJsonUploadStatus.style.color = 'orange';
+            return;
+        }
+        
+        let uploadedPassages = [];
+        
+        try {
+            const file = bulkPassageJsonUpload.files[0];
+            const jsonText = bulkPassageJsonTextarea.value.trim();
+            
+            if (file) {
+                const text = await readFileAsText(file);
+                const jsonData = JSON.parse(text);
+                uploadedPassages = extractPassagesFromJson(jsonData);
+            } else if (jsonText) {
+                const jsonData = JSON.parse(jsonText);
+                uploadedPassages = extractPassagesFromJson(jsonData);
+            } else {
+                bulkPassageJsonUploadStatus.textContent = 'Please provide passage content first.';
+                bulkPassageJsonUploadStatus.style.color = 'orange';
+                return;
+            }
+            
+            const matches = matchPassagesByTitle(uploadedPassages, existingPassages);
+            const validMatches = matches.filter(match => match.uploadedPassage);
+            
+            if (validMatches.length === 0) {
+                bulkPassageJsonUploadStatus.textContent = 'No matching passages found. Check your titles.';
+                bulkPassageJsonUploadStatus.style.color = 'orange';
+                return;
+            }
+            
+            bulkPassageJsonUploadStatus.textContent = `Updating ${validMatches.length} passages...`;
+            bulkPassageJsonUploadStatus.style.color = 'blue';
+            bulkPassageJsonUploadBtn.disabled = true;
+            
+            // Update passages in the loaded data
+            let updatedCount = 0;
+            
+            validMatches.forEach(match => {
+                if (match.uploadedPassage && match.uploadedPassage.content) {
+                    loadedTestData.tests[match.existingPassage.testIndex]
+                        .passages[match.existingPassage.passageIndex]
+                        .content = match.uploadedPassage.content;
+                    updatedCount++;
+                }
+            });
+            
+            // Save to Firestore
+            if (updatedCount > 0) {
+                bulkPassageJsonUploadStatus.textContent = `Saving ${updatedCount} passages to Firestore...`;
+                
+                const testDocRef = doc(db, "tests", currentTestDocId);
+                await setDoc(testDocRef, loadedTestData);
+                
+                bulkPassageJsonUploadStatus.textContent = `✅ Success! ${updatedCount} passages updated successfully!`;
+                bulkPassageJsonUploadStatus.style.color = 'green';
+                
+                // Reset form and refresh
+                bulkPassageJsonUpload.value = '';
+                bulkPassageJsonTextarea.value = '';
+                bulkPassageMatchPreview.style.display = 'none';
+                populateDropdowns();
+            } else {
+                bulkPassageJsonUploadStatus.textContent = 'No passages were updated.';
+                bulkPassageJsonUploadStatus.style.color = 'orange';
+            }
+            
+        } catch (error) {
+            console.error('Bulk passage upload error:', error);
+            bulkPassageJsonUploadStatus.textContent = `❌ Error: ${error.message}`;
+            bulkPassageJsonUploadStatus.style.color = 'red';
+        } finally {
+            bulkPassageJsonUploadBtn.disabled = false;
+        }
+    });
+
+    // Add event listeners for bulk passage upload
+    bulkPassageJsonUpload.addEventListener('change', handleBulkPassageJsonInput);
+    bulkPassageJsonTextarea.addEventListener('input', handleBulkPassageJsonInput);
+
+    // Helper function to read file as text
+    function readFileAsText(file) {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = e => resolve(e.target.result);
+            reader.onerror = reject;
+            reader.readAsText(file);
+        });
+    }
+
+    // ==================== BULK IMAGE UPLOAD FUNCTIONALITY ====================
+    
     bulkImageUploadInput.addEventListener('change', (e) => {
         const files = Array.from(e.target.files);
         bulkImageList.innerHTML = '';
@@ -745,13 +1095,11 @@ async function setupContentManager() {
         });
     });
 
-    // CORRECTED: Extract number from filename
     function extractNumberFromFileName(fileName) {
         const match = fileName.match(/(\d+)\./); // Get number before file extension
         return match ? parseInt(match[1]) : null;
     }
 
-    // CORRECTED: Find ONE question by number - one-to-one mapping
     function findQuestionByNumber(number, overwriteMode = false) {
         if (!number) return null;
         
@@ -1768,6 +2116,7 @@ onAuthStateChanged(auth, async (user) => {
 
 
 // [End Updated admin.js File]
+
 
 
 
