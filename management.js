@@ -1546,219 +1546,219 @@ async function renderTutorReportsPanel(container) {
 
         return [headers.join(','), ...rows.map(row => row.join(','))].join('\n');
     }
-}
 
-// Fixed function to fetch and render reports
-async function fetchAndRenderTutorReports() {
-    const reportsListContainer = document.getElementById('tutor-reports-list');
-    if (!reportsListContainer) return;
+    // Fixed function to fetch and render reports
+    async function fetchAndRenderTutorReports() {
+        const reportsListContainer = document.getElementById('tutor-reports-list');
+        if (!reportsListContainer) return;
 
-    reportsListContainer.innerHTML = `
-        <div class="text-center py-10">
-            <div class="loading-spinner mx-auto" style="width: 40px; height: 40px;"></div>
-            <p class="text-green-600 font-semibold mt-4">Loading reports for selected period...</p>
-        </div>
-    `;
+        reportsListContainer.innerHTML = `
+            <div class="text-center py-10">
+                <div class="loading-spinner mx-auto" style="width: 40px; height: 40px;"></div>
+                <p class="text-green-600 font-semibold mt-4">Loading reports for selected period...</p>
+            </div>
+        `;
 
-    try {
-        const startDateInput = document.getElementById('reports-start-date');
-        const endDateInput = document.getElementById('reports-end-date');
-        
-        const startDate = startDateInput.value ? new Date(startDateInput.value) : null;
-        const endDate = endDateInput.value ? new Date(endDateInput.value) : null;
-        
-        if (!startDate || !endDate) {
-            throw new Error('Please select both start and end dates.');
-        }
+        try {
+            const startDateInput = document.getElementById('reports-start-date');
+            const endDateInput = document.getElementById('reports-end-date');
+            
+            const startDate = startDateInput.value ? new Date(startDateInput.value) : null;
+            const endDate = endDateInput.value ? new Date(endDateInput.value) : null;
+            
+            if (!startDate || !endDate) {
+                throw new Error('Please select both start and end dates.');
+            }
 
-        endDate.setHours(23, 59, 59, 999);
+            endDate.setHours(23, 59, 59, 999);
 
-        // Convert dates to Firestore timestamps
-        const startTimestamp = Timestamp.fromDate(startDate);
-        const endTimestamp = Timestamp.fromDate(endDate);
+            // Convert dates to Firestore timestamps
+            const startTimestamp = Timestamp.fromDate(startDate);
+            const endTimestamp = Timestamp.fromDate(endDate);
 
-        // Query reports within date range
-        const reportsQuery = query(
-            collection(db, "tutor_submissions"), 
-            where("submittedAt", ">=", startTimestamp),
-            where("submittedAt", "<=", endTimestamp),
-            orderBy("submittedAt", "desc")
-        );
+            // Query reports within date range
+            const reportsQuery = query(
+                collection(db, "tutor_submissions"), 
+                where("submittedAt", ">=", startTimestamp),
+                where("submittedAt", "<=", endTimestamp),
+                orderBy("submittedAt", "desc")
+            );
 
-        const snapshot = await getDocs(reportsQuery);
-        
-        if (snapshot.empty) {
-            allReports = [];
-            filteredReports = [];
+            const snapshot = await getDocs(reportsQuery);
+            
+            if (snapshot.empty) {
+                allReports = [];
+                filteredReports = [];
+                renderTutorReportsFromCache();
+                return;
+            }
+
+            allReports = snapshot.docs.map(doc => ({ 
+                id: doc.id, 
+                ...doc.data() 
+            }));
+
+            filteredReports = [...allReports];
+
+            // Update filter dropdowns
+            updateFilterDropdowns();
+
+            // Save to cache and render
+            saveToLocalStorage('reports', allReports);
             renderTutorReportsFromCache();
+
+        } catch (error) {
+            console.error("Error fetching reports:", error);
+            reportsListContainer.innerHTML = `
+                <div class="text-center py-10 text-red-600">
+                    <p class="font-semibold">Failed to load reports</p>
+                    <p class="text-sm mt-2">${error.message}</p>
+                    <button onclick="fetchAndRenderTutorReports()" class="mt-4 bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">
+                        Try Again
+                    </button>
+                </div>
+            `;
+        }
+    }
+
+    function updateFilterDropdowns() {
+        const tutorFilter = document.getElementById('reports-tutor-filter');
+        const studentFilter = document.getElementById('reports-student-filter');
+        
+        // Get unique tutors and students
+        const tutors = [...new Set(allReports.map(r => r.tutorEmail))].filter(Boolean);
+        const students = [...new Set(allReports.map(r => r.studentName))].filter(Boolean);
+        
+        // Update tutor filter
+        tutorFilter.innerHTML = '<option value="">All Tutors</option>' + 
+            tutors.map(tutor => `<option value="${tutor}">${tutor}</option>`).join('');
+        
+        // Update student filter
+        studentFilter.innerHTML = '<option value="">All Students</option>' + 
+            students.map(student => `<option value="${student}">${student}</option>`).join('');
+    }
+
+    function renderTutorReportsFromCache() {
+        const reportsListContainer = document.getElementById('tutor-reports-list');
+        if (!reportsListContainer) return;
+
+        if (filteredReports.length === 0) {
+            reportsListContainer.innerHTML = `
+                <div class="text-center py-10">
+                    <p class="text-gray-500">No reports found for the selected period and filters.</p>
+                    <p class="text-sm text-gray-400 mt-2">Try adjusting your date range or search terms.</p>
+                </div>`;
+            
+            document.getElementById('report-tutor-count').textContent = '0';
+            document.getElementById('report-total-count').textContent = '0';
+            document.getElementById('report-page-count').textContent = '0';
+            document.getElementById('reports-pagination').classList.add('hidden');
             return;
         }
 
-        allReports = snapshot.docs.map(doc => ({ 
-            id: doc.id, 
-            ...doc.data() 
-        }));
+        // Update statistics
+        const uniqueTutors = new Set(filteredReports.map(r => r.tutorEmail)).size;
+        document.getElementById('report-tutor-count').textContent = uniqueTutors;
+        document.getElementById('report-total-count').textContent = filteredReports.length;
 
-        filteredReports = [...allReports];
-
-        // Update filter dropdowns
-        updateFilterDropdowns();
-
-        // Save to cache and render
-        saveToLocalStorage('reports', allReports);
-        renderTutorReportsFromCache();
-
-    } catch (error) {
-        console.error("Error fetching reports:", error);
-        reportsListContainer.innerHTML = `
-            <div class="text-center py-10 text-red-600">
-                <p class="font-semibold">Failed to load reports</p>
-                <p class="text-sm mt-2">${error.message}</p>
-                <button onclick="fetchAndRenderTutorReports()" class="mt-4 bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">
-                    Try Again
-                </button>
-            </div>
-        `;
+        // Render current page
+        renderCurrentPage();
     }
-}
 
-function updateFilterDropdowns() {
-    const tutorFilter = document.getElementById('reports-tutor-filter');
-    const studentFilter = document.getElementById('reports-student-filter');
-    
-    // Get unique tutors and students
-    const tutors = [...new Set(allReports.map(r => r.tutorEmail))].filter(Boolean);
-    const students = [...new Set(allReports.map(r => r.studentName))].filter(Boolean);
-    
-    // Update tutor filter
-    tutorFilter.innerHTML = '<option value="">All Tutors</option>' + 
-        tutors.map(tutor => `<option value="${tutor}">${tutor}</option>`).join('');
-    
-    // Update student filter
-    studentFilter.innerHTML = '<option value="">All Students</option>' + 
-        students.map(student => `<option value="${student}">${student}</option>`).join('');
-}
+    function renderCurrentPage() {
+        const reportsListContainer = document.getElementById('tutor-reports-list');
+        if (!reportsListContainer) return;
 
-function renderTutorReportsFromCache() {
-    const reportsListContainer = document.getElementById('tutor-reports-list');
-    if (!reportsListContainer) return;
+        const currentPageReports = getCurrentPageReports();
+        const totalPages = Math.ceil(filteredReports.length / reportsPerPage);
 
-    if (filteredReports.length === 0) {
-        reportsListContainer.innerHTML = `
-            <div class="text-center py-10">
-                <p class="text-gray-500">No reports found for the selected period and filters.</p>
-                <p class="text-sm text-gray-400 mt-2">Try adjusting your date range or search terms.</p>
-            </div>`;
+        document.getElementById('report-page-count').textContent = currentPageReports.length;
+        document.getElementById('current-page').textContent = currentReportsPage;
+        document.getElementById('total-pages').textContent = totalPages;
+
+        // Show/hide pagination
+        const pagination = document.getElementById('reports-pagination');
+        if (totalPages > 1) {
+            pagination.classList.remove('hidden');
+            document.getElementById('prev-page-btn').disabled = currentReportsPage === 1;
+            document.getElementById('next-page-btn').disabled = currentReportsPage === totalPages;
+        } else {
+            pagination.classList.add('hidden');
+        }
+
+        const canDownload = window.userData?.permissions?.actions?.canDownloadReports === true;
         
-        document.getElementById('report-tutor-count').textContent = '0';
-        document.getElementById('report-total-count').textContent = '0';
-        document.getElementById('report-page-count').textContent = '0';
-        document.getElementById('reports-pagination').classList.add('hidden');
-        return;
-    }
-
-    // Update statistics
-    const uniqueTutors = new Set(filteredReports.map(r => r.tutorEmail)).size;
-    document.getElementById('report-tutor-count').textContent = uniqueTutors;
-    document.getElementById('report-total-count').textContent = filteredReports.length;
-
-    // Render current page
-    renderCurrentPage();
-}
-
-function renderCurrentPage() {
-    const reportsListContainer = document.getElementById('tutor-reports-list');
-    if (!reportsListContainer) return;
-
-    const currentPageReports = getCurrentPageReports();
-    const totalPages = Math.ceil(filteredReports.length / reportsPerPage);
-
-    document.getElementById('report-page-count').textContent = currentPageReports.length;
-    document.getElementById('current-page').textContent = currentReportsPage;
-    document.getElementById('total-pages').textContent = totalPages;
-
-    // Show/hide pagination
-    const pagination = document.getElementById('reports-pagination');
-    if (totalPages > 1) {
-        pagination.classList.remove('hidden');
-        document.getElementById('prev-page-btn').disabled = currentReportsPage === 1;
-        document.getElementById('next-page-btn').disabled = currentReportsPage === totalPages;
-    } else {
-        pagination.classList.add('hidden');
-    }
-
-    const canDownload = window.userData?.permissions?.actions?.canDownloadReports === true;
-    
-    // Render reports
-    let html = '';
-    
-    currentPageReports.forEach(report => {
-        const isSelected = selectedReports.has(report.id);
-        const submissionDate = report.submittedAt ? 
-            new Date(report.submittedAt.seconds * 1000).toLocaleDateString() : 'Unknown date';
+        // Render reports
+        let html = '';
         
-        const previewText = report.introduction ? 
-            (report.introduction.length > 150 ? 
-                report.introduction.substring(0, 150) + '...' : 
-                report.introduction) : 
-            'No content available';
+        currentPageReports.forEach(report => {
+            const isSelected = selectedReports.has(report.id);
+            const submissionDate = report.submittedAt ? 
+                new Date(report.submittedAt.seconds * 1000).toLocaleDateString() : 'Unknown date';
+            
+            const previewText = report.introduction ? 
+                (report.introduction.length > 150 ? 
+                    report.introduction.substring(0, 150) + '...' : 
+                    report.introduction) : 
+                'No content available';
 
-        html += `
-            <div class="border rounded-lg bg-white shadow-sm hover:shadow-md transition-shadow ${isSelected ? 'border-2 border-blue-500 bg-blue-50' : ''}">
-                <div class="p-4">
-                    <div class="flex justify-between items-start mb-3">
-                        <div class="flex items-center space-x-3">
-                            ${canDownload ? `
-                                <input type="checkbox" ${isSelected ? 'checked' : ''} 
-                                       onchange="toggleReportSelection('${report.id}')"
-                                       class="report-checkbox h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
-                            ` : ''}
-                            <div>
-                                <h3 class="font-bold text-lg text-gray-800">${report.studentName || 'Unknown Student'}</h3>
-                                <p class="text-sm text-gray-600">Tutor: ${report.tutorName || report.tutorEmail}</p>
+            html += `
+                <div class="border rounded-lg bg-white shadow-sm hover:shadow-md transition-shadow ${isSelected ? 'border-2 border-blue-500 bg-blue-50' : ''}">
+                    <div class="p-4">
+                        <div class="flex justify-between items-start mb-3">
+                            <div class="flex items-center space-x-3">
+                                ${canDownload ? `
+                                    <input type="checkbox" ${isSelected ? 'checked' : ''} 
+                                           onchange="toggleReportSelection('${report.id}')"
+                                           class="report-checkbox h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
+                                ` : ''}
+                                <div>
+                                    <h3 class="font-bold text-lg text-gray-800">${report.studentName || 'Unknown Student'}</h3>
+                                    <p class="text-sm text-gray-600">Tutor: ${report.tutorName || report.tutorEmail}</p>
+                                </div>
+                            </div>
+                            <div class="text-right">
+                                <span class="text-xs text-gray-500 block">${submissionDate}</span>
+                                <span class="text-xs bg-green-100 text-green-800 px-2 py-1 rounded-full">Submitted</span>
                             </div>
                         </div>
-                        <div class="text-right">
-                            <span class="text-xs text-gray-500 block">${submissionDate}</span>
-                            <span class="text-xs bg-green-100 text-green-800 px-2 py-1 rounded-full">Submitted</span>
+                        
+                        <div class="mb-3">
+                            <p class="text-gray-700 text-sm">${previewText}</p>
                         </div>
-                    </div>
-                    
-                    <div class="mb-3">
-                        <p class="text-gray-700 text-sm">${previewText}</p>
-                    </div>
 
-                    <div class="flex justify-between items-center text-sm">
-                        <div class="text-gray-500">
-                            Grade: ${report.grade || 'N/A'} | 
-                            Parent: ${report.parentName || 'N/A'}
-                        </div>
-                        <div class="flex space-x-2">
-                            <button onclick="previewReport('${report.id}')" 
-                                    class="bg-blue-500 text-white px-3 py-1 rounded text-xs hover:bg-blue-600 flex items-center">
-                                <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path>
-                                </svg>
-                                Preview
-                            </button>
-                            ${canDownload ? `
-                                <button onclick="downloadSingleReport('${report.id}')" 
-                                        class="bg-green-600 text-white px-3 py-1 rounded text-xs hover:bg-green-700 flex items-center">
+                        <div class="flex justify-between items-center text-sm">
+                            <div class="text-gray-500">
+                                Grade: ${report.grade || 'N/A'} | 
+                                Parent: ${report.parentName || 'N/A'}
+                            </div>
+                            <div class="flex space-x-2">
+                                <button onclick="previewReport('${report.id}')" 
+                                        class="bg-blue-500 text-white px-3 py-1 rounded text-xs hover:bg-blue-600 flex items-center">
                                     <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path>
                                     </svg>
-                                    Download PDF
+                                    Preview
                                 </button>
-                            ` : ''}
+                                ${canDownload ? `
+                                    <button onclick="downloadSingleReport('${report.id}')" 
+                                            class="bg-green-600 text-white px-3 py-1 rounded text-xs hover:bg-green-700 flex items-center">
+                                        <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                                        </svg>
+                                        Download PDF
+                                    </button>
+                                ` : ''}
+                            </div>
                         </div>
                     </div>
                 </div>
-            </div>
-        `;
-    });
+            `;
+        });
 
-    reportsListContainer.innerHTML = html;
+        reportsListContainer.innerHTML = html;
+    }
 }
 
 // Global functions for event handlers
@@ -1817,167 +1817,6 @@ window.downloadSingleReport = async function(reportId) {
         button.disabled = false;
     }
 };
-
-// Enhanced report generation with better error handling
-async function generateReportHTML(reportId) {
-    try {
-        const reportDoc = await getDoc(doc(db, "tutor_submissions", reportId));
-        if (!reportDoc.exists()) throw new Error("Report not found!");
-        const reportData = reportDoc.data();
-
-        // Define the sections to be displayed in the report
-        const reportSections = {
-            "INTRODUCTION": reportData.introduction,
-            "TOPICS & REMARKS": reportData.topics,
-            "PROGRESS & ACHIEVEMENTS": reportData.progress,
-            "STRENGTHS AND WEAKNESSES": reportData.strengthsWeaknesses,
-            "RECOMMENDATIONS": reportData.recommendations,
-            "GENERAL TUTOR'S COMMENTS": reportData.generalComments
-        };
-
-        // Generate the HTML for each section
-        const sectionsHTML = Object.entries(reportSections).map(([title, content]) => {
-            const sanitizedContent = content ? String(content).replace(/</g, "&lt;").replace(/>/g, "&gt;") : '';
-            const displayContent = (sanitizedContent && sanitizedContent.trim() !== '') ? 
-                sanitizedContent.replace(/\n/g, '<br>') : 
-                '<em class="text-gray-500">No content provided</em>';
-            
-            return `
-                <div class="report-section">
-                    <h2>${title}</h2>
-                    <p>${displayContent}</p>
-                </div>
-            `;
-        }).join('');
-
-        const logoUrl = "https://res.cloudinary.com/dy2hxcyaf/image/upload/v1757700806/newbhlogo_umwqzy.svg";
-        const reportTemplate = `
-            <!DOCTYPE html>
-            <html>
-            <head>
-                <meta charset="UTF-8">
-                <title>${reportData.studentName} - Monthly Learning Report</title>
-                <style>
-                    body { 
-                        font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; 
-                        color: #333; 
-                        line-height: 1.6;
-                        margin: 0;
-                        padding: 20px;
-                    }
-                    .report-container { 
-                        max-width: 800px; 
-                        margin: 0 auto; 
-                        padding: 20px;
-                    }
-                    .header { 
-                        text-align: center; 
-                        margin-bottom: 40px; 
-                        border-bottom: 2px solid #16a34a;
-                        padding-bottom: 20px;
-                    }
-                    .header img { 
-                        height: 80px; 
-                        margin-bottom: 10px;
-                    }
-                    .header h1 { 
-                        color: #166534; 
-                        margin: 10px 0; 
-                        font-size: 28px; 
-                    }
-                    .header h2 { 
-                        color: #15803d; 
-                        margin: 5px 0; 
-                        font-size: 22px; 
-                    }
-                    .header p { 
-                        margin: 5px 0; 
-                        color: #555; 
-                        font-size: 14px;
-                    }
-                    .student-info { 
-                        display: grid; 
-                        grid-template-columns: 1fr 1fr; 
-                        gap: 10px 20px; 
-                        margin-bottom: 30px; 
-                        background-color: #f9f9f9;
-                        border: 1px solid #eee;
-                        padding: 20px;
-                        border-radius: 8px;
-                        font-size: 14px;
-                    }
-                    .student-info p { 
-                        margin: 8px 0; 
-                    }
-                    .report-section {
-                        page-break-inside: avoid;
-                        margin-bottom: 25px;
-                        border: 1px solid #e5e7eb;
-                        padding: 20px;
-                        border-radius: 8px;
-                        background: white;
-                    }
-                    .report-section h2 { 
-                        font-size: 18px; 
-                        font-weight: bold; 
-                        color: #16a34a; 
-                        margin: 0 0 15px 0;
-                        padding-bottom: 10px;
-                        border-bottom: 2px solid #d1fae5;
-                    }
-                    .report-section p { 
-                        line-height: 1.6; 
-                        white-space: pre-wrap; 
-                        margin: 0;
-                        font-size: 14px;
-                    }
-                    .footer { 
-                        text-align: right; 
-                        margin-top: 40px;
-                        padding-top: 20px;
-                        border-top: 1px solid #e5e7eb;
-                    }
-                    @media print {
-                        body { padding: 0; }
-                        .report-container { padding: 15px; }
-                        .report-section { border: 1px solid #ccc; }
-                    }
-                </style>
-            </head>
-            <body>
-                <div class="report-container">
-                    <div class="header">
-                        <img src="${logoUrl}" alt="Blooming Kids House Logo">
-                        <h2>Blooming Kids House</h2>
-                        <h1>MONTHLY LEARNING REPORT</h1>
-                        <p>Date: ${reportData.submittedAt ? new Date(reportData.submittedAt.seconds * 1000).toLocaleDateString() : 'N/A'}</p>
-                    </div>
-                    <div class="student-info">
-                        <p><strong>Student's Name:</strong> ${reportData.studentName || 'N/A'}</p>
-                        <p><strong>Parent's Name:</strong> ${reportData.parentName || 'N/A'}</p>
-                        <p><strong>Parent's Phone:</strong> ${reportData.parentPhone || 'N/A'}</p>
-                        <p><strong>Grade:</strong> ${reportData.grade || 'N/A'}</p>
-                        <p><strong>Tutor's Name:</strong> ${reportData.tutorName || 'N/A'}</p>
-                        <p><strong>Tutor's Email:</strong> ${reportData.tutorEmail || 'N/A'}</p>
-                    </div>
-                    ${sectionsHTML}
-                    <div class="footer">
-                        <p>Best regards,</p>
-                        <p><strong>${reportData.tutorName || 'N/A'}</strong></p>
-                        <p><em>Blooming Kids House Tutor</em></p>
-                    </div>
-                </div>
-            </body>
-            </html>
-        `;
-        
-        return { html: reportTemplate, reportData: reportData };
-        
-    } catch (error) {
-        console.error("Error generating report HTML:", error);
-        throw new Error(`Failed to generate report: ${error.message}`);
-    }
-}
 
 // Enhanced zip download function
 async function zipAndDownloadReports(reports, zipName) {
@@ -2861,5 +2700,6 @@ onAuthStateChanged(auth, async (user) => {
 });
 
 // [End Updated management.js File]
+
 
 
