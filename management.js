@@ -1240,7 +1240,7 @@ function renderPayAdviceTable() {
     });
 }
 
-// --- Tutor Reports Panel --- (FIXED VERSION)
+// --- Tutor Reports Panel --- (ROBUST FIXED VERSION)
 async function renderTutorReportsPanel(container) {
     const canDownload = window.userData?.permissions?.actions?.canDownloadReports === true;
     const canExport = window.userData?.permissions?.actions?.canExportPayAdvice === true;
@@ -1310,14 +1310,14 @@ async function renderTutorReportsPanel(container) {
             </div>
 
             <!-- Progress Modal -->
-            <div id="zip-progress-modal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-center justify-center hidden">
+            <div id="pdf-progress-modal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-center justify-center hidden">
                 <div class="relative p-8 bg-white w-96 rounded-lg shadow-xl">
-                    <h3 class="text-xl font-bold mb-4">Download Progress</h3>
-                    <p id="zip-progress-message" class="mb-4">Preparing files...</p>
+                    <h3 class="text-xl font-bold mb-4">Generating PDF</h3>
+                    <p id="pdf-progress-message" class="mb-4">Initializing...</p>
                     <div class="w-full bg-gray-200 rounded-full h-4 mb-4">
-                        <div id="zip-progress-bar" class="bg-green-600 h-4 rounded-full transition-all duration-300" style="width: 0%"></div>
+                        <div id="pdf-progress-bar" class="bg-green-600 h-4 rounded-full transition-all duration-300" style="width: 0%"></div>
                     </div>
-                    <p id="zip-progress-text" class="text-center text-sm text-gray-600">0%</p>
+                    <p id="pdf-progress-text" class="text-center text-sm text-gray-600">0%</p>
                 </div>
             </div>
 
@@ -1659,6 +1659,266 @@ async function renderTutorReportsPanel(container) {
     }
 }
 
+// ROBUST PDF Generation Functions
+
+// Enhanced PDF generation with pre-rendering and validation
+async function generateRobustPDF(reportId, progressCallback = null) {
+    try {
+        if (progressCallback) progressCallback(10, "Loading report data...");
+        
+        const reportDoc = await getDoc(doc(db, "tutor_submissions", reportId));
+        if (!reportDoc.exists()) throw new Error("Report not found!");
+        const reportData = reportDoc.data();
+
+        if (progressCallback) progressCallback(20, "Preparing content...");
+
+        // Create simplified, PDF-optimized HTML
+        const pdfHTML = createPDFOptimizedHTML(reportData);
+        
+        if (progressCallback) progressCallback(30, "Creating rendering container...");
+        
+        // Pre-render in hidden container
+        const renderResult = await preRenderHTML(pdfHTML, progressCallback);
+        
+        if (progressCallback) progressCallback(80, "Generating PDF...");
+        
+        // Generate PDF with optimized settings
+        const pdfBlob = await generatePDFFromElement(renderResult.container, progressCallback);
+        
+        if (progressCallback) progressCallback(100, "PDF ready!");
+        
+        // Cleanup
+        renderResult.container.remove();
+        
+        return { pdfBlob, reportData };
+        
+    } catch (error) {
+        console.error("Error in robust PDF generation:", error);
+        throw error;
+    }
+}
+
+// Create PDF-optimized HTML (simpler, more reliable)
+function createPDFOptimizedHTML(reportData) {
+    const logoUrl = "https://res.cloudinary.com/dy2hxcyaf/image/upload/v1757700806/newbhlogo_umwqzy.svg";
+    const submissionDate = reportData.submittedAt ? 
+        new Date(reportData.submittedAt.seconds * 1000).toLocaleDateString() : 'N/A';
+
+    const sections = [
+        { title: "INTRODUCTION", content: reportData.introduction },
+        { title: "TOPICS & REMARKS", content: reportData.topics },
+        { title: "PROGRESS & ACHIEVEMENTS", content: reportData.progress },
+        { title: "STRENGTHS AND WEAKNESSES", content: reportData.strengthsWeaknesses },
+        { title: "RECOMMENDATIONS", content: reportData.recommendations },
+        { title: "GENERAL TUTOR'S COMMENTS", content: reportData.generalComments }
+    ];
+
+    const sectionsHTML = sections.map(section => {
+        const content = section.content && section.content.trim() !== '' ? 
+            section.content.replace(/\n/g, '<br>') : 
+            '<em>No content provided for this section.</em>';
+        
+        return `
+            <div class="section" style="margin-bottom: 20px; page-break-inside: avoid;">
+                <h3 style="color: #16a34a; font-size: 16px; font-weight: bold; margin-bottom: 10px; border-bottom: 2px solid #d1fae5; padding-bottom: 5px;">
+                    ${section.title}
+                </h3>
+                <div style="line-height: 1.6; font-size: 13px;">
+                    ${content}
+                </div>
+            </div>
+        `;
+    }).join('');
+
+    return `
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta charset="UTF-8">
+            <title>${reportData.studentName} - Report</title>
+            <style>
+                body {
+                    font-family: Arial, sans-serif;
+                    margin: 0;
+                    padding: 20px;
+                    color: #333;
+                    line-height: 1.4;
+                }
+                .header {
+                    text-align: center;
+                    margin-bottom: 25px;
+                    border-bottom: 2px solid #16a34a;
+                    padding-bottom: 15px;
+                }
+                .header img {
+                    height: 60px;
+                    margin-bottom: 10px;
+                }
+                .header h1 {
+                    color: #166534;
+                    margin: 5px 0;
+                    font-size: 20px;
+                }
+                .header h2 {
+                    color: #15803d;
+                    margin: 5px 0;
+                    font-size: 18px;
+                }
+                .student-info {
+                    background: #f8f9fa;
+                    padding: 15px;
+                    border-radius: 5px;
+                    margin-bottom: 25px;
+                    font-size: 13px;
+                }
+                .student-info div {
+                    margin-bottom: 5px;
+                }
+                .section {
+                    margin-bottom: 20px;
+                }
+                .footer {
+                    text-align: right;
+                    margin-top: 30px;
+                    padding-top: 15px;
+                    border-top: 1px solid #ddd;
+                    font-size: 13px;
+                }
+                @media print {
+                    body { padding: 15px; }
+                }
+            </style>
+        </head>
+        <body>
+            <div class="header">
+                <img src="${logoUrl}" alt="Logo" onerror="this.style.display='none'">
+                <h2>Blooming Kids House</h2>
+                <h1>MONTHLY LEARNING REPORT</h1>
+                <div>Date: ${submissionDate}</div>
+            </div>
+            
+            <div class="student-info">
+                <div><strong>Student:</strong> ${reportData.studentName || 'N/A'}</div>
+                <div><strong>Parent:</strong> ${reportData.parentName || 'N/A'}</div>
+                <div><strong>Phone:</strong> ${reportData.parentPhone || 'N/A'}</div>
+                <div><strong>Grade:</strong> ${reportData.grade || 'N/A'}</div>
+                <div><strong>Tutor:</strong> ${reportData.tutorName || 'N/A'}</div>
+            </div>
+            
+            ${sectionsHTML}
+            
+            <div class="footer">
+                <div><strong>Best regards,</strong></div>
+                <div>${reportData.tutorName || 'N/A'}</div>
+                <div><em>Blooming Kids House Tutor</em></div>
+            </div>
+        </body>
+        </html>
+    `;
+}
+
+// Pre-render HTML in hidden container with resource loading
+async function preRenderHTML(html, progressCallback = null) {
+    return new Promise((resolve, reject) => {
+        const container = document.createElement('div');
+        container.style.cssText = `
+            position: fixed;
+            left: -9999px;
+            top: -9999px;
+            width: 800px;
+            background: white;
+            z-index: -1000;
+        `;
+        document.body.appendChild(container);
+        
+        container.innerHTML = html;
+        
+        if (progressCallback) progressCallback(40, "Loading resources...");
+        
+        // Wait for images to load
+        const images = container.getElementsByTagName('img');
+        let imagesLoaded = 0;
+        const totalImages = images.length;
+        
+        if (totalImages === 0) {
+            if (progressCallback) progressCallback(60, "Resources loaded");
+            setTimeout(() => resolve({ container }), 500);
+            return;
+        }
+        
+        const checkImagesLoaded = () => {
+            imagesLoaded++;
+            const progress = 40 + (imagesLoaded / totalImages) * 20;
+            if (progressCallback) progressCallback(Math.round(progress), `Loading images (${imagesLoaded}/${totalImages})...`);
+            
+            if (imagesLoaded === totalImages) {
+                if (progressCallback) progressCallback(60, "All resources loaded");
+                setTimeout(() => resolve({ container }), 1000);
+            }
+        };
+        
+        Array.from(images).forEach(img => {
+            if (img.complete) {
+                checkImagesLoaded();
+            } else {
+                img.onload = checkImagesLoaded;
+                img.onerror = checkImagesLoaded; // Continue even if image fails
+            }
+        });
+        
+        // Fallback timeout
+        setTimeout(() => {
+            if (progressCallback) progressCallback(60, "Resources loaded (timeout)");
+            resolve({ container });
+        }, 5000);
+    });
+}
+
+// Generate PDF from pre-rendered element
+async function generatePDFFromElement(element, progressCallback = null) {
+    return new Promise((resolve, reject) => {
+        try {
+            if (progressCallback) progressCallback(70, "Converting to PDF...");
+            
+            const options = {
+                margin: 0.5,
+                image: { 
+                    type: 'jpeg', 
+                    quality: 0.95 
+                },
+                html2canvas: { 
+                    scale: 2,
+                    useCORS: true,
+                    logging: false,
+                    backgroundColor: '#FFFFFF',
+                    scrollX: 0,
+                    scrollY: 0
+                },
+                jsPDF: { 
+                    unit: 'in', 
+                    format: 'a4', 
+                    orientation: 'portrait'
+                }
+            };
+            
+            html2pdf()
+                .set(options)
+                .from(element)
+                .outputPdf('blob')
+                .then(pdfBlob => {
+                    if (progressCallback) progressCallback(90, "Finalizing PDF...");
+                    resolve(pdfBlob);
+                })
+                .catch(error => {
+                    reject(new Error(`PDF generation failed: ${error.message}`));
+                });
+                
+        } catch (error) {
+            reject(error);
+        }
+    });
+}
+
 // FIXED Global functions for event handlers
 window.previewReport = async function(reportId) {
     try {
@@ -1672,7 +1932,7 @@ window.previewReport = async function(reportId) {
     }
 };
 
-// FIXED: Working PDF download function with optimized settings
+// FIXED: Robust PDF download function
 window.downloadSingleReport = async function(reportId, event) {
     const button = event.target;
     const originalText = button.innerHTML;
@@ -1682,44 +1942,42 @@ window.downloadSingleReport = async function(reportId, event) {
         button.innerHTML = '<div class="loading-spinner mx-auto" style="width: 16px; height: 16px;"></div>';
         button.disabled = true;
         
-        const { html, reportData } = await generateReportHTML(reportId);
+        // Show progress modal
+        const progressModal = document.getElementById('pdf-progress-modal');
+        const progressBar = document.getElementById('pdf-progress-bar');
+        const progressText = document.getElementById('pdf-progress-text');
+        const progressMessage = document.getElementById('pdf-progress-message');
         
-        // OPTIMIZED PDF settings for complete content capture
-        const options = {
-            margin: 0.5,
-            filename: `${reportData.studentName}_Report_${new Date().getTime()}.pdf`,
-            image: { 
-                type: 'jpeg', 
-                quality: 1.0 
-            },
-            html2canvas: { 
-                scale: 3, // Higher scale for better quality
-                useCORS: true,
-                logging: false,
-                letterRendering: true,
-                allowTaint: false,
-                backgroundColor: '#FFFFFF'
-            },
-            jsPDF: { 
-                unit: 'in', 
-                format: 'a4', 
-                orientation: 'portrait',
-                compress: true
-            },
-            pagebreak: { 
-                mode: ['avoid-all', 'css', 'legacy'] 
-            }
+        progressModal.classList.remove('hidden');
+        
+        const updateProgress = (percent, message) => {
+            progressBar.style.width = `${percent}%`;
+            progressText.textContent = `${percent}%`;
+            progressMessage.textContent = message;
         };
         
-        // Generate and download PDF with timeout to ensure complete rendering
-        await new Promise((resolve, reject) => {
-            const pdfPromise = html2pdf().set(options).from(html).save();
-            setTimeout(() => resolve(pdfPromise), 1000);
-        });
+        // Use robust PDF generation
+        const { pdfBlob, reportData } = await generateRobustPDF(reportId, updateProgress);
+        
+        // Download the PDF
+        const url = URL.createObjectURL(pdfBlob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `${reportData.studentName}_Report_${new Date().getTime()}.pdf`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+        
+        // Close modal after delay
+        setTimeout(() => {
+            progressModal.classList.add('hidden');
+        }, 1000);
         
     } catch (error) {
         console.error("Error downloading report:", error);
         alert(`Error downloading report: ${error.message}`);
+        document.getElementById('pdf-progress-modal').classList.add('hidden');
     } finally {
         // Restore button
         button.innerHTML = originalText;
@@ -1733,10 +1991,10 @@ window.zipAndDownloadTutorReports = async function(reports, tutorName, button) {
     
     try {
         // Show progress modal
-        const progressModal = document.getElementById('zip-progress-modal');
-        const progressBar = document.getElementById('zip-progress-bar');
-        const progressText = document.getElementById('zip-progress-text');
-        const progressMessage = document.getElementById('zip-progress-message');
+        const progressModal = document.getElementById('pdf-progress-modal');
+        const progressBar = document.getElementById('pdf-progress-bar');
+        const progressText = document.getElementById('pdf-progress-text');
+        const progressMessage = document.getElementById('pdf-progress-message');
         
         progressModal.classList.remove('hidden');
         progressMessage.textContent = `Preparing ${reports.length} reports for ${tutorName}...`;
@@ -1746,32 +2004,26 @@ window.zipAndDownloadTutorReports = async function(reports, tutorName, button) {
         const zip = new JSZip();
         let processedCount = 0;
 
+        const updateProgress = (percent, message) => {
+            progressBar.style.width = `${percent}%`;
+            progressText.textContent = `${percent}%`;
+            progressMessage.textContent = message;
+            button.innerHTML = `📦 ${message}`;
+        };
+
         // Process reports in small batches
-        const batchSize = 2;
+        const batchSize = 1; // Process one at a time for reliability
         for (let i = 0; i < reports.length; i += batchSize) {
             const batch = reports.slice(i, i + batchSize);
-            const batchPromises = batch.map(async (report) => {
+            
+            for (const report of batch) {
                 try {
-                    const { html, reportData } = await generateReportHTML(report.id);
-                    
-                    const options = {
-                        image: { type: 'jpeg', quality: 1.0 },
-                        html2canvas: { 
-                            scale: 3,
-                            useCORS: true,
-                            logging: false,
-                            letterRendering: true,
-                            backgroundColor: '#FFFFFF'
-                        },
-                        jsPDF: { 
-                            unit: 'in', 
-                            format: 'a4', 
-                            orientation: 'portrait',
-                            compress: true
-                        }
-                    };
-                    
-                    const pdfBlob = await html2pdf().set(options).from(html).output('blob');
+                    updateProgress(
+                        Math.round((processedCount / reports.length) * 100),
+                        `Processing report ${processedCount + 1} of ${reports.length}...`
+                    );
+
+                    const { pdfBlob, reportData } = await generateRobustPDF(report.id);
                     
                     // Create safe filename
                     const safeStudentName = (reportData.studentName || 'Unknown_Student').replace(/[^a-z0-9]/gi, '_');
@@ -1787,33 +2039,21 @@ window.zipAndDownloadTutorReports = async function(reports, tutorName, button) {
                 }
                 
                 processedCount++;
-                const progress = Math.round((processedCount / reports.length) * 100);
-                
-                // Update progress
-                progressBar.style.width = `${progress}%`;
-                progressText.textContent = `${progress}%`;
-                progressMessage.textContent = `Processed ${processedCount} of ${reports.length} reports...`;
-                
-                // Update button text
-                button.innerHTML = `📦 Zipping... ${progress}%`;
-            });
+            }
             
-            await Promise.all(batchPromises);
-            
-            // Small delay between batches to prevent freezing
-            await new Promise(resolve => setTimeout(resolve, 500));
+            // Small delay between batches
+            await new Promise(resolve => setTimeout(resolve, 1000));
         }
 
         // Generate zip file
-        progressMessage.textContent = 'Creating ZIP file...';
+        updateProgress(95, 'Creating ZIP file...');
         const zipBlob = await zip.generateAsync({ 
             type: "blob",
-            compression: "DEFLATE",
-            compressionOptions: { level: 6 }
+            compression: "DEFLATE"
         });
 
         // Download zip
-        progressMessage.textContent = 'Download starting...';
+        updateProgress(100, 'Download starting...');
         saveAs(zipBlob, `${tutorName}_Reports_${new Date().toISOString().split('T')[0]}.zip`);
         
         // Close modal after short delay
@@ -1824,7 +2064,7 @@ window.zipAndDownloadTutorReports = async function(reports, tutorName, button) {
     } catch (error) {
         console.error("Error creating zip file:", error);
         alert("Failed to create zip file. Please try again.");
-        document.getElementById('zip-progress-modal').classList.add('hidden');
+        document.getElementById('pdf-progress-modal').classList.add('hidden');
     } finally {
         // Restore button
         button.innerHTML = originalButtonText;
@@ -1847,7 +2087,7 @@ const additionalStyles = `
     0% { transform: rotate(0deg); }
     100% { transform: rotate(360deg); }
 }
-#zip-progress-modal {
+#pdf-progress-modal {
     backdrop-filter: blur(5px);
 }
 </style>
@@ -2633,6 +2873,7 @@ onAuthStateChanged(auth, async (user) => {
 });
 
 // [End Updated management.js File]
+
 
 
 
