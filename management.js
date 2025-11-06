@@ -1240,7 +1240,7 @@ function renderPayAdviceTable() {
     });
 }
 
-// --- Tutor Reports Panel --- (CORRECTED VERSION)
+// --- Tutor Reports Panel --- (FIXED VERSION)
 async function renderTutorReportsPanel(container) {
     const canDownload = window.userData?.permissions?.actions?.canDownloadReports === true;
     const canExport = window.userData?.permissions?.actions?.canExportPayAdvice === true;
@@ -1307,6 +1307,18 @@ async function renderTutorReportsPanel(container) {
             <div class="mb-6">
                 <input type="search" id="reports-search" placeholder="Search reports by student, tutor, or content..." 
                        class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent">
+            </div>
+
+            <!-- Progress Modal -->
+            <div id="zip-progress-modal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-center justify-center hidden">
+                <div class="relative p-8 bg-white w-96 rounded-lg shadow-xl">
+                    <h3 class="text-xl font-bold mb-4">Download Progress</h3>
+                    <p id="zip-progress-message" class="mb-4">Preparing files...</p>
+                    <div class="w-full bg-gray-200 rounded-full h-4 mb-4">
+                        <div id="zip-progress-bar" class="bg-green-600 h-4 rounded-full transition-all duration-300" style="width: 0%"></div>
+                    </div>
+                    <p id="zip-progress-text" class="text-center text-sm text-gray-600">0%</p>
+                </div>
             </div>
 
             <!-- Reports List -->
@@ -1583,17 +1595,17 @@ async function renderTutorReportsPanel(container) {
                         <li class="flex justify-between items-center p-3 bg-gray-50 rounded-lg border">
                             <div>
                                 <span class="font-medium">${reportDate}</span>
-                                <span class="text-sm text-gray-500 ml-3">${report.grade || 'No grade'}</span>
+                                <span class="text-sm text-gray-500 ml-3">Grade: ${report.grade || 'N/A'}</span>
                             </div>
                             <div class="flex gap-2">
                                 <button onclick="previewReport('${report.id}')" 
                                         class="bg-blue-500 text-white px-3 py-1 rounded text-xs hover:bg-blue-600">
-                                    Preview
+                                    👁️ Preview
                                 </button>
                                 ${canDownload ? `
                                     <button onclick="downloadSingleReport('${report.id}', event)" 
                                             class="bg-green-600 text-white px-3 py-1 rounded text-xs hover:bg-green-700">
-                                        Download
+                                        📥 Download
                                     </button>
                                 ` : ''}
                             </div>
@@ -1603,7 +1615,7 @@ async function renderTutorReportsPanel(container) {
 
                 return `
                     <div class="ml-4 mt-2">
-                        <h4 class="font-semibold text-gray-700 mb-2">${studentName}</h4>
+                        <h4 class="font-semibold text-gray-700 mb-2">📚 ${studentName}</h4>
                         <ul class="space-y-2">
                             ${reportLinks}
                         </ul>
@@ -1613,9 +1625,12 @@ async function renderTutorReportsPanel(container) {
 
             const zipButtonHTML = canDownload ? `
                 <div class="p-4 border-t bg-blue-50">
-                    <button onclick="zipAndDownloadTutorReports(${JSON.stringify(tutorData.reports)}, '${tutorData.name}', event)" 
-                            class="zip-reports-btn bg-blue-600 text-white px-4 py-2 text-sm rounded w-full hover:bg-blue-700 transition-colors">
-                        📦 Zip & Download All Reports for ${tutorData.name}
+                    <button onclick="zipAndDownloadTutorReports(${JSON.stringify(tutorData.reports).replace(/"/g, '&quot;')}, '${tutorData.name.replace(/'/g, "\\'")}', this)" 
+                            class="w-full bg-blue-600 text-white px-4 py-3 rounded-lg hover:bg-blue-700 transition-colors font-semibold flex items-center justify-center">
+                        <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10"></path>
+                        </svg>
+                        📦 ZIP & DOWNLOAD ALL REPORTS FOR ${tutorData.name.toUpperCase()}
                     </button>
                 </div>
             ` : '';
@@ -1624,7 +1639,7 @@ async function renderTutorReportsPanel(container) {
                 <div class="border rounded-lg shadow-sm bg-white">
                     <details open>
                         <summary class="p-4 cursor-pointer flex justify-between items-center font-semibold text-lg bg-green-50 hover:bg-green-100 rounded-t-lg">
-                            <span>${tutorData.name}</span>
+                            <span>👨‍🏫 ${tutorData.name}</span>
                             <span class="text-sm font-normal text-gray-500 bg-green-200 px-2 py-1 rounded-full">
                                 ${tutorData.reports.length} report${tutorData.reports.length !== 1 ? 's' : ''}
                             </span>
@@ -1657,102 +1672,177 @@ window.previewReport = async function(reportId) {
     }
 };
 
-// FIXED: Added event parameter to fix the error
+// FIXED: Working PDF download function
 window.downloadSingleReport = async function(reportId, event) {
+    const button = event.target;
+    const originalText = button.innerHTML;
+    
     try {
-        const button = event.target;
-        const originalText = button.innerHTML;
-        
         // Show loading state
-        button.innerHTML = 'Generating...';
+        button.innerHTML = '<div class="loading-spinner mx-auto" style="width: 16px; height: 16px;"></div>';
         button.disabled = true;
         
         const { html, reportData } = await generateReportHTML(reportId);
+        
+        // Create PDF with proper content
         const options = {
             margin: 0.5,
-            filename: `${reportData.studentName}_report_${new Date().getTime()}.pdf`,
+            filename: `${reportData.studentName}_Report_${new Date().getTime()}.pdf`,
             image: { type: 'jpeg', quality: 0.98 },
-            html2canvas: { scale: 2, useCORS: true },
-            jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' }
+            html2canvas: { 
+                scale: 2, 
+                useCORS: true,
+                logging: true,
+                letterRendering: true
+            },
+            jsPDF: { 
+                unit: 'in', 
+                format: 'letter', 
+                orientation: 'portrait' 
+            }
         };
         
-        await html2pdf().from(html).set(options).save();
-        
-        // Restore button
-        button.innerHTML = originalText;
-        button.disabled = false;
+        // Generate and download PDF
+        await html2pdf().set(options).from(html).save();
         
     } catch (error) {
         console.error("Error downloading report:", error);
-        alert(`Error: ${error.message}`);
-        
-        // Restore button on error
-        if (event && event.target) {
-            event.target.innerHTML = 'Download';
-            event.target.disabled = false;
-        }
+        alert(`Error downloading report: ${error.message}`);
+    } finally {
+        // Restore button
+        button.innerHTML = originalText;
+        button.disabled = false;
     }
 };
 
-// FIXED: Added event parameter
-window.zipAndDownloadTutorReports = async function(reports, tutorName, event) {
-    const button = event.target;
-    const originalButtonText = button.textContent;
+// FIXED: Enhanced zip download with visible progress
+window.zipAndDownloadTutorReports = async function(reports, tutorName, button) {
+    const originalButtonText = button.innerHTML;
     
     try {
-        button.textContent = 'Zipping... (0%)';
-        button.disabled = true;
+        // Show progress modal
+        const progressModal = document.getElementById('zip-progress-modal');
+        const progressBar = document.getElementById('zip-progress-bar');
+        const progressText = document.getElementById('zip-progress-text');
+        const progressMessage = document.getElementById('zip-progress-message');
+        
+        progressModal.classList.remove('hidden');
+        progressMessage.textContent = `Preparing ${reports.length} reports for ${tutorName}...`;
+        progressBar.style.width = '0%';
+        progressText.textContent = '0%';
 
         const zip = new JSZip();
-        let filesGenerated = 0;
-        
-        // Process reports in batches
-        const batchSize = 3;
+        let processedCount = 0;
+
+        // Process reports in small batches
+        const batchSize = 2;
         for (let i = 0; i < reports.length; i += batchSize) {
             const batch = reports.slice(i, i + batchSize);
             const batchPromises = batch.map(async (report) => {
                 try {
                     const { html, reportData } = await generateReportHTML(report.id);
+                    
                     const options = {
                         image: { type: 'jpeg', quality: 0.98 },
-                        html2canvas: { scale: 2, useCORS: true },
-                        jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' }
+                        html2canvas: { 
+                            scale: 2, 
+                            useCORS: true,
+                            logging: false
+                        },
+                        jsPDF: { 
+                            unit: 'in', 
+                            format: 'letter', 
+                            orientation: 'portrait' 
+                        }
                     };
-                    const pdfBlob = await html2pdf().from(html).set(options).output('blob');
+                    
+                    const pdfBlob = await html2pdf().set(options).from(html).output('blob');
                     
                     // Create safe filename
-                    const safeStudentName = (reportData.studentName || 'Unknown').replace(/[^a-z0-9]/gi, '_');
-                    const safeDate = reportData.submittedAt ? 
+                    const safeStudentName = (reportData.studentName || 'Unknown_Student').replace(/[^a-z0-9]/gi, '_');
+                    const reportDate = reportData.submittedAt ? 
                         new Date(reportData.submittedAt.seconds * 1000).toISOString().split('T')[0] : 
                         'unknown_date';
-                    const filename = `${safeStudentName}_${safeDate}_report.pdf`;
+                    const filename = `${safeStudentName}_${reportDate}.pdf`;
                     
                     zip.file(filename, pdfBlob);
-                    filesGenerated++;
-                    
-                    // Update progress
-                    const progress = Math.round((filesGenerated / reports.length) * 100);
-                    button.textContent = `Zipping... (${progress}%)`;
                     
                 } catch (error) {
                     console.error(`Error processing report ${report.id}:`, error);
                 }
+                
+                processedCount++;
+                const progress = Math.round((processedCount / reports.length) * 100);
+                
+                // Update progress
+                progressBar.style.width = `${progress}%`;
+                progressText.textContent = `${progress}%`;
+                progressMessage.textContent = `Processed ${processedCount} of ${reports.length} reports...`;
+                
+                // Update button text
+                button.innerHTML = `📦 Zipping... ${progress}%`;
             });
             
             await Promise.all(batchPromises);
+            
+            // Small delay between batches to prevent freezing
+            await new Promise(resolve => setTimeout(resolve, 100));
         }
-        
-        const zipBlob = await zip.generateAsync({ type: "blob" });
+
+        // Generate zip file
+        progressMessage.textContent = 'Creating ZIP file...';
+        const zipBlob = await zip.generateAsync({ 
+            type: "blob",
+            compression: "DEFLATE"
+        });
+
+        // Download zip
+        progressMessage.textContent = 'Download starting...';
         saveAs(zipBlob, `${tutorName}_Reports_${new Date().toISOString().split('T')[0]}.zip`);
+        
+        // Close modal after short delay
+        setTimeout(() => {
+            progressModal.classList.add('hidden');
+        }, 1000);
         
     } catch (error) {
         console.error("Error creating zip file:", error);
         alert("Failed to create zip file. Please try again.");
+        document.getElementById('zip-progress-modal').classList.add('hidden');
     } finally {
-        button.textContent = originalButtonText;
+        // Restore button
+        button.innerHTML = originalButtonText;
         button.disabled = false;
     }
 };
+
+// Add CSS for loading spinner
+const additionalStyles = `
+<style>
+.loading-spinner {
+    border: 3px solid #f3f3f3;
+    border-top: 3px solid #3498db;
+    border-radius: 50%;
+    width: 40px;
+    height: 40px;
+    animation: spin 1s linear infinite;
+}
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+#zip-progress-modal {
+    backdrop-filter: blur(5px);
+}
+</style>
+`;
+// Only add styles if not already added
+if (!document.querySelector('style[data-reports-panel]')) {
+    const styleEl = document.createElement('style');
+    styleEl.setAttribute('data-reports-panel', 'true');
+    styleEl.innerHTML = additionalStyles;
+    document.head.appendChild(styleEl);
+}
 
 // --- Pending Approvals Panel ---
 async function renderPendingApprovalsPanel(container) {
@@ -2527,6 +2617,7 @@ onAuthStateChanged(auth, async (user) => {
 });
 
 // [End Updated management.js File]
+
 
 
 
