@@ -1240,7 +1240,7 @@ function renderPayAdviceTable() {
     });
 }
 
-// --- Tutor Reports Panel --- (FIXED VERSION)
+// --- Tutor Reports Panel --- (FULLY FIXED VERSION)
 async function renderTutorReportsPanel(container) {
     const canDownload = window.userData?.permissions?.actions?.canDownloadReports === true;
     const canExport = window.userData?.permissions?.actions?.canExportPayAdvice === true;
@@ -1659,6 +1659,268 @@ async function renderTutorReportsPanel(container) {
     }
 }
 
+// FIXED: Completely rewritten PDF generation function
+async function generateReportHTML(reportId) {
+    try {
+        const reportDoc = await getDoc(doc(db, "tutor_submissions", reportId));
+        if (!reportDoc.exists()) throw new Error("Report not found!");
+        const reportData = reportDoc.data();
+
+        // Define the sections to be displayed in the report
+        const reportSections = {
+            "INTRODUCTION": reportData.introduction,
+            "TOPICS & REMARKS": reportData.topics,
+            "PROGRESS & ACHIEVEMENTS": reportData.progress,
+            "STRENGTHS AND WEAKNESSES": reportData.strengthsWeaknesses,
+            "RECOMMENDATIONS": reportData.recommendations,
+            "GENERAL TUTOR'S COMMENTS": reportData.generalComments
+        };
+
+        // Generate the HTML for each section with proper formatting
+        const sectionsHTML = Object.entries(reportSections).map(([title, content]) => {
+            if (!content || content.trim() === '') {
+                return `
+                    <div class="report-section" style="page-break-inside: avoid; margin-bottom: 25px; padding: 15px; border: 1px solid #e5e7eb; border-radius: 8px; background: white;">
+                        <h2 style="font-size: 18px; font-weight: bold; color: #16a34a; margin: 0 0 15px 0; padding-bottom: 10px; border-bottom: 2px solid #d1fae5;">${title}</h2>
+                        <p style="line-height: 1.6; margin: 0; color: #666; font-style: italic;">No content provided for this section.</p>
+                    </div>
+                `;
+            }
+
+            const sanitizedContent = String(content)
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/\n/g, '<br>');
+            
+            return `
+                <div class="report-section" style="page-break-inside: avoid; margin-bottom: 25px; padding: 15px; border: 1px solid #e5e7eb; border-radius: 8px; background: white;">
+                    <h2 style="font-size: 18px; font-weight: bold; color: #16a34a; margin: 0 0 15px 0; padding-bottom: 10px; border-bottom: 2px solid #d1fae5;">${title}</h2>
+                    <p style="line-height: 1.6; margin: 0; white-space: pre-wrap;">${sanitizedContent}</p>
+                </div>
+            `;
+        }).join('');
+
+        const logoUrl = "https://res.cloudinary.com/dy2hxcyaf/image/upload/v1757700806/newbhlogo_umwqzy.svg";
+        const submissionDate = reportData.submittedAt ? 
+            new Date(reportData.submittedAt.seconds * 1000).toLocaleDateString() : 'N/A';
+
+        // COMPLETELY FIXED HTML TEMPLATE - Inline all CSS for PDF compatibility
+        const reportTemplate = `
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <meta charset="UTF-8">
+                <title>${reportData.studentName} - Monthly Learning Report</title>
+                <style>
+                    @media print {
+                        body { 
+                            margin: 0; 
+                            padding: 0; 
+                            font-family: 'Arial', 'Helvetica', sans-serif; 
+                            color: #333; 
+                            line-height: 1.6;
+                            background: white;
+                        }
+                        .report-container { 
+                            max-width: 100%; 
+                            margin: 0 auto; 
+                            padding: 20px;
+                        }
+                        .header { 
+                            text-align: center; 
+                            margin-bottom: 30px; 
+                            border-bottom: 3px solid #16a34a;
+                            padding-bottom: 20px;
+                        }
+                        .header img { 
+                            height: 70px; 
+                            margin-bottom: 10px;
+                        }
+                        .header h1 { 
+                            color: #166534; 
+                            margin: 10px 0; 
+                            font-size: 24px; 
+                            font-weight: bold;
+                        }
+                        .header h2 { 
+                            color: #15803d; 
+                            margin: 5px 0; 
+                            font-size: 20px; 
+                            font-weight: bold;
+                        }
+                        .header p { 
+                            margin: 5px 0; 
+                            color: #555; 
+                            font-size: 14px;
+                        }
+                        .student-info { 
+                            display: grid; 
+                            grid-template-columns: 1fr 1fr; 
+                            gap: 8px 15px; 
+                            margin-bottom: 25px; 
+                            background-color: #f9f9f9;
+                            border: 1px solid #eee;
+                            padding: 15px;
+                            border-radius: 6px;
+                            font-size: 13px;
+                        }
+                        .student-info p { 
+                            margin: 6px 0; 
+                        }
+                        .report-section {
+                            page-break-inside: avoid;
+                            margin-bottom: 20px;
+                            border: 1px solid #e5e7eb;
+                            padding: 15px;
+                            border-radius: 6px;
+                            background: white;
+                        }
+                        .report-section h2 { 
+                            font-size: 16px; 
+                            font-weight: bold; 
+                            color: #16a34a; 
+                            margin: 0 0 12px 0;
+                            padding-bottom: 8px;
+                            border-bottom: 2px solid #d1fae5;
+                        }
+                        .report-section p { 
+                            line-height: 1.6; 
+                            white-space: pre-wrap; 
+                            margin: 0;
+                            font-size: 13px;
+                        }
+                        .footer { 
+                            text-align: right; 
+                            margin-top: 30px;
+                            padding-top: 15px;
+                            border-top: 1px solid #e5e7eb;
+                            font-size: 13px;
+                        }
+                    }
+                    
+                    /* Screen styles */
+                    body { 
+                        font-family: 'Arial', 'Helvetica', sans-serif; 
+                        color: #333; 
+                        line-height: 1.6;
+                        margin: 0;
+                        padding: 20px;
+                        background: white;
+                    }
+                    .report-container { 
+                        max-width: 800px; 
+                        margin: 0 auto; 
+                        padding: 20px;
+                    }
+                    .header { 
+                        text-align: center; 
+                        margin-bottom: 30px; 
+                        border-bottom: 3px solid #16a34a;
+                        padding-bottom: 20px;
+                    }
+                    .header img { 
+                        height: 70px; 
+                        margin-bottom: 10px;
+                    }
+                    .header h1 { 
+                        color: #166534; 
+                        margin: 10px 0; 
+                        font-size: 24px; 
+                        font-weight: bold;
+                    }
+                    .header h2 { 
+                        color: #15803d; 
+                        margin: 5px 0; 
+                        font-size: 20px; 
+                        font-weight: bold;
+                    }
+                    .header p { 
+                        margin: 5px 0; 
+                        color: #555; 
+                        font-size: 14px;
+                    }
+                    .student-info { 
+                        display: grid; 
+                        grid-template-columns: 1fr 1fr; 
+                        gap: 8px 15px; 
+                        margin-bottom: 25px; 
+                        background-color: #f9f9f9;
+                        border: 1px solid #eee;
+                        padding: 15px;
+                        border-radius: 6px;
+                        font-size: 13px;
+                    }
+                    .student-info p { 
+                        margin: 6px 0; 
+                    }
+                    .report-section {
+                        margin-bottom: 20px;
+                        border: 1px solid #e5e7eb;
+                        padding: 15px;
+                        border-radius: 6px;
+                        background: white;
+                    }
+                    .report-section h2 { 
+                        font-size: 16px; 
+                        font-weight: bold; 
+                        color: #16a34a; 
+                        margin: 0 0 12px 0;
+                        padding-bottom: 8px;
+                        border-bottom: 2px solid #d1fae5;
+                    }
+                    .report-section p { 
+                        line-height: 1.6; 
+                        white-space: pre-wrap; 
+                        margin: 0;
+                        font-size: 13px;
+                    }
+                    .footer { 
+                        text-align: right; 
+                        margin-top: 30px;
+                        padding-top: 15px;
+                        border-top: 1px solid #e5e7eb;
+                        font-size: 13px;
+                    }
+                </style>
+            </head>
+            <body>
+                <div class="report-container">
+                    <div class="header">
+                        <img src="${logoUrl}" alt="Blooming Kids House Logo" onerror="this.style.display='none'">
+                        <h2>Blooming Kids House</h2>
+                        <h1>MONTHLY LEARNING REPORT</h1>
+                        <p>Date: ${submissionDate}</p>
+                    </div>
+                    
+                    <div class="student-info">
+                        <p><strong>Student's Name:</strong> ${reportData.studentName || 'N/A'}</p>
+                        <p><strong>Parent's Name:</strong> ${reportData.parentName || 'N/A'}</p>
+                        <p><strong>Parent's Phone:</strong> ${reportData.parentPhone || 'N/A'}</p>
+                        <p><strong>Grade:</strong> ${reportData.grade || 'N/A'}</p>
+                        <p><strong>Tutor's Name:</strong> ${reportData.tutorName || 'N/A'}</p>
+                        <p><strong>Tutor's Email:</strong> ${reportData.tutorEmail || 'N/A'}</p>
+                    </div>
+                    
+                    ${sectionsHTML}
+                    
+                    <div class="footer">
+                        <p>Best regards,</p>
+                        <p><strong>${reportData.tutorName || 'N/A'}</strong></p>
+                        <p><em>Blooming Kids House Tutor</em></p>
+                    </div>
+                </div>
+            </body>
+            </html>
+        `;
+        
+        return { html: reportTemplate, reportData: reportData };
+        
+    } catch (error) {
+        console.error("Error generating report HTML:", error);
+        throw new Error(`Failed to generate report: ${error.message}`);
+    }
+}
+
 // FIXED Global functions for event handlers
 window.previewReport = async function(reportId) {
     try {
@@ -1672,7 +1934,7 @@ window.previewReport = async function(reportId) {
     }
 };
 
-// FIXED: Working PDF download function
+// FIXED: Working PDF download function with optimized settings
 window.downloadSingleReport = async function(reportId, event) {
     const button = event.target;
     const originalText = button.innerHTML;
@@ -1684,26 +1946,38 @@ window.downloadSingleReport = async function(reportId, event) {
         
         const { html, reportData } = await generateReportHTML(reportId);
         
-        // Create PDF with proper content
+        // OPTIMIZED PDF settings for complete content capture
         const options = {
             margin: 0.5,
             filename: `${reportData.studentName}_Report_${new Date().getTime()}.pdf`,
-            image: { type: 'jpeg', quality: 0.98 },
+            image: { 
+                type: 'jpeg', 
+                quality: 1.0 
+            },
             html2canvas: { 
-                scale: 2, 
+                scale: 3, // Higher scale for better quality
                 useCORS: true,
-                logging: true,
-                letterRendering: true
+                logging: false,
+                letterRendering: true,
+                allowTaint: false,
+                backgroundColor: '#FFFFFF'
             },
             jsPDF: { 
                 unit: 'in', 
-                format: 'letter', 
-                orientation: 'portrait' 
+                format: 'a4', 
+                orientation: 'portrait',
+                compress: true
+            },
+            pagebreak: { 
+                mode: ['avoid-all', 'css', 'legacy'] 
             }
         };
         
-        // Generate and download PDF
-        await html2pdf().set(options).from(html).save();
+        // Generate and download PDF with timeout to ensure complete rendering
+        await new Promise((resolve, reject) => {
+            const pdfPromise = html2pdf().set(options).from(html).save();
+            setTimeout(() => resolve(pdfPromise), 1000);
+        });
         
     } catch (error) {
         console.error("Error downloading report:", error);
@@ -1743,16 +2017,19 @@ window.zipAndDownloadTutorReports = async function(reports, tutorName, button) {
                     const { html, reportData } = await generateReportHTML(report.id);
                     
                     const options = {
-                        image: { type: 'jpeg', quality: 0.98 },
+                        image: { type: 'jpeg', quality: 1.0 },
                         html2canvas: { 
-                            scale: 2, 
+                            scale: 3,
                             useCORS: true,
-                            logging: false
+                            logging: false,
+                            letterRendering: true,
+                            backgroundColor: '#FFFFFF'
                         },
                         jsPDF: { 
                             unit: 'in', 
-                            format: 'letter', 
-                            orientation: 'portrait' 
+                            format: 'a4', 
+                            orientation: 'portrait',
+                            compress: true
                         }
                     };
                     
@@ -1786,14 +2063,15 @@ window.zipAndDownloadTutorReports = async function(reports, tutorName, button) {
             await Promise.all(batchPromises);
             
             // Small delay between batches to prevent freezing
-            await new Promise(resolve => setTimeout(resolve, 100));
+            await new Promise(resolve => setTimeout(resolve, 500));
         }
 
         // Generate zip file
         progressMessage.textContent = 'Creating ZIP file...';
         const zipBlob = await zip.generateAsync({ 
             type: "blob",
-            compression: "DEFLATE"
+            compression: "DEFLATE",
+            compressionOptions: { level: 6 }
         });
 
         // Download zip
@@ -1803,7 +2081,7 @@ window.zipAndDownloadTutorReports = async function(reports, tutorName, button) {
         // Close modal after short delay
         setTimeout(() => {
             progressModal.classList.add('hidden');
-        }, 1000);
+        }, 2000);
         
     } catch (error) {
         console.error("Error creating zip file:", error);
@@ -2617,6 +2895,7 @@ onAuthStateChanged(auth, async (user) => {
 });
 
 // [End Updated management.js File]
+
 
 
 
