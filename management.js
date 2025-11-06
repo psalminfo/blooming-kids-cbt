@@ -1240,7 +1240,7 @@ function renderPayAdviceTable() {
     });
 }
 
-// --- Tutor Reports Panel --- (ROBUST FIXED VERSION)
+// --- Tutor Reports Panel --- (SIMPLIFIED RELIABLE VERSION)
 async function renderTutorReportsPanel(container) {
     const canDownload = window.userData?.permissions?.actions?.canDownloadReports === true;
     const canExport = window.userData?.permissions?.actions?.canExportPayAdvice === true;
@@ -1659,265 +1659,7 @@ async function renderTutorReportsPanel(container) {
     }
 }
 
-// ROBUST PDF Generation Functions
-
-// Enhanced PDF generation with pre-rendering and validation
-async function generateRobustPDF(reportId, progressCallback = null) {
-    try {
-        if (progressCallback) progressCallback(10, "Loading report data...");
-        
-        const reportDoc = await getDoc(doc(db, "tutor_submissions", reportId));
-        if (!reportDoc.exists()) throw new Error("Report not found!");
-        const reportData = reportDoc.data();
-
-        if (progressCallback) progressCallback(20, "Preparing content...");
-
-        // Create simplified, PDF-optimized HTML
-        const pdfHTML = createPDFOptimizedHTML(reportData);
-        
-        if (progressCallback) progressCallback(30, "Creating rendering container...");
-        
-        // Pre-render in hidden container
-        const renderResult = await preRenderHTML(pdfHTML, progressCallback);
-        
-        if (progressCallback) progressCallback(80, "Generating PDF...");
-        
-        // Generate PDF with optimized settings
-        const pdfBlob = await generatePDFFromElement(renderResult.container, progressCallback);
-        
-        if (progressCallback) progressCallback(100, "PDF ready!");
-        
-        // Cleanup
-        renderResult.container.remove();
-        
-        return { pdfBlob, reportData };
-        
-    } catch (error) {
-        console.error("Error in robust PDF generation:", error);
-        throw error;
-    }
-}
-
-// Create PDF-optimized HTML (simpler, more reliable)
-function createPDFOptimizedHTML(reportData) {
-    const logoUrl = "https://res.cloudinary.com/dy2hxcyaf/image/upload/v1757700806/newbhlogo_umwqzy.svg";
-    const submissionDate = reportData.submittedAt ? 
-        new Date(reportData.submittedAt.seconds * 1000).toLocaleDateString() : 'N/A';
-
-    const sections = [
-        { title: "INTRODUCTION", content: reportData.introduction },
-        { title: "TOPICS & REMARKS", content: reportData.topics },
-        { title: "PROGRESS & ACHIEVEMENTS", content: reportData.progress },
-        { title: "STRENGTHS AND WEAKNESSES", content: reportData.strengthsWeaknesses },
-        { title: "RECOMMENDATIONS", content: reportData.recommendations },
-        { title: "GENERAL TUTOR'S COMMENTS", content: reportData.generalComments }
-    ];
-
-    const sectionsHTML = sections.map(section => {
-        const content = section.content && section.content.trim() !== '' ? 
-            section.content.replace(/\n/g, '<br>') : 
-            '<em>No content provided for this section.</em>';
-        
-        return `
-            <div class="section" style="margin-bottom: 20px; page-break-inside: avoid;">
-                <h3 style="color: #16a34a; font-size: 16px; font-weight: bold; margin-bottom: 10px; border-bottom: 2px solid #d1fae5; padding-bottom: 5px;">
-                    ${section.title}
-                </h3>
-                <div style="line-height: 1.6; font-size: 13px;">
-                    ${content}
-                </div>
-            </div>
-        `;
-    }).join('');
-
-    return `
-        <!DOCTYPE html>
-        <html>
-        <head>
-            <meta charset="UTF-8">
-            <title>${reportData.studentName} - Report</title>
-            <style>
-                body {
-                    font-family: Arial, sans-serif;
-                    margin: 0;
-                    padding: 20px;
-                    color: #333;
-                    line-height: 1.4;
-                }
-                .header {
-                    text-align: center;
-                    margin-bottom: 25px;
-                    border-bottom: 2px solid #16a34a;
-                    padding-bottom: 15px;
-                }
-                .header img {
-                    height: 60px;
-                    margin-bottom: 10px;
-                }
-                .header h1 {
-                    color: #166534;
-                    margin: 5px 0;
-                    font-size: 20px;
-                }
-                .header h2 {
-                    color: #15803d;
-                    margin: 5px 0;
-                    font-size: 18px;
-                }
-                .student-info {
-                    background: #f8f9fa;
-                    padding: 15px;
-                    border-radius: 5px;
-                    margin-bottom: 25px;
-                    font-size: 13px;
-                }
-                .student-info div {
-                    margin-bottom: 5px;
-                }
-                .section {
-                    margin-bottom: 20px;
-                }
-                .footer {
-                    text-align: right;
-                    margin-top: 30px;
-                    padding-top: 15px;
-                    border-top: 1px solid #ddd;
-                    font-size: 13px;
-                }
-                @media print {
-                    body { padding: 15px; }
-                }
-            </style>
-        </head>
-        <body>
-            <div class="header">
-                <img src="${logoUrl}" alt="Logo" onerror="this.style.display='none'">
-                <h2>Blooming Kids House</h2>
-                <h1>MONTHLY LEARNING REPORT</h1>
-                <div>Date: ${submissionDate}</div>
-            </div>
-            
-            <div class="student-info">
-                <div><strong>Student:</strong> ${reportData.studentName || 'N/A'}</div>
-                <div><strong>Parent:</strong> ${reportData.parentName || 'N/A'}</div>
-                <div><strong>Phone:</strong> ${reportData.parentPhone || 'N/A'}</div>
-                <div><strong>Grade:</strong> ${reportData.grade || 'N/A'}</div>
-                <div><strong>Tutor:</strong> ${reportData.tutorName || 'N/A'}</div>
-            </div>
-            
-            ${sectionsHTML}
-            
-            <div class="footer">
-                <div><strong>Best regards,</strong></div>
-                <div>${reportData.tutorName || 'N/A'}</div>
-                <div><em>Blooming Kids House Tutor</em></div>
-            </div>
-        </body>
-        </html>
-    `;
-}
-
-// Pre-render HTML in hidden container with resource loading
-async function preRenderHTML(html, progressCallback = null) {
-    return new Promise((resolve, reject) => {
-        const container = document.createElement('div');
-        container.style.cssText = `
-            position: fixed;
-            left: -9999px;
-            top: -9999px;
-            width: 800px;
-            background: white;
-            z-index: -1000;
-        `;
-        document.body.appendChild(container);
-        
-        container.innerHTML = html;
-        
-        if (progressCallback) progressCallback(40, "Loading resources...");
-        
-        // Wait for images to load
-        const images = container.getElementsByTagName('img');
-        let imagesLoaded = 0;
-        const totalImages = images.length;
-        
-        if (totalImages === 0) {
-            if (progressCallback) progressCallback(60, "Resources loaded");
-            setTimeout(() => resolve({ container }), 500);
-            return;
-        }
-        
-        const checkImagesLoaded = () => {
-            imagesLoaded++;
-            const progress = 40 + (imagesLoaded / totalImages) * 20;
-            if (progressCallback) progressCallback(Math.round(progress), `Loading images (${imagesLoaded}/${totalImages})...`);
-            
-            if (imagesLoaded === totalImages) {
-                if (progressCallback) progressCallback(60, "All resources loaded");
-                setTimeout(() => resolve({ container }), 1000);
-            }
-        };
-        
-        Array.from(images).forEach(img => {
-            if (img.complete) {
-                checkImagesLoaded();
-            } else {
-                img.onload = checkImagesLoaded;
-                img.onerror = checkImagesLoaded; // Continue even if image fails
-            }
-        });
-        
-        // Fallback timeout
-        setTimeout(() => {
-            if (progressCallback) progressCallback(60, "Resources loaded (timeout)");
-            resolve({ container });
-        }, 5000);
-    });
-}
-
-// Generate PDF from pre-rendered element
-async function generatePDFFromElement(element, progressCallback = null) {
-    return new Promise((resolve, reject) => {
-        try {
-            if (progressCallback) progressCallback(70, "Converting to PDF...");
-            
-            const options = {
-                margin: 0.5,
-                image: { 
-                    type: 'jpeg', 
-                    quality: 0.95 
-                },
-                html2canvas: { 
-                    scale: 2,
-                    useCORS: true,
-                    logging: false,
-                    backgroundColor: '#FFFFFF',
-                    scrollX: 0,
-                    scrollY: 0
-                },
-                jsPDF: { 
-                    unit: 'in', 
-                    format: 'a4', 
-                    orientation: 'portrait'
-                }
-            };
-            
-            html2pdf()
-                .set(options)
-                .from(element)
-                .outputPdf('blob')
-                .then(pdfBlob => {
-                    if (progressCallback) progressCallback(90, "Finalizing PDF...");
-                    resolve(pdfBlob);
-                })
-                .catch(error => {
-                    reject(new Error(`PDF generation failed: ${error.message}`));
-                });
-                
-        } catch (error) {
-            reject(error);
-        }
-    });
-}
+// SIMPLIFIED & RELIABLE PDF DOWNLOAD FUNCTIONS
 
 // FIXED Global functions for event handlers
 window.previewReport = async function(reportId) {
@@ -1932,7 +1674,7 @@ window.previewReport = async function(reportId) {
     }
 };
 
-// FIXED: Robust PDF download function
+// SIMPLIFIED: Download using the same HTML as preview
 window.downloadSingleReport = async function(reportId, event) {
     const button = event.target;
     const originalText = button.innerHTML;
@@ -1949,25 +1691,46 @@ window.downloadSingleReport = async function(reportId, event) {
         const progressMessage = document.getElementById('pdf-progress-message');
         
         progressModal.classList.remove('hidden');
+        progressMessage.textContent = 'Generating PDF...';
+        progressBar.style.width = '0%';
+        progressText.textContent = '0%';
+
+        // Use the SAME HTML generation as preview (proven to work)
+        const { html, reportData } = await generateReportHTML(reportId);
         
-        const updateProgress = (percent, message) => {
-            progressBar.style.width = `${percent}%`;
-            progressText.textContent = `${percent}%`;
-            progressMessage.textContent = message;
+        // Update progress
+        progressBar.style.width = '50%';
+        progressText.textContent = '50%';
+        progressMessage.textContent = 'Converting to PDF...';
+
+        // Simple PDF conversion with optimized settings
+        const options = {
+            margin: 0.5,
+            filename: `${reportData.studentName}_Report_${new Date().getTime()}.pdf`,
+            image: { 
+                type: 'jpeg', 
+                quality: 0.98 
+            },
+            html2canvas: { 
+                scale: 2,
+                useCORS: true,
+                logging: false,
+                backgroundColor: '#FFFFFF'
+            },
+            jsPDF: { 
+                unit: 'in', 
+                format: 'a4', 
+                orientation: 'portrait'
+            }
         };
+
+        // Generate and download PDF
+        await html2pdf().set(options).from(html).save();
         
-        // Use robust PDF generation
-        const { pdfBlob, reportData } = await generateRobustPDF(reportId, updateProgress);
-        
-        // Download the PDF
-        const url = URL.createObjectURL(pdfBlob);
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = `${reportData.studentName}_Report_${new Date().getTime()}.pdf`;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        URL.revokeObjectURL(url);
+        // Update progress
+        progressBar.style.width = '100%';
+        progressText.textContent = '100%';
+        progressMessage.textContent = 'Download complete!';
         
         // Close modal after delay
         setTimeout(() => {
@@ -1985,7 +1748,7 @@ window.downloadSingleReport = async function(reportId, event) {
     }
 };
 
-// FIXED: Enhanced zip download with visible progress
+// SIMPLIFIED: Bulk download using same reliable method
 window.zipAndDownloadTutorReports = async function(reports, tutorName, button) {
     const originalButtonText = button.innerHTML;
     
@@ -2004,56 +1767,76 @@ window.zipAndDownloadTutorReports = async function(reports, tutorName, button) {
         const zip = new JSZip();
         let processedCount = 0;
 
-        const updateProgress = (percent, message) => {
-            progressBar.style.width = `${percent}%`;
-            progressText.textContent = `${percent}%`;
-            progressMessage.textContent = message;
-            button.innerHTML = `📦 ${message}`;
-        };
+        // Process reports one at a time for reliability
+        for (const report of reports) {
+            try {
+                // Update progress
+                const progress = Math.round((processedCount / reports.length) * 100);
+                progressBar.style.width = `${progress}%`;
+                progressText.textContent = `${progress}%`;
+                progressMessage.textContent = `Processing report ${processedCount + 1} of ${reports.length}...`;
+                button.innerHTML = `📦 Processing ${processedCount + 1}/${reports.length}`;
 
-        // Process reports in small batches
-        const batchSize = 1; // Process one at a time for reliability
-        for (let i = 0; i < reports.length; i += batchSize) {
-            const batch = reports.slice(i, i + batchSize);
-            
-            for (const report of batch) {
-                try {
-                    updateProgress(
-                        Math.round((processedCount / reports.length) * 100),
-                        `Processing report ${processedCount + 1} of ${reports.length}...`
-                    );
-
-                    const { pdfBlob, reportData } = await generateRobustPDF(report.id);
-                    
-                    // Create safe filename
-                    const safeStudentName = (reportData.studentName || 'Unknown_Student').replace(/[^a-z0-9]/gi, '_');
-                    const reportDate = reportData.submittedAt ? 
-                        new Date(reportData.submittedAt.seconds * 1000).toISOString().split('T')[0] : 
-                        'unknown_date';
-                    const filename = `${safeStudentName}_${reportDate}.pdf`;
-                    
-                    zip.file(filename, pdfBlob);
-                    
-                } catch (error) {
-                    console.error(`Error processing report ${report.id}:`, error);
-                }
+                // Use the SAME reliable HTML generation as preview
+                const { html, reportData } = await generateReportHTML(report.id);
                 
-                processedCount++;
+                // Convert to PDF blob
+                const options = {
+                    margin: 0.5,
+                    image: { 
+                        type: 'jpeg', 
+                        quality: 0.98 
+                    },
+                    html2canvas: { 
+                        scale: 2,
+                        useCORS: true,
+                        logging: false,
+                        backgroundColor: '#FFFFFF'
+                    },
+                    jsPDF: { 
+                        unit: 'in', 
+                        format: 'a4', 
+                        orientation: 'portrait'
+                    }
+                };
+
+                const pdfBlob = await html2pdf().set(options).from(html).output('blob');
+                
+                // Create safe filename
+                const safeStudentName = (reportData.studentName || 'Unknown_Student').replace(/[^a-z0-9]/gi, '_');
+                const reportDate = reportData.submittedAt ? 
+                    new Date(reportData.submittedAt.seconds * 1000).toISOString().split('T')[0] : 
+                    'unknown_date';
+                const filename = `${safeStudentName}_${reportDate}.pdf`;
+                
+                zip.file(filename, pdfBlob);
+                
+            } catch (error) {
+                console.error(`Error processing report ${report.id}:`, error);
+                // Continue with next report even if one fails
             }
             
-            // Small delay between batches
-            await new Promise(resolve => setTimeout(resolve, 1000));
+            processedCount++;
+            
+            // Small delay to prevent overwhelming the browser
+            await new Promise(resolve => setTimeout(resolve, 500));
         }
 
         // Generate zip file
-        updateProgress(95, 'Creating ZIP file...');
+        progressMessage.textContent = 'Creating ZIP file...';
+        progressBar.style.width = '95%';
+        progressText.textContent = '95%';
+        
         const zipBlob = await zip.generateAsync({ 
             type: "blob",
             compression: "DEFLATE"
         });
 
         // Download zip
-        updateProgress(100, 'Download starting...');
+        progressMessage.textContent = 'Download starting...';
+        progressBar.style.width = '100%';
+        progressText.textContent = '100%';
+        
         saveAs(zipBlob, `${tutorName}_Reports_${new Date().toISOString().split('T')[0]}.zip`);
         
         // Close modal after short delay
@@ -2873,6 +2656,7 @@ onAuthStateChanged(auth, async (user) => {
 });
 
 // [End Updated management.js File]
+
 
 
 
