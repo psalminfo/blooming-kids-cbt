@@ -2,6 +2,7 @@ document.getElementById("studentLoginForm").addEventListener("submit", function 
   e.preventDefault();
 
   const studentName = document.getElementById("studentName").value;
+  const parentName = document.getElementById("parentName").value;
   const parentEmail = document.getElementById("parentEmail").value;
   const parentPhone = document.getElementById("parentPhone").value;
   const grade = document.getElementById("grade").value;
@@ -19,6 +20,7 @@ document.getElementById("studentLoginForm").addEventListener("submit", function 
 
   const studentData = {
     studentName,
+    parentName,
     parentEmail,
     parentPhone,
     grade,
