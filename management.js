@@ -1240,7 +1240,7 @@ function renderPayAdviceTable() {
     });
 }
 
-// --- Tutor Reports Panel --- (FIXED VERSION)
+// --- Tutor Reports Panel --- (CORRECTED VERSION)
 async function renderTutorReportsPanel(container) {
     const canDownload = window.userData?.permissions?.actions?.canDownloadReports === true;
     const canExport = window.userData?.permissions?.actions?.canExportPayAdvice === true;
@@ -1284,10 +1284,6 @@ async function renderTutorReportsPanel(container) {
                             <h4 class="font-bold text-yellow-800 text-sm">Total Reports</h4>
                             <p id="report-total-count" class="text-2xl font-extrabold">0</p>
                         </div>
-                        <div class="bg-blue-100 p-3 rounded-lg text-center shadow">
-                            <h4 class="font-bold text-blue-800 text-sm">This Page</h4>
-                            <p id="report-page-count" class="text-2xl font-extrabold">0</p>
-                        </div>
                     </div>
                     
                     <div class="flex items-center space-x-2">
@@ -1303,12 +1299,6 @@ async function renderTutorReportsPanel(container) {
                             </svg>
                             Export CSV
                         </button>` : ''}
-                        ${canDownload ? `<button id="bulk-download-btn" class="bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700 flex items-center">
-                            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10"></path>
-                            </svg>
-                            Bulk Download
-                        </button>` : ''}
                     </div>
                 </div>
             </div>
@@ -1319,39 +1309,12 @@ async function renderTutorReportsPanel(container) {
                        class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent">
             </div>
 
-            <!-- Bulk Selection Controls (Hidden by default) -->
-            <div id="bulk-controls" class="hidden mb-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-                <div class="flex items-center justify-between">
-                    <div>
-                        <span id="selected-count" class="font-bold text-yellow-800">0</span> reports selected
-                    </div>
-                    <div class="space-x-2">
-                        <button id="select-all-btn" class="bg-blue-500 text-white px-3 py-1 rounded text-sm">Select All</button>
-                        <button id="clear-selection-btn" class="bg-gray-500 text-white px-3 py-1 rounded text-sm">Clear Selection</button>
-                        <button id="download-selected-btn" class="bg-green-600 text-white px-4 py-2 rounded">Download Selected</button>
-                    </div>
-                </div>
-            </div>
-
             <!-- Reports List -->
             <div id="tutor-reports-list" class="space-y-4">
                 <div class="text-center py-10">
                     <div class="loading-spinner mx-auto" style="width: 40px; height: 40px;"></div>
                     <p class="text-green-600 font-semibold mt-4">Loading reports...</p>
                 </div>
-            </div>
-
-            <!-- Pagination -->
-            <div id="reports-pagination" class="mt-6 flex justify-between items-center hidden">
-                <button id="prev-page-btn" class="bg-gray-300 text-gray-700 px-4 py-2 rounded hover:bg-gray-400 disabled:opacity-50 disabled:cursor-not-allowed">
-                    Previous
-                </button>
-                <div class="text-sm text-gray-600">
-                    Page <span id="current-page">1</span> of <span id="total-pages">1</span>
-                </div>
-                <button id="next-page-btn" class="bg-gray-300 text-gray-700 px-4 py-2 rounded hover:bg-gray-400 disabled:opacity-50 disabled:cursor-not-allowed">
-                    Next
-                </button>
             </div>
         </div>
     `;
@@ -1364,18 +1327,11 @@ async function renderTutorReportsPanel(container) {
     document.getElementById('reports-start-date').value = firstDay.toISOString().split('T')[0];
     document.getElementById('reports-end-date').value = lastDay.toISOString().split('T')[0];
 
-    // Initialize pagination state
-    let currentReportsPage = 1;
-    const reportsPerPage = 10;
     let allReports = [];
     let filteredReports = [];
-    let selectedReports = new Set();
 
     // Date change handler
     const handleDateChange = () => {
-        currentReportsPage = 1;
-        selectedReports.clear();
-        updateBulkControls();
         fetchAndRenderTutorReports();
     };
 
@@ -1398,31 +1354,6 @@ async function renderTutorReportsPanel(container) {
         applyFilters();
     });
 
-    // Bulk operations
-    document.getElementById('bulk-download-btn')?.addEventListener('click', () => {
-        document.getElementById('bulk-controls').classList.toggle('hidden');
-    });
-
-    document.getElementById('select-all-btn')?.addEventListener('click', selectAllReports);
-    document.getElementById('clear-selection-btn')?.addEventListener('click', clearSelection);
-    document.getElementById('download-selected-btn')?.addEventListener('click', downloadSelectedReports);
-
-    // Pagination
-    document.getElementById('prev-page-btn')?.addEventListener('click', () => {
-        if (currentReportsPage > 1) {
-            currentReportsPage--;
-            renderCurrentPage();
-        }
-    });
-
-    document.getElementById('next-page-btn')?.addEventListener('click', () => {
-        const totalPages = Math.ceil(filteredReports.length / reportsPerPage);
-        if (currentReportsPage < totalPages) {
-            currentReportsPage++;
-            renderCurrentPage();
-        }
-    });
-
     // Export CSV
     const exportBtn = document.getElementById('export-reports-csv-btn');
     if (exportBtn) {
@@ -1443,8 +1374,7 @@ async function renderTutorReportsPanel(container) {
             report.topics?.toLowerCase().includes(lowerCaseTerm) ||
             report.progress?.toLowerCase().includes(lowerCaseTerm)
         );
-        currentReportsPage = 1;
-        renderCurrentPage();
+        renderTutorReportsFromCache();
     }
 
     function applyFilters() {
@@ -1457,50 +1387,7 @@ async function renderTutorReportsPanel(container) {
             return tutorMatch && studentMatch;
         });
         
-        currentReportsPage = 1;
-        renderCurrentPage();
-    }
-
-    function selectAllReports() {
-        const currentPageReports = getCurrentPageReports();
-        currentPageReports.forEach(report => selectedReports.add(report.id));
-        updateBulkControls();
-        renderCurrentPage();
-    }
-
-    function clearSelection() {
-        selectedReports.clear();
-        updateBulkControls();
-        renderCurrentPage();
-    }
-
-    function updateBulkControls() {
-        const bulkControls = document.getElementById('bulk-controls');
-        const selectedCount = document.getElementById('selected-count');
-        
-        if (selectedReports.size > 0) {
-            bulkControls.classList.remove('hidden');
-            selectedCount.textContent = selectedReports.size;
-        } else {
-            bulkControls.classList.add('hidden');
-        }
-    }
-
-    function getCurrentPageReports() {
-        const startIndex = (currentReportsPage - 1) * reportsPerPage;
-        const endIndex = startIndex + reportsPerPage;
-        return filteredReports.slice(startIndex, endIndex);
-    }
-
-    async function downloadSelectedReports() {
-        if (selectedReports.size === 0) {
-            alert('Please select at least one report to download.');
-            return;
-        }
-
-        const selectedReportsData = allReports.filter(report => selectedReports.has(report.id));
-        await zipAndDownloadReports(selectedReportsData, 'Selected_Reports');
-        clearSelection();
+        renderTutorReportsFromCache();
     }
 
     async function exportReportsToCSV() {
@@ -1651,108 +1538,104 @@ async function renderTutorReportsPanel(container) {
             
             document.getElementById('report-tutor-count').textContent = '0';
             document.getElementById('report-total-count').textContent = '0';
-            document.getElementById('report-page-count').textContent = '0';
-            document.getElementById('reports-pagination').classList.add('hidden');
             return;
         }
 
+        // Group reports by tutor
+        const reportsByTutor = {};
+        filteredReports.forEach(report => {
+            if (!reportsByTutor[report.tutorEmail]) {
+                reportsByTutor[report.tutorEmail] = { 
+                    name: report.tutorName || report.tutorEmail, 
+                    reports: [] 
+                };
+            }
+            reportsByTutor[report.tutorEmail].reports.push(report);
+        });
+
         // Update statistics
-        const uniqueTutors = new Set(filteredReports.map(r => r.tutorEmail)).size;
+        const uniqueTutors = Object.keys(reportsByTutor).length;
         document.getElementById('report-tutor-count').textContent = uniqueTutors;
         document.getElementById('report-total-count').textContent = filteredReports.length;
 
-        // Render current page
-        renderCurrentPage();
-    }
-
-    function renderCurrentPage() {
-        const reportsListContainer = document.getElementById('tutor-reports-list');
-        if (!reportsListContainer) return;
-
-        const currentPageReports = getCurrentPageReports();
-        const totalPages = Math.ceil(filteredReports.length / reportsPerPage);
-
-        document.getElementById('report-page-count').textContent = currentPageReports.length;
-        document.getElementById('current-page').textContent = currentReportsPage;
-        document.getElementById('total-pages').textContent = totalPages;
-
-        // Show/hide pagination
-        const pagination = document.getElementById('reports-pagination');
-        if (totalPages > 1) {
-            pagination.classList.remove('hidden');
-            document.getElementById('prev-page-btn').disabled = currentReportsPage === 1;
-            document.getElementById('next-page-btn').disabled = currentReportsPage === totalPages;
-        } else {
-            pagination.classList.add('hidden');
-        }
-
         const canDownload = window.userData?.permissions?.actions?.canDownloadReports === true;
         
-        // Render reports
+        // Render the reports in tutor → student hierarchy
         let html = '';
         
-        currentPageReports.forEach(report => {
-            const isSelected = selectedReports.has(report.id);
-            const submissionDate = report.submittedAt ? 
-                new Date(report.submittedAt.seconds * 1000).toLocaleDateString() : 'Unknown date';
-            
-            const previewText = report.introduction ? 
-                (report.introduction.length > 150 ? 
-                    report.introduction.substring(0, 150) + '...' : 
-                    report.introduction) : 
-                'No content available';
+        Object.values(reportsByTutor).forEach(tutorData => {
+            // Group reports by student for this tutor
+            const reportsByStudent = {};
+            tutorData.reports.forEach(report => {
+                if (!reportsByStudent[report.studentName]) {
+                    reportsByStudent[report.studentName] = [];
+                }
+                reportsByStudent[report.studentName].push(report);
+            });
 
-            html += `
-                <div class="border rounded-lg bg-white shadow-sm hover:shadow-md transition-shadow ${isSelected ? 'border-2 border-blue-500 bg-blue-50' : ''}">
-                    <div class="p-4">
-                        <div class="flex justify-between items-start mb-3">
-                            <div class="flex items-center space-x-3">
-                                ${canDownload ? `
-                                    <input type="checkbox" ${isSelected ? 'checked' : ''} 
-                                           onchange="toggleReportSelection('${report.id}')"
-                                           class="report-checkbox h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
-                                ` : ''}
-                                <div>
-                                    <h3 class="font-bold text-lg text-gray-800">${report.studentName || 'Unknown Student'}</h3>
-                                    <p class="text-sm text-gray-600">Tutor: ${report.tutorName || report.tutorEmail}</p>
-                                </div>
-                            </div>
-                            <div class="text-right">
-                                <span class="text-xs text-gray-500 block">${submissionDate}</span>
-                                <span class="text-xs bg-green-100 text-green-800 px-2 py-1 rounded-full">Submitted</span>
-                            </div>
-                        </div>
+            const studentReportsHTML = Object.entries(reportsByStudent).map(([studentName, studentReports]) => {
+                const reportLinks = studentReports.map(report => {
+                    const reportDate = report.submittedAt ? 
+                        new Date(report.submittedAt.seconds * 1000).toLocaleDateString() : 
+                        'Unknown date';
                         
-                        <div class="mb-3">
-                            <p class="text-gray-700 text-sm">${previewText}</p>
-                        </div>
-
-                        <div class="flex justify-between items-center text-sm">
-                            <div class="text-gray-500">
-                                Grade: ${report.grade || 'N/A'} | 
-                                Parent: ${report.parentName || 'N/A'}
+                    return `
+                        <li class="flex justify-between items-center p-3 bg-gray-50 rounded-lg border">
+                            <div>
+                                <span class="font-medium">${reportDate}</span>
+                                <span class="text-sm text-gray-500 ml-3">${report.grade || 'No grade'}</span>
                             </div>
-                            <div class="flex space-x-2">
+                            <div class="flex gap-2">
                                 <button onclick="previewReport('${report.id}')" 
-                                        class="bg-blue-500 text-white px-3 py-1 rounded text-xs hover:bg-blue-600 flex items-center">
-                                    <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path>
-                                    </svg>
+                                        class="bg-blue-500 text-white px-3 py-1 rounded text-xs hover:bg-blue-600">
                                     Preview
                                 </button>
                                 ${canDownload ? `
-                                    <button onclick="downloadSingleReport('${report.id}')" 
-                                            class="bg-green-600 text-white px-3 py-1 rounded text-xs hover:bg-green-700 flex items-center">
-                                        <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
-                                        </svg>
-                                        Download PDF
+                                    <button onclick="downloadSingleReport('${report.id}', event)" 
+                                            class="bg-green-600 text-white px-3 py-1 rounded text-xs hover:bg-green-700">
+                                        Download
                                     </button>
                                 ` : ''}
                             </div>
-                        </div>
+                        </li>
+                    `;
+                }).join('');
+
+                return `
+                    <div class="ml-4 mt-2">
+                        <h4 class="font-semibold text-gray-700 mb-2">${studentName}</h4>
+                        <ul class="space-y-2">
+                            ${reportLinks}
+                        </ul>
                     </div>
+                `;
+            }).join('');
+
+            const zipButtonHTML = canDownload ? `
+                <div class="p-4 border-t bg-blue-50">
+                    <button onclick="zipAndDownloadTutorReports(${JSON.stringify(tutorData.reports)}, '${tutorData.name}', event)" 
+                            class="zip-reports-btn bg-blue-600 text-white px-4 py-2 text-sm rounded w-full hover:bg-blue-700 transition-colors">
+                        📦 Zip & Download All Reports for ${tutorData.name}
+                    </button>
+                </div>
+            ` : '';
+
+            html += `
+                <div class="border rounded-lg shadow-sm bg-white">
+                    <details open>
+                        <summary class="p-4 cursor-pointer flex justify-between items-center font-semibold text-lg bg-green-50 hover:bg-green-100 rounded-t-lg">
+                            <span>${tutorData.name}</span>
+                            <span class="text-sm font-normal text-gray-500 bg-green-200 px-2 py-1 rounded-full">
+                                ${tutorData.reports.length} report${tutorData.reports.length !== 1 ? 's' : ''}
+                            </span>
+                        </summary>
+                        <div class="border-t">
+                            <div class="space-y-4 p-4">
+                                ${studentReportsHTML}
+                            </div>
+                            ${zipButtonHTML}
+                        </div>
+                    </details>
                 </div>
             `;
         });
@@ -1761,17 +1644,7 @@ async function renderTutorReportsPanel(container) {
     }
 }
 
-// Global functions for event handlers
-window.toggleReportSelection = function(reportId) {
-    if (selectedReports.has(reportId)) {
-        selectedReports.delete(reportId);
-    } else {
-        selectedReports.add(reportId);
-    }
-    updateBulkControls();
-    renderCurrentPage();
-};
-
+// FIXED Global functions for event handlers
 window.previewReport = async function(reportId) {
     try {
         const { html } = await generateReportHTML(reportId);
@@ -1784,22 +1657,24 @@ window.previewReport = async function(reportId) {
     }
 };
 
-window.downloadSingleReport = async function(reportId) {
+// FIXED: Added event parameter to fix the error
+window.downloadSingleReport = async function(reportId, event) {
     try {
+        const button = event.target;
+        const originalText = button.innerHTML;
+        
+        // Show loading state
+        button.innerHTML = 'Generating...';
+        button.disabled = true;
+        
         const { html, reportData } = await generateReportHTML(reportId);
         const options = {
             margin: 0.5,
-            filename: `${reportData.studentName}_report_${reportId.substring(0, 8)}.pdf`,
+            filename: `${reportData.studentName}_report_${new Date().getTime()}.pdf`,
             image: { type: 'jpeg', quality: 0.98 },
             html2canvas: { scale: 2, useCORS: true },
             jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' }
         };
-        
-        // Show download progress
-        const button = event.target;
-        const originalText = button.innerHTML;
-        button.innerHTML = '<div class="loading-spinner" style="width: 16px; height: 16px;"></div> Generating...';
-        button.disabled = true;
         
         await html2pdf().from(html).set(options).save();
         
@@ -1812,23 +1687,27 @@ window.downloadSingleReport = async function(reportId) {
         alert(`Error: ${error.message}`);
         
         // Restore button on error
-        const button = event.target;
-        button.innerHTML = 'Download PDF';
-        button.disabled = false;
+        if (event && event.target) {
+            event.target.innerHTML = 'Download';
+            event.target.disabled = false;
+        }
     }
 };
 
-// Enhanced zip download function
-async function zipAndDownloadReports(reports, zipName) {
-    const zip = new JSZip();
-    let processedCount = 0;
-
+// FIXED: Added event parameter
+window.zipAndDownloadTutorReports = async function(reports, tutorName, event) {
+    const button = event.target;
+    const originalButtonText = button.textContent;
+    
     try {
-        // Show progress
-        const progressModal = showProgressModal(`Generating ${reports.length} reports...`, reports.length);
+        button.textContent = 'Zipping... (0%)';
+        button.disabled = true;
+
+        const zip = new JSZip();
+        let filesGenerated = 0;
         
-        // Process reports in batches to avoid memory issues
-        const batchSize = 5;
+        // Process reports in batches
+        const batchSize = 3;
         for (let i = 0; i < reports.length; i += batchSize) {
             const batch = reports.slice(i, i + batchSize);
             const batchPromises = batch.map(async (report) => {
@@ -1843,89 +1722,37 @@ async function zipAndDownloadReports(reports, zipName) {
                     
                     // Create safe filename
                     const safeStudentName = (reportData.studentName || 'Unknown').replace(/[^a-z0-9]/gi, '_');
-                    const filename = `${safeStudentName}_Report_${report.id.substring(0, 8)}.pdf`;
+                    const safeDate = reportData.submittedAt ? 
+                        new Date(reportData.submittedAt.seconds * 1000).toISOString().split('T')[0] : 
+                        'unknown_date';
+                    const filename = `${safeStudentName}_${safeDate}_report.pdf`;
                     
                     zip.file(filename, pdfBlob);
-                    processedCount++;
-                    updateProgressModal(progressModal, processedCount, reports.length);
+                    filesGenerated++;
+                    
+                    // Update progress
+                    const progress = Math.round((filesGenerated / reports.length) * 100);
+                    button.textContent = `Zipping... (${progress}%)`;
                     
                 } catch (error) {
                     console.error(`Error processing report ${report.id}:`, error);
-                    // Continue with other reports even if one fails
                 }
             });
             
             await Promise.all(batchPromises);
         }
         
-        // Generate and download zip
-        const zipBlob = await zip.generateAsync({ 
-            type: "blob",
-            compression: "DEFLATE",
-            compressionOptions: { level: 6 }
-        });
-        
-        saveAs(zipBlob, `${zipName}_${new Date().toISOString().split('T')[0]}.zip`);
-        hideProgressModal(progressModal);
+        const zipBlob = await zip.generateAsync({ type: "blob" });
+        saveAs(zipBlob, `${tutorName}_Reports_${new Date().toISOString().split('T')[0]}.zip`);
         
     } catch (error) {
         console.error("Error creating zip file:", error);
-        alert("Failed to create zip file. Some reports may not have been included.");
+        alert("Failed to create zip file. Please try again.");
+    } finally {
+        button.textContent = originalButtonText;
+        button.disabled = false;
     }
-}
-
-// Progress modal functions
-function showProgressModal(message, total) {
-    const modalHtml = `
-        <div id="progress-modal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-center justify-center">
-            <div class="relative p-8 bg-white w-96 rounded-lg shadow-xl">
-                <h3 class="text-xl font-bold mb-4">Download Progress</h3>
-                <p class="mb-4">${message}</p>
-                <div class="w-full bg-gray-200 rounded-full h-4 mb-4">
-                    <div id="progress-bar" class="bg-green-600 h-4 rounded-full" style="width: 0%"></div>
-                </div>
-                <p id="progress-text" class="text-center text-sm text-gray-600">0/${total} processed</p>
-            </div>
-        </div>
-    `;
-    document.body.insertAdjacentHTML('beforeend', modalHtml);
-    return { total };
-}
-
-function updateProgressModal(progressModal, processed, total) {
-    const progressBar = document.getElementById('progress-bar');
-    const progressText = document.getElementById('progress-text');
-    const percentage = Math.round((processed / total) * 100);
-    
-    if (progressBar) progressBar.style.width = `${percentage}%`;
-    if (progressText) progressText.textContent = `${processed}/${total} processed (${percentage}%)`;
-}
-
-function hideProgressModal(progressModal) {
-    const modal = document.getElementById('progress-modal');
-    if (modal) modal.remove();
-}
-
-// Make sure to add these CSS styles for the loading spinner
-const additionalStyles = `
-<style>
-.loading-spinner {
-    border: 3px solid #f3f3f3;
-    border-top: 3px solid #16a34a;
-    border-radius: 50%;
-    animation: spin 1s linear infinite;
-}
-@keyframes spin {
-    0% { transform: rotate(0deg); }
-    100% { transform: rotate(360deg); }
-}
-.report-checkbox:checked {
-    background-color: #2563eb;
-    border-color: #2563eb;
-}
-</style>
-`;
-document.head.insertAdjacentHTML('beforeend', additionalStyles);
+};
 
 // --- Pending Approvals Panel ---
 async function renderPendingApprovalsPanel(container) {
@@ -2700,6 +2527,7 @@ onAuthStateChanged(auth, async (user) => {
 });
 
 // [End Updated management.js File]
+
 
 
 
