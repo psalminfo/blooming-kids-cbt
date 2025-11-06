@@ -104,7 +104,7 @@ export function getAllLoadedQuestions() {
 }
 
 /**
- * Select ELA questions prioritizing one passage with its questions, then fill to 15 total
+ * Select ELA questions with priority: 1 passage + non-passage questions to reach 15, OR 2 passages
  */
 function selectELAQuestions(allQuestions, passagesMap) {
     const questionsWithPassages = [];
@@ -129,46 +129,57 @@ function selectELAQuestions(allQuestions, passagesMap) {
     });
     
     const selectedQuestions = [];
+    const selectedPassageIds = [];
     
-    // Step 1: Select one random passage with all its questions
     const passageIds = Object.keys(questionsByPassage);
-    let selectedPassageId = null;
+    
+    // Step 1: Select first random passage with all its questions
     if (passageIds.length > 0) {
-        selectedPassageId = passageIds[Math.floor(Math.random() * passageIds.length)];
-        selectedQuestions.push(...questionsByPassage[selectedPassageId]);
-        console.log(`Selected passage ${selectedPassageId} with ${questionsByPassage[selectedPassageId].length} questions`);
+        const firstPassageId = passageIds[Math.floor(Math.random() * passageIds.length)];
+        selectedQuestions.push(...questionsByPassage[firstPassageId]);
+        selectedPassageIds.push(firstPassageId);
+        console.log(`Selected first passage ${firstPassageId} with ${questionsByPassage[firstPassageId].length} questions`);
     }
     
-    // Step 2: If we have less than 15 questions, add random questions without passages
-    if (selectedQuestions.length < 15) {
-        const remainingSlots = 15 - selectedQuestions.length;
-        const shuffledRemaining = questionsWithoutPassages.sort(() => 0.5 - Math.random());
-        const additionalQuestions = shuffledRemaining.slice(0, remainingSlots);
+    // Step 2: Check if we can reach 15 with non-passage questions
+    const questionsNeeded = 15 - selectedQuestions.length;
+    const availableNonPassageQuestions = Math.min(questionsWithoutPassages.length, questionsNeeded);
+    
+    if (availableNonPassageQuestions >= questionsNeeded) {
+        // We have enough non-passage questions to reach 15 - use them
+        const shuffledNonPassage = questionsWithoutPassages.sort(() => 0.5 - Math.random());
+        const additionalQuestions = shuffledNonPassage.slice(0, questionsNeeded);
         selectedQuestions.push(...additionalQuestions);
-        console.log(`Added ${additionalQuestions.length} additional questions without passages`);
-    }
-    
-    // Step 3: If still less than 15, add questions from other passages
-    if (selectedQuestions.length < 15 && selectedPassageId) {
-        const remainingSlots = 15 - selectedQuestions.length;
-        const otherPassageQuestions = [];
-        
-        // Collect questions from other passages (excluding the one we already selected)
-        Object.keys(questionsByPassage).forEach(passageId => {
-            if (passageId !== selectedPassageId) {
-                otherPassageQuestions.push(...questionsByPassage[passageId]);
+        console.log(`Added ${additionalQuestions.length} non-passage questions to reach 15 total`);
+    } else if (passageIds.length > 1) {
+        // Not enough non-passage questions - add a second passage instead
+        const remainingPassageIds = passageIds.filter(id => !selectedPassageIds.includes(id));
+        if (remainingPassageIds.length > 0) {
+            const secondPassageId = remainingPassageIds[Math.floor(Math.random() * remainingPassageIds.length)];
+            selectedQuestions.push(...questionsByPassage[secondPassageId]);
+            selectedPassageIds.push(secondPassageId);
+            console.log(`Added second passage ${secondPassageId} with ${questionsByPassage[secondPassageId].length} questions (not enough non-passage questions)`);
+            
+            // If we still have room after second passage, add available non-passage questions
+            const remainingSlots = 15 - selectedQuestions.length;
+            if (remainingSlots > 0 && questionsWithoutPassages.length > 0) {
+                const shuffledNonPassage = questionsWithoutPassages.sort(() => 0.5 - Math.random());
+                const finalQuestions = shuffledNonPassage.slice(0, remainingSlots);
+                selectedQuestions.push(...finalQuestions);
+                console.log(`Added ${finalQuestions.length} non-passage questions after second passage`);
             }
-        });
-        
-        const shuffledOtherPassage = otherPassageQuestions.sort(() => 0.5 - Math.random());
-        const finalQuestions = shuffledOtherPassage.slice(0, remainingSlots);
-        selectedQuestions.push(...finalQuestions);
-        console.log(`Added ${finalQuestions.length} questions from other passages to reach 15 total`);
+        }
+    } else {
+        // Only one passage available - add whatever non-passage questions we have
+        const shuffledNonPassage = questionsWithoutPassages.sort(() => 0.5 - Math.random());
+        const additionalQuestions = shuffledNonPassage.slice(0, availableNonPassageQuestions);
+        selectedQuestions.push(...additionalQuestions);
+        console.log(`Added ${additionalQuestions.length} non-passage questions (only one passage available)`);
     }
     
-    // Final shuffle to mix passage questions with others
-    const finalSelection = selectedQuestions.sort(() => 0.5 - Math.random()).slice(0, 15);
-    console.log(`Final ELA selection: ${finalSelection.length} questions (includes one full passage)`);
+    // Final selection - take only 15 questions max
+    const finalSelection = selectedQuestions.slice(0, 15);
+    console.log(`Final ELA selection: ${finalSelection.length} questions (includes ${selectedPassageIds.length} passages)`);
     
     return finalSelection;
 }
@@ -401,7 +412,7 @@ export async function loadQuestions(subject, grade, state) {
             let selectedQuestions = [];
             
             if (subject.toLowerCase() === 'ela') {
-                // For ELA: Prioritize one passage with its questions, then fill with others
+                // For ELA: Prioritize one passage + non-passage questions to reach 15, OR 2 passages
                 selectedQuestions = selectELAQuestions(filteredQuestions, passagesMap);
             } else {
                 // For other subjects: Just take 15 random questions
