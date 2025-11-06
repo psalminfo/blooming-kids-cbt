@@ -1,5 +1,3 @@
-// [Begin Updated management.js File]
-
 import { auth, db } from './firebaseConfig.js';
 import { collection, getDocs, doc, getDoc, where, query, orderBy, Timestamp, writeBatch, updateDoc, deleteDoc, setDoc, addDoc, limit, startAfter } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
 import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-auth.js";
@@ -1242,7 +1240,7 @@ function renderPayAdviceTable() {
     });
 }
 
-// --- Tutor Reports Panel ---
+// --- Tutor Reports Panel --- (FIXED VERSION)
 async function renderTutorReportsPanel(container) {
     const canDownload = window.userData?.permissions?.actions?.canDownloadReports === true;
     const canExport = window.userData?.permissions?.actions?.canExportPayAdvice === true;
@@ -1250,30 +1248,110 @@ async function renderTutorReportsPanel(container) {
     container.innerHTML = `
         <div class="bg-white p-6 rounded-lg shadow-md">
             <h2 class="text-2xl font-bold text-green-700 mb-4">Tutor Reports</h2>
-            <div class="bg-green-50 p-4 rounded-lg mb-6 grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
-                <div>
-                    <label for="reports-start-date" class="block text-sm font-medium">Start Date</label>
-                    <input type="date" id="reports-start-date" class="mt-1 block w-full p-2 border rounded-md">
-                </div>
-                <div>
-                    <label for="reports-end-date" class="block text-sm font-medium">End Date</label>
-                    <input type="date" id="reports-end-date" class="mt-1 block w-full p-2 border rounded-md">
-                </div>
-                <div class="flex items-center space-x-4 col-span-2">
-                    <div class="bg-green-100 p-3 rounded-lg text-center shadow w-full">
-                        <h4 class="font-bold text-green-800 text-sm">Tutors Submitted</h4>
-                        <p id="report-tutor-count" class="text-2xl font-extrabold">0</p>
+            
+            <!-- Filters and Controls -->
+            <div class="bg-green-50 p-4 rounded-lg mb-6">
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-4 items-end mb-4">
+                    <div>
+                        <label for="reports-start-date" class="block text-sm font-medium">Start Date</label>
+                        <input type="date" id="reports-start-date" class="mt-1 block w-full p-2 border rounded-md">
                     </div>
-                    <div class="bg-yellow-100 p-3 rounded-lg text-center shadow w-full">
-                        <h4 class="font-bold text-yellow-800 text-sm">Total Reports</h4>
-                        <p id="report-total-count" class="text-2xl font-extrabold">0</p>
+                    <div>
+                        <label for="reports-end-date" class="block text-sm font-medium">End Date</label>
+                        <input type="date" id="reports-end-date" class="mt-1 block w-full p-2 border rounded-md">
                     </div>
-                    ${canExport ? `<button id="export-reports-csv-btn" class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 h-full">Export CSV</button>` : ''}
-                    <button id="refresh-reports-btn" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 h-full">Refresh</button>
+                    <div>
+                        <label for="reports-tutor-filter" class="block text-sm font-medium">Filter by Tutor</label>
+                        <select id="reports-tutor-filter" class="mt-1 block w-full p-2 border rounded-md">
+                            <option value="">All Tutors</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label for="reports-student-filter" class="block text-sm font-medium">Filter by Student</label>
+                        <select id="reports-student-filter" class="mt-1 block w-full p-2 border rounded-md">
+                            <option value="">All Students</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <div class="flex flex-wrap items-center justify-between gap-4">
+                    <div class="flex items-center space-x-4">
+                        <div class="bg-green-100 p-3 rounded-lg text-center shadow">
+                            <h4 class="font-bold text-green-800 text-sm">Tutors Submitted</h4>
+                            <p id="report-tutor-count" class="text-2xl font-extrabold">0</p>
+                        </div>
+                        <div class="bg-yellow-100 p-3 rounded-lg text-center shadow">
+                            <h4 class="font-bold text-yellow-800 text-sm">Total Reports</h4>
+                            <p id="report-total-count" class="text-2xl font-extrabold">0</p>
+                        </div>
+                        <div class="bg-blue-100 p-3 rounded-lg text-center shadow">
+                            <h4 class="font-bold text-blue-800 text-sm">This Page</h4>
+                            <p id="report-page-count" class="text-2xl font-extrabold">0</p>
+                        </div>
+                    </div>
+                    
+                    <div class="flex items-center space-x-2">
+                        <button id="refresh-reports-btn" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 flex items-center">
+                            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                            </svg>
+                            Refresh
+                        </button>
+                        ${canExport ? `<button id="export-reports-csv-btn" class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 flex items-center">
+                            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                            </svg>
+                            Export CSV
+                        </button>` : ''}
+                        ${canDownload ? `<button id="bulk-download-btn" class="bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700 flex items-center">
+                            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10"></path>
+                            </svg>
+                            Bulk Download
+                        </button>` : ''}
+                    </div>
                 </div>
             </div>
+
+            <!-- Search Box -->
+            <div class="mb-6">
+                <input type="search" id="reports-search" placeholder="Search reports by student, tutor, or content..." 
+                       class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent">
+            </div>
+
+            <!-- Bulk Selection Controls (Hidden by default) -->
+            <div id="bulk-controls" class="hidden mb-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <span id="selected-count" class="font-bold text-yellow-800">0</span> reports selected
+                    </div>
+                    <div class="space-x-2">
+                        <button id="select-all-btn" class="bg-blue-500 text-white px-3 py-1 rounded text-sm">Select All</button>
+                        <button id="clear-selection-btn" class="bg-gray-500 text-white px-3 py-1 rounded text-sm">Clear Selection</button>
+                        <button id="download-selected-btn" class="bg-green-600 text-white px-4 py-2 rounded">Download Selected</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Reports List -->
             <div id="tutor-reports-list" class="space-y-4">
-                <p class="text-center text-gray-500 py-10">Select a date range to view reports.</p>
+                <div class="text-center py-10">
+                    <div class="loading-spinner mx-auto" style="width: 40px; height: 40px;"></div>
+                    <p class="text-green-600 font-semibold mt-4">Loading reports...</p>
+                </div>
+            </div>
+
+            <!-- Pagination -->
+            <div id="reports-pagination" class="mt-6 flex justify-between items-center hidden">
+                <button id="prev-page-btn" class="bg-gray-300 text-gray-700 px-4 py-2 rounded hover:bg-gray-400 disabled:opacity-50 disabled:cursor-not-allowed">
+                    Previous
+                </button>
+                <div class="text-sm text-gray-600">
+                    Page <span id="current-page">1</span> of <span id="total-pages">1</span>
+                </div>
+                <button id="next-page-btn" class="bg-gray-300 text-gray-700 px-4 py-2 rounded hover:bg-gray-400 disabled:opacity-50 disabled:cursor-not-allowed">
+                    Next
+                </button>
             </div>
         </div>
     `;
@@ -1286,44 +1364,215 @@ async function renderTutorReportsPanel(container) {
     document.getElementById('reports-start-date').value = firstDay.toISOString().split('T')[0];
     document.getElementById('reports-end-date').value = lastDay.toISOString().split('T')[0];
 
+    // Initialize pagination state
+    let currentReportsPage = 1;
+    const reportsPerPage = 10;
+    let allReports = [];
+    let filteredReports = [];
+    let selectedReports = new Set();
+
     // Date change handler
     const handleDateChange = () => {
+        currentReportsPage = 1;
+        selectedReports.clear();
+        updateBulkControls();
+        fetchAndRenderTutorReports();
+    };
+
+    // Event listeners
+    document.getElementById('reports-start-date').addEventListener('change', handleDateChange);
+    document.getElementById('reports-end-date').addEventListener('change', handleDateChange);
+    document.getElementById('refresh-reports-btn').addEventListener('click', handleDateChange);
+    
+    // Search functionality
+    document.getElementById('reports-search').addEventListener('input', (e) => {
+        filterReports(e.target.value);
+    });
+
+    // Filter functionality
+    document.getElementById('reports-tutor-filter').addEventListener('change', () => {
+        applyFilters();
+    });
+    
+    document.getElementById('reports-student-filter').addEventListener('change', () => {
+        applyFilters();
+    });
+
+    // Bulk operations
+    document.getElementById('bulk-download-btn')?.addEventListener('click', () => {
+        document.getElementById('bulk-controls').classList.toggle('hidden');
+    });
+
+    document.getElementById('select-all-btn')?.addEventListener('click', selectAllReports);
+    document.getElementById('clear-selection-btn')?.addEventListener('click', clearSelection);
+    document.getElementById('download-selected-btn')?.addEventListener('click', downloadSelectedReports);
+
+    // Pagination
+    document.getElementById('prev-page-btn')?.addEventListener('click', () => {
+        if (currentReportsPage > 1) {
+            currentReportsPage--;
+            renderCurrentPage();
+        }
+    });
+
+    document.getElementById('next-page-btn')?.addEventListener('click', () => {
+        const totalPages = Math.ceil(filteredReports.length / reportsPerPage);
+        if (currentReportsPage < totalPages) {
+            currentReportsPage++;
+            renderCurrentPage();
+        }
+    });
+
+    // Export CSV
+    const exportBtn = document.getElementById('export-reports-csv-btn');
+    if (exportBtn) {
+        exportBtn.addEventListener('click', exportReportsToCSV);
+    }
+
+    // Load initial data
+    handleDateChange();
+
+    // Helper functions for the reports panel
+    function filterReports(searchTerm) {
+        const lowerCaseTerm = searchTerm.toLowerCase();
+        filteredReports = allReports.filter(report => 
+            report.studentName?.toLowerCase().includes(lowerCaseTerm) ||
+            report.tutorName?.toLowerCase().includes(lowerCaseTerm) ||
+            report.tutorEmail?.toLowerCase().includes(lowerCaseTerm) ||
+            report.introduction?.toLowerCase().includes(lowerCaseTerm) ||
+            report.topics?.toLowerCase().includes(lowerCaseTerm) ||
+            report.progress?.toLowerCase().includes(lowerCaseTerm)
+        );
+        currentReportsPage = 1;
+        renderCurrentPage();
+    }
+
+    function applyFilters() {
+        const tutorFilter = document.getElementById('reports-tutor-filter').value;
+        const studentFilter = document.getElementById('reports-student-filter').value;
+        
+        filteredReports = allReports.filter(report => {
+            const tutorMatch = !tutorFilter || report.tutorEmail === tutorFilter;
+            const studentMatch = !studentFilter || report.studentName === studentFilter;
+            return tutorMatch && studentMatch;
+        });
+        
+        currentReportsPage = 1;
+        renderCurrentPage();
+    }
+
+    function selectAllReports() {
+        const currentPageReports = getCurrentPageReports();
+        currentPageReports.forEach(report => selectedReports.add(report.id));
+        updateBulkControls();
+        renderCurrentPage();
+    }
+
+    function clearSelection() {
+        selectedReports.clear();
+        updateBulkControls();
+        renderCurrentPage();
+    }
+
+    function updateBulkControls() {
+        const bulkControls = document.getElementById('bulk-controls');
+        const selectedCount = document.getElementById('selected-count');
+        
+        if (selectedReports.size > 0) {
+            bulkControls.classList.remove('hidden');
+            selectedCount.textContent = selectedReports.size;
+        } else {
+            bulkControls.classList.add('hidden');
+        }
+    }
+
+    function getCurrentPageReports() {
+        const startIndex = (currentReportsPage - 1) * reportsPerPage;
+        const endIndex = startIndex + reportsPerPage;
+        return filteredReports.slice(startIndex, endIndex);
+    }
+
+    async function downloadSelectedReports() {
+        if (selectedReports.size === 0) {
+            alert('Please select at least one report to download.');
+            return;
+        }
+
+        const selectedReportsData = allReports.filter(report => selectedReports.has(report.id));
+        await zipAndDownloadReports(selectedReportsData, 'Selected_Reports');
+        clearSelection();
+    }
+
+    async function exportReportsToCSV() {
+        try {
+            const csvData = convertReportsToCSV(filteredReports);
+            const blob = new Blob([csvData], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            const startDate = document.getElementById('reports-start-date').value;
+            const endDate = document.getElementById('reports-end-date').value;
+            link.href = URL.createObjectURL(blob);
+            link.download = `Tutor_Reports_${startDate}_to_${endDate}.csv`;
+            link.click();
+        } catch (error) {
+            console.error('Error exporting CSV:', error);
+            alert('Failed to export CSV. Please try again.');
+        }
+    }
+
+    function convertReportsToCSV(reports) {
+        const headers = [
+            'Tutor Name', 'Tutor Email', 'Student Name', 'Parent Name', 'Grade',
+            'Submission Date', 'Topics Covered', 'Progress', 'Strengths & Weaknesses',
+            'Recommendations'
+        ];
+
+        const rows = reports.map(report => {
+            const submissionDate = report.submittedAt ? 
+                new Date(report.submittedAt.seconds * 1000).toLocaleDateString() : 'N/A';
+            
+            return [
+                `"${report.tutorName || 'N/A'}"`,
+                `"${report.tutorEmail || 'N/A'}"`,
+                `"${report.studentName || 'N/A'}"`,
+                `"${report.parentName || 'N/A'}"`,
+                `"${report.grade || 'N/A'}"`,
+                `"${submissionDate}"`,
+                `"${(report.topics || 'N/A').replace(/"/g, '""')}"`,
+                `"${(report.progress || 'N/A').replace(/"/g, '""')}"`,
+                `"${(report.strengthsWeaknesses || 'N/A').replace(/"/g, '""')}"`,
+                `"${(report.recommendations || 'N/A').replace(/"/g, '""')}"`
+            ];
+        });
+
+        return [headers.join(','), ...rows.map(row => row.join(','))].join('\n');
+    }
+}
+
+// Fixed function to fetch and render reports
+async function fetchAndRenderTutorReports() {
+    const reportsListContainer = document.getElementById('tutor-reports-list');
+    if (!reportsListContainer) return;
+
+    reportsListContainer.innerHTML = `
+        <div class="text-center py-10">
+            <div class="loading-spinner mx-auto" style="width: 40px; height: 40px;"></div>
+            <p class="text-green-600 font-semibold mt-4">Loading reports for selected period...</p>
+        </div>
+    `;
+
+    try {
         const startDateInput = document.getElementById('reports-start-date');
         const endDateInput = document.getElementById('reports-end-date');
         
         const startDate = startDateInput.value ? new Date(startDateInput.value) : null;
         const endDate = endDateInput.value ? new Date(endDateInput.value) : null;
         
-        if (startDate && endDate) {
-            endDate.setHours(23, 59, 59, 999);
-            fetchAndRenderTutorReports(startDate, endDate);
+        if (!startDate || !endDate) {
+            throw new Error('Please select both start and end dates.');
         }
-    };
 
-    document.getElementById('reports-start-date').addEventListener('change', handleDateChange);
-    document.getElementById('reports-end-date').addEventListener('change', handleDateChange);
-    document.getElementById('refresh-reports-btn').addEventListener('click', handleDateChange);
+        endDate.setHours(23, 59, 59, 999);
 
-    // Export button
-    const exportBtn = document.getElementById('export-reports-csv-btn');
-    if (exportBtn) {
-        exportBtn.onclick = () => {
-            // You can implement CSV export for reports if needed
-            alert('Reports CSV export would be implemented here');
-        };
-    }
-
-    // Load initial data
-    handleDateChange();
-}
-
-async function fetchAndRenderTutorReports(startDate, endDate) {
-    const reportsListContainer = document.getElementById('tutor-reports-list');
-    if (!reportsListContainer) return;
-
-    reportsListContainer.innerHTML = `<p class="text-center text-gray-500 py-10">Loading reports for selected period...</p>`;
-
-    try {
         // Convert dates to Firestore timestamps
         const startTimestamp = Timestamp.fromDate(startDate);
         const endTimestamp = Timestamp.fromDate(endDate);
@@ -1337,151 +1586,507 @@ async function fetchAndRenderTutorReports(startDate, endDate) {
         );
 
         const snapshot = await getDocs(reportsQuery);
-        console.log(`Found ${snapshot.size} reports in date range`);
-
+        
         if (snapshot.empty) {
-            reportsListContainer.innerHTML = `
-                <div class="text-center py-10">
-                    <p class="text-gray-500">No reports found for the selected period.</p>
-                    <p class="text-sm text-gray-400 mt-2">Date range: ${startDate.toLocaleDateString()} to ${endDate.toLocaleDateString()}</p>
-                </div>`;
-            document.getElementById('report-tutor-count').textContent = '0';
-            document.getElementById('report-total-count').textContent = '0';
+            allReports = [];
+            filteredReports = [];
+            renderTutorReportsFromCache();
             return;
         }
 
-        const reportsData = snapshot.docs.map(doc => ({ 
+        allReports = snapshot.docs.map(doc => ({ 
             id: doc.id, 
             ...doc.data() 
         }));
 
+        filteredReports = [...allReports];
+
+        // Update filter dropdowns
+        updateFilterDropdowns();
+
         // Save to cache and render
-        saveToLocalStorage('reports', reportsData);
-        renderTutorReportsFromCache(reportsData);
+        saveToLocalStorage('reports', allReports);
+        renderTutorReportsFromCache();
 
     } catch (error) {
         console.error("Error fetching reports:", error);
         reportsListContainer.innerHTML = `
             <div class="text-center py-10 text-red-600">
-                <p>Failed to load reports:</p>
-                <p class="text-sm">${error.message}</p>
-            </div>`;
+                <p class="font-semibold">Failed to load reports</p>
+                <p class="text-sm mt-2">${error.message}</p>
+                <button onclick="fetchAndRenderTutorReports()" class="mt-4 bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">
+                    Try Again
+                </button>
+            </div>
+        `;
     }
 }
 
-function renderTutorReportsFromCache(reportsData = null) {
-    // Use provided data or fall back to cache
-    const reports = reportsData || sessionCache.reports || [];
+function updateFilterDropdowns() {
+    const tutorFilter = document.getElementById('reports-tutor-filter');
+    const studentFilter = document.getElementById('reports-student-filter');
+    
+    // Get unique tutors and students
+    const tutors = [...new Set(allReports.map(r => r.tutorEmail))].filter(Boolean);
+    const students = [...new Set(allReports.map(r => r.studentName))].filter(Boolean);
+    
+    // Update tutor filter
+    tutorFilter.innerHTML = '<option value="">All Tutors</option>' + 
+        tutors.map(tutor => `<option value="${tutor}">${tutor}</option>`).join('');
+    
+    // Update student filter
+    studentFilter.innerHTML = '<option value="">All Students</option>' + 
+        students.map(student => `<option value="${student}">${student}</option>`).join('');
+}
+
+function renderTutorReportsFromCache() {
     const reportsListContainer = document.getElementById('tutor-reports-list');
     if (!reportsListContainer) return;
 
-    console.log("Rendering reports:", reports.length);
-
-    if (reports.length === 0) {
-        reportsListContainer.innerHTML = `<p class="text-center text-gray-500 py-10">No reports to display.</p>`;
+    if (filteredReports.length === 0) {
+        reportsListContainer.innerHTML = `
+            <div class="text-center py-10">
+                <p class="text-gray-500">No reports found for the selected period and filters.</p>
+                <p class="text-sm text-gray-400 mt-2">Try adjusting your date range or search terms.</p>
+            </div>`;
+        
         document.getElementById('report-tutor-count').textContent = '0';
         document.getElementById('report-total-count').textContent = '0';
+        document.getElementById('report-page-count').textContent = '0';
+        document.getElementById('reports-pagination').classList.add('hidden');
         return;
     }
 
-    // Group reports by tutor
-    const reportsByTutor = {};
-    reports.forEach(report => {
-        if (!reportsByTutor[report.tutorEmail]) {
-            reportsByTutor[report.tutorEmail] = { 
-                name: report.tutorName || report.tutorEmail, 
-                reports: [] 
-            };
-        }
-        reportsByTutor[report.tutorEmail].reports.push(report);
-    });
-
     // Update statistics
-    document.getElementById('report-tutor-count').textContent = Object.keys(reportsByTutor).length;
-    document.getElementById('report-total-count').textContent = reports.length;
+    const uniqueTutors = new Set(filteredReports.map(r => r.tutorEmail)).size;
+    document.getElementById('report-tutor-count').textContent = uniqueTutors;
+    document.getElementById('report-total-count').textContent = filteredReports.length;
+
+    // Render current page
+    renderCurrentPage();
+}
+
+function renderCurrentPage() {
+    const reportsListContainer = document.getElementById('tutor-reports-list');
+    if (!reportsListContainer) return;
+
+    const currentPageReports = getCurrentPageReports();
+    const totalPages = Math.ceil(filteredReports.length / reportsPerPage);
+
+    document.getElementById('report-page-count').textContent = currentPageReports.length;
+    document.getElementById('current-page').textContent = currentReportsPage;
+    document.getElementById('total-pages').textContent = totalPages;
+
+    // Show/hide pagination
+    const pagination = document.getElementById('reports-pagination');
+    if (totalPages > 1) {
+        pagination.classList.remove('hidden');
+        document.getElementById('prev-page-btn').disabled = currentReportsPage === 1;
+        document.getElementById('next-page-btn').disabled = currentReportsPage === totalPages;
+    } else {
+        pagination.classList.add('hidden');
+    }
 
     const canDownload = window.userData?.permissions?.actions?.canDownloadReports === true;
     
-    // Render the reports
+    // Render reports
     let html = '';
     
-    Object.values(reportsByTutor).forEach(tutorData => {
-        const reportLinks = tutorData.reports.map(report => {
-            const buttonHTML = canDownload
-                ? `<button class="download-report-btn bg-green-500 text-white px-3 py-1 text-sm rounded hover:bg-green-600" data-report-id="${report.id}">Download</button>`
-                : `<button class="view-report-btn bg-gray-500 text-white px-3 py-1 text-sm rounded hover:bg-gray-600" data-report-id="${report.id}">View</button>`;
-            
-            const reportDate = report.submittedAt ? 
-                new Date(report.submittedAt.seconds * 1000).toLocaleDateString() : 
-                'Unknown date';
-                
-            return `
-                <li class="flex justify-between items-center p-3 bg-gray-50 rounded-lg border">
-                    <div>
-                        <span class="font-medium">${report.studentName}</span>
-                        <span class="text-sm text-gray-500 ml-3">${reportDate}</span>
-                    </div>
-                    <div class="flex gap-2">
-                        ${buttonHTML}
-                    </div>
-                </li>
-            `;
-        }).join('');
-
-        const zipButtonHTML = canDownload
-            ? `<div class="p-4 border-t bg-blue-50">
-                 <button class="zip-reports-btn bg-blue-600 text-white px-4 py-2 text-sm rounded w-full hover:bg-blue-700 transition-colors" data-tutor-email="${tutorData.reports[0].tutorEmail}">
-                     📦 Zip & Download All Reports for ${tutorData.name}
-                 </button>
-               </div>`
-            : '';
+    currentPageReports.forEach(report => {
+        const isSelected = selectedReports.has(report.id);
+        const submissionDate = report.submittedAt ? 
+            new Date(report.submittedAt.seconds * 1000).toLocaleDateString() : 'Unknown date';
+        
+        const previewText = report.introduction ? 
+            (report.introduction.length > 150 ? 
+                report.introduction.substring(0, 150) + '...' : 
+                report.introduction) : 
+            'No content available';
 
         html += `
-            <div class="border rounded-lg shadow-sm bg-white">
-                <details open>
-                    <summary class="p-4 cursor-pointer flex justify-between items-center font-semibold text-lg bg-green-50 hover:bg-green-100 rounded-t-lg">
-                        <span>${tutorData.name}</span>
-                        <span class="text-sm font-normal text-gray-500 bg-green-200 px-2 py-1 rounded-full">
-                            ${tutorData.reports.length} report${tutorData.reports.length !== 1 ? 's' : ''}
-                        </span>
-                    </summary>
-                    <div class="border-t">
-                        <ul class="space-y-2 p-4">${reportLinks}</ul>
-                        ${zipButtonHTML}
+            <div class="border rounded-lg bg-white shadow-sm hover:shadow-md transition-shadow ${isSelected ? 'border-2 border-blue-500 bg-blue-50' : ''}">
+                <div class="p-4">
+                    <div class="flex justify-between items-start mb-3">
+                        <div class="flex items-center space-x-3">
+                            ${canDownload ? `
+                                <input type="checkbox" ${isSelected ? 'checked' : ''} 
+                                       onchange="toggleReportSelection('${report.id}')"
+                                       class="report-checkbox h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
+                            ` : ''}
+                            <div>
+                                <h3 class="font-bold text-lg text-gray-800">${report.studentName || 'Unknown Student'}</h3>
+                                <p class="text-sm text-gray-600">Tutor: ${report.tutorName || report.tutorEmail}</p>
+                            </div>
+                        </div>
+                        <div class="text-right">
+                            <span class="text-xs text-gray-500 block">${submissionDate}</span>
+                            <span class="text-xs bg-green-100 text-green-800 px-2 py-1 rounded-full">Submitted</span>
+                        </div>
                     </div>
-                </details>
+                    
+                    <div class="mb-3">
+                        <p class="text-gray-700 text-sm">${previewText}</p>
+                    </div>
+
+                    <div class="flex justify-between items-center text-sm">
+                        <div class="text-gray-500">
+                            Grade: ${report.grade || 'N/A'} | 
+                            Parent: ${report.parentName || 'N/A'}
+                        </div>
+                        <div class="flex space-x-2">
+                            <button onclick="previewReport('${report.id}')" 
+                                    class="bg-blue-500 text-white px-3 py-1 rounded text-xs hover:bg-blue-600 flex items-center">
+                                <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path>
+                                </svg>
+                                Preview
+                            </button>
+                            ${canDownload ? `
+                                <button onclick="downloadSingleReport('${report.id}')" 
+                                        class="bg-green-600 text-white px-3 py-1 rounded text-xs hover:bg-green-700 flex items-center">
+                                    <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                                    </svg>
+                                    Download PDF
+                                </button>
+                            ` : ''}
+                        </div>
+                    </div>
+                </div>
             </div>
         `;
     });
 
     reportsListContainer.innerHTML = html;
-
-    // Add event listeners
-    document.querySelectorAll('.download-report-btn').forEach(button => {
-        button.addEventListener('click', (e) => { 
-            e.stopPropagation(); 
-            viewReportInNewTab(e.target.dataset.reportId, true); 
-        });
-    });
-    
-    document.querySelectorAll('.view-report-btn').forEach(button => {
-        button.addEventListener('click', (e) => { 
-            e.stopPropagation(); 
-            viewReportInNewTab(e.target.dataset.reportId, false); 
-        });
-    });
-    
-    document.querySelectorAll('.zip-reports-btn').forEach(button => {
-        button.addEventListener('click', async (e) => {
-            e.stopPropagation();
-            const tutorEmail = e.target.dataset.tutorEmail;
-            const tutorData = reportsByTutor[tutorEmail];
-            if (tutorData) {
-                await zipAndDownloadTutorReports(tutorData.reports, tutorData.name, e.target);
-            }
-        });
-    });
 }
+
+// Global functions for event handlers
+window.toggleReportSelection = function(reportId) {
+    if (selectedReports.has(reportId)) {
+        selectedReports.delete(reportId);
+    } else {
+        selectedReports.add(reportId);
+    }
+    updateBulkControls();
+    renderCurrentPage();
+};
+
+window.previewReport = async function(reportId) {
+    try {
+        const { html } = await generateReportHTML(reportId);
+        const newWindow = window.open();
+        newWindow.document.write(html);
+        newWindow.document.close();
+    } catch (error) {
+        console.error("Error previewing report:", error);
+        alert(`Error: ${error.message}`);
+    }
+};
+
+window.downloadSingleReport = async function(reportId) {
+    try {
+        const { html, reportData } = await generateReportHTML(reportId);
+        const options = {
+            margin: 0.5,
+            filename: `${reportData.studentName}_report_${reportId.substring(0, 8)}.pdf`,
+            image: { type: 'jpeg', quality: 0.98 },
+            html2canvas: { scale: 2, useCORS: true },
+            jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' }
+        };
+        
+        // Show download progress
+        const button = event.target;
+        const originalText = button.innerHTML;
+        button.innerHTML = '<div class="loading-spinner" style="width: 16px; height: 16px;"></div> Generating...';
+        button.disabled = true;
+        
+        await html2pdf().from(html).set(options).save();
+        
+        // Restore button
+        button.innerHTML = originalText;
+        button.disabled = false;
+        
+    } catch (error) {
+        console.error("Error downloading report:", error);
+        alert(`Error: ${error.message}`);
+        
+        // Restore button on error
+        const button = event.target;
+        button.innerHTML = 'Download PDF';
+        button.disabled = false;
+    }
+};
+
+// Enhanced report generation with better error handling
+async function generateReportHTML(reportId) {
+    try {
+        const reportDoc = await getDoc(doc(db, "tutor_submissions", reportId));
+        if (!reportDoc.exists()) throw new Error("Report not found!");
+        const reportData = reportDoc.data();
+
+        // Define the sections to be displayed in the report
+        const reportSections = {
+            "INTRODUCTION": reportData.introduction,
+            "TOPICS & REMARKS": reportData.topics,
+            "PROGRESS & ACHIEVEMENTS": reportData.progress,
+            "STRENGTHS AND WEAKNESSES": reportData.strengthsWeaknesses,
+            "RECOMMENDATIONS": reportData.recommendations,
+            "GENERAL TUTOR'S COMMENTS": reportData.generalComments
+        };
+
+        // Generate the HTML for each section
+        const sectionsHTML = Object.entries(reportSections).map(([title, content]) => {
+            const sanitizedContent = content ? String(content).replace(/</g, "&lt;").replace(/>/g, "&gt;") : '';
+            const displayContent = (sanitizedContent && sanitizedContent.trim() !== '') ? 
+                sanitizedContent.replace(/\n/g, '<br>') : 
+                '<em class="text-gray-500">No content provided</em>';
+            
+            return `
+                <div class="report-section">
+                    <h2>${title}</h2>
+                    <p>${displayContent}</p>
+                </div>
+            `;
+        }).join('');
+
+        const logoUrl = "https://res.cloudinary.com/dy2hxcyaf/image/upload/v1757700806/newbhlogo_umwqzy.svg";
+        const reportTemplate = `
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <meta charset="UTF-8">
+                <title>${reportData.studentName} - Monthly Learning Report</title>
+                <style>
+                    body { 
+                        font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; 
+                        color: #333; 
+                        line-height: 1.6;
+                        margin: 0;
+                        padding: 20px;
+                    }
+                    .report-container { 
+                        max-width: 800px; 
+                        margin: 0 auto; 
+                        padding: 20px;
+                    }
+                    .header { 
+                        text-align: center; 
+                        margin-bottom: 40px; 
+                        border-bottom: 2px solid #16a34a;
+                        padding-bottom: 20px;
+                    }
+                    .header img { 
+                        height: 80px; 
+                        margin-bottom: 10px;
+                    }
+                    .header h1 { 
+                        color: #166534; 
+                        margin: 10px 0; 
+                        font-size: 28px; 
+                    }
+                    .header h2 { 
+                        color: #15803d; 
+                        margin: 5px 0; 
+                        font-size: 22px; 
+                    }
+                    .header p { 
+                        margin: 5px 0; 
+                        color: #555; 
+                        font-size: 14px;
+                    }
+                    .student-info { 
+                        display: grid; 
+                        grid-template-columns: 1fr 1fr; 
+                        gap: 10px 20px; 
+                        margin-bottom: 30px; 
+                        background-color: #f9f9f9;
+                        border: 1px solid #eee;
+                        padding: 20px;
+                        border-radius: 8px;
+                        font-size: 14px;
+                    }
+                    .student-info p { 
+                        margin: 8px 0; 
+                    }
+                    .report-section {
+                        page-break-inside: avoid;
+                        margin-bottom: 25px;
+                        border: 1px solid #e5e7eb;
+                        padding: 20px;
+                        border-radius: 8px;
+                        background: white;
+                    }
+                    .report-section h2 { 
+                        font-size: 18px; 
+                        font-weight: bold; 
+                        color: #16a34a; 
+                        margin: 0 0 15px 0;
+                        padding-bottom: 10px;
+                        border-bottom: 2px solid #d1fae5;
+                    }
+                    .report-section p { 
+                        line-height: 1.6; 
+                        white-space: pre-wrap; 
+                        margin: 0;
+                        font-size: 14px;
+                    }
+                    .footer { 
+                        text-align: right; 
+                        margin-top: 40px;
+                        padding-top: 20px;
+                        border-top: 1px solid #e5e7eb;
+                    }
+                    @media print {
+                        body { padding: 0; }
+                        .report-container { padding: 15px; }
+                        .report-section { border: 1px solid #ccc; }
+                    }
+                </style>
+            </head>
+            <body>
+                <div class="report-container">
+                    <div class="header">
+                        <img src="${logoUrl}" alt="Blooming Kids House Logo">
+                        <h2>Blooming Kids House</h2>
+                        <h1>MONTHLY LEARNING REPORT</h1>
+                        <p>Date: ${reportData.submittedAt ? new Date(reportData.submittedAt.seconds * 1000).toLocaleDateString() : 'N/A'}</p>
+                    </div>
+                    <div class="student-info">
+                        <p><strong>Student's Name:</strong> ${reportData.studentName || 'N/A'}</p>
+                        <p><strong>Parent's Name:</strong> ${reportData.parentName || 'N/A'}</p>
+                        <p><strong>Parent's Phone:</strong> ${reportData.parentPhone || 'N/A'}</p>
+                        <p><strong>Grade:</strong> ${reportData.grade || 'N/A'}</p>
+                        <p><strong>Tutor's Name:</strong> ${reportData.tutorName || 'N/A'}</p>
+                        <p><strong>Tutor's Email:</strong> ${reportData.tutorEmail || 'N/A'}</p>
+                    </div>
+                    ${sectionsHTML}
+                    <div class="footer">
+                        <p>Best regards,</p>
+                        <p><strong>${reportData.tutorName || 'N/A'}</strong></p>
+                        <p><em>Blooming Kids House Tutor</em></p>
+                    </div>
+                </div>
+            </body>
+            </html>
+        `;
+        
+        return { html: reportTemplate, reportData: reportData };
+        
+    } catch (error) {
+        console.error("Error generating report HTML:", error);
+        throw new Error(`Failed to generate report: ${error.message}`);
+    }
+}
+
+// Enhanced zip download function
+async function zipAndDownloadReports(reports, zipName) {
+    const zip = new JSZip();
+    let processedCount = 0;
+
+    try {
+        // Show progress
+        const progressModal = showProgressModal(`Generating ${reports.length} reports...`, reports.length);
+        
+        // Process reports in batches to avoid memory issues
+        const batchSize = 5;
+        for (let i = 0; i < reports.length; i += batchSize) {
+            const batch = reports.slice(i, i + batchSize);
+            const batchPromises = batch.map(async (report) => {
+                try {
+                    const { html, reportData } = await generateReportHTML(report.id);
+                    const options = {
+                        image: { type: 'jpeg', quality: 0.98 },
+                        html2canvas: { scale: 2, useCORS: true },
+                        jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' }
+                    };
+                    const pdfBlob = await html2pdf().from(html).set(options).output('blob');
+                    
+                    // Create safe filename
+                    const safeStudentName = (reportData.studentName || 'Unknown').replace(/[^a-z0-9]/gi, '_');
+                    const filename = `${safeStudentName}_Report_${report.id.substring(0, 8)}.pdf`;
+                    
+                    zip.file(filename, pdfBlob);
+                    processedCount++;
+                    updateProgressModal(progressModal, processedCount, reports.length);
+                    
+                } catch (error) {
+                    console.error(`Error processing report ${report.id}:`, error);
+                    // Continue with other reports even if one fails
+                }
+            });
+            
+            await Promise.all(batchPromises);
+        }
+        
+        // Generate and download zip
+        const zipBlob = await zip.generateAsync({ 
+            type: "blob",
+            compression: "DEFLATE",
+            compressionOptions: { level: 6 }
+        });
+        
+        saveAs(zipBlob, `${zipName}_${new Date().toISOString().split('T')[0]}.zip`);
+        hideProgressModal(progressModal);
+        
+    } catch (error) {
+        console.error("Error creating zip file:", error);
+        alert("Failed to create zip file. Some reports may not have been included.");
+    }
+}
+
+// Progress modal functions
+function showProgressModal(message, total) {
+    const modalHtml = `
+        <div id="progress-modal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-center justify-center">
+            <div class="relative p-8 bg-white w-96 rounded-lg shadow-xl">
+                <h3 class="text-xl font-bold mb-4">Download Progress</h3>
+                <p class="mb-4">${message}</p>
+                <div class="w-full bg-gray-200 rounded-full h-4 mb-4">
+                    <div id="progress-bar" class="bg-green-600 h-4 rounded-full" style="width: 0%"></div>
+                </div>
+                <p id="progress-text" class="text-center text-sm text-gray-600">0/${total} processed</p>
+            </div>
+        </div>
+    `;
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+    return { total };
+}
+
+function updateProgressModal(progressModal, processed, total) {
+    const progressBar = document.getElementById('progress-bar');
+    const progressText = document.getElementById('progress-text');
+    const percentage = Math.round((processed / total) * 100);
+    
+    if (progressBar) progressBar.style.width = `${percentage}%`;
+    if (progressText) progressText.textContent = `${processed}/${total} processed (${percentage}%)`;
+}
+
+function hideProgressModal(progressModal) {
+    const modal = document.getElementById('progress-modal');
+    if (modal) modal.remove();
+}
+
+// Make sure to add these CSS styles for the loading spinner
+const additionalStyles = `
+<style>
+.loading-spinner {
+    border: 3px solid #f3f3f3;
+    border-top: 3px solid #16a34a;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+.report-checkbox:checked {
+    background-color: #2563eb;
+    border-color: #2563eb;
+}
+</style>
+`;
+document.head.insertAdjacentHTML('beforeend', additionalStyles);
 
 // --- Pending Approvals Panel ---
 async function renderPendingApprovalsPanel(container) {
@@ -2256,4 +2861,5 @@ onAuthStateChanged(auth, async (user) => {
 });
 
 // [End Updated management.js File]
+
 
