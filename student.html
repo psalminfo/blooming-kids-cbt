@@ -100,11 +100,11 @@
         /**
          * Creates permanent student record in Firebase (NEW ADDITION)
          */
-        async function createPermanentStudentRecord(studentName, parentEmail, parentPhone, tutorEmail, grade, country, referralCode) {
+        async function createPermanentStudentRecord(studentName, parentName, parentEmail, parentPhone, tutorEmail, grade, country, referralCode) {
             try {
                 const studentData = {
                     studentName: studentName,
-                    parentName: parentName,
+                    parentName: parentName, // Added parentName here
                     parentEmail: parentEmail,
                     parentPhone: parentPhone,
                     tutorEmail: tutorEmail,
@@ -134,14 +134,15 @@
             const subject = urlParams.get('subject');
             const grade = urlParams.get('grade');
             const studentName = urlParams.get('studentName');
-            const parentName = urlParams.get('parentName');
+            const parentName = urlParams.get('parentName'); // Added parentName parameter
             const parentEmail = urlParams.get('parentEmail');
             const tutorEmail = urlParams.get('tutorEmail');
             const studentCountry = urlParams.get('country');
             const referralCode = urlParams.get('referralCode') || '';
             const state = urlParams.get('state') || (subject === 'ela' ? 'creative-writing' : 'mcq');
 
-            if (!subject || !grade || !studentName || !parentName ||!parentEmail || !tutorEmail || !studentCountry) {
+            // Updated validation to include parentName
+            if (!subject || !grade || !studentName || !parentName || !parentEmail || !tutorEmail || !studentCountry) {
                 alert("Missing student info. Redirecting...");
                 window.location.href = "index.html";
                 return;
@@ -157,7 +158,7 @@
             }
 
             try {
-                // STEP 1: Create permanent student record FIRST
+                // STEP 1: Create permanent student record FIRST - now includes parentName
                 const studentUid = await createPermanentStudentRecord(
                     studentName, parentName, parentEmail, parentPhone, tutorEmail, grade, studentCountry, referralCode
                 );
@@ -185,7 +186,7 @@
                     submitBtn.textContent = 'Submitting...';
 
                     try {
-                        // STEP 3: Use ORIGINAL submitAnswers.js for test answers
+                        // STEP 3: Use ORIGINAL submitAnswers.js for test answers - updated to include parentName
                         await submitTestToFirebase(
                             subject, grade, studentName, parentName, parentEmail, 
                             tutorEmail, studentCountry, parentPhone
@@ -227,4 +228,3 @@
     </script>
 </body>
 </html>
-
