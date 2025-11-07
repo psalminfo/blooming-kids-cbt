@@ -299,7 +299,7 @@ onSnapshot(settingsDocRef, (docSnap) => {
 });
 
 // ##################################################################
-// # SECTION 1: TUTOR DASHBOARD
+// # SECTION 1: TUTOR DASHBOARD - UPDATED TO USE student_results
 // ##################################################################
 function renderTutorDashboard(container, tutor) {
     container.innerHTML = `
@@ -326,88 +326,37 @@ function renderTutorDashboard(container, tutor) {
     loadTutorReports(tutor.email);
 }
 
-// NEW: Function to sync creative writing comments to student_results
-async function syncCreativeWritingToStudentResults(submissionData, tutorReport) {
-    try {
-        console.log("Syncing creative writing comments to student_results...");
-        
-        // Find the corresponding creative writing assessment in student_results
-        const studentResultsQuery = query(
-            collection(db, "student_results"),
-            where("studentName", "==", submissionData.studentName),
-            where("parentPhone", "==", submissionData.parentPhone),
-            where("tutorEmail", "==", submissionData.tutorEmail)
-        );
-        
-        const studentResultsSnapshot = await getDocs(studentResultsQuery);
-        
-        if (!studentResultsSnapshot.empty) {
-            const batch = writeBatch(db);
-            
-            studentResultsSnapshot.forEach(doc => {
-                const resultData = doc.data();
-                
-                // Check if this is a creative writing submission
-                if (resultData.answers && Array.isArray(resultData.answers)) {
-                    const creativeWritingAnswer = resultData.answers.find(answer => 
-                        answer.type === 'creative-writing'
-                    );
-                    
-                    if (creativeWritingAnswer) {
-                        // Update the tutorReport field in the creative writing answer
-                        const updatedAnswers = resultData.answers.map(answer => {
-                            if (answer.type === 'creative-writing') {
-                                return {
-                                    ...answer,
-                                    tutorReport: tutorReport
-                                };
-                            }
-                            return answer;
-                        });
-                        
-                        // Update the document with the new answers
-                        const resultRef = doc(db, "student_results", doc.id);
-                        batch.update(resultRef, {
-                            answers: updatedAnswers,
-                            tutorReport: tutorReport // Also add at top level for easy access
-                        });
-                        
-                        console.log("Updated creative writing comments for:", submissionData.studentName);
-                    }
-                }
-            });
-            
-            // Commit all updates
-            if (batch._mutations.length > 0) {
-                await batch.commit();
-                console.log("Successfully synced creative writing comments to student_results");
-            }
-        } else {
-            console.log("No matching student_results found for creative writing sync");
-        }
-    } catch (error) {
-        console.error("Error syncing creative writing comments:", error);
-    }
-}
-
+// UPDATED: Load reports from student_results instead of tutor_submissions
 async function loadTutorReports(tutorEmail, parentName = null) {
     const pendingReportsContainer = document.getElementById('pendingReportsContainer');
     const gradedReportsContainer = document.getElementById('gradedReportsContainer');
     pendingReportsContainer.innerHTML = `<p class="text-gray-500">Loading pending submissions...</p>`;
     if (gradedReportsContainer) gradedReportsContainer.innerHTML = `<p class="text-gray-500">Loading graded submissions...</p>`;
 
-    let submissionsQuery = query(collection(db, "tutor_submissions"), where("tutorEmail", "==", tutorEmail));
+    // UPDATED: Query student_results instead of tutor_submissions
+    let assessmentsQuery = query(
+        collection(db, "student_results"), 
+        where("tutorEmail", "==", tutorEmail)
+    );
+
     if (parentName) {
-        submissionsQuery = query(submissionsQuery, where("parentName", "==", parentName));
+        assessmentsQuery = query(assessmentsQuery, where("parentName", "==", parentName));
     }
 
     try {
-        const querySnapshot = await getDocs(submissionsQuery);
+        const querySnapshot = await getDocs(assessmentsQuery);
         let pendingHTML = '';
         let gradedHTML = '';
 
         querySnapshot.forEach(doc => {
             const data = doc.data();
+            
+            // Check if this assessment needs tutor feedback (creative writing or pending review)
+            const needsFeedback = data.answers && data.answers.some(answer => 
+                answer.type === 'creative-writing' && 
+                (!answer.tutorReport || answer.tutorReport.trim() === '')
+            );
+
             const reportCardHTML = `
                 <div class="border rounded-lg p-4 shadow-sm bg-white mb-4">
                     <p><strong>Student:</strong> ${data.studentName}</p>
@@ -415,18 +364,31 @@ async function loadTutorReports(tutorEmail, parentName = null) {
                     <p><strong>Grade:</strong> ${data.grade}</p>
                     <p><strong>Submitted At:</strong> ${new Date(data.submittedAt.seconds * 1000).toLocaleString()}</p>
                     <div class="mt-4 border-t pt-4">
-                        <h4 class="font-semibold">Creative Writing Submission:</h4>
-                        ${data.fileUrl ? `<a href="${data.fileUrl}" target="_blank" class="text-green-600 hover:underline">Download File</a>` : `<p class="italic">${data.textAnswer || "No response"}</p>`}
-                        <p class="mt-2"><strong>Status:</strong> ${data.status || 'Pending'}</p>
-                        ${(data.status === 'pending_review') ?
-                            `<textarea class="tutor-report w-full mt-2 p-2 border rounded" rows="3" placeholder="Write your report here..."></textarea>
-                            <button class="submit-report-btn bg-green-600 text-white px-4 py-2 rounded mt-2" data-doc-id="${doc.id}">Submit Report</button>`
-                            : `<p class="mt-2"><strong>Tutor's Report:</strong> ${data.tutorReport || 'N/A'}</p>`
-                        }
+                        <h4 class="font-semibold">Assessment Details:</h4>
+                        ${data.answers ? data.answers.map(answer => {
+                            if (answer.type === 'creative-writing') {
+                                return `
+                                    <div class="mb-3 p-3 bg-gray-50 rounded">
+                                        <p><strong>Creative Writing:</strong></p>
+                                        <p class="italic">${answer.textAnswer || "No response"}</p>
+                                        ${answer.fileUrl ? `<a href="${answer.fileUrl}" target="_blank" class="text-green-600 hover:underline">Download File</a>` : ''}
+                                        <p class="mt-2"><strong>Status:</strong> ${answer.tutorReport ? 'Graded' : 'Pending Review'}</p>
+                                        ${!answer.tutorReport ? `
+                                            <textarea class="tutor-report w-full mt-2 p-2 border rounded" rows="3" placeholder="Write your feedback here..."></textarea>
+                                            <button class="submit-report-btn bg-green-600 text-white px-4 py-2 rounded mt-2" data-doc-id="${doc.id}" data-answer-index="${data.answers.indexOf(answer)}">Submit Feedback</button>
+                                        ` : `
+                                            <p class="mt-2"><strong>Tutor's Feedback:</strong> ${answer.tutorReport || 'N/A'}</p>
+                                        `}
+                                    </div>
+                                `;
+                            }
+                            return '';
+                        }).join('') : '<p>No assessment data available.</p>'}
                     </div>
                 </div>
             `;
-            if (data.status === 'pending_review') {
+
+            if (needsFeedback) {
                 pendingHTML += reportCardHTML;
             } else {
                 gradedHTML += reportCardHTML;
@@ -436,28 +398,44 @@ async function loadTutorReports(tutorEmail, parentName = null) {
         pendingReportsContainer.innerHTML = pendingHTML || `<p class="text-gray-500">No pending submissions found.</p>`;
         if (gradedReportsContainer) gradedReportsContainer.innerHTML = gradedHTML || `<p class="text-gray-500">No graded submissions found.</p>`;
 
+        // UPDATED: Submit feedback directly to student_results
         document.querySelectorAll('.submit-report-btn').forEach(button => {
             button.addEventListener('click', async (e) => {
                 const docId = e.target.getAttribute('data-doc-id');
-                const reportTextarea = e.target.closest('.border').querySelector('.tutor-report');
+                const answerIndex = parseInt(e.target.getAttribute('data-answer-index'));
+                const reportTextarea = e.target.closest('.bg-gray-50').querySelector('.tutor-report');
                 const tutorReport = reportTextarea.value.trim();
+                
                 if (tutorReport) {
-                    const docRef = doc(db, "tutor_submissions", docId);
-                    
-                    // Get the submission data first
-                    const submissionDoc = await getDoc(docRef);
-                    const submissionData = submissionDoc.data();
-                    
-                    // Update the tutor_submissions document
-                    await updateDoc(docRef, { 
-                        tutorReport: tutorReport, 
-                        status: 'Graded' 
-                    });
-                    
-                    // NEW: Sync creative writing comments to student_results
-                    await syncCreativeWritingToStudentResults(submissionData, tutorReport);
-                    
-                    loadTutorReports(tutorEmail, parentName); // Refresh the list
+                    try {
+                        const docRef = doc(db, "student_results", docId);
+                        
+                        // Get the current document
+                        const docSnap = await getDoc(docRef);
+                        const currentData = docSnap.data();
+                        
+                        // Update the specific answer with tutor feedback
+                        const updatedAnswers = [...currentData.answers];
+                        updatedAnswers[answerIndex] = {
+                            ...updatedAnswers[answerIndex],
+                            tutorReport: tutorReport,
+                            gradedAt: new Date()
+                        };
+                        
+                        // Update the document
+                        await updateDoc(docRef, { 
+                            answers: updatedAnswers,
+                            hasTutorFeedback: true
+                        });
+                        
+                        showCustomAlert('Feedback submitted successfully!');
+                        loadTutorReports(tutorEmail, parentName); // Refresh the list
+                    } catch (error) {
+                        console.error("Error submitting feedback:", error);
+                        showCustomAlert('Failed to submit feedback. Please try again.');
+                    }
+                } else {
+                    showCustomAlert('Please write some feedback before submitting.');
                 }
             });
         });
@@ -468,9 +446,8 @@ async function loadTutorReports(tutorEmail, parentName = null) {
     }
 }
 
-
 // ##################################################################
-// # SECTION 2: STUDENT DATABASE (MERGED FUNCTIONALITY)
+// # SECTION 2: STUDENT DATABASE (MERGED FUNCTIONALITY) - UNCHANGED
 // ##################################################################
 
 // Helper function to generate the new student form fields
@@ -1567,5 +1544,3 @@ function renderAutoStudentsList(students) {
         });
     });
 }
-
-
