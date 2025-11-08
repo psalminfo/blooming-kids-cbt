@@ -1709,8 +1709,7 @@ document.addEventListener('DOMContentLoaded', function() {
         if (e.key === 'Enter') handlePasswordReset();
     });
     
-    // --- START: NEW MAIN TAB SWITCHING LISTENERS (PHASE 3) ---
-    document.getElementById("reportTab")?.addEventListener("click", () => switchMainTab('reports'));
-    document.getElementById("rewardsTab")?.addEventListener("click", () => switchMainTab('rewards'));
-    // --- END: NEW MAIN TAB SWITCHING LISTENERS (PHASE 3) ---
-});
+   // --- START: NEW MAIN TAB SWITCHING LISTENERS (PHASE 3) ---
+document.getElementById("reportTab")?.addEventListener("click", () => switchMainTab('reports'));
+document.getElementById("rewardsTab")?.addEventListener("click", () => switchMainTab('rewards'));
+// --- END: NEW MAIN TAB SWITCHING LISTENERS (PHASE 3) ---
