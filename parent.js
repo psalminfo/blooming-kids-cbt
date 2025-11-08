@@ -11,10 +11,48 @@ firebase.initializeApp({
 const db = firebase.firestore();
 const auth = firebase.auth();
 
-// Simple phone cleaning - just trim, no normalization
+// Enhanced phone cleaning with international normalization
 function cleanPhoneNumber(phone) {
     if (!phone) return '';
-    return phone.trim();
+    
+    // Remove all non-digit characters except leading +
+    let cleaned = phone.trim().replace(/[^\d+]/g, '');
+    
+    // If it starts with +234 (Nigeria international code)
+    if (cleaned.startsWith('+234')) {
+        // Convert +234 to 0
+        cleaned = '0' + cleaned.slice(4);
+    }
+    // If it starts with 234 without + (common mistake)
+    else if (cleaned.startsWith('234') && cleaned.length >= 10) {
+        cleaned = '0' + cleaned.slice(3);
+    }
+    // If it's a Nigerian number missing the leading 0 (like 8026957689)
+    else if (cleaned.length === 10 && cleaned.startsWith('80')) {
+        cleaned = '0' + cleaned;
+    }
+    
+    return cleaned;
+}
+
+// Generate possible phone number variations for searching existing data
+function getPhoneNumberVariations(phone) {
+    const cleaned = cleanPhoneNumber(phone);
+    const variations = new Set([cleaned]);
+    
+    // Add common variations that might exist in the database
+    if (cleaned.startsWith('0')) {
+        // +234 version
+        variations.add('+234' + cleaned.slice(1));
+        // 234 version (without +)
+        variations.add('234' + cleaned.slice(1));
+        // Version without leading 0 (if it's a Nigerian number)
+        if (cleaned.startsWith('080')) {
+            variations.add(cleaned.slice(1));
+        }
+    }
+    
+    return Array.from(variations);
 }
 
 function capitalize(str) {
@@ -282,63 +320,73 @@ async function findParentNameFromStudents(parentPhone) {
     try {
         console.log("Searching for parent name with phone:", parentPhone);
         
+        // Get all possible phone variations for searching
+        const phoneVariations = getPhoneNumberVariations(parentPhone);
+        console.log("Searching with phone variations:", phoneVariations);
+        
         // PRIMARY SEARCH: students collection (same as tutor.js)
-        const studentsSnapshot = await db.collection("students")
-            .where("parentPhone", "==", parentPhone)
-            .limit(1)
-            .get();
+        for (const phoneVar of phoneVariations) {
+            const studentsSnapshot = await db.collection("students")
+                .where("parentPhone", "==", phoneVar)
+                .limit(1)
+                .get();
 
-        if (!studentsSnapshot.empty) {
-            const studentDoc = studentsSnapshot.docs[0];
-            const studentData = studentDoc.data();
-            
-            // Use parentName field (same as tutor.js)
-            const parentName = studentData.parentName;
-            
-            if (parentName) {
-                console.log("Found parent name in students collection:", parentName);
-                return parentName;
+            if (!studentsSnapshot.empty) {
+                const studentDoc = studentsSnapshot.docs[0];
+                const studentData = studentDoc.data();
+                
+                // Use parentName field (same as tutor.js)
+                const parentName = studentData.parentName;
+                
+                if (parentName) {
+                    console.log("Found parent name in students collection with phone:", phoneVar, "Name:", parentName);
+                    return parentName;
+                }
             }
         }
 
         // SECONDARY SEARCH: pending_students collection (same as tutor.js)
-        const pendingStudentsSnapshot = await db.collection("pending_students")
-            .where("parentPhone", "==", parentPhone)
-            .limit(1)
-            .get();
+        for (const phoneVar of phoneVariations) {
+            const pendingStudentsSnapshot = await db.collection("pending_students")
+                .where("parentPhone", "==", phoneVar)
+                .limit(1)
+                .get();
 
-        if (!pendingStudentsSnapshot.empty) {
-            const pendingStudentDoc = pendingStudentsSnapshot.docs[0];
-            const pendingStudentData = pendingStudentDoc.data();
-            
-            // Use parentName field (same as tutor.js)
-            const parentName = pendingStudentData.parentName;
-            
-            if (parentName) {
-                console.log("Found parent name in pending_students collection:", parentName);
-                return parentName;
+            if (!pendingStudentsSnapshot.empty) {
+                const pendingStudentDoc = pendingStudentsSnapshot.docs[0];
+                const pendingStudentData = pendingStudentDoc.data();
+                
+                // Use parentName field (same as tutor.js)
+                const parentName = pendingStudentData.parentName;
+                
+                if (parentName) {
+                    console.log("Found parent name in pending_students collection with phone:", phoneVar, "Name:", parentName);
+                    return parentName;
+                }
             }
         }
 
         // FALLBACK SEARCH: tutor_submissions (for historical data)
-        const submissionsSnapshot = await db.collection("tutor_submissions")
-            .where("parentPhone", "==", parentPhone)
-            .limit(1)
-            .get();
+        for (const phoneVar of phoneVariations) {
+            const submissionsSnapshot = await db.collection("tutor_submissions")
+                .where("parentPhone", "==", phoneVar)
+                .limit(1)
+                .get();
 
-        if (!submissionsSnapshot.empty) {
-            const submissionDoc = submissionsSnapshot.docs[0];
-            const submissionData = submissionDoc.data();
-            
-            const parentName = submissionData.parentName;
-            
-            if (parentName) {
-                console.log("Found parent name in tutor_submissions:", parentName);
-                return parentName;
+            if (!submissionsSnapshot.empty) {
+                const submissionDoc = submissionsSnapshot.docs[0];
+                const submissionData = submissionDoc.data();
+                
+                const parentName = submissionData.parentName;
+                
+                if (parentName) {
+                    console.log("Found parent name in tutor_submissions with phone:", phoneVar, "Name:", parentName);
+                    return parentName;
+                }
             }
         }
 
-        console.log("No parent name found in any collection");
+        console.log("No parent name found in any collection with any phone variation");
         return null;
     } catch (error) {
         console.error("Error finding parent name:", error);
@@ -891,7 +939,7 @@ function addViewResponsesButton() {
     }, 1000);
 }
 
-// MAIN REPORT LOADING FUNCTION - FIXED COLLECTION NAME AND VARIABLE DECLARATION
+// MAIN REPORT LOADING FUNCTION - UPDATED TO HANDLE EXISTING DATA WITH MULTIPLE PHONE FORMATS
 async function loadAllReportsForParent(parentPhone, userId) {
     const reportArea = document.getElementById("reportArea");
     const reportContent = document.getElementById("reportContent");
@@ -1014,55 +1062,86 @@ async function loadAllReportsForParent(parentPhone, userId) {
             }
         }
 
-        console.log("🔍 Searching reports with:", { parentPhone, parentEmail });
+        console.log("🔍 Searching reports with parent phone:", parentPhone);
+        console.log("🔍 Parent email:", parentEmail);
 
-        // --- FIXED: PRIORITY SEARCH WITH CORRECT COLLECTION NAME ---
-        // Try phone search first (newer tests), fall back to email search only if needed
-        let assessmentSnapshot;
+        // Get all possible phone variations for searching existing data
+        const phoneVariations = getPhoneNumberVariations(parentPhone);
+        console.log("🔍 Searching with phone variations:", phoneVariations);
 
-        try {
-            // First try phone search (newer tests) - FIXED COLLECTION NAME
-            assessmentSnapshot = await db.collection("student_results").where("parentPhone", "==", parentPhone).get();
-            console.log("📊 Assessment results (phone search):", assessmentSnapshot.size);
-            
-            // If no results from phone search, try email search (older tests) - FIXED COLLECTION NAME
-            if (assessmentSnapshot.empty) {
-                console.log("🔍 No results from phone search, trying email search...");
-                assessmentSnapshot = await db.collection("student_results").where("parentEmail", "==", parentEmail).get();
-                console.log("📊 Assessment results (email search):", assessmentSnapshot.size);
+        // --- UPDATED: SEARCH WITH MULTIPLE PHONE FORMATS FOR EXISTING DATA ---
+        let studentResults = [];
+        let monthlyReports = [];
+
+        // Search assessment reports with all phone variations
+        for (const phoneVar of phoneVariations) {
+            try {
+                const assessmentSnapshot = await db.collection("student_results").where("parentPhone", "==", phoneVar).get();
+                console.log(`📊 Assessment results for phone ${phoneVar}:`, assessmentSnapshot.size);
+                
+                assessmentSnapshot.forEach(doc => {
+                    const data = doc.data();
+                    // Avoid duplicates
+                    if (!studentResults.find(r => r.id === doc.id)) {
+                        studentResults.push({ 
+                            id: doc.id,
+                            ...data,
+                            timestamp: data.submittedAt?.seconds || Date.now() / 1000,
+                            type: 'assessment'
+                        });
+                    }
+                });
+            } catch (error) {
+                console.error(`Error searching assessments for phone ${phoneVar}:`, error);
             }
-        } catch (error) {
-            console.error("Error searching assessments:", error);
-            assessmentSnapshot = { empty: true, forEach: () => {} };
         }
 
-        // FIX: Declare studentResults array
-        let studentResults = [];
-        assessmentSnapshot.forEach(doc => {
-            const data = doc.data();
-            studentResults.push({ 
-                id: doc.id,
-                ...data,
-                timestamp: data.submittedAt?.seconds || Date.now() / 1000,
-                type: 'assessment'
-            });
-        });
+        // If no results from phone search, try email search (older tests)
+        if (studentResults.length === 0) {
+            console.log("🔍 No results from phone search, trying email search...");
+            try {
+                const assessmentSnapshot = await db.collection("student_results").where("parentEmail", "==", parentEmail).get();
+                console.log("📊 Assessment results (email search):", assessmentSnapshot.size);
+                
+                assessmentSnapshot.forEach(doc => {
+                    const data = doc.data();
+                    studentResults.push({ 
+                        id: doc.id,
+                        ...data,
+                        timestamp: data.submittedAt?.seconds || Date.now() / 1000,
+                        type: 'assessment'
+                    });
+                });
+            } catch (error) {
+                console.error("Error searching assessments by email:", error);
+            }
+        }
 
-        // Monthly reports: search by phone only
-        const monthlySnapshot = await db.collection("tutor_submissions").where("parentPhone", "==", parentPhone).get();
-        const monthlyReports = [];
-        monthlySnapshot.forEach(doc => {
-            const data = doc.data();
-            monthlyReports.push({ 
-                id: doc.id,
-                ...data,
-                timestamp: data.submittedAt?.seconds || Date.now() / 1000,
-                type: 'monthly'
-            });
-        });
+        // Search monthly reports with all phone variations
+        for (const phoneVar of phoneVariations) {
+            try {
+                const monthlySnapshot = await db.collection("tutor_submissions").where("parentPhone", "==", phoneVar).get();
+                console.log(`📊 Monthly reports for phone ${phoneVar}:`, monthlySnapshot.size);
+                
+                monthlySnapshot.forEach(doc => {
+                    const data = doc.data();
+                    // Avoid duplicates
+                    if (!monthlyReports.find(r => r.id === doc.id)) {
+                        monthlyReports.push({ 
+                            id: doc.id,
+                            ...data,
+                            timestamp: data.submittedAt?.seconds || Date.now() / 1000,
+                            type: 'monthly'
+                        });
+                    }
+                });
+            } catch (error) {
+                console.error(`Error searching monthly reports for phone ${phoneVar}:`, error);
+            }
+        }
 
-        console.log("📊 Assessment results (unique):", studentResults.length);
-        console.log("📊 Monthly reports:", monthlySnapshot.size);
+        console.log("📊 Total assessment results:", studentResults.length);
+        console.log("📊 Total monthly reports:", monthlyReports.length);
 
         if (studentResults.length === 0 && monthlyReports.length === 0) {
             showMessage(`No reports found for your account. Please contact Blooming Kids House if you believe this is an error.`, 'info');
