@@ -16,110 +16,170 @@ const libphonenumberScript = document.createElement('script');
 libphonenumberScript.src = 'https://cdn.jsdelivr.net/npm/libphonenumber-js@1.10.14/bundle/libphonenumber-js.min.js';
 document.head.appendChild(libphonenumberScript);
 
-// GLOBAL phone number normalization function for ALL countries
-function normalizePhoneNumber(phone) {
+// ENHANCED MULTI-NORMALIZATION FUNCTION FOR ALL COUNTRIES
+function multiNormalizePhoneNumber(phone) {
     if (!phone || typeof phone !== 'string') {
         return { normalized: null, country: null, valid: false, error: 'Invalid input' };
     }
 
+    console.log("🔧 Starting multi-normalization for:", phone);
+    
+    const normalizationAttempts = [];
+    
     try {
-        // First, clean the phone number - remove all non-digit characters except +
+        // Clean the phone number - remove all non-digit characters except +
         let cleaned = phone.replace(/[^\d+]/g, '');
         
-        // If the number doesn't start with +, try to determine country code
-        if (!cleaned.startsWith('+')) {
-            // Common country code patterns
-            const countryPatterns = [
-                { code: '1', pattern: /^1\d{10}$/ }, // US/Canada: 1 + 10 digits
-                { code: '44', pattern: /^44\d{10}$/ }, // UK: 44 + 10 digits
-                { code: '234', pattern: /^234\d{10}$/ }, // Nigeria: 234 + 10 digits
-                { code: '33', pattern: /^33\d{9}$/ }, // France: 33 + 9 digits
-                { code: '49', pattern: /^49\d{10,11}$/ }, // Germany: 49 + 10-11 digits
-                { code: '91', pattern: /^91\d{10}$/ }, // India: 91 + 10 digits
-                { code: '86', pattern: /^86\d{11}$/ }, // China: 86 + 11 digits
-                { code: '81', pattern: /^81\d{9,10}$/ }, // Japan: 81 + 9-10 digits
-                { code: '7', pattern: /^7\d{10}$/ }, // Russia: 7 + 10 digits
-                { code: '61', pattern: /^61\d{9}$/ }, // Australia: 61 + 9 digits
-                { code: '55', pattern: /^55\d{10,11}$/ }, // Brazil: 55 + 10-11 digits
-                { code: '27', pattern: /^27\d{9}$/ }, // South Africa: 27 + 9 digits
-                { code: '34', pattern: /^34\d{9}$/ }, // Spain: 34 + 9 digits
-                { code: '39', pattern: /^39\d{9,10}$/ }, // Italy: 39 + 9-10 digits
-                { code: '82', pattern: /^82\d{9,10}$/ } // South Korea: 82 + 9-10 digits
+        // ATTEMPT 1: Standard normalization (current logic)
+        let attempt1 = null;
+        try {
+            const parsed1 = libphonenumber.parsePhoneNumberFromString(cleaned);
+            if (parsed1 && parsed1.isValid()) {
+                attempt1 = {
+                    normalized: parsed1.format('E.164'),
+                    country: parsed1.country,
+                    valid: true,
+                    attempt: 'standard'
+                };
+                normalizationAttempts.push(attempt1);
+                console.log("🔧 Attempt 1 (Standard):", attempt1.normalized);
+            }
+        } catch (e) {
+            console.log("🔧 Attempt 1 failed:", e.message);
+        }
+
+        // ATTEMPT 2: Country code correction for common patterns
+        let attempt2 = null;
+        try {
+            // US/Canada patterns
+            if (cleaned.match(/^(1)?(469|214|972|713|281|832|210|817)/) && !cleaned.startsWith('+')) {
+                const usNumber = '+1' + cleaned.replace(/^1/, '');
+                const parsed2 = libphonenumber.parsePhoneNumberFromString(usNumber);
+                if (parsed2 && parsed2.isValid()) {
+                    attempt2 = {
+                        normalized: parsed2.format('E.164'),
+                        country: parsed2.country,
+                        valid: true,
+                        attempt: 'us_correction'
+                    };
+                    normalizationAttempts.push(attempt2);
+                    console.log("🔧 Attempt 2 (US Correction):", attempt2.normalized);
+                }
+            }
+            
+            // UK patterns
+            if (cleaned.match(/^(44)?(20|7|1|2|3|8|9)/) && !cleaned.startsWith('+')) {
+                const ukNumber = '+44' + cleaned.replace(/^44/, '');
+                const parsed2 = libphonenumber.parsePhoneNumberFromString(ukNumber);
+                if (parsed2 && parsed2.isValid()) {
+                    attempt2 = {
+                        normalized: parsed2.format('E.164'),
+                        country: parsed2.country,
+                        valid: true,
+                        attempt: 'uk_correction'
+                    };
+                    normalizationAttempts.push(attempt2);
+                    console.log("🔧 Attempt 2 (UK Correction):", attempt2.normalized);
+                }
+            }
+            
+            // Nigeria patterns
+            if (cleaned.match(/^(234)?(80|70|81|90|91)/) && !cleaned.startsWith('+')) {
+                const ngNumber = '+234' + cleaned.replace(/^234/, '');
+                const parsed2 = libphonenumber.parsePhoneNumberFromString(ngNumber);
+                if (parsed2 && parsed2.isValid()) {
+                    attempt2 = {
+                        normalized: parsed2.format('E.164'),
+                        country: parsed2.country,
+                        valid: true,
+                        attempt: 'nigeria_correction'
+                    };
+                    normalizationAttempts.push(attempt2);
+                    console.log("🔧 Attempt 2 (Nigeria Correction):", attempt2.normalized);
+                }
+            }
+        } catch (e) {
+            console.log("🔧 Attempt 2 failed:", e.message);
+        }
+
+        // ATTEMPT 3: Area code only (for numbers that lost country code)
+        let attempt3 = null;
+        try {
+            // Common area codes that might be missing country codes
+            const areaCodePatterns = [
+                { code: '1', patterns: [/^(469|214|972|713|281|832|210|817)/] }, // US
+                { code: '44', patterns: [/^(20|7|1|2|3|8|9)/] }, // UK
+                { code: '234', patterns: [/^(80|70|81|90|91)/] }, // Nigeria
+                { code: '33', patterns: [/^(1|2|3|4|5)/] }, // France
+                { code: '49', patterns: [/^(15|16|17|17)/] }, // Germany
+                { code: '91', patterns: [/^(98|99|90|80)/] }, // India
             ];
             
-            // Check if it matches any known country code pattern
-            for (const country of countryPatterns) {
-                if (country.pattern.test(cleaned)) {
-                    cleaned = '+' + cleaned;
-                    break;
-                }
-            }
-            
-            // If still no + and it's a reasonable length, try parsing as international
-            if (!cleaned.startsWith('+') && cleaned.length >= 8 && cleaned.length <= 15) {
-                // Try to parse with common country contexts
-                const commonCountries = ['US', 'NG', 'GB', 'CA', 'FR', 'DE', 'IN', 'CN', 'JP', 'RU', 'AU', 'BR', 'ZA', 'ES', 'IT', 'KR'];
-                
-                for (const countryCode of commonCountries) {
-                    const parsed = libphonenumber.parsePhoneNumberFromString('+' + cleaned, countryCode);
-                    if (parsed && parsed.isValid()) {
-                        cleaned = '+' + cleaned;
-                        break;
+            for (const country of areaCodePatterns) {
+                for (const pattern of country.patterns) {
+                    if (pattern.test(cleaned) && !cleaned.startsWith('+')) {
+                        const correctedNumber = '+' + country.code + cleaned;
+                        const parsed3 = libphonenumber.parsePhoneNumberFromString(correctedNumber);
+                        if (parsed3 && parsed3.isValid()) {
+                            attempt3 = {
+                                normalized: parsed3.format('E.164'),
+                                country: parsed3.country,
+                                valid: true,
+                                attempt: 'area_code_correction'
+                            };
+                            normalizationAttempts.push(attempt3);
+                            console.log("🔧 Attempt 3 (Area Code Correction):", attempt3.normalized);
+                            break;
+                        }
                     }
                 }
+                if (attempt3) break;
             }
+        } catch (e) {
+            console.log("🔧 Attempt 3 failed:", e.message);
         }
 
-        // Now try parsing the cleaned number with multiple approaches
-        let parsedNumber = null;
-        
-        // First try: parse as international number
-        parsedNumber = libphonenumber.parsePhoneNumberFromString(cleaned);
-        
-        if (!parsedNumber || !parsedNumber.isValid()) {
-            // Second try: parse with common country contexts
-            const commonCountries = ['US', 'NG', 'GB', 'CA', 'FR', 'DE', 'IN', 'CN', 'JP', 'RU', 'AU', 'BR', 'ZA', 'ES', 'IT', 'KR'];
-            
-            for (const countryCode of commonCountries) {
-                parsedNumber = libphonenumber.parsePhoneNumberFromString(cleaned, countryCode);
-                if (parsedNumber && parsedNumber.isValid()) {
-                    break;
-                }
-            }
-        }
-
-        // Final fallback: if still not valid, try with just the digits
-        if (!parsedNumber || !parsedNumber.isValid()) {
+        // ATTEMPT 4: Digits only (fallback)
+        let attempt4 = null;
+        try {
             const digitsOnly = cleaned.replace(/\D/g, '');
             if (digitsOnly.length >= 8 && digitsOnly.length <= 15) {
-                parsedNumber = libphonenumber.parsePhoneNumberFromString('+' + digitsOnly);
+                attempt4 = {
+                    normalized: digitsOnly,
+                    country: null,
+                    valid: true,
+                    attempt: 'digits_only'
+                };
+                normalizationAttempts.push(attempt4);
+                console.log("🔧 Attempt 4 (Digits Only):", attempt4.normalized);
             }
+        } catch (e) {
+            console.log("🔧 Attempt 4 failed:", e.message);
         }
 
-        if (!parsedNumber || !parsedNumber.isValid()) {
-            return { 
-                normalized: null, 
-                country: null, 
-                valid: false, 
-                error: 'Invalid phone number format for any country' 
-            };
+        // Return all valid normalization attempts
+        if (normalizationAttempts.length > 0) {
+            console.log("🎯 Multi-normalization results:", normalizationAttempts.map(a => a.normalized));
+            return normalizationAttempts;
         }
-        
-        // Return the properly parsed number
-        return {
-            normalized: parsedNumber.format('E.164'),
-            country: parsedNumber.country,
-            valid: true,
-            format: parsedNumber.formatInternational()
-        };
-        
-    } catch (error) {
-        return { 
+
+        return [{ 
             normalized: null, 
             country: null, 
             valid: false, 
-            error: error.message 
-        };
+            error: 'No valid normalization found',
+            attempt: 'failed'
+        }];
+        
+    } catch (error) {
+        console.error("❌ Multi-normalization error:", error);
+        return [{ 
+            normalized: null, 
+            country: null, 
+            valid: false, 
+            error: error.message,
+            attempt: 'error'
+        }];
     }
 }
 
@@ -394,80 +454,67 @@ async function findParentNameFromStudents(parentPhone) {
     try {
         console.log("Searching for parent name with phone:", parentPhone);
         
-        // PRIMARY SEARCH: students collection (same as tutor.js)
-        const studentsSnapshot = await db.collection("students")
-            .where("normalizedParentPhone", "==", parentPhone)
-            .limit(1)
-            .get();
+        // Use multi-normalization to get all possible phone versions
+        const normalizedVersions = multiNormalizePhoneNumber(parentPhone);
+        const validVersions = normalizedVersions.filter(v => v.valid && v.normalized);
+        
+        // Search with each normalized version
+        for (const version of validVersions) {
+            console.log(`🔍 Searching parent name with: ${version.normalized} (${version.attempt})`);
+            
+            // PRIMARY SEARCH: students collection
+            const studentsSnapshot = await db.collection("students")
+                .where("normalizedParentPhone", "==", version.normalized)
+                .limit(1)
+                .get();
 
-        if (!studentsSnapshot.empty) {
-            const studentDoc = studentsSnapshot.docs[0];
-            const studentData = studentDoc.data();
-            
-            // Use parentName field (same as tutor.js)
-            const parentName = studentData.parentName;
-            
-            if (parentName) {
-                console.log("Found parent name in students collection:", parentName);
-                return parentName;
+            if (!studentsSnapshot.empty) {
+                const studentDoc = studentsSnapshot.docs[0];
+                const studentData = studentDoc.data();
+                const parentName = studentData.parentName;
+                
+                if (parentName) {
+                    console.log("Found parent name in students collection:", parentName);
+                    return parentName;
+                }
+            }
+
+            // SECONDARY SEARCH: pending_students collection
+            const pendingStudentsSnapshot = await db.collection("pending_students")
+                .where("normalizedParentPhone", "==", version.normalized)
+                .limit(1)
+                .get();
+
+            if (!pendingStudentsSnapshot.empty) {
+                const pendingStudentDoc = pendingStudentsSnapshot.docs[0];
+                const pendingStudentData = pendingStudentDoc.data();
+                const parentName = pendingStudentData.parentName;
+                
+                if (parentName) {
+                    console.log("Found parent name in pending_students collection:", parentName);
+                    return parentName;
+                }
+            }
+
+            // FALLBACK SEARCH: original phone fields
+            const fallbackStudentsSnapshot = await db.collection("students")
+                .where("parentPhone", "==", version.normalized)
+                .limit(1)
+                .get();
+
+            if (!fallbackStudentsSnapshot.empty) {
+                const studentDoc = fallbackStudentsSnapshot.docs[0];
+                const studentData = studentDoc.data();
+                const parentName = studentData.parentName;
+                
+                if (parentName) {
+                    console.log("Found parent name in students collection (fallback):", parentName);
+                    return parentName;
+                }
             }
         }
 
-        // SECONDARY SEARCH: pending_students collection (same as tutor.js)
-        const pendingStudentsSnapshot = await db.collection("pending_students")
-            .where("normalizedParentPhone", "==", parentPhone)
-            .limit(1)
-            .get();
-
-        if (!pendingStudentsSnapshot.empty) {
-            const pendingStudentDoc = pendingStudentsSnapshot.docs[0];
-            const pendingStudentData = pendingStudentDoc.data();
-            
-            // Use parentName field (same as tutor.js)
-            const parentName = pendingStudentData.parentName;
-            
-            if (parentName) {
-                console.log("Found parent name in pending_students collection:", parentName);
-                return parentName;
-            }
-        }
-
-        // FALLBACK SEARCH: tutor_submissions (for historical data)
-        const submissionsSnapshot = await db.collection("tutor_submissions")
-            .where("normalizedParentPhone", "==", parentPhone)
-            .limit(1)
-            .get();
-
-        if (!submissionsSnapshot.empty) {
-            const submissionDoc = submissionsSnapshot.docs[0];
-            const submissionData = submissionDoc.data();
-            
-            const parentName = submissionData.parentName;
-            
-            if (parentName) {
-                console.log("Found parent name in tutor_submissions:", parentName);
-                return parentName;
-            }
-        }
-
-        // FINAL FALLBACK: Search by original phone fields (backward compatibility)
-        const fallbackStudentsSnapshot = await db.collection("students")
-            .where("parentPhone", "==", parentPhone)
-            .limit(1)
-            .get();
-
-        if (!fallbackStudentsSnapshot.empty) {
-            const studentDoc = fallbackStudentsSnapshot.docs[0];
-            const studentData = studentDoc.data();
-            const parentName = studentData.parentName;
-            
-            if (parentName) {
-                console.log("Found parent name in students collection (fallback):", parentName);
-                return parentName;
-            }
-        }
-
-        console.log("No parent name found in any collection");
+        console.log("No parent name found in any collection with any normalization");
         return null;
     } catch (error) {
         console.error("Error finding parent name:", error);
@@ -498,14 +545,17 @@ async function handleSignUp() {
         return;
     }
 
-    // Phone number validation and normalization
-    const phoneValidation = normalizePhoneNumber(phone);
-    if (!phoneValidation.valid) {
+    // Use multi-normalization for phone validation
+    const phoneValidations = multiNormalizePhoneNumber(phone);
+    const validVersions = phoneValidations.filter(v => v.valid && v.normalized);
+    
+    if (validVersions.length === 0) {
         showMessage(`Invalid phone number format. Please try with country code (like +1234567890) or local format`, 'error');
         return;
     }
 
-    const normalizedPhone = phoneValidation.normalized;
+    // Use the first valid normalized version
+    const normalizedPhone = validVersions[0].normalized;
 
     const signUpBtn = document.getElementById('signUpBtn');
     const authLoader = document.getElementById('authLoader');
@@ -605,21 +655,35 @@ async function handleSignIn() {
                 normalizedPhone = userData.normalizedPhone;
             }
         } else {
-            // Sign in with phone - normalize and find the user
-            const phoneValidation = normalizePhoneNumber(identifier);
-            if (!phoneValidation.valid) {
+            // Sign in with phone - use multi-normalization
+            const phoneValidations = multiNormalizePhoneNumber(identifier);
+            const validVersions = phoneValidations.filter(v => v.valid && v.normalized);
+            
+            if (validVersions.length === 0) {
                 throw new Error(`Invalid phone number format. Please try with country code (like +1234567890) or local format`);
             }
             
-            normalizedPhone = phoneValidation.normalized;
+            normalizedPhone = validVersions[0].normalized;
             
-            // Find user by normalized phone
-            const userQuery = await db.collection('parent_users')
-                .where('normalizedPhone', '==', normalizedPhone)
-                .limit(1)
-                .get();
+            // Find user by any normalized phone version
+            let userFound = false;
+            for (const version of validVersions) {
+                const userQuery = await db.collection('parent_users')
+                    .where('normalizedPhone', '==', version.normalized)
+                    .limit(1)
+                    .get();
 
-            if (userQuery.empty) {
+                if (!userQuery.empty) {
+                    const userData = userQuery.docs[0].data();
+                    userCredential = await auth.signInWithEmailAndPassword(userData.email, password);
+                    userPhone = userData.phone;
+                    userId = userCredential.user.uid;
+                    userFound = true;
+                    break;
+                }
+            }
+
+            if (!userFound) {
                 // Fallback: search by original phone field
                 const fallbackQuery = await db.collection('parent_users')
                     .where('phone', '==', identifier)
@@ -634,19 +698,15 @@ async function handleSignIn() {
                 userCredential = await auth.signInWithEmailAndPassword(userData.email, password);
                 userPhone = identifier;
                 userId = userCredential.user.uid;
-            } else {
-                const userData = userQuery.docs[0].data();
-                userCredential = await auth.signInWithEmailAndPassword(userData.email, password);
-                userPhone = userData.phone;
-                userId = userCredential.user.uid;
             }
         }
 
         if (!normalizedPhone && userPhone) {
             // Normalize the phone if we have it
-            const phoneValidation = normalizePhoneNumber(userPhone);
-            if (phoneValidation.valid) {
-                normalizedPhone = phoneValidation.normalized;
+            const phoneValidations = multiNormalizePhoneNumber(userPhone);
+            const validVersions = phoneValidations.filter(v => v.valid && v.normalized);
+            if (validVersions.length > 0) {
+                normalizedPhone = validVersions[0].normalized;
             }
         }
 
@@ -1062,73 +1122,168 @@ async function performMultiLayerSearch(parentPhone, parentEmail, userId) {
     let monthlyResults = [];
     
     try {
+        // Get multiple normalized versions of the phone number
+        const normalizedVersions = multiNormalizePhoneNumber(parentPhone);
+        const validVersions = normalizedVersions.filter(v => v.valid && v.normalized);
+        
+        console.log(`🎯 Searching with ${validVersions.length} normalized versions:`, validVersions.map(v => v.normalized));
+
         // --- ASSESSMENT REPORTS SEARCH ---
-        console.log("📊 ASSESSMENT SEARCH - Layer 1: Normalized phone");
-        let assessmentSnapshot = await db.collection("student_results")
-            .where("normalizedParentPhone", "==", parentPhone)
-            .get();
-        console.log("📊 Assessment results (normalized phone):", assessmentSnapshot.size);
-        
-        if (assessmentSnapshot.empty) {
-            console.log("📊 ASSESSMENT SEARCH - Layer 2: Original phone field");
-            assessmentSnapshot = await db.collection("student_results")
-                .where("parentPhone", "==", parentPhone)
+        for (const version of validVersions) {
+            console.log(`📊 ASSESSMENT SEARCH - Attempt with: ${version.normalized} (${version.attempt})`);
+            
+            // Layer 1: Normalized phone search
+            let assessmentSnapshot = await db.collection("student_results")
+                .where("normalizedParentPhone", "==", version.normalized)
                 .get();
-            console.log("📊 Assessment results (original phone):", assessmentSnapshot.size);
+            
+            if (!assessmentSnapshot.empty) {
+                console.log(`✅ Assessment FOUND with version: ${version.normalized}`);
+                assessmentSnapshot.forEach(doc => {
+                    const data = doc.data();
+                    // Check if we already have this result to avoid duplicates
+                    if (!assessmentResults.some(r => r.id === doc.id)) {
+                        assessmentResults.push({ 
+                            id: doc.id,
+                            ...data,
+                            timestamp: data.submittedAt?.seconds || Date.now() / 1000,
+                            type: 'assessment',
+                            foundWith: version.normalized
+                        });
+                    }
+                });
+                break; // Stop searching if we found results
+            }
         }
-        
-        if (assessmentSnapshot.empty) {
+
+        // If no results from normalized search, try original fields
+        if (assessmentResults.length === 0) {
+            console.log("📊 ASSESSMENT SEARCH - Layer 2: Original phone fields");
+            for (const version of validVersions) {
+                let assessmentSnapshot = await db.collection("student_results")
+                    .where("parentPhone", "==", version.normalized)
+                    .get();
+                
+                if (!assessmentSnapshot.empty) {
+                    console.log(`✅ Assessment FOUND in original fields with: ${version.normalized}`);
+                    assessmentSnapshot.forEach(doc => {
+                        const data = doc.data();
+                        if (!assessmentResults.some(r => r.id === doc.id)) {
+                            assessmentResults.push({ 
+                                id: doc.id,
+                                ...data,
+                                timestamp: data.submittedAt?.seconds || Date.now() / 1000,
+                                type: 'assessment',
+                                foundWith: version.normalized
+                            });
+                        }
+                    });
+                    break;
+                }
+            }
+        }
+
+        // If still no results, try email search
+        if (assessmentResults.length === 0 && parentEmail) {
             console.log("📊 ASSESSMENT SEARCH - Layer 3: Email search");
-            assessmentSnapshot = await db.collection("student_results")
+            let assessmentSnapshot = await db.collection("student_results")
                 .where("parentEmail", "==", parentEmail)
                 .get();
-            console.log("📊 Assessment results (email):", assessmentSnapshot.size);
+            
+            if (!assessmentSnapshot.empty) {
+                console.log("✅ Assessment FOUND with email");
+                assessmentSnapshot.forEach(doc => {
+                    const data = doc.data();
+                    if (!assessmentResults.some(r => r.id === doc.id)) {
+                        assessmentResults.push({ 
+                            id: doc.id,
+                            ...data,
+                            timestamp: data.submittedAt?.seconds || Date.now() / 1000,
+                            type: 'assessment',
+                            foundWith: 'email'
+                        });
+                    }
+                });
+            }
         }
-        
-        // Process assessment results
-        assessmentSnapshot.forEach(doc => {
-            const data = doc.data();
-            assessmentResults.push({ 
-                id: doc.id,
-                ...data,
-                timestamp: data.submittedAt?.seconds || Date.now() / 1000,
-                type: 'assessment'
-            });
-        });
 
         // --- MONTHLY REPORTS SEARCH ---
-        console.log("📈 MONTHLY REPORTS SEARCH - Layer 1: Normalized phone");
-        let monthlySnapshot = await db.collection("tutor_submissions")
-            .where("normalizedParentPhone", "==", parentPhone)
-            .get();
-        console.log("📈 Monthly reports (normalized phone):", monthlySnapshot.size);
-        
-        if (monthlySnapshot.empty) {
-            console.log("📈 MONTHLY REPORTS SEARCH - Layer 2: Original phone field");
-            monthlySnapshot = await db.collection("tutor_submissions")
-                .where("parentPhone", "==", parentPhone)
+        for (const version of validVersions) {
+            console.log(`📈 MONTHLY REPORTS SEARCH - Attempt with: ${version.normalized} (${version.attempt})`);
+            
+            // Layer 1: Normalized phone search
+            let monthlySnapshot = await db.collection("tutor_submissions")
+                .where("normalizedParentPhone", "==", version.normalized)
                 .get();
-            console.log("📈 Monthly reports (original phone):", monthlySnapshot.size);
+            
+            if (!monthlySnapshot.empty) {
+                console.log(`✅ Monthly reports FOUND with version: ${version.normalized}`);
+                monthlySnapshot.forEach(doc => {
+                    const data = doc.data();
+                    if (!monthlyResults.some(r => r.id === doc.id)) {
+                        monthlyResults.push({ 
+                            id: doc.id,
+                            ...data,
+                            timestamp: data.submittedAt?.seconds || Date.now() / 1000,
+                            type: 'monthly',
+                            foundWith: version.normalized
+                        });
+                    }
+                });
+                break;
+            }
         }
-        
-        if (monthlySnapshot.empty && parentEmail) {
+
+        // If no results from normalized search, try original fields
+        if (monthlyResults.length === 0) {
+            console.log("📈 MONTHLY REPORTS SEARCH - Layer 2: Original phone fields");
+            for (const version of validVersions) {
+                let monthlySnapshot = await db.collection("tutor_submissions")
+                    .where("parentPhone", "==", version.normalized)
+                    .get();
+                
+                if (!monthlySnapshot.empty) {
+                    console.log(`✅ Monthly reports FOUND in original fields with: ${version.normalized}`);
+                    monthlySnapshot.forEach(doc => {
+                        const data = doc.data();
+                        if (!monthlyResults.some(r => r.id === doc.id)) {
+                            monthlyResults.push({ 
+                                id: doc.id,
+                                ...data,
+                                timestamp: data.submittedAt?.seconds || Date.now() / 1000,
+                                type: 'monthly',
+                                foundWith: version.normalized
+                            });
+                        }
+                    });
+                    break;
+                }
+            }
+        }
+
+        // If still no results, try email search
+        if (monthlyResults.length === 0 && parentEmail) {
             console.log("📈 MONTHLY REPORTS SEARCH - Layer 3: Email search");
-            monthlySnapshot = await db.collection("tutor_submissions")
+            let monthlySnapshot = await db.collection("tutor_submissions")
                 .where("parentEmail", "==", parentEmail)
                 .get();
-            console.log("📈 Monthly reports (email):", monthlySnapshot.size);
+            
+            if (!monthlySnapshot.empty) {
+                console.log("✅ Monthly reports FOUND with email");
+                monthlySnapshot.forEach(doc => {
+                    const data = doc.data();
+                    if (!monthlyResults.some(r => r.id === doc.id)) {
+                        monthlyResults.push({ 
+                            id: doc.id,
+                            ...data,
+                            timestamp: data.submittedAt?.seconds || Date.now() / 1000,
+                            type: 'monthly',
+                            foundWith: 'email'
+                        });
+                    }
+                });
+            }
         }
-        
-        // Process monthly results
-        monthlySnapshot.forEach(doc => {
-            const data = doc.data();
-            monthlyResults.push({ 
-                id: doc.id,
-                ...data,
-                timestamp: data.submittedAt?.seconds || Date.now() / 1000,
-                type: 'monthly'
-            });
-        });
 
         console.log("🎯 SEARCH SUMMARY - Assessments:", assessmentResults.length, "Monthly:", monthlyResults.length);
         
