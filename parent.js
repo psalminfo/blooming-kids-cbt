@@ -11,7 +11,62 @@ firebase.initializeApp({
 const db = firebase.firestore();
 const auth = firebase.auth();
 
-// Simple phone cleaning - just trim, no normalization
+// Load libphonenumber-js for phone number validation
+const libphonenumberScript = document.createElement('script');
+libphonenumberScript.src = 'https://cdn.jsdelivr.net/npm/libphonenumber-js@1.10.14/bundle/libphonenumber-js.min.js';
+document.head.appendChild(libphonenumberScript);
+
+// Phone number normalization function using libphonenumber-js
+function normalizePhoneNumber(phone) {
+    if (!phone || typeof phone !== 'string') {
+        return { normalized: null, country: null, valid: false, error: 'Invalid input' };
+    }
+
+    try {
+        // Parse the phone number with Nigeria as default context
+        const parsedNumber = libphonenumber.parsePhoneNumberFromString(phone, 'NG');
+        
+        if (!parsedNumber || !parsedNumber.isValid()) {
+            // Try parsing without default country for international numbers
+            const parsedNumberInternational = libphonenumber.parsePhoneNumberFromString(phone);
+            
+            if (!parsedNumberInternational || !parsedNumberInternational.isValid()) {
+                return { 
+                    normalized: null, 
+                    country: null, 
+                    valid: false, 
+                    error: 'Invalid phone number format' 
+                };
+            }
+            
+            // Use the internationally parsed number
+            return {
+                normalized: parsedNumberInternational.format('E.164'),
+                country: parsedNumberInternational.country,
+                valid: true,
+                format: parsedNumberInternational.formatInternational()
+            };
+        }
+        
+        // Return the properly parsed number
+        return {
+            normalized: parsedNumber.format('E.164'),
+            country: parsedNumber.country,
+            valid: true,
+            format: parsedNumber.formatInternational()
+        };
+        
+    } catch (error) {
+        return { 
+            normalized: null, 
+            country: null, 
+            valid: false, 
+            error: error.message 
+        };
+    }
+}
+
+// Simple phone cleaning - fallback if library not loaded
 function cleanPhoneNumber(phone) {
     if (!phone) return '';
     return phone.trim();
@@ -284,7 +339,7 @@ async function findParentNameFromStudents(parentPhone) {
         
         // PRIMARY SEARCH: students collection (same as tutor.js)
         const studentsSnapshot = await db.collection("students")
-            .where("parentPhone", "==", parentPhone)
+            .where("normalizedParentPhone", "==", parentPhone)
             .limit(1)
             .get();
 
@@ -303,7 +358,7 @@ async function findParentNameFromStudents(parentPhone) {
 
         // SECONDARY SEARCH: pending_students collection (same as tutor.js)
         const pendingStudentsSnapshot = await db.collection("pending_students")
-            .where("parentPhone", "==", parentPhone)
+            .where("normalizedParentPhone", "==", parentPhone)
             .limit(1)
             .get();
 
@@ -322,7 +377,7 @@ async function findParentNameFromStudents(parentPhone) {
 
         // FALLBACK SEARCH: tutor_submissions (for historical data)
         const submissionsSnapshot = await db.collection("tutor_submissions")
-            .where("parentPhone", "==", parentPhone)
+            .where("normalizedParentPhone", "==", parentPhone)
             .limit(1)
             .get();
 
@@ -334,6 +389,23 @@ async function findParentNameFromStudents(parentPhone) {
             
             if (parentName) {
                 console.log("Found parent name in tutor_submissions:", parentName);
+                return parentName;
+            }
+        }
+
+        // FINAL FALLBACK: Search by original phone fields (backward compatibility)
+        const fallbackStudentsSnapshot = await db.collection("students")
+            .where("parentPhone", "==", parentPhone)
+            .limit(1)
+            .get();
+
+        if (!fallbackStudentsSnapshot.empty) {
+            const studentDoc = fallbackStudentsSnapshot.docs[0];
+            const studentData = studentDoc.data();
+            const parentName = studentData.parentName;
+            
+            if (parentName) {
+                console.log("Found parent name in students collection (fallback):", parentName);
                 return parentName;
             }
         }
@@ -369,11 +441,14 @@ async function handleSignUp() {
         return;
     }
 
-    const cleanedPhone = cleanPhoneNumber(phone);
-    if (!cleanedPhone) {
-        showMessage('Please enter a valid phone number', 'error');
+    // Phone number validation and normalization
+    const phoneValidation = normalizePhoneNumber(phone);
+    if (!phoneValidation.valid) {
+        showMessage(`Invalid phone number: ${phoneValidation.error}. Please use format like +1234567890 or 08012345678`, 'error');
         return;
     }
+
+    const normalizedPhone = phoneValidation.normalized;
 
     const signUpBtn = document.getElementById('signUpBtn');
     const authLoader = document.getElementById('authLoader');
@@ -388,7 +463,7 @@ async function handleSignUp() {
         const user = userCredential.user;
 
         // Find parent name from existing data (SAME SOURCE AS TUTOR.JS)
-        const parentName = await findParentNameFromStudents(cleanedPhone);
+        const parentName = await findParentNameFromStudents(normalizedPhone);
         
         // --- START: REFERRAL SYSTEM INTEGRATION (PHASE 1) ---
         const referralCode = await generateReferralCode();
@@ -396,7 +471,8 @@ async function handleSignUp() {
 
         // Store user data in Firestore for easy retrieval
         await db.collection('parent_users').doc(user.uid).set({
-            phone: cleanedPhone,
+            phone: phone, // Store original format
+            normalizedPhone: normalizedPhone, // Store normalized version
             email: email,
             parentName: parentName || 'Parent', // Use found name or default
             createdAt: firebase.firestore.FieldValue.serverTimestamp(),
@@ -409,7 +485,7 @@ async function handleSignUp() {
         showMessage('Account created successfully!', 'success');
         
         // Automatically load reports after signup
-        await loadAllReportsForParent(cleanedPhone, user.uid);
+        await loadAllReportsForParent(normalizedPhone, user.uid);
 
     } catch (error) {
         console.error('Sign up error:', error);
@@ -457,6 +533,7 @@ async function handleSignIn() {
         let userCredential;
         let userPhone;
         let userId;
+        let normalizedPhone;
         
         // Determine if identifier is email or phone
         if (identifier.includes('@')) {
@@ -468,34 +545,63 @@ async function handleSignIn() {
             if (userDoc.exists) {
                 const userData = userDoc.data();
                 userPhone = userData.phone;
+                normalizedPhone = userData.normalizedPhone;
             }
         } else {
-            // Sign in with phone - find the user's email first
-            const cleanedPhone = cleanPhoneNumber(identifier);
+            // Sign in with phone - normalize and find the user
+            const phoneValidation = normalizePhoneNumber(identifier);
+            if (!phoneValidation.valid) {
+                throw new Error(`Invalid phone number: ${phoneValidation.error}`);
+            }
+            
+            normalizedPhone = phoneValidation.normalized;
+            
+            // Find user by normalized phone
             const userQuery = await db.collection('parent_users')
-                .where('phone', '==', cleanedPhone)
+                .where('normalizedPhone', '==', normalizedPhone)
                 .limit(1)
                 .get();
 
             if (userQuery.empty) {
-                throw new Error('No account found with this phone number');
+                // Fallback: search by original phone field
+                const fallbackQuery = await db.collection('parent_users')
+                    .where('phone', '==', identifier)
+                    .limit(1)
+                    .get();
+                    
+                if (fallbackQuery.empty) {
+                    throw new Error('No account found with this phone number');
+                }
+                
+                const userData = fallbackQuery.docs[0].data();
+                userCredential = await auth.signInWithEmailAndPassword(userData.email, password);
+                userPhone = identifier;
+                userId = userCredential.user.uid;
+            } else {
+                const userData = userQuery.docs[0].data();
+                userCredential = await auth.signInWithEmailAndPassword(userData.email, password);
+                userPhone = userData.phone;
+                userId = userCredential.user.uid;
             }
-
-            const userData = userQuery.docs[0].data();
-            userCredential = await auth.signInWithEmailAndPassword(userData.email, password);
-            userPhone = cleanedPhone;
-            userId = userCredential.user.uid;
         }
 
-        if (!userPhone) {
-            throw new Error('Could not retrieve phone number for user');
+        if (!normalizedPhone && userPhone) {
+            // Normalize the phone if we have it
+            const phoneValidation = normalizePhoneNumber(userPhone);
+            if (phoneValidation.valid) {
+                normalizedPhone = phoneValidation.normalized;
+            }
+        }
+
+        if (!normalizedPhone) {
+            throw new Error('Could not retrieve valid phone number for user');
         }
         
         // Handle Remember Me
         handleRememberMe();
         
-        // Load all reports for the parent using the exact phone number as stored
-        await loadAllReportsForParent(userPhone, userId);
+        // Load all reports for the parent using the normalized phone number
+        await loadAllReportsForParent(normalizedPhone, userId);
 
     } catch (error) {
         console.error('Sign in error:', error);
@@ -891,7 +997,7 @@ function addViewResponsesButton() {
     }, 1000);
 }
 
-// MAIN REPORT LOADING FUNCTION - FIXED COLLECTION NAME AND VARIABLE DECLARATION
+// MAIN REPORT LOADING FUNCTION - UPDATED TO USE NORMALIZED PHONE FIELDS
 async function loadAllReportsForParent(parentPhone, userId) {
     const reportArea = document.getElementById("reportArea");
     const reportContent = document.getElementById("reportContent");
@@ -981,7 +1087,6 @@ async function loadAllReportsForParent(parentPhone, userId) {
         }
         // --- END: REFERRAL CODE CHECK/GENERATION FOR EXISTING USERS (FIX) ---
 
-
         // If not found in students collections, use name from user document
         if (!parentName && userId) {
             if (userDoc.exists) {
@@ -1014,18 +1119,24 @@ async function loadAllReportsForParent(parentPhone, userId) {
             }
         }
 
-        console.log("🔍 Searching reports with:", { parentPhone, parentEmail });
+        console.log("🔍 Searching reports with normalized phone:", parentPhone);
 
-        // --- FIXED: PRIORITY SEARCH WITH CORRECT COLLECTION NAME ---
-        // Try phone search first (newer tests), fall back to email search only if needed
+        // --- UPDATED: SEARCH USING NORMALIZED PHONE FIELDS ---
         let assessmentSnapshot;
 
         try {
-            // First try phone search (newer tests) - FIXED COLLECTION NAME
-            assessmentSnapshot = await db.collection("student_results").where("parentPhone", "==", parentPhone).get();
-            console.log("📊 Assessment results (phone search):", assessmentSnapshot.size);
+            // First try normalized phone search
+            assessmentSnapshot = await db.collection("student_results").where("normalizedParentPhone", "==", parentPhone).get();
+            console.log("📊 Assessment results (normalized phone search):", assessmentSnapshot.size);
             
-            // If no results from phone search, try email search (older tests) - FIXED COLLECTION NAME
+            // If no results from normalized search, try original phone search (backward compatibility)
+            if (assessmentSnapshot.empty) {
+                console.log("🔍 No results from normalized search, trying original phone search...");
+                assessmentSnapshot = await db.collection("student_results").where("parentPhone", "==", parentPhone).get();
+                console.log("📊 Assessment results (original phone search):", assessmentSnapshot.size);
+            }
+            
+            // If still no results, try email search (older tests)
             if (assessmentSnapshot.empty) {
                 console.log("🔍 No results from phone search, trying email search...");
                 assessmentSnapshot = await db.collection("student_results").where("parentEmail", "==", parentEmail).get();
@@ -1048,8 +1159,12 @@ async function loadAllReportsForParent(parentPhone, userId) {
             });
         });
 
-        // Monthly reports: search by phone only
-        const monthlySnapshot = await db.collection("tutor_submissions").where("parentPhone", "==", parentPhone).get();
+        // Monthly reports: search by normalized phone first, then fallback
+        let monthlySnapshot = await db.collection("tutor_submissions").where("normalizedParentPhone", "==", parentPhone).get();
+        if (monthlySnapshot.empty) {
+            monthlySnapshot = await db.collection("tutor_submissions").where("parentPhone", "==", parentPhone).get();
+        }
+        
         const monthlyReports = [];
         monthlySnapshot.forEach(doc => {
             const data = doc.data();
@@ -1491,7 +1606,6 @@ function switchMainTab(tab) {
     }
 }
 
-
 // Initialize the page
 document.addEventListener('DOMContentLoaded', function() {
     // Setup Remember Me
@@ -1506,7 +1620,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 .then((doc) => {
                     if (doc.exists) {
                         const userPhone = doc.data().phone;
-                        loadAllReportsForParent(userPhone, user.uid);
+                        const normalizedPhone = doc.data().normalizedPhone;
+                        loadAllReportsForParent(normalizedPhone || userPhone, user.uid);
                     }
                 })
                 .catch((error) => {
