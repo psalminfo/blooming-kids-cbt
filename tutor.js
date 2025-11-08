@@ -1,1568 +1,1547 @@
-// Firebase config for the 'bloomingkidsassessment' project
-firebase.initializeApp({
-    apiKey: "AIzaSyD1lJhsWMMs_qerLBSzk7wKhjLyI_11RJg",
-    authDomain: "bloomingkidsassessment.firebaseapp.com",
-    projectId: "bloomingkidsassessment",
-    storageBucket: "bloomingkidsassessment.appspot.com",
-    messagingSenderId: "238975054977",
-    appId: "1:238975054977:web:87c70b4db044998a204980"
+
+import { auth, db } from './firebaseConfig.js';
+import { collection, getDocs, doc, updateDoc, getDoc, where, query, addDoc, writeBatch, deleteDoc } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
+import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-auth.js";
+import { onSnapshot } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
+
+// --- Inject CSS for transitioning button ---
+const style = document.createElement('style');
+style.textContent = `
+    #add-transitioning-btn {
+        display: block !important;
+        background: orange !important;
+        color: white !important;
+        padding: 10px 20px !important;
+        border-radius: 5px !important;
+        border: none !important;
+        cursor: pointer !important;
+        margin: 5px !important;
+    }
+`;
+document.head.appendChild(style);
+
+// --- Global state to hold report submission status ---
+let isSubmissionEnabled = false;
+let isTutorAddEnabled = false;
+let isSummerBreakEnabled = false;
+let isBypassApprovalEnabled = false;
+// NEW: Global state for new admin settings
+let showStudentFees = false;
+let showEditDeleteButtons = false;
+
+// --- Pay Scheme Configuration ---
+const PAY_SCHEMES = {
+    NEW_TUTOR: {
+        academic: {
+            "Preschool-Grade 2": {2: 50000, 3: 60000, 5: 100000},
+            "Grade 3-8": {2: 60000, 3: 70000, 5: 110000},
+            "Subject Teachers": {1: 30000, 2: 60000, 3: 70000}
+        },
+        specialized: {
+            individual: {
+                "Music": 30000,
+                "Native Language": 20000,
+                "Foreign Language": 25000,
+                "Coding": 30000,
+                "ICT": 10000,
+                "Chess": 25000,
+                "Public Speaking": 25000,
+                "English Proficiency": 25000,
+                "Counseling Programs": 25000
+            },
+            group: {
+                "Music": 25000,
+                "Native Language": 20000,
+                "Foreign Language": 20000,
+                "Chess": 20000,
+                "Public Speaking": 20000,
+                "English Proficiency": 20000,
+                "Counseling Programs": 20000
+            }
+        }
+    },
+    OLD_TUTOR: {
+        academic: {
+            "Preschool-Grade 2": {2: 60000, 3: 70000, 5: 110000},
+            "Grade 3-8": {2: 70000, 3: 80000, 5: 120000},
+            "Subject Teachers": {1: 35000, 2: 70000, 3: 90000}
+        },
+        specialized: {
+            individual: {
+                "Music": 35000,
+                "Native Language": 25000,
+                "Foreign Language": 30000,
+                "Coding": 35000,
+                "ICT": 12000,
+                "Chess": 30000,
+                "Public Speaking": 30000,
+                "English Proficiency": 30000,
+                "Counseling Programs": 30000
+            },
+            group: {
+                "Music": 25000,
+                "Native Language": 20000,
+                "Foreign Language": 20000,
+                "Chess": 20000,
+                "Public Speaking": 20000,
+                "English Proficiency": 20000,
+                "Counseling Programs": 20000
+            }
+        }
+    },
+    MANAGEMENT: {
+        academic: {
+            "Preschool-Grade 2": {2: 70000, 3: 85000, 5: 120000},
+            "Grade 3-8": {2: 80000, 3: 90000, 5: 130000},
+            "Subject Teachers": {1: 40000, 2: 80000, 3: 100000}
+        },
+        specialized: {
+            individual: {
+                "Music": 40000,
+                "Native Language": 30000,
+                "Foreign Language": 35000,
+                "Coding": 40000,
+                "Chess": 35000,
+                "Public Speaking": 35000,
+                "English Proficiency": 35000,
+                "Counseling Programs": 35000
+            },
+            group: {
+                "Music": 25000,
+                "Native Language": 20000,
+                "Foreign Language": 20000,
+                "Chess": 20000,
+                "Public Speaking": 20000,
+                "English Proficiency": 20000,
+                "Counseling Programs": 20000
+            }
+        }
+    }
+};
+
+// --- Subject Categorization ---
+const SUBJECT_CATEGORIES = {
+    "Native Language": ["Yoruba", "Igbo", "Hausa"],
+    "Foreign Language": ["French", "German", "Spanish", "Arabic"],
+    "Specialized": ["Music", "Coding","ICT", "Chess", "Public Speaking", "English Proficiency", "Counseling Programs"]
+};
+
+// --- Local Storage Functions for Report Persistence ---
+const getLocalReportsKey = (tutorEmail) => `savedReports_${tutorEmail}`;
+
+function saveReportsToLocalStorage(tutorEmail, reports) {
+    try {
+        const key = getLocalReportsKey(tutorEmail);
+        localStorage.setItem(key, JSON.stringify(reports));
+    } catch (error) {
+        console.warn('Error saving to local storage:', error);
+    }
+}
+
+function loadReportsFromLocalStorage(tutorEmail) {
+    try {
+        const key = getLocalReportsKey(tutorEmail);
+        const saved = localStorage.getItem(key);
+        return saved ? JSON.parse(saved) : {};
+    } catch (error) {
+        console.warn('Error loading from local storage, using empty object:', error);
+        return {};
+    }
+}
+
+function clearAllReportsFromLocalStorage(tutorEmail) {
+    try {
+        const key = getLocalReportsKey(tutorEmail);
+        localStorage.removeItem(key);
+    } catch (error) {
+        console.warn('Error clearing local storage:', error);
+    }
+}
+
+// --- Employment Date Functions ---
+function shouldShowEmploymentPopup(tutor) {
+    // Don't show if already has employment date
+    if (tutor.employmentDate) return false;
+    
+    // Show on first login each month until they provide it
+    const lastPopupShown = localStorage.getItem(`employmentPopup_${tutor.email}`);
+    const currentMonth = new Date().toISOString().slice(0, 7); // YYYY-MM
+    
+    return !lastPopupShown || lastPopupShown !== currentMonth;
+}
+
+function showEmploymentDatePopup(tutor) {
+    const popupHTML = `
+        <div class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex items-center justify-center z-50">
+            <div class="relative bg-white p-8 rounded-lg shadow-xl w-full max-w-md mx-auto">
+                <h3 class="text-xl font-bold mb-4">Employment Information</h3>
+                <p class="text-sm text-gray-600 mb-4">Please provide your employment start date to help us calculate your payments accurately.</p>
+                <div class="space-y-4">
+                    <div>
+                        <label class="block font-semibold">Month & Year of Employment</label>
+                        <input type="month" id="employment-date" class="w-full mt-1 p-2 border rounded" 
+                               max="${new Date().toISOString().slice(0, 7)}">
+                    </div>
+                    <div class="flex justify-end space-x-2 mt-6">
+                        <button id="save-employment-btn" class="bg-green-600 text-white px-6 py-2 rounded">Save</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    const popup = document.createElement('div');
+    popup.innerHTML = popupHTML;
+    document.body.appendChild(popup);
+
+    document.getElementById('save-employment-btn').addEventListener('click', async () => {
+        const employmentDate = document.getElementById('employment-date').value;
+        if (!employmentDate) {
+            showCustomAlert('Please select your employment month and year.');
+            return;
+        }
+
+        try {
+            const tutorRef = doc(db, "tutors", tutor.id);
+            await updateDoc(tutorRef, { employmentDate: employmentDate });
+            localStorage.setItem(`employmentPopup_${tutor.email}`, new Date().toISOString().slice(0, 7));
+            popup.remove();
+            showCustomAlert('Employment date saved successfully!');
+            window.tutorData.employmentDate = employmentDate;
+        } catch (error) {
+            console.error("Error saving employment date:", error);
+            showCustomAlert('Error saving employment date. Please try again.');
+        }
+    });
+}
+
+function getTutorPayScheme(tutor) {
+    if (tutor.isManagementStaff) return PAY_SCHEMES.MANAGEMENT;
+    
+    if (!tutor.employmentDate) return PAY_SCHEMES.NEW_TUTOR;
+    
+    const employmentDate = new Date(tutor.employmentDate + '-01');
+    const currentDate = new Date();
+    const monthsDiff = (currentDate.getFullYear() - employmentDate.getFullYear()) * 12 + 
+                      (currentDate.getMonth() - employmentDate.getMonth());
+    
+    return monthsDiff >= 12 ? PAY_SCHEMES.OLD_TUTOR : PAY_SCHEMES.NEW_TUTOR;
+}
+
+function calculateSuggestedFee(student, payScheme) {
+    const grade = student.grade;
+    const days = parseInt(student.days) || 0;
+    const subjects = student.subjects || [];
+    
+    // Check for specialized subjects first
+    const specializedSubject = findSpecializedSubject(subjects);
+    if (specializedSubject) {
+        const isGroupClass = student.groupClass || false;
+        const feeType = isGroupClass ? 'group' : 'individual';
+        return payScheme.specialized[feeType][specializedSubject.category] || 0;
+    }
+    
+    // Handle academic subjects
+    let gradeCategory = "Grade 3-8"; // Default
+    
+    if (grade === "Preschool" || grade === "Kindergarten" || grade.includes("Grade 1") || grade.includes("Grade 2")) {
+        gradeCategory = "Preschool-Grade 2";
+    } else if (parseInt(grade.replace('Grade ', '')) >= 9) {
+        return 0; // Manual entry for Grade 9+
+    }
+    
+    // Check if it's subject teaching (Math, English, Science for higher grades)
+    const isSubjectTeacher = subjects.some(subj => ["Math", "English", "Science"].includes(subj)) && 
+                            parseInt(grade.replace('Grade ', '')) >= 5;
+    
+    if (isSubjectTeacher) {
+        return payScheme.academic["Subject Teachers"][days] || 0;
+    } else {
+        return payScheme.academic[gradeCategory][days] || 0;
+    }
+}
+
+function findSpecializedSubject(subjects) {
+    for (const [category, subjectList] of Object.entries(SUBJECT_CATEGORIES)) {
+        for (const subject of subjects) {
+            if (subjectList.includes(subject)) {
+                return { category, subject };
+            }
+        }
+    }
+    return null;
+}
+
+// Function to get current month for reports
+function getCurrentMonthYear() {
+    const now = new Date();
+    return now.toLocaleString('default', { month: 'long', year: 'numeric' });
+}
+
+// Listen for changes to the admin settings in real-time
+const settingsDocRef = doc(db, "settings", "global_settings");
+onSnapshot(settingsDocRef, (docSnap) => {
+    if (docSnap.exists()) {
+        const data = docSnap.data();
+        isSubmissionEnabled = data.isReportEnabled;
+        isTutorAddEnabled = data.isTutorAddEnabled;
+        isSummerBreakEnabled = data.isSummerBreakEnabled;
+        isBypassApprovalEnabled = data.bypassPendingApproval;
+        // NEW: Update the new global settings
+        showStudentFees = data.showStudentFees;
+        showEditDeleteButtons = data.showEditDeleteButtons;
+
+        // Re-render the student database if the page is currently active
+        const mainContent = document.getElementById('mainContent');
+        if (mainContent.querySelector('#student-list-view')) {
+            renderStudentDatabase(mainContent, window.tutorData);
+        }
+    }
 });
 
-const db = firebase.firestore();
-const auth = firebase.auth();
+// ##################################################################
+// # SECTION 1: TUTOR DASHBOARD - UPDATED TO USE student_results
+// ##################################################################
+function renderTutorDashboard(container, tutor) {
+    container.innerHTML = `
+        <div class="bg-white p-6 rounded-lg shadow-md mb-6">
+            <h2 class="text-2xl font-bold text-green-700 mb-4">Welcome, ${tutor.name}</h2>
+            <div class="mb-4">
+                <input type="text" id="searchName" class="w-full mt-1 p-2 border rounded" placeholder="Search by parent name...">
+                <button id="searchBtn" class="bg-green-600 text-white px-4 py-2 rounded mt-2 hover:bg-green-700">Search</button>
+            </div>
+        </div>
+        <div id="pendingReportsContainer" class="space-y-4">
+            <p class="text-gray-500">Loading pending submissions...</p>
+        </div>
+        <div id="gradedReportsContainer" class="space-y-4 hidden">
+            <p class="text-gray-500">Loading graded submissions...</p>
+        </div>
+    `;
 
-// Enhanced phone cleaning with international normalization
-function cleanPhoneNumber(phone) {
-    if (!phone) return '';
-    
-    // Remove all non-digit characters except leading +
-    let cleaned = phone.trim().replace(/[^\d+]/g, '');
-    
-    // If it starts with +234 (Nigeria international code)
-    if (cleaned.startsWith('+234')) {
-        // Convert +234 to 0
-        cleaned = '0' + cleaned.slice(4);
-    }
-    // If it starts with 234 without + (common mistake)
-    else if (cleaned.startsWith('234') && cleaned.length >= 10) {
-        cleaned = '0' + cleaned.slice(3);
-    }
-    
-    return cleaned;
+    document.getElementById('searchBtn').addEventListener('click', async () => {
+        const name = document.getElementById('searchName').value.trim();
+        await loadTutorReports(tutor.email, name || null);
+    });
+
+    loadTutorReports(tutor.email);
 }
 
-function capitalize(str) {
-    if (!str) return "";
-    return str.replace(/\b\w/g, l => l.toUpperCase());
-}
+// UPDATED: Load reports from student_results instead of tutor_submissions
+async function loadTutorReports(tutorEmail, parentName = null) {
+    const pendingReportsContainer = document.getElementById('pendingReportsContainer');
+    const gradedReportsContainer = document.getElementById('gradedReportsContainer');
+    pendingReportsContainer.innerHTML = `<p class="text-gray-500">Loading pending submissions...</p>`;
+    if (gradedReportsContainer) gradedReportsContainer.innerHTML = `<p class="text-gray-500">Loading graded submissions...</p>`;
 
-// Global variables for user data
-let currentUserData = null;
-let userChildren = [];
-let unreadResponsesCount = 0; // Track unread responses
+    // UPDATED: Query student_results instead of tutor_submissions
+    let assessmentsQuery = query(
+        collection(db, "student_results"), 
+        where("tutorEmail", "==", tutorEmail)
+    );
 
-// -------------------------------------------------------------------
-// START: NEW REFERRAL SYSTEM FUNCTIONS (PHASE 1 & 3)
-// -------------------------------------------------------------------
-
-/**
- * Generates a unique, alphanumeric referral code prefixed with 'BKH'.
- * Checks for uniqueness in the parent_users collection.
- * @returns {string} A unique referral code (e.g., BKH7A3X9M)
- */
-async function generateReferralCode() {
-    const chars = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ';
-    const prefix = 'BKH';
-    let code;
-    let isUnique = false;
-
-    while (!isUnique) {
-        let suffix = '';
-        for (let i = 0; i < 6; i++) {
-            suffix += chars.charAt(Math.floor(Math.random() * chars.length));
-        }
-        code = prefix + suffix;
-
-        // Check uniqueness in Firestore
-        const snapshot = await db.collection('parent_users').where('referralCode', '==', code).limit(1).get();
-        if (snapshot.empty) {
-            isUnique = true;
-        }
+    if (parentName) {
+        assessmentsQuery = query(assessmentsQuery, where("parentName", "==", parentName));
     }
-    return code;
-}
-
-/**
- * Loads the parent's referral data for the Rewards Dashboard.
- * @param {string} parentUid The UID of the current parent user.
- */
-async function loadReferralRewards(parentUid) {
-    const rewardsContent = document.getElementById('rewardsContent');
-    rewardsContent.innerHTML = '<div class="text-center py-8"><div class="loading-spinner mx-auto" style="width: 40px; height: 40px;"></div><p class="text-green-600 font-semibold mt-4">Loading rewards data...</p></div>';
 
     try {
-        // 1. Get the parent's referral code and current earnings
-        const userDoc = await db.collection('parent_users').doc(parentUid).get();
-        if (!userDoc.exists) {
-            rewardsContent.innerHTML = '<p class="text-red-500 text-center py-8">User data not found. Please sign in again.</p>';
+        const querySnapshot = await getDocs(assessmentsQuery);
+        let pendingHTML = '';
+        let gradedHTML = '';
+
+        querySnapshot.forEach(doc => {
+            const data = doc.data();
+            
+            // Check if this assessment needs tutor feedback (creative writing or pending review)
+            const needsFeedback = data.answers && data.answers.some(answer => 
+                answer.type === 'creative-writing' && 
+                (!answer.tutorReport || answer.tutorReport.trim() === '')
+            );
+
+            const reportCardHTML = `
+                <div class="border rounded-lg p-4 shadow-sm bg-white mb-4">
+                    <p><strong>Student:</strong> ${data.studentName}</p>
+                    <p><strong>Parent Name:</strong> ${data.parentName || 'N/A'}</p>
+                    <p><strong>Grade:</strong> ${data.grade}</p>
+                    <p><strong>Submitted At:</strong> ${new Date(data.submittedAt.seconds * 1000).toLocaleString()}</p>
+                    <div class="mt-4 border-t pt-4">
+                        <h4 class="font-semibold">Assessment Details:</h4>
+                        ${data.answers ? data.answers.map(answer => {
+                            if (answer.type === 'creative-writing') {
+                                return `
+                                    <div class="mb-3 p-3 bg-gray-50 rounded">
+                                        <p><strong>Creative Writing:</strong></p>
+                                        <p class="italic">${answer.textAnswer || "No response"}</p>
+                                        ${answer.fileUrl ? `<a href="${answer.fileUrl}" target="_blank" class="text-green-600 hover:underline">Download File</a>` : ''}
+                                        <p class="mt-2"><strong>Status:</strong> ${answer.tutorReport ? 'Graded' : 'Pending Review'}</p>
+                                        ${!answer.tutorReport ? `
+                                            <textarea class="tutor-report w-full mt-2 p-2 border rounded" rows="3" placeholder="Write your feedback here..."></textarea>
+                                            <button class="submit-report-btn bg-green-600 text-white px-4 py-2 rounded mt-2" data-doc-id="${doc.id}" data-answer-index="${data.answers.indexOf(answer)}">Submit Feedback</button>
+                                        ` : `
+                                            <p class="mt-2"><strong>Tutor's Feedback:</strong> ${answer.tutorReport || 'N/A'}</p>
+                                        `}
+                                    </div>
+                                `;
+                            }
+                            return '';
+                        }).join('') : '<p>No assessment data available.</p>'}
+                    </div>
+                </div>
+            `;
+
+            if (needsFeedback) {
+                pendingHTML += reportCardHTML;
+            } else {
+                gradedHTML += reportCardHTML;
+            }
+        });
+
+        pendingReportsContainer.innerHTML = pendingHTML || `<p class="text-gray-500">No pending submissions found.</p>`;
+        if (gradedReportsContainer) gradedReportsContainer.innerHTML = gradedHTML || `<p class="text-gray-500">No graded submissions found.</p>`;
+
+        // UPDATED: Submit feedback directly to student_results
+        document.querySelectorAll('.submit-report-btn').forEach(button => {
+            button.addEventListener('click', async (e) => {
+                const docId = e.target.getAttribute('data-doc-id');
+                const answerIndex = parseInt(e.target.getAttribute('data-answer-index'));
+                const reportTextarea = e.target.closest('.bg-gray-50').querySelector('.tutor-report');
+                const tutorReport = reportTextarea.value.trim();
+                
+                if (tutorReport) {
+                    try {
+                        const docRef = doc(db, "student_results", docId);
+                        
+                        // Get the current document
+                        const docSnap = await getDoc(docRef);
+                        const currentData = docSnap.data();
+                        
+                        // Update the specific answer with tutor feedback
+                        const updatedAnswers = [...currentData.answers];
+                        updatedAnswers[answerIndex] = {
+                            ...updatedAnswers[answerIndex],
+                            tutorReport: tutorReport,
+                            gradedAt: new Date()
+                        };
+                        
+                        // Update the document
+                        await updateDoc(docRef, { 
+                            answers: updatedAnswers,
+                            hasTutorFeedback: true
+                        });
+                        
+                        showCustomAlert('Feedback submitted successfully!');
+                        loadTutorReports(tutorEmail, parentName); // Refresh the list
+                    } catch (error) {
+                        console.error("Error submitting feedback:", error);
+                        showCustomAlert('Failed to submit feedback. Please try again.');
+                    }
+                } else {
+                    showCustomAlert('Please write some feedback before submitting.');
+                }
+            });
+        });
+    } catch (error) {
+        console.error("Error loading tutor reports:", error);
+        pendingReportsContainer.innerHTML = `<p class="text-red-500">Failed to load reports.</p>`;
+        if (gradedReportsContainer) gradedReportsContainer.innerHTML = `<p class="text-red-500">Failed to load reports.</p>`;
+    }
+}
+
+// ##################################################################
+// # SECTION 2: STUDENT DATABASE (MERGED FUNCTIONALITY) - UNCHANGED
+// ##################################################################
+
+// Helper function to generate the new student form fields
+function getNewStudentFormFields() {
+    // Generate Grade Options
+    const gradeOptions = `
+        <option value="">Select Grade</option>
+        <option value="Preschool">Preschool</option>
+        <option value="Kindergarten">Kindergarten</option>
+        ${Array.from({ length: 12 }, (_, i) => `<option value="Grade ${i + 1}">Grade ${i + 1}</option>`).join('')}
+        <option value="Pre-College">Pre-College</option>
+        <option value="College">College</option>
+        <option value="Adults">Adults</option>
+    `;
+
+    // Generate Fee Options
+    let feeOptions = '<option value="">Select Fee (₦)</option>';
+    for (let fee = 10000; fee <= 400000; fee += 5000) {
+        feeOptions += `<option value="${fee}">${fee.toLocaleString()}</option>`;
+    }
+    
+    // Define Subjects
+    const subjectsByCategory = {
+        "Academics": ["Math", "Language Arts", "Geography", "Science", "Biology", "Physics", "Chemistry", "Microbiology"],
+        "Pre-College Exams": ["SAT", "IGCSE", "A-Levels", "SSCE", "JAMB"],
+        "Languages": ["French", "German", "Spanish", "Yoruba", "Igbo", "Hausa", "Arabic"],
+        "Tech Courses": ["Coding","ICT", "Stop motion animation", "Computer Appreciation", "Digital Entrepeneurship", "Animation", "YouTube for kids", "Graphic design", "Videography", "Comic/book creation", "Artificial Intelligence", "Chess"],
+        "Support Programs": ["Bible study", "Counseling Programs", "Speech therapy", "Behavioral therapy", "Public speaking", "Adult education", "Communication skills", "English Proficiency"]
+    };
+
+    let subjectsHTML = `<h4 class="font-semibold text-gray-700 mt-2">Subjects</h4><div id="new-student-subjects-container" class="space-y-2 border p-3 rounded bg-gray-50 max-h-48 overflow-y-auto">`;
+    for (const category in subjectsByCategory) {
+        subjectsHTML += `
+            <details>
+                <summary class="font-semibold cursor-pointer text-sm">${category}</summary>
+                <div class="pl-4 grid grid-cols-2 sm:grid-cols-3 gap-2 mt-2">
+                    ${subjectsByCategory[category].map(subject => `<div><label class="text-sm font-normal"><input type="checkbox" name="subjects" value="${subject}"> ${subject}</label></div>`).join('')}
+                </div>
+            </details>
+        `;
+    }
+    subjectsHTML += `
+        <div class="font-semibold pt-2 border-t"><label class="text-sm"><input type="checkbox" name="subjects" value="Music"> Music</label></div>
+    </div>`;
+
+    return `
+        <input type="text" id="new-parent-name" class="w-full mt-1 p-2 border rounded" placeholder="Parent Name">
+        <input type="tel" id="new-parent-phone" class="w-full mt-1 p-2 border rounded" placeholder="Parent Phone Number">
+        <input type="text" id="new-student-name" class="w-full mt-1 p-2 border rounded" placeholder="Student Name">
+        <select id="new-student-grade" class="w-full mt-1 p-2 border rounded">${gradeOptions}</select>
+        ${subjectsHTML}
+        <select id="new-student-days" class="w-full mt-1 p-2 border rounded">
+            <option value="">Select Days per Week</option>
+            ${Array.from({ length: 7 }, (_, i) => `<option value="${i + 1}">${i + 1}</option>`).join('')}
+        </select>
+        <div id="group-class-container" class="hidden">
+            <label class="flex items-center space-x-2 mt-2">
+                <input type="checkbox" id="new-student-group-class" class="rounded">
+                <span class="text-sm font-semibold">Group Class</span>
+            </label>
+        </div>
+        <select id="new-student-fee" class="w-full mt-1 p-2 border rounded">${feeOptions}</select>
+    `;
+}
+
+// Function to handle grade string formatting
+function cleanGradeString(grade) {
+    if (grade && grade.toLowerCase().includes("grade")) {
+        return grade;
+    } else {
+        return `Grade ${grade}`;
+    }
+}
+
+// Function to show the edit student modal
+function showEditStudentModal(student) {
+    // Generate Grade Options with the current grade selected
+    let gradeOptions = `
+        <option value="">Select Grade</option>
+        <option value="Preschool" ${student.grade === 'Preschool' ? 'selected' : ''}>Preschool</option>
+        <option value="Kindergarten" ${student.grade === 'Kindergarten' ? 'selected' : ''}>Kindergarten</option>
+    `;
+    for (let i = 1; i <= 12; i++) {
+        const gradeValue = `Grade ${i}`;
+        gradeOptions += `<option value="${gradeValue}" ${student.grade === gradeValue ? 'selected' : ''}>${gradeValue}</option>`;
+    }
+    gradeOptions += `
+        <option value="Pre-College" ${student.grade === 'Pre-College' ? 'selected' : ''}>Pre-College</option>
+        <option value="College" ${student.grade === 'College' ? 'selected' : ''}>College</option>
+        <option value="Adults" ${student.grade === 'Adults' ? 'selected' : ''}>Adults</option>
+    `;
+    
+    // Generate Days Options with the current days selected
+    let daysOptions = '<option value="">Select Days per Week</option>';
+    for (let i = 1; i <= 7; i++) {
+        daysOptions += `<option value="${i}" ${student.days == i ? 'selected' : ''}>${i}</option>`;
+    }
+
+    // Define Subjects
+    const subjectsByCategory = {
+        "Academics": ["Math", "Language Arts", "Geography", "Science", "Biology", "Physics", "Chemistry", "Microbiology"],
+        "Pre-College Exams": ["SAT", "IGCSE", "A-Levels", "SSCE", "JAMB"],
+        "Languages": ["French", "German", "Spanish", "Yoruba", "Igbo", "Hausa", "Arabic"],
+        "Tech Courses": ["Coding","ICT", "Stop motion animation",  "Computer Appreciation", "Digital Entrepeneurship", "Animation", "YouTube for kids", "Graphic design", "Videography", "Comic/book creation", "Artificial Intelligence", "Chess"],
+        "Support Programs": ["Bible study", "Counseling Programs", "Speech therapy", "Behavioral therapy", "Public speaking", "Adult education", "Communication skills", "English Proficiency"]
+    };
+
+    let subjectsHTML = `<h4 class="font-semibold text-gray-700 mt-2">Subjects</h4><div id="edit-student-subjects-container" class="space-y-2 border p-3 rounded bg-gray-50 max-h-48 overflow-y-auto">`;
+    for (const category in subjectsByCategory) {
+        subjectsHTML += `
+            <details>
+                <summary class="font-semibold cursor-pointer text-sm">${category}</summary>
+                <div class="pl-4 grid grid-cols-2 sm:grid-cols-3 gap-2 mt-2">
+                    ${subjectsByCategory[category].map(subject => {
+                        const isChecked = student.subjects && student.subjects.includes(subject);
+                        return `<div><label class="text-sm font-normal"><input type="checkbox" name="edit-subjects" value="${subject}" ${isChecked ? 'checked' : ''}> ${subject}</label></div>`;
+                    }).join('')}
+                </div>
+            </details>
+        `;
+    }
+    subjectsHTML += `
+        <div class="font-semibold pt-2 border-t"><label class="text-sm"><input type="checkbox" name="edit-subjects" value="Music" ${student.subjects && student.subjects.includes('Music') ? 'checked' : ''}> Music</label></div>
+    </div>`;
+
+    const editFormHTML = `
+        <h3 class="text-xl font-bold mb-4">Edit Student: ${student.studentName}</h3>
+        <div class="space-y-4">
+            <div>
+                <label class="block font-semibold">Parent Name</label>
+                <input type="text" id="edit-parent-name" class="w-full mt-1 p-2 border rounded" value="${student.parentName || ''}" placeholder="Parent Name">
+            </div>
+            <div>
+                <label class="block font-semibold">Parent Phone Number</label>
+                <input type="tel" id="edit-parent-phone" class="w-full mt-1 p-2 border rounded" value="${student.parentPhone || ''}" placeholder="Parent Phone Number">
+            </div>
+            <div>
+                <label class="block font-semibold">Student Name</label>
+                <input type="text" id="edit-student-name" class="w-full mt-1 p-2 border rounded" value="${student.studentName || ''}" placeholder="Student Name">
+            </div>
+            <div>
+                <label class="block font-semibold">Grade</label>
+                <select id="edit-student-grade" class="w-full mt-1 p-2 border rounded">${gradeOptions}</select>
+            </div>
+            ${subjectsHTML}
+            <div>
+                <label class="block font-semibold">Days per Week</label>
+                <select id="edit-student-days" class="w-full mt-1 p-2 border rounded">${daysOptions}</select>
+            </div>
+            <div id="edit-group-class-container" class="${findSpecializedSubject(student.subjects || []) ? '' : 'hidden'}">
+                <label class="flex items-center space-x-2">
+                    <input type="checkbox" id="edit-student-group-class" class="rounded" ${student.groupClass ? 'checked' : ''}>
+                    <span class="text-sm font-semibold">Group Class</span>
+                </label>
+            </div>
+            <div>
+                <label class="block font-semibold">Fee (₦)</label>
+                <input type="text" id="edit-student-fee" class="w-full mt-1 p-2 border rounded" 
+                       value="${(student.studentFee || 0).toLocaleString()}" 
+                       placeholder="Enter fee (e.g., 50,000)">
+            </div>
+            <div class="flex justify-end space-x-2 mt-6">
+                <button id="cancel-edit-btn" class="bg-gray-500 text-white px-6 py-2 rounded">Cancel</button>
+                <button id="save-edit-btn" class="bg-green-600 text-white px-6 py-2 rounded" data-student-id="${student.id}" data-collection="${student.collection}">Save Changes</button>
+            </div>
+        </div>`;
+
+    const editModal = document.createElement('div');
+    editModal.className = 'fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex items-center justify-center z-50';
+    editModal.innerHTML = `<div class="relative bg-white p-8 rounded-lg shadow-xl w-full max-w-lg mx-auto">${editFormHTML}</div>`;
+    document.body.appendChild(editModal);
+
+    document.getElementById('cancel-edit-btn').addEventListener('click', () => editModal.remove());
+    document.getElementById('save-edit-btn').addEventListener('click', async (e) => {
+        const studentId = e.target.getAttribute('data-student-id');
+        const collectionName = e.target.getAttribute('data-collection');
+        
+        const parentName = document.getElementById('edit-parent-name').value.trim();
+        const parentPhone = document.getElementById('edit-parent-phone').value.trim();
+        const studentName = document.getElementById('edit-student-name').value.trim();
+        const studentGrade = document.getElementById('edit-student-grade').value.trim();
+        
+        const selectedSubjects = [];
+        document.querySelectorAll('input[name="edit-subjects"]:checked').forEach(checkbox => {
+            selectedSubjects.push(checkbox.value);
+        });
+
+        const studentDays = document.getElementById('edit-student-days').value.trim();
+        const groupClass = document.getElementById('edit-student-group-class') ? document.getElementById('edit-student-group-class').checked : false;
+        
+        // Parse the fee value (remove commas and convert to number)
+        const feeValue = document.getElementById('edit-student-fee').value.trim();
+        const studentFee = parseFloat(feeValue.replace(/,/g, ''));
+
+        if (!parentName || !studentName || !studentGrade || isNaN(studentFee) || !parentPhone || !studentDays || selectedSubjects.length === 0) {
+            showCustomAlert('Please fill in all parent and student details correctly, including at least one subject.');
             return;
         }
-        const userData = userDoc.data();
-        const referralCode = userData.referralCode || 'N/A';
-        const totalEarnings = userData.referralEarnings || 0;
+
+        if (isNaN(studentFee) || studentFee < 0) {
+            showCustomAlert('Please enter a valid fee amount.');
+            return;
+        }
+
+        try {
+            const studentData = {
+                parentName: parentName,
+                parentPhone: parentPhone,
+                studentName: studentName,
+                grade: studentGrade,
+                subjects: selectedSubjects,
+                days: studentDays,
+                studentFee: studentFee
+            };
+
+            // Add group class field if it exists in the form
+            if (document.getElementById('edit-student-group-class')) {
+                studentData.groupClass = groupClass;
+            }
+
+            const studentRef = doc(db, collectionName, studentId);
+            await updateDoc(studentRef, studentData);
+            
+            editModal.remove();
+            showCustomAlert('Student details updated successfully!');
+            
+            // Refresh the student database view
+            const mainContent = document.getElementById('mainContent');
+            renderStudentDatabase(mainContent, window.tutorData);
+        } catch (error) {
+            console.error("Error updating student:", error);
+            showCustomAlert(`An error occurred: ${error.message}`);
+        }
+    });
+}
+
+async function renderStudentDatabase(container, tutor) {
+    if (!container) {
+        console.error("Container element not found.");
+        return;
+    }
+
+    let savedReports = loadReportsFromLocalStorage(tutor.email);
+
+    // Fetch students and all of the tutor's historical submissions
+    const studentQuery = query(collection(db, "students"), where("tutorEmail", "==", tutor.email));
+    const pendingStudentQuery = query(collection(db, "pending_students"), where("tutorEmail", "==", tutor.email));
+    
+    // --- START: MODIFICATION (NO INDEX REQUIRED) ---
+    // This simple query only filters by one field and does NOT require a custom index.
+    const allSubmissionsQuery = query(collection(db, "tutor_submissions"), where("tutorEmail", "==", tutor.email));
+
+    const [studentsSnapshot, pendingStudentsSnapshot, allSubmissionsSnapshot] = await Promise.all([
+        getDocs(studentQuery),
+        getDocs(pendingStudentQuery),
+        getDocs(allSubmissionsQuery)
+    ]);
+
+    // Now, filter the submissions for the current month here in the code
+    const now = new Date();
+    const currentMonth = now.getMonth();
+    const currentYear = now.getFullYear();
+    const submittedStudentIds = new Set();
+
+    allSubmissionsSnapshot.forEach(doc => {
+        const submissionData = doc.data();
+        const submissionDate = submissionData.submittedAt.toDate(); // Convert Firestore Timestamp to JS Date
+        if (submissionDate.getMonth() === currentMonth && submissionDate.getFullYear() === currentYear) {
+            submittedStudentIds.add(submissionData.studentId);
+        }
+    });
+    // --- END: MODIFICATION (NO INDEX REQUIRED) ---
+
+    const approvedStudents = studentsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data(), isPending: false, collection: "students" }));
+    const pendingStudents = pendingStudentsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data(), isPending: true, collection: "pending_students" }));
+
+    let students = [...approvedStudents, ...pendingStudents];
+
+    // Duplicate Student Cleanup
+    const seenStudents = new Set();
+    const duplicatesToDelete = [];
+    students = students.filter(student => {
+        const studentIdentifier = `${student.studentName}-${student.tutorEmail}`;
+        if (seenStudents.has(studentIdentifier)) {
+            duplicatesToDelete.push({ id: student.id, collection: student.collection });
+            return false;
+        }
+        seenStudents.add(studentIdentifier);
+        return true;
+    });
+    if (duplicatesToDelete.length > 0) {
+        const batch = writeBatch(db);
+        duplicatesToDelete.forEach(dup => {
+            batch.delete(doc(db, dup.collection, dup.id));
+        });
+        await batch.commit();
+        console.log(`Cleaned up ${duplicatesToDelete.length} duplicate student entries.`);
+    }
+
+    const studentsCount = students.length;
+
+    function renderUI() {
+        let studentsHTML = `<h2 class="text-2xl font-bold text-green-700 mb-4">My Students (${studentsCount})</h2>`;
         
-        // 2. Query the referral_transactions collection for all transactions belonging to this code owner
-        const transactionsSnapshot = await db.collection('referral_transactions')
-            .where('ownerUid', '==', parentUid)
-            .orderBy('timestamp', 'desc')
-            .get();
-
-        let referralsHtml = '';
-        let pendingCount = 0;
-        let approvedCount = 0;
-        let paidCount = 0;
-
-        if (transactionsSnapshot.empty) {
-            referralsHtml = `
-                <tr><td colspan="4" class="text-center py-4 text-gray-500">No one has used your referral code yet.</td></tr>
-            `;
-        } else {
-            transactionsSnapshot.forEach(doc => {
-                const data = doc.data();
-                const status = data.status || 'pending';
-                const statusColor = status === 'paid' ? 'bg-green-100 text-green-800' : 
-                                    status === 'approved' ? 'bg-blue-100 text-blue-800' : 
-                                    'bg-yellow-100 text-yellow-800';
-                
-                if (status === 'pending') pendingCount++;
-                if (status === 'approved') approvedCount++;
-                if (status === 'paid') paidCount++;
-
-                const referredName = capitalize(data.referredStudentName || data.referredStudentPhone);
-                const rewardAmount = data.rewardAmount ? `₦${data.rewardAmount.toLocaleString()}` : '₦5,000';
-                const referralDate = data.timestamp?.toDate().toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }) || 'N/A';
-
-                referralsHtml += `
-                    <tr class="hover:bg-gray-50">
-                        <td class="px-4 py-3 text-sm font-medium text-gray-900">${referredName}</td>
-                        <td class="px-4 py-3 text-sm text-gray-500">${referralDate}</td>
-                        <td class="px-4 py-3 text-sm">
-                            <span class="inline-flex items-center px-3 py-0.5 rounded-full text-xs font-medium ${statusColor}">
-                                ${capitalize(status)}
-                            </span>
-                        </td>
-                        <td class="px-4 py-3 text-sm text-gray-900 font-bold">${rewardAmount}</td>
-                    </tr>
-                `;
-            });
+        // ALWAYS show the add student section, but conditionally show buttons
+        studentsHTML += `
+            <div class="bg-gray-100 p-4 rounded-lg shadow-inner mb-4">
+                <h3 class="font-bold text-lg mb-2">Add a New Student</h3>
+                <div class="space-y-2">
+                    ${getNewStudentFormFields()}
+                </div>
+                <div class="flex space-x-2 mt-3">`;
+        
+        // Show "Add Student" button only when admin enables it
+        if (isTutorAddEnabled) {
+            studentsHTML += `<button id="add-student-btn" class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700">Add Student</button>`;
         }
         
-        // Display the dashboard
-        rewardsContent.innerHTML = `
-            <div class="bg-blue-50 border-l-4 border-blue-600 p-4 rounded-lg mb-8 shadow-md">
-                <h2 class="text-2xl font-bold text-blue-800 mb-1">Your Referral Code</h2>
-                <p class="text-xl font-mono text-blue-600 tracking-wider p-2 bg-white inline-block rounded-lg border border-dashed border-blue-300 select-all">${referralCode}</p>
-                <p class="text-blue-700 mt-2">Share this code with other parents. They use it when registering their child, and you earn **₦5,000** once their child completes their first month!</p>
-            </div>
+        // ALWAYS show "Add Transitioning" button regardless of admin setting
+        studentsHTML += `<button id="add-transitioning-btn" class="bg-orange-600 text-white px-4 py-2 rounded hover:bg-orange-700">Add Transitioning</button>`;
+        
+        studentsHTML += `</div></div>`;
+        
+        studentsHTML += `<p class="text-sm text-gray-600 mb-4">Report submission is currently <strong class="${isSubmissionEnabled ? 'text-green-600' : 'text-red-500'}">${isSubmissionEnabled ? 'Enabled' : 'Disabled'}</strong> by the admin.</p>`;
 
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-                <div class="bg-green-100 p-6 rounded-xl shadow-lg border-b-4 border-green-600">
-                    <p class="text-sm font-medium text-green-700">Total Earnings</p>
-                    <p class="text-3xl font-extrabold text-green-900 mt-1">₦${totalEarnings.toLocaleString()}</p>
-                </div>
-                <div class="bg-yellow-100 p-6 rounded-xl shadow-lg border-b-4 border-yellow-600">
-                    <p class="text-sm font-medium text-yellow-700">Approved Rewards (Awaiting Payment)</p>
-                    <p class="text-3xl font-extrabold text-yellow-900 mt-1">${approvedCount}</p>
-                </div>
-                <div class="bg-gray-100 p-6 rounded-xl shadow-lg border-b-4 border-gray-600">
-                    <p class="text-sm font-medium text-gray-700">Total Successful Referrals (Paid)</p>
-                    <p class="text-3xl font-extrabold text-gray-900 mt-1">${paidCount}</p>
-                </div>
-            </div>
+        if (studentsCount === 0) {
+            studentsHTML += `<p class="text-gray-500">You are not assigned to any students yet.</p>`;
+        } else {
+            studentsHTML += `
+                <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-gray-200">
+                        <thead><tr><th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Student Name</th><th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th><th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th></tr></thead>
+                        <tbody class="bg-white divide-y divide-gray-200">`;
+            
+            students.forEach(student => {
+                const hasSubmittedThisMonth = submittedStudentIds.has(student.id);
+                const isStudentOnBreak = student.summerBreak;
+                const isReportSaved = savedReports[student.id];
+                const isTransitioning = student.isTransitioning;
 
-            <h3 class="text-xl font-bold text-gray-800 mb-4">Referral History</h3>
-            <div class="overflow-x-auto bg-white rounded-lg shadow">
-                <table class="min-w-full divide-y divide-gray-200">
-                    <thead class="bg-gray-50">
-                        <tr>
-                            <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Referred Parent/Student</th>
-                            <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date Used</th>
-                            <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                            <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Reward</th>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y divide-gray-200">
-                        ${referralsHtml}
-                    </tbody>
-                </table>
+                const feeDisplay = showStudentFees ? `<div class="text-xs text-gray-500">Fee: ₦${(student.studentFee || 0).toLocaleString()}</div>` : '';
+                
+                let statusHTML = '';
+                let actionsHTML = '';
+                
+                const subjects = student.subjects ? student.subjects.join(', ') : 'N/A';
+                const days = student.days ? `${student.days} days/week` : 'N/A';
+
+                if (student.isPending) {
+                    statusHTML = `<span class="status-indicator text-yellow-600 font-semibold">Awaiting Approval</span>`;
+                    actionsHTML = `<span class="text-gray-400">No actions available</span>`;
+                } else if (hasSubmittedThisMonth) {
+                    statusHTML = `<span class="status-indicator text-blue-600 font-semibold">Report Sent</span>`;
+                    actionsHTML = `<span class="text-gray-400">Submitted this month</span>`;
+                } else {
+                    // Add orange indicator for transitioning students
+                    const transitioningIndicator = isTransitioning ? `<span class="bg-orange-100 text-orange-800 text-xs px-2 py-1 rounded-full ml-2">Transitioning</span>` : '';
+                    
+                    statusHTML = `<span class="status-indicator ${isReportSaved ? 'text-green-600 font-semibold' : 'text-gray-500'}">${isReportSaved ? 'Report Saved' : 'Pending Report'}</span>${transitioningIndicator}`;
+
+                    if (isSummerBreakEnabled && !isStudentOnBreak) {
+                        actionsHTML += `<button class="summer-break-btn bg-yellow-500 text-white px-3 py-1 rounded" data-student-id="${student.id}">Summer Break</button>`;
+                    } else if (isStudentOnBreak) {
+                        actionsHTML += `<span class="text-gray-400">On Break</span>`;
+                    }
+
+                    if (isSubmissionEnabled && !isStudentOnBreak) {
+                        if (approvedStudents.length === 1) {
+                            actionsHTML += `<button class="submit-single-report-btn bg-green-600 text-white px-3 py-1 rounded" data-student-id="${student.id}" data-is-transitioning="${isTransitioning}">Submit Report</button>`;
+                        } else {
+                            actionsHTML += `<button class="enter-report-btn bg-green-600 text-white px-3 py-1 rounded" data-student-id="${student.id}" data-is-transitioning="${isTransitioning}">${isReportSaved ? 'Edit Report' : 'Enter Report'}</button>`;
+                        }
+                    } else if (!isStudentOnBreak) {
+                        actionsHTML += `<span class="text-gray-400">Submission Disabled</span>`;
+                    }
+                    
+                    if (showEditDeleteButtons && !isStudentOnBreak) {
+                        actionsHTML += `<button class="edit-student-btn-tutor bg-blue-500 text-white px-3 py-1 rounded" data-student-id="${student.id}" data-collection="${student.collection}">Edit</button>`;
+                        actionsHTML += `<button class="delete-student-btn-tutor bg-red-500 text-white px-3 py-1 rounded" data-student-id="${student.id}" data-collection="${student.collection}">Delete</button>`;
+                    }
+                }
+                
+                studentsHTML += `
+                    <tr>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            ${student.studentName} (${cleanGradeString(student.grade)})
+                            <div class="text-xs text-gray-500">Subjects: ${subjects} | Days: ${days}</div>
+                            ${feeDisplay}
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap">${statusHTML}</td>
+                        <td class="px-6 py-4 whitespace-nowrap space-x-2">${actionsHTML}</td>
+                    </tr>`;
+            });
+
+            studentsHTML += `</tbody></table></div>`;
+            
+            if (tutor.isManagementStaff) {
+                studentsHTML += `
+                    <div class="bg-green-50 p-4 rounded-lg shadow-md mt-6">
+                        <h3 class="text-lg font-bold text-green-800 mb-2">Management Fee</h3>
+                        <p class="text-sm text-gray-600 mb-2">As you are part of the management staff, please set your monthly management fee before final submission.</p>
+                        <div class="flex items-center space-x-2">
+                            <label for="management-fee-input" class="font-semibold">Fee (₦):</label>
+                            <input type="number" id="management-fee-input" class="p-2 border rounded w-full" value="${tutor.managementFee || 0}">
+                            <button id="save-management-fee-btn" class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700">Save Fee</button>
+                        </div>
+                    </div>`;
+            }
+            
+            if (approvedStudents.length > 1 && isSubmissionEnabled) {
+                const submittableStudents = approvedStudents.filter(s => !s.summerBreak && !submittedStudentIds.has(s.id)).length;
+                const allReportsSaved = Object.keys(savedReports).length === submittableStudents && submittableStudents > 0;
+                
+                if (submittableStudents > 0) {
+                    studentsHTML += `
+                        <div class="mt-6 text-right">
+                            <button id="submit-all-reports-btn" class="bg-green-700 text-white px-6 py-3 rounded-lg font-bold ${!allReportsSaved ? 'opacity-50 cursor-not-allowed' : 'hover:bg-green-800'}" ${!allReportsSaved ? 'disabled' : ''}>
+                                Submit All Reports
+                            </button>
+                        </div>`;
+                }
+            }
+        }
+        container.innerHTML = `<div id="student-list-view" class="bg-white p-6 rounded-lg shadow-md">${studentsHTML}</div>`;
+        attachEventListeners();
+    }
+
+    function showReportModal(student) {
+        // Skip report modal for transitioning students - go directly to fee confirmation
+        if (student.isTransitioning) {
+            const currentMonthYear = getCurrentMonthYear();
+            const reportData = {
+                studentId: student.id, 
+                studentName: student.studentName, 
+                grade: student.grade,
+                parentName: student.parentName, 
+                parentPhone: student.parentPhone,
+                reportMonth: currentMonthYear,
+                introduction: "Transitioning student - no monthly report required.",
+                topics: "Transitioning student - no monthly report required.",
+                progress: "Transitioning student - no monthly report required.",
+                strengthsWeaknesses: "Transitioning student - no monthly report required.",
+                recommendations: "Transitioning student - no monthly report required.",
+                generalComments: "Transitioning student - no monthly report required.",
+                isTransitioning: true
+            };
+            
+            showFeeConfirmationModal(student, reportData);
+            return;
+        }
+
+        const existingReport = savedReports[student.id] || {};
+        const isSingleApprovedStudent = approvedStudents.filter(s => !s.summerBreak && !submittedStudentIds.has(s.id)).length === 1;
+        const currentMonthYear = getCurrentMonthYear();
+        
+        const reportFormHTML = `
+            <h3 class="text-xl font-bold mb-4">Monthly Report for ${student.studentName}</h3>
+            <div class="bg-blue-50 p-3 rounded-lg mb-4">
+                <p class="text-sm font-semibold text-blue-800">Month: ${currentMonthYear}</p>
+            </div>
+            <div class="space-y-4">
+                <div><label class="block font-semibold">Introduction</label><textarea id="report-intro" class="w-full mt-1 p-2 border rounded" rows="2">${existingReport.introduction || ''}</textarea></div>
+                <div><label class="block font-semibold">Topics & Remarks</label><textarea id="report-topics" class="w-full mt-1 p-2 border rounded" rows="3">${existingReport.topics || ''}</textarea></div>
+                <div><label class="block font-semibold">Progress & Achievements</label><textarea id="report-progress" class="w-full mt-1 p-2 border rounded" rows="2">${existingReport.progress || ''}</textarea></div>
+                <div><label class="block font-semibold">Strengths & Weaknesses</label><textarea id="report-sw" class="w-full mt-1 p-2 border rounded" rows="2">${existingReport.strengthsWeaknesses || ''}</textarea></div>
+                <div><label class="block font-semibold">Recommendations</label><textarea id="report-recs" class="w-full mt-1 p-2 border rounded" rows="2">${existingReport.recommendations || ''}</textarea></div>
+                <div><label class="block font-semibold">General Comments</label><textarea id="report-general" class="w-full mt-1 p-2 border rounded" rows="2">${existingReport.generalComments || ''}</textarea></div>
+                <div class="flex justify-end space-x-2">
+                    <button id="cancel-report-btn" class="bg-gray-500 text-white px-6 py-2 rounded">Cancel</button>
+                    <button id="modal-action-btn" class="bg-green-600 text-white px-6 py-2 rounded">${isSingleApprovedStudent ? 'Proceed to Submit' : 'Save Report'}</button>
+                </div>
+            </div>`;
+        
+        const reportModal = document.createElement('div');
+        reportModal.className = 'fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex items-center justify-center z-50';
+        reportModal.innerHTML = `<div class="relative bg-white p-8 rounded-lg shadow-xl w-full max-w-2xl mx-auto">${reportFormHTML}</div>`;
+        document.body.appendChild(reportModal);
+
+        document.getElementById('cancel-report-btn').addEventListener('click', () => reportModal.remove());
+        document.getElementById('modal-action-btn').addEventListener('click', async () => {
+            const reportData = {
+                studentId: student.id, 
+                studentName: student.studentName, 
+                grade: student.grade,
+                parentName: student.parentName, 
+                parentPhone: student.parentPhone,
+                reportMonth: currentMonthYear, // Add month to report data
+                introduction: document.getElementById('report-intro').value,
+                topics: document.getElementById('report-topics').value,
+                progress: document.getElementById('report-progress').value,
+                strengthsWeaknesses: document.getElementById('report-sw').value,
+                recommendations: document.getElementById('report-recs').value,
+                generalComments: document.getElementById('report-general').value
+            };
+
+            reportModal.remove();
+            showFeeConfirmationModal(student, reportData);
+        });
+    }
+
+    function showFeeConfirmationModal(student, reportData) {
+        const feeConfirmationHTML = `
+            <h3 class="text-xl font-bold mb-4">Confirm Fee for ${student.studentName}</h3>
+            <p class="text-sm text-gray-600 mb-4">Please verify the monthly fee for this student before saving the report. You can make corrections if needed.</p>
+            <div class="space-y-4">
+                <div>
+                    <label class="block font-semibold">Current Fee (₦)</label>
+                    <input type="number" id="confirm-student-fee" class="w-full mt-1 p-2 border rounded" 
+                           value="${student.studentFee || 0}" 
+                           placeholder="Enter fee amount">
+                </div>
+                <div class="flex justify-end space-x-2 mt-6">
+                    <button id="cancel-fee-confirm-btn" class="bg-gray-500 text-white px-6 py-2 rounded">Cancel</button>
+                    <button id="confirm-fee-btn" class="bg-green-600 text-white px-6 py-2 rounded">Confirm Fee & Save</button>
+                </div>
+            </div>`;
+
+        const feeModal = document.createElement('div');
+        feeModal.className = 'fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex items-center justify-center z-50';
+        feeModal.innerHTML = `<div class="relative bg-white p-8 rounded-lg shadow-xl w-full max-w-lg mx-auto">${feeConfirmationHTML}</div>`;
+        document.body.appendChild(feeModal);
+
+        const isSingleApprovedStudent = approvedStudents.filter(s => !s.summerBreak && !submittedStudentIds.has(s.id)).length === 1;
+
+        document.getElementById('cancel-fee-confirm-btn').addEventListener('click', () => feeModal.remove());
+        document.getElementById('confirm-fee-btn').addEventListener('click', async () => {
+            const newFeeValue = document.getElementById('confirm-student-fee').value;
+            const newFee = parseFloat(newFeeValue);
+
+            if (isNaN(newFee) || newFee < 0) {
+                showCustomAlert('Please enter a valid, non-negative fee amount.');
+                return;
+            }
+
+            if (newFee !== student.studentFee) {
+                try {
+                    const studentRef = doc(db, student.collection, student.id);
+                    await updateDoc(studentRef, { studentFee: newFee });
+                    student.studentFee = newFee; 
+                    showCustomAlert('Student fee has been updated successfully!');
+                } catch (error) {
+                    console.error("Error updating student fee:", error);
+                    showCustomAlert(`Failed to update fee: ${error.message}`);
+                }
+            }
+
+            feeModal.remove();
+
+            if (isSingleApprovedStudent) {
+                showAccountDetailsModal([reportData]);
+            } else {
+                savedReports[student.id] = reportData;
+                saveReportsToLocalStorage(tutor.email, savedReports);
+                showCustomAlert(`${student.studentName}'s report has been saved.`);
+                renderUI(); 
+            }
+        });
+    }
+
+    function showAccountDetailsModal(reportsArray) {
+        const accountFormHTML = `
+            <h3 class="text-xl font-bold mb-4">Enter Your Payment Details</h3>
+            <p class="text-sm text-gray-600 mb-4">Please provide your bank details for payment processing. This is required before final submission.</p>
+            <div class="space-y-4">
+                <div>
+                    <label class="block font-semibold">Beneficiary Bank Name</label>
+                    <input type="text" id="beneficiary-bank" class="w-full mt-1 p-2 border rounded" placeholder="e.g., Zenith Bank">
+                </div>
+                <div>
+                    <label class="block font-semibold">Beneficiary Account Number</label>
+                    <input type="text" id="beneficiary-account" class="w-full mt-1 p-2 border rounded" placeholder="Your 10-digit account number">
+                </div>
+                <div>
+                    <label class="block font-semibold">Beneficiary Name</label>
+                    <input type="text" id="beneficiary-name" class="w-full mt-1 p-2 border rounded" placeholder="Your full name as on the account">
+                </div>
+                <div class="flex justify-end space-x-2 mt-6">
+                    <button id="cancel-account-btn" class="bg-gray-500 text-white px-6 py-2 rounded">Cancel</button>
+                    <button id="confirm-submit-btn" class="bg-green-600 text-white px-6 py-2 rounded">Confirm & Submit Report(s)</button>
+                </div>
+            </div>`;
+        const accountModal = document.createElement('div');
+        accountModal.className = 'fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex items-center justify-center z-50';
+        accountModal.innerHTML = `<div class="relative bg-white p-8 rounded-lg shadow-xl w-full max-w-lg mx-auto">${accountFormHTML}</div>`;
+        document.body.appendChild(accountModal);
+
+        document.getElementById('cancel-account-btn').addEventListener('click', () => accountModal.remove());
+        document.getElementById('confirm-submit-btn').addEventListener('click', async () => {
+            const accountDetails = {
+                beneficiaryBank: document.getElementById('beneficiary-bank').value.trim(),
+                beneficiaryAccount: document.getElementById('beneficiary-account').value.trim(),
+                beneficiaryName: document.getElementById('beneficiary-name').value.trim(),
+            };
+
+            if (!accountDetails.beneficiaryBank || !accountDetails.beneficiaryAccount || !accountDetails.beneficiaryName) {
+                showCustomAlert("Please fill in all bank account details before submitting.");
+                return;
+            }
+
+            accountModal.remove();
+            await submitAllReports(reportsArray, accountDetails);
+        });
+    }
+    
+    async function submitAllReports(reportsArray, accountDetails) {
+        if (reportsArray.length === 0) {
+            showCustomAlert("No reports to submit.");
+            return;
+        }
+
+        const batch = writeBatch(db);
+        reportsArray.forEach(report => {
+            const newReportRef = doc(collection(db, "tutor_submissions"));
+            batch.set(newReportRef, {
+                tutorEmail: tutor.email,
+                tutorName: tutor.name,
+                submittedAt: new Date(),
+                ...report,
+                ...accountDetails
+            });
+        });
+
+        try {
+            await batch.commit();
+            clearAllReportsFromLocalStorage(tutor.email);
+            showCustomAlert(`Successfully submitted ${reportsArray.length} report(s)!`);
+            await renderStudentDatabase(container, tutor);
+        } catch (error) {
+            console.error("Error submitting reports:", error);
+            showCustomAlert(`Error: ${error.message}`);
+        }
+    }
+
+    function showCustomAlert(message) {
+        const alertModal = document.createElement('div');
+        alertModal.className = 'fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex items-center justify-center z-50';
+        alertModal.innerHTML = `
+            <div class="relative bg-white p-8 rounded-lg shadow-xl w-full max-w-md mx-auto">
+                <p class="mb-4">${message}</p>
+                <button id="alert-ok-btn" class="bg-green-600 text-white px-6 py-2 rounded float-right">OK</button>
+            </div>`;
+        document.body.appendChild(alertModal);
+        document.getElementById('alert-ok-btn').addEventListener('click', () => alertModal.remove());
+    }
+
+    // Function to show confirmation for adding transitioning student
+    function showTransitioningConfirmation() {
+        const confirmationHTML = `
+            <div class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex items-center justify-center z-50">
+                <div class="relative bg-white p-8 rounded-lg shadow-xl w-full max-w-md mx-auto">
+                    <h3 class="text-xl font-bold mb-4 text-orange-600">Add Transitioning Student</h3>
+                    <p class="text-sm text-gray-600 mb-4">
+                        <strong>Please confirm:</strong> Transitioning students skip monthly report writing and go directly to fee confirmation. 
+                        They will be marked with orange indicators and their fees will be included in pay advice.
+                    </p>
+                    <p class="text-sm text-orange-600 font-semibold mb-4">
+                        Are you sure you want to add a transitioning student?
+                    </p>
+                    <div class="flex justify-end space-x-2">
+                        <button id="cancel-transitioning-btn" class="bg-gray-500 text-white px-6 py-2 rounded">Cancel</button>
+                        <button id="confirm-transitioning-btn" class="bg-orange-600 text-white px-6 py-2 rounded">Yes, Add Transitioning</button>
+                    </div>
+                </div>
             </div>
         `;
         
-    } catch (error) {
-        console.error('Error loading referral rewards:', error);
-        rewardsContent.innerHTML = '<p class="text-red-500 text-center py-8">An error occurred while loading your rewards data. Please try again later.</p>';
-    }
-}
+        const confirmationModal = document.createElement('div');
+        confirmationModal.innerHTML = confirmationHTML;
+        document.body.appendChild(confirmationModal);
 
-// -------------------------------------------------------------------
-// END: NEW REFERRAL SYSTEM FUNCTIONS
-// -------------------------------------------------------------------
-
-// Remember Me Functionality
-function setupRememberMe() {
-    const rememberMe = localStorage.getItem('rememberMe');
-    const savedEmail = localStorage.getItem('savedEmail');
-    
-    if (rememberMe === 'true' && savedEmail) {
-        document.getElementById('loginIdentifier').value = savedEmail;
-        document.getElementById('rememberMe').checked = true;
-    }
-}
-
-function handleRememberMe() {
-    const rememberMe = document.getElementById('rememberMe').checked;
-    const identifier = document.getElementById('loginIdentifier').value.trim();
-    
-    if (rememberMe && identifier) {
-        localStorage.setItem('rememberMe', 'true');
-        localStorage.setItem('savedEmail', identifier);
-    } else {
-        localStorage.removeItem('rememberMe');
-        localStorage.removeItem('savedEmail');
-    }
-}
-
-/**
- * Generates a unique, personalized recommendation using a smart template.
- * It summarizes performance instead of just listing topics.
- * @param {string} studentName The name of the student.
- * @param {string} tutorName The name of the tutor.
- * @param {Array} results The student's test results.
- * @returns {string} A personalized recommendation string.
- */
-function generateTemplatedRecommendation(studentName, tutorName, results) {
-    const strengths = [];
-    const weaknesses = [];
-    results.forEach(res => {
-        const percentage = res.total > 0 ? (res.correct / res.total) * 100 : 0;
-        const topicList = res.topics.length > 0 ? res.topics : [res.subject];
-        if (percentage >= 75) {
-            strengths.push(...topicList);
-        } else if (percentage < 50) {
-            weaknesses.push(...topicList);
-        }
-    });
-
-    const uniqueStrengths = [...new Set(strengths)];
-    const uniqueWeaknesses = [...new Set(weaknesses)];
-
-    let praiseClause = "";
-    if (uniqueStrengths.length > 2) {
-        praiseClause = `It was great to see ${studentName} demonstrate a solid understanding of several key concepts, particularly in areas like ${uniqueStrengths[0]} and ${uniqueStrengths[1]}. `;
-    } else if (uniqueStrengths.length > 0) {
-        praiseClause = `${studentName} showed strong potential, especially in the topic of ${uniqueStrengths.join(', ')}. `;
-    } else {
-        praiseClause = `${studentName} has put in a commendable effort on this initial assessment. `;
-    }
-
-    let improvementClause = "";
-    if (uniqueWeaknesses.length > 2) {
-        improvementClause = `Our next step will be to focus on building more confidence in a few areas, such as ${uniqueWeaknesses[0]} and ${uniqueWeaknesses[1]}. `;
-    } else if (uniqueWeaknesses.length > 0) {
-        improvementClause = `To continue this positive progress, our focus will be on the topic of ${uniqueWeaknesses.join(', ')}. `;
-    } else {
-        improvementClause = "We will continue to build on these fantastic results and explore more advanced topics. ";
-    }
-
-    const closingStatement = `With personalized support from their tutor, ${tutorName}, at Blooming Kids House, we are very confident that ${studentName} will master these skills and unlock their full potential.`;
-
-    return praiseClause + improvementClause + closingStatement;
-}
-
-/**
- * Checks if the search name matches the stored name, allowing for extra names added by tutors
- * @param {string} storedName The name stored in the database
- * @param {string} searchName The name entered by the parent
- * @returns {boolean} True if names match (case insensitive and allows extra names)
- */
-function nameMatches(storedName, searchName) {
-    if (!storedName || !searchName) return false;
-    
-    const storedLower = storedName.toLowerCase().trim();
-    const searchLower = searchName.toLowerCase().trim();
-    
-    // Exact match
-    if (storedLower === searchLower) return true;
-    
-    // If stored name contains the search name (tutor added extra names)
-    if (storedLower.includes(searchLower)) return true;
-    
-    // If search name contains the stored name (parent entered full name but stored has partial)
-    if (searchLower.includes(storedLower)) return true;
-    
-    // Split into words and check if all search words are in stored name
-    const searchWords = searchLower.split(/\s+/).filter(word => word.length > 1);
-    const storedWords = storedLower.split(/\s+/);
-    
-    if (searchWords.length > 0) {
-        return searchWords.every(word => storedWords.some(storedWord => storedWord.includes(word)));
-    }
-    
-    return false;
-}
-
-// Find parent name from students collection (SAME AS TUTOR.JS)
-async function findParentNameFromStudents(parentPhone) {
-    try {
-        console.log("Searching for parent name with phone:", parentPhone);
-        
-        // PRIMARY SEARCH: students collection (same as tutor.js)
-        const studentsSnapshot = await db.collection("students")
-            .where("parentPhone", "==", parentPhone)
-            .limit(1)
-            .get();
-
-        if (!studentsSnapshot.empty) {
-            const studentDoc = studentsSnapshot.docs[0];
-            const studentData = studentDoc.data();
-            
-            // Use parentName field (same as tutor.js)
-            const parentName = studentData.parentName;
-            
-            if (parentName) {
-                console.log("Found parent name in students collection:", parentName);
-                return parentName;
-            }
-        }
-
-        // SECONDARY SEARCH: pending_students collection (same as tutor.js)
-        const pendingStudentsSnapshot = await db.collection("pending_students")
-            .where("parentPhone", "==", parentPhone)
-            .limit(1)
-            .get();
-
-        if (!pendingStudentsSnapshot.empty) {
-            const pendingStudentDoc = pendingStudentsSnapshot.docs[0];
-            const pendingStudentData = pendingStudentDoc.data();
-            
-            // Use parentName field (same as tutor.js)
-            const parentName = pendingStudentData.parentName;
-            
-            if (parentName) {
-                console.log("Found parent name in pending_students collection:", parentName);
-                return parentName;
-            }
-        }
-
-        // FALLBACK SEARCH: tutor_submissions (for historical data)
-        const submissionsSnapshot = await db.collection("tutor_submissions")
-            .where("parentPhone", "==", parentPhone)
-            .limit(1)
-            .get();
-
-        if (!submissionsSnapshot.empty) {
-            const submissionDoc = submissionsSnapshot.docs[0];
-            const submissionData = submissionDoc.data();
-            
-            const parentName = submissionData.parentName;
-            
-            if (parentName) {
-                console.log("Found parent name in tutor_submissions:", parentName);
-                return parentName;
-            }
-        }
-
-        console.log("No parent name found in any collection");
-        return null;
-    } catch (error) {
-        console.error("Error finding parent name:", error);
-        return null;
-    }
-}
-
-// Authentication Functions
-async function handleSignUp() {
-    const phone = document.getElementById('signupPhone').value.trim();
-    const email = document.getElementById('signupEmail').value.trim();
-    const password = document.getElementById('signupPassword').value;
-    const confirmPassword = document.getElementById('signupConfirmPassword').value;
-
-    // Validation
-    if (!phone || !email || !password || !confirmPassword) {
-        showMessage('Please fill in all fields', 'error');
-        return;
-    }
-
-    if (password.length < 6) {
-        showMessage('Password must be at least 6 characters', 'error');
-        return;
-    }
-
-    if (password !== confirmPassword) {
-        showMessage('Passwords do not match', 'error');
-        return;
-    }
-
-    const cleanedPhone = cleanPhoneNumber(phone);
-    if (!cleanedPhone) {
-        showMessage('Please enter a valid phone number', 'error');
-        return;
-    }
-
-    const signUpBtn = document.getElementById('signUpBtn');
-    const authLoader = document.getElementById('authLoader');
-
-    signUpBtn.disabled = true;
-    signUpBtn.textContent = 'Creating Account...';
-    authLoader.classList.remove('hidden');
-
-    try {
-        // Create user with email and password
-        const userCredential = await auth.createUserWithEmailAndPassword(email, password);
-        const user = userCredential.user;
-
-        // Find parent name from existing data (SAME SOURCE AS TUTOR.JS)
-        const parentName = await findParentNameFromStudents(cleanedPhone);
-        
-        // --- START: REFERRAL SYSTEM INTEGRATION (PHASE 1) ---
-        const referralCode = await generateReferralCode();
-        // --- END: REFERRAL SYSTEM INTEGRATION (PHASE 1) ---
-
-        // Store user data in Firestore for easy retrieval
-        await db.collection('parent_users').doc(user.uid).set({
-            phone: cleanedPhone,
-            email: email,
-            parentName: parentName || 'Parent', // Use found name or default
-            createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-            // --- START: REFERRAL SYSTEM INTEGRATION (PHASE 1) ---
-            referralCode: referralCode, // Store the unique code
-            referralEarnings: 0,        // Initialize earnings
-            // --- END: REFERRAL SYSTEM INTEGRATION (PHASE 1) ---
+        document.getElementById('cancel-transitioning-btn').addEventListener('click', () => {
+            confirmationModal.remove();
         });
 
-        showMessage('Account created successfully!', 'success');
-        
-        // Automatically load reports after signup
-        await loadAllReportsForParent(cleanedPhone, user.uid);
-
-    } catch (error) {
-        console.error('Sign up error:', error);
-        let errorMessage = 'Account creation failed. ';
-        
-        switch (error.code) {
-            case 'auth/email-already-in-use':
-                errorMessage += 'Email address is already in use.';
-                break;
-            case 'auth/invalid-email':
-                errorMessage += 'Email address is invalid.';
-                break;
-            case 'auth/weak-password':
-                errorMessage += 'Password is too weak.';
-                break;
-            default:
-                errorMessage += 'Please try again.';
-        }
-        
-        showMessage(errorMessage, 'error');
-    } finally {
-        signUpBtn.disabled = false;
-        signUpBtn.textContent = 'Create Account';
-        authLoader.classList.add('hidden');
-    }
-}
-
-async function handleSignIn() {
-    const identifier = document.getElementById('loginIdentifier').value.trim();
-    const password = document.getElementById('loginPassword').value;
-
-    if (!identifier || !password) {
-        showMessage('Please fill in all fields', 'error');
-        return;
+        document.getElementById('confirm-transitioning-btn').addEventListener('click', async () => {
+            confirmationModal.remove();
+            await addTransitioningStudent();
+        });
     }
 
-    const signInBtn = document.getElementById('signInBtn');
-    const authLoader = document.getElementById('authLoader');
-
-    signInBtn.disabled = true;
-    signInBtn.textContent = 'Signing In...';
-    authLoader.classList.remove('hidden');
-
-    try {
-        let userCredential;
-        let userPhone;
-        let userId;
+    // Function to add transitioning student
+    async function addTransitioningStudent() {
+        const parentName = document.getElementById('new-parent-name').value.trim();
+        const parentPhone = document.getElementById('new-parent-phone').value.trim();
+        const studentName = document.getElementById('new-student-name').value.trim();
+        const studentGrade = document.getElementById('new-student-grade').value.trim();
         
-        // Determine if identifier is email or phone
-        if (identifier.includes('@')) {
-            // Sign in with email
-            userCredential = await auth.signInWithEmailAndPassword(identifier, password);
-            userId = userCredential.user.uid;
-            // Get phone from user profile
-            const userDoc = await db.collection('parent_users').doc(userId).get();
-            if (userDoc.exists) {
-                const userData = userDoc.data();
-                userPhone = userData.phone;
-            }
-        } else {
-            // Sign in with phone - find the user's email first
-            const cleanedPhone = cleanPhoneNumber(identifier);
-            const userQuery = await db.collection('parent_users')
-                .where('phone', '==', cleanedPhone)
-                .limit(1)
-                .get();
+        const selectedSubjects = [];
+        document.querySelectorAll('input[name="subjects"]:checked').forEach(checkbox => {
+            selectedSubjects.push(checkbox.value);
+        });
 
-            if (userQuery.empty) {
-                throw new Error('No account found with this phone number');
-            }
+        const studentDays = document.getElementById('new-student-days').value.trim();
+        const groupClass = document.getElementById('new-student-group-class') ? document.getElementById('new-student-group-class').checked : false;
+        const studentFee = parseFloat(document.getElementById('new-student-fee').value);
 
-            const userData = userQuery.docs[0].data();
-            userCredential = await auth.signInWithEmailAndPassword(userData.email, password);
-            userPhone = cleanedPhone;
-            userId = userCredential.user.uid;
+        if (!parentName || !studentName || !studentGrade || isNaN(studentFee) || !parentPhone || !studentDays || selectedSubjects.length === 0) {
+            showCustomAlert('Please fill in all parent and student details correctly, including at least one subject.');
+            return;
         }
 
-        if (!userPhone) {
-            throw new Error('Could not retrieve phone number for user');
-        }
-        
-        // Handle Remember Me
-        handleRememberMe();
-        
-        // Load all reports for the parent using the exact phone number as stored
-        await loadAllReportsForParent(userPhone, userId);
+        // Calculate suggested fee based on pay scheme
+        const payScheme = getTutorPayScheme(tutor);
+        const suggestedFee = calculateSuggestedFee({
+            grade: studentGrade,
+            days: studentDays,
+            subjects: selectedSubjects,
+            groupClass: groupClass
+        }, payScheme);
 
-    } catch (error) {
-        console.error('Sign in error:', error);
-        let errorMessage = 'Sign in failed. ';
-        
-        switch (error.code) {
-            case 'auth/user-not-found':
-                errorMessage += 'No account found with these credentials.';
-                break;
-            case 'auth/wrong-password':
-                errorMessage += 'Incorrect password.';
-                break;
-            case 'auth/invalid-email':
-                errorMessage += 'Invalid email format.';
-                break;
-            default:
-                errorMessage += error.message || 'Please check your credentials and try again.';
-        }
-        
-        showMessage(errorMessage, 'error');
-    } finally {
-        signInBtn.disabled = false;
-        signInBtn.textContent = 'Sign In';
-        authLoader.classList.add('hidden');
-    }
-}
-
-async function handlePasswordReset() {
-    const email = document.getElementById('resetEmail').value.trim();
-    
-    if (!email) {
-        showMessage('Please enter your email address', 'error');
-        return;
-    }
-
-    const sendResetBtn = document.getElementById('sendResetBtn');
-    const resetLoader = document.getElementById('resetLoader');
-
-    sendResetBtn.disabled = true;
-    resetLoader.classList.remove('hidden');
-
-    try {
-        await auth.sendPasswordResetEmail(email);
-        showMessage('Password reset link sent to your email. Please check your inbox.', 'success');
-        document.getElementById('passwordResetModal').classList.add('hidden');
-    } catch (error) {
-        console.error('Password reset error:', error);
-        let errorMessage = 'Failed to send reset email. ';
-        
-        switch (error.code) {
-            case 'auth/user-not-found':
-                errorMessage += 'No account found with this email address.';
-                break;
-            case 'auth/invalid-email':
-                errorMessage += 'Invalid email address.';
-                break;
-            default:
-                errorMessage += 'Please try again.';
-        }
-        
-        showMessage(errorMessage, 'error');
-    } finally {
-        sendResetBtn.disabled = false;
-        resetLoader.classList.add('hidden');
-    }
-}
-
-// Feedback System Functions
-function showFeedbackModal() {
-    populateStudentDropdown();
-    document.getElementById('feedbackModal').classList.remove('hidden');
-}
-
-function hideFeedbackModal() {
-    document.getElementById('feedbackModal').classList.add('hidden');
-    // Reset form
-    document.getElementById('feedbackCategory').value = '';
-    document.getElementById('feedbackPriority').value = '';
-    document.getElementById('feedbackStudent').value = '';
-    document.getElementById('feedbackMessage').value = '';
-}
-
-function populateStudentDropdown() {
-    const studentDropdown = document.getElementById('feedbackStudent');
-    studentDropdown.innerHTML = '<option value="">Select student</option>';
-    
-    // Get student names from the report headers that are already displayed
-    const studentHeaders = document.querySelectorAll('[class*="bg-green-100"] h2');
-    
-    if (studentHeaders.length === 0) {
-        studentDropdown.innerHTML += '<option value="" disabled>No students found - please wait for reports to load</option>';
-        return;
-    }
-
-    studentHeaders.forEach(header => {
-        const studentName = header.textContent.trim();
-        const option = document.createElement('option');
-        option.value = studentName;
-        option.textContent = studentName;
-        studentDropdown.appendChild(option);
-    });
-}
-
-async function submitFeedback() {
-    const category = document.getElementById('feedbackCategory').value;
-    const priority = document.getElementById('feedbackPriority').value;
-    const student = document.getElementById('feedbackStudent').value;
-    const message = document.getElementById('feedbackMessage').value;
-
-    // Validation
-    if (!category || !priority || !student || !message) {
-        showMessage('Please fill in all required fields', 'error');
-        return;
-    }
-
-    if (message.length < 10) {
-        showMessage('Please provide a more detailed message (at least 10 characters)', 'error');
-        return;
-    }
-
-    const submitBtn = document.getElementById('submitFeedbackBtn');
-    submitBtn.disabled = true;
-    submitBtn.textContent = 'Submitting...';
-
-    try {
-        const user = auth.currentUser;
-        if (!user) {
-            throw new Error('Please sign in to submit feedback');
-        }
-
-        // Get user data
-        const userDoc = await db.collection('parent_users').doc(user.uid).get();
-        const userData = userDoc.data();
-
-        // Create feedback document
-        const feedbackData = {
-            parentName: currentUserData?.parentName || userData.parentName || 'Unknown Parent',
-            parentPhone: userData.phone,
-            parentEmail: userData.email,
-            studentName: student,
-            category: category,
-            priority: priority,
-            message: message,
-            status: 'New',
-            timestamp: firebase.firestore.FieldValue.serverTimestamp(),
-            emailSent: false,
-            parentUid: user.uid, // Add parent UID for querying responses
-            responses: [] // Initialize empty responses array
+        const studentData = {
+            parentName: parentName,
+            parentPhone: parentPhone,
+            studentName: studentName,
+            grade: studentGrade,
+            subjects: selectedSubjects,
+            days: studentDays,
+            studentFee: suggestedFee > 0 ? suggestedFee : studentFee,
+            tutorEmail: tutor.email,
+            tutorName: tutor.name,
+            isTransitioning: true  // Mark as transitioning student
         };
 
-        // Save to Firestore
-        await db.collection('parent_feedback').add(feedbackData);
-
-        showMessage('Thank you! Your feedback has been submitted successfully. We will respond within 24-48 hours.', 'success');
-        
-        // Close modal and reset form
-        hideFeedbackModal();
-
-    } catch (error) {
-        console.error('Feedback submission error:', error);
-        showMessage('Failed to submit feedback. Please try again.', 'error');
-    } finally {
-        submitBtn.disabled = false;
-        submitBtn.textContent = 'Submit Feedback';
-    }
-}
-
-// Admin Responses Functions with Notification Counter
-function showResponsesModal() {
-    document.getElementById('responsesModal').classList.remove('hidden');
-    loadAdminResponses();
-    // Reset notification count when user views responses
-    resetNotificationCount();
-}
-
-function hideResponsesModal() {
-    document.getElementById('responsesModal').classList.add('hidden');
-}
-
-async function loadAdminResponses() {
-    const responsesContent = document.getElementById('responsesContent');
-    responsesContent.innerHTML = '<div class="text-center py-8"><div class="loading-spinner mx-auto" style="width: 40px; height: 40px;"></div><p class="text-green-600 font-semibold mt-4">Loading responses...</p></div>';
-
-    try {
-        const user = auth.currentUser;
-        if (!user) {
-            throw new Error('Please sign in to view responses');
+        // Add group class field if applicable
+        if (findSpecializedSubject(selectedSubjects)) {
+            studentData.groupClass = groupClass;
         }
 
-        // Query feedback where parentUid matches current user AND responses array exists and is not empty
-        const feedbackSnapshot = await db.collection('parent_feedback')
-            .where('parentUid', '==', user.uid)
-            .get();
-
-        if (feedbackSnapshot.empty) {
-            responsesContent.innerHTML = `
-                <div class="text-center py-12">
-                    <div class="text-6xl mb-4">📭</div>
-                    <h3 class="text-xl font-bold text-gray-700 mb-2">No Responses Yet</h3>
-                    <p class="text-gray-500 max-w-md mx-auto">You haven't received any responses from our staff yet. We'll respond to your feedback within 24-48 hours.</p>
-                </div>
-            `;
-            return;
-        }
-
-        // Filter feedback that has responses
-        const feedbackWithResponses = [];
-        feedbackSnapshot.forEach(doc => {
-            const feedback = { id: doc.id, ...doc.data() };
-            if (feedback.responses && feedback.responses.length > 0) {
-                feedbackWithResponses.push(feedback);
+        try {
+            if (isBypassApprovalEnabled) {
+                await addDoc(collection(db, "students"), studentData);
+                showCustomAlert('Transitioning student added successfully!');
+            } else {
+                await addDoc(collection(db, "pending_students"), studentData);
+                showCustomAlert('Transitioning student added and is pending approval.');
             }
-        });
+            renderStudentDatabase(container, tutor);
+        } catch (error) {
+            console.error("Error adding transitioning student:", error);
+            showCustomAlert(`An error occurred: ${error.message}`);
+        }
+    }
 
-        if (feedbackWithResponses.length === 0) {
-            responsesContent.innerHTML = `
-                <div class="text-center py-12">
-                    <div class="text-6xl mb-4">📭</div>
-                    <h3 class="text-xl font-bold text-gray-700 mb-2">No Responses Yet</h3>
-                    <p class="text-gray-500 max-w-md mx-auto">You haven't received any responses from our staff yet. We'll respond to your feedback within 24-48 hours.</p>
-                </div>
-            `;
-            return;
+    function attachEventListeners() {
+        // Group class toggle functionality for new student form
+        const subjectsContainer = document.getElementById('new-student-subjects-container');
+        const groupClassContainer = document.getElementById('group-class-container');
+        
+        if (subjectsContainer && groupClassContainer) {
+            subjectsContainer.addEventListener('change', (e) => {
+                if (e.target.type === 'checkbox' && e.target.checked) {
+                    const subject = e.target.value;
+                    const hasSpecializedSubject = findSpecializedSubject([subject]);
+                    if (hasSpecializedSubject) {
+                        groupClassContainer.classList.remove('hidden');
+                    }
+                }
+            });
         }
 
-        // Sort by most recent response
-        feedbackWithResponses.sort((a, b) => {
-            const aDate = a.responses[0]?.responseDate?.toDate() || new Date(0);
-            const bDate = b.responses[0]?.responseDate?.toDate() || new Date(0);
-            return bDate - aDate;
-        });
+        // Add event listener for transitioning student button - ALWAYS available
+        const transitioningBtn = document.getElementById('add-transitioning-btn');
+        if (transitioningBtn) {
+            transitioningBtn.addEventListener('click', () => {
+                showTransitioningConfirmation();
+            });
+        }
 
-        responsesContent.innerHTML = '';
-
-        feedbackWithResponses.forEach((feedback) => {
-            feedback.responses.forEach((response, index) => {
-                const responseDate = response.responseDate?.toDate() || feedback.timestamp?.toDate() || new Date();
-                const formattedDate = responseDate.toLocaleDateString('en-US', {
-                    year: 'numeric',
-                    month: 'long',
-                    day: 'numeric',
-                    hour: '2-digit',
-                    minute: '2-digit'
+        // Add event listener for regular student button - only when admin enables it
+        const studentBtn = document.getElementById('add-student-btn');
+        if (studentBtn && isTutorAddEnabled) {
+            studentBtn.addEventListener('click', async () => {
+                const parentName = document.getElementById('new-parent-name').value.trim();
+                const parentPhone = document.getElementById('new-parent-phone').value.trim();
+                const studentName = document.getElementById('new-student-name').value.trim();
+                const studentGrade = document.getElementById('new-student-grade').value.trim();
+                
+                const selectedSubjects = [];
+                document.querySelectorAll('input[name="subjects"]:checked').forEach(checkbox => {
+                    selectedSubjects.push(checkbox.value);
                 });
 
-                const responseElement = document.createElement('div');
-                responseElement.className = 'bg-white border border-gray-200 rounded-xl p-6 mb-4';
-                responseElement.innerHTML = `
-                    <div class="flex justify-between items-start mb-4">
-                        <div class="flex flex-wrap gap-2">
-                            <span class="inline-block px-3 py-1 rounded-full text-sm font-semibold ${getCategoryColor(feedback.category)}">
-                                ${feedback.category}
-                            </span>
-                            <span class="inline-block px-3 py-1 rounded-full text-sm font-semibold ${getPriorityColor(feedback.priority)}">
-                                ${feedback.priority} Priority
-                            </span>
-                        </div>
-                        <span class="text-sm text-gray-500">${formattedDate}</span>
-                    </div>
-                    
-                    <div class="mb-4">
-                        <h4 class="font-semibold text-gray-800 mb-2">Regarding: ${feedback.studentName}</h4>
-                        <p class="text-gray-700 bg-gray-50 p-4 rounded-lg border">${feedback.message}</p>
-                    </div>
-                    
-                    <div class="response-bubble">
-                        <div class="response-header">📨 Response from ${response.responderName || 'Admin'}:</div>
-                        <p class="text-gray-700 mt-2">${response.responseText}</p>
-                        <div class="text-sm text-gray-500 mt-2">
-                            Responded by: ${response.responderName || 'Admin Staff'} 
-                            ${response.responderEmail ? `(${response.responderEmail})` : ''}
-                        </div>
-                    </div>
-                `;
+                const studentDays = document.getElementById('new-student-days').value.trim();
+                const groupClass = document.getElementById('new-student-group-class') ? document.getElementById('new-student-group-class').checked : false;
+                const studentFee = parseFloat(document.getElementById('new-student-fee').value);
 
-                responsesContent.appendChild(responseElement);
-            });
-        });
-
-    } catch (error) {
-        console.error('Error loading responses:', error);
-        responsesContent.innerHTML = `
-            <div class="text-center py-8">
-                <div class="text-4xl mb-4">❌</div>
-                <h3 class="text-xl font-bold text-red-700 mb-2">Error Loading Responses</h3>
-                <p class="text-gray-500">Unable to load responses at this time. Please try again later.</p>
-            </div>
-        `;
-    }
-}
-
-// Notification System for Responses
-async function checkForNewResponses() {
-    try {
-        const user = auth.currentUser;
-        if (!user) return;
-
-        const feedbackSnapshot = await db.collection('parent_feedback')
-            .where('parentUid', '==', user.uid)
-            .get();
-
-        let totalResponses = 0;
-        
-        feedbackSnapshot.forEach(doc => {
-            const feedback = doc.data();
-            if (feedback.responses && feedback.responses.length > 0) {
-                totalResponses += feedback.responses.length;
-            }
-        });
-
-        // Update notification badge
-        updateNotificationBadge(totalResponses > 0 ? totalResponses : 0);
-        
-        // Store for later use
-        unreadResponsesCount = totalResponses;
-
-    } catch (error) {
-        console.error('Error checking for new responses:', error);
-    }
-}
-
-function updateNotificationBadge(count) {
-    let badge = document.getElementById('responseNotificationBadge');
-    const viewResponsesBtn = document.getElementById('viewResponsesBtn');
-    
-    if (!viewResponsesBtn) return;
-    
-    if (!badge) {
-        badge = document.createElement('span');
-        badge.id = 'responseNotificationBadge';
-        badge.className = 'absolute -top-2 -right-2 bg-red-500 text-white rounded-full text-xs w-6 h-6 flex items-center justify-center font-bold animate-pulse';
-        viewResponsesBtn.style.position = 'relative';
-        viewResponsesBtn.appendChild(badge);
-    }
-    
-    if (count > 0) {
-        badge.textContent = count > 9 ? '9+' : count;
-        badge.classList.remove('hidden');
-    } else {
-        badge.classList.add('hidden');
-    }
-}
-
-function resetNotificationCount() {
-    // When user views responses, mark them as read and reset counter
-    updateNotificationBadge(0);
-    unreadResponsesCount = 0;
-}
-
-function getCategoryColor(category) {
-    const colors = {
-        'Feedback': 'bg-blue-100 text-blue-800',
-        'Request': 'bg-green-100 text-green-800',
-        'Complaint': 'bg-red-100 text-red-800',
-        'Suggestion': 'bg-purple-100 text-purple-800'
-    };
-    return colors[category] || 'bg-gray-100 text-gray-800';
-}
-
-function getPriorityColor(priority) {
-    const colors = {
-        'Low': 'bg-gray-100 text-gray-800',
-        'Medium': 'bg-yellow-100 text-yellow-800',
-        'High': 'bg-orange-100 text-orange-800',
-        'Urgent': 'bg-red-100 text-red-800'
-    };
-    return colors[priority] || 'bg-gray-100 text-gray-800';
-}
-
-// Add View Responses button to the welcome section with notification badge
-function addViewResponsesButton() {
-    const welcomeSection = document.querySelector('.bg-green-50');
-    if (!welcomeSection) return;
-    
-    const buttonContainer = welcomeSection.querySelector('.flex.gap-2');
-    if (!buttonContainer) return;
-    
-    // Check if button already exists
-    if (document.getElementById('viewResponsesBtn')) return;
-    
-    const viewResponsesBtn = document.createElement('button');
-    viewResponsesBtn.id = 'viewResponsesBtn';
-    viewResponsesBtn.onclick = showResponsesModal;
-    viewResponsesBtn.className = 'bg-blue-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-blue-700 transition-all duration-200 btn-glow flex items-center justify-center relative';
-    viewResponsesBtn.innerHTML = '<span class="mr-2">📨</span> View Responses';
-    
-    // Insert before the logout button
-    buttonContainer.insertBefore(viewResponsesBtn, buttonContainer.lastElementChild);
-    
-    // Check for responses to show notification
-    setTimeout(() => {
-        checkForNewResponses();
-    }, 1000);
-}
-
-// MAIN REPORT LOADING FUNCTION - FIXED COLLECTION NAME AND VARIABLE DECLARATION
-async function loadAllReportsForParent(parentPhone, userId) {
-    const reportArea = document.getElementById("reportArea");
-    const reportContent = document.getElementById("reportContent");
-    const authArea = document.getElementById("authArea");
-    const authLoader = document.getElementById("authLoader");
-    const welcomeMessage = document.getElementById("welcomeMessage");
-
-    authLoader.classList.remove("hidden");
-
-    try {
-        // --- CACHE IMPLEMENTATION ---
-        const cacheKey = `reportCache_${parentPhone}`;
-        const twoWeeksInMillis = 14 * 24 * 60 * 60 * 1000;
-        
-        try {
-            const cachedItem = localStorage.getItem(cacheKey);
-            if (cachedItem) {
-                const { timestamp, html, chartConfigs, userData } = JSON.parse(cachedItem);
-                if (Date.now() - timestamp < twoWeeksInMillis) {
-                    console.log("Loading reports from cache.");
-                    reportContent.innerHTML = html;
-                    
-                    // Set welcome message from cache
-                    if (userData && userData.parentName) {
-                        welcomeMessage.textContent = `Welcome, ${userData.parentName}!`;
-                        currentUserData = userData;
-                    } else {
-                        welcomeMessage.textContent = `Welcome!`;
-                    }
-                    
-                    // Re-initialize charts from cached configuration
-                    if (chartConfigs && chartConfigs.length > 0) {
-                        setTimeout(() => {
-                            chartConfigs.forEach(chart => {
-                                const ctx = document.getElementById(chart.canvasId);
-                                if (ctx) new Chart(ctx, chart.config);
-                            });
-                        }, 0);
-                    }
-
-                    authArea.classList.add("hidden");
-                    reportArea.classList.remove("hidden");
-                    
-                    // Add View Responses button to welcome section
-                    addViewResponsesButton();
-                    
-                    // Load initial referral data for the rewards dashboard tab (must be done after auth/cache check)
-                    loadReferralRewards(userId);
-
+                if (!parentName || !studentName || !studentGrade || isNaN(studentFee) || !parentPhone || !studentDays || selectedSubjects.length === 0) {
+                    showCustomAlert('Please fill in all parent and student details correctly, including at least one subject.');
                     return;
                 }
-            }
-        } catch (e) {
-            console.error("Could not read from cache:", e);
-            localStorage.removeItem(cacheKey);
-        }
-        // --- END CACHE IMPLEMENTATION ---
 
-        // FIND PARENT NAME FROM SAME SOURCES AS TUTOR.JS
-        let parentName = await findParentNameFromStudents(parentPhone);
-        
-        // Get parent's email and latest user data from their account document
-        const userDocRef = db.collection('parent_users').doc(userId);
-        let userDoc = await userDocRef.get();
-        let userData = userDoc.data();
-        const parentEmail = userData.email;
+                // Calculate suggested fee based on pay scheme
+                const payScheme = getTutorPayScheme(tutor);
+                const suggestedFee = calculateSuggestedFee({
+                    grade: studentGrade,
+                    days: studentDays,
+                    subjects: selectedSubjects,
+                    groupClass: groupClass
+                }, payScheme);
 
-        // --- START: REFERRAL CODE CHECK/GENERATION FOR EXISTING USERS (FIX) ---
-        if (!userData.referralCode) {
-            console.log("Existing user detected without a referral code. Generating and assigning now.");
-            try {
-                const newReferralCode = await generateReferralCode();
-                await userDocRef.update({
-                    referralCode: newReferralCode,
-                    referralEarnings: userData.referralEarnings || 0 // Initialize if missing
-                });
-                
-                // Re-fetch updated user data
-                userDoc = await userDocRef.get();
-                userData = userDoc.data();
-                console.log("Referral code assigned successfully:", newReferralCode);
-                
-            } catch (error) {
-                console.error('Error auto-assigning referral code:', error);
-                // Non-critical failure, continue loading reports
-            }
-        }
-        // --- END: REFERRAL CODE CHECK/GENERATION FOR EXISTING USERS (FIX) ---
+                const studentData = {
+                    parentName: parentName,
+                    parentPhone: parentPhone,
+                    studentName: studentName,
+                    grade: studentGrade,
+                    subjects: selectedSubjects,
+                    days: studentDays,
+                    studentFee: suggestedFee > 0 ? suggestedFee : studentFee,
+                    tutorEmail: tutor.email,
+                    tutorName: tutor.name
+                };
 
+                // Add group class field if applicable
+                if (findSpecializedSubject(selectedSubjects)) {
+                    studentData.groupClass = groupClass;
+                }
 
-        // If not found in students collections, use name from user document
-        if (!parentName && userId) {
-            if (userDoc.exists) {
-                parentName = userData.parentName;
-            }
+                try {
+                    if (isBypassApprovalEnabled) {
+                        await addDoc(collection(db, "students"), studentData);
+                        showCustomAlert('Student added successfully!');
+                    } else {
+                        await addDoc(collection(db, "pending_students"), studentData);
+                        showCustomAlert('Student added and is pending approval.');
+                    }
+                    renderStudentDatabase(container, tutor);
+                } catch (error) {
+                    console.error("Error adding student:", error);
+                    showCustomAlert(`An error occurred: ${error.message}`);
+                }
+            });
         }
 
-        // Final fallback
-        if (!parentName) {
-            parentName = 'Parent';
-        }
-
-        // Store user data globally
-        currentUserData = {
-            parentName: parentName,
-            parentPhone: parentPhone
-        };
-
-        // UPDATE WELCOME MESSAGE WITH PARENT NAME
-        welcomeMessage.textContent = `Welcome, ${currentUserData.parentName}!`;
-
-        // Update parent name in user document if we found a better one
-        if (userId && parentName && parentName !== 'Parent' && userData.parentName !== parentName) {
-            try {
-                await userDocRef.update({
-                    parentName: parentName
-                });
-            } catch (error) {
-                console.error('Error updating parent name:', error);
-            }
-        }
-
-        console.log("🔍 Searching reports with:", { parentPhone, parentEmail });
-
-        // --- FIXED: PRIORITY SEARCH WITH CORRECT COLLECTION NAME ---
-        // Try phone search first (newer tests), fall back to email search only if needed
-        let assessmentSnapshot;
-
-        try {
-            // First try phone search (newer tests) - FIXED COLLECTION NAME
-            assessmentSnapshot = await db.collection("student_results").where("parentPhone", "==", parentPhone).get();
-            console.log("📊 Assessment results (phone search):", assessmentSnapshot.size);
-            
-            // If no results from phone search, try email search (older tests) - FIXED COLLECTION NAME
-            if (assessmentSnapshot.empty) {
-                console.log("🔍 No results from phone search, trying email search...");
-                assessmentSnapshot = await db.collection("student_results").where("parentEmail", "==", parentEmail).get();
-                console.log("📊 Assessment results (email search):", assessmentSnapshot.size);
-            }
-        } catch (error) {
-            console.error("Error searching assessments:", error);
-            assessmentSnapshot = { empty: true, forEach: () => {} };
-        }
-
-        // FIX: Declare studentResults array
-        let studentResults = [];
-        assessmentSnapshot.forEach(doc => {
-            const data = doc.data();
-            studentResults.push({ 
-                id: doc.id,
-                ...data,
-                timestamp: data.submittedAt?.seconds || Date.now() / 1000,
-                type: 'assessment'
+        document.querySelectorAll('.enter-report-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const studentId = btn.getAttribute('data-student-id');
+                const student = students.find(s => s.id === studentId);
+                showReportModal(student);
             });
         });
 
-        // Monthly reports: search by phone only
-        const monthlySnapshot = await db.collection("tutor_submissions").where("parentPhone", "==", parentPhone).get();
-        const monthlyReports = [];
-        monthlySnapshot.forEach(doc => {
-            const data = doc.data();
-            monthlyReports.push({ 
-                id: doc.id,
-                ...data,
-                timestamp: data.submittedAt?.seconds || Date.now() / 1000,
-                type: 'monthly'
+        document.querySelectorAll('.submit-single-report-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const studentId = btn.getAttribute('data-student-id');
+                const student = students.find(s => s.id === studentId);
+                showReportModal(student);
             });
         });
 
-        console.log("📊 Assessment results (unique):", studentResults.length);
-        console.log("📊 Monthly reports:", monthlySnapshot.size);
-
-        if (studentResults.length === 0 && monthlyReports.length === 0) {
-            showMessage(`No reports found for your account. Please contact Blooming Kids House if you believe this is an error.`, 'info');
-            authLoader.classList.add("hidden");
-            
-            // Load initial referral data for the rewards dashboard tab even if no reports
-            loadReferralRewards(userId);
-
-            return;
-        }
+       document.querySelectorAll('.summer-break-btn').forEach(btn => {
+    btn.addEventListener('click', async () => {
+        const studentId = btn.getAttribute('data-student-id');
+        const student = students.find(s => s.id === studentId);
         
-        reportContent.innerHTML = "";
-        const chartConfigsToCache = [];
-
-        // Group reports by student name and extract parent name
-        const studentsMap = new Map();
-
-        // Process assessment reports
-        studentResults.forEach(result => {
-            const studentName = result.studentName;
-            if (!studentsMap.has(studentName)) {
-                studentsMap.set(studentName, { assessments: [], monthly: [] });
-            }
-            studentsMap.get(studentName).assessments.push(result);
-        });
-
-        // Process monthly reports
-        monthlyReports.forEach(report => {
-            const studentName = report.studentName;
-            if (!studentsMap.has(studentName)) {
-                studentsMap.set(studentName, { assessments: [], monthly: [] });
-            }
-            studentsMap.get(studentName).monthly.push(report);
-        });
-
-        userChildren = Array.from(studentsMap.keys());
-
-        // Display reports for each student
-        let studentIndex = 0;
-        for (const [studentName, reports] of studentsMap) {
-            const fullName = capitalize(studentName);
-            
-            // Add student header
-            const studentHeader = `
-                <div class="bg-green-100 border-l-4 border-green-600 p-4 rounded-lg mb-6">
-                    <h2 class="text-xl font-bold text-green-800">${fullName}</h2>
-                    <p class="text-green-600">Showing all reports for ${fullName}</p>
-                </div>
-            `;
-            reportContent.innerHTML += studentHeader;
-
-            // Display Assessment Reports for this student - NO DUPLICATES
-            if (reports.assessments.length > 0) {
-                // Group by unique test sessions using timestamp
-                const uniqueSessions = new Map();
-                
-                reports.assessments.forEach((result) => {
-                    const sessionKey = Math.floor(result.timestamp / 86400); // Group by day
-                    if (!uniqueSessions.has(sessionKey)) {
-                        uniqueSessions.set(sessionKey, []);
-                    }
-                    uniqueSessions.get(sessionKey).push(result);
-                });
-
-                let assessmentIndex = 0;
-                for (const [sessionKey, session] of uniqueSessions) {
-                    const tutorEmail = session[0].tutorEmail || 'N/A';
-                    const studentCountry = session[0].studentCountry || 'N/A';
-                    const formattedDate = new Date(session[0].timestamp * 1000).toLocaleString('en-US', {
-                        dateStyle: 'long',
-                        timeStyle: 'short'
-                    });
-
-                    let tutorName = 'N/A';
-                    if (tutorEmail && tutorEmail !== 'N/A') {
-                        try {
-                            const tutorDoc = await db.collection("tutors").doc(tutorEmail).get();
-                            if (tutorDoc.exists) {
-                                tutorName = tutorDoc.data().name;
-                            }
-                        } catch (error) {
-                            // Silent fail - tutor name will remain 'N/A'
-                        }
-                    }
-
-                    const results = session.map(testResult => {
-                        const topics = [...new Set(testResult.answers?.map(a => a.topic).filter(t => t))] || [];
-                        return {
-                            subject: testResult.subject,
-                            correct: testResult.score !== undefined ? testResult.score : 0,
-                            total: testResult.totalScoreableQuestions !== undefined ? testResult.totalScoreableQuestions : 0,
-                            topics: topics,
-                        };
-                    });
-
-                    const tableRows = results.map(res => `<tr><td class="border px-2 py-1">${res.subject.toUpperCase()}</td><td class="border px-2 py-1 text-center">${res.correct} / ${res.total}</td></tr>`).join("");
-                    const topicsTableRows = results.map(res => `<tr><td class="border px-2 py-1 font-semibold">${res.subject.toUpperCase()}</td><td class="border px-2 py-1">${res.topics.join(', ') || 'N/A'}</td></tr>`).join("");
-
-                    const recommendation = generateTemplatedRecommendation(fullName, tutorName, results);
-                    const creativeWritingAnswer = session[0].answers?.find(a => a.type === 'creative-writing');
-                    const tutorReport = creativeWritingAnswer?.tutorReport || 'Pending review.';
-
-                    const assessmentBlock = `
-                        <div class="border rounded-lg shadow mb-8 p-6 bg-white" id="assessment-block-${studentIndex}-${assessmentIndex}">
-                            <div class="text-center mb-6 border-b pb-4">
-                                <img src="https://res.cloudinary.com/dy2hxcyaf/image/upload/v1757700806/newbhlogo_umwqzy.svg" 
-                                     alt="Blooming Kids House Logo" 
-                                     class="h-16 w-auto mx-auto mb-3">
-                                <h2 class="text-2xl font-bold text-green-800">Assessment Report</h2>
-                                <p class="text-gray-600">Date: ${formattedDate}</p>
-                            </div>
-
-                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6 bg-green-50 p-4 rounded-lg">
-                                <div>
-                                    <p><strong>Student's Name:</strong> ${fullName}</p>
-                                    <p><strong>Parent's Phone:</strong> ${session[0].parentPhone || 'N/A'}</p>
-                                    <p><strong>Grade:</strong> ${session[0].grade}</p>
-                                </div>
-                                <div>
-                                    <p><strong>Tutor:</strong> ${tutorName || 'N/A'}</p>
-                                    <p><strong>Location:</strong> ${studentCountry || 'N/A'}</p>
-                                </div>
-                            </div>
-                            
-                            <h3 class="text-lg font-semibold mt-4 mb-2 text-green-700">Performance Summary</h3>
-                            <table class="w-full text-sm mb-4 border border-collapse">
-                                <thead class="bg-gray-100"><tr><th class="border px-2 py-1 text-left">Subject</th><th class="border px-2 py-1 text-center">Score</th></tr></thead>
-                                <tbody>${tableRows}</tbody>
-                            </table>
-                            
-                            <h3 class="text-lg font-semibold mt-4 mb-2 text-green-700">Knowledge & Skill Analysis</h3>
-                            <table class="w-full text-sm mb-4 border border-collapse">
-                                <thead class="bg-gray-100"><tr><th class="border px-2 py-1 text-left">Subject</th><th class="border px-2 py-1 text-left">Topics Covered</th></tr></thead>
-                                <tbody>${topicsTableRows}</tbody>
-                            </table>
-                            
-                            <h3 class="text-lg font-semibold mt-4 mb-2 text-green-700">Tutor's Recommendation</h3>
-                            <p class="mb-2 text-gray-700 leading-relaxed">${recommendation}</p>
-
-                            ${creativeWritingAnswer ? `
-                            <h3 class="text-lg font-semibold mt-4 mb-2 text-green-700">Creative Writing Feedback</h3>
-                            <p class="mb-2 text-gray-700"><strong>Tutor's Report:</strong> ${tutorReport}</p>
-                            ` : ''}
-
-                            ${results.length > 0 ? `
-                            <canvas id="chart-${studentIndex}-${assessmentIndex}" class="w-full h-48 mb-4"></canvas>
-                            ` : ''}
-                            
-                            <div class="bg-yellow-50 p-4 rounded-lg mt-6">
-                                <h3 class="text-lg font-semibold mb-1 text-green-700">Director's Message</h3>
-                                <p class="italic text-sm text-gray-700">At Blooming Kids House, we are committed to helping every child succeed. We believe that with personalized support from our tutors, ${fullName} will unlock their full potential. Keep up the great work!<br/>– Mrs. Yinka Isikalu, Director</p>
-                            </div>
-                            
-                            <div class="mt-6 text-center">
-                                <button onclick="downloadSessionReport(${studentIndex}, ${assessmentIndex}, '${fullName}', 'assessment')" class="bg-green-600 text-white px-6 py-2 rounded-lg font-semibold hover:bg-green-700 transition-all duration-200">
-                                    Download Assessment PDF
-                                </button>
-                            </div>
-                        </div>
-                    `;
-
-                    reportContent.innerHTML += assessmentBlock;
-
-                    if (results.length > 0) {
-                        const ctx = document.getElementById(`chart-${studentIndex}-${assessmentIndex}`);
-                        if (ctx) {
-                            const chartConfig = {
-                                type: 'bar',
-                                data: {
-                                    labels: results.map(r => r.subject.toUpperCase()),
-                                    datasets: [
-                                        { label: 'Correct Answers', data: results.map(s => s.correct), backgroundColor: '#4CAF50' }, 
-                                        { label: 'Incorrect/Unanswered', data: results.map(s => s.total - s.correct), backgroundColor: '#FFCD56' }
-                                    ]
-                                },
-                                options: {
-                                    responsive: true,
-                                    scales: { x: { stacked: true }, y: { stacked: true, beginAtZero: true } },
-                                    plugins: { title: { display: true, text: 'Score Distribution by Subject' } }
-                                }
-                            };
-                            new Chart(ctx, chartConfig);
-                            chartConfigsToCache.push({ canvasId: `chart-${studentIndex}-${assessmentIndex}`, config: chartConfig });
-                        }
-                    }
-                    assessmentIndex++;
-                }
-            }
-            
-            // Display Monthly Reports for this student
-            if (reports.monthly.length > 0) {
-                const groupedMonthly = {};
-                reports.monthly.forEach((result) => {
-                    const sessionKey = Math.floor(result.timestamp / 86400); 
-                    if (!groupedMonthly[sessionKey]) groupedMonthly[sessionKey] = [];
-                    groupedMonthly[sessionKey].push(result);
-                });
-
-                let monthlyIndex = 0;
-                for (const key in groupedMonthly) {
-                    const session = groupedMonthly[key];
-                    const formattedDate = new Date(session[0].timestamp * 1000).toLocaleString('en-US', {
-                        dateStyle: 'long',
-                        timeStyle: 'short'
-                    });
-
-                    session.forEach((monthlyReport, reportIndex) => {
-                        const monthlyBlock = `
-                            <div class="border rounded-lg shadow mb-8 p-6 bg-white" id="monthly-block-${studentIndex}-${monthlyIndex}">
-                                <div class="text-center mb-6 border-b pb-4">
-                                    <img src="https://res.cloudinary.com/dy2hxcyaf/image/upload/v1757700806/newbhlogo_umwqzy.svg" 
-                                         alt="Blooming Kids House Logo" 
-                                         class="h-16 w-auto mx-auto mb-3">
-                                    <h2 class="text-2xl font-bold text-green-800">MONTHLY LEARNING REPORT</h2>
-                                    <p class="text-gray-600">Date: ${formattedDate}</p>
-                                </div>
-                                
-                                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6 bg-green-50 p-4 rounded-lg">
-                                    <div>
-                                        <p><strong>Student's Name:</strong> ${monthlyReport.studentName || 'N/A'}</p>
-                                        <p><strong>Parent's Name:</strong> ${monthlyReport.parentName || 'N/A'}</p>
-                                        <p><strong>Parent's Phone:</strong> ${monthlyReport.parentPhone || 'N/A'}</p>
-                                    </div>
-                                    <div>
-                                        <p><strong>Grade:</strong> ${monthlyReport.grade || 'N/A'}</p>
-                                        <p><strong>Tutor's Name:</strong> ${monthlyReport.tutorName || 'N/A'}</p>
-                                    </div>
-                                </div>
-
-                                ${monthlyReport.introduction ? `
-                                <div class="mb-6">
-                                    <h3 class="text-lg font-semibold text-green-700 mb-2 border-b pb-1">INTRODUCTION</h3>
-                                    <p class="text-gray-700 leading-relaxed preserve-whitespace">${monthlyReport.introduction}</p>
-                                </div>
-                                ` : ''}
-
-                                ${monthlyReport.topics ? `
-                                <div class="mb-6">
-                                    <h3 class="text-lg font-semibold text-green-700 mb-2 border-b pb-1">TOPICS & REMARKS</h3>
-                                    <p class="text-gray-700 leading-relaxed preserve-whitespace">${monthlyReport.topics}</p>
-                                </div>
-                                ` : ''}
-
-                                ${monthlyReport.progress ? `
-                                <div class="mb-6">
-                                    <h3 class="text-lg font-semibold text-green-700 mb-2 border-b pb-1">PROGRESS & ACHIEVEMENTS</h3>
-                                    <p class="text-gray-700 leading-relaxed preserve-whitespace">${monthlyReport.progress}</p>
-                                </div>
-                                ` : ''}
-
-                                ${monthlyReport.strengthsWeaknesses ? `
-                                <div class="mb-6">
-                                    <h3 class="text-lg font-semibold text-green-700 mb-2 border-b pb-1">STRENGTHS AND WEAKNESSES</h3>
-                                    <p class="text-gray-700 leading-relaxed preserve-whitespace">${monthlyReport.strengthsWeaknesses}</p>
-                                </div>
-                                ` : ''}
-
-                                ${monthlyReport.recommendations ? `
-                                <div class="mb-6">
-                                    <h3 class="text-lg font-semibold text-green-700 mb-2 border-b pb-1">RECOMMENDATIONS</h3>
-                                    <p class="text-gray-700 leading-relaxed preserve-whitespace">${monthlyReport.recommendations}</p>
-                                </div>
-                                ` : ''}
-
-                                ${monthlyReport.generalComments ? `
-                                <div class="mb-6">
-                                    <h3 class="text-lg font-semibold text-green-700 mb-2 border-b pb-1">GENERAL TUTOR'S COMMENTS</h3>
-                                    <p class="text-gray-700 leading-relaxed preserve-whitespace">${monthlyReport.generalComments}</p>
-                                </div>
-                                ` : ''}
-
-                                <div class="text-right mt-8 pt-4 border-t">
-                                    <p class="text-gray-600">Best regards,</p>
-                                    <p class="font-semibold text-green-800">${monthlyReport.tutorName || 'N/A'}</p>
-                                </div>
-
-                                <div class="mt-6 text-center">
-                                    <button onclick="downloadMonthlyReport(${studentIndex}, ${monthlyIndex}, '${fullName}')" class="bg-green-600 text-white px-6 py-2 rounded-lg font-semibold hover:bg-green-700 transition-all duration-200">
-                                        Download Monthly Report PDF
-                                    </button>
-                                </div>
-                            </div>
-                        `;
-                        reportContent.innerHTML += monthlyBlock;
-                        monthlyIndex++;
-                    });
-                }
-            }
-            
-            studentIndex++;
-        }
-        
-        // --- CACHE SAVING LOGIC ---
-        try {
-            const dataToCache = {
-                timestamp: Date.now(),
-                html: reportContent.innerHTML,
-                chartConfigs: chartConfigsToCache,
-                userData: currentUserData
-            };
-            localStorage.setItem(cacheKey, JSON.stringify(dataToCache));
-            console.log("Report data cached successfully.");
-        } catch (e) {
-            console.error("Could not write to cache:", e);
-        }
-        // --- END CACHE SAVING ---
-
-        authArea.classList.add("hidden");
-        reportArea.classList.remove("hidden");
-
-        // Add View Responses button to welcome section
-        addViewResponsesButton();
-        
-        // Load initial referral data for the rewards dashboard tab
-        // Note: This function will only run when the user is authenticated and the reports load successfully.
-        loadReferralRewards(userId);
-
-    } catch (error) {
-        console.error("Error loading reports:", error);
-        showMessage("Sorry, there was an error loading the reports. Please try again.", "error");
-    } finally {
-        authLoader.classList.add("hidden");
-    }
-}
-
-function downloadSessionReport(studentIndex, sessionIndex, studentName, type) {
-    const element = document.getElementById(`${type}-block-${studentIndex}-${sessionIndex}`);
-    const safeStudentName = studentName.replace(/ /g, '_');
-    const fileName = `${type === 'assessment' ? 'Assessment' : 'Monthly'}_Report_${safeStudentName}.pdf`;
-    const opt = { margin: 0.5, filename: fileName, image: { type: 'jpeg', quality: 0.98 }, html2canvas: { scale: 2, useCORS: true }, jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' } };
-    html2pdf().from(element).set(opt).save();
-}
-
-function downloadMonthlyReport(studentIndex, monthlyIndex, studentName) {
-    downloadSessionReport(studentIndex, monthlyIndex, studentName, 'monthly');
-}
-
-function logout() {
-    // Clear remember me on logout
-    localStorage.removeItem('rememberMe');
-    localStorage.removeItem('savedEmail');
-    
-    auth.signOut().then(() => {
-        window.location.reload();
-    });
-}
-
-function showMessage(message, type) {
-    // Remove any existing message
-    const existingMessage = document.querySelector('.message-toast');
-    if (existingMessage) {
-        existingMessage.remove();
-    }
-
-    const messageDiv = document.createElement('div');
-    messageDiv.className = `message-toast fixed top-4 right-4 p-4 rounded-lg shadow-lg z-50 max-w-sm ${
-        type === 'error' ? 'bg-red-500 text-white' : 
-        type === 'success' ? 'bg-green-500 text-white' : 
-        'bg-blue-500 text-white'
-    }`;
-    messageDiv.textContent = `BKH says: ${message}`;
-    
-    document.body.appendChild(messageDiv);
-    
-    // Auto remove after 5 seconds
-    setTimeout(() => {
-        messageDiv.remove();
-    }, 5000);
-}
-
-function switchTab(tab) {
-    const signInTab = document.getElementById('signInTab');
-    const signUpTab = document.getElementById('signUpTab');
-    const signInForm = document.getElementById('signInForm');
-    const signUpForm = document.getElementById('signUpForm');
-
-    if (tab === 'signin') {
-        signInTab.classList.remove('tab-inactive');
-        signInTab.classList.add('tab-active');
-        signUpTab.classList.remove('tab-active');
-        signUpTab.classList.add('tab-inactive');
-        signInForm.classList.remove('hidden');
-        signUpForm.classList.add('hidden');
-    } else {
-        signUpTab.classList.remove('tab-inactive');
-        signUpTab.classList.add('tab-active');
-        signInTab.classList.remove('tab-active');
-        signInTab.classList.add('tab-inactive');
-        signUpForm.classList.remove('hidden');
-        signInForm.classList.add('hidden');
-    }
-}
-
-function switchMainTab(tab) {
-    const reportTab = document.getElementById('reportTab');
-    const rewardsTab = document.getElementById('rewardsTab');
-    
-    const reportContentArea = document.getElementById('reportContentArea');
-    const rewardsContentArea = document.getElementById('rewardsContentArea');
-    
-    // Deactivate all tabs
-    reportTab?.classList.remove('tab-active-main');
-    reportTab?.classList.add('tab-inactive-main');
-    rewardsTab?.classList.remove('tab-active-main');
-    rewardsTab?.classList.add('tab-inactive-main');
-    
-    // Hide all content areas
-    reportContentArea?.classList.add('hidden');
-    rewardsContentArea?.classList.add('hidden');
-    
-    // Activate selected tab and show content
-    if (tab === 'reports') {
-        reportTab?.classList.remove('tab-inactive-main');
-        reportTab?.classList.add('tab-active-main');
-        reportContentArea?.classList.remove('hidden');
-    } else if (tab === 'rewards') {
-        rewardsTab?.classList.remove('tab-inactive-main');
-        rewardsTab?.classList.add('tab-active-main');
-        rewardsContentArea?.classList.remove('hidden');
-        
-        // Reload rewards data when the tab is clicked to ensure it's up-to-date
-        const user = auth.currentUser;
-        if (user) {
-            loadReferralRewards(user.uid);
-        }
-    }
-}
-
-
-// Initialize the page
-document.addEventListener('DOMContentLoaded', function() {
-    // Setup Remember Me
-    setupRememberMe();
-    
-    // Check authentication state
-    auth.onAuthStateChanged((user) => {
-        if (user) {
-            // User is signed in, load their reports
-            // Get phone from Firestore user document
-            db.collection('parent_users').doc(user.uid).get()
-                .then((doc) => {
-                    if (doc.exists) {
-                        const userPhone = doc.data().phone;
-                        loadAllReportsForParent(userPhone, user.uid);
-                    }
-                })
-                .catch((error) => {
-                    console.error('Error getting user data:', error);
-                });
+        // Add confirmation dialog
+        if (confirm(`Are you sure you want to put ${student.studentName} on summer break?`)) {
+            const studentRef = doc(db, "students", studentId);
+            await updateDoc(studentRef, { summerBreak: true });
+            showCustomAlert(`${student.studentName} has been marked as on summer break.`);
+            renderStudentDatabase(container, tutor);
         }
     });
-
-    // Set up event listeners
-    document.getElementById("signInBtn").addEventListener("click", handleSignIn);
-    document.getElementById("signUpBtn").addEventListener("click", handleSignUp);
-    document.getElementById("sendResetBtn").addEventListener("click", handlePasswordReset);
-    document.getElementById("submitFeedbackBtn").addEventListener("click", submitFeedback);
-    
-    document.getElementById("signInTab").addEventListener("click", () => switchTab('signin'));
-    document.getElementById("signUpTab").addEventListener("click", () => switchTab('signup'));
-    
-    document.getElementById("forgotPasswordBtn").addEventListener("click", () => {
-        document.getElementById("passwordResetModal").classList.remove("hidden");
-    });
-    
-    document.getElementById("cancelResetBtn").addEventListener("click", () => {
-        document.getElementById("passwordResetModal").classList.add("hidden");
-    });
-
-    document.getElementById("rememberMe").addEventListener("change", handleRememberMe);
-
-    // Allow Enter key to submit forms
-    document.getElementById('loginPassword').addEventListener('keypress', (e) => {
-        if (e.key === 'Enter') handleSignIn();
-    });
-    
-    document.getElementById('signupConfirmPassword').addEventListener('keypress', (e) => {
-        if (e.key === 'Enter') handleSignUp();
-    });
-    
-    document.getElementById('resetEmail').addEventListener('keypress', (e) => {
-        if (e.key === 'Enter') handlePasswordReset();
-    });
-    
-    // --- START: NEW MAIN TAB SWITCHING LISTENERS (PHASE 3) ---
-    document.getElementById("reportTab")?.addEventListener("click", () => switchMainTab('reports'));
-    document.getElementById("rewardsTab")?.addEventListener("click", () => switchMainTab('rewards'));
-    // --- END: NEW MAIN TAB SWITCHING LISTENERS (PHASE 3) ---
 });
+
+        const submitAllBtn = document.getElementById('submit-all-reports-btn');
+        if (submitAllBtn) {
+            submitAllBtn.addEventListener('click', () => {
+                const reportsToSubmit = Object.values(savedReports);
+                showAccountDetailsModal(reportsToSubmit);
+            });
+        }
+
+        const saveFeeBtn = document.getElementById('save-management-fee-btn');
+        if (saveFeeBtn) {
+            saveFeeBtn.addEventListener('click', async () => {
+                const newFee = parseFloat(document.getElementById('management-fee-input').value);
+                if (isNaN(newFee) || newFee < 0) {
+                    showCustomAlert("Please enter a valid fee amount.");
+                    return;
+                }
+                const tutorRef = doc(db, "tutors", tutor.id);
+                await updateDoc(tutorRef, { managementFee: newFee });
+                showCustomAlert("Management fee updated successfully.");
+                window.tutorData.managementFee = newFee;
+            });
+        }
+        
+        document.querySelectorAll('.edit-student-btn-tutor').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const studentId = btn.getAttribute('data-student-id');
+                const collectionName = btn.getAttribute('data-collection');
+                const student = students.find(s => s.id === studentId && s.collection === collectionName);
+                if (student) {
+                    showEditStudentModal(student);
+                }
+            });
+        });
+
+        document.querySelectorAll('.delete-student-btn-tutor').forEach(btn => {
+            btn.addEventListener('click', async () => {
+                const studentId = btn.getAttribute('data-student-id');
+                const collectionName = btn.getAttribute('data-collection');
+                const student = students.find(s => s.id === studentId && s.collection === collectionName);
+                
+                if (student && confirm(`Are you sure you want to delete ${student.studentName}? This action cannot be undone.`)) {
+                    try {
+                        await deleteDoc(doc(db, collectionName, studentId));
+                        showCustomAlert('Student deleted successfully!');
+                        renderStudentDatabase(container, tutor);
+                    } catch (error) {
+                        console.error("Error deleting student:", error);
+                        showCustomAlert(`An error occurred: ${error.message}`);
+                    }
+                }
+            });
+        });
+    }
+
+    renderUI();
+}
+
+// ##################################################################
+// # SECTION 3: MAIN APP INITIALIZATION
+// ##################################################################
+document.addEventListener('DOMContentLoaded', async () => {
+    onAuthStateChanged(auth, async (user) => {
+        if (user) {
+            const tutorQuery = query(collection(db, "tutors"), where("email", "==", user.email.trim()));
+            const querySnapshot = await getDocs(tutorQuery);
+            if (!querySnapshot.empty) {
+                const tutorDoc = querySnapshot.docs[0];
+                const tutorData = { id: tutorDoc.id, ...tutorDoc.data() };
+                window.tutorData = tutorData;
+                
+                // Show employment date popup if needed
+                if (shouldShowEmploymentPopup(tutorData)) {
+                    showEmploymentDatePopup(tutorData);
+                }
+                
+                renderTutorDashboard(document.getElementById('mainContent'), tutorData);
+            } else {
+                console.error("No matching tutor found.");
+                document.getElementById('mainContent').innerHTML = `<p class="text-red-500">Error: No tutor profile found for your email.</p>`;
+            }
+        } else {
+            window.location.href = 'login.html';
+        }
+    });
+
+    document.getElementById('logoutBtn').addEventListener('click', () => {
+        signOut(auth).then(() => {
+            window.location.href = 'tutor-auth.html';
+        }).catch(error => {
+            console.error("Error signing out:", error);
+        });
+    });
+
+    document.getElementById('navDashboard').addEventListener('click', () => {
+        if (window.tutorData) {
+            renderTutorDashboard(document.getElementById('mainContent'), window.tutorData);
+        }
+    });
+
+    document.getElementById('navStudentDatabase').addEventListener('click', () => {
+        if (window.tutorData) {
+            renderStudentDatabase(document.getElementById('mainContent'), window.tutorData);
+        }
+    });
+
+    // ##################################################################
+    // # SECTION 4: AUTO-REGISTERED STUDENTS NAVIGATION (NEW - ADDED AT BOTTOM)
+    // ##################################################################
+    document.getElementById('navAutoStudents').addEventListener('click', () => {
+        if (window.tutorData) {
+            renderAutoRegisteredStudents(document.getElementById('mainContent'), window.tutorData);
+        }
+    });
+});
+
+// ##################################################################
+// # SECTION 5: AUTO-REGISTERED STUDENTS DISPLAY (NEW - ADDED AT BOTTOM)
+// ##################################################################
+
+function renderAutoRegisteredStudents(container, tutor) {
+    container.innerHTML = `
+        <div class="bg-white p-6 rounded-lg shadow-md">
+            <h2 class="text-2xl font-bold text-blue-700 mb-4">Auto-Registered Students</h2>
+            <p class="text-sm text-gray-600 mb-4">Students who completed tests and need profile completion</p>
+            <div id="auto-students-list">
+                <p class="text-gray-500">Loading auto-registered students...</p>
+            </div>
+        </div>
+    `;
+    
+    loadAutoRegisteredStudents(tutor.email);
+}
+
+async function loadAutoRegisteredStudents(tutorEmail) {
+    // Query both collections for auto-registered students
+    const studentsQuery = query(collection(db, "students"), 
+        where("tutorEmail", "==", tutorEmail),
+        where("autoRegistered", "==", true));
+    
+    const pendingQuery = query(collection(db, "pending_students"), 
+        where("tutorEmail", "==", tutorEmail),
+        where("autoRegistered", "==", true));
+
+    try {
+        const [studentsSnapshot, pendingSnapshot] = await Promise.all([
+            getDocs(studentsQuery),
+            getDocs(pendingQuery)
+        ]);
+
+        const autoStudents = [
+            ...studentsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data(), collection: "students" })),
+            ...pendingSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data(), collection: "pending_students" }))
+        ];
+
+        renderAutoStudentsList(autoStudents);
+    } catch (error) {
+        console.error("Error loading auto-registered students:", error);
+        document.getElementById('auto-students-list').innerHTML = `<p class="text-red-500">Failed to load auto-registered students.</p>`;
+    }
+}
+
+function renderAutoStudentsList(students) {
+    const container = document.getElementById('auto-students-list');
+    
+    if (students.length === 0) {
+        container.innerHTML = `<p class="text-gray-500">No auto-registered students found.</p>`;
+        return;
+    }
+
+    let html = `
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-200">
+                <thead>
+                    <tr>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Student</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Test Info</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
+                    </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-gray-200">
+    `;
+
+    students.forEach(student => {
+        const status = student.collection === "students" ? 
+            "🆕 Needs Completion" : 
+            "🆕 Awaiting Approval";
+            
+        const statusClass = student.collection === "students" ? 
+            'bg-blue-100 text-blue-800' : 
+            'bg-yellow-100 text-yellow-800';
+        
+        html += `
+            <tr>
+                <td class="px-6 py-4 whitespace-nowrap">
+                    <div class="font-medium">${student.studentName}</div>
+                    <div class="text-sm text-gray-500">${student.grade} • ${student.parentPhone || 'No phone'}</div>
+                    <div class="text-xs text-gray-400">${student.parentEmail || 'No email'}</div>
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap">
+                    <span class="px-2 py-1 text-xs font-semibold rounded-full ${statusClass}">
+                        ${status}
+                    </span>
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    ${student.testSubject || 'General Test'}
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap space-x-2">
+                    <button class="complete-student-btn bg-green-600 text-white px-3 py-1 rounded text-sm" 
+                            data-student-id="${student.id}" data-collection="${student.collection}">
+                        Complete Profile
+                    </button>
+                </td>
+            </tr>
+        `;
+    });
+
+    html += `</tbody></table></div>`;
+    container.innerHTML = html;
+    
+    // Attach event listeners
+    document.querySelectorAll('.complete-student-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const studentId = btn.getAttribute('data-student-id');
+            const collection = btn.getAttribute('data-collection');
+            const student = students.find(s => s.id === studentId && s.collection === collection);
+            if (student) {
+                showEditStudentModal(student); // Reuse existing edit modal
+            }
+        });
+    });
+}
