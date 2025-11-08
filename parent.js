@@ -1391,6 +1391,7 @@ class ReportService {
             this.displayPaginatedReports(this.currentPage - 1, appState.state.user.data?.uid);
         }
     }
+    } //
 
 // =============================================================================
 // FEEDBACK SERVICE WITH OFFLINE SUPPORT
@@ -3218,3 +3219,4 @@ if ('serviceWorker' in navigator) {
 // =============================================================================
 // COMPREHENSIVE PARENT.JS UPDATE COMPLETE
 // =============================================================================
+
