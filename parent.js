@@ -1054,7 +1054,92 @@ function addViewResponsesButton() {
     }, 1000);
 }
 
-// MAIN REPORT LOADING FUNCTION - UPDATED TO USE NORMALIZED PHONE FIELDS
+// ENHANCED MULTI-LAYER SEARCH SYSTEM FOR ALL COUNTRIES
+async function performMultiLayerSearch(parentPhone, parentEmail, userId) {
+    console.log("🔍 Starting multi-layer search for:", parentPhone);
+    
+    let assessmentResults = [];
+    let monthlyResults = [];
+    
+    try {
+        // --- ASSESSMENT REPORTS SEARCH ---
+        console.log("📊 ASSESSMENT SEARCH - Layer 1: Normalized phone");
+        let assessmentSnapshot = await db.collection("student_results")
+            .where("normalizedParentPhone", "==", parentPhone)
+            .get();
+        console.log("📊 Assessment results (normalized phone):", assessmentSnapshot.size);
+        
+        if (assessmentSnapshot.empty) {
+            console.log("📊 ASSESSMENT SEARCH - Layer 2: Original phone field");
+            assessmentSnapshot = await db.collection("student_results")
+                .where("parentPhone", "==", parentPhone)
+                .get();
+            console.log("📊 Assessment results (original phone):", assessmentSnapshot.size);
+        }
+        
+        if (assessmentSnapshot.empty) {
+            console.log("📊 ASSESSMENT SEARCH - Layer 3: Email search");
+            assessmentSnapshot = await db.collection("student_results")
+                .where("parentEmail", "==", parentEmail)
+                .get();
+            console.log("📊 Assessment results (email):", assessmentSnapshot.size);
+        }
+        
+        // Process assessment results
+        assessmentSnapshot.forEach(doc => {
+            const data = doc.data();
+            assessmentResults.push({ 
+                id: doc.id,
+                ...data,
+                timestamp: data.submittedAt?.seconds || Date.now() / 1000,
+                type: 'assessment'
+            });
+        });
+
+        // --- MONTHLY REPORTS SEARCH ---
+        console.log("📈 MONTHLY REPORTS SEARCH - Layer 1: Normalized phone");
+        let monthlySnapshot = await db.collection("tutor_submissions")
+            .where("normalizedParentPhone", "==", parentPhone)
+            .get();
+        console.log("📈 Monthly reports (normalized phone):", monthlySnapshot.size);
+        
+        if (monthlySnapshot.empty) {
+            console.log("📈 MONTHLY REPORTS SEARCH - Layer 2: Original phone field");
+            monthlySnapshot = await db.collection("tutor_submissions")
+                .where("parentPhone", "==", parentPhone)
+                .get();
+            console.log("📈 Monthly reports (original phone):", monthlySnapshot.size);
+        }
+        
+        if (monthlySnapshot.empty && parentEmail) {
+            console.log("📈 MONTHLY REPORTS SEARCH - Layer 3: Email search");
+            monthlySnapshot = await db.collection("tutor_submissions")
+                .where("parentEmail", "==", parentEmail)
+                .get();
+            console.log("📈 Monthly reports (email):", monthlySnapshot.size);
+        }
+        
+        // Process monthly results
+        monthlySnapshot.forEach(doc => {
+            const data = doc.data();
+            monthlyResults.push({ 
+                id: doc.id,
+                ...data,
+                timestamp: data.submittedAt?.seconds || Date.now() / 1000,
+                type: 'monthly'
+            });
+        });
+
+        console.log("🎯 SEARCH SUMMARY - Assessments:", assessmentResults.length, "Monthly:", monthlyResults.length);
+        
+    } catch (error) {
+        console.error("❌ Error during multi-layer search:", error);
+    }
+    
+    return { assessmentResults, monthlyResults };
+}
+
+// MAIN REPORT LOADING FUNCTION - UPDATED WITH ROBUST MULTI-LAYER SEARCH
 async function loadAllReportsForParent(parentPhone, userId) {
     const reportArea = document.getElementById("reportArea");
     const reportContent = document.getElementById("reportContent");
@@ -1176,67 +1261,12 @@ async function loadAllReportsForParent(parentPhone, userId) {
             }
         }
 
-        console.log("🔍 Searching reports with normalized phone:", parentPhone);
+        console.log("🔍 Starting enhanced multi-layer search for:", parentPhone);
 
-        // --- UPDATED: SEARCH USING NORMALIZED PHONE FIELDS ---
-        let assessmentSnapshot;
+        // --- USE ENHANCED MULTI-LAYER SEARCH SYSTEM ---
+        const { assessmentResults, monthlyResults } = await performMultiLayerSearch(parentPhone, parentEmail, userId);
 
-        try {
-            // First try normalized phone search
-            assessmentSnapshot = await db.collection("student_results").where("normalizedParentPhone", "==", parentPhone).get();
-            console.log("📊 Assessment results (normalized phone search):", assessmentSnapshot.size);
-            
-            // If no results from normalized search, try original phone search (backward compatibility)
-            if (assessmentSnapshot.empty) {
-                console.log("🔍 No results from normalized search, trying original phone search...");
-                assessmentSnapshot = await db.collection("student_results").where("parentPhone", "==", parentPhone).get();
-                console.log("📊 Assessment results (original phone search):", assessmentSnapshot.size);
-            }
-            
-            // If still no results, try email search (older tests)
-            if (assessmentSnapshot.empty) {
-                console.log("🔍 No results from phone search, trying email search...");
-                assessmentSnapshot = await db.collection("student_results").where("parentEmail", "==", parentEmail).get();
-                console.log("📊 Assessment results (email search):", assessmentSnapshot.size);
-            }
-        } catch (error) {
-            console.error("Error searching assessments:", error);
-            assessmentSnapshot = { empty: true, forEach: () => {} };
-        }
-
-        // FIX: Declare studentResults array
-        let studentResults = [];
-        assessmentSnapshot.forEach(doc => {
-            const data = doc.data();
-            studentResults.push({ 
-                id: doc.id,
-                ...data,
-                timestamp: data.submittedAt?.seconds || Date.now() / 1000,
-                type: 'assessment'
-            });
-        });
-
-        // Monthly reports: search by normalized phone first, then fallback
-        let monthlySnapshot = await db.collection("tutor_submissions").where("normalizedParentPhone", "==", parentPhone).get();
-        if (monthlySnapshot.empty) {
-            monthlySnapshot = await db.collection("tutor_submissions").where("parentPhone", "==", parentPhone).get();
-        }
-        
-        const monthlyReports = [];
-        monthlySnapshot.forEach(doc => {
-            const data = doc.data();
-            monthlyReports.push({ 
-                id: doc.id,
-                ...data,
-                timestamp: data.submittedAt?.seconds || Date.now() / 1000,
-                type: 'monthly'
-            });
-        });
-
-        console.log("📊 Assessment results (unique):", studentResults.length);
-        console.log("📊 Monthly reports:", monthlySnapshot.size);
-
-        if (studentResults.length === 0 && monthlyReports.length === 0) {
+        if (assessmentResults.length === 0 && monthlyResults.length === 0) {
             showMessage(`No reports found for your account. Please contact Blooming Kids House if you believe this is an error.`, 'info');
             authLoader.classList.add("hidden");
             
@@ -1253,7 +1283,7 @@ async function loadAllReportsForParent(parentPhone, userId) {
         const studentsMap = new Map();
 
         // Process assessment reports
-        studentResults.forEach(result => {
+        assessmentResults.forEach(result => {
             const studentName = result.studentName;
             if (!studentsMap.has(studentName)) {
                 studentsMap.set(studentName, { assessments: [], monthly: [] });
@@ -1262,7 +1292,7 @@ async function loadAllReportsForParent(parentPhone, userId) {
         });
 
         // Process monthly reports
-        monthlyReports.forEach(report => {
+        monthlyResults.forEach(report => {
             const studentName = report.studentName;
             if (!studentsMap.has(studentName)) {
                 studentsMap.set(studentName, { assessments: [], monthly: [] });
