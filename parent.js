@@ -16,35 +16,92 @@ const libphonenumberScript = document.createElement('script');
 libphonenumberScript.src = 'https://cdn.jsdelivr.net/npm/libphonenumber-js@1.10.14/bundle/libphonenumber-js.min.js';
 document.head.appendChild(libphonenumberScript);
 
-// Phone number normalization function using libphonenumber-js
+// GLOBAL phone number normalization function for ALL countries
 function normalizePhoneNumber(phone) {
     if (!phone || typeof phone !== 'string') {
         return { normalized: null, country: null, valid: false, error: 'Invalid input' };
     }
 
     try {
-        // Parse the phone number with Nigeria as default context
-        const parsedNumber = libphonenumber.parsePhoneNumberFromString(phone, 'NG');
+        // First, clean the phone number - remove all non-digit characters except +
+        let cleaned = phone.replace(/[^\d+]/g, '');
         
-        if (!parsedNumber || !parsedNumber.isValid()) {
-            // Try parsing without default country for international numbers
-            const parsedNumberInternational = libphonenumber.parsePhoneNumberFromString(phone);
+        // If the number doesn't start with +, try to determine country code
+        if (!cleaned.startsWith('+')) {
+            // Common country code patterns
+            const countryPatterns = [
+                { code: '1', pattern: /^1\d{10}$/ }, // US/Canada: 1 + 10 digits
+                { code: '44', pattern: /^44\d{10}$/ }, // UK: 44 + 10 digits
+                { code: '234', pattern: /^234\d{10}$/ }, // Nigeria: 234 + 10 digits
+                { code: '33', pattern: /^33\d{9}$/ }, // France: 33 + 9 digits
+                { code: '49', pattern: /^49\d{10,11}$/ }, // Germany: 49 + 10-11 digits
+                { code: '91', pattern: /^91\d{10}$/ }, // India: 91 + 10 digits
+                { code: '86', pattern: /^86\d{11}$/ }, // China: 86 + 11 digits
+                { code: '81', pattern: /^81\d{9,10}$/ }, // Japan: 81 + 9-10 digits
+                { code: '7', pattern: /^7\d{10}$/ }, // Russia: 7 + 10 digits
+                { code: '61', pattern: /^61\d{9}$/ }, // Australia: 61 + 9 digits
+                { code: '55', pattern: /^55\d{10,11}$/ }, // Brazil: 55 + 10-11 digits
+                { code: '27', pattern: /^27\d{9}$/ }, // South Africa: 27 + 9 digits
+                { code: '34', pattern: /^34\d{9}$/ }, // Spain: 34 + 9 digits
+                { code: '39', pattern: /^39\d{9,10}$/ }, // Italy: 39 + 9-10 digits
+                { code: '82', pattern: /^82\d{9,10}$/ } // South Korea: 82 + 9-10 digits
+            ];
             
-            if (!parsedNumberInternational || !parsedNumberInternational.isValid()) {
-                return { 
-                    normalized: null, 
-                    country: null, 
-                    valid: false, 
-                    error: 'Invalid phone number format' 
-                };
+            // Check if it matches any known country code pattern
+            for (const country of countryPatterns) {
+                if (country.pattern.test(cleaned)) {
+                    cleaned = '+' + cleaned;
+                    break;
+                }
             }
             
-            // Use the internationally parsed number
-            return {
-                normalized: parsedNumberInternational.format('E.164'),
-                country: parsedNumberInternational.country,
-                valid: true,
-                format: parsedNumberInternational.formatInternational()
+            // If still no + and it's a reasonable length, try parsing as international
+            if (!cleaned.startsWith('+') && cleaned.length >= 8 && cleaned.length <= 15) {
+                // Try to parse with common country contexts
+                const commonCountries = ['US', 'NG', 'GB', 'CA', 'FR', 'DE', 'IN', 'CN', 'JP', 'RU', 'AU', 'BR', 'ZA', 'ES', 'IT', 'KR'];
+                
+                for (const countryCode of commonCountries) {
+                    const parsed = libphonenumber.parsePhoneNumberFromString('+' + cleaned, countryCode);
+                    if (parsed && parsed.isValid()) {
+                        cleaned = '+' + cleaned;
+                        break;
+                    }
+                }
+            }
+        }
+
+        // Now try parsing the cleaned number with multiple approaches
+        let parsedNumber = null;
+        
+        // First try: parse as international number
+        parsedNumber = libphonenumber.parsePhoneNumberFromString(cleaned);
+        
+        if (!parsedNumber || !parsedNumber.isValid()) {
+            // Second try: parse with common country contexts
+            const commonCountries = ['US', 'NG', 'GB', 'CA', 'FR', 'DE', 'IN', 'CN', 'JP', 'RU', 'AU', 'BR', 'ZA', 'ES', 'IT', 'KR'];
+            
+            for (const countryCode of commonCountries) {
+                parsedNumber = libphonenumber.parsePhoneNumberFromString(cleaned, countryCode);
+                if (parsedNumber && parsedNumber.isValid()) {
+                    break;
+                }
+            }
+        }
+
+        // Final fallback: if still not valid, try with just the digits
+        if (!parsedNumber || !parsedNumber.isValid()) {
+            const digitsOnly = cleaned.replace(/\D/g, '');
+            if (digitsOnly.length >= 8 && digitsOnly.length <= 15) {
+                parsedNumber = libphonenumber.parsePhoneNumberFromString('+' + digitsOnly);
+            }
+        }
+
+        if (!parsedNumber || !parsedNumber.isValid()) {
+            return { 
+                normalized: null, 
+                country: null, 
+                valid: false, 
+                error: 'Invalid phone number format for any country' 
             };
         }
         
@@ -444,7 +501,7 @@ async function handleSignUp() {
     // Phone number validation and normalization
     const phoneValidation = normalizePhoneNumber(phone);
     if (!phoneValidation.valid) {
-        showMessage(`Invalid phone number: ${phoneValidation.error}. Please use format like +1234567890 or 08012345678`, 'error');
+        showMessage(`Invalid phone number format. Please try with country code (like +1234567890) or local format`, 'error');
         return;
     }
 
@@ -551,7 +608,7 @@ async function handleSignIn() {
             // Sign in with phone - normalize and find the user
             const phoneValidation = normalizePhoneNumber(identifier);
             if (!phoneValidation.valid) {
-                throw new Error(`Invalid phone number: ${phoneValidation.error}`);
+                throw new Error(`Invalid phone number format. Please try with country code (like +1234567890) or local format`);
             }
             
             normalizedPhone = phoneValidation.normalized;
