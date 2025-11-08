@@ -1671,7 +1671,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         loadAllReportsForParent(userPhone, user.uid);
                     }
                 })
-                .catch((error) {
+                .catch((error) => {
                     console.error('Error getting user data:', error);
                 });
         }
@@ -1709,7 +1709,16 @@ document.addEventListener('DOMContentLoaded', function() {
         if (e.key === 'Enter') handlePasswordReset();
     });
     
-   // --- START: NEW MAIN TAB SWITCHING LISTENERS (PHASE 3) ---
-document.getElementById("reportTab")?.addEventListener("click", () => switchMainTab('reports'));
-document.getElementById("rewardsTab")?.addEventListener("click", () => switchMainTab('rewards'));
-// --- END: NEW MAIN TAB SWITCHING LISTENERS (PHASE 3) ---
+    // --- START: NEW MAIN TAB SWITCHING LISTENERS (PHASE 3) ---
+    const reportTab = document.getElementById("reportTab");
+    const rewardsTab = document.getElementById("rewardsTab");
+
+    if (reportTab) {
+        reportTab.addEventListener("click", () => switchMainTab('reports'));
+    }
+
+    if (rewardsTab) {
+        rewardsTab.addEventListener("click", () => switchMainTab('rewards'));
+    }
+    // --- END: NEW MAIN TAB SWITCHING LISTENERS (PHASE 3) ---
+});
