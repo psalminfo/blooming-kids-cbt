@@ -1,6 +1,6 @@
 // Firebase config for the 'bloomingkidsassessment' project
 firebase.initializeApp({
-    apiKey: "AIzaSyD1lJhsNMMs_qerLBSzk7wKhjLyI_11RJg",
+    apiKey: "AIzaSyD1lJhsWMMs_qerLBSzk7wKhjLyI_11RJg",
     authDomain: "bloomingkidsassessment.firebaseapp.com",
     projectId: "bloomingkidsassessment",
     storageBucket: "bloomingkidsassessment.appspot.com",
@@ -11,148 +11,10 @@ firebase.initializeApp({
 const db = firebase.firestore();
 const auth = firebase.auth();
 
-// Load libphonenumber-js library (add this to your HTML: <script src="https://cdn.jsdelivr.net/npm/libphonenumber-js@1.9.6/bundle/libphonenumber-js.min.js"></script>)
-
-// Global phone number handling with libphonenumber-js
-function cleanPhoneNumber(phone, defaultCountry = 'NG') {
+// Simple phone cleaning - just trim, no normalization
+function cleanPhoneNumber(phone) {
     if (!phone) return '';
-    
-    try {
-        const phoneString = phone.toString().trim();
-        
-        // 1. Try to parse assuming a default country if no '+' sign is present
-        let parsedNumber = null;
-        if (phoneString.startsWith('+')) {
-            parsedNumber = libphonenumber.parsePhoneNumberFromString(phoneString);
-        } else {
-            // Try parsing assuming the default country (e.g., NG for Nigeria, US for USA)
-            parsedNumber = libphonenumber.parsePhoneNumberFromString(phoneString, defaultCountry);
-            
-            // SECONDARY CHECK: If not valid in default, try common countries
-            if (!parsedNumber || !parsedNumber.isValid()) {
-                // Nigerian check (common case: 080...)
-                if (phoneString.startsWith('0') && (phoneString.length === 11 || phoneString.length === 10)) {
-                    parsedNumber = libphonenumber.parsePhoneNumberFromString(phoneString, 'NG');
-                }
-                // US/Canada check (common case: 469...)
-                else if (phoneString.length === 10) {
-                     parsedNumber = libphonenumber.parsePhoneNumberFromString(phoneString, 'US');
-                }
-                // UK check (common case: 07...)
-                else if (phoneString.startsWith('07') && phoneString.length >= 10 && phoneString.length <= 11) {
-                    parsedNumber = libphonenumber.parsePhoneNumberFromString(phoneString, 'GB');
-                }
-                // Fallback to primary parsing to clean up if all else fails
-                if (!parsedNumber || !parsedNumber.isValid()) {
-                     parsedNumber = libphonenumber.parsePhoneNumberFromString(phoneString);
-                }
-            }
-        }
-        
-        if (parsedNumber && parsedNumber.isValid()) {
-            // Return in international E.164 format for consistent storage
-            return parsedNumber.format('E.164'); // Returns +1234567890 format
-        }
-        
-        // Fallback: basic cleaning - remove non-digits except a leading '+'
-        let cleaned = phoneString.replace(/[^\d+]/g, '');
-        if (!cleaned.startsWith('+') && cleaned.length > 10) {
-             // If it looks like a number with country code but missing the +, add it (e.g., 23480...)
-             if (cleaned.startsWith('234') || cleaned.startsWith('1') || cleaned.startsWith('44') || cleaned.startsWith('233')) {
-                cleaned = '+' + cleaned;
-             }
-        }
-        return cleaned;
-    } catch (error) {
-        console.error('Phone number parsing error:', error);
-        // Fallback: basic cleaning
-        return phone.toString().trim().replace(/[^\d+]/g, '');
-    }
-}
-
-// Generate all possible search variations for a phone number
-function getPhoneNumberSearchVariations(phone) {
-    const variations = new Set();
-    
-    if (!phone) return Array.from(variations);
-    
-    try {
-        const phoneString = phone.toString().trim();
-        // Add the original number
-        variations.add(phoneString);
-        
-        // Parse with libphonenumber
-        const parsedNumber = libphonenumber.parsePhoneNumberFromString(phoneString);
-        
-        if (parsedNumber && parsedNumber.isValid()) {
-            // Add different formats
-            variations.add(parsedNumber.format('E.164')); // +1234567890 (Canonical format)
-            variations.add(parsedNumber.number); // 1234567890 (just digits)
-            
-            const nationalNumber = parsedNumber.nationalNumber;
-            const countryCode = parsedNumber.countryCallingCode;
-
-            // Add versions with/without country code prefix
-            if (nationalNumber) {
-                variations.add(nationalNumber); // e.g., 4697772121
-
-                // Add national format with leading zero (common in Nigeria/UK)
-                if (parsedNumber.country === 'NG' || parsedNumber.country === 'GB') {
-                    variations.add('0' + nationalNumber); 
-                }
-            }
-
-            if (countryCode) {
-                 variations.add(countryCode + nationalNumber); // e.g., 14697772121
-                 variations.add('+' + countryCode + nationalNumber);
-            }
-        }
-        
-        // Add basic cleaned versions (fallback)
-        const basicCleaned = phoneString.replace(/[^\d+]/g, '');
-        variations.add(basicCleaned);
-        
-        // Add version without country code if it has one
-        if (basicCleaned.startsWith('+')) {
-            variations.add(basicCleaned.substring(1)); // Remove +
-        }
-        
-        // Add version with spaces/formatting removed
-        const digitsOnly = phoneString.replace(/\D/g, '');
-        variations.add(digitsOnly);
-        
-    } catch (error) {
-        console.error('Error generating phone variations:', error);
-        // Fallback: add basic variations
-        variations.add(phone.toString().trim());
-        variations.add(phone.toString().replace(/\D/g, ''));
-    }
-    
-    // Filter out empty values and return as array
-    return Array.from(variations).filter(v => v && v.length >= 7); // Min length for a valid number
-}
-
-// Format phone number for nice display
-function formatPhoneForDisplay(phone) {
-    if (!phone) return '';
-    
-    try {
-        // Assume E.164 format for stored numbers for reliable international formatting
-        const parsedNumber = libphonenumber.parsePhoneNumberFromString(phone.toString());
-        if (parsedNumber && parsedNumber.isValid()) {
-            return parsedNumber.format('INTERNATIONAL');
-        }
-    } catch (error) {
-        console.error('Error formatting phone for display:', error);
-    }
-    
-    // Fallback formatting
-    const cleaned = phone.toString().replace(/\D/g, '');
-    if (cleaned.length === 10) {
-        return `(${cleaned.substring(0, 3)}) ${cleaned.substring(3, 6)}-${cleaned.substring(6)}`;
-    }
-    
-    return phone.toString();
+    return phone.trim();
 }
 
 function capitalize(str) {
@@ -328,16 +190,8 @@ function handleRememberMe() {
     const identifier = document.getElementById('loginIdentifier').value.trim();
     
     if (rememberMe && identifier) {
-        // Try to store the clean E.164 version if it's a phone number
-        let savedIdentifier = identifier;
-        if (!identifier.includes('@')) {
-            const cleaned = cleanPhoneNumber(identifier);
-            if (cleaned) {
-                savedIdentifier = cleaned;
-            }
-        }
         localStorage.setItem('rememberMe', 'true');
-        localStorage.setItem('savedEmail', savedIdentifier);
+        localStorage.setItem('savedEmail', identifier);
     } else {
         localStorage.removeItem('rememberMe');
         localStorage.removeItem('savedEmail');
@@ -426,69 +280,65 @@ function nameMatches(storedName, searchName) {
 // Find parent name from students collection (SAME AS TUTOR.JS)
 async function findParentNameFromStudents(parentPhone) {
     try {
-        // Since parentPhone passed here should already be E.164 clean, 
-        // we use getPhoneNumberSearchVariations to look up historical, unclean data.
-        const phoneVariations = getPhoneNumberSearchVariations(parentPhone);
+        console.log("Searching for parent name with phone:", parentPhone);
         
         // PRIMARY SEARCH: students collection (same as tutor.js)
-        for (const phoneVar of phoneVariations) {
-            const studentsSnapshot = await db.collection("students")
-                .where("parentPhone", "==", phoneVar)
-                .limit(1)
-                .get();
+        const studentsSnapshot = await db.collection("students")
+            .where("parentPhone", "==", parentPhone)
+            .limit(1)
+            .get();
 
-            if (!studentsSnapshot.empty) {
-                const studentDoc = studentsSnapshot.docs[0];
-                const studentData = studentDoc.data();
-                
-                // Use parentName field (same as tutor.js)
-                const parentName = studentData.parentName;
-                
-                if (parentName) {
-                    return parentName;
-                }
+        if (!studentsSnapshot.empty) {
+            const studentDoc = studentsSnapshot.docs[0];
+            const studentData = studentDoc.data();
+            
+            // Use parentName field (same as tutor.js)
+            const parentName = studentData.parentName;
+            
+            if (parentName) {
+                console.log("Found parent name in students collection:", parentName);
+                return parentName;
             }
         }
 
         // SECONDARY SEARCH: pending_students collection (same as tutor.js)
-        for (const phoneVar of phoneVariations) {
-            const pendingStudentsSnapshot = await db.collection("pending_students")
-                .where("parentPhone", "==", phoneVar)
-                .limit(1)
-                .get();
+        const pendingStudentsSnapshot = await db.collection("pending_students")
+            .where("parentPhone", "==", parentPhone)
+            .limit(1)
+            .get();
 
-            if (!pendingStudentsSnapshot.empty) {
-                const pendingStudentDoc = pendingStudentsSnapshot.docs[0];
-                const pendingStudentData = pendingStudentDoc.data();
-                
-                // Use parentName field (same as tutor.js)
-                const parentName = pendingStudentData.parentName;
-                
-                if (parentName) {
-                    return parentName;
-                }
+        if (!pendingStudentsSnapshot.empty) {
+            const pendingStudentDoc = pendingStudentsSnapshot.docs[0];
+            const pendingStudentData = pendingStudentDoc.data();
+            
+            // Use parentName field (same as tutor.js)
+            const parentName = pendingStudentData.parentName;
+            
+            if (parentName) {
+                console.log("Found parent name in pending_students collection:", parentName);
+                return parentName;
             }
         }
 
         // FALLBACK SEARCH: tutor_submissions (for historical data)
-        for (const phoneVar of phoneVariations) {
-            const submissionsSnapshot = await db.collection("tutor_submissions")
-                .where("parentPhone", "==", phoneVar)
-                .limit(1)
-                .get();
+        const submissionsSnapshot = await db.collection("tutor_submissions")
+            .where("parentPhone", "==", parentPhone)
+            .limit(1)
+            .get();
 
-            if (!submissionsSnapshot.empty) {
-                const submissionDoc = submissionsSnapshot.docs[0];
-                const submissionData = submissionDoc.data();
-                
-                const parentName = submissionData.parentName;
-                
-                if (parentName) {
-                    return parentName;
-                }
+        if (!submissionsSnapshot.empty) {
+            const submissionDoc = submissionsSnapshot.docs[0];
+            const submissionData = submissionDoc.data();
+            
+            const parentName = submissionData.parentName;
+            
+            if (parentName) {
+                console.log("Found parent name in tutor_submissions:", parentName);
+                return parentName;
             }
         }
 
+        console.log("No parent name found in any collection");
         return null;
     } catch (error) {
         console.error("Error finding parent name:", error);
@@ -519,13 +369,11 @@ async function handleSignUp() {
         return;
     }
 
-    // --- PHASE 2: REAL-TIME NORMALIZATION (ENFORCING E.164) ---
     const cleanedPhone = cleanPhoneNumber(phone);
-    if (!cleanedPhone || cleanedPhone.length < 10) {
-        showMessage('Please enter a valid phone number, including country code if outside Nigeria/US/UK format.', 'error');
+    if (!cleanedPhone) {
+        showMessage('Please enter a valid phone number', 'error');
         return;
     }
-    // -----------------------------------------------------------
 
     const signUpBtn = document.getElementById('signUpBtn');
     const authLoader = document.getElementById('authLoader');
@@ -540,7 +388,6 @@ async function handleSignUp() {
         const user = userCredential.user;
 
         // Find parent name from existing data (SAME SOURCE AS TUTOR.JS)
-        // Use the CLEANED phone number for look-up
         const parentName = await findParentNameFromStudents(cleanedPhone);
         
         // --- START: REFERRAL SYSTEM INTEGRATION (PHASE 1) ---
@@ -549,7 +396,7 @@ async function handleSignUp() {
 
         // Store user data in Firestore for easy retrieval
         await db.collection('parent_users').doc(user.uid).set({
-            phone: cleanedPhone, // Store the CANONICAL E.164 phone number
+            phone: cleanedPhone,
             email: email,
             parentName: parentName || 'Parent', // Use found name or default
             createdAt: firebase.firestore.FieldValue.serverTimestamp(),
@@ -620,61 +467,34 @@ async function handleSignIn() {
             const userDoc = await db.collection('parent_users').doc(userId).get();
             if (userDoc.exists) {
                 const userData = userDoc.data();
-                userPhone = userData.phone; // This should be the E.164 clean number
+                userPhone = userData.phone;
             }
         } else {
-            // --- PHASE 2 & 3: REAL-TIME NORMALIZATION & INTELLIGENT SEARCH ---
-            const identifierPhone = identifier;
-            const cleanedIdentifierPhone = cleanPhoneNumber(identifierPhone);
-            
-            if (!cleanedIdentifierPhone) {
-                throw new Error('Please enter a valid phone number or email address');
-            }
+            // Sign in with phone - find the user's email first
+            const cleanedPhone = cleanPhoneNumber(identifier);
+            const userQuery = await db.collection('parent_users')
+                .where('phone', '==', cleanedPhone)
+                .limit(1)
+                .get();
 
-            // Search for the user using all phone variations, including the canonical one
-            const phoneVariations = getPhoneNumberSearchVariations(identifierPhone);
-            let userQuery = null;
-
-            for (const phoneVar of phoneVariations) {
-                const querySnapshot = await db.collection('parent_users')
-                    .where('phone', '==', phoneVar)
-                    .limit(1)
-                    .get();
-                
-                if (!querySnapshot.empty) {
-                    userQuery = querySnapshot;
-                    break;
-                }
-            }
-
-            if (!userQuery || userQuery.empty) {
-                // FALLBACK: If canonical search fails, try searching for the clean number itself
-                const canonicalQuery = await db.collection('parent_users')
-                    .where('phone', '==', cleanedIdentifierPhone)
-                    .limit(1)
-                    .get();
-                
-                if (canonicalQuery.empty) {
-                    throw new Error('No account found with this phone number');
-                }
-                userQuery = canonicalQuery;
+            if (userQuery.empty) {
+                throw new Error('No account found with this phone number');
             }
 
             const userData = userQuery.docs[0].data();
             userCredential = await auth.signInWithEmailAndPassword(userData.email, password);
-            userPhone = userData.phone; // Retrieve the canonical number stored in the user doc
+            userPhone = cleanedPhone;
             userId = userCredential.user.uid;
-            // -------------------------------------------------------------------
         }
 
         if (!userPhone) {
-            throw new Error('Could not retrieve canonical phone number for user');
+            throw new Error('Could not retrieve phone number for user');
         }
         
         // Handle Remember Me
         handleRememberMe();
         
-        // Load all reports for the parent using the exact canonical phone number as stored
+        // Load all reports for the parent using the exact phone number as stored
         await loadAllReportsForParent(userPhone, userId);
 
     } catch (error) {
@@ -813,7 +633,7 @@ async function submitFeedback() {
         // Create feedback document
         const feedbackData = {
             parentName: currentUserData?.parentName || userData.parentName || 'Unknown Parent',
-            parentPhone: userData.phone, // Use the CANONICAL E.164 phone number
+            parentPhone: userData.phone,
             parentEmail: userData.email,
             studentName: student,
             category: category,
@@ -1071,7 +891,7 @@ function addViewResponsesButton() {
     }, 1000);
 }
 
-// MAIN REPORT LOADING FUNCTION - UPDATED WITH GLOBAL PHONE NUMBER SUPPORT
+// MAIN REPORT LOADING FUNCTION - FIXED COLLECTION NAME AND VARIABLE DECLARATION
 async function loadAllReportsForParent(parentPhone, userId) {
     const reportArea = document.getElementById("reportArea");
     const reportContent = document.getElementById("reportContent");
@@ -1131,7 +951,6 @@ async function loadAllReportsForParent(parentPhone, userId) {
         // --- END CACHE IMPLEMENTATION ---
 
         // FIND PARENT NAME FROM SAME SOURCES AS TUTOR.JS
-        // parentPhone is already the CANONICAL E.164 number stored in parent_users
         let parentName = await findParentNameFromStudents(parentPhone);
         
         // Get parent's email and latest user data from their account document
@@ -1195,89 +1014,55 @@ async function loadAllReportsForParent(parentPhone, userId) {
             }
         }
 
-        console.log("🔍 Canonical phone:", parentPhone);
-        console.log("🔍 Parent email:", parentEmail);
+        console.log("🔍 Searching reports with:", { parentPhone, parentEmail });
 
-        // --- PHASE 3: INTELLIGENT SEARCH & MATCHING ---
-        // Get all possible phone variations for searching EXISTING data
-        const phoneVariations = getPhoneNumberSearchVariations(parentPhone);
-        console.log("🔍 Searching with all phone variations:", phoneVariations);
+        // --- FIXED: PRIORITY SEARCH WITH CORRECT COLLECTION NAME ---
+        // Try phone search first (newer tests), fall back to email search only if needed
+        let assessmentSnapshot;
 
-        // --- GLOBAL PHONE NUMBER SEARCH ---
+        try {
+            // First try phone search (newer tests) - FIXED COLLECTION NAME
+            assessmentSnapshot = await db.collection("student_results").where("parentPhone", "==", parentPhone).get();
+            console.log("📊 Assessment results (phone search):", assessmentSnapshot.size);
+            
+            // If no results from phone search, try email search (older tests) - FIXED COLLECTION NAME
+            if (assessmentSnapshot.empty) {
+                console.log("🔍 No results from phone search, trying email search...");
+                assessmentSnapshot = await db.collection("student_results").where("parentEmail", "==", parentEmail).get();
+                console.log("📊 Assessment results (email search):", assessmentSnapshot.size);
+            }
+        } catch (error) {
+            console.error("Error searching assessments:", error);
+            assessmentSnapshot = { empty: true, forEach: () => {} };
+        }
+
+        // FIX: Declare studentResults array
         let studentResults = [];
-        let monthlyReports = [];
+        assessmentSnapshot.forEach(doc => {
+            const data = doc.data();
+            studentResults.push({ 
+                id: doc.id,
+                ...data,
+                timestamp: data.submittedAt?.seconds || Date.now() / 1000,
+                type: 'assessment'
+            });
+        });
 
-        // Search assessment reports with all phone variations
-        for (const phoneVar of phoneVariations) {
-            try {
-                // Search for the phone in 'student_results' (which may still hold un-migrated data)
-                const assessmentSnapshot = await db.collection("student_results").where("parentPhone", "==", phoneVar).get();
-                
-                assessmentSnapshot.forEach(doc => {
-                    const data = doc.data();
-                    // Avoid duplicates
-                    if (!studentResults.find(r => r.id === doc.id)) {
-                        studentResults.push({ 
-                            id: doc.id,
-                            ...data,
-                            timestamp: data.submittedAt?.seconds || Date.now() / 1000,
-                            type: 'assessment'
-                        });
-                    }
-                });
-            } catch (error) {
-                console.error(`Error searching assessments for phone ${phoneVar}:`, error);
-            }
-        }
-        
-        // If results found via phone, ensure the canonical number is also added to variations for safety
-        if (studentResults.length > 0 && !phoneVariations.includes(parentPhone)) {
-             phoneVariations.push(parentPhone);
-        }
+        // Monthly reports: search by phone only
+        const monthlySnapshot = await db.collection("tutor_submissions").where("parentPhone", "==", parentPhone).get();
+        const monthlyReports = [];
+        monthlySnapshot.forEach(doc => {
+            const data = doc.data();
+            monthlyReports.push({ 
+                id: doc.id,
+                ...data,
+                timestamp: data.submittedAt?.seconds || Date.now() / 1000,
+                type: 'monthly'
+            });
+        });
 
-        // If no results from phone search, try email search (older tests)
-        if (studentResults.length === 0) {
-            console.log("🔍 No results from phone search, trying email search...");
-            try {
-                const assessmentSnapshot = await db.collection("student_results").where("parentEmail", "==", parentEmail).get();
-                
-                assessmentSnapshot.forEach(doc => {
-                    const data = doc.data();
-                    studentResults.push({ 
-                        id: doc.id,
-                        ...data,
-                        timestamp: data.submittedAt?.seconds || Date.now() / 1000,
-                        type: 'assessment'
-                    });
-                });
-            } catch (error) {
-                console.error("Error searching assessments by email:", error);
-            }
-        }
-
-        // Search monthly reports with all phone variations
-        for (const phoneVar of phoneVariations) {
-            try {
-                // Search for the phone in 'tutor_submissions' (which may still hold un-migrated data)
-                const monthlySnapshot = await db.collection("tutor_submissions").where("parentPhone", "==", phoneVar).get();
-                
-                monthlySnapshot.forEach(doc => {
-                    const data = doc.data();
-                    // Avoid duplicates
-                    if (!monthlyReports.find(r => r.id === doc.id)) {
-                        monthlyReports.push({ 
-                            id: doc.id,
-                            ...data,
-                            timestamp: data.submittedAt?.seconds || Date.now() / 1000,
-                            type: 'monthly'
-                        });
-                    }
-                });
-            } catch (error) {
-                console.error(`Error searching monthly reports for phone ${phoneVar}:`, error);
-            }
-        }
-        // -------------------------------------------------------------------
+        console.log("📊 Assessment results (unique):", studentResults.length);
+        console.log("📊 Monthly reports:", monthlySnapshot.size);
 
         if (studentResults.length === 0 && monthlyReports.length === 0) {
             showMessage(`No reports found for your account. Please contact Blooming Kids House if you believe this is an error.`, 'info');
@@ -1393,7 +1178,7 @@ async function loadAllReportsForParent(parentPhone, userId) {
                             <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6 bg-green-50 p-4 rounded-lg">
                                 <div>
                                     <p><strong>Student's Name:</strong> ${fullName}</p>
-                                    <p><strong>Parent's Phone:</strong> ${formatPhoneForDisplay(session[0].parentPhone) || 'N/A'}</p>
+                                    <p><strong>Parent's Phone:</strong> ${session[0].parentPhone || 'N/A'}</p>
                                     <p><strong>Grade:</strong> ${session[0].grade}</p>
                                 </div>
                                 <div>
@@ -1499,7 +1284,7 @@ async function loadAllReportsForParent(parentPhone, userId) {
                                     <div>
                                         <p><strong>Student's Name:</strong> ${monthlyReport.studentName || 'N/A'}</p>
                                         <p><strong>Parent's Name:</strong> ${monthlyReport.parentName || 'N/A'}</p>
-                                        <p><strong>Parent's Phone:</strong> ${formatPhoneForDisplay(monthlyReport.parentPhone) || 'N/A'}</p>
+                                        <p><strong>Parent's Phone:</strong> ${monthlyReport.parentPhone || 'N/A'}</p>
                                     </div>
                                     <div>
                                         <p><strong>Grade:</strong> ${monthlyReport.grade || 'N/A'}</p>
@@ -1721,7 +1506,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 .then((doc) => {
                     if (doc.exists) {
                         const userPhone = doc.data().phone;
-                        // userPhone is guaranteed to be in E.164 format here
                         loadAllReportsForParent(userPhone, user.uid);
                     }
                 })
