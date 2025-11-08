@@ -11,48 +11,131 @@ firebase.initializeApp({
 const db = firebase.firestore();
 const auth = firebase.auth();
 
-// Enhanced phone cleaning with international normalization
+// Load libphonenumber-js library (add this to your HTML: <script src="https://cdn.jsdelivr.net/npm/libphonenumber-js@1.9.6/bundle/libphonenumber-js.min.js"></script>)
+
+// Global phone number handling with libphonenumber-js
 function cleanPhoneNumber(phone) {
     if (!phone) return '';
     
-    // Remove all non-digit characters except leading +
-    let cleaned = phone.trim().replace(/[^\d+]/g, '');
-    
-    // If it starts with +234 (Nigeria international code)
-    if (cleaned.startsWith('+234')) {
-        // Convert +234 to 0
-        cleaned = '0' + cleaned.slice(4);
+    try {
+        // Parse the phone number
+        const parsedNumber = libphonenumber.parsePhoneNumberFromString(phone.toString());
+        
+        if (parsedNumber && parsedNumber.isValid()) {
+            // Return in international format for consistent storage
+            return parsedNumber.format('E.164'); // Returns +1234567890 format
+        }
+        
+        // If parsing fails, try basic cleaning
+        return phone.toString().trim().replace(/[^\d+]/g, '');
+    } catch (error) {
+        console.error('Phone number parsing error:', error);
+        // Fallback: basic cleaning
+        return phone.toString().trim().replace(/[^\d+]/g, '');
     }
-    // If it starts with 234 without + (common mistake)
-    else if (cleaned.startsWith('234') && cleaned.length >= 10) {
-        cleaned = '0' + cleaned.slice(3);
-    }
-    // If it's a Nigerian number missing the leading 0 (like 8026957689)
-    else if (cleaned.length === 10 && cleaned.startsWith('80')) {
-        cleaned = '0' + cleaned;
-    }
-    
-    return cleaned;
 }
 
-// Generate possible phone number variations for searching existing data
-function getPhoneNumberVariations(phone) {
-    const cleaned = cleanPhoneNumber(phone);
-    const variations = new Set([cleaned]);
+// Generate all possible search variations for a phone number
+function getPhoneNumberSearchVariations(phone) {
+    const variations = new Set();
     
-    // Add common variations that might exist in the database
-    if (cleaned.startsWith('0')) {
-        // +234 version
-        variations.add('+234' + cleaned.slice(1));
-        // 234 version (without +)
-        variations.add('234' + cleaned.slice(1));
-        // Version without leading 0 (if it's a Nigerian number)
-        if (cleaned.startsWith('080')) {
-            variations.add(cleaned.slice(1));
+    if (!phone) return Array.from(variations);
+    
+    try {
+        // Add the original number
+        variations.add(phone.toString().trim());
+        
+        // Parse with libphonenumber
+        const parsedNumber = libphonenumber.parsePhoneNumberFromString(phone.toString());
+        
+        if (parsedNumber && parsedNumber.isValid()) {
+            // Add different formats
+            variations.add(parsedNumber.format('E.164')); // +1234567890
+            variations.add(parsedNumber.format('INTERNATIONAL')); // +1 234 567 890
+            variations.add(parsedNumber.format('NATIONAL')); // (234) 567-890
+            variations.add(parsedNumber.number); // 1234567890 (just digits)
+            
+            // Add country-specific variations
+            const country = parsedNumber.country;
+            const nationalNumber = parsedNumber.nationalNumber;
+            
+            if (country && nationalNumber) {
+                // Common formats per country
+                switch (country) {
+                    case 'NG': // Nigeria
+                        variations.add('0' + nationalNumber);
+                        variations.add('234' + nationalNumber);
+                        variations.add('+234' + nationalNumber);
+                        break;
+                    case 'US': // USA
+                    case 'CA': // Canada
+                        variations.add('1' + nationalNumber);
+                        variations.add('+1' + nationalNumber);
+                        variations.add(nationalNumber);
+                        // Area code formats
+                        if (nationalNumber.length === 10) {
+                            variations.add('(' + nationalNumber.substring(0, 3) + ') ' + nationalNumber.substring(3, 6) + '-' + nationalNumber.substring(6));
+                        }
+                        break;
+                    case 'GB': // UK
+                        variations.add('0' + nationalNumber);
+                        variations.add('44' + nationalNumber);
+                        variations.add('+44' + nationalNumber);
+                        break;
+                    default:
+                        // For other countries, add common variations
+                        variations.add(nationalNumber);
+                        const countryCode = parsedNumber.countryCallingCode;
+                        variations.add(countryCode + nationalNumber);
+                        variations.add('+' + countryCode + nationalNumber);
+                }
+            }
         }
+        
+        // Add basic cleaned versions (fallback)
+        const basicCleaned = phone.toString().trim().replace(/[^\d+]/g, '');
+        variations.add(basicCleaned);
+        
+        // Add version without country code if it has one
+        if (basicCleaned.startsWith('+')) {
+            variations.add(basicCleaned.substring(1)); // Remove +
+        }
+        
+        // Add version with spaces/formatting removed
+        const digitsOnly = phone.toString().replace(/\D/g, '');
+        variations.add(digitsOnly);
+        
+    } catch (error) {
+        console.error('Error generating phone variations:', error);
+        // Fallback: add basic variations
+        variations.add(phone.toString().trim());
+        variations.add(phone.toString().replace(/\D/g, ''));
     }
     
-    return Array.from(variations);
+    // Filter out empty values and return as array
+    return Array.from(variations).filter(v => v && v.length > 3);
+}
+
+// Format phone number for nice display
+function formatPhoneForDisplay(phone) {
+    if (!phone) return '';
+    
+    try {
+        const parsedNumber = libphonenumber.parsePhoneNumberFromString(phone.toString());
+        if (parsedNumber && parsedNumber.isValid()) {
+            return parsedNumber.format('INTERNATIONAL');
+        }
+    } catch (error) {
+        console.error('Error formatting phone for display:', error);
+    }
+    
+    // Fallback formatting
+    const cleaned = phone.toString().replace(/\D/g, '');
+    if (cleaned.length === 10) {
+        return `(${cleaned.substring(0, 3)}) ${cleaned.substring(3, 6)}-${cleaned.substring(6)}`;
+    }
+    
+    return phone.toString();
 }
 
 function capitalize(str) {
@@ -321,7 +404,7 @@ async function findParentNameFromStudents(parentPhone) {
         console.log("Searching for parent name with phone:", parentPhone);
         
         // Get all possible phone variations for searching
-        const phoneVariations = getPhoneNumberVariations(parentPhone);
+        const phoneVariations = getPhoneNumberSearchVariations(parentPhone);
         console.log("Searching with phone variations:", phoneVariations);
         
         // PRIMARY SEARCH: students collection (same as tutor.js)
@@ -939,7 +1022,7 @@ function addViewResponsesButton() {
     }, 1000);
 }
 
-// MAIN REPORT LOADING FUNCTION - UPDATED TO HANDLE EXISTING DATA WITH MULTIPLE PHONE FORMATS
+// MAIN REPORT LOADING FUNCTION - UPDATED WITH GLOBAL PHONE NUMBER SUPPORT
 async function loadAllReportsForParent(parentPhone, userId) {
     const reportArea = document.getElementById("reportArea");
     const reportContent = document.getElementById("reportContent");
@@ -1066,10 +1149,10 @@ async function loadAllReportsForParent(parentPhone, userId) {
         console.log("🔍 Parent email:", parentEmail);
 
         // Get all possible phone variations for searching existing data
-        const phoneVariations = getPhoneNumberVariations(parentPhone);
+        const phoneVariations = getPhoneNumberSearchVariations(parentPhone);
         console.log("🔍 Searching with phone variations:", phoneVariations);
 
-        // --- UPDATED: SEARCH WITH MULTIPLE PHONE FORMATS FOR EXISTING DATA ---
+        // --- GLOBAL PHONE NUMBER SEARCH ---
         let studentResults = [];
         let monthlyReports = [];
 
@@ -1257,7 +1340,7 @@ async function loadAllReportsForParent(parentPhone, userId) {
                             <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6 bg-green-50 p-4 rounded-lg">
                                 <div>
                                     <p><strong>Student's Name:</strong> ${fullName}</p>
-                                    <p><strong>Parent's Phone:</strong> ${session[0].parentPhone || 'N/A'}</p>
+                                    <p><strong>Parent's Phone:</strong> ${formatPhoneForDisplay(session[0].parentPhone) || 'N/A'}</p>
                                     <p><strong>Grade:</strong> ${session[0].grade}</p>
                                 </div>
                                 <div>
@@ -1363,7 +1446,7 @@ async function loadAllReportsForParent(parentPhone, userId) {
                                     <div>
                                         <p><strong>Student's Name:</strong> ${monthlyReport.studentName || 'N/A'}</p>
                                         <p><strong>Parent's Name:</strong> ${monthlyReport.parentName || 'N/A'}</p>
-                                        <p><strong>Parent's Phone:</strong> ${monthlyReport.parentPhone || 'N/A'}</p>
+                                        <p><strong>Parent's Phone:</strong> ${formatPhoneForDisplay(monthlyReport.parentPhone) || 'N/A'}</p>
                                     </div>
                                     <div>
                                         <p><strong>Grade:</strong> ${monthlyReport.grade || 'N/A'}</p>
@@ -1588,7 +1671,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         loadAllReportsForParent(userPhone, user.uid);
                     }
                 })
-                .catch((error) => {
+                .catch((error) {
                     console.error('Error getting user data:', error);
                 });
         }
