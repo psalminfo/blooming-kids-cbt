@@ -1,5 +1,3 @@
-[file name]: parent.js
-[file content begin]
 // Firebase config for the 'bloomingkidsassessment' project
 firebase.initializeApp({
     apiKey: "AIzaSyD1lJhsWMMs_qerLBSzk7wKhjLyI_11RJg",
@@ -2137,4 +2135,3 @@ document.addEventListener('DOMContentLoaded', function() {
     document.getElementById("rewardsTab")?.addEventListener("click", () => switchMainTab('rewards'));
     // --- END: NEW MAIN TAB SWITCHING LISTENERS (PHASE 3) ---
 });
-[file content end]
