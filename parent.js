@@ -1,3 +1,5 @@
+[file name]: parent.js
+[file content begin]
 // Firebase config for the 'bloomingkidsassessment' project
 firebase.initializeApp({
     apiKey: "AIzaSyD1lJhsWMMs_qerLBSzk7wKhjLyI_11RJg",
@@ -198,6 +200,7 @@ function capitalize(str) {
 let currentUserData = null;
 let userChildren = [];
 let unreadResponsesCount = 0; // Track unread responses
+let realTimeListeners = []; // Track real-time listeners
 
 // -------------------------------------------------------------------
 // START: NEW REFERRAL SYSTEM FUNCTIONS (PHASE 1 & 3)
@@ -1294,8 +1297,178 @@ async function performMultiLayerSearch(parentPhone, parentEmail, userId) {
     return { assessmentResults, monthlyResults };
 }
 
-// MAIN REPORT LOADING FUNCTION - UPDATED WITH ROBUST MULTI-LAYER SEARCH
-async function loadAllReportsForParent(parentPhone, userId) {
+// HYBRID REAL-TIME MONITORING SYSTEM
+function setupRealTimeMonitoring(parentPhone, parentEmail, userId) {
+    // Clear any existing listeners
+    cleanupRealTimeListeners();
+    
+    console.log("🔍 Setting up real-time monitoring for:", parentPhone);
+    
+    // Get normalized phone versions for monitoring
+    const normalizedVersions = multiNormalizePhoneNumber(parentPhone);
+    const validVersions = normalizedVersions.filter(v => v.valid && v.normalized);
+    
+    // Monitor assessment reports
+    validVersions.forEach(version => {
+        const assessmentListener = db.collection("student_results")
+            .where("normalizedParentPhone", "==", version.normalized)
+            .onSnapshot((snapshot) => {
+                snapshot.docChanges().forEach((change) => {
+                    if (change.type === "added") {
+                        console.log("🆕 NEW ASSESSMENT REPORT DETECTED!");
+                        showNewReportNotification('assessment');
+                        // Reload reports after a short delay
+                        setTimeout(() => {
+                            loadAllReportsForParent(parentPhone, userId);
+                        }, 2000);
+                    }
+                });
+            });
+        realTimeListeners.push(assessmentListener);
+    });
+    
+    // Monitor monthly reports
+    validVersions.forEach(version => {
+        const monthlyListener = db.collection("tutor_submissions")
+            .where("normalizedParentPhone", "==", version.normalized)
+            .onSnapshot((snapshot) => {
+                snapshot.docChanges().forEach((change) => {
+                    if (change.type === "added") {
+                        console.log("🆕 NEW MONTHLY REPORT DETECTED!");
+                        showNewReportNotification('monthly');
+                        // Reload reports after a short delay
+                        setTimeout(() => {
+                            loadAllReportsForParent(parentPhone, userId);
+                        }, 2000);
+                    }
+                });
+            });
+        realTimeListeners.push(monthlyListener);
+    });
+    
+    // Also monitor by email if available
+    if (parentEmail) {
+        const emailAssessmentListener = db.collection("student_results")
+            .where("parentEmail", "==", parentEmail)
+            .onSnapshot((snapshot) => {
+                snapshot.docChanges().forEach((change) => {
+                    if (change.type === "added") {
+                        console.log("🆕 NEW ASSESSMENT REPORT DETECTED VIA EMAIL!");
+                        showNewReportNotification('assessment');
+                        setTimeout(() => {
+                            loadAllReportsForParent(parentPhone, userId);
+                        }, 2000);
+                    }
+                });
+            });
+        realTimeListeners.push(emailAssessmentListener);
+        
+        const emailMonthlyListener = db.collection("tutor_submissions")
+            .where("parentEmail", "==", parentEmail)
+            .onSnapshot((snapshot) => {
+                snapshot.docChanges().forEach((change) => {
+                    if (change.type === "added") {
+                        console.log("🆕 NEW MONTHLY REPORT DETECTED VIA EMAIL!");
+                        showNewReportNotification('monthly');
+                        setTimeout(() => {
+                            loadAllReportsForParent(parentPhone, userId);
+                        }, 2000);
+                    }
+                });
+            });
+        realTimeListeners.push(emailMonthlyListener);
+    }
+}
+
+function cleanupRealTimeListeners() {
+    realTimeListeners.forEach(unsubscribe => {
+        if (typeof unsubscribe === 'function') {
+            unsubscribe();
+        }
+    });
+    realTimeListeners = [];
+    console.log("🧹 Cleaned up real-time listeners");
+}
+
+function showNewReportNotification(type) {
+    const reportType = type === 'assessment' ? 'Assessment Report' : 'Monthly Report';
+    showMessage(`New ${reportType} available! Loading now...`, 'success');
+    
+    // Add a visual indicator in the UI
+    const existingIndicator = document.getElementById('newReportIndicator');
+    if (existingIndicator) {
+        existingIndicator.remove();
+    }
+    
+    const indicator = document.createElement('div');
+    indicator.id = 'newReportIndicator';
+    indicator.className = 'fixed top-20 right-4 bg-green-500 text-white px-4 py-2 rounded-lg shadow-lg z-40 animate-pulse';
+    indicator.innerHTML = `📄 New ${reportType} Available!`;
+    document.body.appendChild(indicator);
+    
+    // Remove after 5 seconds
+    setTimeout(() => {
+        indicator.remove();
+    }, 5000);
+}
+
+// MANUAL REFRESH FUNCTION
+async function manualRefreshReports() {
+    const user = auth.currentUser;
+    if (!user) return;
+    
+    const refreshBtn = document.getElementById('manualRefreshBtn');
+    const originalText = refreshBtn.innerHTML;
+    
+    // Show loading state
+    refreshBtn.innerHTML = '<div class="loading-spinner-small mr-2"></div> Checking...';
+    refreshBtn.disabled = true;
+    
+    try {
+        // Get user data
+        const userDoc = await db.collection('parent_users').doc(user.uid).get();
+        if (userDoc.exists) {
+            const userData = userDoc.data();
+            const userPhone = userData.normalizedPhone || userData.phone;
+            
+            // Force reload reports (bypass cache)
+            await loadAllReportsForParent(userPhone, user.uid, true);
+            
+            showMessage('Reports refreshed successfully!', 'success');
+        }
+    } catch (error) {
+        console.error('Manual refresh error:', error);
+        showMessage('Refresh failed. Please try again.', 'error');
+    } finally {
+        // Restore button state
+        refreshBtn.innerHTML = originalText;
+        refreshBtn.disabled = false;
+    }
+}
+
+// ADD MANUAL REFRESH BUTTON TO WELCOME SECTION
+function addManualRefreshButton() {
+    const welcomeSection = document.querySelector('.bg-green-50');
+    if (!welcomeSection) return;
+    
+    const buttonContainer = welcomeSection.querySelector('.flex.gap-2');
+    if (!buttonContainer) return;
+    
+    // Check if button already exists
+    if (document.getElementById('manualRefreshBtn')) return;
+    
+    const refreshBtn = document.createElement('button');
+    refreshBtn.id = 'manualRefreshBtn';
+    refreshBtn.onclick = manualRefreshReports;
+    refreshBtn.className = 'bg-green-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-green-700 transition-all duration-200 btn-glow flex items-center justify-center';
+    refreshBtn.innerHTML = '<span class="mr-2">🔄</span> Check for New Reports';
+    
+    // Insert before the logout button
+    buttonContainer.insertBefore(refreshBtn, buttonContainer.lastElementChild);
+}
+
+// MAIN REPORT LOADING FUNCTION - UPDATED WITH HYBRID SYSTEM
+async function loadAllReportsForParent(parentPhone, userId, forceRefresh = false) {
     const reportArea = document.getElementById("reportArea");
     const reportContent = document.getElementById("reportContent");
     const authArea = document.getElementById("authArea");
@@ -1305,51 +1478,59 @@ async function loadAllReportsForParent(parentPhone, userId) {
     authLoader.classList.remove("hidden");
 
     try {
-        // --- CACHE IMPLEMENTATION ---
+        // --- CACHE IMPLEMENTATION (skip if force refresh) ---
         const cacheKey = `reportCache_${parentPhone}`;
         const twoWeeksInMillis = 14 * 24 * 60 * 60 * 1000;
         
-        try {
-            const cachedItem = localStorage.getItem(cacheKey);
-            if (cachedItem) {
-                const { timestamp, html, chartConfigs, userData } = JSON.parse(cachedItem);
-                if (Date.now() - timestamp < twoWeeksInMillis) {
-                    console.log("Loading reports from cache.");
-                    reportContent.innerHTML = html;
-                    
-                    // Set welcome message from cache
-                    if (userData && userData.parentName) {
-                        welcomeMessage.textContent = `Welcome, ${userData.parentName}!`;
-                        currentUserData = userData;
-                    } else {
-                        welcomeMessage.textContent = `Welcome!`;
-                    }
-                    
-                    // Re-initialize charts from cached configuration
-                    if (chartConfigs && chartConfigs.length > 0) {
-                        setTimeout(() => {
-                            chartConfigs.forEach(chart => {
-                                const ctx = document.getElementById(chart.canvasId);
-                                if (ctx) new Chart(ctx, chart.config);
-                            });
-                        }, 0);
-                    }
+        if (!forceRefresh) {
+            try {
+                const cachedItem = localStorage.getItem(cacheKey);
+                if (cachedItem) {
+                    const { timestamp, html, chartConfigs, userData } = JSON.parse(cachedItem);
+                    if (Date.now() - timestamp < twoWeeksInMillis) {
+                        console.log("Loading reports from cache.");
+                        reportContent.innerHTML = html;
+                        
+                        // Set welcome message from cache
+                        if (userData && userData.parentName) {
+                            welcomeMessage.textContent = `Welcome, ${userData.parentName}!`;
+                            currentUserData = userData;
+                        } else {
+                            welcomeMessage.textContent = `Welcome!`;
+                        }
+                        
+                        // Re-initialize charts from cached configuration
+                        if (chartConfigs && chartConfigs.length > 0) {
+                            setTimeout(() => {
+                                chartConfigs.forEach(chart => {
+                                    const ctx = document.getElementById(chart.canvasId);
+                                    if (ctx) new Chart(ctx, chart.config);
+                                });
+                            }, 0);
+                        }
 
-                    authArea.classList.add("hidden");
-                    reportArea.classList.remove("hidden");
-                    
-                    // Add View Responses button to welcome section
-                    addViewResponsesButton();
-                    
-                    // Load initial referral data for the rewards dashboard tab (must be done after auth/cache check)
-                    loadReferralRewards(userId);
+                        authArea.classList.add("hidden");
+                        reportArea.classList.remove("hidden");
+                        
+                        // Add buttons to welcome section
+                        addViewResponsesButton();
+                        addManualRefreshButton();
+                        
+                        // Setup real-time monitoring
+                        const userDoc = await db.collection('parent_users').doc(userId).get();
+                        const userData = userDoc.data();
+                        setupRealTimeMonitoring(parentPhone, userData.email, userId);
+                        
+                        // Load initial referral data
+                        loadReferralRewards(userId);
 
-                    return;
+                        return;
+                    }
                 }
+            } catch (e) {
+                console.error("Could not read from cache:", e);
+                localStorage.removeItem(cacheKey);
             }
-        } catch (e) {
-            console.error("Could not read from cache:", e);
-            localStorage.removeItem(cacheKey);
         }
         // --- END CACHE IMPLEMENTATION ---
 
@@ -1421,9 +1602,49 @@ async function loadAllReportsForParent(parentPhone, userId) {
         // --- USE ENHANCED MULTI-LAYER SEARCH SYSTEM ---
         const { assessmentResults, monthlyResults } = await performMultiLayerSearch(parentPhone, parentEmail, userId);
 
+        // SETUP REAL-TIME MONITORING (whether reports exist or not)
+        setupRealTimeMonitoring(parentPhone, parentEmail, userId);
+
         if (assessmentResults.length === 0 && monthlyResults.length === 0) {
-            showMessage(`No reports found for your account. Please contact Blooming Kids House if you believe this is an error.`, 'info');
-            authLoader.classList.add("hidden");
+            // NO REPORTS FOUND - SHOW WAITING STATE
+            reportContent.innerHTML = `
+                <div class="text-center py-16">
+                    <div class="text-6xl mb-6">📊</div>
+                    <h2 class="text-2xl font-bold text-gray-800 mb-4">Waiting for Your Child's First Report</h2>
+                    <p class="text-gray-600 max-w-2xl mx-auto mb-6">
+                        No reports found for your account yet. This usually means:
+                    </p>
+                    <div class="bg-blue-50 border border-blue-200 rounded-lg p-6 max-w-2xl mx-auto mb-6">
+                        <ul class="text-left text-gray-700 space-y-3">
+                            <li>• Your child's tutor hasn't submitted their first assessment or monthly report yet</li>
+                            <li>• The phone number/email used doesn't match what the tutor has on file</li>
+                            <li>• Reports are being processed and will appear soon</li>
+                        </ul>
+                    </div>
+                    <div class="bg-green-50 border border-green-200 rounded-lg p-6 max-w-2xl mx-auto">
+                        <h3 class="font-semibold text-green-800 mb-2">What happens next?</h3>
+                        <p class="text-green-700 mb-4">
+                            <strong>We're automatically monitoring for new reports!</strong> When your child's tutor submits 
+                            their first report, it will appear here automatically. You don't need to do anything.
+                        </p>
+                        <div class="flex flex-col sm:flex-row gap-4 justify-center items-center">
+                            <button onclick="manualRefreshReports()" class="bg-green-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-green-700 transition-all duration-200 flex items-center">
+                                <span class="mr-2">🔄</span> Check Now
+                            </button>
+                            <button onclick="showFeedbackModal()" class="bg-blue-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-blue-700 transition-all duration-200 flex items-center">
+                                <span class="mr-2">💬</span> Contact Support
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            authArea.classList.add("hidden");
+            reportArea.classList.remove("hidden");
+            
+            // Add buttons to welcome section
+            addViewResponsesButton();
+            addManualRefreshButton();
             
             // Load initial referral data for the rewards dashboard tab even if no reports
             loadReferralRewards(userId);
@@ -1431,6 +1652,7 @@ async function loadAllReportsForParent(parentPhone, userId) {
             return;
         }
         
+        // REPORTS FOUND - DISPLAY THEM
         reportContent.innerHTML = "";
         const chartConfigsToCache = [];
 
@@ -1730,11 +1952,11 @@ async function loadAllReportsForParent(parentPhone, userId) {
         authArea.classList.add("hidden");
         reportArea.classList.remove("hidden");
 
-        // Add View Responses button to welcome section
+        // Add buttons to welcome section
         addViewResponsesButton();
+        addManualRefreshButton();
         
         // Load initial referral data for the rewards dashboard tab
-        // Note: This function will only run when the user is authenticated and the reports load successfully.
         loadReferralRewards(userId);
 
     } catch (error) {
@@ -1761,6 +1983,9 @@ function logout() {
     // Clear remember me on logout
     localStorage.removeItem('rememberMe');
     localStorage.removeItem('savedEmail');
+    
+    // Clean up real-time listeners
+    cleanupRealTimeListeners();
     
     auth.signOut().then(() => {
         window.location.reload();
@@ -1869,6 +2094,9 @@ document.addEventListener('DOMContentLoaded', function() {
                 .catch((error) => {
                     console.error('Error getting user data:', error);
                 });
+        } else {
+            // User signed out - clean up listeners
+            cleanupRealTimeListeners();
         }
     });
 
@@ -1909,3 +2137,4 @@ document.addEventListener('DOMContentLoaded', function() {
     document.getElementById("rewardsTab")?.addEventListener("click", () => switchMainTab('rewards'));
     // --- END: NEW MAIN TAB SWITCHING LISTENERS (PHASE 3) ---
 });
+[file content end]
