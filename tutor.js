@@ -213,6 +213,70 @@ function showEmploymentDatePopup(tutor) {
     });
 }
 
+// --- TIN Functions ---
+function shouldShowTINPopup(tutor) {
+    // Don't show if already has TIN
+    if (tutor.tinNumber) return false;
+    
+    // Show on first login each month until they provide it
+    const lastPopupShown = localStorage.getItem(`tinPopup_${tutor.email}`);
+    const currentMonth = new Date().toISOString().slice(0, 7); // YYYY-MM
+    
+    return !lastPopupShown || lastPopupShown !== currentMonth;
+}
+
+function showTINPopup(tutor) {
+    const popupHTML = `
+        <div class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex items-center justify-center z-50">
+            <div class="relative bg-white p-8 rounded-lg shadow-xl w-full max-w-md mx-auto">
+                <h3 class="text-xl font-bold mb-4">Tax Identification Number (TIN)</h3>
+                <p class="text-sm text-gray-600 mb-4">Please provide your TIN for payment processing and tax documentation.</p>
+                <div class="space-y-4">
+                    <div>
+                        <label class="block font-semibold">Tax Identification Number (TIN)</label>
+                        <input type="text" id="tin-number" class="w-full mt-1 p-2 border rounded" 
+                               placeholder="Enter your TIN" maxlength="20">
+                    </div>
+                    <div class="flex justify-end space-x-2 mt-6">
+                        <button id="no-tin-btn" class="bg-gray-500 text-white px-6 py-2 rounded">I don't have TIN</button>
+                        <button id="save-tin-btn" class="bg-green-600 text-white px-6 py-2 rounded">Save TIN</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    const popup = document.createElement('div');
+    popup.innerHTML = popupHTML;
+    document.body.appendChild(popup);
+
+    document.getElementById('no-tin-btn').addEventListener('click', () => {
+        // Just close the popup - it will show again next month
+        localStorage.setItem(`tinPopup_${tutor.email}`, new Date().toISOString().slice(0, 7));
+        popup.remove();
+    });
+
+    document.getElementById('save-tin-btn').addEventListener('click', async () => {
+        const tinNumber = document.getElementById('tin-number').value.trim();
+        if (!tinNumber) {
+            showCustomAlert('Please enter your TIN or click "I don\'t have TIN".');
+            return;
+        }
+
+        try {
+            const tutorRef = doc(db, "tutors", tutor.id);
+            await updateDoc(tutorRef, { tinNumber: tinNumber });
+            // Don't set localStorage for TIN popup - it should never show again once TIN is provided
+            popup.remove();
+            showCustomAlert('TIN saved successfully!');
+            window.tutorData.tinNumber = tinNumber;
+        } catch (error) {
+            console.error("Error saving TIN:", error);
+            showCustomAlert('Error saving TIN. Please try again.');
+        }
+    });
+}
+
 function getTutorPayScheme(tutor) {
     if (tutor.isManagementStaff) return PAY_SCHEMES.MANAGEMENT;
     
@@ -1451,6 +1515,11 @@ document.addEventListener('DOMContentLoaded', async () => {
                 // Show employment date popup if needed
                 if (shouldShowEmploymentPopup(tutorData)) {
                     showEmploymentDatePopup(tutorData);
+                }
+                
+                // Show TIN popup if needed
+                if (shouldShowTINPopup(tutorData)) {
+                    showTINPopup(tutorData);
                 }
                 
                 renderTutorDashboard(document.getElementById('mainContent'), tutorData);
