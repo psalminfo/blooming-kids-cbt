@@ -16,6 +16,86 @@ const libphonenumberScript = document.createElement('script');
 libphonenumberScript.src = 'https://cdn.jsdelivr.net/npm/libphonenumber-js@1.10.14/bundle/libphonenumber-js.min.js';
 document.head.appendChild(libphonenumberScript);
 
+// Add this function to create the country dropdown
+function createCountryCodeDropdown() {
+    const phoneInputContainer = document.getElementById('signupPhone').parentNode;
+    
+    // Create container for country code and phone number
+    const container = document.createElement('div');
+    container.className = 'flex gap-2';
+    
+    // Create country code dropdown
+    const countryCodeSelect = document.createElement('select');
+    countryCodeSelect.id = 'countryCode';
+    countryCodeSelect.className = 'w-32 px-3 py-3 border border-gray-300 rounded-xl input-focus focus:outline-none transition-all duration-200';
+    countryCodeSelect.required = true;
+    
+    // Country codes list (40 countries with USA/Canada as default)
+    const countries = [
+        { code: '+1', name: 'USA/Canada (+1)' },
+        { code: '+234', name: 'Nigeria (+234)' },
+        { code: '+44', name: 'UK (+44)' },
+        { code: '+233', name: 'Ghana (+233)' },
+        { code: '+254', name: 'Kenya (+254)' },
+        { code: '+27', name: 'South Africa (+27)' },
+        { code: '+91', name: 'India (+91)' },
+        { code: '+971', name: 'UAE (+971)' },
+        { code: '+966', name: 'Saudi Arabia (+966)' },
+        { code: '+20', name: 'Egypt (+20)' },
+        { code: '+237', name: 'Cameroon (+237)' },
+        { code: '+256', name: 'Uganda (+256)' },
+        { code: '+255', name: 'Tanzania (+255)' },
+        { code: '+250', name: 'Rwanda (+250)' },
+        { code: '+251', name: 'Ethiopia (+251)' },
+        { code: '+41', name: 'Switzerland (+41)' },
+        { code: '+86', name: 'China (+86)' },
+        { code: '+33', name: 'France (+33)' },
+        { code: '+49', name: 'Germany (+49)' },
+        { code: '+61', name: 'Australia (+61)' },
+        { code: '+55', name: 'Brazil (+55)' },
+        { code: '+351', name: 'Portugal (+351)' },
+        { code: '+34', name: 'Spain (+34)' },
+        { code: '+39', name: 'Italy (+39)' },
+        { code: '+31', name: 'Netherlands (+31)' },
+        { code: '+32', name: 'Belgium (+32)' },
+        { code: '+46', name: 'Sweden (+46)' },
+        { code: '+47', name: 'Norway (+47)' },
+        { code: '+45', name: 'Denmark (+45)' },
+        { code: '+358', name: 'Finland (+358)' },
+        { code: '+353', name: 'Ireland (+353)' },
+        { code: '+48', name: 'Poland (+48)' },
+        { code: '+90', name: 'Turkey (+90)' },
+        { code: '+961', name: 'Lebanon (+961)' },
+        { code: '+962', name: 'Jordan (+962)' },
+        { code: '+81', name: 'Japan (+81)' },
+        { code: '+82', name: 'South Korea (+82)' },
+        { code: '+60', name: 'Malaysia (+60)' },
+        { code: '+852', name: 'Hong Kong (+852)' },
+        { code: '+52', name: 'Mexico (+52)' }
+    ];
+    
+    // Add options to dropdown
+    countries.forEach(country => {
+        const option = document.createElement('option');
+        option.value = country.code;
+        option.textContent = country.name;
+        countryCodeSelect.appendChild(option);
+    });
+    
+    // Set USA/Canada as default
+    countryCodeSelect.value = '+1';
+    
+    // Get the existing phone input
+    const phoneInput = document.getElementById('signupPhone');
+    phoneInput.placeholder = 'Enter phone number without country code';
+    phoneInput.className = 'flex-1 px-4 py-3 border border-gray-300 rounded-xl input-focus focus:outline-none transition-all duration-200';
+    
+    // Replace the original input with new structure
+    container.appendChild(countryCodeSelect);
+    container.appendChild(phoneInput);
+    phoneInputContainer.appendChild(container);
+}
+
 // ENHANCED MULTI-NORMALIZATION FUNCTION FOR ALL COUNTRIES
 function multiNormalizePhoneNumber(phone) {
     if (!phone || typeof phone !== 'string') {
@@ -525,14 +605,15 @@ async function findParentNameFromStudents(parentPhone) {
 
 // Authentication Functions
 async function handleSignUp() {
-    const phone = document.getElementById('signupPhone').value.trim();
+    const countryCode = document.getElementById('countryCode').value;
+    const localPhone = document.getElementById('signupPhone').value.trim();
     const email = document.getElementById('signupEmail').value.trim();
     const password = document.getElementById('signupPassword').value;
     const confirmPassword = document.getElementById('signupConfirmPassword').value;
 
     // Validation
-    if (!phone || !email || !password || !confirmPassword) {
-        showMessage('Please fill in all fields', 'error');
+    if (!countryCode || !localPhone || !email || !password || !confirmPassword) {
+        showMessage('Please fill in all fields including country code', 'error');
         return;
     }
 
@@ -546,12 +627,15 @@ async function handleSignUp() {
         return;
     }
 
+    // Combine country code with local phone number
+    const fullPhoneNumber = countryCode + localPhone.replace(/\D/g, '');
+    
     // Use multi-normalization for phone validation
-    const phoneValidations = multiNormalizePhoneNumber(phone);
+    const phoneValidations = multiNormalizePhoneNumber(fullPhoneNumber);
     const validVersions = phoneValidations.filter(v => v.valid && v.normalized);
     
     if (validVersions.length === 0) {
-        showMessage(`Invalid phone number format. Please try with country code (like +1234567890) or local format`, 'error');
+        showMessage('Invalid phone number format. Please check your phone number.', 'error');
         return;
     }
 
@@ -562,7 +646,8 @@ async function handleSignUp() {
     const authLoader = document.getElementById('authLoader');
 
     signUpBtn.disabled = true;
-    signUpBtn.textContent = 'Creating Account...';
+    document.getElementById('signUpText').textContent = 'Creating Account...';
+    document.getElementById('signUpSpinner').classList.remove('hidden');
     authLoader.classList.remove('hidden');
 
     try {
@@ -573,21 +658,20 @@ async function handleSignUp() {
         // Find parent name from existing data (SAME SOURCE AS TUTOR.JS)
         const parentName = await findParentNameFromStudents(normalizedPhone);
         
-        // --- START: REFERRAL SYSTEM INTEGRATION (PHASE 1) ---
+        // Generate referral code
         const referralCode = await generateReferralCode();
-        // --- END: REFERRAL SYSTEM INTEGRATION (PHASE 1) ---
 
         // Store user data in Firestore for easy retrieval
         await db.collection('parent_users').doc(user.uid).set({
-            phone: phone, // Store original format
+            phone: fullPhoneNumber, // Store full number with country code
             normalizedPhone: normalizedPhone, // Store normalized version
+            countryCode: countryCode, // Store selected country code
+            localPhone: localPhone, // Store local number part
             email: email,
-            parentName: parentName || 'Parent', // Use found name or default
+            parentName: parentName || 'Parent',
             createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-            // --- START: REFERRAL SYSTEM INTEGRATION (PHASE 1) ---
-            referralCode: referralCode, // Store the unique code
-            referralEarnings: 0,        // Initialize earnings
-            // --- END: REFERRAL SYSTEM INTEGRATION (PHASE 1) ---
+            referralCode: referralCode,
+            referralEarnings: 0,
         });
 
         showMessage('Account created successfully!', 'success');
@@ -616,7 +700,8 @@ async function handleSignUp() {
         showMessage(errorMessage, 'error');
     } finally {
         signUpBtn.disabled = false;
-        signUpBtn.textContent = 'Create Account';
+        document.getElementById('signUpText').textContent = 'Create Account';
+        document.getElementById('signUpSpinner').classList.add('hidden');
         authLoader.classList.add('hidden');
     }
 }
@@ -634,7 +719,8 @@ async function handleSignIn() {
     const authLoader = document.getElementById('authLoader');
 
     signInBtn.disabled = true;
-    signInBtn.textContent = 'Signing In...';
+    document.getElementById('signInText').textContent = 'Signing In...';
+    document.getElementById('signInSpinner').classList.remove('hidden');
     authLoader.classList.remove('hidden');
 
     try {
@@ -742,7 +828,8 @@ async function handleSignIn() {
         showMessage(errorMessage, 'error');
     } finally {
         signInBtn.disabled = false;
-        signInBtn.textContent = 'Sign In';
+        document.getElementById('signInText').textContent = 'Sign In';
+        document.getElementById('signInSpinner').classList.add('hidden');
         authLoader.classList.add('hidden');
     }
 }
@@ -842,7 +929,8 @@ async function submitFeedback() {
 
     const submitBtn = document.getElementById('submitFeedbackBtn');
     submitBtn.disabled = true;
-    submitBtn.textContent = 'Submitting...';
+    document.getElementById('submitFeedbackText').textContent = 'Submitting...';
+    document.getElementById('submitFeedbackSpinner').classList.remove('hidden');
 
     try {
         const user = auth.currentUser;
@@ -883,7 +971,8 @@ async function submitFeedback() {
         showMessage('Failed to submit feedback. Please try again.', 'error');
     } finally {
         submitBtn.disabled = false;
-        submitBtn.textContent = 'Submit Feedback';
+        document.getElementById('submitFeedbackText').textContent = 'Submit Feedback';
+        document.getElementById('submitFeedbackSpinner').classList.add('hidden');
     }
 }
 
@@ -2075,6 +2164,9 @@ function switchMainTab(tab) {
 document.addEventListener('DOMContentLoaded', function() {
     // Setup Remember Me
     setupRememberMe();
+    
+    // Create country code dropdown when page loads
+    createCountryCodeDropdown();
     
     // Check authentication state
     auth.onAuthStateChanged((user) => {
