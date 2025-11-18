@@ -336,7 +336,7 @@ async function loadTutorReports(tutorEmail, parentName = null) {
 
     // UPDATED: Query student_results instead of tutor_submissions
     let assessmentsQuery = query(
-        collection(db, "student_results"), 
+        collection(db, "tutor_submissions"), 
         where("tutorEmail", "==", tutorEmail)
     );
 
@@ -409,7 +409,7 @@ async function loadTutorReports(tutorEmail, parentName = null) {
                 
                 if (tutorReport) {
                     try {
-                        const docRef = doc(db, "student_results", docId);
+                        const docRef = doc(db, "tutor_submissions", docId);
                         
                         // Get the current document
                         const docSnap = await getDoc(docRef);
@@ -1545,3 +1545,4 @@ function renderAutoStudentsList(students) {
         });
     });
 }
+
