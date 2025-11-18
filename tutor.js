@@ -1,4 +1,3 @@
-
 import { auth, db } from './firebaseConfig.js';
 import { collection, getDocs, doc, updateDoc, getDoc, where, query, addDoc, writeBatch, deleteDoc } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
 import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-auth.js";
@@ -47,17 +46,16 @@ const PAY_SCHEMES = {
                 "Chess": 25000,
                 "Public Speaking": 25000,
                 "English Proficiency": 25000,
-                "Counseling Programs": 25000
-            },
-            group: {
-                "Music": 25000,
-                "Native Language": 20000,
-                "Foreign Language": 20000,
-                "Chess": 20000,
-                "Public Speaking": 20000,
-                "English Proficiency": 20000,
-                "Counseling Programs": 20000
-            }
+                "Counseling Programs": 25000}
+        },
+        group: {
+            "Music": 25000,
+            "Native Language": 20000,
+            "Foreign Language": 20000,
+            "Chess": 20000,
+            "Public Speaking": 20000,
+            "English Proficiency": 20000,
+            "Counseling Programs": 20000
         }
     },
     OLD_TUTOR: {
@@ -300,7 +298,7 @@ onSnapshot(settingsDocRef, (docSnap) => {
 });
 
 // ##################################################################
-// # SECTION 1: TUTOR DASHBOARD - UPDATED TO USE student_results
+// # SECTION 1: TUTOR DASHBOARD - UPDATED TO FETCH FROM BOTH COLLECTIONS
 // ##################################################################
 function renderTutorDashboard(container, tutor) {
     container.innerHTML = `
@@ -327,29 +325,48 @@ function renderTutorDashboard(container, tutor) {
     loadTutorReports(tutor.email);
 }
 
-// UPDATED: Load reports from student_results instead of tutor_submissions
+// UPDATED: Load reports from BOTH student_results AND tutor_submissions
 async function loadTutorReports(tutorEmail, parentName = null) {
     const pendingReportsContainer = document.getElementById('pendingReportsContainer');
     const gradedReportsContainer = document.getElementById('gradedReportsContainer');
     pendingReportsContainer.innerHTML = `<p class="text-gray-500">Loading pending submissions...</p>`;
     if (gradedReportsContainer) gradedReportsContainer.innerHTML = `<p class="text-gray-500">Loading graded submissions...</p>`;
 
-    // UPDATED: Query student_results instead of tutor_submissions
-    let assessmentsQuery = query(
-        collection(db, "tutor_submissions"), 
-        where("tutorEmail", "==", tutorEmail)
-    );
-
-    if (parentName) {
-        assessmentsQuery = query(assessmentsQuery, where("parentName", "==", parentName));
-    }
-
     try {
-        const querySnapshot = await getDocs(assessmentsQuery);
+        // QUERY 1: Multiple-choice tests from student_results
+        let assessmentsQuery = query(
+            collection(db, "student_results"), 
+            where("tutorEmail", "==", tutorEmail)
+        );
+
+        if (parentName) {
+            assessmentsQuery = query(assessmentsQuery, where("parentName", "==", parentName));
+        }
+
+        // QUERY 2: Creative writing submissions from tutor_submissions
+        let creativeWritingQuery = query(
+            collection(db, "tutor_submissions"),
+            where("tutorEmail", "==", tutorEmail),
+            where("type", "==", "creative_writing")
+        );
+
+        if (parentName) {
+            creativeWritingQuery = query(creativeWritingQuery, where("parentName", "==", parentName));
+        }
+
+        // Fetch from both collections simultaneously
+        const [assessmentsSnapshot, creativeWritingSnapshot] = await Promise.all([
+            getDocs(assessmentsQuery),
+            getDocs(creativeWritingQuery)
+        ]);
+
+        console.log(`Found ${assessmentsSnapshot.size} test results and ${creativeWritingSnapshot.size} creative writing submissions`);
+
         let pendingHTML = '';
         let gradedHTML = '';
 
-        querySnapshot.forEach(doc => {
+        // Process multiple-choice test results
+        assessmentsSnapshot.forEach(doc => {
             const data = doc.data();
             
             // Check if this assessment needs tutor feedback (creative writing or pending review)
@@ -363,6 +380,7 @@ async function loadTutorReports(tutorEmail, parentName = null) {
                     <p><strong>Student:</strong> ${data.studentName}</p>
                     <p><strong>Parent Name:</strong> ${data.parentName || 'N/A'}</p>
                     <p><strong>Grade:</strong> ${data.grade}</p>
+                    <p><strong>Type:</strong> Multiple-Choice Test</p>
                     <p><strong>Submitted At:</strong> ${new Date(data.submittedAt.seconds * 1000).toLocaleString()}</p>
                     <div class="mt-4 border-t pt-4">
                         <h4 class="font-semibold">Assessment Details:</h4>
@@ -376,7 +394,7 @@ async function loadTutorReports(tutorEmail, parentName = null) {
                                         <p class="mt-2"><strong>Status:</strong> ${answer.tutorReport ? 'Graded' : 'Pending Review'}</p>
                                         ${!answer.tutorReport ? `
                                             <textarea class="tutor-report w-full mt-2 p-2 border rounded" rows="3" placeholder="Write your feedback here..."></textarea>
-                                            <button class="submit-report-btn bg-green-600 text-white px-4 py-2 rounded mt-2" data-doc-id="${doc.id}" data-answer-index="${data.answers.indexOf(answer)}">Submit Feedback</button>
+                                            <button class="submit-report-btn bg-green-600 text-white px-4 py-2 rounded mt-2" data-doc-id="${doc.id}" data-collection="student_results" data-answer-index="${data.answers.indexOf(answer)}">Submit Feedback</button>
                                         ` : `
                                             <p class="mt-2"><strong>Tutor's Feedback:</strong> ${answer.tutorReport || 'N/A'}</p>
                                         `}
@@ -396,38 +414,84 @@ async function loadTutorReports(tutorEmail, parentName = null) {
             }
         });
 
+        // Process creative writing submissions
+        creativeWritingSnapshot.forEach(doc => {
+            const data = doc.data();
+            const needsFeedback = !data.tutorReport || data.tutorReport.trim() === '';
+
+            const creativeWritingHTML = `
+                <div class="border rounded-lg p-4 shadow-sm bg-white mb-4 border-l-4 border-blue-500">
+                    <p><strong>Student:</strong> ${data.studentName}</p>
+                    <p><strong>Parent Name:</strong> ${data.parentName || 'N/A'}</p>
+                    <p><strong>Grade:</strong> ${data.grade}</p>
+                    <p><strong>Type:</strong> Creative Writing Assignment</p>
+                    <p><strong>Submitted At:</strong> ${new Date(data.submittedAt.seconds * 1000).toLocaleString()}</p>
+                    <div class="mt-4 border-t pt-4">
+                        <h4 class="font-semibold">Creative Writing Submission:</h4>
+                        <div class="mb-3 p-3 bg-blue-50 rounded">
+                            <p><strong>Writing Prompt:</strong> ${data.questionText || 'Creative Writing Assignment'}</p>
+                            <p class="mt-2"><strong>Student's Writing:</strong></p>
+                            <p class="italic bg-white p-3 rounded border">${data.textAnswer || "No response"}</p>
+                            ${data.fileUrl ? `<a href="${data.fileUrl}" target="_blank" class="text-green-600 hover:underline mt-2 block">Download Attached File</a>` : ''}
+                            <p class="mt-2"><strong>Status:</strong> ${data.tutorReport ? 'Graded' : 'Pending Review'}</p>
+                            ${!data.tutorReport ? `
+                                <textarea class="tutor-report w-full mt-2 p-2 border rounded" rows="3" placeholder="Write your feedback here..."></textarea>
+                                <button class="submit-report-btn bg-green-600 text-white px-4 py-2 rounded mt-2" data-doc-id="${doc.id}" data-collection="tutor_submissions">Submit Feedback</button>
+                            ` : `
+                                <p class="mt-2"><strong>Tutor's Feedback:</strong> ${data.tutorReport || 'N/A'}</p>
+                            `}
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            if (needsFeedback) {
+                pendingHTML += creativeWritingHTML;
+            } else {
+                gradedHTML += creativeWritingHTML;
+            }
+        });
+
         pendingReportsContainer.innerHTML = pendingHTML || `<p class="text-gray-500">No pending submissions found.</p>`;
         if (gradedReportsContainer) gradedReportsContainer.innerHTML = gradedHTML || `<p class="text-gray-500">No graded submissions found.</p>`;
 
-        // UPDATED: Submit feedback directly to student_results
+        // UPDATED: Submit feedback to the correct collection
         document.querySelectorAll('.submit-report-btn').forEach(button => {
             button.addEventListener('click', async (e) => {
                 const docId = e.target.getAttribute('data-doc-id');
-                const answerIndex = parseInt(e.target.getAttribute('data-answer-index'));
-                const reportTextarea = e.target.closest('.bg-gray-50').querySelector('.tutor-report');
+                const collectionName = e.target.getAttribute('data-collection');
+                const answerIndex = e.target.getAttribute('data-answer-index');
+                const reportTextarea = e.target.closest('.bg-gray-50, .bg-blue-50').querySelector('.tutor-report');
                 const tutorReport = reportTextarea.value.trim();
                 
                 if (tutorReport) {
                     try {
-                        const docRef = doc(db, "tutor_submissions", docId);
+                        const docRef = doc(db, collectionName, docId);
                         
-                        // Get the current document
-                        const docSnap = await getDoc(docRef);
-                        const currentData = docSnap.data();
-                        
-                        // Update the specific answer with tutor feedback
-                        const updatedAnswers = [...currentData.answers];
-                        updatedAnswers[answerIndex] = {
-                            ...updatedAnswers[answerIndex],
-                            tutorReport: tutorReport,
-                            gradedAt: new Date()
-                        };
-                        
-                        // Update the document
-                        await updateDoc(docRef, { 
-                            answers: updatedAnswers,
-                            hasTutorFeedback: true
-                        });
+                        if (collectionName === "student_results" && answerIndex !== null) {
+                            // Update specific answer in student_results
+                            const docSnap = await getDoc(docRef);
+                            const currentData = docSnap.data();
+                            
+                            const updatedAnswers = [...currentData.answers];
+                            updatedAnswers[parseInt(answerIndex)] = {
+                                ...updatedAnswers[parseInt(answerIndex)],
+                                tutorReport: tutorReport,
+                                gradedAt: new Date()
+                            };
+                            
+                            await updateDoc(docRef, { 
+                                answers: updatedAnswers,
+                                hasTutorFeedback: true
+                            });
+                        } else {
+                            // Update entire creative writing submission in tutor_submissions
+                            await updateDoc(docRef, { 
+                                tutorReport: tutorReport,
+                                gradedAt: new Date(),
+                                status: "graded"
+                            });
+                        }
                         
                         showCustomAlert('Feedback submitted successfully!');
                         loadTutorReports(tutorEmail, parentName); // Refresh the list
@@ -447,6 +511,7 @@ async function loadTutorReports(tutorEmail, parentName = null) {
     }
 }
 
+// [The rest of your existing code remains exactly the same - no changes needed below this line]
 // ##################################################################
 // # SECTION 2: STUDENT DATABASE (MERGED FUNCTIONALITY) - UNCHANGED
 // ##################################################################
@@ -1545,4 +1610,3 @@ function renderAutoStudentsList(students) {
         });
     });
 }
-
