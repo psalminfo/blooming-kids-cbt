@@ -1009,7 +1009,7 @@ function renderDirectoryFromCache(searchTerm = '') {
     }
 }
 
-// --- Pay Advice Panel ---
+// --- Updated Pay Advice Panel ---
 async function renderPayAdvicePanel(container) {
     const canExport = window.userData?.permissions?.actions?.canExportPayAdvice === true;
     container.innerHTML = `
@@ -1027,7 +1027,7 @@ async function renderPayAdvicePanel(container) {
                 <div class="flex items-center space-x-4 col-span-2">
                     <div class="bg-green-100 p-3 rounded-lg text-center shadow w-full"><h4 class="font-bold text-green-800 text-sm">Active Tutors</h4><p id="pay-tutor-count" class="text-2xl font-extrabold">0</p></div>
                     <div class="bg-yellow-100 p-3 rounded-lg text-center shadow w-full"><h4 class="font-bold text-yellow-800 text-sm">Total Students</h4><p id="pay-student-count" class="text-2xl font-extrabold">0</p></div>
-                    ${canExport ? `<button id="export-pay-csv-btn" class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 h-full">Export CSV</button>` : ''}
+                    ${canExport ? `<button id="export-pay-xls-btn" class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 h-full">Download 4 XLS Files</button>` : ''}
                 </div>
             </div>
             <div class="overflow-x-auto">
@@ -1047,34 +1047,37 @@ async function renderPayAdvicePanel(container) {
                     <tbody id="pay-advice-table-body" class="divide-y"><tr><td colspan="8" class="text-center py-4">Select a date range.</td></tr></tbody>
                 </table>
             </div>
+            <div id="pay-advice-total" class="mt-4 p-4 bg-gray-100 rounded-lg hidden">
+                <h3 class="text-lg font-bold text-gray-800">Grand Total: ₦<span id="grand-total-amount">0</span></h3>
+            </div>
         </div>
     `;
+    
     const startDateInput = document.getElementById('start-date');
     const endDateInput = document.getElementById('end-date');
+    
     const handleDateChange = () => {
         const startDate = startDateInput.value ? new Date(startDateInput.value) : null;
         const endDate = endDateInput.value ? new Date(endDateInput.value) : null;
         if (startDate && endDate) {
-            payAdviceGifts = {}; // Reset gifts on new date range
+            // Don't reset gifts - FIXED: Keep existing gifts
             currentPayData = []; // Reset data
             endDate.setHours(23, 59, 59, 999);
             loadPayAdviceData(startDate, endDate);
         }
     };
+    
     startDateInput.addEventListener('change', handleDateChange);
     endDateInput.addEventListener('change', handleDateChange);
 
-    const exportBtn = document.getElementById('export-pay-csv-btn');
+    const exportBtn = document.getElementById('export-pay-xls-btn');
     if (exportBtn) {
         exportBtn.onclick = () => {
-            const csv = convertPayAdviceToCSV(currentPayData);
-            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-            const link = document.createElement('a');
-            const start = document.getElementById('start-date').value;
-            const end = document.getElementById('end-date').value;
-            link.href = URL.createObjectURL(blob);
-            link.download = `Pay_Advice_${start}_to_${end}.csv`;
-            link.click();
+            if (currentPayData.length === 0) {
+                alert("No pay data available to export. Please select a date range first.");
+                return;
+            }
+            exportPayAdviceAsXLS();
         };
     }
 }
@@ -1084,12 +1087,12 @@ async function loadPayAdviceData(startDate, endDate) {
     if (!tableBody) return;
     tableBody.innerHTML = `<tr><td colspan="8" class="text-center py-4">Loading pay data...</td></tr>`;
 
-    // Fix: Adjust end date BEFORE creating timestamps
     endDate.setHours(23, 59, 59, 999);
     const startTimestamp = Timestamp.fromDate(startDate);
     const endTimestamp = Timestamp.fromDate(endDate);
     
     const reportsQuery = query(collection(db, "tutor_submissions"), where("submittedAt", ">=", startTimestamp), where("submittedAt", "<=", endTimestamp));
+    
     try {
         const reportsSnapshot = await getDocs(reportsQuery);
         
@@ -1098,10 +1101,10 @@ async function loadPayAdviceData(startDate, endDate) {
             document.getElementById('pay-tutor-count').textContent = 0;
             document.getElementById('pay-student-count').textContent = 0;
             currentPayData = [];
+            document.getElementById('pay-advice-total').classList.add('hidden');
             return;
         }
 
-        // FIXED: Get unique tutor-student pairs from ACTUAL REPORTS, not all assigned students
         const tutorStudentPairs = {};
         const activeTutorEmails = new Set();
         const tutorBankDetails = {};
@@ -1113,13 +1116,11 @@ async function loadPayAdviceData(startDate, endDate) {
             
             activeTutorEmails.add(tutorEmail);
             
-            // Track unique students per tutor based on ACTUAL REPORTS
             if (!tutorStudentPairs[tutorEmail]) {
                 tutorStudentPairs[tutorEmail] = new Set();
             }
             tutorStudentPairs[tutorEmail].add(studentName);
             
-            // Get bank details from submissions
             if (data.beneficiaryBank && data.beneficiaryAccount) {
                 tutorBankDetails[tutorEmail] = {
                     beneficiaryBank: data.beneficiaryBank,
@@ -1131,7 +1132,6 @@ async function loadPayAdviceData(startDate, endDate) {
 
         const activeTutorEmailsArray = Array.from(activeTutorEmails);
 
-        // Firestore 'in' queries are limited to 30 values. This function fetches tutors by chunking the email list.
         const fetchTutorsInChunks = async (emails) => {
             if (emails.length === 0) return [];
             const chunks = [];
@@ -1144,11 +1144,9 @@ async function loadPayAdviceData(startDate, endDate) {
             );
 
             const querySnapshots = await Promise.all(queryPromises);
-            // Combine the docs from all snapshot results into a single array
             return querySnapshots.flatMap(snapshot => snapshot.docs);
         };
 
-        // Fetch both tutors (in chunks) and all students concurrently.
         const [tutorDocs, studentsSnapshot] = await Promise.all([
             fetchTutorsInChunks(activeTutorEmailsArray),
             getDocs(collection(db, "students"))
@@ -1158,19 +1156,16 @@ async function loadPayAdviceData(startDate, endDate) {
         let totalStudentCount = 0;
         const payData = [];
         
-        // Iterate over the combined array of tutor documents
         tutorDocs.forEach(doc => {
             const tutor = doc.data();
             const tutorEmail = tutor.email;
             
-            // FIXED: Only count students that actually had reports submitted
             const reportedStudentNames = tutorStudentPairs[tutorEmail] || new Set();
             
-            // Get student details for reported students only
             const reportedStudents = allStudents.filter(s => 
                 s.tutorEmail === tutorEmail && 
                 reportedStudentNames.has(s.studentName) &&
-                s.summerBreak !== true // Exclude students on break
+                s.summerBreak !== true
             );
             
             const totalStudentFees = reportedStudents.reduce((sum, s) => sum + (s.studentFee || 0), 0);
@@ -1185,11 +1180,12 @@ async function loadPayAdviceData(startDate, endDate) {
                 totalStudentFees: totalStudentFees,
                 managementFee: managementFee,
                 totalPay: totalStudentFees + managementFee,
+                tinNumber: tutor.tinNumber || '', // Added TIN number
                 ...bankDetails
             });
         });
         
-        currentPayData = payData; // Store for reuse
+        currentPayData = payData;
         document.getElementById('pay-tutor-count').textContent = payData.length;
         document.getElementById('pay-student-count').textContent = totalStudentCount;
         renderPayAdviceTable();
@@ -1204,9 +1200,13 @@ function renderPayAdviceTable() {
     const tableBody = document.getElementById('pay-advice-table-body');
     if (!tableBody) return;
     
+    let grandTotal = 0;
+    
     tableBody.innerHTML = currentPayData.map(d => {
         const giftAmount = payAdviceGifts[d.tutorEmail] || 0;
         const finalPay = d.totalPay + giftAmount;
+        grandTotal += finalPay;
+        
         return `
             <tr>
                 <td class="px-6 py-4">${d.tutorName}</td>
@@ -1222,6 +1222,13 @@ function renderPayAdviceTable() {
             </tr>
         `;
     }).join('');
+    
+    // Show grand total
+    const totalElement = document.getElementById('pay-advice-total');
+    const totalAmountElement = document.getElementById('grand-total-amount');
+    totalAmountElement.textContent = grandTotal.toLocaleString();
+    totalElement.classList.remove('hidden');
+    
     document.querySelectorAll('.add-gift-btn').forEach(button => {
         button.addEventListener('click', (e) => {
             const tutorEmail = e.target.dataset.tutorEmail;
@@ -1231,12 +1238,167 @@ function renderPayAdviceTable() {
                 const giftAmount = parseFloat(giftInput);
                 if (!isNaN(giftAmount) && giftAmount >= 0) {
                     payAdviceGifts[tutorEmail] = giftAmount;
-                    renderPayAdviceTable(); // Re-render the table with the new gift
+                    renderPayAdviceTable(); // Re-render with updated gift
                 } else {
                     alert("Please enter a valid, non-negative number.");
                 }
             }
         });
+    });
+}
+
+// NEW: Export Pay Advice as 4 XLS Files
+async function exportPayAdviceAsXLS() {
+    try {
+        const currentDate = new Date();
+        const monthYear = currentDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+        
+        // Calculate the splits for each tutor
+        const processedData = currentPayData.map(tutor => {
+            const giftAmount = payAdviceGifts[tutor.tutorEmail] || 0;
+            const finalPay = tutor.totalPay + giftAmount;
+            
+            const firstHalf = finalPay / 2;
+            const tenPercentDeduction = firstHalf * 0.1;
+            const mainPayment = firstHalf - tenPercentDeduction;
+            const dataZoomPayment = firstHalf; // Full 50%
+            const tinRemittance = tenPercentDeduction;
+            
+            return {
+                ...tutor,
+                finalPay: finalPay,
+                giftAmount: giftAmount,
+                mainPayment: mainPayment,
+                dataZoomPayment: dataZoomPayment,
+                tinRemittance: tinRemittance
+            };
+        });
+
+        // FILE 1: Main Payment (First Half MINUS 10%)
+        const mainPaymentData = processedData.map(tutor => [
+            tutor.tutorName,
+            tutor.beneficiaryBank,
+            '', // Beneficiary branch (blank)
+            tutor.beneficiaryAccount,
+            '', // Transaction Unique Reference (blank)
+            'NIP',
+            tutor.mainPayment,
+            'NGN',
+            `${monthYear} Tutor Payment`
+        ]);
+
+        // FILE 2: DataZoom Allocation (Second Half - Full 50%)
+        const dataZoomData = processedData.map(tutor => [
+            tutor.tutorName,
+            tutor.beneficiaryBank,
+            '', // Beneficiary branch (blank)
+            tutor.beneficiaryAccount,
+            '', // Transaction Unique Reference (blank)
+            'NIP',
+            tutor.dataZoomPayment,
+            'NGN',
+            'DATAZOOMALLOCT'
+        ]);
+
+        // FILE 3: TIN Remittance (The 10% Deducted)
+        const tinRemittanceData = processedData.map(tutor => [
+            tutor.tutorName,
+            tutor.tinNumber || '', // TIN number (blank if not available)
+            tutor.tinRemittance,
+            'NGN',
+            monthYear
+        ]);
+
+        // FILE 4: Full Pay Advice Report (Original)
+        const fullPayAdviceData = processedData.map(tutor => [
+            tutor.tutorName,
+            tutor.studentCount,
+            tutor.totalStudentFees,
+            tutor.managementFee,
+            tutor.totalPay,
+            tutor.giftAmount,
+            tutor.finalPay,
+            tutor.beneficiaryBank,
+            tutor.beneficiaryAccount,
+            tutor.tutorName
+        ]);
+
+        // Create and download all 4 files
+        await downloadMultipleXLSFiles([
+            {
+                filename: `Main_Payment_${monthYear.replace(' ', '_')}.xls`,
+                data: mainPaymentData,
+                headers: ['Beneficiary name', 'Beneficiary Bank name', 'Beneficiary branch', 'Beneficiary account', 'Transaction Unique Reference number', 'payment method code', 'payment amount', 'payment currency', 'remarks']
+            },
+            {
+                filename: `DataZoom_Allocation_${monthYear.replace(' ', '_')}.xls`,
+                data: dataZoomData,
+                headers: ['Beneficiary name', 'Beneficiary Bank name', 'Beneficiary branch', 'Beneficiary account', 'Transaction Unique Reference number', 'payment method code', 'payment amount', 'payment currency', 'remarks']
+            },
+            {
+                filename: `TIN_Remittance_${monthYear.replace(' ', '_')}.xls`,
+                data: tinRemittanceData,
+                headers: ['Tutor Name', 'TIN Number', 'Amount', 'Currency', 'Month']
+            },
+            {
+                filename: `Full_PayAdvice_${monthYear.replace(' ', '_')}.xls`,
+                data: fullPayAdviceData,
+                headers: ['Tutor Name', 'Student Count', 'Total Student Fees (₦)', 'Management Fee (₦)', 'Total Pay (₦)', 'Gift (₦)', 'Final Pay (₦)', 'Beneficiary Bank', 'Beneficiary Account', 'Beneficiary Name']
+            }
+        ]);
+
+        alert('All 4 XLS files downloaded successfully!');
+
+    } catch (error) {
+        console.error("Error exporting XLS files:", error);
+        alert("Failed to export XLS files. Please try again.");
+    }
+}
+
+// NEW: Function to download multiple XLS files
+async function downloadMultipleXLSFiles(files) {
+    for (const file of files) {
+        await downloadAsXLS(file.data, file.headers, file.filename);
+        // Small delay between downloads to prevent browser issues
+        await new Promise(resolve => setTimeout(resolve, 500));
+    }
+}
+
+// NEW: Function to convert data to XLS format
+function downloadAsXLS(data, headers, filename) {
+    return new Promise((resolve) => {
+        // Create HTML table for XLS format
+        let html = '<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40"><head><meta charset="UTF-8"><!--[if gte mso 9]><xml><x:ExcelWorkbook><x:ExcelWorksheets><x:ExcelWorksheet><x:Name>Sheet1</x:Name><x:WorksheetOptions><x:DisplayGridlines/></x:WorksheetOptions></x:ExcelWorksheet></x:ExcelWorksheets></x:ExcelWorkbook></xml><![endif]--></head><body>';
+        html += '<table border="1">';
+        
+        // Add headers
+        html += '<tr>';
+        headers.forEach(header => {
+            html += `<th>${header}</th>`;
+        });
+        html += '</tr>';
+        
+        // Add data rows
+        data.forEach(row => {
+            html += '<tr>';
+            row.forEach(cell => {
+                html += `<td>${cell}</td>`;
+            });
+            html += '</tr>';
+        });
+        
+        html += '</table></body></html>';
+        
+        // Create and trigger download
+        const blob = new Blob([html], { type: 'application/vnd.ms-excel' });
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = filename;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        
+        resolve();
     });
 }
 
@@ -2656,6 +2818,7 @@ onAuthStateChanged(auth, async (user) => {
 });
 
 // [End Updated management.js File]
+
 
 
 
