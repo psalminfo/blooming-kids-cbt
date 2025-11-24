@@ -1,5 +1,5 @@
 import { auth, db } from './firebaseConfig.js';
-import { collection, getDocs, doc, updateDoc, getDoc, where, query, addDoc, writeBatch, deleteDoc } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
+import { collection, getDocs, doc, updateDoc, getDoc, where, query, addDoc, writeBatch, deleteDoc, setDoc } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
 import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-auth.js";
 import { onSnapshot } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
 
@@ -131,23 +131,17 @@ const SUBJECT_CATEGORIES = {
 async function saveReportsToFirestore(tutorEmail, reports) {
     try {
         const reportRef = doc(db, "tutor_saved_reports", tutorEmail);
-        await updateDoc(reportRef, {
+        
+        // Use setDoc with merge: true instead of updateDoc
+        await setDoc(reportRef, {
             reports: reports,
             lastUpdated: new Date()
-        });
+        }, { merge: true });
+        
     } catch (error) {
-        // If document doesn't exist, create it
-        if (error.code === 'not-found') {
-            const reportRef = doc(db, "tutor_saved_reports", tutorEmail);
-            await updateDoc(reportRef, {
-                reports: reports,
-                lastUpdated: new Date()
-            });
-        } else {
-            console.warn('Error saving to Firestore:', error);
-            // Fallback to localStorage
-            saveReportsToLocalStorage(tutorEmail, reports);
-        }
+        console.warn('Error saving to Firestore:', error);
+        // Fallback to localStorage
+        saveReportsToLocalStorage(tutorEmail, reports);
     }
 }
 
@@ -1740,4 +1734,5 @@ function renderAutoStudentsList(students) {
         });
     });
 }
+
 
