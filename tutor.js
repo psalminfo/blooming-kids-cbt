@@ -16,6 +16,9 @@ style.textContent = `
         cursor: pointer !important;
         margin: 5px !important;
     }
+    #add-transitioning-btn:hover {
+        background: darkorange !important;
+    }
 `;
 document.head.appendChild(style);
 
@@ -124,7 +127,62 @@ const SUBJECT_CATEGORIES = {
     "Specialized": ["Music", "Coding","ICT", "Chess", "Public Speaking", "English Proficiency", "Counseling Programs"]
 };
 
-// --- Local Storage Functions for Report Persistence ---
+// --- Firestore Functions for Report Persistence (Cross-Device) ---
+async function saveReportsToFirestore(tutorEmail, reports) {
+    try {
+        const reportRef = doc(db, "tutor_saved_reports", tutorEmail);
+        await updateDoc(reportRef, {
+            reports: reports,
+            lastUpdated: new Date()
+        });
+    } catch (error) {
+        // If document doesn't exist, create it
+        if (error.code === 'not-found') {
+            const reportRef = doc(db, "tutor_saved_reports", tutorEmail);
+            await updateDoc(reportRef, {
+                reports: reports,
+                lastUpdated: new Date()
+            });
+        } else {
+            console.warn('Error saving to Firestore:', error);
+            // Fallback to localStorage
+            saveReportsToLocalStorage(tutorEmail, reports);
+        }
+    }
+}
+
+async function loadReportsFromFirestore(tutorEmail) {
+    try {
+        const reportRef = doc(db, "tutor_saved_reports", tutorEmail);
+        const docSnap = await getDoc(reportRef);
+        
+        if (docSnap.exists()) {
+            const data = docSnap.data();
+            return data.reports || {};
+        } else {
+            // Fallback to localStorage if no Firestore data
+            return loadReportsFromLocalStorage(tutorEmail);
+        }
+    } catch (error) {
+        console.warn('Error loading from Firestore, using localStorage:', error);
+        return loadReportsFromLocalStorage(tutorEmail);
+    }
+}
+
+async function clearAllReportsFromFirestore(tutorEmail) {
+    try {
+        const reportRef = doc(db, "tutor_saved_reports", tutorEmail);
+        await updateDoc(reportRef, {
+            reports: {},
+            lastUpdated: new Date()
+        });
+    } catch (error) {
+        console.warn('Error clearing Firestore reports:', error);
+        clearAllReportsFromLocalStorage(tutorEmail);
+    }
+}
+
+// --- Local Storage Functions for Report Persistence (Fallback) ---
 const getLocalReportsKey = (tutorEmail) => `savedReports_${tutorEmail}`;
 
 function saveReportsToLocalStorage(tutorEmail, reports) {
@@ -820,7 +878,8 @@ async function renderStudentDatabase(container, tutor) {
         return;
     }
 
-    let savedReports = loadReportsFromLocalStorage(tutor.email);
+    // CHANGED: Load reports from Firestore (cross-device) instead of localStorage
+    let savedReports = await loadReportsFromFirestore(tutor.email);
 
     // Fetch students and all of the tutor's historical submissions
     const studentQuery = query(collection(db, "students"), where("tutorEmail", "==", tutor.email));
@@ -1129,8 +1188,9 @@ async function renderStudentDatabase(container, tutor) {
             if (isSingleApprovedStudent) {
                 showAccountDetailsModal([reportData]);
             } else {
+                // CHANGED: Save to Firestore instead of localStorage for cross-device access
                 savedReports[student.id] = reportData;
-                saveReportsToLocalStorage(tutor.email, savedReports);
+                await saveReportsToFirestore(tutor.email, savedReports);
                 showCustomAlert(`${student.studentName}'s report has been saved.`);
                 renderUI(); 
             }
@@ -1202,7 +1262,8 @@ async function renderStudentDatabase(container, tutor) {
 
         try {
             await batch.commit();
-            clearAllReportsFromLocalStorage(tutor.email);
+            // CHANGED: Clear from Firestore instead of localStorage
+            await clearAllReportsFromFirestore(tutor.email);
             showCustomAlert(`Successfully submitted ${reportsArray.length} report(s)!`);
             await renderStudentDatabase(container, tutor);
         } catch (error) {
