@@ -1299,7 +1299,7 @@ async function renderStudentDatabase(container, tutor) {
                     </p>
                     <div class="flex justify-end space-x-2">
                         <button id="cancel-transitioning-btn" class="bg-gray-500 text-white px-6 py-2 rounded">Cancel</button>
-                        <button id="confirm-transitioning-btn" class="bg-orange-600 text-white px-6 py-2 rounded">Yes, Add Transitioning</button>
+                        <button id="confirm-transitioning-btn" class="bg-green-600 text-white px-6 py-2 rounded">Yes, Add Transitioning</button>
                     </div>
                 </div>
             </div>
@@ -1740,3 +1740,4 @@ function renderAutoStudentsList(students) {
         });
     });
 }
+
