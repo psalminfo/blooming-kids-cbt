@@ -1733,6 +1733,461 @@ function renderAutoStudentsList(students) {
             }
         });
     });
+
+    // ##################################################################
+// # SECTION 6: SUBMISSION ERROR HANDLING WITH IMMEDIATE FEEDBACK
+// ##################################################################
+
+// Function to validate account details before submission
+function validateAccountDetails(accountDetails) {
+    const errors = [];
+    
+    if (!accountDetails.beneficiaryBank || accountDetails.beneficiaryBank.trim() === '') {
+        errors.push("• Beneficiary Bank Name is required");
+    }
+    
+    if (!accountDetails.beneficiaryAccount || accountDetails.beneficiaryAccount.trim() === '') {
+        errors.push("• Beneficiary Account Number is required");
+    } else if (!/^\d{10}$/.test(accountDetails.beneficiaryAccount.trim())) {
+        errors.push("• Account Number must be 10 digits");
+    }
+    
+    if (!accountDetails.beneficiaryName || accountDetails.beneficiaryName.trim() === '') {
+        errors.push("• Beneficiary Name is required");
+    }
+    
+    return errors;
 }
+
+// Function to validate report data
+function validateReportData(reportData) {
+    const errors = [];
+    
+    if (!reportData.studentName || reportData.studentName.trim() === '') {
+        errors.push("• Student Name is required");
+    }
+    
+    if (!reportData.grade || reportData.grade.trim() === '') {
+        errors.push("• Student Grade is required");
+    }
+    
+    if (!reportData.parentName || reportData.parentName.trim() === '') {
+        errors.push("• Parent Name is required");
+    }
+    
+    if (!reportData.parentPhone || reportData.parentPhone.trim() === '') {
+        errors.push("• Parent Phone Number is required");
+    }
+    
+    return errors;
+}
+
+// Function to show submission error popup
+function showSubmissionErrorPopup(errorMessages, onRetryCallback = null) {
+    const errorModalHTML = `
+        <div class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex items-center justify-center z-50">
+            <div class="relative bg-white p-8 rounded-lg shadow-xl w-full max-w-md mx-auto">
+                <div class="flex items-center mb-4">
+                    <div class="flex-shrink-0">
+                        <svg class="h-6 w-6 text-red-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                    </div>
+                    <h3 class="ml-3 text-lg font-bold text-red-700">Submission Error</h3>
+                </div>
+                
+                <div class="bg-red-50 border-l-4 border-red-400 p-4 mb-4">
+                    <p class="text-sm text-red-700 mb-2">Please fix the following issues:</p>
+                    <ul class="text-sm text-red-600 list-disc pl-5 space-y-1">
+                        ${errorMessages.map(error => `<li>${error}</li>`).join('')}
+                    </ul>
+                </div>
+                
+                <p class="text-sm text-gray-600 mb-4">Once you fix these issues, try submitting again.</p>
+                
+                <div class="flex justify-end space-x-2">
+                    <button id="error-popup-ok-btn" class="bg-red-600 text-white px-6 py-2 rounded hover:bg-red-700">OK</button>
+                    ${onRetryCallback ? 
+                        `<button id="error-popup-retry-btn" class="bg-green-600 text-white px-6 py-2 rounded hover:bg-green-700">Fix & Retry</button>` 
+                        : ''}
+                </div>
+            </div>
+        </div>
+    `;
+    
+    const errorModal = document.createElement('div');
+    errorModal.innerHTML = errorModalHTML;
+    document.body.appendChild(errorModal);
+    
+    // Focus on the OK button by default
+    const okBtn = document.getElementById('error-popup-ok-btn');
+    if (okBtn) okBtn.focus();
+    
+    document.getElementById('error-popup-ok-btn').addEventListener('click', () => {
+        errorModal.remove();
+    });
+    
+    if (onRetryCallback) {
+        document.getElementById('error-popup-retry-btn').addEventListener('click', () => {
+            errorModal.remove();
+            onRetryCallback();
+        });
+    }
+    
+    // Close on escape key
+    errorModal.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+            errorModal.remove();
+        }
+    });
+}
+
+// Function to show submission success popup
+function showSubmissionSuccessPopup(message) {
+    const successModalHTML = `
+        <div class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex items-center justify-center z-50">
+            <div class="relative bg-white p-8 rounded-lg shadow-xl w-full max-w-md mx-auto">
+                <div class="flex items-center mb-4">
+                    <div class="flex-shrink-0">
+                        <svg class="h-6 w-6 text-green-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                        </svg>
+                    </div>
+                    <h3 class="ml-3 text-lg font-bold text-green-700">Success!</h3>
+                </div>
+                
+                <p class="text-gray-700 mb-6">${message}</p>
+                
+                <div class="flex justify-end">
+                    <button id="success-popup-ok-btn" class="bg-green-600 text-white px-6 py-2 rounded hover:bg-green-700">OK</button>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    const successModal = document.createElement('div');
+    successModal.innerHTML = successModalHTML;
+    document.body.appendChild(successModal);
+    
+    document.getElementById('success-popup-ok-btn').addEventListener('click', () => {
+        successModal.remove();
+    });
+    
+    // Auto-close after 5 seconds
+    setTimeout(() => {
+        if (document.body.contains(successModal)) {
+            successModal.remove();
+        }
+    }, 5000);
+}
+
+// Override the existing account details modal submission to add validation
+const originalAccountDetailsModal = window.showAccountDetailsModal;
+
+window.showAccountDetailsModal = function(reportsArray) {
+    // First validate all reports
+    const reportErrors = [];
+    reportsArray.forEach((report, index) => {
+        const errors = validateReportData(report);
+        if (errors.length > 0) {
+            reportErrors.push({
+                student: report.studentName,
+                errors: errors
+            });
+        }
+    });
+    
+    if (reportErrors.length > 0) {
+        const errorMessages = [];
+        reportErrors.forEach(reportError => {
+            errorMessages.push(`<strong>${reportError.student}:</strong>`);
+            reportError.errors.forEach(error => errorMessages.push(error));
+        });
+        showSubmissionErrorPopup(errorMessages);
+        return;
+    }
+    
+    const accountFormHTML = `
+        <h3 class="text-xl font-bold mb-4">Enter Your Payment Details</h3>
+        <p class="text-sm text-gray-600 mb-4">Please provide your bank details for payment processing. This is required before final submission.</p>
+        <div class="space-y-4">
+            <div>
+                <label class="block font-semibold">Beneficiary Bank Name</label>
+                <input type="text" id="beneficiary-bank" class="w-full mt-1 p-2 border rounded" placeholder="e.g., Zenith Bank">
+            </div>
+            <div>
+                <label class="block font-semibold">Beneficiary Account Number</label>
+                <input type="text" id="beneficiary-account" class="w-full mt-1 p-2 border rounded" placeholder="Your 10-digit account number">
+            </div>
+            <div>
+                <label class="block font-semibold">Beneficiary Name</label>
+                <input type="text" id="beneficiary-name" class="w-full mt-1 p-2 border rounded" placeholder="Your full name as on the account">
+            </div>
+            <div class="flex justify-end space-x-2 mt-6">
+                <button id="cancel-account-btn" class="bg-gray-500 text-white px-6 py-2 rounded">Cancel</button>
+                <button id="confirm-submit-btn" class="bg-green-600 text-white px-6 py-2 rounded">Confirm & Submit Report(s)</button>
+            </div>
+        </div>`;
+    
+    const accountModal = document.createElement('div');
+    accountModal.className = 'fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex items-center justify-center z-50';
+    accountModal.innerHTML = `<div class="relative bg-white p-8 rounded-lg shadow-xl w-full max-w-lg mx-auto">${accountFormHTML}</div>`;
+    document.body.appendChild(accountModal);
+    
+    // Add validation indicators
+    const bankInput = document.getElementById('beneficiary-bank');
+    const accountInput = document.getElementById('beneficiary-account');
+    const nameInput = document.getElementById('beneficiary-name');
+    
+    function validateInput(input, isValid) {
+        if (isValid) {
+            input.classList.remove('border-red-500');
+            input.classList.add('border-green-500');
+        } else {
+            input.classList.remove('border-green-500');
+            input.classList.add('border-red-500');
+        }
+    }
+    
+    bankInput.addEventListener('input', () => {
+        validateInput(bankInput, bankInput.value.trim() !== '');
+    });
+    
+    accountInput.addEventListener('input', () => {
+        const isValid = /^\d{10}$/.test(accountInput.value.trim());
+        validateInput(accountInput, isValid);
+    });
+    
+    nameInput.addEventListener('input', () => {
+        validateInput(nameInput, nameInput.value.trim() !== '');
+    });
+    
+    document.getElementById('cancel-account-btn').addEventListener('click', () => accountModal.remove());
+    
+    document.getElementById('confirm-submit-btn').addEventListener('click', async () => {
+        const accountDetails = {
+            beneficiaryBank: bankInput.value.trim(),
+            beneficiaryAccount: accountInput.value.trim(),
+            beneficiaryName: nameInput.value.trim(),
+        };
+        
+        // Validate account details
+        const validationErrors = validateAccountDetails(accountDetails);
+        
+        if (validationErrors.length > 0) {
+            showSubmissionErrorPopup(validationErrors, () => {
+                // Retry callback - reopen the modal
+                window.showAccountDetailsModal(reportsArray);
+            });
+            accountModal.remove();
+            return;
+        }
+        
+        accountModal.remove();
+        
+        // Show processing indicator
+        const processingHTML = `
+            <div class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex items-center justify-center z-50">
+                <div class="relative bg-white p-8 rounded-lg shadow-xl w-full max-w-md mx-auto">
+                    <div class="flex flex-col items-center">
+                        <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600 mb-4"></div>
+                        <h3 class="text-lg font-bold text-gray-700">Submitting Reports...</h3>
+                        <p class="text-sm text-gray-600 mt-2">Please wait while we submit your reports.</p>
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        const processingModal = document.createElement('div');
+        processingModal.innerHTML = processingHTML;
+        document.body.appendChild(processingModal);
+        
+        try {
+            await submitAllReports(reportsArray, accountDetails);
+            processingModal.remove();
+            showSubmissionSuccessPopup(`Successfully submitted ${reportsArray.length} report(s)!`);
+        } catch (error) {
+            processingModal.remove();
+            showSubmissionErrorPopup([`Submission failed: ${error.message}`]);
+        }
+    });
+};
+
+// Also override the single student submission to add validation
+const originalShowReportModal = window.showReportModal;
+
+window.showReportModal = function(student) {
+    // Keep your existing logic for transitioning students
+    if (student.isTransitioning) {
+        const currentMonthYear = getCurrentMonthYear();
+        const reportData = {
+            studentId: student.id, 
+            studentName: student.studentName, 
+            grade: student.grade,
+            parentName: student.parentName, 
+            parentPhone: student.parentPhone,
+            reportMonth: currentMonthYear,
+            introduction: "Transitioning student - no monthly report required.",
+            topics: "Transitioning student - no monthly report required.",
+            progress: "Transitioning student - no monthly report required.",
+            strengthsWeaknesses: "Transitioning student - no monthly report required.",
+            recommendations: "Transitioning student - no monthly report required.",
+            generalComments: "Transitioning student - no monthly report required.",
+            isTransitioning: true
+        };
+        
+        showFeeConfirmationModal(student, reportData);
+        return;
+    }
+    
+    // Rest of your existing code with validation added
+    const existingReport = savedReports[student.id] || {};
+    const isSingleApprovedStudent = approvedStudents.filter(s => !s.summerBreak && !submittedStudentIds.has(s.id)).length === 1;
+    const currentMonthYear = getCurrentMonthYear();
+    
+    const reportFormHTML = `
+        <h3 class="text-xl font-bold mb-4">Monthly Report for ${student.studentName}</h3>
+        <div class="bg-blue-50 p-3 rounded-lg mb-4">
+            <p class="text-sm font-semibold text-blue-800">Month: ${currentMonthYear}</p>
+            <p class="text-xs text-blue-600 mt-1">All fields are required for submission</p>
+        </div>
+        <div class="space-y-4">
+            <div>
+                <label class="block font-semibold">Introduction</label>
+                <textarea id="report-intro" class="w-full mt-1 p-2 border rounded required-field" rows="2" placeholder="Enter introduction...">${existingReport.introduction || ''}</textarea>
+            </div>
+            <div>
+                <label class="block font-semibold">Topics & Remarks</label>
+                <textarea id="report-topics" class="w-full mt-1 p-2 border rounded required-field" rows="3" placeholder="Enter topics and remarks...">${existingReport.topics || ''}</textarea>
+            </div>
+            <div>
+                <label class="block font-semibold">Progress & Achievements</label>
+                <textarea id="report-progress" class="w-full mt-1 p-2 border rounded required-field" rows="2" placeholder="Enter progress and achievements...">${existingReport.progress || ''}</textarea>
+            </div>
+            <div>
+                <label class="block font-semibold">Strengths & Weaknesses</label>
+                <textarea id="report-sw" class="w-full mt-1 p-2 border rounded required-field" rows="2" placeholder="Enter strengths and weaknesses...">${existingReport.strengthsWeaknesses || ''}</textarea>
+            </div>
+            <div>
+                <label class="block font-semibold">Recommendations</label>
+                <textarea id="report-recs" class="w-full mt-1 p-2 border rounded required-field" rows="2" placeholder="Enter recommendations...">${existingReport.recommendations || ''}</textarea>
+            </div>
+            <div>
+                <label class="block font-semibold">General Comments</label>
+                <textarea id="report-general" class="w-full mt-1 p-2 border rounded required-field" rows="2" placeholder="Enter general comments...">${existingReport.generalComments || ''}</textarea>
+            </div>
+            <div class="flex justify-end space-x-2">
+                <button id="cancel-report-btn" class="bg-gray-500 text-white px-6 py-2 rounded">Cancel</button>
+                <button id="modal-action-btn" class="bg-green-600 text-white px-6 py-2 rounded">${isSingleApprovedStudent ? 'Proceed to Submit' : 'Save Report'}</button>
+            </div>
+        </div>`;
+    
+    const reportModal = document.createElement('div');
+    reportModal.className = 'fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex items-center justify-center z-50';
+    reportModal.innerHTML = `<div class="relative bg-white p-8 rounded-lg shadow-xl w-full max-w-2xl mx-auto">${reportFormHTML}</div>`;
+    document.body.appendChild(reportModal);
+    
+    // Add real-time validation
+    const textareas = reportModal.querySelectorAll('.required-field');
+    textareas.forEach(textarea => {
+        textarea.addEventListener('input', function() {
+            if (this.value.trim() === '') {
+                this.classList.add('border-red-300');
+                this.classList.remove('border-green-300');
+            } else {
+                this.classList.remove('border-red-300');
+                this.classList.add('border-green-300');
+            }
+        });
+    });
+    
+    document.getElementById('cancel-report-btn').addEventListener('click', () => reportModal.remove());
+    
+    document.getElementById('modal-action-btn').addEventListener('click', async () => {
+        // Validate all fields
+        const requiredFields = ['report-intro', 'report-topics', 'report-progress', 'report-sw', 'report-recs', 'report-general'];
+        const missingFields = [];
+        const fieldLabels = {
+            'report-intro': 'Introduction',
+            'report-topics': 'Topics & Remarks',
+            'report-progress': 'Progress & Achievements',
+            'report-sw': 'Strengths & Weaknesses',
+            'report-recs': 'Recommendations',
+            'report-general': 'General Comments'
+        };
+        
+        requiredFields.forEach(fieldId => {
+            const field = document.getElementById(fieldId);
+            if (!field.value.trim()) {
+                missingFields.push(fieldLabels[fieldId]);
+            }
+        });
+        
+        if (missingFields.length > 0) {
+            showSubmissionErrorPopup([
+                "Please complete all report fields:",
+                ...missingFields.map(field => `• ${field}`)
+            ]);
+            return;
+        }
+        
+        const reportData = {
+            studentId: student.id, 
+            studentName: student.studentName, 
+            grade: student.grade,
+            parentName: student.parentName, 
+            parentPhone: student.parentPhone,
+            reportMonth: currentMonthYear,
+            introduction: document.getElementById('report-intro').value,
+            topics: document.getElementById('report-topics').value,
+            progress: document.getElementById('report-progress').value,
+            strengthsWeaknesses: document.getElementById('report-sw').value,
+            recommendations: document.getElementById('report-recs').value,
+            generalComments: document.getElementById('report-general').value
+        };
+        
+        reportModal.remove();
+        showFeeConfirmationModal(student, reportData);
+    });
+};
+
+// Global error handler for any submission failures
+window.addEventListener('unhandledrejection', (event) => {
+    if (event.reason && event.reason.message && event.reason.message.includes('Firebase')) {
+        console.error('Submission error:', event.reason);
+        showSubmissionErrorPopup([
+            "A network error occurred during submission.",
+            "Please check your internet connection and try again.",
+            "Error details: " + event.reason.message
+        ]);
+    }
+});
+
+// Add CSS for validation styling
+const validationStyles = document.createElement('style');
+validationStyles.textContent = `
+    .border-red-300 {
+        border-color: #fca5a5 !important;
+    }
+    .border-green-300 {
+        border-color: #86efac !important;
+    }
+    .border-red-500 {
+        border-color: #ef4444 !important;
+    }
+    .border-green-500 {
+        border-color: #22c55e !important;
+    }
+    .animate-spin {
+        animation: spin 1s linear infinite;
+    }
+    @keyframes spin {
+        from { transform: rotate(0deg); }
+        to { transform: rotate(360deg); }
+    }
+`;
+document.head.appendChild(validationStyles);
+}
+
 
 
