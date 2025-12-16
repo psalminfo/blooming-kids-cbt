@@ -330,7 +330,6 @@
         .about-section {
             padding: 100px 40px;
             background: white;
-            margin-top: 50px;
         }
 
         .about-content {
@@ -381,12 +380,145 @@
             font-size: 0.9rem;
         }
 
+        /* Programs Section */
+        .programs-section {
+            padding: 100px 40px;
+            background: linear-gradient(135deg, #f0f7ff 0%, #e6f2ff 100%);
+        }
+
+        .programs-section h2 {
+            text-align: center;
+            font-size: 2.8rem;
+            color: var(--primary-dark);
+            margin-bottom: 50px;
+        }
+
+        .programs-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 30px;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .program-card {
+            background: white;
+            border-radius: var(--border-radius);
+            padding: 40px 30px;
+            text-align: center;
+            box-shadow: var(--shadow);
+            transition: var(--transition);
+            border: 2px solid transparent;
+        }
+
+        .program-card:hover {
+            transform: translateY(-10px);
+            border-color: var(--primary);
+            box-shadow: 0 20px 40px rgba(46, 139, 87, 0.15);
+        }
+
+        .program-card i {
+            font-size: 50px;
+            color: var(--primary);
+            margin-bottom: 20px;
+        }
+
+        .program-card h3 {
+            font-size: 1.5rem;
+            color: var(--dark);
+            margin-bottom: 15px;
+        }
+
+        .program-card p {
+            color: #666;
+            line-height: 1.6;
+            font-size: 1rem;
+        }
+
+        /* Testimonials Section */
+        .testimonials-section {
+            padding: 100px 40px;
+            background: white;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .testimonials-section h2 {
+            text-align: center;
+            font-size: 2.8rem;
+            color: var(--primary-dark);
+            margin-bottom: 50px;
+        }
+
+        .testimonials-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            position: relative;
+        }
+
+        .testimonials-track {
+            display: flex;
+            gap: 30px;
+            animation: scrollTestimonials 30s linear infinite;
+            padding: 20px 0;
+        }
+
+        @keyframes scrollTestimonials {
+            0% { transform: translateX(0); }
+            100% { transform: translateX(calc(-350px * 5 - 30px * 5)); }
+        }
+
+        .testimonial-card {
+            min-width: 350px;
+            background: #F8F9FA;
+            border-radius: var(--border-radius);
+            padding: 30px;
+            box-shadow: var(--shadow);
+            border-left: 5px solid var(--primary);
+        }
+
+        .testimonial-text {
+            font-style: italic;
+            color: #555;
+            line-height: 1.6;
+            margin-bottom: 20px;
+            font-size: 1.1rem;
+        }
+
+        .testimonial-author {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .author-avatar {
+            width: 50px;
+            height: 50px;
+            background: var(--primary);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+            font-size: 1.2rem;
+        }
+
+        .author-info h4 {
+            color: var(--dark);
+            margin-bottom: 5px;
+        }
+
+        .author-info p {
+            color: #666;
+            font-size: 0.9rem;
+        }
+
         /* Footer */
         .footer {
             background: var(--primary-dark);
             color: white;
             padding: 60px 40px 30px;
-            margin-top: 50px;
         }
 
         .footer-content {
@@ -437,6 +569,50 @@
             font-size: 14px;
         }
 
+        /* Floating WhatsApp Button */
+        .whatsapp-float {
+            position: fixed;
+            bottom: 30px;
+            right: 30px;
+            background: #25D366;
+            color: white;
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 30px;
+            box-shadow: 0 4px 20px rgba(37, 211, 102, 0.3);
+            z-index: 1000;
+            transition: var(--transition);
+            text-decoration: none;
+        }
+
+        .whatsapp-float:hover {
+            transform: scale(1.1);
+            box-shadow: 0 6px 25px rgba(37, 211, 102, 0.4);
+        }
+
+        .whatsapp-float .tooltip {
+            position: absolute;
+            right: 70px;
+            background: var(--dark);
+            color: white;
+            padding: 8px 15px;
+            border-radius: 20px;
+            font-size: 14px;
+            opacity: 0;
+            pointer-events: none;
+            transition: var(--transition);
+            white-space: nowrap;
+        }
+
+        .whatsapp-float:hover .tooltip {
+            opacity: 1;
+            right: 75px;
+        }
+
         /* Responsive Design */
         @media (max-width: 992px) {
             .hero h2 {
@@ -459,6 +635,14 @@
             .mobile-menu-btn {
                 display: block;
             }
+
+            .testimonials-track {
+                animation: scrollTestimonials 40s linear infinite;
+            }
+
+            .programs-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
         }
 
         @media (max-width: 768px) {
@@ -475,12 +659,27 @@
                 min-height: 450px;
             }
             
-            .about-section {
+            .about-section,
+            .programs-section,
+            .testimonials-section {
                 padding: 60px 20px;
             }
             
-            .stats {
+            .stats,
+            .programs-grid {
                 grid-template-columns: 1fr;
+            }
+
+            .testimonial-card {
+                min-width: 300px;
+            }
+
+            .whatsapp-float {
+                width: 50px;
+                height: 50px;
+                font-size: 25px;
+                bottom: 20px;
+                right: 20px;
             }
         }
 
@@ -515,12 +714,18 @@
     </style>
 </head>
 <body>
+    <!-- Floating WhatsApp Button -->
+    <a href="https://wa.me/2347078961070" class="whatsapp-float" target="_blank">
+        <i class="fab fa-whatsapp"></i>
+        <span class="tooltip">Chat with us</span>
+    </a>
+
     <!-- Header & Navigation -->
     <header class="header">
         <div class="logo-container">
-            <img src="https://res.cloudinary.com/dy2hxcyaf/image/upload/v1757700806/newbhlogo_umwqzy.svg" 
+            <img src="https://res.cloudinary.com/dy2xcyaf/image/upload/v1757700806/newbhlogo_umwqzy.svg" 
                  alt="Blooming Kids House Logo" 
-                 class="logo-img"
+                 class="logo-img">
             <div class="logo-text">
                 <h1>Blooming Kids House</h1>
                 <p>Nurturing Young Minds for Excellence</p>
@@ -723,6 +928,192 @@
         </div>
     </section>
 
+    <!-- Programs Section -->
+    <section class="programs-section" id="programs">
+        <h2>Our Academic Programs</h2>
+        <div class="programs-grid">
+            <div class="program-card">
+                <i class="fas fa-baby"></i>
+                <h3>Preschool to Grade 1</h3>
+                <p>Building strong foundations in reading, writing, and basic math skills through interactive learning.</p>
+            </div>
+            
+            <div class="program-card">
+                <i class="fas fa-child"></i>
+                <h3>Grade 2 to 4</h3>
+                <p>Developing core academic skills and confidence in all major subjects with personalized attention.</p>
+            </div>
+            
+            <div class="program-card">
+                <i class="fas fa-user-graduate"></i>
+                <h3>Grade 5 to 8</h3>
+                <p>Preparing for higher grades with comprehensive subject coverage and exam preparation techniques.</p>
+            </div>
+            
+            <div class="program-card">
+                <i class="fas fa-graduation-cap"></i>
+                <h3>Grade 9 to 12</h3>
+                <p>Advanced tutoring for O'Level and A'Level preparation with focus on university entrance requirements.</p>
+            </div>
+            
+            <div class="program-card">
+                <i class="fas fa-sun"></i>
+                <h3>Holiday Programs</h3>
+                <p>Special intensive courses during school breaks to catch up or get ahead in challenging subjects.</p>
+            </div>
+            
+            <div class="program-card">
+                <i class="fas fa-users"></i>
+                <h3>Group Sessions</h3>
+                <p>Small group tutoring for collaborative learning and peer support at discounted rates.</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- Testimonials Section -->
+    <section class="testimonials-section" id="testimonials">
+        <h2>What Parents & Students Say</h2>
+        <div class="testimonials-container">
+            <div class="testimonials-track">
+                <!-- Testimonial 1 -->
+                <div class="testimonial-card">
+                    <div class="testimonial-text">
+                        "My daughter's grades improved from C's to A's in just 3 months! The personalized attention made all the difference."
+                    </div>
+                    <div class="testimonial-author">
+                        <div class="author-avatar">M</div>
+                        <div class="author-info">
+                            <h4>Mrs. Adeola Johnson</h4>
+                            <p>Parent of Grade 5 Student</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Testimonial 2 -->
+                <div class="testimonial-card">
+                    <div class="testimonial-text">
+                        "The tutors are exceptional! They not only teach the subjects but also build my son's confidence. Worth every kobo!"
+                    </div>
+                    <div class="testimonial-author">
+                        <div class="author-avatar">D</div>
+                        <div class="author-info">
+                            <h4>Mr. David Okon</h4>
+                            <p>Parent of Grade 8 Student</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Testimonial 3 -->
+                <div class="testimonial-card">
+                    <div class="testimonial-text">
+                        "After trying 3 different tutors, we finally found Blooming Kids House. Their structured approach and monthly reports keep us informed."
+                    </div>
+                    <div class="testimonial-author">
+                        <div class="author-avatar">C</div>
+                        <div class="author-info">
+                            <h4>Mrs. Chidinma Eze</h4>
+                            <p>Parent of Grade 3 Student</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Testimonial 4 -->
+                <div class="testimonial-card">
+                    <div class="testimonial-text">
+                        "The sibling discount made it affordable for both my children. Now they study together and motivate each other!"
+                    </div>
+                    <div class="testimonial-author">
+                        <div class="author-avatar">F</div>
+                        <div class="author-info">
+                            <h4>Mr. Femi Adeyemi</h4>
+                            <p>Parent of Grade 6 & 9 Students</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Testimonial 5 -->
+                <div class="testimonial-card">
+                    <div class="testimonial-text">
+                        "My child was struggling with math, but after joining Blooming Kids House, he now loves it and helps his classmates!"
+                    </div>
+                    <div class="testimonial-author">
+                        <div class="author-avatar">B</div>
+                        <div class="author-info">
+                            <h4>Mrs. Bola Ahmed</h4>
+                            <p>Parent of Grade 4 Student</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Duplicate testimonials for seamless scrolling -->
+                <div class="testimonial-card">
+                    <div class="testimonial-text">
+                        "My daughter's grades improved from C's to A's in just 3 months! The personalized attention made all the difference."
+                    </div>
+                    <div class="testimonial-author">
+                        <div class="author-avatar">M</div>
+                        <div class="author-info">
+                            <h4>Mrs. Adeola Johnson</h4>
+                            <p>Parent of Grade 5 Student</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="testimonial-card">
+                    <div class="testimonial-text">
+                        "The tutors are exceptional! They not only teach the subjects but also build my son's confidence. Worth every kobo!"
+                    </div>
+                    <div class="testimonial-author">
+                        <div class="author-avatar">D</div>
+                        <div class="author-info">
+                            <h4>Mr. David Okon</h4>
+                            <p>Parent of Grade 8 Student</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="testimonial-card">
+                    <div class="testimonial-text">
+                        "After trying 3 different tutors, we finally found Blooming Kids House. Their structured approach and monthly reports keep us informed."
+                    </div>
+                    <div class="testimonial-author">
+                        <div class="author-avatar">C</div>
+                        <div class="author-info">
+                            <h4>Mrs. Chidinma Eze</h4>
+                            <p>Parent of Grade 3 Student</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="testimonial-card">
+                    <div class="testimonial-text">
+                        "The sibling discount made it affordable for both my children. Now they study together and motivate each other!"
+                    </div>
+                    <div class="testimonial-author">
+                        <div class="author-avatar">F</div>
+                        <div class="author-info">
+                            <h4>Mr. Femi Adeyemi</h4>
+                            <p>Parent of Grade 6 & 9 Students</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="testimonial-card">
+                    <div class="testimonial-text">
+                        "My child was struggling with math, but after joining Blooming Kids House, he now loves it and helps his classmates!"
+                    </div>
+                    <div class="testimonial-author">
+                        <div class="author-avatar">B</div>
+                        <div class="author-info">
+                            <h4>Mrs. Bola Ahmed</h4>
+                            <p>Parent of Grade 4 Student</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
     <!-- Footer -->
     <footer class="footer">
         <div class="footer-content">
@@ -754,27 +1145,28 @@
             
             <div class="footer-section">
                 <h3>Programs</h3>
-                <a href="#">Preschool to Grade 1</a>
-                <a href="#">Grade 2 to 4</a>
-                <a href="#">Grade 5 to 8</a>
-                <a href="#">Grade 9 to 12</a>
-                <a href="#">Holiday Programs</a>
+                <a href="#programs">Preschool to Grade 1</a>
+                <a href="#programs">Grade 2 to 4</a>
+                <a href="#programs">Grade 5 to 8</a>
+                <a href="#programs">Grade 9 to 12</a>
+                <a href="#programs">Holiday Programs</a>
             </div>
             
             <div class="footer-section">
                 <h3>Connect With Us</h3>
                 <p>Follow us on social media for updates and educational tips.</p>
                 <div style="display: flex; gap: 15px; margin-top: 20px;">
-                    <a href="#" style="background: rgba(255,255,255,0.1); width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center;">
+                    <!-- Replace # with your actual social media links -->
+                    <a href="https://facebook.com/YOUR_PAGE" target="_blank" style="background: rgba(255,255,255,0.1); width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center;">
                         <i class="fab fa-facebook-f"></i>
                     </a>
-                    <a href="#" style="background: rgba(255,255,255,0.1); width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center;">
+                    <a href="https://instagram.com/YOUR_PAGE" target="_blank" style="background: rgba(255,255,255,0.1); width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center;">
                         <i class="fab fa-instagram"></i>
                     </a>
-                    <a href="#" style="background: rgba(255,255,255,0.1); width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center;">
+                    <a href="https://twitter.com/YOUR_PAGE" target="_blank" style="background: rgba(255,255,255,0.1); width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center;">
                         <i class="fab fa-twitter"></i>
                     </a>
-                    <a href="#" style="background: rgba(255,255,255,0.1); width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center;">
+                    <a href="https://wa.me/2347078961070" target="_blank" style="background: rgba(255,255,255,0.1); width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center;">
                         <i class="fab fa-whatsapp"></i>
                     </a>
                 </div>
@@ -782,7 +1174,7 @@
         </div>
         
         <div class="copyright">
-            <p>© 2024 Blooming Kids House Ltd. All rights reserved.</p>
+            <p>© <span id="current-year">2024</span> Blooming Kids House Ltd. All rights reserved.</p>
             <p style="margin-top: 5px;">Designed with ❤️ for the future of education</p>
         </div>
     </footer>
@@ -860,7 +1252,7 @@
         }, observerOptions);
 
         // Observe elements for animation
-        document.querySelectorAll('.about-section, .footer').forEach(el => {
+        document.querySelectorAll('.about-section, .programs-section, .testimonials-section').forEach(el => {
             observer.observe(el);
         });
 
@@ -868,28 +1260,28 @@
         const enrollBtn = document.querySelector('.btn-primary.btn-large');
         if (enrollBtn) {
             enrollBtn.addEventListener('click', function(e) {
-                // Check if the link goes to enrollment-portal.html
                 if (this.getAttribute('href') === 'enrollment-portal.html') {
-                    // Allow navigation to enrollment portal
                     return true;
                 }
-                
-                // If not linked properly, show a message
                 e.preventDefault();
-                alert('This button will take you to the Enrollment Portal. For now, you can view the enrollment portal separately.');
-                
-                // Optional: Open enrollment portal in new tab
-                // window.open('enrollment-portal.html', '_blank');
+                alert('This button will take you to the Enrollment Portal.');
             });
         }
 
-        // Current year in footer
-        document.addEventListener('DOMContentLoaded', function() {
-            const yearSpan = document.querySelector('.copyright p');
-            if (yearSpan) {
-                yearSpan.innerHTML = yearSpan.innerHTML.replace('2024', new Date().getFullYear());
-            }
-        });
+        // Set current year in footer
+        document.getElementById('current-year').textContent = new Date().getFullYear();
+
+        // Pause testimonials on hover
+        const testimonialsTrack = document.querySelector('.testimonials-track');
+        if (testimonialsTrack) {
+            testimonialsTrack.addEventListener('mouseenter', () => {
+                testimonialsTrack.style.animationPlayState = 'paused';
+            });
+            
+            testimonialsTrack.addEventListener('mouseleave', () => {
+                testimonialsTrack.style.animationPlayState = 'running';
+            });
+        }
     </script>
 </body>
 </html>
