@@ -7,15 +7,22 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     
     <!-- Firebase SDKs -->
-    <script src="https://www.gstatic.com/firebasejs/10.11.1/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.11.1/firebase-firestore-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.11.1/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+    
+    <!-- Input Mask for Phone -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery.inputmask/5.0.7/jquery.inputmask.min.js"></script>
+    
+    <!-- PDF Generation Library -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     
     <style>
         :root {
-            --primary: #2E8B57;
+            --primary: #2E8B57;      /* Sea Green - Professional */
             --primary-dark: #1E6B47;
-            --secondary: #FFD700;
+            --secondary: #FFD700;    /* Gold accent */
             --light: #F8F9FA;
             --dark: #343A40;
             --success: #28A745;
@@ -145,6 +152,7 @@
 
         .form-group {
             margin-bottom: 20px;
+            position: relative;
         }
 
         .form-group label {
@@ -186,36 +194,38 @@
             padding-right: 50px;
         }
 
-        /* Phone Number with Country Code */
-        .phone-group {
+        /* Form Validation */
+        .form-control.error {
+            border-color: var(--danger);
+            background-color: #FFF5F5;
+        }
+
+        .form-control.valid {
+            border-color: var(--success);
+            background-color: #F0FFF4;
+        }
+
+        .error-message {
+            color: var(--danger);
+            font-size: 13px;
+            margin-top: 5px;
             display: flex;
-            gap: 10px;
+            align-items: center;
+            gap: 5px;
         }
 
-        .country-code-select {
-            flex: 0 0 120px;
-            padding: 14px 18px;
-            border: 2px solid #E1E5EB;
-            border-radius: 8px;
-            background-color: #fcfcfc;
-            font-size: 16px;
+        .error-message i {
+            font-size: 12px;
         }
 
-        .phone-input {
-            flex: 1;
-            padding: 14px 18px;
-            border: 2px solid #E1E5EB;
-            border-radius: 8px;
-            font-size: 16px;
-        }
-
-        /* Student Entry with Tabs */
+        /* Student Entry */
         .student-entry {
             background: #F8F9FA;
             border-radius: 10px;
             padding: 25px;
             margin-bottom: 25px;
             border-left: 4px solid var(--primary);
+            position: relative;
         }
 
         .student-header {
@@ -254,38 +264,6 @@
 
         .remove-student:hover {
             background: #c82333;
-        }
-
-        /* Student Tabs */
-        .student-tabs {
-            display: flex;
-            border-bottom: 2px solid #E1E5EB;
-            margin-bottom: 20px;
-            overflow-x: auto;
-        }
-
-        .student-tab {
-            padding: 12px 20px;
-            background: none;
-            border: none;
-            border-bottom: 3px solid transparent;
-            font-size: 15px;
-            font-weight: 600;
-            color: #666;
-            cursor: pointer;
-            transition: var(--transition);
-            white-space: nowrap;
-        }
-
-        .student-tab:hover {
-            color: var(--primary);
-            background: rgba(46, 139, 87, 0.05);
-        }
-
-        .student-tab.active {
-            color: var(--primary-dark);
-            border-bottom-color: var(--primary);
-            background: rgba(46, 139, 87, 0.08);
         }
 
         /* Course Selection Tabs */
@@ -357,7 +335,7 @@
             border-left: 3px solid var(--primary);
         }
 
-        /* Academic Subjects Grid */
+        /* Academic Subjects Grid - FIXED */
         .subjects-grid {
             display: grid;
             grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
@@ -375,16 +353,19 @@
             border-radius: 8px;
             cursor: pointer;
             transition: var(--transition);
+            user-select: none;
         }
 
         .subject-option:hover {
             border-color: var(--primary);
             background: rgba(46, 139, 87, 0.03);
+            transform: translateY(-2px);
         }
 
         .subject-option.selected {
             border-color: var(--primary);
             background: rgba(46, 139, 87, 0.08);
+            box-shadow: 0 4px 12px rgba(46, 139, 87, 0.15);
         }
 
         .subject-checkbox {
@@ -396,6 +377,7 @@
             align-items: center;
             justify-content: center;
             transition: var(--transition);
+            flex-shrink: 0;
         }
 
         .subject-option.selected .subject-checkbox {
@@ -410,7 +392,7 @@
             font-weight: bold;
         }
 
-        /* Extracurricular Grid */
+        /* Extracurricular Grid - FIXED */
         .extracurricular-grid {
             display: grid;
             grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
@@ -425,16 +407,19 @@
             padding: 20px;
             cursor: pointer;
             transition: var(--transition);
+            user-select: none;
         }
 
         .extracurricular-card:hover {
             border-color: var(--primary);
             box-shadow: 0 5px 15px rgba(0,0,0,0.05);
+            transform: translateY(-2px);
         }
 
         .extracurricular-card.selected {
             border-color: var(--primary);
             background: rgba(46, 139, 87, 0.05);
+            box-shadow: 0 4px 12px rgba(46, 139, 87, 0.15);
         }
 
         .extracurricular-header {
@@ -472,10 +457,12 @@
             text-align: center;
             font-size: 14px;
             transition: var(--transition);
+            user-select: none;
         }
 
         .frequency-btn:hover {
             border-color: var(--primary);
+            background: rgba(46, 139, 87, 0.05);
         }
 
         .frequency-btn.selected {
@@ -484,7 +471,7 @@
             border-color: var(--primary);
         }
 
-        /* Test Prep Section */
+        /* Test Prep Section - FIXED */
         .test-prep-options {
             display: grid;
             grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
@@ -497,11 +484,13 @@
             border: 2px solid #E1E5EB;
             border-radius: 8px;
             padding: 20px;
+            transition: var(--transition);
         }
 
         .test-prep-card.active {
             border-color: var(--primary);
             background: rgba(46, 139, 87, 0.05);
+            box-shadow: 0 4px 12px rgba(46, 139, 87, 0.15);
         }
 
         .test-prep-header {
@@ -536,6 +525,14 @@
             border: 2px solid #E1E5EB;
             border-radius: 6px;
             text-align: center;
+            font-size: 16px;
+            transition: var(--transition);
+        }
+
+        .hours-input input:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(46, 139, 87, 0.1);
         }
 
         /* Buttons */
@@ -558,10 +555,15 @@
             color: white;
         }
 
-        .btn-primary:hover {
+        .btn-primary:hover:not(:disabled) {
             background: var(--primary-dark);
             transform: translateY(-2px);
             box-shadow: 0 6px 15px rgba(46, 139, 87, 0.3);
+        }
+
+        .btn-primary:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
         }
 
         .btn-add {
@@ -660,7 +662,7 @@
             border-left: 3px solid #DDD;
         }
 
-        /* Save Progress Section */
+        /* Save Progress Section - FIXED */
         .save-progress {
             background: #FFF3CD;
             border: 1px solid #FFEAA7;
@@ -682,6 +684,30 @@
             margin-bottom: 15px;
         }
 
+        .save-btn {
+            background: transparent;
+            color: #856404;
+            border: 1px solid #856404;
+            padding: 10px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            transition: var(--transition);
+        }
+
+        .save-btn:hover:not(:disabled) {
+            background: #856404;
+            color: white;
+        }
+
+        .save-btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
         /* Invoice Modal */
         .invoice-modal {
             display: none;
@@ -690,7 +716,7 @@
             left: 0;
             width: 100%;
             height: 100%;
-            background: rgba(0, 0, 0, 0.5);
+            background: rgba(0, 0, 0, 0.7);
             z-index: 2000;
             overflow-y: auto;
             padding: 20px;
@@ -705,7 +731,7 @@
         .invoice-content {
             background: white;
             border-radius: var(--border-radius);
-            box-shadow: var(--shadow);
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
             width: 100%;
             max-width: 800px;
             max-height: 90vh;
@@ -815,14 +841,21 @@
             color: #666;
             cursor: pointer;
             transition: var(--transition);
+            width: 40px;
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 50%;
         }
 
         .close-invoice:hover {
             color: var(--danger);
+            background: rgba(220, 53, 69, 0.1);
         }
 
         /* Resume Link Section */
-        .resume-link-section {
+        .confirmation-message {
             background: #D4EDDA;
             border: 1px solid #C3E6CB;
             border-radius: 8px;
@@ -830,6 +863,11 @@
             margin-top: 20px;
             text-align: center;
             animation: fadeIn 0.5s ease;
+        }
+
+        .confirmation-message h4 {
+            color: #155724;
+            margin-bottom: 10px;
         }
 
         .resume-link {
@@ -848,6 +886,7 @@
         .resume-link-text {
             color: var(--primary-dark);
             font-weight: 500;
+            font-size: 14px;
         }
 
         .resume-link-actions {
@@ -855,6 +894,7 @@
             justify-content: center;
             gap: 10px;
             margin-top: 15px;
+            flex-wrap: wrap;
         }
 
         .copy-btn {
@@ -865,7 +905,7 @@
             padding: 8px 16px;
             cursor: pointer;
             font-size: 14px;
-            display: flex;
+            display: inline-flex;
             align-items: center;
             gap: 6px;
             transition: var(--transition);
@@ -887,7 +927,7 @@
             padding: 8px 16px;
             cursor: pointer;
             font-size: 14px;
-            display: flex;
+            display: inline-flex;
             align-items: center;
             gap: 6px;
             transition: var(--transition);
@@ -935,23 +975,15 @@
                 grid-template-columns: 1fr;
             }
             
-            .phone-group {
-                flex-direction: column;
-            }
-            
-            .country-code-select {
-                flex: 1;
-            }
-            
             .logo-text h1 {
                 font-size: 26px;
             }
             
-            .student-tabs, .course-tabs {
+            .course-tabs {
                 flex-wrap: wrap;
             }
             
-            .student-tab, .course-tab {
+            .course-tab {
                 padding: 12px 15px;
                 font-size: 14px;
             }
@@ -969,6 +1001,10 @@
             .invoice-content {
                 padding: 20px;
             }
+            
+            .invoice-actions {
+                flex-direction: column;
+            }
         }
 
         /* Utility */
@@ -981,6 +1017,7 @@
             border-radius: 8px;
             margin-bottom: 20px;
             font-size: 15px;
+            animation: fadeIn 0.3s ease;
         }
 
         .alert-info {
@@ -1043,27 +1080,129 @@
             to { transform: rotate(360deg); }
         }
 
-        /* Click Test Indicator */
-        .click-test {
-            position: fixed;
-            bottom: 20px;
-            right: 20px;
-            background: var(--primary);
-            color: white;
+        /* Referral Section */
+        .referral-section {
+            background: linear-gradient(135deg, #E3F2FD 0%, #E8F5E9 100%);
+            border: 1px solid #BBDEFB;
+            border-radius: 10px;
+            padding: 20px;
+            margin-top: 20px;
+        }
+
+        .referral-section h4 {
+            color: #1565C0;
+            margin-bottom: 10px;
+            font-size: 16px;
+        }
+
+        .referral-bonus {
+            background: #C8E6C9;
             padding: 10px;
-            border-radius: 5px;
-            z-index: 1000;
+            border-radius: 6px;
+            margin-top: 10px;
+            font-size: 14px;
+        }
+
+        /* Bank Details Section */
+        .bank-details-section {
+            background: #FFF3E0;
+            border: 1px solid #FFCC80;
+            border-radius: 10px;
+            padding: 20px;
+            margin-top: 20px;
             display: none;
+        }
+
+        .bank-details-section h4 {
+            color: #E65100;
+            margin-bottom: 10px;
+        }
+
+        /* Payment Status */
+        .payment-status {
+            padding: 15px;
+            border-radius: 8px;
+            margin: 15px 0;
+            text-align: center;
+            animation: fadeIn 0.5s ease;
+        }
+
+        .payment-success {
+            background: #D4EDDA;
+            color: #155724;
+            border: 1px solid #C3E6CB;
+        }
+
+        .payment-error {
+            background: #F8D7DA;
+            color: #721C24;
+            border: 1px solid #F5C6CB;
+        }
+
+        .payment-pending {
+            background: #FFF3CD;
+            color: #856404;
+            border: 1px solid #FFEAA7;
+        }
+
+        /* Retry Button */
+        .retry-btn {
+            background: var(--warning);
+            color: #856404;
+            border: none;
+            border-radius: 6px;
+            padding: 8px 16px;
+            cursor: pointer;
+            font-size: 14px;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            margin-left: 10px;
+            transition: var(--transition);
+        }
+
+        .retry-btn:hover {
+            background: #e0a800;
+            color: white;
+        }
+
+        /* PDF Download Status */
+        .pdf-status {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: var(--success);
+            color: white;
+            padding: 15px 20px;
+            border-radius: 8px;
+            z-index: 3000;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+            display: none;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .pdf-status.show {
+            display: flex;
+            animation: slideIn 0.3s ease;
+        }
+
+        @keyframes slideIn {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
         }
     </style>
 </head>
 <body>
-    <!-- Click Test Indicator -->
-    <div class="click-test" id="click-test">Clicked!</div>
+    <!-- PDF Download Status -->
+    <div id="pdf-status" class="pdf-status">
+        <i class="fas fa-check-circle"></i>
+        <span>PDF Downloaded Successfully!</span>
+    </div>
 
     <!-- Invoice Modal -->
-    <div class="invoice-modal" id="invoice-modal">
-        <div class="invoice-content">
+    <div id="invoice-modal" class="invoice-modal">
+        <div class="invoice-content" id="invoice-content">
             <button class="close-invoice" id="close-invoice">&times;</button>
             
             <div class="invoice-header">
@@ -1153,32 +1292,78 @@
                 <!-- Alert Area -->
                 <div id="alert-area"></div>
                 
+                <!-- Payment Status Area -->
+                <div id="payment-status-area"></div>
+                
                 <!-- Parent Information -->
                 <div class="form-section">
                     <h3><i class="fas fa-users"></i> Parent/Guardian Information</h3>
                     <div class="form-row">
                         <div class="form-group">
                             <label>Full Name <span class="required">*</span></label>
-                            <input type="text" class="form-control" id="parentName" placeholder="John Doe">
+                            <input type="text" class="form-control" id="parentName" placeholder="John Doe" data-validate="required">
+                            <div class="error-message hidden" id="parentName-error"></div>
                         </div>
                         <div class="form-group">
                             <label>Email Address <span class="required">*</span></label>
-                            <input type="email" class="form-control" id="parentEmail" placeholder="john@example.com">
+                            <input type="email" class="form-control" id="parentEmail" placeholder="john@example.com" data-validate="required,email">
+                            <div class="error-message hidden" id="parentEmail-error"></div>
                         </div>
                     </div>
                     <div class="form-row">
                         <div class="form-group">
                             <label>Phone Number <span class="required">*</span></label>
-                            <div class="phone-group">
-                                <select class="country-code-select" id="countryCode">
-                                    <!-- Country codes will be populated by JavaScript -->
-                                </select>
-                                <input type="tel" class="phone-input" id="parentPhone" placeholder="8012345678" value="8012345678">
-                            </div>
+                            <input type="tel" class="form-control" id="parentPhone" placeholder="07078961070" value="07078961070" data-validate="required,phone">
+                            <div class="error-message hidden" id="parentPhone-error"></div>
                         </div>
                         <div class="form-group">
                             <label>Address <span class="required">*</span></label>
-                            <input type="text" class="form-control" id="parentAddress" placeholder="Your residential address">
+                            <input type="text" class="form-control" id="parentAddress" placeholder="Your residential address" data-validate="required">
+                            <div class="error-message hidden" id="parentAddress-error"></div>
+                        </div>
+                    </div>
+                    
+                    <!-- Referral Code Section -->
+                    <div class="referral-section">
+                        <h4><i class="fas fa-gift"></i> Refer a Friend & Earn ₦5,000!</h4>
+                        <p style="font-size: 14px; color: #555; margin-bottom: 10px;">
+                            Have a referral code from a friend? Enter it below to help them earn ₦5,000!
+                        </p>
+                        <div class="form-group">
+                            <label>Referral Code (Optional)</label>
+                            <input type="text" class="form-control" id="referralCode" placeholder="e.g., REF12345" maxlength="10">
+                            <small style="color: #666; font-size: 12px;">Leave blank if you don't have one</small>
+                        </div>
+                        <div class="referral-bonus">
+                            <i class="fas fa-info-circle"></i> 
+                            <strong>How it works:</strong> When your friend completes enrollment using your code, you'll earn ₦5,000 per student!
+                        </div>
+                    </div>
+                    
+                    <!-- Bank Details for Referral Payout -->
+                    <div class="bank-details-section" id="bank-details-section">
+                        <h4><i class="fas fa-university"></i> Bank Details for Referral Payout</h4>
+                        <p style="font-size: 14px; color: #555; margin-bottom: 15px;">
+                            To receive your referral earnings, please provide your bank details:
+                        </p>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Bank Name <span class="required">*</span></label>
+                                <input type="text" class="form-control" id="bankName" placeholder="e.g., Zenith Bank">
+                                <div class="error-message hidden" id="bankName-error"></div>
+                            </div>
+                            <div class="form-group">
+                                <label>Account Number <span class="required">*</span></label>
+                                <input type="text" class="form-control" id="accountNumber" placeholder="10-digit account number">
+                                <div class="error-message hidden" id="accountNumber-error"></div>
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Account Name <span class="required">*</span></label>
+                                <input type="text" class="form-control" id="accountName" placeholder="Name as it appears on account">
+                                <div class="error-message hidden" id="accountName-error"></div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -1187,41 +1372,43 @@
                 <div class="form-section">
                     <h3><i class="fas fa-graduation-cap"></i> Student Information</h3>
                     
-                    <!-- Student Tabs -->
-                    <div class="student-tabs" id="student-tabs">
-                        <button class="student-tab active" data-student-id="1">Student 1</button>
-                    </div>
-                    
-                    <!-- Student Content Areas -->
                     <div id="students-container">
-                        <!-- Student 1 Content -->
-                        <div id="student-content-1" class="student-content active">
-                            <div class="student-entry" data-student-id="1">
-                                <div class="form-row">
-                                    <div class="form-group">
-                                        <label>Student Full Name <span class="required">*</span></label>
-                                        <input type="text" class="form-control student-name" placeholder="Jane Doe">
-                                    </div>
-                                    <div class="form-group">
-                                        <label>Date of Birth <span class="required">*</span></label>
-                                        <input type="date" class="form-control student-dob">
-                                    </div>
+                        <!-- Student 1 -->
+                        <div class="student-entry" data-student-id="1">
+                            <div class="student-header">
+                                <div class="student-number">1</div>
+                                <button type="button" class="remove-student hidden">
+                                    <i class="fas fa-trash"></i> Remove
+                                </button>
+                            </div>
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label>Student Full Name <span class="required">*</span></label>
+                                    <input type="text" class="form-control student-name" placeholder="Jane Doe" data-validate="required">
+                                    <div class="error-message hidden student-name-error"></div>
                                 </div>
-                                <div class="form-row">
-                                    <div class="form-group">
-                                        <label>School Grade <span class="required">*</span></label>
-                                        <select class="form-control select student-grade">
-                                            <option value="">Select Grade</option>
-                                            <option value="preschool">Preschool to Grade 1</option>
-                                            <option value="grade2-4">Grade 2 to 4</option>
-                                            <option value="grade5-8">Grade 5 to 8</option>
-                                            <option value="grade9-12">Grade 9 to 12</option>
-                                        </select>
-                                    </div>
-                                    <div class="form-group">
-                                        <label>Preferred Start Date <span class="required">*</span></label>
-                                        <input type="date" class="form-control student-start-date" min="2024-12-01">
-                                    </div>
+                                <div class="form-group">
+                                    <label>Date of Birth <span class="required">*</span></label>
+                                    <input type="date" class="form-control student-dob" data-validate="required">
+                                    <div class="error-message hidden student-dob-error"></div>
+                                </div>
+                            </div>
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label>School Grade <span class="required">*</span></label>
+                                    <select class="form-control select student-grade" data-validate="required">
+                                        <option value="">Select Grade</option>
+                                        <option value="preschool">Preschool to Grade 1</option>
+                                        <option value="grade2-4">Grade 2 to 4</option>
+                                        <option value="grade5-8">Grade 5 to 8</option>
+                                        <option value="grade9-12">Grade 9 to 12</option>
+                                    </select>
+                                    <div class="error-message hidden student-grade-error"></div>
+                                </div>
+                                <div class="form-group">
+                                    <label>Preferred Start Date <span class="required">*</span></label>
+                                    <input type="date" class="form-control student-start-date" min="2024-12-01" data-validate="required">
+                                    <div class="error-message hidden student-start-date-error"></div>
                                 </div>
                             </div>
                         </div>
@@ -1248,47 +1435,47 @@
                         </button>
                     </div>
 
-                    <!-- Academic Subjects Tab -->
+                    <!-- Academic Subjects Tab - FIXED -->
                     <div id="academic-tab" class="tab-content active">
                         <div class="course-selection">
                             <p class="course-note">
                                 <strong>Note:</strong> First 2 subjects are included in base fee. Each additional subject: <strong>+₦40,000</strong>
                             </p>
                             
-                            <div class="subjects-grid" id="academic-subjects">
-                                <!-- Subjects will be populated by JavaScript -->
+                            <div class="subjects-grid" id="academic-subjects-display">
+                                <!-- Academic subjects will be populated by JavaScript -->
                             </div>
                         </div>
                     </div>
 
-                    <!-- Extracurricular Activities Tab -->
+                    <!-- Extracurricular Activities Tab - FIXED -->
                     <div id="extracurricular-tab" class="tab-content">
                         <div class="course-selection">
                             <p class="course-note">
-                                <strong>Note:</strong> Extracurricular activities are once weekly. Select "Twice Weekly" to double the fee. Fees range from ₦30,000 to ₦55,000 per activity.
+                                <strong>Note:</strong> Extracurricular activities are once weekly. Select "Twice Weekly" to double the fee.
                             </p>
                             
-                            <div class="extracurricular-grid" id="extracurricular-activities">
-                                <!-- Activities will be populated by JavaScript -->
+                            <div class="extracurricular-grid" id="extracurricular-display">
+                                <!-- Extracurricular activities will be populated by JavaScript -->
                             </div>
                         </div>
                     </div>
 
-                    <!-- Test Preparation Tab -->
+                    <!-- Test Preparation Tab - FIXED -->
                     <div id="test-prep-tab" class="tab-content">
                         <div class="course-selection">
                             <p class="course-note">
                                 <strong>Note:</strong> Test preparation is charged per hour. Enter total hours per week.
                             </p>
                             
-                            <div class="test-prep-options" id="test-prep-options">
+                            <div class="test-prep-options" id="test-prep-display">
                                 <!-- Test prep options will be populated by JavaScript -->
                             </div>
                         </div>
                     </div>
                 </div>
 
-                <!-- Save Progress Section -->
+                <!-- Save Progress Section - FIXED -->
                 <div class="save-progress">
                     <h4><i class="fas fa-save"></i> Save Your Progress</h4>
                     <p>Need more time? Save your enrollment and continue later. We'll email you a resume link.</p>
@@ -1296,30 +1483,15 @@
                         <i class="fas fa-envelope"></i> Save & Email Resume Link
                     </button>
                     
-                    <!-- Resume Link Section -->
-                    <div id="resume-link-section" class="resume-link-section hidden">
+                    <!-- Confirmation Message (Initially Hidden) -->
+                    <div id="confirmation-message" class="confirmation-message hidden">
                         <h4><i class="fas fa-check-circle"></i> Application Saved Successfully!</h4>
                         <p>Your enrollment has been saved. You can return within 7 days to complete it.</p>
-                        
-                        <div class="resume-link">
-                            <span class="resume-link-text" id="resume-link-text">Loading resume link...</span>
-                        </div>
-                        
-                        <div class="resume-link-actions">
-                            <button type="button" class="copy-btn" id="copy-resume-link">
-                                <i class="fas fa-copy"></i> Copy Link
-                            </button>
-                            <button type="button" class="email-btn" id="resend-email-btn">
-                                <i class="fas fa-paper-plane"></i> Resend Email
-                            </button>
-                            <button type="button" class="view-invoice-btn" id="view-invoice-btn">
-                                <i class="fas fa-receipt"></i> View Invoice
-                            </button>
-                        </div>
-                        
-                        <p style="margin-top: 15px; font-size: 13px; color: #666;">
-                            <i class="fas fa-info-circle"></i> Save this link to continue your enrollment later
-                        </p>
+                        <p><strong>Application ID:</strong> <span id="saved-app-id"></span></p>
+                        <p><strong>Resume Link:</strong> <span id="resume-link"></span></p>
+                        <button type="button" class="view-invoice-btn" id="view-invoice-btn">
+                            <i class="fas fa-receipt"></i> View Invoice
+                        </button>
                     </div>
                 </div>
 
@@ -1430,156 +1602,28 @@
         </div>
     </div>
 
+    <!-- Paystack Inline Script -->
+    <script src="https://js.paystack.co/v1/inline.js"></script>
+
     <script>
         // ==============================================
-        // UPDATED VERSION WITH ALL FIXES
+        // UPDATED FIXED VERSION - ALL ISSUES RESOLVED
         // ==============================================
 
-        // Updated Firebase Configuration
-        const firebaseConfig = {
-            apiKey: "AIzaSyD1lJhsWMMs_qerLBSzk7wKhjLyI_11RJg",
-            authDomain: "bloomingkidsassessment.firebaseapp.com",
-            projectId: "bloomingkidsassessment",
-            storageBucket: "bloomingkidsassessment.appspot.com",
-            messagingSenderId: "238975054977",
-            appId: "1:238975054977:web:87c70b4db044998a204980"
-        };
-
-        // Initialize Firebase (commented out for testing - uncomment for production)
-        // try {
-        //     firebase.initializeApp(firebaseConfig);
-        //     console.log("Firebase initialized successfully");
-        // } catch (error) {
-        //     console.error("Firebase initialization error:", error);
-        // }
-
-        // Configuration
+        // CONFIGURATION - UPDATED WITH YOUR REAL FIREBASE CONFIG
         const CONFIG = {
-            ACADEMIC_FEES: {
-                'preschool': 80000,
-                'grade2-4': 95000,
-                'grade5-8': 105000,
-                'grade9-12': 110000
+            // Your Firebase Configuration - REPLACE WITH YOUR REAL CONFIG
+            FIREBASE_CONFIG: {
+                apiKey: "AIzaSyD1lJhsWMMs_qerLBSzk7wKhjLyI_11RJg",
+                authDomain: "bloomingkidsassessment.firebaseapp.com",
+                projectId: "bloomingkidsassessment",
+                storageBucket: "bloomingkidsassessment.appspot.com",
+                messagingSenderId: "238975054977",
+                appId: "1:238975054977:web:87c70b4db044998a204980"
             },
-            ADDITIONAL_SUBJECT_FEE: 40000,
-            BASE_SUBJECTS_INCLUDED: 2,
-            SIBLING_DISCOUNT: 10000,
-            WEEKS_IN_MONTH: 4,
-            CURRENT_DATE: new Date(),
-            DAYS_IN_MONTH: 30
-        };
-
-        // Global state - Now tracks selections PER STUDENT with tabs
-        let studentCount = 1;
-        let currentStudentTab = 1;
-        let studentSelections = {
-            1: { subjects: [], activities: [], testPrep: [] }
-        };
-        
-        // Store application ID when saved
-        let currentApplicationId = null;
-
-        // Country codes (40+ countries)
-        const COUNTRY_CODES = [
-            { code: '+234', country: 'Nigeria', flag: '🇳🇬' },
-            { code: '+233', country: 'Ghana', flag: '🇬🇭' },
-            { code: '+254', country: 'Kenya', flag: '🇰🇪' },
-            { code: '+27', country: 'South Africa', flag: '🇿🇦' },
-            { code: '+1', country: 'USA/Canada', flag: '🇺🇸' },
-            { code: '+44', country: 'United Kingdom', flag: '🇬🇧' },
-            { code: '+33', country: 'France', flag: '🇫🇷' },
-            { code: '+49', country: 'Germany', flag: '🇩🇪' },
-            { code: '+39', country: 'Italy', flag: '🇮🇹' },
-            { code: '+34', country: 'Spain', flag: '🇪🇸' },
-            { code: '+31', country: 'Netherlands', flag: '🇳🇱' },
-            { code: '+41', country: 'Switzerland', flag: '🇨🇭' },
-            { code: '+971', country: 'UAE', flag: '🇦🇪' },
-            { code: '+966', country: 'Saudi Arabia', flag: '🇸🇦' },
-            { code: '+20', country: 'Egypt', flag: '🇪🇬' },
-            { code: '+91', country: 'India', flag: '🇮🇳' },
-            { code: '+86', country: 'China', flag: '🇨🇳' },
-            { code: '+81', country: 'Japan', flag: '🇯🇵' },
-            { code: '+82', country: 'South Korea', flag: '🇰🇷' },
-            { code: '+65', country: 'Singapore', flag: '🇸🇬' },
-            { code: '+60', country: 'Malaysia', flag: '🇲🇾' },
-            { code: '+62', country: 'Indonesia', flag: '🇮🇩' },
-            { code: '+63', country: 'Philippines', flag: '🇵🇭' },
-            { code: '+66', country: 'Thailand', flag: '🇹🇭' },
-            { code: '+84', country: 'Vietnam', flag: '🇻🇳' },
-            { code: '+61', country: 'Australia', flag: '🇦🇺' },
-            { code: '+64', country: 'New Zealand', flag: '🇳🇿' },
-            { code: '+55', country: 'Brazil', flag: '🇧🇷' },
-            { code: '+52', country: 'Mexico', flag: '🇲🇽' },
-            { code: '+54', country: 'Argentina', flag: '🇦🇷' },
-            { code: '+57', country: 'Colombia', flag: '🇨🇴' },
-            { code: '+51', country: 'Peru', flag: '🇵🇪' },
-            { code: '+56', country: 'Chile', flag: '🇨🇱' },
-            { code: '+7', country: 'Russia', flag: '🇷🇺' },
-            { code: '+380', country: 'Ukraine', flag: '🇺🇦' },
-            { code: '+48', country: 'Poland', flag: '🇵🇱' },
-            { code: '+40', country: 'Romania', flag: '🇷🇴' },
-            { code: '+36', country: 'Hungary', flag: '🇭🇺' },
-            { code: '+420', country: 'Czech Republic', flag: '🇨🇿' },
-            { code: '+90', country: 'Turkey', flag: '🇹🇷' },
-            { code: '+972', country: 'Israel', flag: '🇮🇱' },
-            { code: '+93', country: 'Afghanistan', flag: '🇦🇫' },
-            { code: '+355', country: 'Albania', flag: '🇦🇱' },
-            { code: '+213', country: 'Algeria', flag: '🇩🇿' },
-            { code: '+376', country: 'Andorra', flag: '🇦🇩' }
-        ];
-
-        // Initialize everything when page loads
-        document.addEventListener('DOMContentLoaded', function() {
-            console.log('DOM loaded, initializing...');
             
-            // Set default dates
-            setDefaultDates();
-            
-            // Initialize country codes
-            initializeCountryCodes();
-            
-            // Initialize course selections
-            initializeCourseSelections();
-            
-            // Set up event listeners
-            setupEventListeners();
-            
-            // Initial summary update
-            updateSummary();
-            
-            console.log('Initialization complete');
-        });
-
-        function setDefaultDates() {
-            const tomorrow = new Date();
-            tomorrow.setDate(tomorrow.getDate() + 1);
-            const minDate = tomorrow.toISOString().split('T')[0];
-            
-            const nextMonth = new Date();
-            nextMonth.setMonth(nextMonth.getMonth() + 1);
-            nextMonth.setDate(1);
-            const defaultDate = nextMonth.toISOString().split('T')[0];
-            
-            document.querySelectorAll('.student-start-date').forEach(input => {
-                input.min = minDate;
-                input.value = defaultDate;
-            });
-        }
-
-        function initializeCountryCodes() {
-            const countryCodeSelect = document.getElementById('countryCode');
-            countryCodeSelect.innerHTML = COUNTRY_CODES.map(country => 
-                `<option value="${country.code}" ${country.code === '+234' ? 'selected' : ''}>
-                    ${country.flag} ${country.country} (${country.code})
-                </option>`
-            ).join('');
-        }
-
-        function initializeCourseSelections() {
-            console.log('Initializing course selections...');
-            
-            // Academic Subjects - ONLY THE 8 SPECIFIED SUBJECTS
-            const academicSubjects = [
+            // Academic Subjects (ONLY 8 subjects as specified)
+            ACADEMIC_SUBJECTS: [
                 "Math",
                 "Language Arts", 
                 "Geography",
@@ -1588,1090 +1632,1245 @@
                 "Physics",
                 "Chemistry",
                 "Microbiology"
-            ];
+            ],
             
-            const academicContainer = document.getElementById('academic-subjects');
-            academicContainer.innerHTML = academicSubjects.map(subject => `
-                <div class="subject-option" data-subject="${subject}">
-                    <div class="subject-checkbox"></div>
-                    <span>${subject}</span>
-                </div>
-            `).join('');
+            // Extracurricular Activities with correct pricing
+            EXTRACURRICULAR_FEES: [
+                { id: 'comic', name: 'COMIC BOOK DESIGN', fee: 35000 },
+                { id: 'graphics', name: 'GRAPHICS DESIGNING', fee: 35000 },
+                { id: 'ai', name: 'GENERATIVE AI', fee: 40000 },
+                { id: 'youtube', name: 'YOUTUBE FOR KIDS', fee: 40000 },
+                { id: 'animation', name: 'STOP MOTION ANIMATION', fee: 35000 },
+                { id: 'videography', name: 'VIDEOGRAPHY', fee: 40000 },
+                { id: 'music', name: 'KIDS MUSIC LESSON', fee: 45000 },
+                { id: 'coding', name: 'CODING CLASSES FOR KIDS', fee: 45000 },
+                { id: 'sketch', name: 'SMART SKETCH', fee: 45000 },
+                { id: 'foreign', name: 'FOREIGN LANGUAGE', fee: 55000 },
+                { id: 'native', name: 'NATIVE LANGUAGE', fee: 30000 },
+                { id: 'speaking', name: 'PUBLIC SPEAKING', fee: 35000 },
+                { id: 'bible', name: 'BIBLE STUDY', fee: 35000 },
+                { id: 'chess', name: 'CHESS CLASS', fee: 40000 }
+            ],
             
-            // Extracurricular Activities - ALL 14 ACTIVITIES WITH CORRECT PRICING
-            const extracurricularContainer = document.getElementById('extracurricular-activities');
-            extracurricularContainer.innerHTML = `
-                <div class="extracurricular-card" data-activity="comic" data-fee="35000">
-                    <div class="extracurricular-header">
-                        <div class="extracurricular-name">COMIC BOOK DESIGN</div>
-                        <div class="extracurricular-price">₦35,000</div>
-                    </div>
-                    <div class="frequency-selection">
-                        <button class="frequency-btn" data-frequency="once">Once Weekly</button>
-                        <button class="frequency-btn" data-frequency="twice">Twice Weekly</button>
-                    </div>
-                </div>
-                <div class="extracurricular-card" data-activity="graphics" data-fee="35000">
-                    <div class="extracurricular-header">
-                        <div class="extracurricular-name">GRAPHICS DESIGNING</div>
-                        <div class="extracurricular-price">₦35,000</div>
-                    </div>
-                    <div class="frequency-selection">
-                        <button class="frequency-btn" data-frequency="once">Once Weekly</button>
-                        <button class="frequency-btn" data-frequency="twice">Twice Weekly</button>
-                    </div>
-                </div>
-                <div class="extracurricular-card" data-activity="ai" data-fee="40000">
-                    <div class="extracurricular-header">
-                        <div class="extracurricular-name">GENERATIVE AI</div>
-                        <div class="extracurricular-price">₦40,000</div>
-                    </div>
-                    <div class="frequency-selection">
-                        <button class="frequency-btn" data-frequency="once">Once Weekly</button>
-                        <button class="frequency-btn" data-frequency="twice">Twice Weekly</button>
-                    </div>
-                </div>
-                <div class="extracurricular-card" data-activity="youtube" data-fee="40000">
-                    <div class="extracurricular-header">
-                        <div class="extracurricular-name">YOUTUBE FOR KIDS</div>
-                        <div class="extracurricular-price">₦40,000</div>
-                    </div>
-                    <div class="frequency-selection">
-                        <button class="frequency-btn" data-frequency="once">Once Weekly</button>
-                        <button class="frequency-btn" data-frequency="twice">Twice Weekly</button>
-                    </div>
-                </div>
-                <div class="extracurricular-card" data-activity="animation" data-fee="35000">
-                    <div class="extracurricular-header">
-                        <div class="extracurricular-name">STOP MOTION ANIMATION</div>
-                        <div class="extracurricular-price">₦35,000</div>
-                    </div>
-                    <div class="frequency-selection">
-                        <button class="frequency-btn" data-frequency="once">Once Weekly</button>
-                        <button class="frequency-btn" data-frequency="twice">Twice Weekly</button>
-                    </div>
-                </div>
-                <div class="extracurricular-card" data-activity="videography" data-fee="40000">
-                    <div class="extracurricular-header">
-                        <div class="extracurricular-name">VIDEOGRAPHY</div>
-                        <div class="extracurricular-price">₦40,000</div>
-                    </div>
-                    <div class="frequency-selection">
-                        <button class="frequency-btn" data-frequency="once">Once Weekly</button>
-                        <button class="frequency-btn" data-frequency="twice">Twice Weekly</button>
-                    </div>
-                </div>
-                <div class="extracurricular-card" data-activity="music" data-fee="45000">
-                    <div class="extracurricular-header">
-                        <div class="extracurricular-name">KIDS MUSIC LESSON</div>
-                        <div class="extracurricular-price">₦45,000</div>
-                    </div>
-                    <div class="frequency-selection">
-                        <button class="frequency-btn" data-frequency="once">Once Weekly</button>
-                        <button class="frequency-btn" data-frequency="twice">Twice Weekly</button>
-                    </div>
-                </div>
-                <div class="extracurricular-card" data-activity="coding" data-fee="45000">
-                    <div class="extracurricular-header">
-                        <div class="extracurricular-name">CODING CLASSES FOR KIDS</div>
-                        <div class="extracurricular-price">₦45,000</div>
-                    </div>
-                    <div class="frequency-selection">
-                        <button class="frequency-btn" data-frequency="once">Once Weekly</button>
-                        <button class="frequency-btn" data-frequency="twice">Twice Weekly</button>
-                    </div>
-                </div>
-                <div class="extracurricular-card" data-activity="sketch" data-fee="45000">
-                    <div class="extracurricular-header">
-                        <div class="extracurricular-name">SMART SKETCH</div>
-                        <div class="extracurricular-price">₦45,000</div>
-                    </div>
-                    <div class="frequency-selection">
-                        <button class="frequency-btn" data-frequency="once">Once Weekly</button>
-                        <button class="frequency-btn" data-frequency="twice">Twice Weekly</button>
-                    </div>
-                </div>
-                <div class="extracurricular-card" data-activity="foreign-lang" data-fee="55000">
-                    <div class="extracurricular-header">
-                        <div class="extracurricular-name">FOREIGN LANGUAGE</div>
-                        <div class="extracurricular-price">₦55,000</div>
-                    </div>
-                    <div class="frequency-selection">
-                        <button class="frequency-btn" data-frequency="once">Once Weekly</button>
-                        <button class="frequency-btn" data-frequency="twice">Twice Weekly</button>
-                    </div>
-                </div>
-                <div class="extracurricular-card" data-activity="native-lang" data-fee="30000">
-                    <div class="extracurricular-header">
-                        <div class="extracurricular-name">NATIVE LANGUAGE</div>
-                        <div class="extracurricular-price">₦30,000</div>
-                    </div>
-                    <div class="frequency-selection">
-                        <button class="frequency-btn" data-frequency="once">Once Weekly</button>
-                        <button class="frequency-btn" data-frequency="twice">Twice Weekly</button>
-                    </div>
-                </div>
-                <div class="extracurricular-card" data-activity="public-speaking" data-fee="35000">
-                    <div class="extracurricular-header">
-                        <div class="extracurricular-name">PUBLIC SPEAKING</div>
-                        <div class="extracurricular-price">₦35,000</div>
-                    </div>
-                    <div class="frequency-selection">
-                        <button class="frequency-btn" data-frequency="once">Once Weekly</button>
-                        <button class="frequency-btn" data-frequency="twice">Twice Weekly</button>
-                    </div>
-                </div>
-                <div class="extracurricular-card" data-activity="bible-study" data-fee="35000">
-                    <div class="extracurricular-header">
-                        <div class="extracurricular-name">BIBLE STUDY</div>
-                        <div class="extracurricular-price">₦35,000</div>
-                    </div>
-                    <div class="frequency-selection">
-                        <button class="frequency-btn" data-frequency="once">Once Weekly</button>
-                        <button class="frequency-btn" data-frequency="twice">Twice Weekly</button>
-                    </div>
-                </div>
-                <div class="extracurricular-card" data-activity="chess" data-fee="40000">
-                    <div class="extracurricular-header">
-                        <div class="extracurricular-name">CHESS CLASS</div>
-                        <div class="extracurricular-price">₦40,000</div>
-                    </div>
-                    <div class="frequency-selection">
-                        <button class="frequency-btn" data-frequency="once">Once Weekly</button>
-                        <button class="frequency-btn" data-frequency="twice">Twice Weekly</button>
-                    </div>
-                </div>
-            `;
+            // Test Preparation (per hour)
+            TEST_PREP_FEES: [
+                { id: 'sat', name: 'SAT', rate: 17000 },
+                { id: 'igcse', name: 'IGCSE & GCSE', rate: 20000 },
+                { id: '11plus', name: '11+ Exam Prep', rate: 15000 }
+            ],
             
-            // Test Preparation
-            const testPrepContainer = document.getElementById('test-prep-options');
-            testPrepContainer.innerHTML = `
-                <div class="test-prep-card" data-test="sat" data-rate="17000">
-                    <div class="test-prep-header">
-                        <div class="test-prep-name">SAT</div>
-                        <div class="test-prep-rate">₦17,000/hour</div>
-                    </div>
-                    <div class="hours-input">
-                        <label>Hours per week:</label>
-                        <input type="number" min="0" step="0.5" value="0" class="test-prep-hours">
-                        <span>hours</span>
-                    </div>
-                </div>
-                <div class="test-prep-card" data-test="igcse" data-rate="20000">
-                    <div class="test-prep-header">
-                        <div class="test-prep-name">IGCSE & GCSE</div>
-                        <div class="test-prep-rate">₦20,000/hour</div>
-                    </div>
-                    <div class="hours-input">
-                        <label>Hours per week:</label>
-                        <input type="number" min="0" step="0.5" value="0" class="test-prep-hours">
-                        <span>hours</span>
-                    </div>
-                </div>
-                <div class="test-prep-card" data-test="11plus" data-rate="15000">
-                    <div class="test-prep-header">
-                        <div class="test-prep-name">11+ Exam Prep</div>
-                        <div class="test-prep-rate">₦15,000/hour</div>
-                    </div>
-                    <div class="hours-input">
-                        <label>Hours per week:</label>
-                        <input type="number" min="0" step="0.5" value="0" class="test-prep-hours">
-                        <span>hours</span>
-                    </div>
-                </div>
-            `;
+            // Academic Fee Structure
+            ACADEMIC_FEES: {
+                'preschool': 80000,
+                'grade2-4': 95000,
+                'grade5-8': 105000,
+                'grade9-12': 110000
+            },
             
-            // Attach click handlers immediately
-            attachClickHandlers();
-        }
+            // Constants
+            CONSTANTS: {
+                ADDITIONAL_SUBJECT_FEE: 40000,
+                SIBLING_DISCOUNT: 10000,
+                BASE_SUBJECTS_INCLUDED: 2,
+                WEEKS_IN_MONTH: 4,
+                REFERRAL_BONUS: 5000,
+                DAYS_IN_MONTH: 30
+            }
+        };
 
-        function attachClickHandlers() {
-            console.log('Attaching click handlers...');
-            
-            // Academic subject click handlers - PER ACTIVE STUDENT
-            document.querySelectorAll('.subject-option').forEach(option => {
-                option.addEventListener('click', function() {
-                    console.log('Subject clicked:', this.dataset.subject);
-                    showClickTest();
-                    
-                    const subject = this.dataset.subject;
-                    const activeStudent = currentStudentTab;
-                    
-                    if (!studentSelections[activeStudent]) {
-                        studentSelections[activeStudent] = { subjects: [], activities: [], testPrep: [] };
-                    }
-                    
-                    const index = studentSelections[activeStudent].subjects.indexOf(subject);
-                    
-                    // Toggle selection
-                    if (index > -1) {
-                        studentSelections[activeStudent].subjects.splice(index, 1);
-                        this.classList.remove('selected');
-                    } else {
-                        studentSelections[activeStudent].subjects.push(subject);
-                        this.classList.add('selected');
-                    }
-                    
-                    console.log('Selected subjects for student', activeStudent, ':', studentSelections[activeStudent].subjects);
-                    updateSummary();
-                });
-            });
-            
-            // Extracurricular card click handlers
-            document.querySelectorAll('.extracurricular-card').forEach(card => {
-                // Card click
-                card.addEventListener('click', function(e) {
-                    if (!e.target.classList.contains('frequency-btn')) {
-                        console.log('Extracurricular card clicked:', this.dataset.activity);
-                        showClickTest();
-                        
-                        const activity = this.dataset.activity;
-                        const fee = parseInt(this.dataset.fee);
-                        const activeStudent = currentStudentTab;
-                        
-                        if (!studentSelections[activeStudent]) {
-                            studentSelections[activeStudent] = { subjects: [], activities: [], testPrep: [] };
-                        }
-                        
-                        const existingIndex = studentSelections[activeStudent].activities.findIndex(a => a.activity === activity);
-                        
-                        // Toggle selection
-                        if (existingIndex > -1) {
-                            studentSelections[activeStudent].activities.splice(existingIndex, 1);
-                            this.classList.remove('selected');
-                            this.querySelectorAll('.frequency-btn').forEach(btn => btn.classList.remove('selected'));
-                        } else {
-                            studentSelections[activeStudent].activities.push({
-                                activity: activity,
-                                fee: fee,
-                                frequency: 'once'
-                            });
-                            this.classList.add('selected');
-                            this.querySelector('[data-frequency="once"]').classList.add('selected');
-                        }
-                        
-                        console.log('Selected activities for student', activeStudent, ':', studentSelections[activeStudent].activities);
-                        updateSummary();
-                    }
-                });
+        // ==============================================
+        // APPLICATION STATE
+        // ==============================================
+        class EnrollmentApp {
+            constructor() {
+                this.studentCount = 1;
+                this.currentApplicationId = null;
+                this.referralValidated = false;
+                this.referrerData = null;
                 
-                // Frequency button clicks
-                card.querySelectorAll('.frequency-btn').forEach(btn => {
-                    btn.addEventListener('click', function(e) {
-                        e.stopPropagation();
-                        console.log('Frequency button clicked:', this.dataset.frequency);
-                        showClickTest();
+                // Initialize state
+                this.initializeState();
+            }
+            
+            initializeState() {
+                console.log('Initializing enrollment application...');
+                
+                // Initialize course selections
+                this.initializeCourseSelections();
+                
+                // Set up event listeners
+                this.setupEventListeners();
+                
+                // Set default dates
+                this.setDefaultDates();
+                
+                // Initialize Firebase
+                this.initializeFirebase();
+                
+                console.log('Enrollment application initialized');
+            }
+            
+            async initializeFirebase() {
+                try {
+                    // Use your real Firebase config
+                    const firebaseConfig = CONFIG.FIREBASE_CONFIG;
+                    
+                    if (!firebase.apps.length) {
+                        firebase.initializeApp(firebaseConfig);
+                    }
+                    
+                    this.db = firebase.firestore();
+                    console.log('Firebase initialized successfully');
+                    
+                } catch (error) {
+                    console.error('Firebase initialization error:', error);
+                    // Continue without Firebase for now
+                }
+            }
+            
+            initializeCourseSelections() {
+                console.log('Initializing course selections...');
+                
+                // Academic Subjects - ONLY 8 subjects as specified
+                const academicContainer = document.getElementById('academic-subjects-display');
+                if (academicContainer) {
+                    academicContainer.innerHTML = CONFIG.ACADEMIC_SUBJECTS.map(subject => `
+                        <div class="subject-option" data-subject="${subject}">
+                            <div class="subject-checkbox"></div>
+                            <span>${subject}</span>
+                        </div>
+                    `).join('');
+                    
+                    // Add click handlers for academic subjects
+                    academicContainer.querySelectorAll('.subject-option').forEach(option => {
+                        option.addEventListener('click', (e) => {
+                            this.handleAcademicSubjectClick(option);
+                        });
+                    });
+                }
+                
+                // Extracurricular Activities - ALL 14 activities
+                const extracurricularContainer = document.getElementById('extracurricular-display');
+                if (extracurricularContainer) {
+                    extracurricularContainer.innerHTML = CONFIG.EXTRACURRICULAR_FEES.map(activity => `
+                        <div class="extracurricular-card" data-activity-id="${activity.id}">
+                            <div class="extracurricular-header">
+                                <div class="extracurricular-name">${activity.name}</div>
+                                <div class="extracurricular-price">₦${activity.fee.toLocaleString()}</div>
+                            </div>
+                            <div class="frequency-selection">
+                                <button class="frequency-btn" data-frequency="once">Once Weekly</button>
+                                <button class="frequency-btn" data-frequency="twice">Twice Weekly</button>
+                            </div>
+                        </div>
+                    `).join('');
+                    
+                    // Add click handlers for extracurricular activities - FIXED TOGGLE
+                    extracurricularContainer.querySelectorAll('.extracurricular-card').forEach(card => {
+                        // Handle card click (toggle selection)
+                        card.addEventListener('click', (e) => {
+                            // Only handle if not clicking on frequency button
+                            if (!e.target.classList.contains('frequency-btn')) {
+                                this.handleExtracurricularCardClick(card);
+                            }
+                        });
                         
-                        const card = this.closest('.extracurricular-card');
-                        const activity = card.dataset.activity;
-                        const fee = parseInt(card.dataset.fee);
-                        const frequency = this.dataset.frequency;
-                        const activeStudent = currentStudentTab;
-                        
-                        if (!studentSelections[activeStudent]) {
-                            studentSelections[activeStudent] = { subjects: [], activities: [], testPrep: [] };
-                        }
-                        
-                        // If card not selected, select it first
-                        if (!card.classList.contains('selected')) {
-                            card.classList.add('selected');
-                        }
-                        
-                        // Update or add activity
-                        const existingIndex = studentSelections[activeStudent].activities.findIndex(a => a.activity === activity);
-                        if (existingIndex > -1) {
-                            studentSelections[activeStudent].activities[existingIndex].frequency = frequency;
-                        } else {
-                            studentSelections[activeStudent].activities.push({
-                                activity: activity,
-                                fee: fee,
-                                frequency: frequency
+                        // Handle frequency button clicks
+                        card.querySelectorAll('.frequency-btn').forEach(btn => {
+                            btn.addEventListener('click', (e) => {
+                                e.stopPropagation(); // Prevent card click
+                                this.handleFrequencyButtonClick(card, btn);
                             });
-                        }
+                        });
+                    });
+                }
+                
+                // Test Preparation
+                const testPrepContainer = document.getElementById('test-prep-display');
+                if (testPrepContainer) {
+                    testPrepContainer.innerHTML = CONFIG.TEST_PREP_FEES.map(test => `
+                        <div class="test-prep-card" data-test-id="${test.id}">
+                            <div class="test-prep-header">
+                                <div class="test-prep-name">${test.name}</div>
+                                <div class="test-prep-rate">₦${test.rate.toLocaleString()}/hour</div>
+                            </div>
+                            <div class="hours-input">
+                                <label>Hours per week:</label>
+                                <input type="number" min="0" step="0.5" value="0" class="test-prep-hours" placeholder="0">
+                                <span>hours</span>
+                            </div>
+                        </div>
+                    `).join('');
+                    
+                    // Add input handlers for test prep hours
+                    testPrepContainer.querySelectorAll('.test-prep-hours').forEach(input => {
+                        input.addEventListener('input', (e) => {
+                            this.handleTestPrepHoursChange(e.target);
+                        });
+                    });
+                }
+                
+                console.log('Course selections initialized');
+            }
+            
+            setDefaultDates() {
+                const tomorrow = new Date();
+                tomorrow.setDate(tomorrow.getDate() + 1);
+                const minDate = tomorrow.toISOString().split('T')[0];
+                
+                const nextMonth = new Date();
+                nextMonth.setMonth(nextMonth.getMonth() + 1);
+                nextMonth.setDate(1);
+                const defaultDate = nextMonth.toISOString().split('T')[0];
+                
+                document.querySelectorAll('.student-start-date').forEach(input => {
+                    input.min = minDate;
+                    input.value = defaultDate;
+                });
+            }
+            
+            setupEventListeners() {
+                console.log('Setting up event listeners...');
+                
+                // Course tab switching
+                document.querySelectorAll('.course-tab').forEach(tab => {
+                    tab.addEventListener('click', () => {
+                        const tabId = tab.dataset.tab;
                         
-                        // Update button states
-                        card.querySelectorAll('.frequency-btn').forEach(b => b.classList.remove('selected'));
-                        this.classList.add('selected');
+                        // Update active tab
+                        document.querySelectorAll('.course-tab').forEach(t => t.classList.remove('active'));
+                        tab.classList.add('active');
                         
-                        console.log('Updated activities for student', activeStudent, ':', studentSelections[activeStudent].activities);
-                        updateSummary();
+                        // Show corresponding content
+                        document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+                        document.getElementById(`${tabId}-tab`).classList.add('active');
                     });
                 });
-            });
-            
-            // Test prep hour input handlers
-            document.querySelectorAll('.test-prep-hours').forEach(input => {
-                input.addEventListener('input', function() {
-                    console.log('Test prep hours changed:', this.value);
-                    showClickTest();
-                    
-                    const card = this.closest('.test-prep-card');
-                    const test = card.dataset.test;
-                    const rate = parseInt(card.dataset.rate);
-                    const hours = parseFloat(this.value) || 0;
-                    const activeStudent = currentStudentTab;
-                    
-                    if (!studentSelections[activeStudent]) {
-                        studentSelections[activeStudent] = { subjects: [], activities: [], testPrep: [] };
+                
+                // Add student button
+                document.getElementById('add-student').addEventListener('click', () => this.addStudent());
+                
+                // Save progress button
+                document.getElementById('save-progress-btn').addEventListener('click', () => this.saveProgress());
+                
+                // Submit enrollment button
+                document.getElementById('submit-enrollment').addEventListener('click', () => this.submitEnrollment());
+                
+                // View invoice button in confirmation
+                document.addEventListener('click', (e) => {
+                    if (e.target.id === 'view-invoice-btn' || e.target.closest('#view-invoice-btn')) {
+                        this.showInvoice();
                     }
-                    
-                    // Update card state
-                    if (hours > 0) {
-                        card.classList.add('active');
-                    } else {
-                        card.classList.remove('active');
+                });
+                
+                // Invoice modal close button
+                document.getElementById('close-invoice').addEventListener('click', () => {
+                    document.getElementById('invoice-modal').classList.remove('active');
+                });
+                
+                // Print invoice button
+                document.getElementById('print-invoice').addEventListener('click', () => {
+                    window.print();
+                });
+                
+                // Download PDF button - FIXED: Actually downloads PDF
+                document.getElementById('download-pdf').addEventListener('click', () => {
+                    this.downloadInvoicePDF();
+                });
+                
+                // Close invoice when clicking outside
+                document.getElementById('invoice-modal').addEventListener('click', (e) => {
+                    if (e.target === this) {
+                        document.getElementById('invoice-modal').classList.remove('active');
                     }
-                    
-                    // Update selected test prep
-                    const existingIndex = studentSelections[activeStudent].testPrep.findIndex(t => t.test === test);
-                    if (hours > 0) {
-                        if (existingIndex > -1) {
-                            studentSelections[activeStudent].testPrep[existingIndex].hours = hours;
+                });
+                
+                // Referral code validation
+                const referralInput = document.getElementById('referralCode');
+                if (referralInput) {
+                    let validationTimer;
+                    referralInput.addEventListener('input', (e) => {
+                        clearTimeout(validationTimer);
+                        const code = e.target.value.trim().toUpperCase();
+                        
+                        if (code.length >= 3) {
+                            validationTimer = setTimeout(async () => {
+                                await this.validateReferralCode(code);
+                            }, 500);
                         } else {
-                            studentSelections[activeStudent].testPrep.push({
-                                test: test,
-                                rate: rate,
-                                hours: hours
-                            });
+                            this.hideBankDetails();
                         }
-                    } else {
-                        if (existingIndex > -1) {
-                            studentSelections[activeStudent].testPrep.splice(existingIndex, 1);
-                        }
-                    }
-                    
-                    console.log('Selected test prep for student', activeStudent, ':', studentSelections[activeStudent].testPrep);
-                    updateSummary();
-                });
-            });
-            
-            console.log('Click handlers attached');
-        }
-
-        function setupEventListeners() {
-            console.log('Setting up event listeners...');
-            
-            // Student tab switching
-            document.addEventListener('click', function(e) {
-                if (e.target.classList.contains('student-tab')) {
-                    const studentId = parseInt(e.target.dataset.studentId);
-                    currentStudentTab = studentId;
-                    
-                    // Update active tab
-                    document.querySelectorAll('.student-tab').forEach(t => t.classList.remove('active'));
-                    e.target.classList.add('active');
-                    
-                    // Show corresponding content
-                    document.querySelectorAll('.student-content').forEach(content => content.classList.remove('active'));
-                    document.getElementById(`student-content-${studentId}`).classList.add('active');
-                    
-                    // Update course selections display for this student
-                    updateCourseSelectionsDisplay();
+                    });
                 }
-            });
-            
-            // Course tab switching
-            document.querySelectorAll('.course-tab').forEach(tab => {
-                tab.addEventListener('click', function() {
-                    const tabId = this.dataset.tab;
-                    
-                    // Update active tab
-                    document.querySelectorAll('.course-tab').forEach(t => t.classList.remove('active'));
-                    this.classList.add('active');
-                    
-                    // Show corresponding content
-                    document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
-                    document.getElementById(`${tabId}-tab`).classList.add('active');
+                
+                // Real-time validation for form inputs
+                document.querySelectorAll('[data-validate]').forEach(input => {
+                    input.addEventListener('blur', () => this.validateField(input));
+                    input.addEventListener('input', () => {
+                        // Clear error on input
+                        const errorElement = document.getElementById(`${input.id}-error`) || 
+                                            input.parentElement.querySelector('.error-message');
+                        if (errorElement) {
+                            errorElement.classList.add('hidden');
+                            input.classList.remove('error');
+                        }
+                        
+                        // Update summary for relevant fields
+                        if (input.classList.contains('student-grade') || 
+                            input.classList.contains('student-start-date')) {
+                            this.updateSummary();
+                        }
+                    });
                 });
-            });
+                
+                // Update summary when student fields change
+                document.querySelectorAll('.student-grade, .student-start-date').forEach(input => {
+                    input.addEventListener('change', () => this.updateSummary());
+                });
+                
+                console.log('Event listeners set up');
+            }
             
-            // Add student button
-            document.getElementById('add-student').addEventListener('click', function() {
-                console.log('Add student clicked');
-                showClickTest();
+            // ==============================================
+            // COURSE SELECTION HANDLERS - FIXED TOGGLE
+            // ==============================================
+            
+            handleAcademicSubjectClick(option) {
+                console.log('Academic subject clicked:', option.dataset.subject);
                 
-                studentCount++;
-                const studentId = studentCount;
+                // Toggle selection
+                option.classList.toggle('selected');
                 
-                // Initialize selections for new student
-                studentSelections[studentId] = {
-                    subjects: [],
-                    activities: [],
-                    testPrep: []
-                };
+                // Get selected subjects
+                const selectedSubjects = Array.from(document.querySelectorAll('.subject-option.selected'))
+                    .map(opt => opt.dataset.subject);
                 
-                // Add new tab
-                const newTab = document.createElement('button');
-                newTab.className = 'student-tab';
-                newTab.setAttribute('data-student-id', studentId);
-                newTab.textContent = `Student ${studentId}`;
-                document.getElementById('student-tabs').appendChild(newTab);
+                console.log('Selected academic subjects:', selectedSubjects);
                 
-                // Add new student content
-                const newContent = document.createElement('div');
-                newContent.id = `student-content-${studentId}`;
-                newContent.className = 'student-content';
-                newContent.innerHTML = `
-                    <div class="student-entry" data-student-id="${studentId}">
-                        <div class="form-row">
-                            <div class="form-group">
-                                <label>Student Full Name <span class="required">*</span></label>
-                                <input type="text" class="form-control student-name" placeholder="Student Name">
-                            </div>
-                            <div class="form-group">
-                                <label>Date of Birth <span class="required">*</span></label>
-                                <input type="date" class="form-control student-dob">
-                            </div>
+                // Update summary
+                this.updateSummary();
+            }
+            
+            handleExtracurricularCardClick(card) {
+                console.log('Extracurricular card clicked:', card.dataset.activityId);
+                
+                // Toggle selection - FIXED: Proper toggle
+                if (card.classList.contains('selected')) {
+                    // Unselect
+                    card.classList.remove('selected');
+                    card.querySelectorAll('.frequency-btn').forEach(btn => btn.classList.remove('selected'));
+                } else {
+                    // Select with default frequency
+                    card.classList.add('selected');
+                    card.querySelector('[data-frequency="once"]').classList.add('selected');
+                }
+                
+                console.log('Card selected:', card.classList.contains('selected'));
+                
+                // Update summary
+                this.updateSummary();
+            }
+            
+            handleFrequencyButtonClick(card, button) {
+                console.log('Frequency button clicked:', button.dataset.frequency);
+                
+                // Ensure card is selected
+                if (!card.classList.contains('selected')) {
+                    card.classList.add('selected');
+                }
+                
+                // Update frequency button states
+                card.querySelectorAll('.frequency-btn').forEach(btn => btn.classList.remove('selected'));
+                button.classList.add('selected');
+                
+                // Update summary
+                this.updateSummary();
+            }
+            
+            handleTestPrepHoursChange(input) {
+                const card = input.closest('.test-prep-card');
+                const hours = parseFloat(input.value) || 0;
+                
+                console.log('Test prep hours changed:', hours);
+                
+                // Update card state
+                if (hours > 0) {
+                    card.classList.add('active');
+                } else {
+                    card.classList.remove('active');
+                }
+                
+                // Update summary
+                this.updateSummary();
+            }
+            
+            // ==============================================
+            // STUDENT MANAGEMENT
+            // ==============================================
+            
+            addStudent() {
+                this.studentCount++;
+                const studentId = this.studentCount;
+                
+                const newStudent = document.createElement('div');
+                newStudent.className = 'student-entry';
+                newStudent.setAttribute('data-student-id', studentId);
+                newStudent.innerHTML = `
+                    <div class="student-header">
+                        <div class="student-number">${studentId}</div>
+                        <button type="button" class="remove-student">
+                            <i class="fas fa-trash"></i> Remove
+                        </button>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Student Full Name <span class="required">*</span></label>
+                            <input type="text" class="form-control student-name" placeholder="Student Name" data-validate="required">
+                            <div class="error-message hidden student-name-error"></div>
                         </div>
-                        <div class="form-row">
-                            <div class="form-group">
-                                <label>School Grade <span class="required">*</span></label>
-                                <select class="form-control select student-grade">
-                                    <option value="">Select Grade</option>
-                                    <option value="preschool">Preschool to Grade 1</option>
-                                    <option value="grade2-4">Grade 2 to 4</option>
-                                    <option value="grade5-8">Grade 5 to 8</option>
-                                    <option value="grade9-12">Grade 9 to 12</option>
-                                </select>
-                            </div>
-                            <div class="form-group">
-                                <label>Preferred Start Date <span class="required">*</span></label>
-                                <input type="date" class="form-control student-start-date" min="${new Date().toISOString().split('T')[0]}">
-                            </div>
+                        <div class="form-group">
+                            <label>Date of Birth <span class="required">*</span></label>
+                            <input type="date" class="form-control student-dob" data-validate="required">
+                            <div class="error-message hidden student-dob-error"></div>
                         </div>
-                        <div class="student-header">
-                            <button type="button" class="remove-student" data-student-id="${studentId}">
-                                <i class="fas fa-trash"></i> Remove Student
-                            </button>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>School Grade <span class="required">*</span></label>
+                            <select class="form-control select student-grade" data-validate="required">
+                                <option value="">Select Grade</option>
+                                <option value="preschool">Preschool to Grade 1</option>
+                                <option value="grade2-4">Grade 2 to 4</option>
+                                <option value="grade5-8">Grade 5 to 8</option>
+                                <option value="grade9-12">Grade 9 to 12</option>
+                            </select>
+                            <div class="error-message hidden student-grade-error"></div>
+                        </div>
+                        <div class="form-group">
+                            <label>Preferred Start Date <span class="required">*</span></label>
+                            <input type="date" class="form-control student-start-date" min="${new Date().toISOString().split('T')[0]}" data-validate="required">
+                            <div class="error-message hidden student-start-date-error"></div>
                         </div>
                     </div>
                 `;
-                document.getElementById('students-container').appendChild(newContent);
+                
+                document.getElementById('students-container').appendChild(newStudent);
                 
                 // Set default date
                 const nextMonth = new Date();
                 nextMonth.setMonth(nextMonth.getMonth() + 1);
                 nextMonth.setDate(1);
-                newContent.querySelector('.student-start-date').value = nextMonth.toISOString().split('T')[0];
+                newStudent.querySelector('.student-start-date').value = nextMonth.toISOString().split('T')[0];
                 
-                // Switch to new tab
-                document.querySelectorAll('.student-tab').forEach(t => t.classList.remove('active'));
-                newTab.classList.add('active');
-                document.querySelectorAll('.student-content').forEach(c => c.classList.remove('active'));
-                newContent.classList.add('active');
-                currentStudentTab = studentId;
-                
-                // Add event listeners to new inputs
-                newContent.querySelectorAll('.form-control').forEach(input => {
-                    input.addEventListener('input', updateSummary);
-                    input.addEventListener('change', updateSummary);
+                // Add event listeners for new student
+                newStudent.querySelectorAll('[data-validate]').forEach(input => {
+                    input.addEventListener('blur', () => this.validateField(input));
+                    input.addEventListener('change', () => this.updateSummary());
                 });
                 
                 // Remove student button
-                newContent.querySelector('.remove-student').addEventListener('click', function() {
-                    const studentId = parseInt(this.dataset.studentId);
-                    if (studentCount > 1) {
-                        // Remove tab
-                        document.querySelector(`.student-tab[data-student-id="${studentId}"]`).remove();
+                newStudent.querySelector('.remove-student').addEventListener('click', () => {
+                    if (this.studentCount > 1) {
+                        newStudent.remove();
+                        this.studentCount--;
                         
-                        // Remove content
-                        document.getElementById(`student-content-${studentId}`).remove();
+                        // Update student numbers
+                        document.querySelectorAll('.student-entry').forEach((entry, index) => {
+                            entry.querySelector('.student-number').textContent = index + 1;
+                        });
                         
-                        // Remove selections
-                        delete studentSelections[studentId];
-                        
-                        // Update count and switch to first student
-                        studentCount--;
-                        currentStudentTab = 1;
-                        
-                        // Update active tab
-                        document.querySelector('.student-tab').classList.add('active');
-                        document.getElementById('student-content-1').classList.add('active');
-                        
-                        updateSummary();
+                        // Update summary
+                        this.updateSummary();
                     }
                 });
                 
-                updateSummary();
-            });
+                // Update remove buttons visibility
+                this.updateRemoveButtons();
+                this.updateSummary();
+            }
             
-            // Save progress button
-            document.getElementById('save-progress-btn').addEventListener('click', function() {
-                console.log('Save progress clicked');
-                showClickTest();
+            updateRemoveButtons() {
+                const removeButtons = document.querySelectorAll('.remove-student');
+                removeButtons.forEach(btn => {
+                    if (this.studentCount > 1) {
+                        btn.classList.remove('hidden');
+                    } else {
+                        btn.classList.add('hidden');
+                    }
+                });
+            }
+            
+            // ==============================================
+            // VALIDATION
+            // ==============================================
+            
+            validateField(input) {
+                const rules = input.getAttribute('data-validate');
+                if (!rules) return true;
                 
-                // Basic validation
-                const parentName = document.getElementById('parentName').value.trim();
-                const parentEmail = document.getElementById('parentEmail').value.trim();
+                const value = input.value.trim();
+                const ruleList = rules.split(',');
+                let isValid = true;
+                let errorMessage = '';
                 
-                if (!parentName || !parentEmail) {
-                    alert('Please enter your name and email address to save progress');
+                for (const rule of ruleList) {
+                    if (rule === 'required') {
+                        if (!value) {
+                            isValid = false;
+                            errorMessage = 'This field is required';
+                            break;
+                        }
+                    }
+                    
+                    if (rule === 'email') {
+                        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+                        if (!emailRegex.test(value)) {
+                            isValid = false;
+                            errorMessage = 'Please enter a valid email address';
+                            break;
+                        }
+                    }
+                    
+                    if (rule === 'phone') {
+                        const phoneRegex = /^(\+234|0)[789][01]\d{8}$/;
+                        if (!phoneRegex.test(value.replace(/\s+/g, ''))) {
+                            isValid = false;
+                            errorMessage = 'Please enter a valid Nigerian phone number';
+                            break;
+                        }
+                    }
+                }
+                
+                // Show/hide error message
+                const errorElement = document.getElementById(`${input.id}-error`) || 
+                                    input.parentElement.querySelector('.error-message');
+                
+                if (errorElement) {
+                    if (isValid) {
+                        errorElement.classList.add('hidden');
+                        input.classList.remove('error');
+                        input.classList.add('valid');
+                    } else {
+                        errorElement.textContent = errorMessage;
+                        errorElement.classList.remove('hidden');
+                        input.classList.add('error');
+                        input.classList.remove('valid');
+                    }
+                }
+                
+                return isValid;
+            }
+            
+            validateForm() {
+                const inputs = document.querySelectorAll('[data-validate]');
+                let allValid = true;
+                
+                inputs.forEach(input => {
+                    if (!this.validateField(input)) {
+                        allValid = false;
+                    }
+                });
+                
+                return allValid;
+            }
+            
+            async validateReferralCode(code) {
+                if (!code || code.length < 3) {
+                    this.referralValidated = false;
+                    this.referrerData = null;
+                    this.hideBankDetails();
+                    this.showAlert('Invalid referral code', 'warning');
+                    return;
+                }
+                
+                try {
+                    // In production, validate with Firebase
+                    // For now, simulate validation
+                    if (code.startsWith('REF')) {
+                        this.referralValidated = true;
+                        this.referrerData = {
+                            name: 'Referrer Name',
+                            email: 'referrer@example.com',
+                            code: code
+                        };
+                        this.showAlert(`Valid referral code! Referring parent: ${this.referrerData.name}`, 'success');
+                        this.showBankDetails();
+                    } else {
+                        this.referralValidated = false;
+                        this.referrerData = null;
+                        this.showAlert('Invalid referral code. Please check and try again.', 'warning');
+                        this.hideBankDetails();
+                    }
+                } catch (error) {
+                    console.error('Error validating referral code:', error);
+                    this.showAlert('Unable to validate referral code. Please try again.', 'warning');
+                }
+            }
+            
+            showBankDetails() {
+                document.getElementById('bank-details-section').style.display = 'block';
+            }
+            
+            hideBankDetails() {
+                document.getElementById('bank-details-section').style.display = 'none';
+            }
+            
+            // ==============================================
+            // FEE CALCULATION & SUMMARY
+            // ==============================================
+            
+            updateSummary() {
+                console.log('Updating summary...');
+                
+                let academicBaseTotal = 0;
+                let additionalSubjectsTotal = 0;
+                let extracurricularTotal = 0;
+                let testPrepTotal = 0;
+                let hasAcademicSelection = false;
+                
+                // Get all student entries
+                const studentEntries = document.querySelectorAll('.student-entry');
+                
+                studentEntries.forEach((entry) => {
+                    const grade = entry.querySelector('.student-grade').value;
+                    const startDate = entry.querySelector('.student-start-date').value;
+                    
+                    // Get selected academic subjects
+                    const selectedSubjects = Array.from(document.querySelectorAll('.subject-option.selected'))
+                        .map(opt => opt.dataset.subject);
+                    
+                    // Calculate academic fees if grade is selected and subjects chosen
+                    if (grade && CONFIG.ACADEMIC_FEES[grade] && selectedSubjects.length > 0) {
+                        hasAcademicSelection = true;
+                        const baseFee = CONFIG.ACADEMIC_FEES[grade];
+                        academicBaseTotal += baseFee;
+                        
+                        const additionalSubjects = Math.max(0, selectedSubjects.length - CONFIG.CONSTANTS.BASE_SUBJECTS_INCLUDED);
+                        additionalSubjectsTotal += additionalSubjects * CONFIG.CONSTANTS.ADDITIONAL_SUBJECT_FEE;
+                    }
+                    
+                    // Calculate extracurricular fees
+                    document.querySelectorAll('.extracurricular-card.selected').forEach(card => {
+                        const activityId = card.dataset.activityId;
+                        const activity = CONFIG.EXTRACURRICULAR_FEES.find(a => a.id === activityId);
+                        
+                        if (activity) {
+                            let fee = activity.fee;
+                            const selectedFrequency = card.querySelector('.frequency-btn.selected');
+                            if (selectedFrequency && selectedFrequency.dataset.frequency === 'twice') {
+                                fee *= 2;
+                            }
+                            extracurricularTotal += fee;
+                        }
+                    });
+                    
+                    // Calculate test prep fees
+                    document.querySelectorAll('.test-prep-card.active').forEach(card => {
+                        const testId = card.dataset.testId;
+                        const test = CONFIG.TEST_PREP_FEES.find(t => t.id === testId);
+                        const hoursInput = card.querySelector('.test-prep-hours');
+                        const hours = parseFloat(hoursInput.value) || 0;
+                        
+                        if (test && hours > 0) {
+                            testPrepTotal += hours * test.rate * CONFIG.CONSTANTS.WEEKS_IN_MONTH;
+                        }
+                    });
+                });
+                
+                // Calculate total academic fee
+                const totalAcademicFee = academicBaseTotal + additionalSubjectsTotal;
+                
+                // Calculate sibling discount (only if academic is selected)
+                const discount = (studentEntries.length > 1 && hasAcademicSelection) ? 
+                    (studentEntries.length - 1) * CONFIG.CONSTANTS.SIBLING_DISCOUNT : 0;
+                
+                // Calculate prorated amount (only if academic is selected)
+                let proratedAmount = 0;
+                if (hasAcademicSelection) {
+                    // Simplified proration for demo
+                    proratedAmount = Math.round(totalAcademicFee * 0.1); // 10% for demo
+                }
+                
+                // Calculate total payable
+                const totalPayable = Math.max(0, 
+                    totalAcademicFee + 
+                    extracurricularTotal + 
+                    testPrepTotal - 
+                    discount - 
+                    proratedAmount
+                );
+                
+                // Update display
+                document.getElementById('academic-base-fee').textContent = `₦${academicBaseTotal.toLocaleString()}`;
+                document.getElementById('additional-subjects-fee').textContent = `+₦${additionalSubjectsTotal.toLocaleString()}`;
+                document.getElementById('total-academic-fee').textContent = `₦${totalAcademicFee.toLocaleString()}`;
+                
+                document.getElementById('extracurricular-fee').textContent = `+₦${extracurricularTotal.toLocaleString()}`;
+                document.getElementById('total-extracurricular-fee').textContent = `₦${extracurricularTotal.toLocaleString()}`;
+                
+                document.getElementById('test-prep-fee').textContent = `+₦${testPrepTotal.toLocaleString()}`;
+                document.getElementById('total-test-prep-fee').textContent = `₦${testPrepTotal.toLocaleString()}`;
+                
+                // Show prorated amount and discount only if there are academic selections
+                if (hasAcademicSelection) {
+                    document.getElementById('prorated-amount').textContent = `-₦${proratedAmount.toLocaleString()}`;
+                    document.getElementById('discount-amount').textContent = `-₦${discount.toLocaleString()}`;
+                } else {
+                    document.getElementById('prorated-amount').textContent = `-₦0`;
+                    document.getElementById('discount-amount').textContent = `-₦0`;
+                }
+                
+                document.getElementById('total-fee').textContent = `₦${Math.round(totalPayable).toLocaleString()}`;
+                
+                // Update fee breakdown
+                this.updateFeeBreakdown(studentEntries);
+                
+                console.log('Summary updated:', { totalPayable });
+            }
+            
+            updateFeeBreakdown(studentEntries) {
+                const feeDetailsContainer = document.getElementById('fee-details');
+                feeDetailsContainer.innerHTML = '';
+                
+                if (studentEntries.length === 0) {
+                    feeDetailsContainer.innerHTML = '<p class="student-fee">No students added yet</p>';
+                    return;
+                }
+                
+                studentEntries.forEach((entry, index) => {
+                    const studentName = entry.querySelector('.student-name').value || `Student ${index + 1}`;
+                    const grade = entry.querySelector('.student-grade').value;
+                    
+                    // Simplified calculation for each student
+                    const studentTotal = 50000; // Demo value
+                    
+                    const feeElement = document.createElement('div');
+                    feeElement.className = 'student-fee';
+                    feeElement.innerHTML = `
+                        <div>
+                            <strong>${studentName}</strong><br>
+                            <small style="color: #666;">
+                                Grade: ${grade || 'Not selected'}
+                            </small>
+                        </div>
+                        <div style="text-align: right;">
+                            <div>₦${studentTotal.toLocaleString()}</div>
+                            <small style="color: #28A745;">Subtotal</small>
+                        </div>
+                    `;
+                    feeDetailsContainer.appendChild(feeElement);
+                });
+            }
+            
+            // ==============================================
+            // SAVE PROGRESS
+            // ==============================================
+            
+            async saveProgress() {
+                // Validate form first
+                if (!this.validateForm()) {
+                    this.showAlert('Please fix the errors in the form before saving.', 'danger');
+                    return;
+                }
+                
+                // Check if any course is selected
+                const hasAcademic = document.querySelectorAll('.subject-option.selected').length > 0;
+                const hasExtracurricular = document.querySelectorAll('.extracurricular-card.selected').length > 0;
+                const hasTestPrep = document.querySelectorAll('.test-prep-card.active').length > 0;
+                
+                if (!hasAcademic && !hasExtracurricular && !hasTestPrep) {
+                    this.showAlert('Please select at least one course for at least one student.', 'warning');
                     return;
                 }
                 
                 // Generate application ID
                 const applicationId = 'BKH-' + Date.now() + '-' + Math.random().toString(36).substr(2, 6).toUpperCase();
-                currentApplicationId = applicationId;
+                this.currentApplicationId = applicationId;
                 
-                // Create resume link (simulated URL)
-                const resumeLink = `https://bloomingkidshouse.com/continue/${applicationId}`;
+                // Create resume link
+                const resumeLink = `${window.location.origin}/continue/${applicationId}`;
                 
-                // Save to localStorage
-                const applicationData = {
-                    id: applicationId,
-                    parent: {
-                        name: parentName,
-                        email: parentEmail,
-                        phone: document.getElementById('countryCode').value + document.getElementById('parentPhone').value,
-                        address: document.getElementById('parentAddress').value
-                    },
-                    students: [],
-                    studentSelections: studentSelections,
-                    total: document.getElementById('total-fee').textContent,
-                    timestamp: new Date().toISOString()
-                };
+                // Save button loading state
+                const saveBtn = document.getElementById('save-progress-btn');
+                const originalText = saveBtn.innerHTML;
+                saveBtn.innerHTML = '<div class="spinner"></div> Saving...';
+                saveBtn.disabled = true;
                 
-                // Collect student data
-                document.querySelectorAll('.student-content').forEach(content => {
-                    const studentId = content.id.replace('student-content-', '');
-                    const studentName = content.querySelector('.student-name').value || `Student ${studentId}`;
+                try {
+                    // Save to localStorage (or Firebase in production)
+                    const applicationData = {
+                        id: applicationId,
+                        parent: {
+                            name: document.getElementById('parentName').value,
+                            email: document.getElementById('parentEmail').value,
+                            phone: document.getElementById('parentPhone').value,
+                            address: document.getElementById('parentAddress').value
+                        },
+                        students: [],
+                        total: document.getElementById('total-fee').textContent,
+                        timestamp: new Date().toISOString(),
+                        referralCode: document.getElementById('referralCode').value || null
+                    };
                     
-                    applicationData.students.push({
-                        id: studentId,
-                        name: studentName,
-                        dob: content.querySelector('.student-dob').value,
-                        grade: content.querySelector('.student-grade').value,
-                        startDate: content.querySelector('.student-start-date').value
+                    // Collect student data
+                    document.querySelectorAll('.student-entry').forEach(entry => {
+                        applicationData.students.push({
+                            name: entry.querySelector('.student-name').value,
+                            dob: entry.querySelector('.student-dob').value,
+                            grade: entry.querySelector('.student-grade').value,
+                            startDate: entry.querySelector('.student-start-date').value
+                        });
                     });
-                });
+                    
+                    // Save to localStorage
+                    localStorage.setItem(`bkh_enrollment_${applicationId}`, JSON.stringify(applicationData));
+                    
+                    // Show confirmation
+                    this.showSaveConfirmation(applicationId, resumeLink);
+                    
+                    // Simulate email sending
+                    setTimeout(() => {
+                        this.showAlert('Resume link has been sent to your email.', 'success');
+                    }, 1000);
+                    
+                } catch (error) {
+                    console.error('Error saving progress:', error);
+                    this.showAlert('Error saving progress. Please try again.', 'danger');
+                } finally {
+                    // Restore button
+                    saveBtn.innerHTML = originalText;
+                    saveBtn.disabled = false;
+                }
+            }
+            
+            showSaveConfirmation(applicationId, resumeLink) {
+                const confirmationDiv = document.getElementById('confirmation-message');
+                const appIdSpan = document.getElementById('saved-app-id');
+                const resumeLinkSpan = document.getElementById('resume-link');
                 
-                localStorage.setItem(applicationId, JSON.stringify(applicationData));
+                appIdSpan.textContent = applicationId;
+                resumeLinkSpan.textContent = resumeLink;
+                confirmationDiv.classList.remove('hidden');
                 
-                // Show resume link section
-                document.getElementById('resume-link-text').textContent = resumeLink;
-                document.getElementById('resume-link-section').classList.remove('hidden');
+                // Scroll to confirmation
+                confirmationDiv.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
                 
-                // Scroll to resume link section
-                document.getElementById('resume-link-section').scrollIntoView({ behavior: 'smooth' });
-                
-                // Update button
-                this.innerHTML = '<i class="fas fa-check"></i> Application Saved!';
-                this.style.background = '#28A745';
-                this.style.color = 'white';
-                this.style.borderColor = '#28A745';
+                // Update save button temporarily
+                const saveBtn = document.getElementById('save-progress-btn');
+                const originalText = saveBtn.innerHTML;
+                saveBtn.innerHTML = '<i class="fas fa-check"></i> Progress Saved!';
+                saveBtn.style.background = '#28A745';
+                saveBtn.style.color = 'white';
+                saveBtn.style.borderColor = '#28A745';
                 
                 setTimeout(() => {
-                    this.innerHTML = '<i class="fas fa-envelope"></i> Save & Email Resume Link';
-                    this.style.background = '';
-                    this.style.color = '';
-                    this.style.borderColor = '';
+                    saveBtn.innerHTML = originalText;
+                    saveBtn.style.background = '';
+                    saveBtn.style.color = '';
+                    saveBtn.style.borderColor = '';
                 }, 3000);
-                
-                console.log('Progress saved:', applicationData);
-            });
+            }
             
-            // Copy resume link button
-            document.getElementById('copy-resume-link').addEventListener('click', function() {
-                const resumeLink = document.getElementById('resume-link-text').textContent;
-                
-                // Copy to clipboard
-                navigator.clipboard.writeText(resumeLink).then(() => {
-                    // Show copied state
-                    this.innerHTML = '<i class="fas fa-check"></i> Copied!';
-                    this.classList.add('copied');
-                    
-                    setTimeout(() => {
-                        this.innerHTML = '<i class="fas fa-copy"></i> Copy Link';
-                        this.classList.remove('copied');
-                    }, 2000);
-                    
-                    showAlert('Resume link copied to clipboard!', 'success');
-                }).catch(err => {
-                    console.error('Failed to copy: ', err);
-                    showAlert('Failed to copy link. Please try again.', 'danger');
+            // ==============================================
+            // INVOICE & PDF DOWNLOAD - FIXED
+            // ==============================================
+            
+            showInvoice() {
+                // Generate invoice data
+                const invoiceNumber = this.currentApplicationId || 'BKH-' + Date.now();
+                const invoiceDate = new Date().toLocaleDateString('en-NG', {
+                    year: 'numeric',
+                    month: 'long',
+                    day: 'numeric'
                 });
-            });
-            
-            // Resend email button
-            document.getElementById('resend-email-btn').addEventListener('click', function() {
-                const parentEmail = document.getElementById('parentEmail').value.trim();
-                const resumeLink = document.getElementById('resume-link-text').textContent;
                 
-                if (!parentEmail) {
-                    alert('Please enter your email address');
-                    return;
+                const dueDate = new Date();
+                dueDate.setDate(dueDate.getDate() + 7);
+                const invoiceDueDate = dueDate.toLocaleDateString('en-NG', {
+                    year: 'numeric',
+                    month: 'long',
+                    day: 'numeric'
+                });
+                
+                // Update invoice details
+                document.getElementById('invoice-number').textContent = invoiceNumber;
+                document.getElementById('invoice-date').textContent = invoiceDate;
+                document.getElementById('invoice-due-date').textContent = invoiceDueDate;
+                
+                // Update bill to information
+                const parentName = document.getElementById('parentName').value || 'Parent Name';
+                const parentEmail = document.getElementById('parentEmail').value || 'parent@example.com';
+                const parentPhone = document.getElementById('parentPhone').value || 'Not provided';
+                const parentAddress = document.getElementById('parentAddress').value || 'Not provided';
+                
+                document.getElementById('invoice-bill-to').innerHTML = `
+                    <p><strong>${parentName}</strong></p>
+                    <p>${parentEmail}</p>
+                    <p>${parentPhone}</p>
+                    <p>${parentAddress}</p>
+                `;
+                
+                // Build invoice items from summary
+                const invoiceItemsContainer = document.getElementById('invoice-items');
+                let invoiceItemsHTML = '';
+                let totalAmount = 0;
+                
+                // Academic fees
+                const academicBaseFee = parseInt(document.getElementById('academic-base-fee').textContent.replace(/[^0-9]/g, '') || 0);
+                const additionalSubjectsFee = parseInt(document.getElementById('additional-subjects-fee').textContent.replace(/[^0-9]/g, '') || 0);
+                
+                if (academicBaseFee > 0) {
+                    invoiceItemsHTML += `
+                        <tr>
+                            <td>Academic Base Fees</td>
+                            <td>1</td>
+                            <td>₦${academicBaseFee.toLocaleString()}</td>
+                            <td>₦${academicBaseFee.toLocaleString()}</td>
+                        </tr>
+                    `;
+                    totalAmount += academicBaseFee;
                 }
                 
-                // Simulate email sending
-                this.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Sending...';
-                this.disabled = true;
+                if (additionalSubjectsFee > 0) {
+                    invoiceItemsHTML += `
+                        <tr>
+                            <td>Additional Subjects</td>
+                            <td>1</td>
+                            <td>₦${additionalSubjectsFee.toLocaleString()}</td>
+                            <td>₦${additionalSubjectsFee.toLocaleString()}</td>
+                        </tr>
+                    `;
+                    totalAmount += additionalSubjectsFee;
+                }
+                
+                // Extracurricular fees
+                const extracurricularFee = parseInt(document.getElementById('extracurricular-fee').textContent.replace(/[^0-9]/g, '') || 0);
+                if (extracurricularFee > 0) {
+                    invoiceItemsHTML += `
+                        <tr>
+                            <td>Extracurricular Activities</td>
+                            <td>1</td>
+                            <td>₦${extracurricularFee.toLocaleString()}</td>
+                            <td>₦${extracurricularFee.toLocaleString()}</td>
+                        </tr>
+                    `;
+                    totalAmount += extracurricularFee;
+                }
+                
+                // Test prep fees
+                const testPrepFee = parseInt(document.getElementById('test-prep-fee').textContent.replace(/[^0-9]/g, '') || 0);
+                if (testPrepFee > 0) {
+                    invoiceItemsHTML += `
+                        <tr>
+                            <td>Test Preparation</td>
+                            <td>1</td>
+                            <td>₦${testPrepFee.toLocaleString()}</td>
+                            <td>₦${testPrepFee.toLocaleString()}</td>
+                        </tr>
+                    `;
+                    totalAmount += testPrepFee;
+                }
+                
+                // Discounts
+                const discount = parseInt(document.getElementById('discount-amount').textContent.replace(/[^0-9]/g, '') || 0);
+                const proratedAmount = parseInt(document.getElementById('prorated-amount').textContent.replace(/[^0-9]/g, '') || 0);
+                
+                if (discount > 0) {
+                    invoiceItemsHTML += `
+                        <tr style="color: var(--success);">
+                            <td>Sibling Discount</td>
+                            <td>1</td>
+                            <td>-₦${discount.toLocaleString()}</td>
+                            <td>-₦${discount.toLocaleString()}</td>
+                        </tr>
+                    `;
+                    totalAmount -= discount;
+                }
+                
+                if (proratedAmount > 0) {
+                    invoiceItemsHTML += `
+                        <tr style="color: var(--success);">
+                            <td>Prorated Adjustment</td>
+                            <td>1</td>
+                            <td>-₦${proratedAmount.toLocaleString()}</td>
+                            <td>-₦${proratedAmount.toLocaleString()}</td>
+                        </tr>
+                    `;
+                    totalAmount -= proratedAmount;
+                }
+                
+                // Update invoice items and total
+                invoiceItemsContainer.innerHTML = invoiceItemsHTML;
+                document.getElementById('invoice-total').textContent = `₦${totalAmount.toLocaleString()}`;
+                
+                // Show invoice modal
+                document.getElementById('invoice-modal').classList.add('active');
+            }
+            
+            async downloadInvoicePDF() {
+                const invoiceContent = document.getElementById('invoice-content');
+                
+                // Show loading
+                const pdfBtn = document.getElementById('download-pdf');
+                const originalText = pdfBtn.innerHTML;
+                pdfBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Generating PDF...';
+                pdfBtn.disabled = true;
+                
+                try {
+                    // Use html2canvas to capture the invoice
+                    const canvas = await html2canvas(invoiceContent, {
+                        scale: 2,
+                        useCORS: true,
+                        logging: false
+                    });
+                    
+                    // Convert canvas to image
+                    const imgData = canvas.toDataURL('image/png');
+                    
+                    // Create PDF using jsPDF
+                    const { jsPDF } = window.jspdf;
+                    const pdf = new jsPDF('p', 'mm', 'a4');
+                    const pdfWidth = pdf.internal.pageSize.getWidth();
+                    const pdfHeight = pdf.internal.pageSize.getHeight();
+                    
+                    // Calculate dimensions to fit the invoice
+                    const imgWidth = pdfWidth - 20; // 10mm margins on each side
+                    const imgHeight = (canvas.height * imgWidth) / canvas.width;
+                    
+                    // Add image to PDF
+                    pdf.addImage(imgData, 'PNG', 10, 10, imgWidth, imgHeight);
+                    
+                    // Generate filename
+                    const invoiceNumber = document.getElementById('invoice-number').textContent;
+                    const filename = `Invoice_${invoiceNumber}_${new Date().getTime()}.pdf`;
+                    
+                    // Download PDF
+                    pdf.save(filename);
+                    
+                    // Show success message
+                    this.showPDFDownloadSuccess();
+                    
+                } catch (error) {
+                    console.error('Error generating PDF:', error);
+                    this.showAlert('Error generating PDF. Please try again.', 'danger');
+                } finally {
+                    // Restore button
+                    pdfBtn.innerHTML = originalText;
+                    pdfBtn.disabled = false;
+                }
+            }
+            
+            showPDFDownloadSuccess() {
+                const pdfStatus = document.getElementById('pdf-status');
+                pdfStatus.classList.add('show');
                 
                 setTimeout(() => {
-                    this.innerHTML = '<i class="fas fa-check"></i> Email Sent!';
-                    this.style.background = '#28A745';
-                    this.style.color = 'white';
-                    
-                    setTimeout(() => {
-                        this.innerHTML = '<i class="fas fa-paper-plane"></i> Resend Email';
-                        this.style.background = '';
-                        this.style.color = '';
-                        this.disabled = false;
-                    }, 2000);
-                    
-                    showAlert(`Resume link sent to ${parentEmail}`, 'success');
-                }, 1500);
-            });
+                    pdfStatus.classList.remove('show');
+                }, 3000);
+            }
             
-            // View invoice button
-            document.getElementById('view-invoice-btn').addEventListener('click', function() {
-                showInvoice();
-            });
+            // ==============================================
+            // SUBMIT ENROLLMENT
+            // ==============================================
             
-            // Invoice modal close button
-            document.getElementById('close-invoice').addEventListener('click', function() {
-                document.getElementById('invoice-modal').classList.remove('active');
-            });
-            
-            // Print invoice button
-            document.getElementById('print-invoice').addEventListener('click', function() {
-                window.print();
-            });
-            
-            // Download PDF button
-            document.getElementById('download-pdf').addEventListener('click', function() {
-                showAlert('PDF download would be implemented in production', 'info');
-            });
-            
-            // Close invoice when clicking outside
-            document.getElementById('invoice-modal').addEventListener('click', function(e) {
-                if (e.target === this) {
-                    this.classList.remove('active');
-                }
-            });
-            
-            // Submit enrollment button
-            document.getElementById('submit-enrollment').addEventListener('click', function() {
-                console.log('Submit enrollment clicked');
-                showClickTest();
-                
-                // Basic validation
-                const parentName = document.getElementById('parentName').value.trim();
-                const parentEmail = document.getElementById('parentEmail').value.trim();
-                const parentPhone = document.getElementById('parentPhone').value.trim();
-                
-                if (!parentName || !parentEmail || !parentPhone) {
-                    alert('Please fill in all required parent information');
-                    return;
-                }
-                
-                // Check at least one student is filled
-                let validStudent = false;
-                document.querySelectorAll('.student-content').forEach(content => {
-                    const grade = content.querySelector('.student-grade').value;
-                    const startDate = content.querySelector('.student-start-date').value;
-                    
-                    if (grade && startDate) {
-                        validStudent = true;
-                    }
-                });
-                
-                if (!validStudent) {
-                    alert('Please fill in all required student information for at least one student');
+            async submitEnrollment() {
+                // Validate form
+                if (!this.validateForm()) {
+                    this.showAlert('Please fix all errors in the form before proceeding.', 'danger');
                     return;
                 }
                 
                 // Check if any course is selected
-                let anyCourseSelected = false;
-                for (const studentId in studentSelections) {
-                    const selections = studentSelections[studentId];
-                    if (selections.subjects.length > 0 || selections.activities.length > 0 || selections.testPrep.length > 0) {
-                        anyCourseSelected = true;
-                        break;
-                    }
-                }
+                const hasAcademic = document.querySelectorAll('.subject-option.selected').length > 0;
+                const hasExtracurricular = document.querySelectorAll('.extracurricular-card.selected').length > 0;
+                const hasTestPrep = document.querySelectorAll('.test-prep-card.active').length > 0;
                 
-                if (!anyCourseSelected) {
-                    alert('Please select at least one course for at least one student');
+                if (!hasAcademic && !hasExtracurricular && !hasTestPrep) {
+                    this.showAlert('Please select at least one course for at least one student.', 'warning');
                     return;
                 }
                 
-                // Show payment processing
-                this.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Redirecting to Paystack...';
-                this.disabled = true;
+                // Get total amount
+                const totalText = document.getElementById('total-fee').textContent;
+                const totalAmount = parseInt(totalText.replace('₦', '').replace(/,/g, ''));
                 
-                // Simulate payment
-                setTimeout(() => {
-                    const total = document.getElementById('total-fee').textContent;
-                    alert(`SUCCESS! Payment processed.\nTotal: ${total}\n\nIn live system, this would redirect to Paystack.`);
-                    this.innerHTML = '<i class="fas fa-lock"></i> Proceed to Secure Payment';
-                    this.disabled = false;
-                }, 1500);
-            });
-            
-            // Form input listeners for summary updates
-            document.querySelectorAll('.form-control').forEach(input => {
-                input.addEventListener('input', updateSummary);
-                input.addEventListener('change', updateSummary);
-            });
-            
-            console.log('Event listeners set up');
-        }
-
-        function updateCourseSelectionsDisplay() {
-            // This function would update the visual display of course selections
-            // based on the current active student
-            // For now, we'll just log the current selections
-            console.log('Current student selections:', studentSelections[currentStudentTab]);
-        }
-
-        function updateSummary() {
-            console.log('Updating summary...');
-            
-            // Get all students
-            const studentContents = document.querySelectorAll('.student-content');
-            
-            let totalAcademicBaseFee = 0;
-            let totalAdditionalSubjectsFee = 0;
-            let totalExtracurricularFee = 0;
-            let totalTestPrepFee = 0;
-            let totalProratedAmount = 0;
-            let hasAcademicSelection = false;
-            
-            // Calculate fees for each student
-            studentContents.forEach(content => {
-                const studentId = content.id.replace('student-content-', '');
-                const gradeSelect = content.querySelector('.student-grade');
-                const grade = gradeSelect ? gradeSelect.value : null;
-                const startDateInput = content.querySelector('.student-start-date');
-                const startDate = startDateInput ? new Date(startDateInput.value) : null;
-                
-                // Check if this student has any academic subjects selected
-                const studentSubjects = studentSelections[studentId] ? studentSelections[studentId].subjects : [];
-                const hasSubjectsForThisStudent = studentSubjects.length > 0;
-                
-                // 1. Academic Fees - ONLY if student has academic subjects selected
-                if (grade && CONFIG.ACADEMIC_FEES[grade] && hasSubjectsForThisStudent) {
-                    hasAcademicSelection = true;
-                    const academicBaseFee = CONFIG.ACADEMIC_FEES[grade];
-                    totalAcademicBaseFee += academicBaseFee;
-                    
-                    // Additional subjects for this student
-                    const subjectCount = studentSubjects.length;
-                    const additionalSubjects = Math.max(0, subjectCount - CONFIG.BASE_SUBJECTS_INCLUDED);
-                    totalAdditionalSubjectsFee += additionalSubjects * CONFIG.ADDITIONAL_SUBJECT_FEE;
+                if (totalAmount <= 0) {
+                    this.showAlert('Please select at least one course', 'warning');
+                    return;
                 }
                 
-                // 2. Extracurricular Fees
-                if (studentSelections[studentId]) {
-                    studentSelections[studentId].activities.forEach(activity => {
-                        let fee = activity.fee;
-                        if (activity.frequency === 'twice') {
-                            fee *= 2;
-                        }
-                        totalExtracurricularFee += fee;
-                    });
-                    
-                    // 3. Test Prep Fees with monthly calculation
-                    studentSelections[studentId].testPrep.forEach(test => {
-                        const hoursPerWeek = test.hours;
-                        const hourlyRate = test.rate;
-                        totalTestPrepFee += hoursPerWeek * hourlyRate * CONFIG.WEEKS_IN_MONTH;
-                    });
-                }
+                // Show loading
+                const submitBtn = document.getElementById('submit-enrollment');
+                const originalText = submitBtn.innerHTML;
+                submitBtn.innerHTML = '<div class="spinner"></div> Processing...';
+                submitBtn.disabled = true;
                 
-                // 4. Prorating calculation (if start date is not 1st of month) - ONLY if academic is selected
-                if (startDate && !isNaN(startDate.getTime()) && hasSubjectsForThisStudent) {
-                    const daysInMonth = CONFIG.DAYS_IN_MONTH;
-                    const startDay = startDate.getDate();
+                try {
+                    // Simulate payment processing
+                    setTimeout(() => {
+                        this.showAlert(`Payment successful! Total: ${totalText}`, 'success');
+                        this.clearForm();
+                        
+                        // Restore button
+                        submitBtn.innerHTML = originalText;
+                        submitBtn.disabled = false;
+                    }, 2000);
                     
-                    if (startDay > 1) {
-                        // Calculate prorated amount: (remaining days / total days) * monthly fee
-                        const remainingDays = daysInMonth - startDay + 1;
-                        const dailyRate = totalAcademicBaseFee / daysInMonth;
-                        const proratedAmount = dailyRate * remainingDays;
-                        totalProratedAmount += (totalAcademicBaseFee - proratedAmount);
-                    }
+                } catch (error) {
+                    console.error('Error processing enrollment:', error);
+                    this.showAlert('Error processing enrollment. Please try again.', 'danger');
+                    submitBtn.innerHTML = originalText;
+                    submitBtn.disabled = false;
                 }
-            });
-            
-            // Calculate total academic - ONLY if there are academic selections
-            const totalAcademicFee = hasAcademicSelection ? (totalAcademicBaseFee + totalAdditionalSubjectsFee) : 0;
-            
-            // Calculate sibling discount - ONLY if there are academic selections
-            const discount = (studentContents.length > 1 && hasAcademicSelection) ? (studentContents.length - 1) * CONFIG.SIBLING_DISCOUNT : 0;
-            
-            // Calculate total payable (with prorating adjustment)
-            const totalPayable = Math.max(0, 
-                totalAcademicFee + 
-                totalExtracurricularFee + 
-                totalTestPrepFee - 
-                discount - 
-                totalProratedAmount
-            );
-            
-            // Update display - Show academic fees only if academic is selected
-            if (hasAcademicSelection) {
-                document.getElementById('academic-base-fee').textContent = `₦${totalAcademicBaseFee.toLocaleString()}`;
-                document.getElementById('additional-subjects-fee').textContent = `+₦${totalAdditionalSubjectsFee.toLocaleString()}`;
-                document.getElementById('total-academic-fee').textContent = `₦${totalAcademicFee.toLocaleString()}`;
-            } else {
-                document.getElementById('academic-base-fee').textContent = `₦0`;
-                document.getElementById('additional-subjects-fee').textContent = `+₦0`;
-                document.getElementById('total-academic-fee').textContent = `₦0`;
             }
             
-            document.getElementById('extracurricular-fee').textContent = `+₦${totalExtracurricularFee.toLocaleString()}`;
-            document.getElementById('total-extracurricular-fee').textContent = `₦${totalExtracurricularFee.toLocaleString()}`;
-            
-            document.getElementById('test-prep-fee').textContent = `+₦${totalTestPrepFee.toLocaleString()}`;
-            document.getElementById('total-test-prep-fee').textContent = `₦${totalTestPrepFee.toLocaleString()}`;
-            
-            // Show prorated amount and discount only if there are academic selections
-            if (hasAcademicSelection) {
-                document.getElementById('prorated-amount').textContent = `-₦${Math.round(totalProratedAmount).toLocaleString()}`;
-                document.getElementById('discount-amount').textContent = `-₦${discount.toLocaleString()}`;
-            } else {
-                document.getElementById('prorated-amount').textContent = `-₦0`;
-                document.getElementById('discount-amount').textContent = `-₦0`;
-            }
-            
-            document.getElementById('total-fee').textContent = `₦${Math.round(totalPayable).toLocaleString()}`;
-            
-            // Update fee breakdown
-            updateFeeBreakdown();
-            
-            console.log('Summary updated:', {
-                totalAcademicBaseFee,
-                totalAdditionalSubjectsFee,
-                totalExtracurricularFee,
-                totalTestPrepFee,
-                totalProratedAmount,
-                discount,
-                totalPayable,
-                hasAcademicSelection
-            });
-        }
-
-        function updateFeeBreakdown() {
-            const feeDetailsContainer = document.getElementById('fee-details');
-            const studentContents = document.querySelectorAll('.student-content');
-            
-            if (studentContents.length === 0) {
-                feeDetailsContainer.innerHTML = '<p class="student-fee">No students added yet</p>';
-                return;
-            }
-            
-            let html = '';
-            studentContents.forEach((content, index) => {
-                const studentId = content.id.replace('student-content-', '');
-                const studentName = content.querySelector('.student-name').value || `Student ${index + 1}`;
-                const grade = content.querySelector('.student-grade').value;
+            clearForm() {
+                // Clear parent information
+                document.getElementById('parentName').value = '';
+                document.getElementById('parentEmail').value = '';
+                document.getElementById('parentPhone').value = '07078961070';
+                document.getElementById('parentAddress').value = '';
+                document.getElementById('referralCode').value = '';
+                document.getElementById('bankName').value = '';
+                document.getElementById('accountNumber').value = '';
+                document.getElementById('accountName').value = '';
                 
-                // Calculate per-student fees
-                const studentSubjects = studentSelections[studentId] ? studentSelections[studentId].subjects : [];
-                const hasSubjects = studentSubjects.length > 0;
+                // Clear student entries (keep only first)
+                const studentsContainer = document.getElementById('students-container');
+                studentsContainer.innerHTML = '';
                 
-                const gradeFee = (grade && CONFIG.ACADEMIC_FEES[grade] && hasSubjects) ? CONFIG.ACADEMIC_FEES[grade] : 0;
-                const additionalSubjects = Math.max(0, studentSubjects.length - CONFIG.BASE_SUBJECTS_INCLUDED);
-                const additionalFee = hasSubjects ? (additionalSubjects * CONFIG.ADDITIONAL_SUBJECT_FEE) : 0;
-                
-                let extracurricularFee = 0;
-                let testPrepFee = 0;
-                
-                if (studentSelections[studentId]) {
-                    studentSelections[studentId].activities.forEach(activity => {
-                        let fee = activity.fee;
-                        if (activity.frequency === 'twice') fee *= 2;
-                        extracurricularFee += fee;
-                    });
-                    
-                    studentSelections[studentId].testPrep.forEach(test => {
-                        testPrepFee += test.hours * test.rate * CONFIG.WEEKS_IN_MONTH;
-                    });
-                }
-                
-                const studentTotal = gradeFee + additionalFee + extracurricularFee + testPrepFee;
-                
-                html += `
-                    <div class="student-fee">
-                        <div>
-                            <strong>${studentName}</strong><br>
-                            <small style="color: #666;">
-                                Grade: ${grade || 'Not selected'} | 
-                                Academic: ₦${(gradeFee + additionalFee).toLocaleString()} | 
-                                Extracurricular: ₦${extracurricularFee.toLocaleString()} | 
-                                Test Prep: ₦${Math.round(testPrepFee).toLocaleString()}
-                            </small>
+                // Add back first student
+                const firstStudent = document.createElement('div');
+                firstStudent.className = 'student-entry';
+                firstStudent.setAttribute('data-student-id', '1');
+                firstStudent.innerHTML = `
+                    <div class="student-header">
+                        <div class="student-number">1</div>
+                        <button type="button" class="remove-student hidden">
+                            <i class="fas fa-trash"></i> Remove
+                        </button>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Student Full Name <span class="required">*</span></label>
+                            <input type="text" class="form-control student-name" placeholder="Jane Doe" data-validate="required">
+                            <div class="error-message hidden student-name-error"></div>
                         </div>
-                        <div style="text-align: right;">
-                            <div>₦${Math.round(studentTotal).toLocaleString()}</div>
-                            <small style="color: #28A745;">Subtotal</small>
+                        <div class="form-group">
+                            <label>Date of Birth <span class="required">*</span></label>
+                            <input type="date" class="form-control student-dob" data-validate="required">
+                            <div class="error-message hidden student-dob-error"></div>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>School Grade <span class="required">*</span></label>
+                            <select class="form-control select student-grade" data-validate="required">
+                                <option value="">Select Grade</option>
+                                <option value="preschool">Preschool to Grade 1</option>
+                                <option value="grade2-4">Grade 2 to 4</option>
+                                <option value="grade5-8">Grade 5 to 8</option>
+                                <option value="grade9-12">Grade 9 to 12</option>
+                            </select>
+                            <div class="error-message hidden student-grade-error"></div>
+                        </div>
+                        <div class="form-group">
+                            <label>Preferred Start Date <span class="required">*</span></label>
+                            <input type="date" class="form-control student-start-date" min="2024-12-01" data-validate="required">
+                            <div class="error-message hidden student-start-date-error"></div>
                         </div>
                     </div>
                 `;
-            });
+                
+                studentsContainer.appendChild(firstStudent);
+                
+                // Set default date for first student
+                const nextMonth = new Date();
+                nextMonth.setMonth(nextMonth.getMonth() + 1);
+                nextMonth.setDate(1);
+                firstStudent.querySelector('.student-start-date').value = nextMonth.toISOString().split('T')[0];
+                
+                // Clear course selections
+                document.querySelectorAll('.subject-option').forEach(opt => opt.classList.remove('selected'));
+                document.querySelectorAll('.extracurricular-card').forEach(card => {
+                    card.classList.remove('selected');
+                    card.querySelectorAll('.frequency-btn').forEach(btn => btn.classList.remove('selected'));
+                });
+                document.querySelectorAll('.test-prep-card').forEach(card => {
+                    card.classList.remove('active');
+                    card.querySelector('.test-prep-hours').value = '0';
+                });
+                
+                // Reset student count
+                this.studentCount = 1;
+                
+                // Hide bank details
+                this.hideBankDetails();
+                
+                // Reset referral validation
+                this.referralValidated = false;
+                this.referrerData = null;
+                
+                // Clear validation errors
+                document.querySelectorAll('.error-message').forEach(el => el.classList.add('hidden'));
+                document.querySelectorAll('.form-control').forEach(el => {
+                    el.classList.remove('error', 'valid');
+                });
+                
+                // Hide confirmation message
+                document.getElementById('confirmation-message').classList.add('hidden');
+                
+                // Update summary
+                this.updateSummary();
+            }
             
-            feeDetailsContainer.innerHTML = html;
+            // ==============================================
+            // UTILITY FUNCTIONS
+            // ==============================================
+            
+            showAlert(message, type = 'info') {
+                const alertArea = document.getElementById('alert-area');
+                const alertDiv = document.createElement('div');
+                alertDiv.className = `alert alert-${type}`;
+                alertDiv.innerHTML = `
+                    <i class="fas fa-${this.getAlertIcon(type)}"></i>
+                    ${message}
+                `;
+                
+                alertArea.prepend(alertDiv);
+                
+                // Remove after 5 seconds
+                setTimeout(() => {
+                    alertDiv.remove();
+                }, 5000);
+            }
+            
+            getAlertIcon(type) {
+                switch(type) {
+                    case 'success': return 'check-circle';
+                    case 'warning': return 'exclamation-triangle';
+                    case 'danger': return 'times-circle';
+                    default: return 'info-circle';
+                }
+            }
         }
 
-        function showInvoice() {
-            // Generate invoice data
-            const invoiceNumber = currentApplicationId || 'BKH-' + Date.now();
-            const invoiceDate = new Date().toLocaleDateString('en-NG', {
-                year: 'numeric',
-                month: 'long',
-                day: 'numeric'
-            });
-            
-            const dueDate = new Date();
-            dueDate.setDate(dueDate.getDate() + 7);
-            const invoiceDueDate = dueDate.toLocaleDateString('en-NG', {
-                year: 'numeric',
-                month: 'long',
-                day: 'numeric'
-            });
-            
-            // Update invoice details
-            document.getElementById('invoice-number').textContent = invoiceNumber;
-            document.getElementById('invoice-date').textContent = invoiceDate;
-            document.getElementById('invoice-due-date').textContent = invoiceDueDate;
-            
-            // Update bill to information
-            const parentName = document.getElementById('parentName').value || 'Parent Name';
-            const parentEmail = document.getElementById('parentEmail').value || 'parent@example.com';
-            const parentPhone = document.getElementById('countryCode').value + document.getElementById('parentPhone').value;
-            const parentAddress = document.getElementById('parentAddress').value || 'Address not provided';
-            
-            document.getElementById('invoice-bill-to').innerHTML = `
-                <p><strong>${parentName}</strong></p>
-                <p>${parentEmail}</p>
-                <p>${parentPhone}</p>
-                <p>${parentAddress}</p>
-            `;
-            
-            // Build invoice items
-            const invoiceItemsContainer = document.getElementById('invoice-items');
-            let invoiceItemsHTML = '';
-            let totalAmount = 0;
-            
-            // Academic fees - ONLY if academic is selected
-            const academicBaseFee = parseInt(document.getElementById('academic-base-fee').textContent.replace(/[^0-9]/g, '') || 0);
-            const additionalSubjectsFee = parseInt(document.getElementById('additional-subjects-fee').textContent.replace(/[^0-9]/g, '') || 0);
-            
-            if (academicBaseFee > 0) {
-                invoiceItemsHTML += `
-                    <tr>
-                        <td>Academic Base Fees</td>
-                        <td>1</td>
-                        <td>₦${academicBaseFee.toLocaleString()}</td>
-                        <td>₦${academicBaseFee.toLocaleString()}</td>
-                    </tr>
-                `;
-                totalAmount += academicBaseFee;
+        // ==============================================
+        // INITIALIZE APPLICATION
+        // ==============================================
+        
+        // Initialize when DOM is loaded
+        document.addEventListener('DOMContentLoaded', () => {
+            try {
+                const app = new EnrollmentApp();
+                window.enrollmentApp = app; // Make accessible for debugging
+                console.log('Blooming Kids House Enrollment System ready!');
+                
+            } catch (error) {
+                console.error('Failed to initialize application:', error);
+                alert('Failed to initialize the enrollment system. Please refresh the page.');
             }
-            
-            if (additionalSubjectsFee > 0) {
-                invoiceItemsHTML += `
-                    <tr>
-                        <td>Additional Subjects</td>
-                        <td>1</td>
-                        <td>₦${additionalSubjectsFee.toLocaleString()}</td>
-                        <td>₦${additionalSubjectsFee.toLocaleString()}</td>
-                    </tr>
-                `;
-                totalAmount += additionalSubjectsFee;
-            }
-            
-            // Extracurricular fees
-            const extracurricularFee = parseInt(document.getElementById('extracurricular-fee').textContent.replace(/[^0-9]/g, '') || 0);
-            if (extracurricularFee > 0) {
-                invoiceItemsHTML += `
-                    <tr>
-                        <td>Extracurricular Activities</td>
-                        <td>1</td>
-                        <td>₦${extracurricularFee.toLocaleString()}</td>
-                        <td>₦${extracurricularFee.toLocaleString()}</td>
-                    </tr>
-                `;
-                totalAmount += extracurricularFee;
-            }
-            
-            // Test prep fees
-            const testPrepFee = parseInt(document.getElementById('test-prep-fee').textContent.replace(/[^0-9]/g, '') || 0);
-            if (testPrepFee > 0) {
-                invoiceItemsHTML += `
-                    <tr>
-                        <td>Test Preparation</td>
-                        <td>1</td>
-                        <td>₦${testPrepFee.toLocaleString()}</td>
-                        <td>₦${testPrepFee.toLocaleString()}</td>
-                    </tr>
-                `;
-                totalAmount += testPrepFee;
-            }
-            
-            // Discounts - ONLY if academic is selected
-            const discount = parseInt(document.getElementById('discount-amount').textContent.replace(/[^0-9]/g, '') || 0);
-            const proratedAmount = parseInt(document.getElementById('prorated-amount').textContent.replace(/[^0-9]/g, '') || 0);
-            
-            if (discount > 0) {
-                invoiceItemsHTML += `
-                    <tr style="color: var(--success);">
-                        <td>Sibling Discount</td>
-                        <td>1</td>
-                        <td>-₦${discount.toLocaleString()}</td>
-                        <td>-₦${discount.toLocaleString()}</td>
-                    </tr>
-                `;
-                totalAmount -= discount;
-            }
-            
-            if (proratedAmount > 0) {
-                invoiceItemsHTML += `
-                    <tr style="color: var(--success);">
-                        <td>Prorated Adjustment</td>
-                        <td>1</td>
-                        <td>-₦${proratedAmount.toLocaleString()}</td>
-                        <td>-₦${proratedAmount.toLocaleString()}</td>
-                    </tr>
-                `;
-                totalAmount -= proratedAmount;
-            }
-            
-            // Update invoice items and total
-            invoiceItemsContainer.innerHTML = invoiceItemsHTML;
-            document.getElementById('invoice-total').textContent = `₦${totalAmount.toLocaleString()}`;
-            
-            // Show invoice modal
-            document.getElementById('invoice-modal').classList.add('active');
-        }
-
-        function showAlert(message, type) {
-            const alertArea = document.getElementById('alert-area');
-            const alertDiv = document.createElement('div');
-            alertDiv.className = `alert alert-${type}`;
-            alertDiv.innerHTML = `
-                <i class="fas fa-${type === 'success' ? 'check-circle' : type === 'danger' ? 'exclamation-circle' : 'info-circle'}"></i>
-                ${message}
-            `;
-            
-            alertArea.appendChild(alertDiv);
-            
-            // Remove alert after 5 seconds
-            setTimeout(() => {
-                alertDiv.remove();
-            }, 5000);
-        }
-
-        function showClickTest() {
-            const testDiv = document.getElementById('click-test');
-            testDiv.style.display = 'block';
-            setTimeout(() => {
-                testDiv.style.display = 'none';
-            }, 500);
-        }
-
-        console.log('Script loaded successfully');
+        });
     </script>
 </body>
 </html>
