@@ -1,0 +1,1766 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Blooming Kids House - Enrollment Portal</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        :root {
+            --primary: #2E8B57;      /* Sea Green - Professional */
+            --primary-dark: #1E6B47;
+            --secondary: #FFD700;    /* Gold accent */
+            --light: #F8F9FA;
+            --dark: #343A40;
+            --success: #28A745;
+            --warning: #FFC107;
+            --danger: #DC3545;
+            --border-radius: 12px;
+            --shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+            --transition: all 0.3s ease;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        body {
+            background: linear-gradient(135deg, #f5f7fa 0%, #e4edf5 100%);
+            color: var(--dark);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        /* Header */
+        .header {
+            background: white;
+            border-radius: var(--border-radius);
+            box-shadow: var(--shadow);
+            padding: 25px 40px;
+            margin-bottom: 30px;
+            text-align: center;
+            border-top: 5px solid var(--primary);
+        }
+
+        .logo-container {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 20px;
+            margin-bottom: 15px;
+        }
+
+        .logo-img {
+            height: 70px;
+            width: auto;
+        }
+
+        .logo-text h1 {
+            color: var(--primary-dark);
+            font-size: 32px;
+            margin-bottom: 5px;
+        }
+
+        .logo-text p {
+            color: #666;
+            font-size: 16px;
+        }
+
+        /* Main Layout */
+        .main-content {
+            display: grid;
+            grid-template-columns: 1fr 450px;
+            gap: 30px;
+        }
+
+        @media (max-width: 1200px) {
+            .main-content {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        /* Enrollment Form */
+        .form-card {
+            background: white;
+            border-radius: var(--border-radius);
+            box-shadow: var(--shadow);
+            padding: 35px;
+            margin-bottom: 30px;
+        }
+
+        .form-card h2 {
+            color: var(--primary-dark);
+            margin-bottom: 25px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid var(--light);
+            font-size: 24px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .form-card h2 i {
+            color: var(--primary);
+        }
+
+        /* Course Selection Tabs */
+        .course-tabs {
+            display: flex;
+            border-bottom: 2px solid #E1E5EB;
+            margin-bottom: 30px;
+            overflow-x: auto;
+        }
+
+        .course-tab {
+            padding: 15px 25px;
+            background: none;
+            border: none;
+            border-bottom: 3px solid transparent;
+            font-size: 16px;
+            font-weight: 600;
+            color: #666;
+            cursor: pointer;
+            transition: var(--transition);
+            white-space: nowrap;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .course-tab:hover {
+            color: var(--primary);
+            background: rgba(46, 139, 87, 0.05);
+        }
+
+        .course-tab.active {
+            color: var(--primary-dark);
+            border-bottom-color: var(--primary);
+            background: rgba(46, 139, 87, 0.08);
+        }
+
+        .course-tab i {
+            font-size: 18px;
+        }
+
+        /* Tab Content */
+        .tab-content {
+            display: none;
+            animation: fadeIn 0.5s ease;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        /* Form Sections */
+        .form-section {
+            margin-bottom: 35px;
+        }
+
+        .form-section h3 {
+            font-size: 18px;
+            margin-bottom: 20px;
+            color: var(--dark);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .form-section h3 i {
+            color: var(--primary);
+            width: 24px;
+        }
+
+        .form-row {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #555;
+            font-size: 15px;
+        }
+
+        .form-group label .required {
+            color: var(--danger);
+        }
+
+        .form-control {
+            width: 100%;
+            padding: 14px 18px;
+            border: 2px solid #E1E5EB;
+            border-radius: 8px;
+            font-size: 16px;
+            transition: var(--transition);
+            background-color: #fcfcfc;
+        }
+
+        .form-control:focus {
+            outline: none;
+            border-color: var(--primary);
+            background-color: white;
+            box-shadow: 0 0 0 3px rgba(46, 139, 87, 0.1);
+        }
+
+        .form-control.select {
+            cursor: pointer;
+            background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23555' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
+            background-repeat: no-repeat;
+            background-position: right 15px center;
+            background-size: 18px;
+            appearance: none;
+            padding-right: 50px;
+        }
+
+        /* Course Selection Areas */
+        .course-selection {
+            background: #F8F9FA;
+            border-radius: 10px;
+            padding: 20px;
+            margin-top: 15px;
+        }
+
+        .course-note {
+            font-size: 14px;
+            color: #666;
+            margin-top: 10px;
+            font-style: italic;
+            padding: 10px;
+            background: white;
+            border-radius: 6px;
+            border-left: 3px solid var(--primary);
+        }
+
+        /* Academic Subjects Grid */
+        .subjects-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 15px;
+            margin-top: 20px;
+        }
+
+        .subject-option {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 15px;
+            background: white;
+            border: 2px solid #E1E5EB;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: var(--transition);
+        }
+
+        .subject-option:hover {
+            border-color: var(--primary);
+            background: rgba(46, 139, 87, 0.03);
+        }
+
+        .subject-option.selected {
+            border-color: var(--primary);
+            background: rgba(46, 139, 87, 0.08);
+        }
+
+        .subject-checkbox {
+            width: 22px;
+            height: 22px;
+            border: 2px solid #CCC;
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: var(--transition);
+        }
+
+        .subject-option.selected .subject-checkbox {
+            background: var(--primary);
+            border-color: var(--primary);
+        }
+
+        .subject-option.selected .subject-checkbox::after {
+            content: '✓';
+            color: white;
+            font-size: 14px;
+            font-weight: bold;
+        }
+
+        /* Extracurricular Grid */
+        .extracurricular-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 15px;
+            margin-top: 20px;
+        }
+
+        .extracurricular-card {
+            background: white;
+            border: 2px solid #E1E5EB;
+            border-radius: 8px;
+            padding: 20px;
+            cursor: pointer;
+            transition: var(--transition);
+        }
+
+        .extracurricular-card:hover {
+            border-color: var(--primary);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.05);
+        }
+
+        .extracurricular-card.selected {
+            border-color: var(--primary);
+            background: rgba(46, 139, 87, 0.05);
+        }
+
+        .extracurricular-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: start;
+            margin-bottom: 15px;
+        }
+
+        .extracurricular-name {
+            font-weight: 600;
+            color: var(--dark);
+            font-size: 16px;
+        }
+
+        .extracurricular-price {
+            font-weight: 700;
+            color: var(--primary);
+            font-size: 16px;
+        }
+
+        .frequency-selection {
+            display: flex;
+            gap: 10px;
+            margin-top: 10px;
+        }
+
+        .frequency-btn {
+            flex: 1;
+            padding: 8px 12px;
+            border: 2px solid #E1E5EB;
+            border-radius: 6px;
+            background: white;
+            cursor: pointer;
+            text-align: center;
+            font-size: 14px;
+            transition: var(--transition);
+        }
+
+        .frequency-btn:hover {
+            border-color: var(--primary);
+        }
+
+        .frequency-btn.selected {
+            background: var(--primary);
+            color: white;
+            border-color: var(--primary);
+        }
+
+        /* Test Prep Section */
+        .test-prep-options {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 20px;
+            margin-top: 20px;
+        }
+
+        .test-prep-card {
+            background: white;
+            border: 2px solid #E1E5EB;
+            border-radius: 8px;
+            padding: 20px;
+        }
+
+        .test-prep-card.active {
+            border-color: var(--primary);
+            background: rgba(46, 139, 87, 0.05);
+        }
+
+        .test-prep-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+
+        .test-prep-name {
+            font-weight: 600;
+            color: var(--dark);
+            font-size: 16px;
+        }
+
+        .test-prep-rate {
+            font-weight: 700;
+            color: var(--primary);
+            font-size: 16px;
+        }
+
+        .hours-input {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-top: 15px;
+        }
+
+        .hours-input input {
+            width: 100px;
+            padding: 10px;
+            border: 2px solid #E1E5EB;
+            border-radius: 6px;
+            text-align: center;
+        }
+
+        .hours-input input:focus {
+            outline: none;
+            border-color: var(--primary);
+        }
+
+        /* Student Entry */
+        .student-entry {
+            background: #F8F9FA;
+            border-radius: 10px;
+            padding: 25px;
+            margin-bottom: 25px;
+            border-left: 4px solid var(--primary);
+            position: relative;
+        }
+
+        .student-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .student-number {
+            background: var(--primary);
+            color: white;
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 16px;
+        }
+
+        .remove-student {
+            background: var(--danger);
+            color: white;
+            border: none;
+            border-radius: 6px;
+            padding: 8px 16px;
+            cursor: pointer;
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            transition: var(--transition);
+        }
+
+        .remove-student:hover {
+            background: #c82333;
+        }
+
+        /* Buttons */
+        .btn {
+            padding: 14px 28px;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: var(--transition);
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+        }
+
+        .btn-primary {
+            background: var(--primary);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: var(--primary-dark);
+            transform: translateY(-2px);
+            box-shadow: 0 6px 15px rgba(46, 139, 87, 0.3);
+        }
+
+        .btn-secondary {
+            background: #6C757D;
+            color: white;
+        }
+
+        .btn-secondary:hover {
+            background: #5A6268;
+        }
+
+        .btn-add {
+            background: transparent;
+            color: var(--primary);
+            border: 2px dashed var(--primary);
+            width: 100%;
+            padding: 16px;
+            margin-top: 10px;
+        }
+
+        .btn-add:hover {
+            background: rgba(46, 139, 87, 0.05);
+            border-style: solid;
+        }
+
+        .btn-submit {
+            width: 100%;
+            padding: 18px;
+            font-size: 18px;
+            margin-top: 10px;
+        }
+
+        /* Summary Panel */
+        .summary-panel {
+            background: white;
+            border-radius: var(--border-radius);
+            box-shadow: var(--shadow);
+            padding: 30px;
+            position: sticky;
+            top: 30px;
+            height: fit-content;
+        }
+
+        .summary-panel h2 {
+            color: var(--primary-dark);
+            margin-bottom: 25px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid var(--light);
+            font-size: 22px;
+        }
+
+        .summary-item {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 18px;
+            padding-bottom: 18px;
+            border-bottom: 1px solid #EEE;
+        }
+
+        .summary-item.total {
+            border-top: 2px solid var(--primary);
+            border-bottom: none;
+            padding-top: 20px;
+            margin-top: 10px;
+            font-size: 20px;
+            font-weight: 700;
+            color: var(--primary-dark);
+        }
+
+        .summary-item.discount {
+            color: var(--success);
+            font-weight: 600;
+        }
+
+        .summary-item.section-total {
+            font-weight: 600;
+            color: var(--dark);
+            margin-top: 10px;
+            background: #F8F9FA;
+            padding: 15px;
+            border-radius: 8px;
+        }
+
+        .fee-breakdown {
+            background: #F8F9FA;
+            border-radius: 10px;
+            padding: 20px;
+            margin-top: 25px;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        .fee-breakdown h4 {
+            margin-bottom: 15px;
+            color: #555;
+            font-size: 16px;
+        }
+
+        .student-fee {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 12px;
+            font-size: 15px;
+            padding-left: 10px;
+            border-left: 3px solid #DDD;
+        }
+
+        /* Save Progress Section */
+        .save-progress {
+            background: #FFF3CD;
+            border: 1px solid #FFEAA7;
+            border-radius: 10px;
+            padding: 20px;
+            margin-top: 25px;
+            text-align: center;
+        }
+
+        .save-progress h4 {
+            color: #856404;
+            margin-bottom: 10px;
+            font-size: 16px;
+        }
+
+        .save-progress p {
+            color: #856404;
+            font-size: 14px;
+            margin-bottom: 15px;
+        }
+
+        .save-btn {
+            background: transparent;
+            color: #856404;
+            border: 1px solid #856404;
+            padding: 10px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            transition: var(--transition);
+        }
+
+        .save-btn:hover {
+            background: #856404;
+            color: white;
+        }
+
+        /* Footer */
+        .footer {
+            text-align: center;
+            margin-top: 40px;
+            padding-top: 20px;
+            border-top: 1px solid #DDD;
+            color: #777;
+            font-size: 14px;
+        }
+
+        /* Responsive */
+        @media (max-width: 992px) {
+            .main-content {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .header {
+                padding: 20px;
+            }
+            
+            .form-card, .summary-panel {
+                padding: 25px;
+            }
+            
+            .form-row {
+                grid-template-columns: 1fr;
+            }
+            
+            .logo-text h1 {
+                font-size: 26px;
+            }
+            
+            .course-tabs {
+                flex-wrap: wrap;
+            }
+            
+            .course-tab {
+                padding: 12px 15px;
+                font-size: 14px;
+            }
+            
+            .subjects-grid,
+            .extracurricular-grid,
+            .test-prep-options {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        /* Utility */
+        .hidden {
+            display: none !important;
+        }
+
+        .alert {
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            font-size: 15px;
+        }
+
+        .alert-info {
+            background: #E7F4FF;
+            color: #004085;
+            border-left: 4px solid #0062CC;
+        }
+
+        .alert-success {
+            background: #D4EDDA;
+            color: #155724;
+            border-left: 4px solid #28A745;
+        }
+
+        .text-success {
+            color: var(--success);
+        }
+
+        .text-danger {
+            color: var(--danger);
+        }
+
+        .text-muted {
+            color: #6C757D;
+        }
+
+        .text-primary {
+            color: var(--primary);
+        }
+
+        /* Confirmation Message */
+        .confirmation-message {
+            background: #D4EDDA;
+            border: 1px solid #C3E6CB;
+            border-radius: 8px;
+            padding: 20px;
+            margin-top: 20px;
+            text-align: center;
+            animation: fadeIn 0.5s ease;
+        }
+
+        /* View Invoice Button */
+        .view-invoice-btn {
+            background: transparent;
+            color: var(--primary);
+            border: 1px solid var(--primary);
+            padding: 8px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            margin-top: 10px;
+            transition: var(--transition);
+        }
+
+        .view-invoice-btn:hover {
+            background: var(--primary);
+            color: white;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <header class="header">
+            <div class="logo-container">
+                <img src="https://res.cloudinary.com/dy2xcyaf/image/upload/v1757700806/newbhlogo_umwqzy.svg" 
+                     alt="Blooming Kids House Logo" 
+                     class="logo-img"
+                     onerror="this.onerror=null; this.src='data:image/svg+xml;utf8,<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"70\" height=\"70\" viewBox=\"0 0 70 70\"><rect width=\"70\" height=\"70\" fill=\"%232E8B57\"/><text x=\"35\" y=\"45\" font-family=\"Arial\" font-size=\"30\" fill=\"white\" text-anchor=\"middle\">BKH</text></svg>'">
+                <div class="logo-text">
+                    <h1>Blooming Kids House</h1>
+                    <p>Secure Your Child's Spot - Enrollment Portal</p>
+                </div>
+            </div>
+            <p style="margin-top: 15px; color: #666;">Complete this form to register your child for our specialized programs</p>
+        </header>
+
+        <div class="main-content">
+            <!-- Enrollment Form -->
+            <div class="form-card">
+                <h2><i class="fas fa-user-plus"></i> Student Enrollment Form</h2>
+                
+                <!-- Parent Information -->
+                <div class="form-section">
+                    <h3><i class="fas fa-users"></i> Parent/Guardian Information</h3>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Full Name <span class="required">*</span></label>
+                            <input type="text" class="form-control" id="parentName" placeholder="John Doe">
+                        </div>
+                        <div class="form-group">
+                            <label>Email Address <span class="required">*</span></label>
+                            <input type="email" class="form-control" id="parentEmail" placeholder="john@example.com">
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Phone Number <span class="required">*</span></label>
+                            <input type="tel" class="form-control" id="parentPhone" placeholder="07078961070" value="07078961070">
+                        </div>
+                        <div class="form-group">
+                            <label>Address</label>
+                            <input type="text" class="form-control" id="parentAddress" placeholder="Your residential address">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Student Information -->
+                <div class="form-section">
+                    <h3><i class="fas fa-graduation-cap"></i> Student Information</h3>
+                    
+                    <div id="students-container">
+                        <!-- Student 1 -->
+                        <div class="student-entry" data-student-id="1">
+                            <div class="student-header">
+                                <div class="student-number">1</div>
+                                <button type="button" class="remove-student hidden">
+                                    <i class="fas fa-trash"></i> Remove
+                                </button>
+                            </div>
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label>Student Full Name <span class="required">*</span></label>
+                                    <input type="text" class="form-control student-name" placeholder="Jane Doe" data-input="name">
+                                </div>
+                                <div class="form-group">
+                                    <label>Date of Birth <span class="required">*</span></label>
+                                    <input type="date" class="form-control student-dob" data-input="dob">
+                                </div>
+                            </div>
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label>School Grade <span class="required">*</span></label>
+                                    <select class="form-control select student-grade" data-input="grade">
+                                        <option value="">Select Grade</option>
+                                        <option value="preschool">Preschool to Grade 1</option>
+                                        <option value="grade2-4">Grade 2 to 4</option>
+                                        <option value="grade5-8">Grade 5 to 8</option>
+                                        <option value="grade9-12">Grade 9 to 12</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label>Preferred Start Date <span class="required">*</span></label>
+                                    <input type="date" class="form-control student-start-date" data-input="startDate" min="2024-12-01">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <button type="button" class="btn btn-add" id="add-student">
+                        <i class="fas fa-plus-circle"></i> Add Another Student (Sibling)
+                    </button>
+                </div>
+
+                <!-- Course Selection Tabs -->
+                <div class="form-section">
+                    <h3><i class="fas fa-book-open"></i> Course Selection</h3>
+                    
+                    <div class="course-tabs">
+                        <button class="course-tab active" data-tab="academic">
+                            <i class="fas fa-graduation-cap"></i> Academic Subjects
+                        </button>
+                        <button class="course-tab" data-tab="extracurricular">
+                            <i class="fas fa-palette"></i> Extracurricular Activities
+                        </button>
+                        <button class="course-tab" data-tab="test-prep">
+                            <i class="fas fa-chart-line"></i> Test Preparation
+                        </button>
+                    </div>
+
+                    <!-- Academic Subjects Tab -->
+                    <div id="academic-tab" class="tab-content active">
+                        <div class="course-selection">
+                            <p class="course-note">
+                                <strong>Note:</strong> First 2 subjects are included in base fee. Each additional subject: <strong>+₦40,000</strong>
+                            </p>
+                            
+                            <div class="subjects-grid" id="academic-subjects-1">
+                                <!-- Academic subjects will be populated by JavaScript -->
+                            </div>
+                            <div id="academic-subjects-selection-1" class="hidden"></div>
+                        </div>
+                    </div>
+
+                    <!-- Extracurricular Activities Tab -->
+                    <div id="extracurricular-tab" class="tab-content">
+                        <div class="course-selection">
+                            <p class="course-note">
+                                <strong>Note:</strong> Extracurricular activities are once weekly. Select "Twice Weekly" to double the fee.
+                            </p>
+                            
+                            <div class="extracurricular-grid" id="extracurricular-activities-1">
+                                <!-- Extracurricular activities will be populated by JavaScript -->
+                            </div>
+                            <div id="extracurricular-selection-1" class="hidden"></div>
+                        </div>
+                    </div>
+
+                    <!-- Test Preparation Tab -->
+                    <div id="test-prep-tab" class="tab-content">
+                        <div class="course-selection">
+                            <p class="course-note">
+                                <strong>Note:</strong> Test preparation is charged per hour. Enter total hours per week.
+                            </p>
+                            
+                            <div class="test-prep-options" id="test-prep-options-1">
+                                <!-- Test prep options will be populated by JavaScript -->
+                            </div>
+                            <div id="test-prep-selection-1" class="hidden"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Save Progress Section -->
+                <div class="save-progress">
+                    <h4><i class="fas fa-save"></i> Save Your Progress</h4>
+                    <p>Need more time? Save your enrollment and continue later. We'll email you a resume link.</p>
+                    <button type="button" class="save-btn" id="save-progress-btn">
+                        <i class="fas fa-envelope"></i> Save & Email Resume Link
+                    </button>
+                    
+                    <!-- Confirmation Message (Initially Hidden) -->
+                    <div id="confirmation-message" class="confirmation-message hidden">
+                        <h4><i class="fas fa-check-circle"></i> Application Saved Successfully!</h4>
+                        <p>Your enrollment has been saved. You can return within 7 days to complete it.</p>
+                        <p><strong>Application ID:</strong> <span id="saved-app-id"></span></p>
+                        <button type="button" class="view-invoice-btn" id="view-invoice-btn">
+                            <i class="fas fa-receipt"></i> View Invoice
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Submit Button -->
+                <button type="button" class="btn btn-primary btn-submit" id="submit-enrollment">
+                    <i class="fas fa-lock"></i> Proceed to Secure Payment
+                </button>
+                
+                <div class="alert alert-info" style="margin-top: 25px;">
+                    <i class="fas fa-info-circle"></i> 
+                    <strong>Note:</strong> After payment, you'll be redirected to set up your Parent Portal account immediately.
+                </div>
+            </div>
+
+            <!-- Summary Panel -->
+            <div class="summary-panel">
+                <h2><i class="fas fa-receipt"></i> Fee Summary</h2>
+                
+                <!-- Academic Fees -->
+                <div class="summary-item">
+                    <span>Academic Base Fees:</span>
+                    <span id="academic-base-fee">₦0</span>
+                </div>
+                
+                <div class="summary-item">
+                    <span>Additional Subjects:</span>
+                    <span id="additional-subjects-fee">+₦0</span>
+                </div>
+                
+                <div class="summary-item section-total">
+                    <span>Total Academic Fees:</span>
+                    <span id="total-academic-fee">₦0</span>
+                </div>
+
+                <!-- Extracurricular Fees -->
+                <div class="summary-item">
+                    <span>Extracurricular Activities:</span>
+                    <span id="extracurricular-fee">+₦0</span>
+                </div>
+                
+                <div class="summary-item section-total">
+                    <span>Total Extracurricular:</span>
+                    <span id="total-extracurricular-fee">₦0</span>
+                </div>
+
+                <!-- Test Prep Fees -->
+                <div class="summary-item">
+                    <span>Test Preparation:</span>
+                    <span id="test-prep-fee">+₦0</span>
+                </div>
+                
+                <div class="summary-item section-total">
+                    <span>Total Test Prep:</span>
+                    <span id="total-test-prep-fee">₦0</span>
+                </div>
+                
+                <!-- Overall Adjustments -->
+                <div class="summary-item">
+                    <span>Prorated Adjustment:</span>
+                    <span id="prorated-amount">-₦0</span>
+                </div>
+                
+                <div class="summary-item discount">
+                    <span>Sibling Discount:</span>
+                    <span id="discount-amount">-₦0</span>
+                </div>
+                
+                <div class="summary-item total">
+                    <span>Total Payable:</span>
+                    <span id="total-fee">₦0</span>
+                </div>
+
+                <!-- Fee Breakdown -->
+                <div class="fee-breakdown">
+                    <h4>Fee Breakdown by Student:</h4>
+                    <div id="fee-details">
+                        <p class="student-fee">No students added yet</p>
+                    </div>
+                </div>
+
+                <!-- Payment Information -->
+                <div style="background: linear-gradient(135deg, #2E8B57 0%, #1E6B47 100%); color: white; border-radius: 10px; padding: 25px; margin-top: 30px; text-align: center;">
+                    <h3 style="margin-bottom: 15px; font-size: 20px;"><i class="fas fa-shield-alt"></i> Secure Payment</h3>
+                    <p style="opacity: 0.9; font-size: 15px; margin-bottom: 20px;">Your payment is processed securely via Paystack. All major cards and bank transfers accepted.</p>
+                    
+                    <div style="display: flex; justify-content: center; gap: 20px; margin-top: 20px;">
+                        <i class="fab fa-cc-mastercard" style="font-size: 32px; color: white; opacity: 0.8;"></i>
+                        <i class="fab fa-cc-visa" style="font-size: 32px; color: white; opacity: 0.8;"></i>
+                        <i class="fas fa-university" style="font-size: 32px; color: white; opacity: 0.8;"></i>
+                        <i class="fab fa-cc-paypal" style="font-size: 32px; color: white; opacity: 0.8;"></i>
+                    </div>
+                </div>
+
+                <!-- Contact Info -->
+                <div style="margin-top: 25px; padding-top: 20px; border-top: 1px solid #EEE;">
+                    <p style="font-size: 14px; color: #666; text-align: center;">
+                        <i class="fas fa-headset"></i> Need help? 
+                        <a href="tel:07078961070" style="color: var(--primary); text-decoration: none;">Call: 0707 896 1070</a>
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <div class="footer">
+            <p>© 2024 Blooming Kids House Ltd. All rights reserved.</p>
+            <p style="margin-top: 5px;">This is a secure enrollment system. Your information is protected.</p>
+        </div>
+    </div>
+
+    <script>
+        // ==================== CONFIGURATION ====================
+        const CONFIG = {
+            // Academic Fee Structure (for 2 subjects)
+            ACADEMIC_FEES: {
+                'preschool': { twice: 80000, thrice: 95000, five: 150000 },
+                'grade2-4': { twice: 95000, thrice: 110000, five: 170000 },
+                'grade5-8': { twice: 105000, thrice: 120000, five: 180000 },
+                'grade9-12': { twice: 110000, thrice: 135000, five: 200000 }
+            },
+            
+            // Extracurricular Activities (once weekly)
+            EXTRACURRICULAR_FEES: [
+                { id: 'comic', name: 'COMIC BOOK DESIGN', fee: 35000 },
+                { id: 'graphics', name: 'GRAPHICS DESIGNING', fee: 35000 },
+                { id: 'ai', name: 'GENERATIVE AI', fee: 40000 },
+                { id: 'youtube', name: 'YOUTUBE FOR KIDS', fee: 40000 },
+                { id: 'animation', name: 'STOP MOTION ANIMATION', fee: 35000 },
+                { id: 'videography', name: 'VIDEOGRAPHY', fee: 40000 },
+                { id: 'music', name: 'KIDS MUSIC LESSON', fee: 45000 },
+                { id: 'coding', name: 'CODING CLASSES FOR KIDS', fee: 45000 },
+                { id: 'sketch', name: 'SMART SKETCH', fee: 45000 },
+                { id: 'foreign', name: 'FOREIGN LANGUAGE', fee: 55000 },
+                { id: 'native', name: 'NATIVE LANGUAGE', fee: 30000 },
+                { id: 'speaking', name: 'PUBLIC SPEAKING', fee: 35000 },
+                { id: 'bible', name: 'BIBLE STUDY', fee: 35000 },
+                { id: 'chess', name: 'CHESS CLASS', fee: 40000 }
+            ],
+            
+            // Test Preparation (per hour)
+            TEST_PREP_FEES: [
+                { id: 'sat', name: 'SAT', rate: 17000 },
+                { id: 'igcse', name: 'IGCSE & GCSE', rate: 20000 },
+                { id: '11plus', name: '11+ Exam Prep', rate: 15000 }
+            ],
+            
+            // Constants
+            ADDITIONAL_SUBJECT_FEE: 40000, // ₦40,000 per additional subject
+            SIBLING_DISCOUNT: 10000, // ₦10,000 per sibling after first
+            BASE_SUBJECTS_INCLUDED: 2, // First 2 subjects are free
+            SESSIONS_PER_MONTH: 20, // Assuming 4 weeks × 5 days = 20 sessions max
+            WEEKS_IN_MONTH: 4, // For test prep calculation
+            ACADEMIC_SUBJECTS: [
+                'Mathematics', 'English Language', 'Physics', 'Chemistry', 'Biology',
+                'Further Mathematics', 'Economics', 'Accounting', 'Commerce',
+                'Government', 'Literature', 'History', 'Geography', 'French',
+                'Computer Science', 'CRS/IRS', 'Agricultural Science', 'Physical Education'
+            ]
+        };
+
+        let studentCount = 1;
+        let savedApplicationId = null;
+
+        // ==================== INITIALIZATION ====================
+        document.addEventListener('DOMContentLoaded', function() {
+            // Set minimum start date to tomorrow
+            const tomorrow = new Date();
+            tomorrow.setDate(tomorrow.getDate() + 1);
+            const minDate = tomorrow.toISOString().split('T')[0];
+            
+            document.querySelectorAll('.student-start-date').forEach(input => {
+                input.min = minDate;
+                // Set default to first of next month
+                const nextMonth = new Date();
+                nextMonth.setMonth(nextMonth.getMonth() + 1);
+                nextMonth.setDate(1);
+                input.value = nextMonth.toISOString().split('T')[0];
+            });
+            
+            // Initialize course selections for first student
+            initializeCourseSelections(1);
+            
+            // Update summary
+            updateSummary();
+            
+            // Initialize tab switching
+            initializeTabs();
+        });
+
+        // ==================== TAB MANAGEMENT ====================
+        function initializeTabs() {
+            document.querySelectorAll('.course-tab').forEach(tab => {
+                tab.addEventListener('click', function() {
+                    const tabId = this.dataset.tab;
+                    
+                    // Update active tab
+                    document.querySelectorAll('.course-tab').forEach(t => t.classList.remove('active'));
+                    this.classList.add('active');
+                    
+                    // Show corresponding content
+                    document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+                    document.getElementById(`${tabId}-tab`).classList.add('active');
+                });
+            });
+        }
+
+        // ==================== COURSE SELECTIONS ====================
+        function initializeCourseSelections(studentId) {
+            // Academic Subjects
+            const academicContainer = document.getElementById(`academic-subjects-${studentId}`);
+            if (academicContainer) {
+                academicContainer.innerHTML = CONFIG.ACADEMIC_SUBJECTS.map(subject => `
+                    <div class="subject-option" data-subject="${subject.toLowerCase().replace(/ /g, '-')}">
+                        <div class="subject-checkbox"></div>
+                        <span>${subject}</span>
+                    </div>
+                `).join('');
+                
+                // Add click handlers for academic subjects
+                academicContainer.querySelectorAll('.subject-option').forEach(option => {
+                    option.addEventListener('click', function() {
+                        const studentEntry = this.closest('.student-entry');
+                        const studentId = studentEntry.dataset.studentId;
+                        
+                        // Toggle selection
+                        this.classList.toggle('selected');
+                        
+                        // Update hidden input
+                        updateAcademicSelection(studentId);
+                        updateSummary();
+                    });
+                });
+            }
+            
+            // Extracurricular Activities
+            const extracurricularContainer = document.getElementById(`extracurricular-activities-${studentId}`);
+            if (extracurricularContainer) {
+                extracurricularContainer.innerHTML = CONFIG.EXTRACURRICULAR_FEES.map(activity => `
+                    <div class="extracurricular-card" data-activity-id="${activity.id}">
+                        <div class="extracurricular-header">
+                            <div class="extracurricular-name">${activity.name}</div>
+                            <div class="extracurricular-price">₦${activity.fee.toLocaleString()}</div>
+                        </div>
+                        <div class="frequency-selection">
+                            <button class="frequency-btn" data-frequency="once">Once Weekly</button>
+                            <button class="frequency-btn" data-frequency="twice">Twice Weekly</button>
+                        </div>
+                    </div>
+                `).join('');
+                
+                // Add click handlers for extracurricular
+                extracurricularContainer.querySelectorAll('.extracurricular-card').forEach(card => {
+                    card.addEventListener('click', function(e) {
+                        if (!e.target.classList.contains('frequency-btn')) {
+                            this.classList.toggle('selected');
+                            updateExtracurricularSelection(studentId);
+                            updateSummary();
+                        }
+                    });
+                    
+                    // Frequency button handlers
+                    card.querySelectorAll('.frequency-btn').forEach(btn => {
+                        btn.addEventListener('click', function(e) {
+                            e.stopPropagation();
+                            const card = this.closest('.extracurricular-card');
+                            
+                            // Remove selection from other buttons in this card
+                            card.querySelectorAll('.frequency-btn').forEach(b => b.classList.remove('selected'));
+                            
+                            // Select this button
+                            this.classList.add('selected');
+                            
+                            // Mark card as selected
+                            card.classList.add('selected');
+                            
+                            updateExtracurricularSelection(studentId);
+                            updateSummary();
+                        });
+                    });
+                });
+            }
+            
+            // Test Preparation
+            const testPrepContainer = document.getElementById(`test-prep-options-${studentId}`);
+            if (testPrepContainer) {
+                testPrepContainer.innerHTML = CONFIG.TEST_PREP_FEES.map(test => `
+                    <div class="test-prep-card" data-test-id="${test.id}">
+                        <div class="test-prep-header">
+                            <div class="test-prep-name">${test.name}</div>
+                            <div class="test-prep-rate">₦${test.rate.toLocaleString()}/hour</div>
+                        </div>
+                        <div class="hours-input">
+                            <label>Hours per week:</label>
+                            <input type="number" min="0" step="0.5" value="0" class="test-prep-hours" placeholder="0">
+                            <span>hours</span>
+                        </div>
+                    </div>
+                `).join('');
+                
+                // Add input handlers for test prep
+                testPrepContainer.querySelectorAll('.test-prep-hours').forEach(input => {
+                    input.addEventListener('input', function() {
+                        const card = this.closest('.test-prep-card');
+                        const hours = parseFloat(this.value) || 0;
+                        
+                        if (hours > 0) {
+                            card.classList.add('active');
+                        } else {
+                            card.classList.remove('active');
+                        }
+                        
+                        updateTestPrepSelection(studentId);
+                        updateSummary();
+                    });
+                });
+            }
+        }
+
+        function updateAcademicSelection(studentId) {
+            const studentEntry = document.querySelector(`.student-entry[data-student-id="${studentId}"]`);
+            if (!studentEntry) return;
+            
+            const selectedSubjects = Array.from(studentEntry.querySelectorAll('.subject-option.selected'))
+                .map(sub => {
+                    const text = sub.querySelector('span').textContent;
+                    return text;
+                });
+            
+            const hiddenInput = document.getElementById(`academic-subjects-selection-${studentId}`);
+            if (hiddenInput) {
+                hiddenInput.value = JSON.stringify(selectedSubjects);
+            }
+        }
+
+        function updateExtracurricularSelection(studentId) {
+            const studentEntry = document.querySelector(`.student-entry[data-student-id="${studentId}"]`);
+            if (!studentEntry) return;
+            
+            const selectedActivities = Array.from(studentEntry.querySelectorAll('.extracurricular-card.selected')).map(card => {
+                const activityId = card.dataset.activityId;
+                const frequencyBtn = card.querySelector('.frequency-btn.selected');
+                const frequency = frequencyBtn ? frequencyBtn.dataset.frequency : 'once';
+                
+                return {
+                    id: activityId,
+                    frequency: frequency
+                };
+            });
+            
+            const hiddenInput = document.getElementById(`extracurricular-selection-${studentId}`);
+            if (hiddenInput) {
+                hiddenInput.value = JSON.stringify(selectedActivities);
+            }
+        }
+
+        function updateTestPrepSelection(studentId) {
+            const studentEntry = document.querySelector(`.student-entry[data-student-id="${studentId}"]`);
+            if (!studentEntry) return;
+            
+            const testPrepData = Array.from(studentEntry.querySelectorAll('.test-prep-card')).map(card => {
+                const testId = card.dataset.testId;
+                const hoursInput = card.querySelector('.test-prep-hours');
+                const hours = parseFloat(hoursInput.value) || 0;
+                
+                return {
+                    id: testId,
+                    hours: hours
+                };
+            });
+            
+            const hiddenInput = document.getElementById(`test-prep-selection-${studentId}`);
+            if (hiddenInput) {
+                hiddenInput.value = JSON.stringify(testPrepData);
+            }
+        }
+
+        // ==================== STUDENT MANAGEMENT ====================
+        // Add another student
+        document.getElementById('add-student').addEventListener('click', function() {
+            studentCount++;
+            const studentId = studentCount;
+            
+            const newStudent = document.createElement('div');
+            newStudent.className = 'student-entry';
+            newStudent.setAttribute('data-student-id', studentId);
+            newStudent.innerHTML = `
+                <div class="student-header">
+                    <div class="student-number">${studentId}</div>
+                    <button type="button" class="remove-student">
+                        <i class="fas fa-trash"></i> Remove
+                    </button>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Student Full Name <span class="required">*</span></label>
+                        <input type="text" class="form-control student-name" placeholder="Student Name" data-input="name">
+                    </div>
+                    <div class="form-group">
+                        <label>Date of Birth <span class="required">*</span></label>
+                        <input type="date" class="form-control student-dob" data-input="dob">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>School Grade <span class="required">*</span></label>
+                        <select class="form-control select student-grade" data-input="grade">
+                            <option value="">Select Grade</option>
+                            <option value="preschool">Preschool to Grade 1</option>
+                            <option value="grade2-4">Grade 2 to 4</option>
+                            <option value="grade5-8">Grade 5 to 8</option>
+                            <option value="grade9-12">Grade 9 to 12</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Preferred Start Date <span class="required">*</span></label>
+                        <input type="date" class="form-control student-start-date" data-input="startDate" min="${new Date().toISOString().split('T')[0]}">
+                    </div>
+                </div>
+                
+                <!-- Hidden containers for course selections -->
+                <div id="academic-subjects-${studentId}" class="hidden"></div>
+                <div id="academic-subjects-selection-${studentId}" class="hidden"></div>
+                <div id="extracurricular-activities-${studentId}" class="hidden"></div>
+                <div id="extracurricular-selection-${studentId}" class="hidden"></div>
+                <div id="test-prep-options-${studentId}" class="hidden"></div>
+                <div id="test-prep-selection-${studentId}" class="hidden"></div>
+            `;
+            
+            document.getElementById('students-container').appendChild(newStudent);
+            
+            // Add event listeners
+            newStudent.querySelectorAll('.form-control').forEach(input => {
+                input.addEventListener('input', updateSummary);
+                input.addEventListener('change', updateSummary);
+            });
+            
+            // Set default start date
+            const nextMonth = new Date();
+            nextMonth.setMonth(nextMonth.getMonth() + 1);
+            nextMonth.setDate(1);
+            newStudent.querySelector('.student-start-date').value = nextMonth.toISOString().split('T')[0];
+            
+            // Initialize course selections for new student
+            initializeCourseSelections(studentId);
+            
+            // Add remove functionality
+            newStudent.querySelector('.remove-student').addEventListener('click', function() {
+                if (studentCount > 1) {
+                    newStudent.remove();
+                    studentCount--;
+                    updateSummary();
+                    // Update student numbers
+                    document.querySelectorAll('.student-entry').forEach((entry, index) => {
+                        entry.querySelector('.student-number').textContent = index + 1;
+                    });
+                }
+            });
+            
+            updateSummary();
+        });
+
+        // ==================== FEE CALCULATION ====================
+        function calculateAcademicFee(grade, selectedSubjects) {
+            if (!grade || !CONFIG.ACADEMIC_FEES[grade]) return { base: 0, additional: 0, total: 0 };
+            
+            // Get base fee for twice weekly (default for calculation)
+            const baseFee = CONFIG.ACADEMIC_FEES[grade].twice;
+            
+            // Calculate additional subject fees
+            const subjectCount = selectedSubjects ? selectedSubjects.length : 0;
+            const additionalSubjects = Math.max(0, subjectCount - CONFIG.BASE_SUBJECTS_INCLUDED);
+            const additionalFee = additionalSubjects * CONFIG.ADDITIONAL_SUBJECT_FEE;
+            
+            return {
+                base: baseFee,
+                additional: additionalFee,
+                total: baseFee + additionalFee
+            };
+        }
+
+        function calculateExtracurricularFee(selectedActivities) {
+            if (!selectedActivities) return 0;
+            
+            const activities = JSON.parse(selectedActivities) || [];
+            let total = 0;
+            
+            activities.forEach(activity => {
+                const activityData = CONFIG.EXTRACURRICULAR_FEES.find(a => a.id === activity.id);
+                if (activityData) {
+                    let fee = activityData.fee;
+                    if (activity.frequency === 'twice') {
+                        fee *= 2; // Double fee for twice weekly
+                    }
+                    total += fee;
+                }
+            });
+            
+            return total;
+        }
+
+        function calculateTestPrepFee(testPrepData) {
+            if (!testPrepData) return 0;
+            
+            const tests = JSON.parse(testPrepData) || [];
+            let total = 0;
+            
+            tests.forEach(test => {
+                const testData = CONFIG.TEST_PREP_FEES.find(t => t.id === test.id);
+                if (testData && test.hours > 0) {
+                    // Calculate monthly fee: hours/week × rate × 4 weeks
+                    total += test.hours * testData.rate * CONFIG.WEEKS_IN_MONTH;
+                }
+            });
+            
+            return total;
+        }
+
+        function calculateProratedFee(fullFee, startDate) {
+            if (!startDate) return fullFee;
+            
+            const start = new Date(startDate);
+            const now = new Date();
+            const currentMonth = now.getMonth();
+            const currentYear = now.getFullYear();
+            
+            // Get number of days in current month
+            const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
+            
+            // If starting next month, no proration
+            if (start.getMonth() > currentMonth || start.getFullYear() > currentYear) {
+                return fullFee;
+            }
+            
+            // Calculate remaining days in month
+            const startDay = start.getDate();
+            const remainingDays = daysInMonth - startDay + 1;
+            
+            // Calculate proration ratio
+            const prorationRatio = remainingDays / daysInMonth;
+            
+            // Calculate prorated fee (rounded to nearest 100)
+            const proratedFee = Math.round((fullFee * prorationRatio) / 100) * 100;
+            
+            return Math.max(0, proratedFee);
+        }
+
+        // ==================== SUMMARY UPDATES ====================
+        function updateSummary() {
+            let academicBaseTotal = 0;
+            let additionalSubjectsTotal = 0;
+            let extracurricularTotal = 0;
+            let testPrepTotal = 0;
+            let beforeProrationTotal = 0;
+            let proratedTotal = 0;
+            const feeDetails = [];
+            
+            // Get all student entries
+            const studentEntries = document.querySelectorAll('.student-entry');
+            
+            studentEntries.forEach((entry, index) => {
+                const studentId = entry.dataset.studentId;
+                const grade = entry.querySelector('.student-grade').value;
+                const startDate = entry.querySelector('.student-start-date').value;
+                
+                // Get academic selection
+                const academicInput = document.getElementById(`academic-subjects-selection-${studentId}`);
+                const selectedSubjects = academicInput ? academicInput.value : '[]';
+                
+                // Get extracurricular selection
+                const extracurricularInput = document.getElementById(`extracurricular-selection-${studentId}`);
+                const selectedActivities = extracurricularInput ? extracurricularInput.value : '[]';
+                
+                // Get test prep selection
+                const testPrepInput = document.getElementById(`test-prep-selection-${studentId}`);
+                const testPrepData = testPrepInput ? testPrepInput.value : '[]';
+                
+                // Calculate fees
+                const academicFee = calculateAcademicFee(grade, selectedSubjects);
+                const extracurricularFee = calculateExtracurricularFee(selectedActivities);
+                const testPrepFee = calculateTestPrepFee(testPrepData);
+                
+                // Add to totals
+                academicBaseTotal += academicFee.base;
+                additionalSubjectsTotal += academicFee.additional;
+                extracurricularTotal += extracurricularFee;
+                testPrepTotal += testPrepFee;
+                
+                const studentFullFee = academicFee.total + extracurricularFee + testPrepFee;
+                beforeProrationTotal += studentFullFee;
+                
+                // Calculate prorated fee for this student
+                const studentProratedFee = calculateProratedFee(studentFullFee, startDate);
+                proratedTotal += studentProratedFee;
+                
+                // Add to fee details
+                const studentName = entry.querySelector('.student-name').value || `Student ${index + 1}`;
+                feeDetails.push({
+                    name: studentName,
+                    academic: academicFee.total,
+                    extracurricular: extracurricularFee,
+                    testPrep: testPrepFee,
+                    prorated: studentProratedFee
+                });
+            });
+            
+            // Calculate sibling discount
+            const discount = studentCount > 1 ? (studentCount - 1) * CONFIG.SIBLING_DISCOUNT : 0;
+            
+            // Update summary display
+            document.getElementById('academic-base-fee').textContent = `₦${academicBaseTotal.toLocaleString()}`;
+            document.getElementById('additional-subjects-fee').textContent = `+₦${additionalSubjectsTotal.toLocaleString()}`;
+            document.getElementById('total-academic-fee').textContent = `₦${(academicBaseTotal + additionalSubjectsTotal).toLocaleString()}`;
+            
+            document.getElementById('extracurricular-fee').textContent = `+₦${extracurricularTotal.toLocaleString()}`;
+            document.getElementById('total-extracurricular-fee').textContent = `₦${extracurricularTotal.toLocaleString()}`;
+            
+            document.getElementById('test-prep-fee').textContent = `+₦${testPrepTotal.toLocaleString()}`;
+            document.getElementById('total-test-prep-fee').textContent = `₦${testPrepTotal.toLocaleString()}`;
+            
+            const prorationAmount = beforeProrationTotal - proratedTotal;
+            document.getElementById('prorated-amount').textContent = prorationAmount > 0 ? `-₦${prorationAmount.toLocaleString()}` : '₦0';
+            
+            document.getElementById('discount-amount').textContent = `-₦${discount.toLocaleString()}`;
+            
+            const totalPayable = Math.max(0, proratedTotal - discount);
+            document.getElementById('total-fee').textContent = `₦${totalPayable.toLocaleString()}`;
+            
+            // Update fee breakdown
+            updateFeeBreakdown(feeDetails);
+            
+            // Update remove button visibility
+            updateRemoveButtons();
+        }
+
+        function updateFeeBreakdown(feeDetails) {
+            const feeDetailsContainer = document.getElementById('fee-details');
+            feeDetailsContainer.innerHTML = '';
+            
+            if (feeDetails.length === 0) {
+                feeDetailsContainer.innerHTML = '<p class="student-fee">No students added yet</p>';
+                return;
+            }
+            
+            feeDetails.forEach(detail => {
+                const feeElement = document.createElement('div');
+                feeElement.className = 'student-fee';
+                feeElement.innerHTML = `
+                    <div>
+                        <strong>${detail.name}</strong><br>
+                        <small class="text-muted">
+                            Academic: ₦${detail.academic.toLocaleString()} | 
+                            Extracurricular: ₦${detail.extracurricular.toLocaleString()} | 
+                            Test Prep: ₦${detail.testPrep.toLocaleString()}
+                        </small>
+                    </div>
+                    <div style="text-align: right;">
+                        <div>₦${detail.prorated.toLocaleString()}</div>
+                        <small class="text-success">Prorated</small>
+                    </div>
+                `;
+                feeDetailsContainer.appendChild(feeElement);
+            });
+            
+            // Add discount line if applicable
+            const discount = studentCount > 1 ? (studentCount - 1) * CONFIG.SIBLING_DISCOUNT : 0;
+            if (discount > 0) {
+                const discountElement = document.createElement('div');
+                discountElement.className = 'student-fee text-success';
+                discountElement.innerHTML = `
+                    <span><i class="fas fa-gift"></i> Sibling Discount</span>
+                    <span>-₦${discount.toLocaleString()}</span>
+                `;
+                feeDetailsContainer.appendChild(discountElement);
+            }
+        }
+
+        function updateRemoveButtons() {
+            const removeButtons = document.querySelectorAll('.remove-student');
+            removeButtons.forEach(btn => {
+                if (studentCount > 1) {
+                    btn.classList.remove('hidden');
+                } else {
+                    btn.classList.add('hidden');
+                }
+            });
+        }
+
+        // ==================== SAVE PROGRESS ====================
+        document.getElementById('save-progress-btn').addEventListener('click', function() {
+            // Basic validation
+            const parentEmail = document.getElementById('parentEmail').value.trim();
+            if (!parentEmail) {
+                alert('Please enter your email address to save progress');
+                return;
+            }
+            
+            // Generate application ID
+            savedApplicationId = 'BKH-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
+            
+            // Save to localStorage (in real app, this would be API call)
+            const applicationData = {
+                id: savedApplicationId,
+                parent: {
+                    name: document.getElementById('parentName').value,
+                    email: parentEmail,
+                    phone: document.getElementById('parentPhone').value,
+                    address: document.getElementById('parentAddress').value
+                },
+                students: [],
+                total: document.getElementById('total-fee').textContent,
+                timestamp: new Date().toISOString()
+            };
+            
+            // Collect student data
+            document.querySelectorAll('.student-entry').forEach(entry => {
+                const studentId = entry.dataset.studentId;
+                
+                // Get all selections
+                const academicInput = document.getElementById(`academic-subjects-selection-${studentId}`);
+                const extracurricularInput = document.getElementById(`extracurricular-selection-${studentId}`);
+                const testPrepInput = document.getElementById(`test-prep-selection-${studentId}`);
+                
+                applicationData.students.push({
+                    name: entry.querySelector('.student-name').value,
+                    dob: entry.querySelector('.student-dob').value,
+                    grade: entry.querySelector('.student-grade').value,
+                    startDate: entry.querySelector('.student-start-date').value,
+                    academicSubjects: academicInput ? JSON.parse(academicInput.value) : [],
+                    extracurricular: extracurricularInput ? JSON.parse(extracurricularInput.value) : [],
+                    testPrep: testPrepInput ? JSON.parse(testPrepInput.value) : []
+                });
+            });
+            
+            localStorage.setItem(savedApplicationId, JSON.stringify(applicationData));
+            
+            // Show confirmation message
+            showConfirmation(applicationData);
+        });
+
+        function showConfirmation(data) {
+            const confirmationDiv = document.getElementById('confirmation-message');
+            const appIdSpan = document.getElementById('saved-app-id');
+            
+            appIdSpan.textContent = data.id;
+            confirmationDiv.classList.remove('hidden');
+            
+            // Scroll to confirmation message
+            confirmationDiv.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            
+            // Update save button text
+            const saveBtn = document.getElementById('save-progress-btn');
+            const originalText = saveBtn.innerHTML;
+            saveBtn.innerHTML = '<i class="fas fa-check"></i> Application Saved!';
+            saveBtn.style.background = '#28A745';
+            saveBtn.style.color = 'white';
+            saveBtn.style.borderColor = '#28A745';
+            
+            setTimeout(() => {
+                saveBtn.innerHTML = originalText;
+                saveBtn.style.background = '';
+                saveBtn.style.color = '';
+                saveBtn.style.borderColor = '';
+            }, 3000);
+        }
+
+        // ==================== FORM SUBMISSION ====================
+        document.getElementById('submit-enrollment').addEventListener('click', function() {
+            // Basic validation
+            const parentName = document.getElementById('parentName').value.trim();
+            const parentEmail = document.getElementById('parentEmail').value.trim();
+            const parentPhone = document.getElementById('parentPhone').value.trim();
+            
+            if (!parentName || !parentEmail || !parentPhone) {
+                alert('Please fill in all required parent information');
+                return;
+            }
+            
+            // Check at least one student is fully filled
+            let validStudent = false;
+            document.querySelectorAll('.student-entry').forEach(entry => {
+                const grade = entry.querySelector('.student-grade').value;
+                const startDate = entry.querySelector('.student-start-date').value;
+                
+                if (grade && startDate) {
+                    validStudent = true;
+                }
+            });
+            
+            if (!validStudent) {
+                alert('Please fill in all required student information for at least one student');
+                return;
+            }
+            
+            // Show payment processing
+            this.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Redirecting to Paystack...';
+            this.disabled = true;
+            
+            // Simulate Paystack redirect (in production, this would be real API call)
+            setTimeout(() => {
+                alert('SUCCESS! In live system:\n1. Parent pays via Paystack\n2. System creates parent account\n3. Redirects to parent portal setup\n\nTotal: ' + document.getElementById('total-fee').textContent);
+                this.innerHTML = '<i class="fas fa-lock"></i> Proceed to Secure Payment';
+                this.disabled = false;
+            }, 1500);
+        });
+
+        // Event listeners for all inputs
+        document.querySelectorAll('.form-control').forEach(input => {
+            input.addEventListener('input', updateSummary);
+            input.addEventListener('change', updateSummary);
+        });
+    </script>
+</body>
+</html>
