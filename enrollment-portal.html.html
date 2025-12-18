@@ -1465,7 +1465,7 @@
                     <div id="test-prep-tab" class="tab-content">
                         <div class="course-selection">
                             <p class="course-note">
-                                <strong>Note:</strong> Test preparation is charged per hour. Enter total hours per week.
+                                <strong>Note:</strong> Test preparation starts from 0.5 hours (30 minutes).
                             </p>
                             
                             <div class="test-prep-options" id="test-prep-display">
@@ -1489,9 +1489,14 @@
                         <p>Your enrollment has been saved. You can return within 7 days to complete it.</p>
                         <p><strong>Application ID:</strong> <span id="saved-app-id"></span></p>
                         <p><strong>Resume Link:</strong> <span id="resume-link"></span></p>
-                        <button type="button" class="view-invoice-btn" id="view-invoice-btn">
-                            <i class="fas fa-receipt"></i> View Invoice
-                        </button>
+                        <div class="resume-link-actions">
+                            <button class="copy-btn" id="copy-resume-link">
+                                <i class="fas fa-copy"></i> Copy Link
+                            </button>
+                            <button class="view-invoice-btn" id="view-invoice-btn">
+                                <i class="fas fa-receipt"></i> View Invoice
+                            </button>
+                        </div>
                     </div>
                 </div>
 
@@ -1589,7 +1594,7 @@
                 <div style="margin-top: 25px; padding-top: 20px; border-top: 1px solid #EEE;">
                     <p style="font-size: 14px; color: #666; text-align: center;">
                         <i class="fas fa-headset"></i> Need help? 
-                        <a href="tel:07078961070" style="color: var(--primary); text-decoration: none;">Call: 0707 896 1070</a>
+                        <a href="tel:07078961070, 09029147024" style="color: var(--primary); text-decoration: none;">Call: 0707 896 1070</a>
                     </p>
                 </div>
             </div>
@@ -1607,12 +1612,12 @@
 
     <script>
         // ==============================================
-        // UPDATED FIXED VERSION - WITH ONLY THE REQUESTED EDITS
+        // COMPLETE UPDATED VERSION - ALL FIXES APPLIED
         // ==============================================
 
-        // CONFIGURATION - UPDATED WITH YOUR REAL FIREBASE CONFIG
+        // CONFIGURATION
         const CONFIG = {
-            // Your Firebase Configuration - REPLACE WITH YOUR REAL CONFIG
+            // Your Firebase Configuration
             FIREBASE_CONFIG: {
                 apiKey: "AIzaSyD1lJhsWMMs_qerLBSzk7wKhjLyI_11RJg",
                 authDomain: "bloomingkidsassessment.firebaseapp.com",
@@ -1622,7 +1627,7 @@
                 appId: "1:238975054977:web:87c70b4db044998a204980"
             },
             
-            // Academic Subjects (ONLY 8 subjects as specified)
+            // Academic Subjects (ONLY 8 subjects)
             ACADEMIC_SUBJECTS: [
                 "Math",
                 "Language Arts", 
@@ -1634,7 +1639,7 @@
                 "Microbiology"
             ],
             
-            // Extracurricular Activities with correct pricing
+            // Extracurricular Activities
             EXTRACURRICULAR_FEES: [
                 { id: 'comic', name: 'COMIC BOOK DESIGN', fee: 35000 },
                 { id: 'graphics', name: 'GRAPHICS DESIGNING', fee: 35000 },
@@ -1652,7 +1657,7 @@
                 { id: 'chess', name: 'CHESS CLASS', fee: 40000 }
             ],
             
-            // Test Preparation (per hour)
+            // Test Preparation (per hour) - FIXED: No weekly multiplication
             TEST_PREP_FEES: [
                 { id: 'sat', name: 'SAT', rate: 17000 },
                 { id: 'igcse', name: 'IGCSE & GCSE', rate: 20000 },
@@ -1667,14 +1672,14 @@
                 'grade9-12': 110000
             },
             
-            // Constants
+            // Constants - REMOVED WEEKS_IN_MONTH for test prep
             CONSTANTS: {
                 ADDITIONAL_SUBJECT_FEE: 40000,
                 SIBLING_DISCOUNT: 10000, // FLAT DISCOUNT FOR 2+ STUDENTS
                 BASE_SUBJECTS_INCLUDED: 2,
-                WEEKS_IN_MONTH: 4,
                 REFERRAL_BONUS: 5000,
-                DAYS_IN_MONTH: 30
+                DAYS_IN_MONTH: 30,
+                FULL_FEE_THRESHOLD: 6 // 1st-6th = full fee
             }
         };
 
@@ -1687,32 +1692,25 @@
                 this.currentApplicationId = null;
                 this.referralValidated = false;
                 this.referrerData = null;
+                this.db = null;
                 
-                // Initialize state
                 this.initializeState();
             }
             
-            initializeState() {
+            async initializeState() {
                 console.log('Initializing enrollment application...');
                 
-                // Initialize course selections
+                await this.initializeFirebase();
                 this.initializeCourseSelections();
-                
-                // Set up event listeners
                 this.setupEventListeners();
-                
-                // Set default dates
                 this.setDefaultDates();
-                
-                // Initialize Firebase
-                this.initializeFirebase();
+                this.checkResumeLink();
                 
                 console.log('Enrollment application initialized');
             }
             
             async initializeFirebase() {
                 try {
-                    // Use your real Firebase config
                     const firebaseConfig = CONFIG.FIREBASE_CONFIG;
                     
                     if (!firebase.apps.length) {
@@ -1724,14 +1722,12 @@
                     
                 } catch (error) {
                     console.error('Firebase initialization error:', error);
-                    // Continue without Firebase for now
+                    this.showAlert('Unable to connect to database. Some features may be limited.', 'warning');
                 }
             }
             
             initializeCourseSelections() {
-                console.log('Initializing course selections...');
-                
-                // Academic Subjects - ONLY 8 subjects as specified
+                // Academic Subjects
                 const academicContainer = document.getElementById('academic-subjects-display');
                 if (academicContainer) {
                     academicContainer.innerHTML = CONFIG.ACADEMIC_SUBJECTS.map(subject => `
@@ -1741,15 +1737,14 @@
                         </div>
                     `).join('');
                     
-                    // Add click handlers for academic subjects
                     academicContainer.querySelectorAll('.subject-option').forEach(option => {
-                        option.addEventListener('click', (e) => {
+                        option.addEventListener('click', () => {
                             this.handleAcademicSubjectClick(option);
                         });
                     });
                 }
                 
-                // Extracurricular Activities - ALL 14 activities
+                // Extracurricular Activities
                 const extracurricularContainer = document.getElementById('extracurricular-display');
                 if (extracurricularContainer) {
                     extracurricularContainer.innerHTML = CONFIG.EXTRACURRICULAR_FEES.map(activity => `
@@ -1765,27 +1760,23 @@
                         </div>
                     `).join('');
                     
-                    // Add click handlers for extracurricular activities - FIXED TOGGLE
                     extracurricularContainer.querySelectorAll('.extracurricular-card').forEach(card => {
-                        // Handle card click (toggle selection)
                         card.addEventListener('click', (e) => {
-                            // Only handle if not clicking on frequency button
                             if (!e.target.classList.contains('frequency-btn')) {
                                 this.handleExtracurricularCardClick(card);
                             }
                         });
                         
-                        // Handle frequency button clicks
                         card.querySelectorAll('.frequency-btn').forEach(btn => {
                             btn.addEventListener('click', (e) => {
-                                e.stopPropagation(); // Prevent card click
+                                e.stopPropagation();
                                 this.handleFrequencyButtonClick(card, btn);
                             });
                         });
                     });
                 }
                 
-                // Test Preparation
+                // Test Preparation - UPDATED: No weekly multiplication
                 const testPrepContainer = document.getElementById('test-prep-display');
                 if (testPrepContainer) {
                     testPrepContainer.innerHTML = CONFIG.TEST_PREP_FEES.map(test => `
@@ -1795,22 +1786,19 @@
                                 <div class="test-prep-rate">₦${test.rate.toLocaleString()}/hour</div>
                             </div>
                             <div class="hours-input">
-                                <label>Hours per week:</label>
-                                <input type="number" min="0" step="0.5" value="0" class="test-prep-hours" placeholder="0">
-                                <span>hours</span>
+                                <label>Hours:</label>
+                                <input type="number" min="0" step="0.5" value="0" class="test-prep-hours" placeholder="0.5">
+                                <span>hours total</span>
                             </div>
                         </div>
                     `).join('');
                     
-                    // Add input handlers for test prep hours
                     testPrepContainer.querySelectorAll('.test-prep-hours').forEach(input => {
                         input.addEventListener('input', (e) => {
                             this.handleTestPrepHoursChange(e.target);
                         });
                     });
                 }
-                
-                console.log('Course selections initialized');
             }
             
             setDefaultDates() {
@@ -1829,63 +1817,207 @@
                 });
             }
             
-            setupEventListeners() {
-                console.log('Setting up event listeners...');
+            checkResumeLink() {
+                const urlParams = new URLSearchParams(window.location.search);
+                const resumeId = urlParams.get('resume');
                 
-                // Course tab switching
+                if (resumeId && this.db) {
+                    this.loadSavedApplication(resumeId);
+                }
+            }
+            
+            async loadSavedApplication(applicationId) {
+                try {
+                    if (!this.db) {
+                        this.showAlert('Database not connected. Cannot load saved application.', 'warning');
+                        return;
+                    }
+                    
+                    const doc = await this.db.collection('enrollments').doc(applicationId).get();
+                    
+                    if (doc.exists) {
+                        const data = doc.data();
+                        this.currentApplicationId = applicationId;
+                        
+                        // Load parent data
+                        document.getElementById('parentName').value = data.parent.name || '';
+                        document.getElementById('parentEmail').value = data.parent.email || '';
+                        document.getElementById('parentPhone').value = data.parent.phone || '';
+                        document.getElementById('parentAddress').value = data.parent.address || '';
+                        document.getElementById('referralCode').value = data.referralCode || '';
+                        
+                        // Load students
+                        this.studentCount = 0;
+                        const container = document.getElementById('students-container');
+                        container.innerHTML = '';
+                        
+                        data.students.forEach((student, index) => {
+                            this.studentCount++;
+                            const studentId = this.studentCount;
+                            
+                            const studentDiv = document.createElement('div');
+                            studentDiv.className = 'student-entry';
+                            studentDiv.setAttribute('data-student-id', studentId);
+                            studentDiv.innerHTML = `
+                                <div class="student-header">
+                                    <div class="student-number">${studentId}</div>
+                                    <button type="button" class="remove-student ${this.studentCount > 1 ? '' : 'hidden'}">
+                                        <i class="fas fa-trash"></i> Remove
+                                    </button>
+                                </div>
+                                <div class="form-row">
+                                    <div class="form-group">
+                                        <label>Student Full Name <span class="required">*</span></label>
+                                        <input type="text" class="form-control student-name" value="${student.name || ''}" data-validate="required">
+                                        <div class="error-message hidden student-name-error"></div>
+                                    </div>
+                                    <div class="form-group">
+                                        <label>Date of Birth <span class="required">*</span></label>
+                                        <input type="date" class="form-control student-dob" value="${student.dob || ''}" data-validate="required">
+                                        <div class="error-message hidden student-dob-error"></div>
+                                    </div>
+                                </div>
+                                <div class="form-row">
+                                    <div class="form-group">
+                                        <label>School Grade <span class="required">*</span></label>
+                                        <select class="form-control select student-grade" data-validate="required">
+                                            <option value="">Select Grade</option>
+                                            <option value="preschool" ${student.grade === 'preschool' ? 'selected' : ''}>Preschool to Grade 1</option>
+                                            <option value="grade2-4" ${student.grade === 'grade2-4' ? 'selected' : ''}>Grade 2 to 4</option>
+                                            <option value="grade5-8" ${student.grade === 'grade5-8' ? 'selected' : ''}>Grade 5 to 8</option>
+                                            <option value="grade9-12" ${student.grade === 'grade9-12' ? 'selected' : ''}>Grade 9 to 12</option>
+                                        </select>
+                                        <div class="error-message hidden student-grade-error"></div>
+                                    </div>
+                                    <div class="form-group">
+                                        <label>Preferred Start Date <span class="required">*</span></label>
+                                        <input type="date" class="form-control student-start-date" value="${student.startDate || ''}" min="${new Date().toISOString().split('T')[0]}" data-validate="required">
+                                        <div class="error-message hidden student-start-date-error"></div>
+                                    </div>
+                                </div>
+                            `;
+                            
+                            container.appendChild(studentDiv);
+                            
+                            studentDiv.querySelectorAll('[data-validate]').forEach(input => {
+                                input.addEventListener('blur', () => this.validateField(input));
+                                input.addEventListener('change', () => this.updateSummary());
+                            });
+                            
+                            studentDiv.querySelector('.remove-student').addEventListener('click', () => {
+                                if (this.studentCount > 1) {
+                                    studentDiv.remove();
+                                    this.studentCount--;
+                                    this.updateRemoveButtons();
+                                    this.updateSummary();
+                                }
+                            });
+                        });
+                        
+                        // Load course selections
+                        if (data.courses) {
+                            // Academic subjects
+                            if (data.courses.academic) {
+                                document.querySelectorAll('.subject-option').forEach(option => {
+                                    if (data.courses.academic.includes(option.dataset.subject)) {
+                                        option.classList.add('selected');
+                                    }
+                                });
+                            }
+                            
+                            // Extracurricular
+                            if (data.courses.extracurricular) {
+                                data.courses.extracurricular.forEach(activity => {
+                                    const card = document.querySelector(`[data-activity-id="${activity.id}"]`);
+                                    if (card) {
+                                        card.classList.add('selected');
+                                        if (activity.frequency) {
+                                            const btn = card.querySelector(`[data-frequency="${activity.frequency}"]`);
+                                            if (btn) btn.classList.add('selected');
+                                        }
+                                    }
+                                });
+                            }
+                            
+                            // Test prep
+                            if (data.courses.testPrep) {
+                                data.courses.testPrep.forEach(test => {
+                                    const card = document.querySelector(`[data-test-id="${test.id}"]`);
+                                    if (card) {
+                                        const input = card.querySelector('.test-prep-hours');
+                                        input.value = test.hours || 0;
+                                        if (test.hours > 0) {
+                                            card.classList.add('active');
+                                        }
+                                    }
+                                });
+                            }
+                        }
+                        
+                        this.updateRemoveButtons();
+                        this.updateSummary();
+                        
+                        this.showAlert('Previous application loaded successfully!', 'success');
+                    } else {
+                        this.showAlert('Saved application not found. Starting fresh.', 'warning');
+                    }
+                } catch (error) {
+                    console.error('Error loading saved application:', error);
+                    this.showAlert('Could not load saved application. Starting fresh.', 'warning');
+                }
+            }
+            
+            setupEventListeners() {
+                // Course tabs
                 document.querySelectorAll('.course-tab').forEach(tab => {
                     tab.addEventListener('click', () => {
                         const tabId = tab.dataset.tab;
-                        
-                        // Update active tab
                         document.querySelectorAll('.course-tab').forEach(t => t.classList.remove('active'));
                         tab.classList.add('active');
-                        
-                        // Show corresponding content
                         document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
                         document.getElementById(`${tabId}-tab`).classList.add('active');
                     });
                 });
                 
-                // Add student button
+                // Add student
                 document.getElementById('add-student').addEventListener('click', () => this.addStudent());
                 
-                // Save progress button
+                // Save progress
                 document.getElementById('save-progress-btn').addEventListener('click', () => this.saveProgress());
                 
-                // Submit enrollment button
+                // Submit enrollment
                 document.getElementById('submit-enrollment').addEventListener('click', () => this.submitEnrollment());
                 
-                // View invoice button in confirmation
-                document.addEventListener('click', (e) => {
-                    if (e.target.id === 'view-invoice-btn' || e.target.closest('#view-invoice-btn')) {
-                        this.showInvoice();
-                    }
+                // Copy resume link
+                document.getElementById('copy-resume-link').addEventListener('click', (e) => {
+                    this.copyResumeLink(e.target);
                 });
                 
-                // Invoice modal close button
+                // View invoice
+                document.getElementById('view-invoice-btn').addEventListener('click', () => {
+                    this.showInvoice();
+                });
+                
+                // Invoice modal
                 document.getElementById('close-invoice').addEventListener('click', () => {
                     document.getElementById('invoice-modal').classList.remove('active');
                 });
                 
-                // Print invoice button
                 document.getElementById('print-invoice').addEventListener('click', () => {
                     window.print();
                 });
                 
-                // Download PDF button - FIXED: Actually downloads PDF
                 document.getElementById('download-pdf').addEventListener('click', () => {
                     this.downloadInvoicePDF();
                 });
                 
-                // Close invoice when clicking outside
                 document.getElementById('invoice-modal').addEventListener('click', (e) => {
-                    if (e.target === this) {
+                    if (e.target === e.currentTarget) {
                         document.getElementById('invoice-modal').classList.remove('active');
                     }
                 });
                 
-                // Referral code validation
+                // Referral code
                 const referralInput = document.getElementById('referralCode');
                 if (referralInput) {
                     let validationTimer;
@@ -1903,11 +2035,10 @@
                     });
                 }
                 
-                // Real-time validation for form inputs
+                // Form validation
                 document.querySelectorAll('[data-validate]').forEach(input => {
                     input.addEventListener('blur', () => this.validateField(input));
                     input.addEventListener('input', () => {
-                        // Clear error on input
                         const errorElement = document.getElementById(`${input.id}-error`) || 
                                             input.parentElement.querySelector('.error-message');
                         if (errorElement) {
@@ -1915,7 +2046,6 @@
                             input.classList.remove('error');
                         }
                         
-                        // Update summary for relevant fields
                         if (input.classList.contains('student-grade') || 
                             input.classList.contains('student-start-date')) {
                             this.updateSummary();
@@ -1923,87 +2053,61 @@
                     });
                 });
                 
-                // Update summary when student fields change
                 document.querySelectorAll('.student-grade, .student-start-date').forEach(input => {
                     input.addEventListener('change', () => this.updateSummary());
                 });
-                
-                console.log('Event listeners set up');
             }
             
             // ==============================================
-            // COURSE SELECTION HANDLERS - FIXED TOGGLE (EDIT 1)
+            // COURSE SELECTION HANDLERS
             // ==============================================
             
             handleAcademicSubjectClick(option) {
-                console.log('Academic subject clicked:', option.dataset.subject);
-                
-                // Toggle selection
                 option.classList.toggle('selected');
-                
-                // Get selected subjects
-                const selectedSubjects = Array.from(document.querySelectorAll('.subject-option.selected'))
-                    .map(opt => opt.dataset.subject);
-                
-                console.log('Selected academic subjects:', selectedSubjects);
-                
-                // Update summary
                 this.updateSummary();
             }
             
             handleExtracurricularCardClick(card) {
-                console.log('Extracurricular card clicked:', card.dataset.activityId);
-                
-                // Toggle selection - FIXED: Proper toggle for double-click
                 card.classList.toggle('selected');
                 
-                // If card is being unselected, also clear frequency buttons
                 if (!card.classList.contains('selected')) {
                     card.querySelectorAll('.frequency-btn').forEach(btn => btn.classList.remove('selected'));
                 } else {
-                    // If card is being selected, set default frequency to once weekly
                     const onceBtn = card.querySelector('[data-frequency="once"]');
                     if (onceBtn && !card.querySelector('.frequency-btn.selected')) {
                         onceBtn.classList.add('selected');
                     }
                 }
                 
-                console.log('Card selected:', card.classList.contains('selected'));
-                
-                // Update summary
                 this.updateSummary();
             }
             
             handleFrequencyButtonClick(card, button) {
-                console.log('Frequency button clicked:', button.dataset.frequency);
-                
-                // Ensure card is selected when clicking frequency buttons
                 if (!card.classList.contains('selected')) {
                     card.classList.add('selected');
                 }
                 
-                // Update frequency button states
                 card.querySelectorAll('.frequency-btn').forEach(btn => btn.classList.remove('selected'));
                 button.classList.add('selected');
-                
-                // Update summary
                 this.updateSummary();
             }
             
             handleTestPrepHoursChange(input) {
                 const card = input.closest('.test-prep-card');
-                const hours = parseFloat(input.value) || 0;
+                let hours = parseFloat(input.value) || 0;
                 
-                console.log('Test prep hours changed:', hours);
+                // Ensure minimum 0.5 hours if value is > 0
+                if (hours > 0 && hours < 0.5) {
+                    hours = 0.5;
+                    input.value = 0.5;
+                }
                 
-                // Update card state
                 if (hours > 0) {
                     card.classList.add('active');
                 } else {
                     card.classList.remove('active');
                 }
                 
-                // Update summary
                 this.updateSummary();
             }
             
@@ -2065,7 +2169,7 @@
                 nextMonth.setDate(1);
                 newStudent.querySelector('.student-start-date').value = nextMonth.toISOString().split('T')[0];
                 
-                // Add event listeners for new student
+                // Add event listeners
                 newStudent.querySelectorAll('[data-validate]').forEach(input => {
                     input.addEventListener('blur', () => this.validateField(input));
                     input.addEventListener('change', () => this.updateSummary());
@@ -2076,25 +2180,17 @@
                     if (this.studentCount > 1) {
                         newStudent.remove();
                         this.studentCount--;
-                        
-                        // Update student numbers
-                        document.querySelectorAll('.student-entry').forEach((entry, index) => {
-                            entry.querySelector('.student-number').textContent = index + 1;
-                        });
-                        
-                        // Update summary
+                        this.updateRemoveButtons();
                         this.updateSummary();
                     }
                 });
                 
-                // Update remove buttons visibility
                 this.updateRemoveButtons();
                 this.updateSummary();
             }
             
             updateRemoveButtons() {
-                const removeButtons = document.querySelectorAll('.remove-student');
-                removeButtons.forEach(btn => {
+                document.querySelectorAll('.remove-student').forEach(btn => {
                     if (this.studentCount > 1) {
                         btn.classList.remove('hidden');
                     } else {
@@ -2144,7 +2240,6 @@
                     }
                 }
                 
-                // Show/hide error message
                 const errorElement = document.getElementById(`${input.id}-error`) || 
                                     input.parentElement.querySelector('.error-message');
                 
@@ -2182,27 +2277,28 @@
                     this.referralValidated = false;
                     this.referrerData = null;
                     this.hideBankDetails();
-                    this.showAlert('Invalid referral code', 'warning');
                     return;
                 }
                 
                 try {
-                    // In production, validate with Firebase
-                    // For now, simulate validation
-                    if (code.startsWith('REF')) {
-                        this.referralValidated = true;
-                        this.referrerData = {
-                            name: 'Referrer Name',
-                            email: 'referrer@example.com',
-                            code: code
-                        };
-                        this.showAlert(`Valid referral code! Referring parent: ${this.referrerData.name}`, 'success');
-                        this.showBankDetails();
-                    } else {
-                        this.referralValidated = false;
-                        this.referrerData = null;
-                        this.showAlert('Invalid referral code. Please check and try again.', 'warning');
-                        this.hideBankDetails();
+                    if (this.db) {
+                        const snapshot = await this.db.collection('referrals')
+                            .where('code', '==', code.toUpperCase())
+                            .limit(1)
+                            .get();
+                        
+                        if (!snapshot.empty) {
+                            this.referralValidated = true;
+                            const doc = snapshot.docs[0];
+                            this.referrerData = doc.data();
+                            this.showAlert(`Valid referral code! Referring parent: ${this.referrerData.name}`, 'success');
+                            this.showBankDetails();
+                        } else {
+                            this.referralValidated = false;
+                            this.referrerData = null;
+                            this.showAlert('Invalid referral code. Please check and try again.', 'warning');
+                            this.hideBankDetails();
+                        }
                     }
                 } catch (error) {
                     console.error('Error validating referral code:', error);
@@ -2219,17 +2315,36 @@
             }
             
             // ==============================================
-            // FEE CALCULATION & SUMMARY - FIXED (EDIT 2: FLAT DISCOUNT)
+            // FEE CALCULATION & SUMMARY - UPDATED
             // ==============================================
             
-            updateSummary() {
-                console.log('Updating summary...');
+            calculateProratedAmount(totalAcademicFee, startDate) {
+                if (!startDate || totalAcademicFee === 0) return 0;
                 
+                const start = new Date(startDate);
+                const dayOfMonth = start.getDate();
+                
+                // 1st-6th = full fee (no proration)
+                if (dayOfMonth <= CONFIG.CONSTANTS.FULL_FEE_THRESHOLD) {
+                    return 0;
+                }
+                
+                // 7th onwards = prorated
+                const daysInMonth = new Date(start.getFullYear(), start.getMonth() + 1, 0).getDate();
+                const daysRemaining = daysInMonth - dayOfMonth + 1;
+                const dailyRate = totalAcademicFee / daysInMonth;
+                const proratedAmount = Math.round(dailyRate * daysRemaining);
+                
+                return proratedAmount;
+            }
+            
+            updateSummary() {
                 let academicBaseTotal = 0;
                 let additionalSubjectsTotal = 0;
                 let extracurricularTotal = 0;
                 let testPrepTotal = 0;
                 let hasAcademicSelection = false;
+                let earliestStartDate = null;
                 
                 // Get all student entries
                 const studentEntries = document.querySelectorAll('.student-entry');
@@ -2238,6 +2353,11 @@
                 studentEntries.forEach((entry) => {
                     const grade = entry.querySelector('.student-grade').value;
                     const startDate = entry.querySelector('.student-start-date').value;
+                    
+                    // Track earliest start date for proration
+                    if (startDate && (!earliestStartDate || new Date(startDate) < new Date(earliestStartDate))) {
+                        earliestStartDate = startDate;
+                    }
                     
                     // Get selected academic subjects
                     const selectedSubjects = Array.from(document.querySelectorAll('.subject-option.selected'))
@@ -2268,7 +2388,7 @@
                         }
                     });
                     
-                    // Calculate test prep fees
+                    // Calculate test prep fees - FIXED: No weekly multiplication
                     document.querySelectorAll('.test-prep-card.active').forEach(card => {
                         const testId = card.dataset.testId;
                         const test = CONFIG.TEST_PREP_FEES.find(t => t.id === testId);
@@ -2276,7 +2396,8 @@
                         const hours = parseFloat(hoursInput.value) || 0;
                         
                         if (test && hours > 0) {
-                            testPrepTotal += hours * test.rate * CONFIG.CONSTANTS.WEEKS_IN_MONTH;
+                            // FIX: Just hours × rate (no weekly/monthly multiplication)
+                            testPrepTotal += hours * test.rate;
                         }
                     });
                 });
@@ -2285,17 +2406,15 @@
                 const totalAcademicFee = academicBaseTotal + additionalSubjectsTotal;
                 
                 // Calculate sibling discount (only if academic is selected AND there are 2 or more students)
-                // EDIT 2: FLAT DISCOUNT - Only ₦10,000 total for 2+ students (not per student)
                 let discount = 0;
                 if (studentCount >= 2 && hasAcademicSelection) {
-                    discount = CONFIG.CONSTANTS.SIBLING_DISCOUNT; // Just ₦10,000 flat
+                    discount = CONFIG.CONSTANTS.SIBLING_DISCOUNT; // Flat ₦10,000
                 }
                 
-                // Calculate prorated amount (only if academic is selected)
+                // Calculate prorated amount based on earliest start date
                 let proratedAmount = 0;
-                if (hasAcademicSelection) {
-                    // Simplified proration for demo
-                    proratedAmount = Math.round(totalAcademicFee * 0.1); // 10% for demo
+                if (hasAcademicSelection && earliestStartDate) {
+                    proratedAmount = this.calculateProratedAmount(totalAcademicFee, earliestStartDate);
                 }
                 
                 // Calculate total payable
@@ -2318,18 +2437,12 @@
                 document.getElementById('test-prep-fee').textContent = `+₦${testPrepTotal.toLocaleString()}`;
                 document.getElementById('total-test-prep-fee').textContent = `₦${testPrepTotal.toLocaleString()}`;
                 
-                // Show prorated amount and discount only if there are academic selections
-                if (hasAcademicSelection) {
-                    document.getElementById('prorated-amount').textContent = `-₦${proratedAmount.toLocaleString()}`;
-                    
-                    // Only show discount if there are 2 or more students
-                    if (studentCount >= 2) {
-                        document.getElementById('discount-amount').textContent = `-₦${discount.toLocaleString()}`;
-                    } else {
-                        document.getElementById('discount-amount').textContent = `-₦0`;
-                    }
+                // Show prorated amount and discount
+                document.getElementById('prorated-amount').textContent = `-₦${proratedAmount.toLocaleString()}`;
+                
+                if (studentCount >= 2 && hasAcademicSelection) {
+                    document.getElementById('discount-amount').textContent = `-₦${discount.toLocaleString()}`;
                 } else {
-                    document.getElementById('prorated-amount').textContent = `-₦0`;
                     document.getElementById('discount-amount').textContent = `-₦0`;
                 }
                 
@@ -2337,13 +2450,6 @@
                 
                 // Update fee breakdown
                 this.updateFeeBreakdown(studentEntries);
-                
-                console.log('Summary updated:', { 
-                    totalPayable, 
-                    studentCount, 
-                    discount,
-                    discountApplied: studentCount >= 2 
-                });
             }
             
             updateFeeBreakdown(studentEntries) {
@@ -2359,9 +2465,6 @@
                     const studentName = entry.querySelector('.student-name').value || `Student ${index + 1}`;
                     const grade = entry.querySelector('.student-grade').value;
                     
-                    // Simplified calculation for each student
-                    const studentTotal = 50000; // Demo value
-                    
                     const feeElement = document.createElement('div');
                     feeElement.className = 'student-fee';
                     feeElement.innerHTML = `
@@ -2372,7 +2475,7 @@
                             </small>
                         </div>
                         <div style="text-align: right;">
-                            <div>₦${studentTotal.toLocaleString()}</div>
+                            <div>₦${actualStudentFee.toLocaleString()}</div>
                             <small style="color: #28A745;">Subtotal</small>
                         </div>
                     `;
@@ -2385,13 +2488,11 @@
             // ==============================================
             
             async saveProgress() {
-                // Validate form first
                 if (!this.validateForm()) {
                     this.showAlert('Please fix the errors in the form before saving.', 'danger');
                     return;
                 }
                 
-                // Check if any course is selected
                 const hasAcademic = document.querySelectorAll('.subject-option.selected').length > 0;
                 const hasExtracurricular = document.querySelectorAll('.extracurricular-card.selected').length > 0;
                 const hasTestPrep = document.querySelectorAll('.test-prep-card.active').length > 0;
@@ -2406,7 +2507,7 @@
                 this.currentApplicationId = applicationId;
                 
                 // Create resume link
-                const resumeLink = `${window.location.origin}/continue/${applicationId}`;
+                const resumeLink = `${window.location.origin}${window.location.pathname}?resume=${applicationId}`;
                 
                 // Save button loading state
                 const saveBtn = document.getElementById('save-progress-btn');
@@ -2415,7 +2516,26 @@
                 saveBtn.disabled = true;
                 
                 try {
-                    // Save to localStorage (or Firebase in production)
+                    // Collect course selections
+                    const courseSelections = {
+                        academic: Array.from(document.querySelectorAll('.subject-option.selected')).map(opt => opt.dataset.subject),
+                        extracurricular: Array.from(document.querySelectorAll('.extracurricular-card.selected')).map(card => {
+                            const frequencyBtn = card.querySelector('.frequency-btn.selected');
+                            return {
+                                id: card.dataset.activityId,
+                                frequency: frequencyBtn ? frequencyBtn.dataset.frequency : 'once'
+                            };
+                        }),
+                        testPrep: Array.from(document.querySelectorAll('.test-prep-card.active')).map(card => {
+                            const hoursInput = card.querySelector('.test-prep-hours');
+                            return {
+                                id: card.dataset.testId,
+                                hours: parseFloat(hoursInput.value) || 0
+                            };
+                        })
+                    };
+                    
+                    // Prepare application data
                     const applicationData = {
                         id: applicationId,
                         parent: {
@@ -2425,9 +2545,12 @@
                             address: document.getElementById('parentAddress').value
                         },
                         students: [],
+                        courses: courseSelections,
                         total: document.getElementById('total-fee').textContent,
                         timestamp: new Date().toISOString(),
-                        referralCode: document.getElementById('referralCode').value || null
+                        referralCode: document.getElementById('referralCode').value || null,
+                        status: 'draft',
+                        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
                     };
                     
                     // Collect student data
@@ -2440,22 +2563,27 @@
                         });
                     });
                     
-                    // Save to localStorage
-                    localStorage.setItem(`bkh_enrollment_${applicationId}`, JSON.stringify(applicationData));
+                    // Save to Firebase
+                    if (this.db) {
+                        await this.db.collection('enrollments').doc(applicationId).set(applicationData);
+                        console.log('Application saved to Firebase:', applicationId);
+                    } else {
+                        // Fallback to localStorage
+                        localStorage.setItem(`bkh_enrollment_${applicationId}`, JSON.stringify(applicationData));
+                        console.log('Application saved to localStorage:', applicationId);
+                    }
                     
                     // Show confirmation
                     this.showSaveConfirmation(applicationId, resumeLink);
                     
-                    // Simulate email sending
                     setTimeout(() => {
-                        this.showAlert('Resume link has been sent to your email.', 'success');
+                        this.showAlert('Application saved successfully! Resume link has been generated.', 'success');
                     }, 1000);
                     
                 } catch (error) {
                     console.error('Error saving progress:', error);
                     this.showAlert('Error saving progress. Please try again.', 'danger');
                 } finally {
-                    // Restore button
                     saveBtn.innerHTML = originalText;
                     saveBtn.disabled = false;
                 }
@@ -2470,10 +2598,8 @@
                 resumeLinkSpan.textContent = resumeLink;
                 confirmationDiv.classList.remove('hidden');
                 
-                // Scroll to confirmation
                 confirmationDiv.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
                 
-                // Update save button temporarily
                 const saveBtn = document.getElementById('save-progress-btn');
                 const originalText = saveBtn.innerHTML;
                 saveBtn.innerHTML = '<i class="fas fa-check"></i> Progress Saved!';
@@ -2489,12 +2615,31 @@
                 }, 3000);
             }
             
+            copyResumeLink(button) {
+                const resumeLink = document.getElementById('resume-link').textContent;
+                
+                navigator.clipboard.writeText(resumeLink).then(() => {
+                    const originalText = button.innerHTML;
+                    button.innerHTML = '<i class="fas fa-check"></i> Copied!';
+                    button.classList.add('copied');
+                    
+                    setTimeout(() => {
+                        button.innerHTML = originalText;
+                        button.classList.remove('copied');
+                    }, 2000);
+                    
+                    this.showAlert('Resume link copied to clipboard!', 'success');
+                }).catch(err => {
+                    console.error('Failed to copy:', err);
+                    this.showAlert('Failed to copy link. Please copy manually.', 'danger');
+                });
+            }
+            
             // ==============================================
-            // INVOICE & PDF DOWNLOAD - FIXED
+            // INVOICE & PDF DOWNLOAD
             // ==============================================
             
             showInvoice() {
-                // Generate invoice data
                 const invoiceNumber = this.currentApplicationId || 'BKH-' + Date.now();
                 const invoiceDate = new Date().toLocaleDateString('en-NG', {
                     year: 'numeric',
@@ -2510,12 +2655,10 @@
                     day: 'numeric'
                 });
                 
-                // Update invoice details
                 document.getElementById('invoice-number').textContent = invoiceNumber;
                 document.getElementById('invoice-date').textContent = invoiceDate;
                 document.getElementById('invoice-due-date').textContent = invoiceDueDate;
                 
-                // Update bill to information
                 const parentName = document.getElementById('parentName').value || 'Parent Name';
                 const parentEmail = document.getElementById('parentEmail').value || 'parent@example.com';
                 const parentPhone = document.getElementById('parentPhone').value || 'Not provided';
@@ -2528,12 +2671,10 @@
                     <p>${parentAddress}</p>
                 `;
                 
-                // Build invoice items from summary
                 const invoiceItemsContainer = document.getElementById('invoice-items');
                 let invoiceItemsHTML = '';
                 let totalAmount = 0;
                 
-                // Academic fees
                 const academicBaseFee = parseInt(document.getElementById('academic-base-fee').textContent.replace(/[^0-9]/g, '') || 0);
                 const additionalSubjectsFee = parseInt(document.getElementById('additional-subjects-fee').textContent.replace(/[^0-9]/g, '') || 0);
                 
@@ -2561,7 +2702,6 @@
                     totalAmount += additionalSubjectsFee;
                 }
                 
-                // Extracurricular fees
                 const extracurricularFee = parseInt(document.getElementById('extracurricular-fee').textContent.replace(/[^0-9]/g, '') || 0);
                 if (extracurricularFee > 0) {
                     invoiceItemsHTML += `
@@ -2575,7 +2715,6 @@
                     totalAmount += extracurricularFee;
                 }
                 
-                // Test prep fees
                 const testPrepFee = parseInt(document.getElementById('test-prep-fee').textContent.replace(/[^0-9]/g, '') || 0);
                 if (testPrepFee > 0) {
                     invoiceItemsHTML += `
@@ -2589,7 +2728,6 @@
                     totalAmount += testPrepFee;
                 }
                 
-                // Discounts
                 const discount = parseInt(document.getElementById('discount-amount').textContent.replace(/[^0-9]/g, '') || 0);
                 const proratedAmount = parseInt(document.getElementById('prorated-amount').textContent.replace(/[^0-9]/g, '') || 0);
                 
@@ -2617,62 +2755,49 @@
                     totalAmount -= proratedAmount;
                 }
                 
-                // Update invoice items and total
                 invoiceItemsContainer.innerHTML = invoiceItemsHTML;
                 document.getElementById('invoice-total').textContent = `₦${totalAmount.toLocaleString()}`;
                 
-                // Show invoice modal
                 document.getElementById('invoice-modal').classList.add('active');
             }
             
             async downloadInvoicePDF() {
                 const invoiceContent = document.getElementById('invoice-content');
                 
-                // Show loading
                 const pdfBtn = document.getElementById('download-pdf');
                 const originalText = pdfBtn.innerHTML;
                 pdfBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Generating PDF...';
                 pdfBtn.disabled = true;
                 
                 try {
-                    // Use html2canvas to capture the invoice
                     const canvas = await html2canvas(invoiceContent, {
                         scale: 2,
                         useCORS: true,
                         logging: false
                     });
                     
-                    // Convert canvas to image
                     const imgData = canvas.toDataURL('image/png');
-                    
-                    // Create PDF using jsPDF
                     const { jsPDF } = window.jspdf;
                     const pdf = new jsPDF('p', 'mm', 'a4');
                     const pdfWidth = pdf.internal.pageSize.getWidth();
                     const pdfHeight = pdf.internal.pageSize.getHeight();
                     
-                    // Calculate dimensions to fit the invoice
-                    const imgWidth = pdfWidth - 20; // 10mm margins on each side
+                    const imgWidth = pdfWidth - 20;
                     const imgHeight = (canvas.height * imgWidth) / canvas.width;
                     
-                    // Add image to PDF
                     pdf.addImage(imgData, 'PNG', 10, 10, imgWidth, imgHeight);
                     
-                    // Generate filename
                     const invoiceNumber = document.getElementById('invoice-number').textContent;
                     const filename = `Invoice_${invoiceNumber}_${new Date().getTime()}.pdf`;
                     
-                    // Download PDF
                     pdf.save(filename);
                     
-                    // Show success message
                     this.showPDFDownloadSuccess();
                     
                 } catch (error) {
                     console.error('Error generating PDF:', error);
                     this.showAlert('Error generating PDF. Please try again.', 'danger');
                 } finally {
-                    // Restore button
                     pdfBtn.innerHTML = originalText;
                     pdfBtn.disabled = false;
                 }
@@ -2692,13 +2817,11 @@
             // ==============================================
             
             async submitEnrollment() {
-                // Validate form
                 if (!this.validateForm()) {
                     this.showAlert('Please fix all errors in the form before proceeding.', 'danger');
                     return;
                 }
                 
-                // Check if any course is selected
                 const hasAcademic = document.querySelectorAll('.subject-option.selected').length > 0;
                 const hasExtracurricular = document.querySelectorAll('.extracurricular-card.selected').length > 0;
                 const hasTestPrep = document.querySelectorAll('.test-prep-card.active').length > 0;
@@ -2708,7 +2831,6 @@
                     return;
                 }
                 
-                // Get total amount
                 const totalText = document.getElementById('total-fee').textContent;
                 const totalAmount = parseInt(totalText.replace('₦', '').replace(/,/g, ''));
                 
@@ -2717,19 +2839,16 @@
                     return;
                 }
                 
-                // Show loading
                 const submitBtn = document.getElementById('submit-enrollment');
                 const originalText = submitBtn.innerHTML;
                 submitBtn.innerHTML = '<div class="spinner"></div> Processing...';
                 submitBtn.disabled = true;
                 
                 try {
-                    // Simulate payment processing
                     setTimeout(() => {
                         this.showAlert(`Payment successful! Total: ${totalText}`, 'success');
                         this.clearForm();
                         
-                        // Restore button
                         submitBtn.innerHTML = originalText;
                         submitBtn.disabled = false;
                     }, 2000);
@@ -2743,7 +2862,6 @@
             }
             
             clearForm() {
-                // Clear parent information
                 document.getElementById('parentName').value = '';
                 document.getElementById('parentEmail').value = '';
                 document.getElementById('parentPhone').value = '07078961070';
@@ -2753,11 +2871,9 @@
                 document.getElementById('accountNumber').value = '';
                 document.getElementById('accountName').value = '';
                 
-                // Clear student entries (keep only first)
                 const studentsContainer = document.getElementById('students-container');
                 studentsContainer.innerHTML = '';
                 
-                // Add back first student
                 const firstStudent = document.createElement('div');
                 firstStudent.className = 'student-entry';
                 firstStudent.setAttribute('data-student-id', '1');
@@ -2802,13 +2918,11 @@
                 
                 studentsContainer.appendChild(firstStudent);
                 
-                // Set default date for first student
                 const nextMonth = new Date();
                 nextMonth.setMonth(nextMonth.getMonth() + 1);
                 nextMonth.setDate(1);
                 firstStudent.querySelector('.student-start-date').value = nextMonth.toISOString().split('T')[0];
                 
-                // Clear course selections
                 document.querySelectorAll('.subject-option').forEach(opt => opt.classList.remove('selected'));
                 document.querySelectorAll('.extracurricular-card').forEach(card => {
                     card.classList.remove('selected');
@@ -2819,26 +2933,17 @@
                     card.querySelector('.test-prep-hours').value = '0';
                 });
                 
-                // Reset student count
                 this.studentCount = 1;
-                
-                // Hide bank details
                 this.hideBankDetails();
-                
-                // Reset referral validation
                 this.referralValidated = false;
                 this.referrerData = null;
                 
-                // Clear validation errors
                 document.querySelectorAll('.error-message').forEach(el => el.classList.add('hidden'));
                 document.querySelectorAll('.form-control').forEach(el => {
                     el.classList.remove('error', 'valid');
                 });
                 
-                // Hide confirmation message
                 document.getElementById('confirmation-message').classList.add('hidden');
-                
-                // Update summary
                 this.updateSummary();
             }
             
@@ -2857,7 +2962,6 @@
                 
                 alertArea.prepend(alertDiv);
                 
-                // Remove after 5 seconds
                 setTimeout(() => {
                     alertDiv.remove();
                 }, 5000);
@@ -2877,11 +2981,10 @@
         // INITIALIZE APPLICATION
         // ==============================================
         
-        // Initialize when DOM is loaded
         document.addEventListener('DOMContentLoaded', () => {
             try {
                 const app = new EnrollmentApp();
-                window.enrollmentApp = app; // Make accessible for debugging
+                window.enrollmentApp = app;
                 console.log('Blooming Kids House Enrollment System ready!');
                 
             } catch (error) {
