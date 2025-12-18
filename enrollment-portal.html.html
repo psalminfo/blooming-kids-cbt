@@ -767,7 +767,7 @@
             color: var(--primary);
             cursor: pointer;
             font-size: 14px;
-            display: flex;
+            display: inline-flex;
             align-items: center;
             gap: 6px;
             transition: var(--transition);
@@ -1607,7 +1607,7 @@
 
     <script>
         // ==============================================
-        // UPDATED FIXED VERSION - ALL ISSUES RESOLVED
+        // UPDATED FIXED VERSION - WITH ONLY THE REQUESTED EDITS
         // ==============================================
 
         // CONFIGURATION - UPDATED WITH YOUR REAL FIREBASE CONFIG
@@ -1670,7 +1670,7 @@
             // Constants
             CONSTANTS: {
                 ADDITIONAL_SUBJECT_FEE: 40000,
-                SIBLING_DISCOUNT: 10000,
+                SIBLING_DISCOUNT: 10000, // FLAT DISCOUNT FOR 2+ STUDENTS
                 BASE_SUBJECTS_INCLUDED: 2,
                 WEEKS_IN_MONTH: 4,
                 REFERRAL_BONUS: 5000,
@@ -1932,7 +1932,7 @@
             }
             
             // ==============================================
-            // COURSE SELECTION HANDLERS - FIXED TOGGLE
+            // COURSE SELECTION HANDLERS - FIXED TOGGLE (EDIT 1)
             // ==============================================
             
             handleAcademicSubjectClick(option) {
@@ -1954,15 +1954,18 @@
             handleExtracurricularCardClick(card) {
                 console.log('Extracurricular card clicked:', card.dataset.activityId);
                 
-                // Toggle selection - FIXED: Proper toggle
-                if (card.classList.contains('selected')) {
-                    // Unselect
-                    card.classList.remove('selected');
+                // Toggle selection - FIXED: Proper toggle for double-click
+                card.classList.toggle('selected');
+                
+                // If card is being unselected, also clear frequency buttons
+                if (!card.classList.contains('selected')) {
                     card.querySelectorAll('.frequency-btn').forEach(btn => btn.classList.remove('selected'));
                 } else {
-                    // Select with default frequency
-                    card.classList.add('selected');
-                    card.querySelector('[data-frequency="once"]').classList.add('selected');
+                    // If card is being selected, set default frequency to once weekly
+                    const onceBtn = card.querySelector('[data-frequency="once"]');
+                    if (onceBtn && !card.querySelector('.frequency-btn.selected')) {
+                        onceBtn.classList.add('selected');
+                    }
                 }
                 
                 console.log('Card selected:', card.classList.contains('selected'));
@@ -1974,7 +1977,7 @@
             handleFrequencyButtonClick(card, button) {
                 console.log('Frequency button clicked:', button.dataset.frequency);
                 
-                // Ensure card is selected
+                // Ensure card is selected when clicking frequency buttons
                 if (!card.classList.contains('selected')) {
                     card.classList.add('selected');
                 }
@@ -2216,7 +2219,7 @@
             }
             
             // ==============================================
-            // FEE CALCULATION & SUMMARY
+            // FEE CALCULATION & SUMMARY - FIXED (EDIT 2: FLAT DISCOUNT)
             // ==============================================
             
             updateSummary() {
@@ -2230,6 +2233,7 @@
                 
                 // Get all student entries
                 const studentEntries = document.querySelectorAll('.student-entry');
+                const studentCount = studentEntries.length;
                 
                 studentEntries.forEach((entry) => {
                     const grade = entry.querySelector('.student-grade').value;
@@ -2280,9 +2284,12 @@
                 // Calculate total academic fee
                 const totalAcademicFee = academicBaseTotal + additionalSubjectsTotal;
                 
-                // Calculate sibling discount (only if academic is selected)
-                const discount = (studentEntries.length > 1 && hasAcademicSelection) ? 
-                    (studentEntries.length - 1) * CONFIG.CONSTANTS.SIBLING_DISCOUNT : 0;
+                // Calculate sibling discount (only if academic is selected AND there are 2 or more students)
+                // EDIT 2: FLAT DISCOUNT - Only ₦10,000 total for 2+ students (not per student)
+                let discount = 0;
+                if (studentCount >= 2 && hasAcademicSelection) {
+                    discount = CONFIG.CONSTANTS.SIBLING_DISCOUNT; // Just ₦10,000 flat
+                }
                 
                 // Calculate prorated amount (only if academic is selected)
                 let proratedAmount = 0;
@@ -2314,7 +2321,13 @@
                 // Show prorated amount and discount only if there are academic selections
                 if (hasAcademicSelection) {
                     document.getElementById('prorated-amount').textContent = `-₦${proratedAmount.toLocaleString()}`;
-                    document.getElementById('discount-amount').textContent = `-₦${discount.toLocaleString()}`;
+                    
+                    // Only show discount if there are 2 or more students
+                    if (studentCount >= 2) {
+                        document.getElementById('discount-amount').textContent = `-₦${discount.toLocaleString()}`;
+                    } else {
+                        document.getElementById('discount-amount').textContent = `-₦0`;
+                    }
                 } else {
                     document.getElementById('prorated-amount').textContent = `-₦0`;
                     document.getElementById('discount-amount').textContent = `-₦0`;
@@ -2325,7 +2338,12 @@
                 // Update fee breakdown
                 this.updateFeeBreakdown(studentEntries);
                 
-                console.log('Summary updated:', { totalPayable });
+                console.log('Summary updated:', { 
+                    totalPayable, 
+                    studentCount, 
+                    discount,
+                    discountApplied: studentCount >= 2 
+                });
             }
             
             updateFeeBreakdown(studentEntries) {
