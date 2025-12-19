@@ -1505,7 +1505,7 @@
                 
                 await this.initializeFirebase();
                 this.setupEventListeners();
-                this.checkResumeLink();
+                await this.checkResumeLink(); // Changed to async
                 
                 // Add initial student if no saved data
                 if (this.studentCount === 0) {
@@ -1604,7 +1604,7 @@
             // STUDENT MANAGEMENT - UPDATED FOR ISOLATED SELECTION
             // ==============================================
             
-            addStudent() {
+            addStudent(data = null) {
                 this.studentCount++;
                 const studentId = this.studentCount;
                 
@@ -1625,12 +1625,12 @@
                     <div class="form-row">
                         <div class="form-group">
                             <label>Student Full Name <span class="required">*</span></label>
-                            <input type="text" class="form-control student-name" placeholder="Student Name" data-validate="required">
+                            <input type="text" class="form-control student-name" placeholder="Student Name" data-validate="required" value="${data?.name || ''}">
                             <div class="error-message hidden student-name-error"></div>
                         </div>
                         <div class="form-group">
                             <label>Date of Birth <span class="required">*</span></label>
-                            <input type="date" class="form-control student-dob" data-validate="required">
+                            <input type="date" class="form-control student-dob" data-validate="required" value="${data?.dob || ''}">
                             <div class="error-message hidden student-dob-error"></div>
                         </div>
                     </div>
@@ -1639,16 +1639,16 @@
                             <label>School Grade <span class="required">*</span></label>
                             <select class="form-control select student-grade" data-validate="required">
                                 <option value="">Select Grade</option>
-                                <option value="preschool">Preschool to Grade 1</option>
-                                <option value="grade2-4">Grade 2 to 4</option>
-                                <option value="grade5-8">Grade 5 to 8</option>
-                                <option value="grade9-12">Grade 9 to 12</option>
+                                <option value="preschool" ${data?.grade === 'preschool' ? 'selected' : ''}>Preschool to Grade 1</option>
+                                <option value="grade2-4" ${data?.grade === 'grade2-4' ? 'selected' : ''}>Grade 2 to 4</option>
+                                <option value="grade5-8" ${data?.grade === 'grade5-8' ? 'selected' : ''}>Grade 5 to 8</option>
+                                <option value="grade9-12" ${data?.grade === 'grade9-12' ? 'selected' : ''}>Grade 9 to 12</option>
                             </select>
                             <div class="error-message hidden student-grade-error"></div>
                         </div>
                         <div class="form-group">
                             <label>Preferred Start Date <span class="required">*</span></label>
-                            <input type="date" class="form-control student-start-date" min="${new Date().toISOString().split('T')[0]}" data-validate="required">
+                            <input type="date" class="form-control student-start-date" min="${new Date().toISOString().split('T')[0]}" data-validate="required" value="${data?.startDate || ''}">
                             <div class="error-message hidden student-start-date-error"></div>
                         </div>
                     </div>
@@ -1671,17 +1671,66 @@
                 
                 document.getElementById('students-container').appendChild(newStudent);
                 
-                // Initialize default date
-                const nextMonth = new Date();
-                nextMonth.setMonth(nextMonth.getMonth() + 1);
-                nextMonth.setDate(1);
-                newStudent.querySelector('.student-start-date').value = nextMonth.toISOString().split('T')[0];
+                // Set default start date if not provided
+                if (!data?.startDate) {
+                    const nextMonth = new Date();
+                    nextMonth.setMonth(nextMonth.getMonth() + 1);
+                    nextMonth.setDate(1);
+                    newStudent.querySelector('.student-start-date').value = nextMonth.toISOString().split('T')[0];
+                }
                 
                 // Attach Event Listeners for this specific student
                 this.attachStudentEventListeners(newStudent, studentId);
                 
+                // Load saved selections if data provided
+                if (data) {
+                    setTimeout(() => {
+                        this.loadStudentSelections(newStudent, data);
+                    }, 100);
+                }
+                
                 this.updateRemoveButtons();
                 this.updateSummary();
+            }
+
+            loadStudentSelections(studentDiv, data) {
+                // Load academic subjects
+                if (data.subjects) {
+                    studentDiv.querySelectorAll('.subject-option').forEach(option => {
+                        const subject = option.dataset.subject;
+                        if (data.subjects.includes(subject)) {
+                            option.classList.add('selected');
+                        }
+                    });
+                }
+                
+                // Load extracurricular activities
+                if (data.extracurriculars) {
+                    data.extracurriculars.forEach(activity => {
+                        const card = studentDiv.querySelector(`.extracurricular-card[data-activity-id="${activity.id}"]`);
+                        if (card) {
+                            card.classList.add('selected');
+                            if (activity.frequency) {
+                                const freqBtn = card.querySelector(`[data-frequency="${activity.frequency}"]`);
+                                if (freqBtn) freqBtn.classList.add('selected');
+                            }
+                        }
+                    });
+                }
+                
+                // Load test prep
+                if (data.testPrep) {
+                    data.testPrep.forEach(test => {
+                        const card = studentDiv.querySelector(`.test-prep-card[data-test-id="${test.id}"]`);
+                        if (card) {
+                            const hoursInput = card.querySelector('.test-prep-hours');
+                            if (hoursInput && test.hours > 0) {
+                                hoursInput.value = test.hours;
+                                card.classList.add('active');
+                            }
+                        }
+                    });
+                }
             }
 
             generateCourseSelectionHTML(id) {
@@ -1842,7 +1891,7 @@
             }
 
             // ==============================================
-            // FEE CALCULATION
+            // FEE CALCULATION - FIXED PRORATED LOGIC
             // ==============================================
             
             calculateProratedAmount(totalAcademicFee, startDate) {
@@ -1851,12 +1900,21 @@
                 const start = new Date(startDate);
                 const dayOfMonth = start.getDate();
                 
+                // If starting on or before 6th, no adjustment needed
                 if (dayOfMonth <= CONFIG.CONSTANTS.FULL_FEE_THRESHOLD) return 0;
                 
+                // Calculate days remaining in the month (from start date to end of month)
                 const daysInMonth = new Date(start.getFullYear(), start.getMonth() + 1, 0).getDate();
                 const daysRemaining = daysInMonth - dayOfMonth + 1;
-                const dailyRate = totalAcademicFee / daysInMonth;
-                return Math.round(dailyRate * daysRemaining);
+                
+                // Calculate the amount to pay for remaining days
+                const dailyRate = totalAcademicFee / CONFIG.CONSTANTS.DAYS_IN_MONTH;
+                const amountToPay = Math.round(dailyRate * daysRemaining);
+                
+                // The prorated amount is the discount (full fee minus amount to pay)
+                const proratedDiscount = totalAcademicFee - amountToPay;
+                
+                return proratedDiscount;
             }
             
             updateSummary() {
@@ -2081,16 +2139,90 @@
             }
 
             // ==============================================
-            // UTILITIES
+            // SAVE PROGRESS - FIXED TO ACTUALLY SAVE DATA
             // ==============================================
             
-            showAlert(message, type = 'info') {
-                const alertArea = document.getElementById('alert-area');
-                const alertDiv = document.createElement('div');
-                alertDiv.className = `alert alert-${type}`;
-                alertDiv.innerHTML = `<i class="fas fa-info-circle"></i> ${message}`;
-                alertArea.prepend(alertDiv);
-                setTimeout(() => alertDiv.remove(), 5000);
+            gatherFormData() {
+                const data = {
+                    parent: {
+                        name: document.getElementById('parentName').value,
+                        email: document.getElementById('parentEmail').value,
+                        phone: document.getElementById('parentPhone').value,
+                        address: document.getElementById('parentAddress').value,
+                        referralCode: document.getElementById('referralCode').value || null,
+                        bankName: document.getElementById('bankName').value || null,
+                        accountNumber: document.getElementById('accountNumber').value || null,
+                        accountName: document.getElementById('accountName').value || null
+                    },
+                    students: [],
+                    summary: {
+                        academicBaseFee: parseInt(document.getElementById('academic-base-fee').textContent.replace(/[^\d]/g, '') || 0),
+                        additionalSubjectsFee: parseInt(document.getElementById('additional-subjects-fee').textContent.replace(/[^\d]/g, '') || 0),
+                        totalAcademicFee: parseInt(document.getElementById('total-academic-fee').textContent.replace(/[^\d]/g, '') || 0),
+                        extracurricularFee: parseInt(document.getElementById('extracurricular-fee').textContent.replace(/[^\d]/g, '') || 0),
+                        testPrepFee: parseInt(document.getElementById('test-prep-fee').textContent.replace(/[^\d]/g, '') || 0),
+                        proratedAmount: parseInt(document.getElementById('prorated-amount').textContent.replace(/[^\d]/g, '') || 0),
+                        discountAmount: parseInt(document.getElementById('discount-amount').textContent.replace(/[^\d]/g, '') || 0),
+                        totalFee: parseInt(document.getElementById('total-fee').textContent.replace(/[^\d]/g, '') || 0)
+                    },
+                    savedAt: new Date().toISOString(),
+                    status: 'draft'
+                };
+                
+                // Gather student data
+                document.querySelectorAll('.student-entry').forEach((entry, index) => {
+                    const studentData = {
+                        id: index + 1,
+                        name: entry.querySelector('.student-name').value,
+                        dob: entry.querySelector('.student-dob').value,
+                        grade: entry.querySelector('.student-grade').value,
+                        startDate: entry.querySelector('.student-start-date').value,
+                        subjects: [],
+                        extracurriculars: [],
+                        testPrep: []
+                    };
+                    
+                    // Get selected subjects
+                    entry.querySelectorAll('.subject-option.selected').forEach(subject => {
+                        studentData.subjects.push(subject.dataset.subject);
+                    });
+                    
+                    // Get extracurricular activities
+                    entry.querySelectorAll('.extracurricular-card.selected').forEach(card => {
+                        const activity = {
+                            id: card.dataset.activityId,
+                            name: card.querySelector('.extracurricular-name').textContent,
+                            fee: parseInt(card.querySelector('.extracurricular-price').textContent.replace(/[^\d]/g, '') || 0)
+                        };
+                        
+                        const freqBtn = card.querySelector('.frequency-btn.selected');
+                        if (freqBtn) {
+                            activity.frequency = freqBtn.dataset.frequency;
+                            if (activity.frequency === 'twice') {
+                                activity.fee = activity.fee / 2; // Store base fee
+                            }
+                        }
+                        
+                        studentData.extracurriculars.push(activity);
+                    });
+                    
+                    // Get test prep
+                    entry.querySelectorAll('.test-prep-card.active').forEach(card => {
+                        const hours = parseFloat(card.querySelector('.test-prep-hours').value) || 0;
+                        if (hours > 0) {
+                            studentData.testPrep.push({
+                                id: card.dataset.testId,
+                                name: card.querySelector('.test-prep-name').textContent,
+                                hours: hours,
+                                rate: parseInt(card.querySelector('.test-prep-rate').textContent.replace(/[^\d]/g, '') || 0)
+                            });
+                        }
+                    });
+                    
+                    data.students.push(studentData);
+                });
+                
+                return data;
             }
             
             async saveProgress() {
@@ -2099,23 +2231,103 @@
                     return;
                 }
                 
-                // Mock Saving
-                const appId = 'BKH-' + Date.now();
-                const resumeLink = window.location.href.split('?')[0] + '?resume=' + appId;
-                
-                document.getElementById('saved-app-id').textContent = appId;
-                document.getElementById('resume-link').textContent = resumeLink;
-                document.getElementById('confirmation-message').classList.remove('hidden');
-                
-                this.showAlert("Progress Saved!", "success");
+                try {
+                    const saveBtn = document.getElementById('save-progress-btn');
+                    saveBtn.innerHTML = '<div class="spinner"></div> Saving...';
+                    saveBtn.disabled = true;
+                    
+                    // Gather all form data
+                    const formData = this.gatherFormData();
+                    
+                    // Save to Firebase
+                    if (this.db) {
+                        const docRef = await this.db.collection('enrollments').add(formData);
+                        this.currentApplicationId = docRef.id;
+                        
+                        // Generate resume link (same format as before)
+                        const appId = 'BKH-' + Date.now().toString().slice(-8);
+                        const resumeLink = window.location.href.split('?')[0] + '?resume=' + docRef.id;
+                        
+                        // Show confirmation
+                        document.getElementById('saved-app-id').textContent = appId;
+                        document.getElementById('resume-link').textContent = resumeLink;
+                        document.getElementById('confirmation-message').classList.remove('hidden');
+                        
+                        this.showAlert("Progress saved successfully! You can resume anytime using the link.", "success");
+                        
+                        // Also store the ID in localStorage for this session
+                        localStorage.setItem('currentEnrollmentId', docRef.id);
+                    } else {
+                        throw new Error('Database not available');
+                    }
+                    
+                } catch (error) {
+                    console.error('Error saving progress:', error);
+                    this.showAlert("Error saving progress. Please try again.", "danger");
+                } finally {
+                    const saveBtn = document.getElementById('save-progress-btn');
+                    saveBtn.innerHTML = '<i class="fas fa-envelope"></i> Save & Email Resume Link';
+                    saveBtn.disabled = false;
+                }
             }
             
-            checkResumeLink() {
+            async checkResumeLink() {
                 const urlParams = new URLSearchParams(window.location.search);
-                if (urlParams.get('resume')) {
-                    this.showAlert("Welcome back! Loading your application...", "info");
-                    // Logic to load from Firebase would go here
+                const resumeId = urlParams.get('resume');
+                
+                if (resumeId) {
+                    try {
+                        this.showAlert("Loading your saved application...", "info");
+                        
+                        if (this.db) {
+                            const doc = await this.db.collection('enrollments').doc(resumeId).get();
+                            
+                            if (doc.exists) {
+                                const data = doc.data();
+                                await this.loadSavedData(data);
+                                this.currentApplicationId = resumeId;
+                                this.showAlert("Application loaded successfully!", "success");
+                            } else {
+                                this.showAlert("Saved application not found. Starting fresh.", "warning");
+                            }
+                        }
+                    } catch (error) {
+                        console.error('Error loading saved data:', error);
+                        this.showAlert("Error loading saved data. Starting fresh.", "warning");
+                    }
                 }
+            }
+            
+            async loadSavedData(data) {
+                // Load parent data
+                document.getElementById('parentName').value = data.parent.name || '';
+                document.getElementById('parentEmail').value = data.parent.email || '';
+                document.getElementById('parentPhone').value = data.parent.phone || '';
+                document.getElementById('parentAddress').value = data.parent.address || '';
+                document.getElementById('referralCode').value = data.parent.referralCode || '';
+                
+                if (data.parent.bankName) {
+                    document.getElementById('bankName').value = data.parent.bankName;
+                    document.getElementById('accountNumber').value = data.parent.accountNumber;
+                    document.getElementById('accountName').value = data.parent.accountName;
+                    this.showBankDetails();
+                }
+                
+                // Clear existing students
+                document.getElementById('students-container').innerHTML = '';
+                this.studentCount = 0;
+                
+                // Load each student
+                if (data.students && data.students.length > 0) {
+                    data.students.forEach(studentData => {
+                        this.addStudent(studentData);
+                    });
+                } else {
+                    this.addStudent(); // Add one empty student if none saved
+                }
+                
+                // Update summary
+                this.updateSummary();
             }
 
             // ==============================================
