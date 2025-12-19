@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1126,6 +1125,13 @@
             from { transform: translateX(100%); opacity: 0; }
             to { transform: translateX(0); opacity: 1; }
         }
+        
+        .proration-explanation {
+            font-size: 12px;
+            color: #666;
+            margin-top: 5px;
+            font-style: italic;
+        }
     </style>
 </head>
 <body>
@@ -1238,12 +1244,12 @@
                     <div class="form-row">
                         <div class="form-group">
                             <label>Phone Number <span class="required">*</span></label>
-                            <input type="tel" class="form-control" id="parentPhone" placeholder="+234801234567890" value="" data-validate="required,phone">
+                            <input type="tel" class="form-control" id="parentPhone" placeholder="" value="+23481234567890" data-validate="required,phone">
                             <div class="error-message hidden" id="parentPhone-error"></div>
                         </div>
                         <div class="form-group">
                             <label>State/Province <span class="required">*</span></label>
-                            <input type="text" class="form-control" id="parentState/Province" placeholder="Your residential State/Province" data-validate="required">
+                            <input type="text" class="form-control" id="parentState/Province" placeholder="Your State or Province" data-validate="required">
                             <div class="error-message hidden" id="parentState/Province-error"></div>
                         </div>
                     </div>
@@ -1293,10 +1299,10 @@
                 </div>
 
                 <div class="save-progress">
-                    <h4><i class="fas fa-save"></i> Save Your Progress</h4>
-                    <p>Need more time? Save your enrollment and continue later. We'll email you a resume link.</p>
+                    <h4><i class="fas fa-save"></i> Save Registration & Receive Your Invoice</h4>
+                    <p>Need more time? Save your enrollment and continue later. We'll email you a resume link, please save the invoice and pay using the account details, when you are done with payment, kidly send to our WhatsApp number, Thank you.</p>
                     <button type="button" class="save-btn" id="save-progress-btn">
-                        <i class="fas fa-envelope"></i> Save & Email Resume Link
+                        <i class="fas fa-envelope"></i> Click to Save, get your Invoice & Email Resume Link
                     </button>
                     
                     <div id="confirmation-message" class="confirmation-message hidden">
@@ -1366,6 +1372,7 @@
                 <div class="summary-item">
                     <span>Prorated Adjustment:</span>
                     <span id="prorated-amount">-₦0</span>
+                    <div id="proration-explanation" class="proration-explanation"></div>
                 </div>
                 
                 <div class="summary-item discount">
@@ -1416,7 +1423,7 @@
 
     <script>
         // ==============================================
-        // COMPLETE UPDATED VERSION - WITH PRORATED FIX AND SAVE/RESUME
+        // COMPLETE UPDATED VERSION - FIXED PRORATION AND SAVE/RESUME
         // ==============================================
 
         // CONFIGURATION
@@ -1497,6 +1504,7 @@
                 this.referrerData = null;
                 this.db = null;
                 this.appData = null;
+                this.isLoadingSavedData = false;
                 
                 this.initializeState();
             }
@@ -1586,32 +1594,42 @@
                 }
                 
                 // Form validation for parent fields
-                document.querySelectorAll('#parentName, #parentEmail, #parentPhone, #parentState/Province').forEach(input => {
-                    input.addEventListener('blur', () => this.validateField(input));
-                    input.addEventListener('input', () => {
-                         const errorElement = document.getElementById(`${input.id}-error`);
-                         if (errorElement) errorElement.classList.add('hidden');
-                         input.classList.remove('error');
-                    });
+                const parentInputs = ['#parentName', '#parentEmail', '#parentPhone', '#parentState/Province'];
+                parentInputs.forEach(selector => {
+                    const input = document.querySelector(selector);
+                    if (input) {
+                        input.addEventListener('blur', () => this.validateField(input));
+                        input.addEventListener('input', () => {
+                            const errorElement = document.getElementById(`${input.id}-error`);
+                            if (errorElement) errorElement.classList.add('hidden');
+                            input.classList.remove('error');
+                        });
+                    }
                 });
                 
-                // Auto-save when form changes (after 2 seconds of inactivity)
+                // Auto-save when form changes (after 3 seconds of inactivity)
                 let saveTimer;
-                const formElements = document.querySelectorAll('.form-control, .subject-option, .extracurricular-card, .frequency-btn, .test-prep-hours');
-                formElements.forEach(element => {
-                    element.addEventListener('change', () => {
-                        clearTimeout(saveTimer);
-                        saveTimer = setTimeout(() => {
-                            if (this.currentApplicationId) {
-                                this.autoSave();
-                            }
-                        }, 2000);
+                const setupAutoSave = () => {
+                    const formElements = document.querySelectorAll('.form-control, .subject-option, .extracurricular-card, .frequency-btn, .test-prep-hours');
+                    formElements.forEach(element => {
+                        element.addEventListener('change', () => {
+                            if (this.isLoadingSavedData) return;
+                            clearTimeout(saveTimer);
+                            saveTimer = setTimeout(() => {
+                                if (this.currentApplicationId) {
+                                    this.autoSave();
+                                }
+                            }, 3000);
+                        });
                     });
-                });
+                };
+                
+                // Setup auto-save after a delay to ensure DOM is ready
+                setTimeout(setupAutoSave, 1000);
             }
 
             // ==============================================
-            // STUDENT MANAGEMENT - UPDATED FOR ISOLATED SELECTION
+            // STUDENT MANAGEMENT
             // ==============================================
             
             addStudent(prefillData = null) {
@@ -1621,8 +1639,15 @@
                 const newStudent = document.createElement('div');
                 newStudent.className = 'student-entry';
                 newStudent.setAttribute('data-student-id', studentId);
+                newStudent.setAttribute('data-student-index', studentId - 1);
                 
-                // Generate HTML for Course Tabs & Grids specifically for THIS student
+                // Set default start date (1st of next month)
+                const nextMonth = new Date();
+                nextMonth.setMonth(nextMonth.getMonth() + 1);
+                nextMonth.setDate(1);
+                const defaultStartDate = nextMonth.toISOString().split('T')[0];
+                
+                // Generate HTML
                 const courseSelectionHTML = this.generateCourseSelectionHTML(studentId);
 
                 newStudent.innerHTML = `
@@ -1658,7 +1683,7 @@
                         </div>
                         <div class="form-group">
                             <label>Preferred Start Date <span class="required">*</span></label>
-                            <input type="date" class="form-control student-start-date" min="${new Date().toISOString().split('T')[0]}" data-validate="required" value="${prefillData?.startDate || ''}">
+                            <input type="date" class="form-control student-start-date" min="${new Date().toISOString().split('T')[0]}" data-validate="required" value="${prefillData?.startDate || defaultStartDate}">
                             <div class="error-message hidden student-start-date-error"></div>
                         </div>
                     </div>
@@ -1681,20 +1706,14 @@
                 
                 document.getElementById('students-container').appendChild(newStudent);
                 
-                // Set default start date if not pre-filled
-                if (!prefillData?.startDate) {
-                    const nextMonth = new Date();
-                    nextMonth.setMonth(nextMonth.getMonth() + 1);
-                    nextMonth.setDate(1);
-                    newStudent.querySelector('.student-start-date').value = nextMonth.toISOString().split('T')[0];
-                }
-                
                 // Attach Event Listeners for this specific student
                 this.attachStudentEventListeners(newStudent, studentId);
                 
                 // Pre-fill selections if data exists
-                if (prefillData) {
-                    this.preloadStudentSelections(newStudent, prefillData);
+                if (prefillData && prefillData.selectedSubjects) {
+                    setTimeout(() => {
+                        this.preloadStudentSelections(newStudent, prefillData);
+                    }, 100);
                 }
                 
                 this.updateRemoveButtons();
@@ -1702,11 +1721,15 @@
             }
             
             preloadStudentSelections(studentDiv, data) {
+                if (!data) return;
+                
                 // Pre-select academic subjects
                 if (data.selectedSubjects && data.selectedSubjects.length > 0) {
                     data.selectedSubjects.forEach(subject => {
                         const option = studentDiv.querySelector(`.subject-option[data-subject="${subject}"]`);
-                        if (option) option.classList.add('selected');
+                        if (option) {
+                            option.classList.add('selected');
+                        }
                     });
                 }
                 
@@ -1717,8 +1740,14 @@
                         if (card) {
                             card.classList.add('selected');
                             // Set frequency
-                            const freqBtn = card.querySelector(`.frequency-btn[data-frequency="${activity.frequency}"]`);
-                            if (freqBtn) freqBtn.classList.add('selected');
+                            if (activity.frequency) {
+                                const freqBtn = card.querySelector(`.frequency-btn[data-frequency="${activity.frequency}"]`);
+                                if (freqBtn) freqBtn.classList.add('selected');
+                            } else {
+                                // Default to once if not specified
+                                const onceBtn = card.querySelector('[data-frequency="once"]');
+                                if (onceBtn) onceBtn.classList.add('selected');
+                            }
                         }
                     });
                 }
@@ -1803,15 +1832,12 @@
                 const tabs = studentDiv.querySelectorAll('.course-tab');
                 tabs.forEach(tab => {
                     tab.addEventListener('click', (e) => {
-                        e.preventDefault(); // Prevent button submission
-                        // Remove active class from all tabs in this student card
+                        e.preventDefault();
                         tabs.forEach(t => t.classList.remove('active'));
                         tab.classList.add('active');
                         
-                        // Hide all content in this student card
                         studentDiv.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
                         
-                        // Show selected content
                         const targetId = tab.dataset.tab;
                         studentDiv.querySelector(`#${targetId}`).classList.add('active');
                     });
@@ -1870,7 +1896,11 @@
                 // 5. Basic Input Validation
                 studentDiv.querySelectorAll('[data-validate]').forEach(input => {
                     input.addEventListener('blur', () => this.validateField(input));
-                    input.addEventListener('change', () => this.updateSummary());
+                    input.addEventListener('change', () => {
+                        if (!this.isLoadingSavedData) {
+                            this.updateSummary();
+                        }
+                    });
                 });
 
                 // 6. Remove Button
@@ -1896,38 +1926,44 @@
             }
 
             // ==============================================
-            // FEE CALCULATION - IMPROVED PRORATED CALCULATION
+            // FEE CALCULATION - FIXED PRORATED CALCULATION
             // ==============================================
             
             calculateProratedAmount(totalAcademicFee, startDate) {
                 if (!startDate || totalAcademicFee === 0) return 0;
                 
-                const start = new Date(startDate);
-                const dayOfMonth = start.getDate();
-                
-                // If starting on or before the 6th, no proration
-                if (dayOfMonth <= CONFIG.CONSTANTS.FULL_FEE_THRESHOLD_DAY) {
+                try {
+                    const start = new Date(startDate);
+                    const dayOfMonth = start.getDate();
+                    
+                    // If starting on or before the 6th, no proration
+                    if (dayOfMonth <= CONFIG.CONSTANTS.FULL_FEE_THRESHOLD_DAY) {
+                        return 0;
+                    }
+                    
+                    // Calculate days in the starting month
+                    const year = start.getFullYear();
+                    const month = start.getMonth();
+                    const daysInMonth = new Date(year, month + 1, 0).getDate();
+                    
+                    // Days remaining from start date to end of month (inclusive)
+                    const daysRemaining = daysInMonth - dayOfMonth + 1;
+                    
+                    // Calculate prorated amount: (days remaining / total days) * fee
+                    const proratedAmount = Math.round((daysRemaining / daysInMonth) * totalAcademicFee);
+                    
+                    console.log(`Prorated calculation: Start Date: ${startDate}, Day ${dayOfMonth} of ${daysInMonth}, ${daysRemaining} days remaining, Fee: ₦${totalAcademicFee}, Prorated: ₦${proratedAmount}`);
+                    
+                    return proratedAmount;
+                } catch (error) {
+                    console.error('Error in prorated calculation:', error);
                     return 0;
                 }
-                
-                // Calculate days in the starting month
-                const year = start.getFullYear();
-                const month = start.getMonth();
-                const daysInMonth = new Date(year, month + 1, 0).getDate();
-                
-                // Days remaining from start date to end of month
-                const daysRemaining = daysInMonth - dayOfMonth + 1;
-                
-                // Calculate prorated amount based on actual days
-                const dailyRate = totalAcademicFee / daysInMonth;
-                const proratedAmount = Math.round(dailyRate * daysRemaining);
-                
-                console.log(`Prorated calculation: Day ${dayOfMonth} of ${daysInMonth}, ${daysRemaining} days remaining, Daily rate: ₦${dailyRate.toFixed(2)}, Prorated: ₦${proratedAmount}`);
-                
-                return proratedAmount;
             }
             
             updateSummary() {
+                if (this.isLoadingSavedData) return;
+                
                 let academicBaseTotal = 0;
                 let additionalSubjectsTotal = 0;
                 let extracurricularTotal = 0;
@@ -1944,6 +1980,8 @@
                 
                 if (studentEntries.length === 0) {
                     breakdownContainer.innerHTML = '<p class="student-fee">No students added yet</p>';
+                    this.updateSummaryDisplay(0, 0, 0, 0, 0, 0, 0);
+                    return;
                 }
 
                 studentEntries.forEach((entry, index) => {
@@ -1954,11 +1992,14 @@
                     const startDate = entry.querySelector('.student-start-date').value;
                     const name = entry.querySelector('.student-name').value || `Student ${index + 1}`;
                     
-                    if (startDate && (!earliestStartDate || new Date(startDate) < new Date(earliestStartDate))) {
-                        earliestStartDate = startDate;
+                    // Track earliest start date for proration
+                    if (startDate) {
+                        if (!earliestStartDate || new Date(startDate) < new Date(earliestStartDate)) {
+                            earliestStartDate = startDate;
+                        }
                     }
                     
-                    // 1. Academic Calculation (Scoped to THIS entry)
+                    // 1. Academic Calculation
                     const selectedSubjects = Array.from(entry.querySelectorAll('.subject-option.selected'));
                     
                     if (grade && CONFIG.ACADEMIC_FEES[grade] && selectedSubjects.length > 0) {
@@ -1977,7 +2018,7 @@
                         totalAcademicFeeAllStudents += studentAcademicFee;
                     }
                     
-                    // 2. Extracurricular (Scoped to THIS entry)
+                    // 2. Extracurricular
                     entry.querySelectorAll('.extracurricular-card.selected').forEach(card => {
                         const activity = CONFIG.EXTRACURRICULAR_FEES.find(a => a.id === card.dataset.activityId);
                         if (activity) {
@@ -1990,7 +2031,7 @@
                         }
                     });
                     
-                    // 3. Test Prep (Scoped to THIS entry)
+                    // 3. Test Prep
                     entry.querySelectorAll('.test-prep-card.active').forEach(card => {
                         const test = CONFIG.TEST_PREP_FEES.find(t => t.id === card.dataset.testId);
                         const hours = parseFloat(card.querySelector('.test-prep-hours').value) || 0;
@@ -2026,8 +2067,19 @@
                 }
                 
                 let proratedAmount = 0;
+                let prorationExplanation = '';
+                
                 if (hasAcademicSelection && earliestStartDate) {
                     proratedAmount = this.calculateProratedAmount(totalAcademicFeeAllStudents, earliestStartDate);
+                    
+                    if (proratedAmount > 0) {
+                        const startDate = new Date(earliestStartDate);
+                        const dayOfMonth = startDate.getDate();
+                        const daysInMonth = new Date(startDate.getFullYear(), startDate.getMonth() + 1, 0).getDate();
+                        const daysRemaining = daysInMonth - dayOfMonth + 1;
+                        
+                        prorationExplanation = `Starting on day ${dayOfMonth} of month (${daysInMonth} days). Charged for ${daysRemaining} days.`;
+                    }
                 }
                 
                 const totalPayable = Math.max(0, 
@@ -2039,6 +2091,23 @@
                 );
                 
                 // Update DOM
+                this.updateSummaryDisplay(
+                    academicBaseTotal,
+                    additionalSubjectsTotal,
+                    totalAcademicFee,
+                    extracurricularTotal,
+                    testPrepTotal,
+                    discount,
+                    proratedAmount,
+                    totalPayable,
+                    prorationExplanation
+                );
+            }
+            
+            updateSummaryDisplay(academicBaseTotal, additionalSubjectsTotal, totalAcademicFee, 
+                               extracurricularTotal, testPrepTotal, discount, 
+                               proratedAmount, totalPayable = 0, prorationExplanation = '') {
+                
                 document.getElementById('academic-base-fee').textContent = `₦${academicBaseTotal.toLocaleString()}`;
                 document.getElementById('additional-subjects-fee').textContent = `+₦${additionalSubjectsTotal.toLocaleString()}`;
                 document.getElementById('total-academic-fee').textContent = `₦${totalAcademicFee.toLocaleString()}`;
@@ -2052,7 +2121,24 @@
                 document.getElementById('prorated-amount').textContent = proratedAmount > 0 ? `-₦${proratedAmount.toLocaleString()}` : `-₦0`;
                 document.getElementById('discount-amount').textContent = discount > 0 ? `-₦${discount.toLocaleString()}` : `-₦0`;
                 
-                document.getElementById('total-fee').textContent = `₦${Math.round(totalPayable).toLocaleString()}`;
+                if (prorationExplanation) {
+                    document.getElementById('proration-explanation').textContent = prorationExplanation;
+                } else {
+                    document.getElementById('proration-explanation').textContent = '';
+                }
+                
+                if (totalPayable > 0) {
+                    document.getElementById('total-fee').textContent = `₦${Math.round(totalPayable).toLocaleString()}`;
+                } else {
+                    const calculatedTotal = Math.max(0, 
+                        totalAcademicFee + 
+                        extracurricularTotal + 
+                        testPrepTotal - 
+                        discount - 
+                        proratedAmount
+                    );
+                    document.getElementById('total-fee').textContent = `₦${Math.round(calculatedTotal).toLocaleString()}`;
+                }
             }
 
             // ==============================================
@@ -2083,7 +2169,6 @@
                         }
                     }
                     if (rule === 'phone') {
-                        // Very basic check, input mask handles UI
                         if (value.length < 10) {
                             isValid = false;
                             errorMessage = 'Invalid Phone';
@@ -2155,7 +2240,7 @@
             }
 
             // ==============================================
-            // SAVE/RESUME FUNCTIONALITY
+            // SAVE/RESUME FUNCTIONALITY - COMPLETE FIX
             // ==============================================
             
             async saveProgress() {
@@ -2169,20 +2254,21 @@
                     
                     // Generate or use existing application ID
                     if (!this.currentApplicationId) {
-                        this.currentApplicationId = 'BKH-' + Date.now() + '-' + Math.random().toString(36).substr(2, 5);
+                        this.currentApplicationId = 'BKH-' + Date.now() + '-' + Math.random().toString(36).substr(2, 5).toUpperCase();
                     }
                     
                     enrollmentData.id = this.currentApplicationId;
                     enrollmentData.lastSaved = new Date().toISOString();
                     enrollmentData.status = 'draft';
+                    enrollmentData.createdAt = enrollmentData.createdAt || new Date().toISOString();
                     
                     // Save to Firebase
                     if (this.db) {
-                        await this.db.collection('enrollments').doc(this.currentApplicationId).set(enrollmentData);
-                        console.log('Saved enrollment data:', enrollmentData);
+                        await this.db.collection('enrollments').doc(this.currentApplicationId).set(enrollmentData, { merge: true });
+                        console.log('Saved enrollment data with ID:', this.currentApplicationId);
                         
                         // Generate resume link
-                        const resumeLink = window.location.href.split('?')[0] + '?resume=' + this.currentApplicationId;
+                        const resumeLink = window.location.origin + window.location.pathname + '?resume=' + this.currentApplicationId;
                         
                         // Update UI
                         document.getElementById('saved-app-id').textContent = this.currentApplicationId;
@@ -2193,6 +2279,7 @@
                         
                         // Store in localStorage for quick access
                         localStorage.setItem('lastEnrollmentId', this.currentApplicationId);
+                        localStorage.setItem('lastEnrollmentData', JSON.stringify(enrollmentData));
                         
                         return {
                             success: true,
@@ -2211,7 +2298,7 @@
             }
             
             async autoSave() {
-                if (!this.currentApplicationId) return;
+                if (!this.currentApplicationId || this.isLoadingSavedData) return;
                 
                 try {
                     const enrollmentData = this.collectFormData();
@@ -2242,13 +2329,14 @@
                     },
                     students: [],
                     summary: {
-                        totalFee: document.getElementById('total-fee').textContent.replace('₦', '').replace(/,/g, ''),
-                        academicFee: document.getElementById('total-academic-fee').textContent.replace('₦', '').replace(/,/g, ''),
-                        extracurricularFee: document.getElementById('total-extracurricular-fee').textContent.replace('₦', '').replace(/,/g, ''),
-                        testPrepFee: document.getElementById('total-test-prep-fee').textContent.replace('₦', '').replace(/,/g, ''),
-                        proratedAmount: document.getElementById('prorated-amount').textContent.replace('₦', '').replace(/,/g, '').replace('-', ''),
-                        discountAmount: document.getElementById('discount-amount').textContent.replace('₦', '').replace(/,/g, '').replace('-', '')
-                    }
+                        totalFee: document.getElementById('total-fee') ? document.getElementById('total-fee').textContent.replace('₦', '').replace(/,/g, '') : '0',
+                        academicFee: document.getElementById('total-academic-fee') ? document.getElementById('total-academic-fee').textContent.replace('₦', '').replace(/,/g, '') : '0',
+                        extracurricularFee: document.getElementById('total-extracurricular-fee') ? document.getElementById('total-extracurricular-fee').textContent.replace('₦', '').replace(/,/g, '') : '0',
+                        testPrepFee: document.getElementById('total-test-prep-fee') ? document.getElementById('total-test-prep-fee').textContent.replace('₦', '').replace(/,/g, '') : '0',
+                        proratedAmount: document.getElementById('prorated-amount') ? document.getElementById('prorated-amount').textContent.replace('₦', '').replace(/,/g, '').replace('-', '') : '0',
+                        discountAmount: document.getElementById('discount-amount') ? document.getElementById('discount-amount').textContent.replace('₦', '').replace(/,/g, '').replace('-', '') : '0'
+                    },
+                    timestamp: new Date().toISOString()
                 };
                 
                 // Collect student data
@@ -2274,7 +2362,8 @@
                         const freqBtn = card.querySelector('.frequency-btn.selected');
                         studentData.extracurriculars.push({
                             id: card.dataset.activityId,
-                            frequency: freqBtn ? freqBtn.dataset.frequency : 'once'
+                            frequency: freqBtn ? freqBtn.dataset.frequency : 'once',
+                            name: card.querySelector('.extracurricular-name').textContent
                         });
                     });
                     
@@ -2284,7 +2373,8 @@
                         if (hours > 0) {
                             studentData.testPrep.push({
                                 id: card.dataset.testId,
-                                hours: hours
+                                hours: hours,
+                                name: card.querySelector('.test-prep-name').textContent
                             });
                         }
                     });
@@ -2301,6 +2391,7 @@
                 
                 if (resumeId) {
                     try {
+                        this.isLoadingSavedData = true;
                         this.showAlert("Loading your saved application...", "info");
                         
                         if (this.db) {
@@ -2309,19 +2400,40 @@
                             if (doc.exists) {
                                 this.appData = doc.data();
                                 this.currentApplicationId = resumeId;
-                                this.loadSavedData(this.appData);
+                                await this.loadSavedData(this.appData);
                                 this.showAlert("Application loaded successfully!", "success");
                             } else {
-                                this.showAlert("Saved application not found. Starting fresh.", "warning");
-                                this.addStudent(); // Add initial student
+                                // Check localStorage as fallback
+                                const localData = localStorage.getItem('lastEnrollmentData');
+                                if (localData) {
+                                    this.appData = JSON.parse(localData);
+                                    this.currentApplicationId = resumeId;
+                                    await this.loadSavedData(this.appData);
+                                    this.showAlert("Application loaded from local storage!", "success");
+                                } else {
+                                    this.showAlert("Saved application not found. Starting fresh.", "warning");
+                                    this.addStudent();
+                                }
                             }
                         } else {
-                            this.addStudent(); // Add initial student
+                            // Fallback to localStorage if Firebase not available
+                            const localData = localStorage.getItem('lastEnrollmentData');
+                            if (localData) {
+                                this.appData = JSON.parse(localData);
+                                this.currentApplicationId = resumeId;
+                                await this.loadSavedData(this.appData);
+                                this.showAlert("Application loaded from local storage!", "success");
+                            } else {
+                                this.showAlert("Starting fresh application.", "info");
+                                this.addStudent();
+                            }
                         }
                     } catch (error) {
                         console.error('Error loading saved data:', error);
                         this.showAlert("Error loading saved data. Starting fresh.", "warning");
-                        this.addStudent(); // Add initial student
+                        this.addStudent();
+                    } finally {
+                        this.isLoadingSavedData = false;
                     }
                 } else {
                     // No resume link, add initial student
@@ -2329,13 +2441,15 @@
                 }
             }
             
-            loadSavedData(data) {
+            async loadSavedData(data) {
+                if (!data) return;
+                
                 // Load parent information
                 if (data.parent) {
                     document.getElementById('parentName').value = data.parent.name || '';
                     document.getElementById('parentEmail').value = data.parent.email || '';
                     document.getElementById('parentPhone').value = data.parent.phone || '';
-                    document.getElementById('parentState/Province').value = data.parent.State/Province || '';
+                    document.getElementById('parenState/Province').value = data.parent.state/province || '';
                 }
                 
                 // Load referral information
@@ -2346,7 +2460,7 @@
                     document.getElementById('accountName').value = data.referral.accountName || '';
                     
                     if (data.referral.code) {
-                        this.validateReferralCode(data.referral.code);
+                        await this.validateReferralCode(data.referral.code);
                     }
                 }
                 
@@ -2356,15 +2470,27 @@
                 
                 // Load students
                 if (data.students && data.students.length > 0) {
+                    // Add all students first
                     data.students.forEach(student => {
                         this.addStudent(student);
                     });
+                    
+                    // Wait for DOM to be ready, then load selections
+                    setTimeout(() => {
+                        document.querySelectorAll('.student-entry').forEach((entry, index) => {
+                            if (data.students[index]) {
+                                this.preloadStudentSelections(entry, data.students[index]);
+                            }
+                        });
+                        
+                        // Update summary after everything is loaded
+                        setTimeout(() => {
+                            this.updateSummary();
+                        }, 500);
+                    }, 500);
                 } else {
-                    this.addStudent(); // Add one if none saved
+                    this.addStudent();
                 }
-                
-                // Update summary
-                setTimeout(() => this.updateSummary(), 500);
             }
 
             // ==============================================
@@ -2439,7 +2565,7 @@
                 // Prorated adjustment
                 const prorated = parseInt(document.getElementById('prorated-amount').textContent.replace(/\D/g,'')) || 0;
                 if (prorated > 0) {
-                    tbody.innerHTML += `<tr><td>Prorated Adjustment</td><td>1</td><td>-</td><td>-₦${prorated.toLocaleString()}</td></tr>`;
+                    tbody.innerHTML += `<tr><td>Prorated Adjustment (Starting mid-month)</td><td>1</td><td>-</td><td>-₦${prorated.toLocaleString()}</td></tr>`;
                 }
 
                 modal.classList.add('active');
