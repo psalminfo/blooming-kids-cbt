@@ -1238,13 +1238,13 @@
                     <div class="form-row">
                         <div class="form-group">
                             <label>Phone Number <span class="required">*</span></label>
-                            <input type="tel" class="form-control" id="parentPhone" placeholder="07078961070" value="07078961070" data-validate="required,phone">
+                            <input type="tel" class="form-control" id="parentPhone" placeholder="+234801234567890" value="" data-validate="required,phone">
                             <div class="error-message hidden" id="parentPhone-error"></div>
                         </div>
                         <div class="form-group">
-                            <label>Address <span class="required">*</span></label>
-                            <input type="text" class="form-control" id="parentAddress" placeholder="Your residential address" data-validate="required">
-                            <div class="error-message hidden" id="parentAddress-error"></div>
+                            <label>State/Province <span class="required">*</span></label>
+                            <input type="text" class="form-control" id="parentState/Province" placeholder="Your residential State/Province" data-validate="required">
+                            <div class="error-message hidden" id="parentState/Province-error"></div>
                         </div>
                     </div>
                     
@@ -1586,7 +1586,7 @@
                 }
                 
                 // Form validation for parent fields
-                document.querySelectorAll('#parentName, #parentEmail, #parentPhone, #parentAddress').forEach(input => {
+                document.querySelectorAll('#parentName, #parentEmail, #parentPhone, #parentState/Province').forEach(input => {
                     input.addEventListener('blur', () => this.validateField(input));
                     input.addEventListener('input', () => {
                          const errorElement = document.getElementById(`${input.id}-error`);
@@ -2232,7 +2232,7 @@
                         name: document.getElementById('parentName').value,
                         email: document.getElementById('parentEmail').value,
                         phone: document.getElementById('parentPhone').value,
-                        address: document.getElementById('parentAddress').value
+                        State/Province: document.getElementById('parentState/Province').value
                     },
                     referral: {
                         code: document.getElementById('referralCode').value,
@@ -2335,7 +2335,7 @@
                     document.getElementById('parentName').value = data.parent.name || '';
                     document.getElementById('parentEmail').value = data.parent.email || '';
                     document.getElementById('parentPhone').value = data.parent.phone || '';
-                    document.getElementById('parentAddress').value = data.parent.address || '';
+                    document.getElementById('parentState/Province').value = data.parent.State/Province || '';
                 }
                 
                 // Load referral information
@@ -2397,10 +2397,10 @@
                 
                 // Populate Bill To
                 const pName = document.getElementById('parentName').value || 'N/A';
-                const pAddress = document.getElementById('parentAddress').value || '';
+                const pState/Province = document.getElementById('parentState/Province').value || '';
                 document.getElementById('invoice-bill-to').innerHTML = `
                     <p><strong>${pName}</strong></p>
-                    <p>${pAddress}</p>
+                    <p>${pState/Province}</p>
                     <p>${document.getElementById('parentEmail').value || ''}</p>
                     <p>${document.getElementById('parentPhone').value || ''}</p>
                 `;
