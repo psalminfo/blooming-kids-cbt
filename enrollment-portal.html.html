@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1237,13 +1238,13 @@
                     <div class="form-row">
                         <div class="form-group">
                             <label>Phone Number <span class="required">*</span></label>
-                            <input type="tel" class="form-control" id="parentPhone" placeholder="+234801234567890" value="" data-validate="required,phone">
+                            <input type="tel" class="form-control" id="parentPhone" placeholder="07078961070" value="07078961070" data-validate="required,phone">
                             <div class="error-message hidden" id="parentPhone-error"></div>
                         </div>
                         <div class="form-group">
-                            <label>State/Province <span class="required">*</span></label>
-                            <input type="text" class="form-control" id="parentState/Province" placeholder="Your state or province" data-validate="required">
-                            <div class="error-message hidden" id="parentState/Province-error"></div>
+                            <label>Address <span class="required">*</span></label>
+                            <input type="text" class="form-control" id="parentAddress" placeholder="Your residential address" data-validate="required">
+                            <div class="error-message hidden" id="parentAddress-error"></div>
                         </div>
                     </div>
                     
@@ -1293,9 +1294,9 @@
 
                 <div class="save-progress">
                     <h4><i class="fas fa-save"></i> Save Your Progress</h4>
-                    <p>Need more time? Save your enrollment and continue later. We'll email you a resume link, please save the invoice and pay using the account details, when you are done with payment, kidly send to our WhatsApp number, Thank you..</p>
+                    <p>Need more time? Save your enrollment and continue later. We'll email you a resume link.</p>
                     <button type="button" class="save-btn" id="save-progress-btn">
-                        <i class="fas fa-envelope"></i> Click to Save, get your Invoice & Email Resume Link
+                        <i class="fas fa-envelope"></i> Save & Email Resume Link
                     </button>
                     
                     <div id="confirmation-message" class="confirmation-message hidden">
@@ -1315,7 +1316,7 @@
                 </div>
 
                 <button type="button" class="btn btn-primary btn-submit" id="submit-enrollment">
-                    <i class="fas fa-lock"></i> Proceed to Secure Payment ( THIS IS UNDER CONSTRUCTION, USE THE BANK DETAILS OPTION IN YOUR INVOICE)
+                    <i class="fas fa-lock"></i> Proceed to Secure Payment
                 </button>
                 
                 <div class="alert alert-info" style="margin-top: 25px;">
@@ -1585,7 +1586,7 @@
                 }
                 
                 // Form validation for parent fields
-                document.querySelectorAll('#parentName, #parentEmail, #parentPhone, #parentState/Province').forEach(input => {
+                document.querySelectorAll('#parentName, #parentEmail, #parentPhone, #parentAddress').forEach(input => {
                     input.addEventListener('blur', () => this.validateField(input));
                     input.addEventListener('input', () => {
                          const errorElement = document.getElementById(`${input.id}-error`);
@@ -2231,7 +2232,7 @@
                         name: document.getElementById('parentName').value,
                         email: document.getElementById('parentEmail').value,
                         phone: document.getElementById('parentPhone').value,
-                        state/Province: document.getElementById('parentState/Province').value
+                        address: document.getElementById('parentAddress').value
                     },
                     referral: {
                         code: document.getElementById('referralCode').value,
@@ -2334,7 +2335,7 @@
                     document.getElementById('parentName').value = data.parent.name || '';
                     document.getElementById('parentEmail').value = data.parent.email || '';
                     document.getElementById('parentPhone').value = data.parent.phone || '';
-                    document.getElementById('parentState/Province').value = data.parent.state/Province || '';
+                    document.getElementById('parentAddress').value = data.parent.address || '';
                 }
                 
                 // Load referral information
@@ -2396,10 +2397,10 @@
                 
                 // Populate Bill To
                 const pName = document.getElementById('parentName').value || 'N/A';
-                const pState/Province = document.getElementById('parentState/Province').value || '';
+                const pAddress = document.getElementById('parentAddress').value || '';
                 document.getElementById('invoice-bill-to').innerHTML = `
                     <p><strong>${pName}</strong></p>
-                    <p>${pState/Province}</p>
+                    <p>${pAddress}</p>
                     <p>${document.getElementById('parentEmail').value || ''}</p>
                     <p>${document.getElementById('parentPhone').value || ''}</p>
                 `;
