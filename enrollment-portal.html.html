@@ -1193,8 +1193,8 @@
             <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #EEE; font-size: 14px; color: #666;">
                 <p><strong>Payment Instructions:</strong></p>
                 <p>Please make payment via Paystack using the payment link or bank transfer to:</p>
-                <p><strong>Bank:</strong> Zenith Bank | <strong>Account:</strong> 1234567890 | <strong>Name:</strong> Blooming Kids House Ltd.</p>
-                <p>For inquiries, call 0707 896 1070 or email info@bloomingkidshouse.com</p>
+                <p><strong>Bank:</strong> Providus Bank | <strong>Account:</strong>5401988045 | <strong>Name:</strong> Blooming Kids House .</p>
+                <p>For inquiries, call 0707 896 1070, 0902 914 7024 or email info@bloomingkidshouse.com</p>
             </div>
         </div>
     </div>
@@ -1202,7 +1202,7 @@
     <div class="container">
         <header class="header">
             <div class="logo-container">
-                <img src="https://res.cloudinary.com/dy2xcyaf/image/upload/v1757700806/newbhlogo_umwqzy.svg" 
+                <img src="https://res.cloudinary.com/dy2hxcyaf/image/upload/v1757700806/newbhlogo_umwqzy.svg" 
                      alt="Blooming Kids House Logo" 
                      class="logo-img"
                      onerror="this.onerror=null; this.src='data:image/svg+xml;utf8,<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"70\" height=\"70\" viewBox=\"0 0 70 70\"><rect width=\"70\" height=\"70\" fill=\"%232E8B57\"/><text x=\"35\" y=\"45\" font-family=\"Arial\" font-size=\"30\" fill=\"white\" text-anchor=\"middle\">BKH</text></svg>'">
@@ -1241,9 +1241,9 @@
                             <div class="error-message hidden" id="parentPhone-error"></div>
                         </div>
                         <div class="form-group">
-                            <label>Address <span class="required">*</span></label>
-                            <input type="text" class="form-control" id="parentAddress" placeholder="Your residential address" data-validate="required">
-                            <div class="error-message hidden" id="parentAddress-error"></div>
+                            <label>State/Province <span class="required">*</span></label>
+                            <input type="text" class="form-control" id="parentState/Province" placeholder="Your State/Province" data-validate="required">
+                            <div class="error-message hidden" id="parentState/Province-error"></div>
                         </div>
                     </div>
                     
@@ -1251,7 +1251,7 @@
                         <h4><i class="fas fa-gift"></i> Refer a Friend & Earn ₦5,000!</h4>
                         <div class="form-group">
                             <label>Referral Code (Optional)</label>
-                            <input type="text" class="form-control" id="referralCode" placeholder="e.g., REF12345" maxlength="10">
+                            <input type="text" class="form-control" id="referralCode" placeholder="e.g., BKH12345" maxlength="10">
                             <small style="color: #666; font-size: 12px;">Leave blank if you don't have one</small>
                         </div>
                     </div>
@@ -1293,9 +1293,9 @@
 
                 <div class="save-progress">
                     <h4><i class="fas fa-save"></i> Save Your Progress</h4>
-                    <p>Need more time? Save your enrollment and continue later. We'll email you a resume link.</p>
+                    <p>Need more time? Save your enrollment and continue later. We'll email you a resume link, please save the invoice and pay using the account details, when you are done with payment send to our whatsApp number, thank you.</p>
                     <button type="button" class="save-btn" id="save-progress-btn">
-                        <i class="fas fa-envelope"></i> Save & Email Resume Link
+                        <i class="fas fa-envelope"></i> Click to Save, get your Invoice & Email Resume Link
                     </button>
                     
                     <div id="confirmation-message" class="confirmation-message hidden">
@@ -1585,7 +1585,7 @@
                 }
                 
                 // Form validation for parent fields
-                document.querySelectorAll('#parentName, #parentEmail, #parentPhone, #parentAddress').forEach(input => {
+                document.querySelectorAll('#parentName, #parentEmail, #parentPhone, #parentState/Province').forEach(input => {
                     input.addEventListener('blur', () => this.validateField(input));
                     input.addEventListener('input', () => {
                          const errorElement = document.getElementById(`${input.id}-error`);
@@ -2231,7 +2231,7 @@
                         name: document.getElementById('parentName').value,
                         email: document.getElementById('parentEmail').value,
                         phone: document.getElementById('parentPhone').value,
-                        address: document.getElementById('parentAddress').value
+                        state/province: document.getElementById('parentState/Province').value
                     },
                     referral: {
                         code: document.getElementById('referralCode').value,
@@ -2334,7 +2334,7 @@
                     document.getElementById('parentName').value = data.parent.name || '';
                     document.getElementById('parentEmail').value = data.parent.email || '';
                     document.getElementById('parentPhone').value = data.parent.phone || '';
-                    document.getElementById('parentAddress').value = data.parent.address || '';
+                    document.getElementById('parentState/Province').value = data.parent.state/province || '';
                 }
                 
                 // Load referral information
@@ -2396,10 +2396,10 @@
                 
                 // Populate Bill To
                 const pName = document.getElementById('parentName').value || 'N/A';
-                const pAddress = document.getElementById('parentAddress').value || '';
+                const pstate/province = document.getElementById('parentState/Province').value || '';
                 document.getElementById('invoice-bill-to').innerHTML = `
                     <p><strong>${pName}</strong></p>
-                    <p>${pAddress}</p>
+                    <p>${pState/Province}</p>
                     <p>${document.getElementById('parentEmail').value || ''}</p>
                     <p>${document.getElementById('parentPhone').value || ''}</p>
                 `;
