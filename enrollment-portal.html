@@ -1926,19 +1926,19 @@
             }
 
             // ==============================================
-            // FEE CALCULATION - FIXED PRORATED CALCULATION
+            // FEE CALCULATION - FIXED PRORATION LOGIC
             // ==============================================
             
             calculateProratedAmount(totalAcademicFee, startDate) {
-                if (!startDate || totalAcademicFee === 0) return 0;
+                if (!startDate || totalAcademicFee === 0) return totalAcademicFee; // Return full fee if no proration needed
                 
                 try {
                     const start = new Date(startDate);
                     const dayOfMonth = start.getDate();
                     
-                    // If starting on or before the 6th, no proration
+                    // If starting on or before the 6th, no proration - pay full fee
                     if (dayOfMonth <= CONFIG.CONSTANTS.FULL_FEE_THRESHOLD_DAY) {
-                        return 0;
+                        return totalAcademicFee; // Return full amount to pay
                     }
                     
                     // Calculate days in the starting month
@@ -1950,14 +1950,30 @@
                     const daysRemaining = daysInMonth - dayOfMonth + 1;
                     
                     // Calculate prorated amount: (days remaining / total days) * fee
-                    const proratedAmount = Math.round((daysRemaining / daysInMonth) * totalAcademicFee);
+                    const proratedAmountToPay = Math.round((daysRemaining / daysInMonth) * totalAcademicFee);
                     
-                    console.log(`Prorated calculation: Start Date: ${startDate}, Day ${dayOfMonth} of ${daysInMonth}, ${daysRemaining} days remaining, Fee: ₦${totalAcademicFee}, Prorated: ₦${proratedAmount}`);
+                    // Calculate deduction for display
+                    const deductionAmount = totalAcademicFee - proratedAmountToPay;
                     
-                    return proratedAmount;
+                    console.log(`Prorated calculation: Start Date: ${startDate}, Day ${dayOfMonth} of ${daysInMonth}, ${daysRemaining} days remaining, Full Fee: ₦${totalAcademicFee}, To Pay: ₦${proratedAmountToPay}, Deduction: ₦${deductionAmount}`);
+                    
+                    // Return both: amount to pay AND deduction for display
+                    return {
+                        toPay: proratedAmountToPay,
+                        deduction: deductionAmount,
+                        daysRemaining: daysRemaining,
+                        daysInMonth: daysInMonth,
+                        dayOfMonth: dayOfMonth
+                    };
                 } catch (error) {
                     console.error('Error in prorated calculation:', error);
-                    return 0;
+                    return {
+                        toPay: totalAcademicFee,
+                        deduction: 0,
+                        daysRemaining: 0,
+                        daysInMonth: 0,
+                        dayOfMonth: 0
+                    };
                 }
             }
             
@@ -2066,28 +2082,26 @@
                     discount = CONFIG.CONSTANTS.SIBLING_DISCOUNT;
                 }
                 
-                let proratedAmount = 0;
+                let proratedAmountToPay = totalAcademicFeeAllStudents; // Default to full fee
+                let prorationDeduction = 0;
                 let prorationExplanation = '';
                 
                 if (hasAcademicSelection && earliestStartDate) {
-                    proratedAmount = this.calculateProratedAmount(totalAcademicFeeAllStudents, earliestStartDate);
+                    const prorationResult = this.calculateProratedAmount(totalAcademicFeeAllStudents, earliestStartDate);
                     
-                    if (proratedAmount > 0) {
-                        const startDate = new Date(earliestStartDate);
-                        const dayOfMonth = startDate.getDate();
-                        const daysInMonth = new Date(startDate.getFullYear(), startDate.getMonth() + 1, 0).getDate();
-                        const daysRemaining = daysInMonth - dayOfMonth + 1;
-                        
-                        prorationExplanation = `Starting on day ${dayOfMonth} of month (${daysInMonth} days). Charged for ${daysRemaining} days.`;
+                    proratedAmountToPay = prorationResult.toPay;
+                    prorationDeduction = prorationResult.deduction;
+                    
+                    if (prorationDeduction > 0) {
+                        prorationExplanation = `Starting on day ${prorationResult.dayOfMonth} of month (${prorationResult.daysInMonth} days). Charged for ${prorationResult.daysRemaining} days.`;
                     }
                 }
                 
                 const totalPayable = Math.max(0, 
-                    totalAcademicFee + 
+                    proratedAmountToPay +  // Use the prorated amount to pay (already reduced)
                     extracurricularTotal + 
                     testPrepTotal - 
-                    discount - 
-                    proratedAmount
+                    discount  // Only subtract sibling discount now
                 );
                 
                 // Update DOM
@@ -2098,7 +2112,7 @@
                     extracurricularTotal,
                     testPrepTotal,
                     discount,
-                    proratedAmount,
+                    prorationDeduction,
                     totalPayable,
                     prorationExplanation
                 );
@@ -2106,7 +2120,7 @@
             
             updateSummaryDisplay(academicBaseTotal, additionalSubjectsTotal, totalAcademicFee, 
                                extracurricularTotal, testPrepTotal, discount, 
-                               proratedAmount, totalPayable = 0, prorationExplanation = '') {
+                               proratedDeduction, totalPayable = 0, prorationExplanation = '') {
                 
                 document.getElementById('academic-base-fee').textContent = `₦${academicBaseTotal.toLocaleString()}`;
                 document.getElementById('additional-subjects-fee').textContent = `+₦${additionalSubjectsTotal.toLocaleString()}`;
@@ -2118,7 +2132,7 @@
                 document.getElementById('test-prep-fee').textContent = `+₦${testPrepTotal.toLocaleString()}`;
                 document.getElementById('total-test-prep-fee').textContent = `₦${testPrepTotal.toLocaleString()}`;
                 
-                document.getElementById('prorated-amount').textContent = proratedAmount > 0 ? `-₦${proratedAmount.toLocaleString()}` : `-₦0`;
+                document.getElementById('prorated-amount').textContent = proratedDeduction > 0 ? `-₦${proratedDeduction.toLocaleString()}` : `-₦0`;
                 document.getElementById('discount-amount').textContent = discount > 0 ? `-₦${discount.toLocaleString()}` : `-₦0`;
                 
                 if (prorationExplanation) {
@@ -2130,12 +2144,13 @@
                 if (totalPayable > 0) {
                     document.getElementById('total-fee').textContent = `₦${Math.round(totalPayable).toLocaleString()}`;
                 } else {
+                    // Calculate fallback total if not provided
                     const calculatedTotal = Math.max(0, 
                         totalAcademicFee + 
                         extracurricularTotal + 
                         testPrepTotal - 
                         discount - 
-                        proratedAmount
+                        proratedDeduction
                     );
                     document.getElementById('total-fee').textContent = `₦${Math.round(calculatedTotal).toLocaleString()}`;
                 }
