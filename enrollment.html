@@ -803,7 +803,7 @@
         <span class="faq-toggle">+</span>
     </div>
     <div class="faq-answer">
-        Yes. All our classes are 100% one-to-one, tailored to your child’s learning needs.
+        Yes. All our classes are 100% one-to-one, tailored to your child's learning needs.
     </div>
 </div>
 
@@ -833,7 +833,7 @@
         <span class="faq-toggle">+</span>
     </div>
     <div class="faq-answer">
-        Payments are made in Naira. Fees depend on your child’s grade level and number of classes per week.
+        Payments are made in Naira. Fees depend on your child's grade level and number of classes per week.
     </div>
 </div>
 
@@ -908,7 +908,8 @@
                         </div>
                     </div>
                     
-                    <a href="https://bkh.netlify.app/enrollment-portal.html" class="btn btn-primary btn-large">
+                    <!-- FIXED: Added target="_blank" for mobile compatibility -->
+                    <a href="https://bkh.netlify.app/enrollment-portal.html" class="btn btn-primary btn-large" target="_blank" rel="noopener noreferrer">
                         <i class="fas fa-user-plus"></i> Enroll Now
                     </a>
                     
@@ -1208,7 +1209,7 @@
                 <a href="#about">About Us</a>
                 <a href="#programs">Programs</a>
                 <a href="#testimonials">Testimonials</a>
-                <a href="https://bkh.netlify.app/enrollment-portal.html">Enrollment Portal</a>
+                <a href="https://bkh.netlify.app/enrollment-portal.html" target="_blank" rel="noopener noreferrer">Enrollment Portal</a>
             </div>
             
             <div class="footer-section">
@@ -1228,7 +1229,7 @@
                     <a href="https://web.facebook.com/p/Blooming-Kids-House-100064221635202/?_rdc=1&_rdr#" target="_blank" style="background: rgba(255,255,255,0.1); width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center;">
                         <i class="fab fa-facebook-f"></i>
                     </a>
-                    <a href="https://www.instagram.com/bloomingkidshouse/?hl=en" style="background: rgba(255,255,255,0.1); width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center;">
+                    <a href="https://www.instagram.com/bloomingkidshouse/?hl=en" target="_blank" style="background: rgba(255,255,255,0.1); width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center;">
                         <i class="fab fa-instagram"></i>
                     </a>
                     <a href="https://twitter.com/YOUR_PAGE" target="_blank" style="background: rgba(255,255,255,0.1); width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center;">
@@ -1324,17 +1325,8 @@
             observer.observe(el);
         });
 
-        // Enroll Now button functionality
-        const enrollBtn = document.querySelector('.btn-primary.btn-large');
-        if (enrollBtn) {
-            enrollBtn.addEventListener('click', function(e) {
-                if (this.getAttribute('href') === 'https://bkh.netlify.app/enrollment-portal.html') {
-                    return true;
-                }
-                e.preventDefault();
-                alert('This button will take you to the Enrollment Portal.');
-            });
-        }
+        // FIXED: Removed the problematic JavaScript that was interfering with the Enroll Now button
+        // The button will now work normally with target="_blank"
 
         // Set current year in footer
         document.getElementById('current-year').textContent = new Date().getFullYear();
