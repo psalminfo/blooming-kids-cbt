@@ -1462,7 +1462,6 @@
                 { id: 'coding', name: 'CODING CLASSES FOR KIDS', fee: 45000 },
                 { id: 'sketch', name: 'SMART SKETCH', fee: 45000 },
                 { id: 'foreign', name: 'FOREIGN LANGUAGE', fee: 55000 },
-                { id: 'global_discovery', name: 'GLOBAL DISCOVERY CLUB (Saturdays)', fee: 50000 },
                 { id: 'native', name: 'NATIVE LANGUAGE', fee: 30000 },
                 { id: 'speaking', name: 'PUBLIC SPEAKING', fee: 35000 },
                 { id: 'bible', name: 'BIBLE STUDY', fee: 35000 },
@@ -1769,7 +1768,6 @@
             }
 
             generateCourseSelectionHTML(id) {
-               generateCourseSelectionHTML(id) {
                 // 1. Academic HTML
                 const academicSubjects = CONFIG.ACADEMIC_SUBJECTS.map(subject => `
                     <div class="subject-option" data-subject="${subject}">
@@ -1778,40 +1776,19 @@
                     </div>
                 `).join('');
 
-                // 2. Extracurricular HTML - MODIFIED FOR GLOBAL DISCOVERY
-                const extracurriculars = CONFIG.EXTRACURRICULAR_FEES.map(activity => {
-                    // Check if this is the Global Discovery Club
-                    const isGlobalDiscovery = activity.id === 'global_discovery';
-                    
-                    // If it is Global Discovery, show ONE 'Monthly' button. 
-                    // Otherwise, show the standard Once/Twice buttons.
-                    let buttonsHTML;
-                    
-                    if (isGlobalDiscovery) {
-                        buttonsHTML = `
-                            <div class="frequency-selection">
-                                <button class="frequency-btn" data-frequency="once" style="width: 100%;">Every Saturday (Monthly)</button>
-                            </div>
-                        `;
-                    } else {
-                        buttonsHTML = `
-                            <div class="frequency-selection">
-                                <button class="frequency-btn" data-frequency="once">Once Weekly</button>
-                                <button class="frequency-btn" data-frequency="twice">Twice Weekly</button>
-                            </div>
-                        `;
-                    }
-
-                    return `
+                // 2. Extracurricular HTML
+                const extracurriculars = CONFIG.EXTRACURRICULAR_FEES.map(activity => `
                     <div class="extracurricular-card" data-activity-id="${activity.id}">
                         <div class="extracurricular-header">
                             <div class="extracurricular-name">${activity.name}</div>
                             <div class="extracurricular-price">₦${activity.fee.toLocaleString()}</div>
                         </div>
-                        ${buttonsHTML}
+                        <div class="frequency-selection">
+                            <button class="frequency-btn" data-frequency="once">Once Weekly</button>
+                            <button class="frequency-btn" data-frequency="twice">Twice Weekly</button>
+                        </div>
                     </div>
-                    `;
-                }).join('');
+                `).join('');
 
                 // 3. Test Prep HTML
                 const testPreps = CONFIG.TEST_PREP_FEES.map(test => `
@@ -1849,6 +1826,72 @@
                     </div>
                 `;
             }
+
+            attachStudentEventListeners(studentDiv, id) {
+                // 1. Tab Switching Logic
+                const tabs = studentDiv.querySelectorAll('.course-tab');
+                tabs.forEach(tab => {
+                    tab.addEventListener('click', (e) => {
+                        e.preventDefault();
+                        tabs.forEach(t => t.classList.remove('active'));
+                        tab.classList.add('active');
+                        
+                        studentDiv.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+                        
+                        const targetId = tab.dataset.tab;
+                        studentDiv.querySelector(`#${targetId}`).classList.add('active');
+                    });
+                });
+
+                // 2. Subject Selection
+                studentDiv.querySelectorAll('.subject-option').forEach(option => {
+                    option.addEventListener('click', () => {
+                        option.classList.toggle('selected');
+                        this.updateSummary();
+                    });
+                });
+
+                // 3. Extracurricular Selection
+                studentDiv.querySelectorAll('.extracurricular-card').forEach(card => {
+                    card.addEventListener('click', (e) => {
+                        if (!e.target.classList.contains('frequency-btn')) {
+                            card.classList.toggle('selected');
+                            // Default to once weekly if selected
+                            if(card.classList.contains('selected') && !card.querySelector('.frequency-btn.selected')) {
+                                const onceBtn = card.querySelector('[data-frequency="once"]');
+                                if(onceBtn) onceBtn.classList.add('selected');
+                            }
+                             // Clear buttons if deselected
+                            if (!card.classList.contains('selected')) {
+                                card.querySelectorAll('.frequency-btn').forEach(b => b.classList.remove('selected'));
+                            }
+                            this.updateSummary();
+                        }
+                    });
+
+                    // Frequency Buttons
+                    card.querySelectorAll('.frequency-btn').forEach(btn => {
+                        btn.addEventListener('click', (e) => {
+                            e.stopPropagation();
+                            if(!card.classList.contains('selected')) card.classList.add('selected');
+                            
+                            card.querySelectorAll('.frequency-btn').forEach(b => b.classList.remove('selected'));
+                            btn.classList.add('selected');
+                            this.updateSummary();
+                        });
+                    });
+                });
+
+                // 4. Test Prep
+                studentDiv.querySelectorAll('.test-prep-hours').forEach(input => {
+                    input.addEventListener('input', (e) => {
+                        const card = input.closest('.test-prep-card');
+                        let val = parseFloat(input.value) || 0;
+                        if(val > 0) card.classList.add('active');
+                        else card.classList.remove('active');
+                        this.updateSummary();
+                    });
+                });
 
                 // 5. Basic Input Validation
                 studentDiv.querySelectorAll('[data-validate]').forEach(input => {
