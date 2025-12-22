@@ -1462,6 +1462,7 @@
                 { id: 'coding', name: 'CODING CLASSES FOR KIDS', fee: 45000 },
                 { id: 'sketch', name: 'SMART SKETCH', fee: 45000 },
                 { id: 'foreign', name: 'FOREIGN LANGUAGE', fee: 55000 },
+                { id: 'global_discovery', name: 'GLOBAL DISCOVERY CLUB (Saturdays)', fee: 50000 },
                 { id: 'native', name: 'NATIVE LANGUAGE', fee: 30000 },
                 { id: 'speaking', name: 'PUBLIC SPEAKING', fee: 35000 },
                 { id: 'bible', name: 'BIBLE STUDY', fee: 35000 },
@@ -1768,6 +1769,7 @@
             }
 
             generateCourseSelectionHTML(id) {
+               generateCourseSelectionHTML(id) {
                 // 1. Academic HTML
                 const academicSubjects = CONFIG.ACADEMIC_SUBJECTS.map(subject => `
                     <div class="subject-option" data-subject="${subject}">
@@ -1776,19 +1778,40 @@
                     </div>
                 `).join('');
 
-                // 2. Extracurricular HTML
-                const extracurriculars = CONFIG.EXTRACURRICULAR_FEES.map(activity => `
+                // 2. Extracurricular HTML - MODIFIED FOR GLOBAL DISCOVERY
+                const extracurriculars = CONFIG.EXTRACURRICULAR_FEES.map(activity => {
+                    // Check if this is the Global Discovery Club
+                    const isGlobalDiscovery = activity.id === 'global_discovery';
+                    
+                    // If it is Global Discovery, show ONE 'Monthly' button. 
+                    // Otherwise, show the standard Once/Twice buttons.
+                    let buttonsHTML;
+                    
+                    if (isGlobalDiscovery) {
+                        buttonsHTML = `
+                            <div class="frequency-selection">
+                                <button class="frequency-btn" data-frequency="once" style="width: 100%;">Every Saturday (Monthly)</button>
+                            </div>
+                        `;
+                    } else {
+                        buttonsHTML = `
+                            <div class="frequency-selection">
+                                <button class="frequency-btn" data-frequency="once">Once Weekly</button>
+                                <button class="frequency-btn" data-frequency="twice">Twice Weekly</button>
+                            </div>
+                        `;
+                    }
+
+                    return `
                     <div class="extracurricular-card" data-activity-id="${activity.id}">
                         <div class="extracurricular-header">
                             <div class="extracurricular-name">${activity.name}</div>
                             <div class="extracurricular-price">₦${activity.fee.toLocaleString()}</div>
                         </div>
-                        <div class="frequency-selection">
-                            <button class="frequency-btn" data-frequency="once">Once Weekly</button>
-                            <button class="frequency-btn" data-frequency="twice">Twice Weekly</button>
-                        </div>
+                        ${buttonsHTML}
                     </div>
-                `).join('');
+                    `;
+                }).join('');
 
                 // 3. Test Prep HTML
                 const testPreps = CONFIG.TEST_PREP_FEES.map(test => `
