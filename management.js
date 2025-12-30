@@ -18,6 +18,7 @@ const sessionCache = {
     breakStudents: null,
     parentFeedback: null,
     referralDataMap: null,
+    enrollments: null, // NEW: Added enrollments cache
 };
 
 /**
@@ -27,7 +28,7 @@ const sessionCache = {
  */
 function saveToLocalStorage(key, data) {
     // Don't cache reports to avoid quota issues
-    if (key === 'reports') {
+    if (key === 'reports' || key === 'enrollments') {
         sessionCache[key] = data; // Keep in memory only
         return;
     }
@@ -835,6 +836,437 @@ async function resetParentBalance(parentUid, currentEarnings) {
         alert("Failed to process payout. Check console for details.");
     }
 }
+
+// ##################################
+// # ENROLLMENT MANAGEMENT PANEL - NEW
+// ##################################
+
+async function renderEnrollmentsPanel(container) {
+    container.innerHTML = `
+        <div class="bg-white p-6 rounded-lg shadow-md">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-2xl font-bold text-green-700">Enrollment Management</h2>
+                <div class="flex items-center gap-4">
+                    <input type="search" id="enrollments-search" placeholder="Search enrollments..." class="p-2 border rounded-md w-64">
+                    <button id="refresh-enrollments-btn" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Refresh</button>
+                </div>
+            </div>
+            
+            <div class="flex space-x-4 mb-6">
+                <div class="bg-green-100 p-3 rounded-lg text-center shadow w-full">
+                    <h4 class="font-bold text-green-800 text-sm">Total Enrollments</h4>
+                    <p id="total-enrollments" class="text-2xl font-extrabold">0</p>
+                </div>
+                <div class="bg-yellow-100 p-3 rounded-lg text-center shadow w-full">
+                    <h4 class="font-bold text-yellow-800 text-sm">Draft Applications</h4>
+                    <p id="draft-enrollments" class="text-2xl font-extrabold">0</p>
+                </div>
+                <div class="bg-blue-100 p-3 rounded-lg text-center shadow w-full">
+                    <h4 class="font-bold text-blue-800 text-sm">Pending Review</h4>
+                    <p id="pending-enrollments" class="text-2xl font-extrabold">0</p>
+                </div>
+                <div class="bg-purple-100 p-3 rounded-lg text-center shadow w-full">
+                    <h4 class="font-bold text-purple-800 text-sm">Completed</h4>
+                    <p id="completed-enrollments" class="text-2xl font-extrabold">0</p>
+                </div>
+            </div>
+
+            <div class="bg-gray-50 p-4 rounded-lg mb-6">
+                <div class="flex space-x-4">
+                    <select id="status-filter" class="p-2 border rounded-md">
+                        <option value="">All Statuses</option>
+                        <option value="draft">Draft</option>
+                        <option value="pending">Pending</option>
+                        <option value="completed">Completed</option>
+                        <option value="payment_received">Payment Received</option>
+                    </select>
+                    <input type="date" id="date-from" class="p-2 border rounded-md" placeholder="From Date">
+                    <input type="date" id="date-to" class="p-2 border rounded-md" placeholder="To Date">
+                </div>
+            </div>
+
+            <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Application ID</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Parent Name</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Students</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total Fee</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Referral Code</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Created</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="enrollments-list" class="bg-white divide-y divide-gray-200">
+                        <tr>
+                            <td colspan="8" class="px-6 py-4 text-center text-gray-500">Loading enrollments...</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    `;
+
+    // Event Listeners
+    document.getElementById('refresh-enrollments-btn').addEventListener('click', () => fetchAndRenderEnrollments(true));
+    document.getElementById('enrollments-search').addEventListener('input', (e) => filterEnrollments(e.target.value));
+    document.getElementById('status-filter').addEventListener('change', applyEnrollmentFilters);
+    document.getElementById('date-from').addEventListener('change', applyEnrollmentFilters);
+    document.getElementById('date-to').addEventListener('change', applyEnrollmentFilters);
+
+    // Load initial data
+    fetchAndRenderEnrollments();
+}
+
+async function fetchAndRenderEnrollments(forceRefresh = false) {
+    if (forceRefresh) {
+        invalidateCache('enrollments');
+    }
+
+    const enrollmentsList = document.getElementById('enrollments-list');
+    if (!enrollmentsList) return;
+
+    try {
+        if (!sessionCache.enrollments || forceRefresh) {
+            enrollmentsList.innerHTML = `<tr><td colspan="8" class="px-6 py-4 text-center text-gray-500">Fetching enrollments...</td></tr>`;
+            
+            const snapshot = await getDocs(query(collection(db, "enrollments"), orderBy("createdAt", "desc")));
+            const enrollmentsData = snapshot.docs.map(doc => ({ 
+                id: doc.id, 
+                ...doc.data() 
+            }));
+            
+            saveToLocalStorage('enrollments', enrollmentsData);
+        }
+        
+        renderEnrollmentsFromCache();
+    } catch (error) {
+        console.error("Error fetching enrollments:", error);
+        enrollmentsList.innerHTML = `<tr><td colspan="8" class="px-6 py-4 text-center text-red-500">Failed to load enrollments: ${error.message}</td></tr>`;
+    }
+}
+
+function renderEnrollmentsFromCache(searchTerm = '') {
+    const enrollments = sessionCache.enrollments || [];
+    const enrollmentsList = document.getElementById('enrollments-list');
+    if (!enrollmentsList) return;
+
+    // Apply filters
+    const statusFilter = document.getElementById('status-filter')?.value || '';
+    const dateFrom = document.getElementById('date-from')?.value;
+    const dateTo = document.getElementById('date-to')?.value;
+    
+    const lowerCaseSearchTerm = searchTerm.toLowerCase();
+    
+    let filteredEnrollments = enrollments.filter(enrollment => {
+        // Search filter
+        if (searchTerm) {
+            const matchesSearch = 
+                (enrollment.id && enrollment.id.toLowerCase().includes(lowerCaseSearchTerm)) ||
+                (enrollment.parent?.name && enrollment.parent.name.toLowerCase().includes(lowerCaseSearchTerm)) ||
+                (enrollment.parent?.email && enrollment.parent.email.toLowerCase().includes(lowerCaseSearchTerm)) ||
+                (enrollment.parent?.phone && enrollment.parent.phone.toLowerCase().includes(lowerCaseSearchTerm)) ||
+                enrollment.students?.some(student => 
+                    student.name && student.name.toLowerCase().includes(lowerCaseSearchTerm)
+                );
+            
+            if (!matchesSearch) return false;
+        }
+        
+        // Status filter
+        if (statusFilter && enrollment.status !== statusFilter) return false;
+        
+        // Date filter
+        if (dateFrom) {
+            const createdDate = new Date(enrollment.createdAt || enrollment.timestamp);
+            const fromDate = new Date(dateFrom);
+            if (createdDate < fromDate) return false;
+        }
+        
+        if (dateTo) {
+            const createdDate = new Date(enrollment.createdAt || enrollment.timestamp);
+            const toDate = new Date(dateTo);
+            toDate.setHours(23, 59, 59, 999);
+            if (createdDate > toDate) return false;
+        }
+        
+        return true;
+    });
+
+    // Update statistics
+    const total = enrollments.length;
+    const draft = enrollments.filter(e => e.status === 'draft').length;
+    const pending = enrollments.filter(e => e.status === 'pending').length;
+    const completed = enrollments.filter(e => e.status === 'completed' || e.status === 'payment_received').length;
+    
+    document.getElementById('total-enrollments').textContent = total;
+    document.getElementById('draft-enrollments').textContent = draft;
+    document.getElementById('pending-enrollments').textContent = pending;
+    document.getElementById('completed-enrollments').textContent = completed;
+
+    if (filteredEnrollments.length === 0) {
+        enrollmentsList.innerHTML = `
+            <tr>
+                <td colspan="8" class="px-6 py-4 text-center text-gray-500">
+                    No enrollments found${searchTerm ? ` for "${searchTerm}"` : ''}.
+                </td>
+            </tr>
+        `;
+        return;
+    }
+
+    // Render enrollments table
+    const tableRows = filteredEnrollments.map(enrollment => {
+        const createdAt = enrollment.createdAt ? new Date(enrollment.createdAt).toLocaleDateString() : 
+                        enrollment.timestamp ? new Date(enrollment.timestamp).toLocaleDateString() : 'N/A';
+        
+        const studentCount = enrollment.students?.length || 0;
+        const studentNames = enrollment.students?.map(s => s.name).join(', ') || 'No students';
+        
+        // Status badge
+        let statusBadge = '';
+        switch(enrollment.status) {
+            case 'draft':
+                statusBadge = `<span class="px-2 py-1 text-xs rounded-full bg-gray-100 text-gray-800">Draft</span>`;
+                break;
+            case 'pending':
+                statusBadge = `<span class="px-2 py-1 text-xs rounded-full bg-yellow-100 text-yellow-800">Pending</span>`;
+                break;
+            case 'completed':
+            case 'payment_received':
+                statusBadge = `<span class="px-2 py-1 text-xs rounded-full bg-green-100 text-green-800">Completed</span>`;
+                break;
+            default:
+                statusBadge = `<span class="px-2 py-1 text-xs rounded-full bg-gray-100 text-gray-800">${enrollment.status || 'Unknown'}</span>`;
+        }
+        
+        // Total fee
+        const totalFee = enrollment.summary?.totalFee || 
+                        (enrollment.summary && typeof enrollment.summary.totalFee === 'string' ? 
+                         enrollment.summary.totalFee.replace('₦', '').replace(/,/g, '') : 0);
+        const formattedFee = totalFee ? `₦${parseInt(totalFee).toLocaleString()}` : '₦0';
+        
+        // Referral code
+        const referralCode = enrollment.referral?.code || 'None';
+        
+        return `
+            <tr class="hover:bg-gray-50">
+                <td class="px-6 py-4 whitespace-nowrap">
+                    <div class="text-sm font-medium text-gray-900">${enrollment.id.substring(0, 12)}...</div>
+                    <div class="text-xs text-gray-500">${enrollment.id}</div>
+                </td>
+                <td class="px-6 py-4">
+                    <div class="text-sm font-medium text-gray-900">${enrollment.parent?.name || 'N/A'}</div>
+                    <div class="text-xs text-gray-500">${enrollment.parent?.email || ''}</div>
+                    <div class="text-xs text-gray-500">${enrollment.parent?.phone || ''}</div>
+                </td>
+                <td class="px-6 py-4">
+                    <div class="text-sm text-gray-900">${studentCount} student(s)</div>
+                    <div class="text-xs text-gray-500 truncate max-w-xs">${studentNames}</div>
+                </td>
+                <td class="px-6 py-4 text-sm font-semibold text-green-600">${formattedFee}</td>
+                <td class="px-6 py-4 text-sm">
+                    <span class="font-mono bg-gray-100 px-2 py-1 rounded">${referralCode}</span>
+                </td>
+                <td class="px-6 py-4">${statusBadge}</td>
+                <td class="px-6 py-4 text-sm text-gray-500">${createdAt}</td>
+                <td class="px-6 py-4 text-sm font-medium">
+                    <button onclick="showEnrollmentDetails('${enrollment.id}')" 
+                            class="text-indigo-600 hover:text-indigo-900 mr-3">
+                        View
+                    </button>
+                    <button onclick="updateEnrollmentStatus('${enrollment.id}', 'completed')" 
+                            class="text-green-600 hover:text-green-900">
+                        Approve
+                    </button>
+                </td>
+            </tr>
+        `;
+    }).join('');
+
+    enrollmentsList.innerHTML = tableRows;
+}
+
+function filterEnrollments(searchTerm) {
+    renderEnrollmentsFromCache(searchTerm);
+}
+
+function applyEnrollmentFilters() {
+    renderEnrollmentsFromCache(document.getElementById('enrollments-search').value);
+}
+
+// Global function to show enrollment details modal
+window.showEnrollmentDetails = async function(enrollmentId) {
+    try {
+        const enrollmentDoc = await getDoc(doc(db, "enrollments", enrollmentId));
+        if (!enrollmentDoc.exists()) {
+            alert("Enrollment not found!");
+            return;
+        }
+
+        const enrollment = { id: enrollmentDoc.id, ...enrollmentDoc.data() };
+        
+        // Format date
+        const createdAt = enrollment.createdAt ? new Date(enrollment.createdAt).toLocaleString() : 
+                         enrollment.timestamp ? new Date(enrollment.timestamp).toLocaleString() : 'N/A';
+        
+        // Build students details HTML
+        let studentsHTML = '';
+        if (enrollment.students && enrollment.students.length > 0) {
+            studentsHTML = enrollment.students.map(student => {
+                let subjectsHTML = '';
+                if (student.selectedSubjects && student.selectedSubjects.length > 0) {
+                    subjectsHTML = `<p class="text-sm"><strong>Subjects:</strong> ${student.selectedSubjects.join(', ')}</p>`;
+                }
+                
+                let extracurricularHTML = '';
+                if (student.extracurriculars && student.extracurriculars.length > 0) {
+                    extracurricularHTML = `<p class="text-sm"><strong>Extracurricular:</strong> ${student.extracurriculars.map(e => `${e.name} (${e.frequency})`).join(', ')}</p>`;
+                }
+                
+                let testPrepHTML = '';
+                if (student.testPrep && student.testPrep.length > 0) {
+                    testPrepHTML = `<p class="text-sm"><strong>Test Prep:</strong> ${student.testPrep.map(t => `${t.name} (${t.hours} hrs)`).join(', ')}</p>`;
+                }
+                
+                return `
+                    <div class="border rounded-lg p-4 mb-3 bg-gray-50">
+                        <h4 class="font-bold text-lg mb-2">${student.name || 'Unnamed Student'}</h4>
+                        <div class="grid grid-cols-2 gap-2 text-sm">
+                            <p><strong>Grade:</strong> ${student.grade || 'N/A'}</p>
+                            <p><strong>DOB:</strong> ${student.dob || 'N/A'}</p>
+                            <p><strong>Start Date:</strong> ${student.startDate || 'N/A'}</p>
+                        </div>
+                        ${subjectsHTML}
+                        ${extracurricularHTML}
+                        ${testPrepHTML}
+                    </div>
+                `;
+            }).join('');
+        }
+
+        // Build fee breakdown HTML
+        let feeBreakdownHTML = '';
+        if (enrollment.summary) {
+            const summary = enrollment.summary;
+            feeBreakdownHTML = `
+                <div class="grid grid-cols-2 gap-4">
+                    <div class="bg-green-50 p-3 rounded">
+                        <p class="text-sm"><strong>Academic Fees:</strong></p>
+                        <p class="text-lg font-bold">₦${(parseInt(summary.academicFee) || 0).toLocaleString()}</p>
+                    </div>
+                    <div class="bg-blue-50 p-3 rounded">
+                        <p class="text-sm"><strong>Extracurricular:</strong></p>
+                        <p class="text-lg font-bold">₦${(parseInt(summary.extracurricularFee) || 0).toLocaleString()}</p>
+                    </div>
+                    <div class="bg-yellow-50 p-3 rounded">
+                        <p class="text-sm"><strong>Test Prep:</strong></p>
+                        <p class="text-lg font-bold">₦${(parseInt(summary.testPrepFee) || 0).toLocaleString()}</p>
+                    </div>
+                    <div class="bg-red-50 p-3 rounded">
+                        <p class="text-sm"><strong>Discount:</strong></p>
+                        <p class="text-lg font-bold">-₦${(parseInt(summary.discountAmount) || 0).toLocaleString()}</p>
+                    </div>
+                </div>
+                <div class="mt-4 p-4 bg-gray-100 rounded">
+                    <p class="text-xl font-bold text-green-700">Total: ₦${(parseInt(summary.totalFee) || 0).toLocaleString()}</p>
+                </div>
+            `;
+        }
+
+        // Build referral info HTML
+        let referralHTML = '';
+        if (enrollment.referral && enrollment.referral.code) {
+            referralHTML = `
+                <div class="border-l-4 border-green-500 pl-4 bg-green-50 p-3 rounded">
+                    <h4 class="font-bold text-green-700">Referral Information</h4>
+                    <p><strong>Code:</strong> <span class="font-mono">${enrollment.referral.code}</span></p>
+                    ${enrollment.referral.bankName ? `<p><strong>Bank:</strong> ${enrollment.referral.bankName}</p>` : ''}
+                    ${enrollment.referral.accountNumber ? `<p><strong>Account:</strong> ${enrollment.referral.accountNumber}</p>` : ''}
+                    ${enrollment.referral.accountName ? `<p><strong>Account Name:</strong> ${enrollment.referral.accountName}</p>` : ''}
+                </div>
+            `;
+        }
+
+        const modalHtml = `
+            <div id="enrollmentDetailsModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-center justify-center">
+                <div class="relative p-8 bg-white w-full max-w-4xl rounded-lg shadow-2xl">
+                    <button class="absolute top-2 right-2 text-gray-500 hover:text-gray-800 text-2xl font-bold" onclick="closeManagementModal('enrollmentDetailsModal')">&times;</button>
+                    <h3 class="text-2xl font-bold mb-4 text-green-700">Enrollment Details</h3>
+                    
+                    <div class="grid grid-cols-2 gap-6 mb-6">
+                        <div>
+                            <h4 class="font-bold text-lg mb-2">Application Information</h4>
+                            <p><strong>ID:</strong> ${enrollment.id}</p>
+                            <p><strong>Status:</strong> <span class="px-2 py-1 text-xs rounded-full ${enrollment.status === 'completed' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}">${enrollment.status || 'Unknown'}</span></p>
+                            <p><strong>Created:</strong> ${createdAt}</p>
+                            ${enrollment.lastSaved ? `<p><strong>Last Saved:</strong> ${new Date(enrollment.lastSaved).toLocaleString()}</p>` : ''}
+                        </div>
+                        
+                        <div>
+                            <h4 class="font-bold text-lg mb-2">Parent Information</h4>
+                            <p><strong>Name:</strong> ${enrollment.parent?.name || 'N/A'}</p>
+                            <p><strong>Email:</strong> ${enrollment.parent?.email || 'N/A'}</p>
+                            <p><strong>Phone:</strong> ${enrollment.parent?.phone || 'N/A'}</p>
+                            <p><strong>Address:</strong> ${enrollment.parent?.address || 'N/A'}</p>
+                        </div>
+                    </div>
+                    
+                    ${referralHTML}
+                    
+                    <div class="mt-6">
+                        <h4 class="font-bold text-lg mb-2">Student Information (${enrollment.students?.length || 0} students)</h4>
+                        ${studentsHTML || '<p class="text-gray-500">No student information available.</p>'}
+                    </div>
+                    
+                    <div class="mt-6">
+                        <h4 class="font-bold text-lg mb-2">Fee Breakdown</h4>
+                        ${feeBreakdownHTML || '<p class="text-gray-500">No fee breakdown available.</p>'}
+                    </div>
+                    
+                    <div class="flex justify-end space-x-3 mt-6 pt-6 border-t">
+                        <button onclick="closeManagementModal('enrollmentDetailsModal')" class="px-4 py-2 bg-gray-300 text-gray-700 rounded hover:bg-gray-400">Close</button>
+                        <button onclick="updateEnrollmentStatus('${enrollment.id}', 'completed')" class="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700">Mark as Completed</button>
+                        <button onclick="updateEnrollmentStatus('${enrollment.id}', 'payment_received')" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">Mark Payment Received</button>
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        document.body.insertAdjacentHTML('beforeend', modalHtml);
+        
+    } catch (error) {
+        console.error("Error showing enrollment details:", error);
+        alert("Failed to load enrollment details. Please try again.");
+    }
+};
+
+// Global function to update enrollment status
+window.updateEnrollmentStatus = async function(enrollmentId, newStatus) {
+    if (!confirm(`Are you sure you want to update this enrollment status to '${newStatus}'?`)) {
+        return;
+    }
+
+    try {
+        await updateDoc(doc(db, "enrollments", enrollmentId), {
+            status: newStatus,
+            lastUpdated: Timestamp.now()
+        });
+
+        alert(`Enrollment status updated to ${newStatus}.`);
+        
+        // Refresh the enrollments list
+        invalidateCache('enrollments');
+        closeManagementModal('enrollmentDetailsModal');
+        await fetchAndRenderEnrollments();
+        
+    } catch (error) {
+        console.error("Error updating enrollment status:", error);
+        alert("Failed to update enrollment status. Please try again.");
+    }
+};
 
 // ##################################
 // # PANEL RENDERING FUNCTIONS
@@ -2713,7 +3145,8 @@ const allNavItems = {
     navSummerBreak: { fn: renderSummerBreakPanel, perm: 'viewSummerBreak', label: 'Summer Break' },
     navPendingApprovals: { fn: renderPendingApprovalsPanel, perm: 'viewPendingApprovals', label: 'Pending Approvals' },
     navParentFeedback: { fn: renderParentFeedbackPanel, perm: 'viewParentFeedback', label: 'Parent Feedback' },
-    navReferralsAdmin: { fn: renderReferralsAdminPanel, perm: 'viewReferralsAdmin', label: 'Referral Management' }
+    navReferralsAdmin: { fn: renderReferralsAdminPanel, perm: 'viewReferralsAdmin', label: 'Referral Management' },
+    navEnrollments: { fn: renderEnrollmentsPanel, perm: 'viewEnrollments', label: 'Enrollments' } // NEW: Added enrollments tab
 };
 
 // Global modal close function
@@ -2818,13 +3251,3 @@ onAuthStateChanged(auth, async (user) => {
 });
 
 // [End Updated management.js File]
-
-
-
-
-
-
-
-
-
-
