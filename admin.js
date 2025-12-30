@@ -1,4 +1,4 @@
-// [Begin Updated admin.js File]
+// [Begin Fully Updated admin.js File]
 
 import { auth, db } from './firebaseConfig.js';
 import { collection, getDocs, doc, addDoc, query, where, getDoc, updateDoc, setDoc, deleteDoc, orderBy, writeBatch, Timestamp } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
@@ -52,7 +52,6 @@ function invalidateCache(key) {
 
 loadFromLocalStorage();
 
-
 // --- Utility Functions ---
 function capitalize(str) {
     if (!str) return '';
@@ -88,11 +87,101 @@ async function uploadImageToCloudinary(file) {
 async function updateStaffPermissions(staffEmail, newRole) {
     const staffDocRef = doc(db, "staff", staffEmail);
    const ROLE_PERMISSIONS = {
-    pending: { tabs: { viewTutorManagement: false, viewPayAdvice: false, viewTutorReports: false, viewSummerBreak: false, viewPendingApprovals: false, viewStaffManagement: false, viewParentFeedback: false, viewEnrollments: false }, actions: { canDownloadReports: false, canExportPayAdvice: false, canEndSummerBreak: false, canEditStudents: false, canDeleteStudents: false } },
-    tutor: { tabs: { viewTutorManagement: false, viewPayAdvice: false, viewTutorReports: false, viewSummerBreak: false, viewPendingApprovals: false, viewStaffManagement: false, viewParentFeedback: false, viewEnrollments: false }, actions: { canDownloadReports: false, canExportPayAdvice: false, canEndSummerBreak: false, canEditStudents: false, canDeleteStudents: false } },
-    manager: { tabs: { viewTutorManagement: true, viewPayAdvice: false, viewTutorReports: true, viewSummerBreak: true, viewPendingApprovals: true, viewStaffManagement: false, viewParentFeedback: true, viewEnrollments: true }, actions: { canDownloadReports: false, canExportPayAdvice: false, canEndSummerBreak: false, canEditStudents: true, canDeleteStudents: false } },
-    director: { tabs: { viewTutorManagement: true, viewPayAdvice: true, viewTutorReports: true, viewSummerBreak: true, viewPendingApprovals: true, viewStaffManagement: true, viewParentFeedback: true, viewEnrollments: true }, actions: { canDownloadReports: true, canExportPayAdvice: true, canEndSummerBreak: true, canEditStudents: true, canDeleteStudents: true } },
-    admin: { tabs: { viewTutorManagement: true, viewPayAdvice: true, viewTutorReports: true, viewSummerBreak: true, viewPendingApprovals: true, viewStaffManagement: true, viewParentFeedback: true, viewEnrollments: true }, actions: { canDownloadReports: true, canExportPayAdvice: true, canEndSummerBreak: true, canEditStudents: true, canDeleteStudents: true } }
+    pending: { 
+        tabs: { 
+            viewTutorManagement: false, 
+            viewPayAdvice: false, 
+            viewTutorReports: false, 
+            viewSummerBreak: false, 
+            viewPendingApprovals: false, 
+            viewStaffManagement: false, 
+            viewParentFeedback: false, 
+            viewEnrollments: false 
+        }, 
+        actions: { 
+            canDownloadReports: false, 
+            canExportPayAdvice: false, 
+            canEndSummerBreak: false, 
+            canEditStudents: false, 
+            canDeleteStudents: false 
+        } 
+    },
+    tutor: { 
+        tabs: { 
+            viewTutorManagement: false, 
+            viewPayAdvice: false, 
+            viewTutorReports: false, 
+            viewSummerBreak: false, 
+            viewPendingApprovals: false, 
+            viewStaffManagement: false, 
+            viewParentFeedback: false, 
+            viewEnrollments: false 
+        }, 
+        actions: { 
+            canDownloadReports: false, 
+            canExportPayAdvice: false, 
+            canEndSummerBreak: false, 
+            canEditStudents: false, 
+            canDeleteStudents: false 
+        } 
+    },
+    manager: { 
+        tabs: { 
+            viewTutorManagement: true, 
+            viewPayAdvice: false, 
+            viewTutorReports: true, 
+            viewSummerBreak: true, 
+            viewPendingApprovals: true, 
+            viewStaffManagement: false, 
+            viewParentFeedback: true, 
+            viewEnrollments: true
+        }, 
+        actions: { 
+            canDownloadReports: false, 
+            canExportPayAdvice: false, 
+            canEndSummerBreak: false, 
+            canEditStudents: true, 
+            canDeleteStudents: false 
+        } 
+    },
+    director: { 
+        tabs: { 
+            viewTutorManagement: true, 
+            viewPayAdvice: true, 
+            viewTutorReports: true, 
+            viewSummerBreak: true, 
+            viewPendingApprovals: true, 
+            viewStaffManagement: true, 
+            viewParentFeedback: true, 
+            viewEnrollments: true
+        }, 
+        actions: { 
+            canDownloadReports: true, 
+            canExportPayAdvice: true, 
+            canEndSummerBreak: true, 
+            canEditStudents: true, 
+            canDeleteStudents: true 
+        } 
+    },
+    admin: { 
+        tabs: { 
+            viewTutorManagement: true, 
+            viewPayAdvice: true, 
+            viewTutorReports: true, 
+            viewSummerBreak: true, 
+            viewPendingApprovals: true, 
+            viewStaffManagement: true, 
+            viewParentFeedback: true, 
+            viewEnrollments: true
+        }, 
+        actions: { 
+            canDownloadReports: true, 
+            canExportPayAdvice: true, 
+            canEndSummerBreak: true, 
+            canEditStudents: true, 
+            canDeleteStudents: true 
+        } 
+    }
 };
     const newPermissions = ROLE_PERMISSIONS[newRole];
     if (!newPermissions) {
@@ -2230,23 +2319,33 @@ async function openPermissionsModal(staffId) {
         <div id="permissions-modal" class="fixed inset-0 bg-gray-600 bg-opacity-75 flex items-center justify-center z-50">
             <div class="bg-white rounded-lg shadow-xl p-8 max-w-lg w-full">
                 <h3 class="text-2xl font-bold mb-4">Edit Permissions for ${staffData.name}</h3><p class="text-sm text-gray-500 mb-4">Current Role: <span class="font-semibold">${capitalize(staffData.role)}</span></p>
-                <div class="space-y-4"><div class="border-t pt-4"><h4 class="font-semibold mb-2">Tab Visibility:</h4><div class="grid grid-cols-2 gap-2">
-   
-                     <label class="flex items-center"><input type="checkbox" id="p-viewTutorManagement" class="mr-2" ${permissions.tabs?.viewTutorManagement ? 'checked' : ''}> Tutor & Student List</label>
-                    <label class="flex items-center"><input type="checkbox" id="p-viewPayAdvice" class="mr-2" ${permissions.tabs?.viewPayAdvice ? 'checked' : ''}> Pay Advice</label>
-                    <label class="flex items-center"><input type="checkbox" id="p-viewTutorReports" class="mr-2" ${permissions.tabs?.viewTutorReports ? 'checked' : ''}> Tutor Reports</label>
-                    <label class="flex items-center"><input type="checkbox" id="p-viewSummerBreak" class="mr-2" ${permissions.tabs?.viewSummerBreak ? 'checked' : ''}> Summer Break</label>
-                    <label class="flex items-center"><input type="checkbox" id="p-viewPendingApprovals" class="mr-2" ${permissions.tabs?.viewPendingApprovals ? 'checked' : ''}> Pending Approvals</label>
-                    <label class="flex items-center"><input type="checkbox" id="p-viewStaffManagement" class="mr-2" ${permissions.tabs?.viewStaffManagement ? 'checked' : ''}> Staff Management</label>
-                    <label class="flex items-center"><input type="checkbox" id="p-viewParentFeedback" class="mr-2" ${permissions.tabs?.viewParentFeedback ? 'checked' : ''}> Parent Feedback</label>
-                </div></div><div class="border-t pt-4"><h4 class="font-semibold mb-2">Specific Actions:</h4>
-                    <label class="flex items-center"><input type="checkbox" id="p-canDownloadReports" class="mr-2" ${permissions.actions?.canDownloadReports ? 'checked' : ''}> Can Download Reports</label>
-                    <label class="flex items-center"><input type="checkbox" id="p-canExportPayAdvice" class="mr-2" ${permissions.actions?.canExportPayAdvice ? 'checked' : ''}> Can Export Pay Advice</label>
-                    <label class="flex items-center"><input type="checkbox" id="p-canEndSummerBreak" class="mr-2" ${permissions.actions?.canEndSummerBreak ? 'checked' : ''}> Can End Summer Break</label>
-                    <label class="flex items-center"><input type="checkbox" id="p-canEditStudents" class="mr-2" ${permissions.actions?.canEditStudents ? 'checked' : ''}> Can Edit Students</label>
-                    <label class="flex items-center"><input type="checkbox" id="p-canDeleteStudents" class="mr-2" ${permissions.actions?.canDeleteStudents ? 'checked' : ''}> Can Delete Students</label>
-                </div></div>
-                <div class="flex justify-end space-x-4 mt-6"><button id="cancel-permissions" class="bg-gray-300 px-4 py-2 rounded">Cancel</button><button id="save-permissions" class="bg-green-600 text-white px-4 py-2 rounded">Save Changes</button></div>
+                <div class="space-y-4">
+                    <div class="border-t pt-4">
+                        <h4 class="font-semibold mb-2">Tab Visibility:</h4>
+                        <div class="grid grid-cols-2 gap-2">
+                            <label class="flex items-center"><input type="checkbox" id="p-viewTutorManagement" class="mr-2" ${permissions.tabs?.viewTutorManagement ? 'checked' : ''}> Tutor & Student List</label>
+                            <label class="flex items-center"><input type="checkbox" id="p-viewPayAdvice" class="mr-2" ${permissions.tabs?.viewPayAdvice ? 'checked' : ''}> Pay Advice</label>
+                            <label class="flex items-center"><input type="checkbox" id="p-viewTutorReports" class="mr-2" ${permissions.tabs?.viewTutorReports ? 'checked' : ''}> Tutor Reports</label>
+                            <label class="flex items-center"><input type="checkbox" id="p-viewSummerBreak" class="mr-2" ${permissions.tabs?.viewSummerBreak ? 'checked' : ''}> Summer Break</label>
+                            <label class="flex items-center"><input type="checkbox" id="p-viewPendingApprovals" class="mr-2" ${permissions.tabs?.viewPendingApprovals ? 'checked' : ''}> Pending Approvals</label>
+                            <label class="flex items-center"><input type="checkbox" id="p-viewStaffManagement" class="mr-2" ${permissions.tabs?.viewStaffManagement ? 'checked' : ''}> Staff Management</label>
+                            <label class="flex items-center"><input type="checkbox" id="p-viewParentFeedback" class="mr-2" ${permissions.tabs?.viewParentFeedback ? 'checked' : ''}> Parent Feedback</label>
+                            <label class="flex items-center"><input type="checkbox" id="p-viewEnrollments" class="mr-2" ${permissions.tabs?.viewEnrollments ? 'checked' : ''}> Enrollments</label>
+                        </div>
+                    </div>
+                    <div class="border-t pt-4">
+                        <h4 class="font-semibold mb-2">Specific Actions:</h4>
+                        <label class="flex items-center"><input type="checkbox" id="p-canDownloadReports" class="mr-2" ${permissions.actions?.canDownloadReports ? 'checked' : ''}> Can Download Reports</label>
+                        <label class="flex items-center"><input type="checkbox" id="p-canExportPayAdvice" class="mr-2" ${permissions.actions?.canExportPayAdvice ? 'checked' : ''}> Can Export Pay Advice</label>
+                        <label class="flex items-center"><input type="checkbox" id="p-canEndSummerBreak" class="mr-2" ${permissions.actions?.canEndSummerBreak ? 'checked' : ''}> Can End Summer Break</label>
+                        <label class="flex items-center"><input type="checkbox" id="p-canEditStudents" class="mr-2" ${permissions.actions?.canEditStudents ? 'checked' : ''}> Can Edit Students</label>
+                        <label class="flex items-center"><input type="checkbox" id="p-canDeleteStudents" class="mr-2" ${permissions.actions?.canDeleteStudents ? 'checked' : ''}> Can Delete Students</label>
+                    </div>
+                </div>
+                <div class="flex justify-end space-x-4 mt-6">
+                    <button id="cancel-permissions" class="bg-gray-300 px-4 py-2 rounded">Cancel</button>
+                    <button id="save-permissions" class="bg-green-600 text-white px-4 py-2 rounded">Save Changes</button>
+                </div>
             </div>
         </div>
     `;
@@ -2255,8 +2354,23 @@ async function openPermissionsModal(staffId) {
     document.getElementById('cancel-permissions').addEventListener('click', closeModal);
     document.getElementById('save-permissions').addEventListener('click', async () => {
         const newPermissions = {
-            tabs: { viewTutorManagement: document.getElementById('p-viewTutorManagement').checked, viewPayAdvice: document.getElementById('p-viewPayAdvice').checked, viewTutorReports: document.getElementById('p-viewTutorReports').checked, viewSummerBreak: document.getElementById('p-viewSummerBreak').checked, viewPendingApprovals: document.getElementById('p-viewPendingApprovals').checked, viewStaffManagement: document.getElementById('p-viewStaffManagement').checked, viewParentFeedback: document.getElementById('p-viewParentFeedback').checked },
-            actions: { canDownloadReports: document.getElementById('p-canDownloadReports').checked, canExportPayAdvice: document.getElementById('p-canExportPayAdvice').checked, canEndSummerBreak: document.getElementById('p-canEndSummerBreak').checked, canEditStudents: document.getElementById('p-canEditStudents').checked, canDeleteStudents: document.getElementById('p-canDeleteStudents').checked }
+            tabs: { 
+                viewTutorManagement: document.getElementById('p-viewTutorManagement').checked, 
+                viewPayAdvice: document.getElementById('p-viewPayAdvice').checked, 
+                viewTutorReports: document.getElementById('p-viewTutorReports').checked, 
+                viewSummerBreak: document.getElementById('p-viewSummerBreak').checked, 
+                viewPendingApprovals: document.getElementById('p-viewPendingApprovals').checked, 
+                viewStaffManagement: document.getElementById('p-viewStaffManagement').checked, 
+                viewParentFeedback: document.getElementById('p-viewParentFeedback').checked,
+                viewEnrollments: document.getElementById('p-viewEnrollments').checked
+            },
+            actions: { 
+                canDownloadReports: document.getElementById('p-canDownloadReports').checked, 
+                canExportPayAdvice: document.getElementById('p-canExportPayAdvice').checked, 
+                canEndSummerBreak: document.getElementById('p-canEndSummerBreak').checked, 
+                canEditStudents: document.getElementById('p-canEditStudents').checked, 
+                canDeleteStudents: document.getElementById('p-canDeleteStudents').checked 
+            }
         };
         await updateDoc(doc(db, "staff", staffId), { permissions: newPermissions });
         alert("Custom permissions saved successfully!");
@@ -2310,10 +2424,14 @@ onAuthStateChanged(auth, async (user) => {
     if (user && user.email === ADMIN_EMAIL) {
         mainContent.innerHTML = '';
         const navItems = {
-            navDashboard: renderAdminPanel, navContent: renderContentManagerPanel, navTutorManagement: renderTutorManagementPanel,
-            navPayAdvice: renderPayAdvicePanel, navTutorReports: renderTutorReportsPanel, navSummerBreak: renderSummerBreakPanel,
-  
-             navStaff: renderStaffPanel, navPendingApprovals: renderPendingApprovalsPanel
+            navDashboard: renderAdminPanel, 
+            navContent: renderContentManagerPanel, 
+            navTutorManagement: renderTutorManagementPanel,
+            navPayAdvice: renderPayAdvicePanel, 
+            navTutorReports: renderTutorReportsPanel, 
+            navSummerBreak: renderSummerBreakPanel,
+            navStaff: renderStaffPanel, 
+            navPendingApprovals: renderPendingApprovalsPanel
         };
         const setActiveNav = (activeId) => Object.keys(navItems).forEach(id => {
             document.getElementById(id)?.classList.toggle('active', id === activeId);
@@ -2321,7 +2439,10 @@ onAuthStateChanged(auth, async (user) => {
         Object.entries(navItems).forEach(([id, renderFn]) => {
             const navElement = document.getElementById(id);
             if (navElement) {
-                navElement.addEventListener('click', () => { setActiveNav(id); renderFn(mainContent); });
+                navElement.addEventListener('click', () => { 
+                    setActiveNav(id); 
+                    renderFn(mainContent); 
+                });
             }
         });
         setActiveNav('navDashboard');
@@ -2333,19 +2454,4 @@ onAuthStateChanged(auth, async (user) => {
     }
 });
 
-
-// [End Updated admin.js File]
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+// [End Fully Updated admin.js File]
