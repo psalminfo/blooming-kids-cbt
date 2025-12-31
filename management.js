@@ -1017,6 +1017,27 @@ function renderEnrollmentsFromCache(searchTerm = '') {
         return;
     }
 
+    // Helper function to parse fee values consistently
+    function parseFeeValue(feeValue) {
+        if (!feeValue && feeValue !== 0) return 0;
+        
+        if (typeof feeValue === 'number') {
+            return Math.round(feeValue);
+        }
+        
+        if (typeof feeValue === 'string') {
+            // Remove all non-numeric characters except decimal point and minus sign
+            const cleaned = feeValue
+                .replace(/[^0-9.-]/g, '')
+                .trim();
+            
+            const parsed = parseFloat(cleaned);
+            return isNaN(parsed) ? 0 : Math.round(parsed);
+        }
+        
+        return 0;
+    }
+
     // Render enrollments table
     const tableRows = filteredEnrollments.map(enrollment => {
         const createdAt = enrollment.createdAt ? new Date(enrollment.createdAt).toLocaleDateString() : 
@@ -1042,11 +1063,9 @@ function renderEnrollmentsFromCache(searchTerm = '') {
                 statusBadge = `<span class="px-2 py-1 text-xs rounded-full bg-gray-100 text-gray-800">${enrollment.status || 'Unknown'}</span>`;
         }
         
-        // Total fee
-        const totalFee = enrollment.summary?.totalFee || 
-                        (enrollment.summary && typeof enrollment.summary.totalFee === 'string' ? 
-                         enrollment.summary.totalFee.replace('₦', '').replace(/,/g, '') : 0);
-        const formattedFee = totalFee ? `₦${parseInt(totalFee).toLocaleString()}` : '₦0';
+        // Total fee - Use consistent parsing
+        const totalFeeAmount = parseFeeValue(enrollment.summary?.totalFee);
+        const formattedFee = totalFeeAmount > 0 ? `₦${totalFeeAmount.toLocaleString()}` : '₦0';
         
         // Referral code
         const referralCode = enrollment.referral?.code || 'None';
@@ -1147,31 +1166,60 @@ window.showEnrollmentDetails = async function(enrollmentId) {
             }).join('');
         }
 
+        // Helper function to parse fee values consistently
+        function parseFeeValue(feeValue) {
+            if (!feeValue && feeValue !== 0) return 0;
+            
+            if (typeof feeValue === 'number') {
+                return Math.round(feeValue);
+            }
+            
+            if (typeof feeValue === 'string') {
+                // Remove all non-numeric characters except decimal point and minus sign
+                const cleaned = feeValue
+                    .replace(/[^0-9.-]/g, '')
+                    .trim();
+                
+                const parsed = parseFloat(cleaned);
+                return isNaN(parsed) ? 0 : Math.round(parsed);
+            }
+            
+            return 0;
+        }
+
         // Build fee breakdown HTML
         let feeBreakdownHTML = '';
         if (enrollment.summary) {
             const summary = enrollment.summary;
+            
+            // Parse all fee values consistently
+            const academicFee = parseFeeValue(summary.academicFee);
+            const extracurricularFee = parseFeeValue(summary.extracurricularFee);
+            const testPrepFee = parseFeeValue(summary.testPrepFee);
+            const discountAmount = parseFeeValue(summary.discountAmount);
+            const totalFee = parseFeeValue(summary.totalFee);
+            
             feeBreakdownHTML = `
                 <div class="grid grid-cols-2 gap-4">
                     <div class="bg-green-50 p-3 rounded">
                         <p class="text-sm"><strong>Academic Fees:</strong></p>
-                        <p class="text-lg font-bold">₦${(parseInt(summary.academicFee) || 0).toLocaleString()}</p>
+                        <p class="text-lg font-bold">₦${academicFee.toLocaleString()}</p>
                     </div>
                     <div class="bg-blue-50 p-3 rounded">
                         <p class="text-sm"><strong>Extracurricular:</strong></p>
-                        <p class="text-lg font-bold">₦${(parseInt(summary.extracurricularFee) || 0).toLocaleString()}</p>
+                        <p class="text-lg font-bold">₦${extracurricularFee.toLocaleString()}</p>
                     </div>
                     <div class="bg-yellow-50 p-3 rounded">
                         <p class="text-sm"><strong>Test Prep:</strong></p>
-                        <p class="text-lg font-bold">₦${(parseInt(summary.testPrepFee) || 0).toLocaleString()}</p>
+                        <p class="text-lg font-bold">₦${testPrepFee.toLocaleString()}</p>
                     </div>
                     <div class="bg-red-50 p-3 rounded">
                         <p class="text-sm"><strong>Discount:</strong></p>
-                        <p class="text-lg font-bold">-₦${(parseInt(summary.discountAmount) || 0).toLocaleString()}</p>
+                        <p class="text-lg font-bold">-₦${discountAmount.toLocaleString()}</p>
                     </div>
                 </div>
                 <div class="mt-4 p-4 bg-gray-100 rounded">
-                    <p class="text-xl font-bold text-green-700">Total: ₦${(parseInt(summary.totalFee) || 0).toLocaleString()}</p>
+                    <p class="text-xl font-bold text-green-700">Total: ₦${totalFee.toLocaleString()}</p>
                 </div>
             `;
         }
@@ -3251,3 +3299,4 @@ onAuthStateChanged(auth, async (user) => {
 });
 
 // [End Updated management.js File]
+
