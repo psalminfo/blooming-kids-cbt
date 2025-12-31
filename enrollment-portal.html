@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1423,7 +1424,7 @@
 
     <script>
         // ==============================================
-        // COMPLETE UPDATED VERSION - FIXED PRORATION AND FEE DISPLAY
+        // COMPLETE UPDATED VERSION - FIXED PRORATION AND SAVE/RESUME
         // ==============================================
 
         // CONFIGURATION
@@ -1952,15 +1953,7 @@
             // ==============================================
             
             calculateProratedAmount(totalAcademicFee, startDate) {
-                if (!startDate || totalAcademicFee === 0) {
-                    return {
-                        toPay: totalAcademicFee,
-                        deduction: 0,
-                        daysRemaining: 0,
-                        daysInMonth: 0,
-                        dayOfMonth: 0
-                    };
-                }
+                if (!startDate || totalAcademicFee === 0) return totalAcademicFee; // Return full fee if no proration needed
                 
                 try {
                     const start = new Date(startDate);
@@ -1968,13 +1961,7 @@
                     
                     // If starting on or before the 6th, no proration - pay full fee
                     if (dayOfMonth <= CONFIG.CONSTANTS.FULL_FEE_THRESHOLD_DAY) {
-                        return {
-                            toPay: totalAcademicFee,
-                            deduction: 0,
-                            daysRemaining: 0,
-                            daysInMonth: 0,
-                            dayOfMonth: dayOfMonth
-                        };
+                        return totalAcademicFee; // Return full amount to pay
                     }
                     
                     // Calculate days in the starting month
@@ -2125,8 +2112,8 @@
                 if (hasAcademicSelection && earliestStartDate) {
                     const prorationResult = this.calculateProratedAmount(totalAcademicFeeAllStudents, earliestStartDate);
                     
-                    proratedAmountToPay = prorationResult.toPay || 0;
-                    prorationDeduction = prorationResult.deduction || 0;
+                    proratedAmountToPay = prorationResult.toPay;
+                    prorationDeduction = prorationResult.deduction;
                     
                     if (prorationDeduction > 0) {
                         prorationExplanation = `Starting on day ${prorationResult.dayOfMonth} of month (${prorationResult.daysInMonth} days). Charged for ${prorationResult.daysRemaining} days.`;
@@ -2158,16 +2145,6 @@
                                extracurricularTotal, testPrepTotal, discount, 
                                proratedDeduction, totalPayable = 0, prorationExplanation = '') {
                 
-                // Ensure all values are numbers
-                academicBaseTotal = Number(academicBaseTotal) || 0;
-                additionalSubjectsTotal = Number(additionalSubjectsTotal) || 0;
-                totalAcademicFee = Number(totalAcademicFee) || 0;
-                extracurricularTotal = Number(extracurricularTotal) || 0;
-                testPrepTotal = Number(testPrepTotal) || 0;
-                discount = Number(discount) || 0;
-                proratedDeduction = Number(proratedDeduction) || 0;
-                totalPayable = Number(totalPayable) || 0;
-                
                 document.getElementById('academic-base-fee').textContent = `₦${academicBaseTotal.toLocaleString()}`;
                 document.getElementById('additional-subjects-fee').textContent = `+₦${additionalSubjectsTotal.toLocaleString()}`;
                 document.getElementById('total-academic-fee').textContent = `₦${totalAcademicFee.toLocaleString()}`;
@@ -2187,7 +2164,19 @@
                     document.getElementById('proration-explanation').textContent = '';
                 }
                 
-                document.getElementById('total-fee').textContent = `₦${Math.round(totalPayable).toLocaleString()}`;
+                if (totalPayable > 0) {
+                    document.getElementById('total-fee').textContent = `₦${Math.round(totalPayable).toLocaleString()}`;
+                } else {
+                    // Calculate fallback total if not provided
+                    const calculatedTotal = Math.max(0, 
+                        totalAcademicFee + 
+                        extracurricularTotal + 
+                        testPrepTotal - 
+                        discount - 
+                        proratedDeduction
+                    );
+                    document.getElementById('total-fee').textContent = `₦${Math.round(calculatedTotal).toLocaleString()}`;
+                }
             }
 
             // ==============================================
@@ -2363,36 +2352,6 @@
             }
             
             collectFormData() {
-                // Get the total fee as a clean number
-                const totalFeeElement = document.getElementById('total-fee');
-                const totalFeeText = totalFeeElement ? totalFeeElement.textContent : '₦0';
-                const totalFeeValue = parseInt(totalFeeText.replace(/[^0-9]/g, '')) || 0;
-                
-                // Get academic fee
-                const academicFeeElement = document.getElementById('total-academic-fee');
-                const academicFeeText = academicFeeElement ? academicFeeElement.textContent : '₦0';
-                const academicFeeValue = parseInt(academicFeeText.replace(/[^0-9]/g, '')) || 0;
-                
-                // Get extracurricular fee
-                const extracurricularFeeElement = document.getElementById('total-extracurricular-fee');
-                const extracurricularFeeText = extracurricularFeeElement ? extracurricularFeeElement.textContent : '₦0';
-                const extracurricularFeeValue = parseInt(extracurricularFeeText.replace(/[^0-9]/g, '')) || 0;
-                
-                // Get test prep fee
-                const testPrepFeeElement = document.getElementById('total-test-prep-fee');
-                const testPrepFeeText = testPrepFeeElement ? testPrepFeeElement.textContent : '₦0';
-                const testPrepFeeValue = parseInt(testPrepFeeText.replace(/[^0-9]/g, '')) || 0;
-                
-                // Get prorated amount
-                const proratedElement = document.getElementById('prorated-amount');
-                const proratedText = proratedElement ? proratedElement.textContent : '-₦0';
-                const proratedValue = parseInt(proratedText.replace(/[^0-9]/g, '')) || 0;
-                
-                // Get discount amount
-                const discountElement = document.getElementById('discount-amount');
-                const discountText = discountElement ? discountElement.textContent : '-₦0';
-                const discountValue = parseInt(discountText.replace(/[^0-9]/g, '')) || 0;
-                
                 const data = {
                     parent: {
                         name: document.getElementById('parentName').value,
@@ -2408,12 +2367,12 @@
                     },
                     students: [],
                     summary: {
-                        totalFee: totalFeeValue,
-                        academicFee: academicFeeValue,
-                        extracurricularFee: extracurricularFeeValue,
-                        testPrepFee: testPrepFeeValue,
-                        proratedAmount: proratedValue,
-                        discountAmount: discountValue
+                        totalFee: document.getElementById('total-fee') ? document.getElementById('total-fee').textContent.replace('₦', '').replace(/,/g, '') : '0',
+                        academicFee: document.getElementById('total-academic-fee') ? document.getElementById('total-academic-fee').textContent.replace('₦', '').replace(/,/g, '') : '0',
+                        extracurricularFee: document.getElementById('total-extracurricular-fee') ? document.getElementById('total-extracurricular-fee').textContent.replace('₦', '').replace(/,/g, '') : '0',
+                        testPrepFee: document.getElementById('total-test-prep-fee') ? document.getElementById('total-test-prep-fee').textContent.replace('₦', '').replace(/,/g, '') : '0',
+                        proratedAmount: document.getElementById('prorated-amount') ? document.getElementById('prorated-amount').textContent.replace('₦', '').replace(/,/g, '').replace('-', '') : '0',
+                        discountAmount: document.getElementById('discount-amount') ? document.getElementById('discount-amount').textContent.replace('₦', '').replace(/,/g, '').replace('-', '') : '0'
                     },
                     timestamp: new Date().toISOString()
                 };
