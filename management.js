@@ -19,7 +19,7 @@ const sessionCache = {
     parentFeedback: null,
     referralDataMap: null,
     enrollments: null,
-    tutorAssignments: null, // NEW: Cache for tutor assignment history
+    tutorAssignments: null,
 };
 
 /**
@@ -204,7 +204,7 @@ function showEditStudentModal(studentId, studentData, collectionName) {
             // Invalidate the cache to force a refresh of the main view
             if (collectionName === 'students') {
                 invalidateCache('students');
-                invalidateCache('tutorAssignments'); // Invalidate tutor assignments cache
+                invalidateCache('tutorAssignments');
             }
             if (collectionName === 'pending_students') invalidateCache('pendingStudents');
             
@@ -283,7 +283,6 @@ function showAssignStudentModal() {
             status: 'approved',
             summerBreak: false,
             createdAt: Timestamp.now(),
-            // NEW: Initialize tutor history
             tutorHistory: [{
                 tutorEmail: selectedTutorData.email,
                 tutorName: selectedTutorData.name,
@@ -291,7 +290,6 @@ function showAssignStudentModal() {
                 assignedBy: window.userData?.email || 'management',
                 isCurrent: true
             }],
-            // NEW: Initialize grade history
             gradeHistory: [{
                 grade: form.elements['assign-grade'].value,
                 changedDate: Timestamp.now(),
@@ -553,7 +551,7 @@ async function handleRejectStudent(studentId) {
 }
 
 // ##################################
-// # REFERRAL MANAGEMENT FUNCTIONS - FIXED PARENT NAMES
+// # REFERRAL MANAGEMENT FUNCTIONS - FIXED
 // ##################################
 
 /**
@@ -564,56 +562,22 @@ function formatNaira(amount) {
 }
 
 /**
- * FIXED: Enhanced function to get parent name from multiple sources
+ * FIXED: Simple function to get parent name from parent_users collection
  */
-async function getParentNameFromMultipleSources(parentEmail, parentUid) {
+async function getParentNameFromParentUsers(parentUid) {
     try {
-        // 1. Try to get from parent_users collection first
-        if (parentUid) {
-            const parentDoc = await getDoc(doc(db, 'parent_users', parentUid));
-            if (parentDoc.exists()) {
-                const parentData = parentDoc.data();
-                if (parentData.name && parentData.name.trim() !== '') {
-                    return capitalize(parentData.name);
-                }
-            }
-        }
+        if (!parentUid) return 'Unknown Parent';
         
-        // 2. Try to get from tutor_submissions (where parent names are often stored)
-        if (parentEmail) {
-            const submissionsQuery = query(
-                collection(db, 'tutor_submissions'),
-                where('parentEmail', '==', parentEmail),
-                limit(1)
-            );
-            const submissionsSnapshot = await getDocs(submissionsQuery);
-            if (!submissionsSnapshot.empty) {
-                const submissionData = submissionsSnapshot.docs[0].data();
-                if (submissionData.parentName && submissionData.parentName.trim() !== '') {
-                    return capitalize(submissionData.parentName);
-                }
-            }
+        const parentDoc = await getDoc(doc(db, 'parent_users', parentUid));
+        if (parentDoc.exists()) {
+            const parentData = parentDoc.data();
+            // Try parentName first, then name, then fallback to email
+            return capitalize(parentData.parentName || parentData.name || parentData.email || 'Unknown Parent');
         }
-        
-        // 3. Try to get from enrollments (where parent info is comprehensive)
-        const enrollmentsQuery = query(
-            collection(db, 'enrollments'),
-            where('parent.email', '==', parentEmail),
-            limit(1)
-        );
-        const enrollmentsSnapshot = await getDocs(enrollmentsQuery);
-        if (!enrollmentsSnapshot.empty) {
-            const enrollmentData = enrollmentsSnapshot.docs[0].data();
-            if (enrollmentData.parent?.name && enrollmentData.parent.name.trim() !== '') {
-                return capitalize(enrollmentData.parent.name);
-            }
-        }
-        
-        // 4. Fallback to email or UID
-        return parentEmail || parentUid || 'Unknown Parent';
+        return 'Unknown Parent';
     } catch (error) {
         console.error("Error fetching parent name:", error);
-        return parentEmail || parentUid || 'Unknown Parent';
+        return 'Unknown Parent';
     }
 }
 
@@ -624,22 +588,19 @@ async function renderReferralsAdminPanel(container) {
     container.innerHTML = '<div class="text-center py-8"><div class="loading-spinner mx-auto" style="width: 40px; height: 40px;"></div><p class="text-green-600 font-semibold mt-4">Loading referral tracking data...</p></div>';
 
     try {
-        // 1. Fetch all parents with referral codes and all referral transactions
+        // 1. Fetch all parents with referral codes
         const parentsQuery = query(collection(db, 'parent_users'), where('referralCode', '!=', null));
-        const [parentsSnapshot, transactionsSnapshot] = await Promise.all([
-            getDocs(parentsQuery),
-            getDocs(collection(db, 'referral_transactions'))
-        ]);
+        const parentsSnapshot = await getDocs(parentsQuery);
 
         const referralDataMap = {};
 
-        // 2. Process Parents with enhanced name fetching
+        // 2. Process Parents - use parentName directly from parent_users
         for (const parentDoc of parentsSnapshot.docs) {
             const data = parentDoc.data();
             const parentUid = parentDoc.id;
             
-            // Get parent name from multiple sources
-            const parentName = await getParentNameFromMultipleSources(data.email, parentUid);
+            // Get parent name from parent_users collection directly
+            const parentName = capitalize(data.parentName || data.name || data.email || 'Unknown Parent');
             
             referralDataMap[parentUid] = {
                 uid: parentUid,
@@ -657,21 +618,9 @@ async function renderReferralsAdminPanel(container) {
             };
         }
 
-        // 3. Process Transactions (Aggregation)
-        // Also fetch enrollments to get referral code usage
-        const enrollmentsSnapshot = await getDocs(collection(db, 'enrollments'));
-        const enrollmentsByReferralCode = {};
+        // 3. Fetch transactions to count referrals
+        const transactionsSnapshot = await getDocs(collection(db, 'referral_transactions'));
         
-        enrollmentsSnapshot.docs.forEach(doc => {
-            const enrollment = doc.data();
-            if (enrollment.referral?.code) {
-                if (!enrollmentsByReferralCode[enrollment.referral.code]) {
-                    enrollmentsByReferralCode[enrollment.referral.code] = [];
-                }
-                enrollmentsByReferralCode[enrollment.referral.code].push(enrollment);
-            }
-        });
-
         transactionsSnapshot.forEach(doc => {
             const data = doc.data();
             const ownerUid = data.ownerUid;
@@ -691,22 +640,10 @@ async function renderReferralsAdminPanel(container) {
             }
         });
 
-        // 4. Update with enrollment referral data
-        Object.values(referralDataMap).forEach(parent => {
-            const enrollmentReferrals = enrollmentsByReferralCode[parent.referralCode] || [];
-            parent.totalReferrals += enrollmentReferrals.length;
-            parent.pendingReferrals += enrollmentReferrals.filter(e => 
-                e.status === 'pending' || e.status === 'draft'
-            ).length;
-            parent.approvedReferrals += enrollmentReferrals.filter(e => 
-                e.status === 'completed' || e.status === 'payment_received'
-            ).length;
-        });
-
-        // Store in cache for quick modal access
+        // Store in cache
         saveToLocalStorage('referralDataMap', referralDataMap);
 
-        // 5. Render HTML
+        // 4. Render HTML
         let tableRows = '';
         const sortedParents = Object.values(referralDataMap).sort((a, b) => b.referralEarnings - a.referralEarnings);
 
@@ -757,7 +694,6 @@ async function renderReferralsAdminPanel(container) {
             </div>
         `;
 
-        // Attach global functions to the window object
         window.showReferralDetailsModal = showReferralDetailsModal;
     } catch (error) {
         console.error("Error loading referral data: ", error);
@@ -901,7 +837,6 @@ async function updateReferralStatus(parentUid, transactionId, newStatus) {
         // If paying (approved -> paid), earnings are cleared in the resetParentBalance function, not here.
 
         if (earningsChange !== 0) {
-            // Note: Firebase server-side increment would be safer here, but for simplicity, we use an update
             const currentEarnings = sessionCache.referralDataMap[parentUid].referralEarnings;
             batch.update(parentRef, {
                 referralEarnings: currentEarnings + earningsChange
@@ -981,10 +916,10 @@ async function resetParentBalance(parentUid, currentEarnings) {
 }
 
 // ##################################
-// # ENROLLMENT MANAGEMENT PANEL - ENHANCED WITH TUTOR HISTORY
+// # ENROLLMENT MANAGEMENT PANEL
 // ##################################
 
-// NEW: Function to fetch tutor assignment history for students
+// Function to fetch tutor assignment history for students
 async function fetchTutorAssignmentHistory() {
     try {
         const studentsSnapshot = await getDocs(collection(db, "students"));
@@ -1036,7 +971,7 @@ async function fetchTutorAssignmentHistory() {
     }
 }
 
-// NEW: Function to display tutor history for a student
+// Function to display tutor history for a student
 function showTutorHistoryModal(studentId, studentData, tutorAssignments) {
     const studentHistory = tutorAssignments[studentId];
     if (!studentHistory) {
@@ -1146,7 +1081,7 @@ function showTutorHistoryModal(studentId, studentData, tutorAssignments) {
     document.body.insertAdjacentHTML('beforeend', modalHtml);
 }
 
-// ENHANCED: Enrollment panel with tutor history
+// Enrollment panel
 async function renderEnrollmentsPanel(container) {
     container.innerHTML = `
         <div class="bg-white p-6 rounded-lg shadow-md">
@@ -1155,7 +1090,6 @@ async function renderEnrollmentsPanel(container) {
                 <div class="flex items-center gap-4">
                     <input type="search" id="enrollments-search" placeholder="Search enrollments..." class="p-2 border rounded-md w-64">
                     <button id="refresh-enrollments-btn" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Refresh</button>
-                    <button id="view-tutor-history-btn" class="bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700 hidden">View Tutor History</button>
                 </div>
             </div>
             
@@ -1173,8 +1107,8 @@ async function renderEnrollmentsPanel(container) {
                     <p id="pending-enrollments" class="text-2xl font-extrabold">0</p>
                 </div>
                 <div class="bg-purple-100 p-3 rounded-lg text-center shadow w-full">
-                    <h4 class="font-bold text-purple-800 text-sm">With Tutor History</h4>
-                    <p id="history-enrollments" class="text-2xl font-extrabold">0</p>
+                    <h4 class="font-bold text-purple-800 text-sm">Completed</h4>
+                    <p id="completed-enrollments" class="text-2xl font-extrabold">0</p>
                 </div>
             </div>
 
@@ -1189,11 +1123,6 @@ async function renderEnrollmentsPanel(container) {
                     </select>
                     <input type="date" id="date-from" class="p-2 border rounded-md" placeholder="From Date">
                     <input type="date" id="date-to" class="p-2 border rounded-md" placeholder="To Date">
-                    <select id="referral-filter" class="p-2 border rounded-md">
-                        <option value="">All Referrals</option>
-                        <option value="with_referral">With Referral Code</option>
-                        <option value="without_referral">Without Referral Code</option>
-                    </select>
                 </div>
             </div>
 
@@ -1206,7 +1135,6 @@ async function renderEnrollmentsPanel(container) {
                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Students</th>
                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total Fee</th>
                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Referral Code</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Assigned Tutor(s)</th>
                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Created</th>
                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
@@ -1214,7 +1142,7 @@ async function renderEnrollmentsPanel(container) {
                     </thead>
                     <tbody id="enrollments-list" class="bg-white divide-y divide-gray-200">
                         <tr>
-                            <td colspan="9" class="px-6 py-4 text-center text-gray-500">Loading enrollments...</td>
+                            <td colspan="8" class="px-6 py-4 text-center text-gray-500">Loading enrollments...</td>
                         </tr>
                     </tbody>
                 </table>
@@ -1228,25 +1156,22 @@ async function renderEnrollmentsPanel(container) {
     document.getElementById('status-filter').addEventListener('change', applyEnrollmentFilters);
     document.getElementById('date-from').addEventListener('change', applyEnrollmentFilters);
     document.getElementById('date-to').addEventListener('change', applyEnrollmentFilters);
-    document.getElementById('referral-filter').addEventListener('change', applyEnrollmentFilters);
 
     // Load initial data
-    await fetchAndRenderEnrollments();
+    fetchAndRenderEnrollments();
 }
 
 async function fetchAndRenderEnrollments(forceRefresh = false) {
     if (forceRefresh) {
         invalidateCache('enrollments');
-        invalidateCache('tutorAssignments');
     }
 
     const enrollmentsList = document.getElementById('enrollments-list');
     if (!enrollmentsList) return;
 
     try {
-        // Fetch enrollments data
         if (!sessionCache.enrollments || forceRefresh) {
-            enrollmentsList.innerHTML = `<tr><td colspan="9" class="px-6 py-4 text-center text-gray-500">Fetching enrollments...</td></tr>`;
+            enrollmentsList.innerHTML = `<tr><td colspan="8" class="px-6 py-4 text-center text-gray-500">Fetching enrollments...</td></tr>`;
             
             const snapshot = await getDocs(query(collection(db, "enrollments"), orderBy("createdAt", "desc")));
             const enrollmentsData = snapshot.docs.map(doc => ({ 
@@ -1257,21 +1182,15 @@ async function fetchAndRenderEnrollments(forceRefresh = false) {
             saveToLocalStorage('enrollments', enrollmentsData);
         }
         
-        // Fetch tutor assignment history
-        if (!sessionCache.tutorAssignments || forceRefresh) {
-            await fetchTutorAssignmentHistory();
-        }
-        
         renderEnrollmentsFromCache();
     } catch (error) {
         console.error("Error fetching enrollments:", error);
-        enrollmentsList.innerHTML = `<tr><td colspan="9" class="px-6 py-4 text-center text-red-500">Failed to load enrollments: ${error.message}</td></tr>`;
+        enrollmentsList.innerHTML = `<tr><td colspan="8" class="px-6 py-4 text-center text-red-500">Failed to load enrollments: ${error.message}</td></tr>`;
     }
 }
 
 function renderEnrollmentsFromCache(searchTerm = '') {
     const enrollments = sessionCache.enrollments || [];
-    const tutorAssignments = sessionCache.tutorAssignments || {};
     const enrollmentsList = document.getElementById('enrollments-list');
     if (!enrollmentsList) return;
 
@@ -1279,7 +1198,6 @@ function renderEnrollmentsFromCache(searchTerm = '') {
     const statusFilter = document.getElementById('status-filter')?.value || '';
     const dateFrom = document.getElementById('date-from')?.value;
     const dateTo = document.getElementById('date-to')?.value;
-    const referralFilter = document.getElementById('referral-filter')?.value || '';
     
     const lowerCaseSearchTerm = searchTerm.toLowerCase();
     
@@ -1315,10 +1233,6 @@ function renderEnrollmentsFromCache(searchTerm = '') {
             if (createdDate > toDate) return false;
         }
         
-        // Referral filter
-        if (referralFilter === 'with_referral' && !enrollment.referral?.code) return false;
-        if (referralFilter === 'without_referral' && enrollment.referral?.code) return false;
-        
         return true;
     });
 
@@ -1326,26 +1240,17 @@ function renderEnrollmentsFromCache(searchTerm = '') {
     const total = enrollments.length;
     const draft = enrollments.filter(e => e.status === 'draft').length;
     const pending = enrollments.filter(e => e.status === 'pending').length;
-    
-    // Count enrollments with students who have tutor history
-    const historyEnrollments = enrollments.filter(enrollment => {
-        return enrollment.students?.some(student => {
-            // Try to find student by name in tutor assignments
-            return Object.values(tutorAssignments).some(assignment => 
-                assignment.studentName === student.name
-            );
-        });
-    }).length;
+    const completed = enrollments.filter(e => e.status === 'completed' || e.status === 'payment_received').length;
     
     document.getElementById('total-enrollments').textContent = total;
     document.getElementById('draft-enrollments').textContent = draft;
     document.getElementById('pending-enrollments').textContent = pending;
-    document.getElementById('history-enrollments').textContent = historyEnrollments;
+    document.getElementById('completed-enrollments').textContent = completed;
 
     if (filteredEnrollments.length === 0) {
         enrollmentsList.innerHTML = `
             <tr>
-                <td colspan="9" class="px-6 py-4 text-center text-gray-500">
+                <td colspan="8" class="px-6 py-4 text-center text-gray-500">
                     No enrollments found${searchTerm ? ` for "${searchTerm}"` : ''}.
                 </td>
             </tr>
@@ -1373,31 +1278,6 @@ function renderEnrollmentsFromCache(searchTerm = '') {
         return 0;
     }
 
-    // Function to get tutor assignments for a student
-    function getTutorAssignmentsForStudent(studentName) {
-        const assignment = Object.values(tutorAssignments).find(a => 
-            a.studentName === studentName
-        );
-        
-        if (!assignment) return 'Not assigned yet';
-        
-        // Get all unique tutors from history
-        const uniqueTutors = [];
-        assignment.tutorHistory.forEach(history => {
-            if (!uniqueTutors.some(t => t.email === history.tutorEmail)) {
-                uniqueTutors.push({
-                    name: history.tutorName || history.tutorEmail,
-                    email: history.tutorEmail,
-                    isCurrent: history.isCurrent
-                });
-            }
-        });
-        
-        return uniqueTutors.map(tutor => 
-            `${tutor.name}${tutor.isCurrent ? ' (Current)' : ''}`
-        ).join(', ');
-    }
-
     // Render enrollments table
     const tableRows = filteredEnrollments.map(enrollment => {
         const createdAt = enrollment.createdAt ? new Date(enrollment.createdAt).toLocaleDateString() : 
@@ -1405,11 +1285,6 @@ function renderEnrollmentsFromCache(searchTerm = '') {
         
         const studentCount = enrollment.students?.length || 0;
         const studentNames = enrollment.students?.map(s => s.name).join(', ') || 'No students';
-        
-        // Get tutor assignments for each student
-        const tutorAssignmentsList = enrollment.students?.map(student => 
-            `${student.name}: ${getTutorAssignmentsForStudent(student.name)}`
-        ).join('; ') || 'No tutor assignments';
         
         // Status badge
         let statusBadge = '';
@@ -1434,9 +1309,6 @@ function renderEnrollmentsFromCache(searchTerm = '') {
         
         // Referral code
         const referralCode = enrollment.referral?.code || 'None';
-        const referralDisplay = referralCode !== 'None' ? 
-            `<span class="font-mono bg-indigo-100 px-2 py-1 rounded text-indigo-800">${referralCode}</span>` : 
-            '<span class="text-gray-500">None</span>';
         
         return `
             <tr class="hover:bg-gray-50">
@@ -1454,9 +1326,8 @@ function renderEnrollmentsFromCache(searchTerm = '') {
                     <div class="text-xs text-gray-500 truncate max-w-xs">${studentNames}</div>
                 </td>
                 <td class="px-6 py-4 text-sm font-semibold text-green-600">${formattedFee}</td>
-                <td class="px-6 py-4 text-sm">${referralDisplay}</td>
-                <td class="px-6 py-4 text-sm text-gray-700 max-w-xs">
-                    <div class="text-xs">${tutorAssignmentsList}</div>
+                <td class="px-6 py-4 text-sm">
+                    <span class="font-mono bg-gray-100 px-2 py-1 rounded">${referralCode}</span>
                 </td>
                 <td class="px-6 py-4">${statusBadge}</td>
                 <td class="px-6 py-4 text-sm text-gray-500">${createdAt}</td>
@@ -1475,23 +1346,6 @@ function renderEnrollmentsFromCache(searchTerm = '') {
     }).join('');
 
     enrollmentsList.innerHTML = tableRows;
-    
-    // Show view tutor history button if there are enrollments with tutor history
-    const viewHistoryBtn = document.getElementById('view-tutor-history-btn');
-    if (viewHistoryBtn) {
-        const hasHistory = Object.keys(tutorAssignments).length > 0;
-        if (hasHistory) {
-            viewHistoryBtn.classList.remove('hidden');
-            viewHistoryBtn.onclick = () => {
-                // Find the first student with history for demo
-                const firstStudentId = Object.keys(tutorAssignments)[0];
-                const firstStudent = sessionCache.students?.find(s => s.id === firstStudentId);
-                if (firstStudent) {
-                    showTutorHistoryModal(firstStudentId, firstStudent, tutorAssignments);
-                }
-            };
-        }
-    }
 }
 
 function filterEnrollments(searchTerm) {
@@ -1502,7 +1356,7 @@ function applyEnrollmentFilters() {
     renderEnrollmentsFromCache(document.getElementById('enrollments-search').value);
 }
 
-// Global function to show enrollment details modal - ENHANCED
+// Global function to show enrollment details modal
 window.showEnrollmentDetails = async function(enrollmentId) {
     try {
         const enrollmentDoc = await getDoc(doc(db, "enrollments", enrollmentId));
@@ -1517,10 +1371,7 @@ window.showEnrollmentDetails = async function(enrollmentId) {
         const createdAt = enrollment.createdAt ? new Date(enrollment.createdAt).toLocaleString() : 
                          enrollment.timestamp ? new Date(enrollment.timestamp).toLocaleString() : 'N/A';
         
-        // Get tutor assignments for students
-        const tutorAssignments = sessionCache.tutorAssignments || {};
-        
-        // Build students details HTML with tutor history
+        // Build students details HTML
         let studentsHTML = '';
         if (enrollment.students && enrollment.students.length > 0) {
             studentsHTML = enrollment.students.map(student => {
@@ -1539,26 +1390,6 @@ window.showEnrollmentDetails = async function(enrollmentId) {
                     testPrepHTML = `<p class="text-sm"><strong>Test Prep:</strong> ${student.testPrep.map(t => `${t.name} (${t.hours} hrs)`).join(', ')}</p>`;
                 }
                 
-                // Find tutor history for this student
-                const studentTutorHistory = Object.values(tutorAssignments).find(a => 
-                    a.studentName === student.name
-                );
-                
-                let tutorHistoryHTML = '';
-                if (studentTutorHistory) {
-                    tutorHistoryHTML = `
-                        <div class="mt-3 border-t pt-3">
-                            <h5 class="font-bold text-sm text-purple-700 mb-2">Tutor Assignment History:</h5>
-                            <ul class="text-xs space-y-1">
-                                ${studentTutorHistory.tutorHistory.map((history, idx) => {
-                                    const date = history.assignedDate?.toDate?.() || new Date();
-                                    return `<li>${idx + 1}. ${history.tutorName || history.tutorEmail} - ${date.toLocaleDateString()} ${history.isCurrent ? '(Current)' : ''}</li>`;
-                                }).join('')}
-                            </ul>
-                        </div>
-                    `;
-                }
-                
                 return `
                     <div class="border rounded-lg p-4 mb-3 bg-gray-50">
                         <h4 class="font-bold text-lg mb-2">${student.name || 'Unnamed Student'}</h4>
@@ -1570,7 +1401,6 @@ window.showEnrollmentDetails = async function(enrollmentId) {
                         ${subjectsHTML}
                         ${extracurricularHTML}
                         ${testPrepHTML}
-                        ${tutorHistoryHTML}
                     </div>
                 `;
             }).join('');
@@ -1725,7 +1555,7 @@ window.updateEnrollmentStatus = async function(enrollmentId, newStatus) {
     }
 };
 
-// NEW: Global function to view tutor history for a specific student
+// Global function to view tutor history for a specific student
 window.viewStudentTutorHistory = function(studentId) {
     const tutorAssignments = sessionCache.tutorAssignments || {};
     const students = sessionCache.students || [];
@@ -1781,7 +1611,7 @@ async function renderManagementTutorView(container) {
     document.getElementById('refresh-directory-btn').addEventListener('click', () => fetchAndRenderDirectory(true));
     document.getElementById('directory-search').addEventListener('input', (e) => renderDirectoryFromCache(e.target.value));
     
-    // NEW: View tutor history button
+    // View tutor history button
     document.getElementById('view-tutor-history-directory-btn').addEventListener('click', async () => {
         if (!sessionCache.tutorAssignments || Object.keys(sessionCache.tutorAssignments).length === 0) {
             alert("No tutor history available. Please refresh the directory first.");
@@ -1842,14 +1672,13 @@ async function fetchAndRenderDirectory(forceRefresh = false) {
     }
 
     try {
-        // If cache is empty, fetch from server. Otherwise, the existing cache (from localStorage) will be used.
+        // If cache is empty, fetch from server.
         if (!sessionCache.tutors || !sessionCache.students) {
             document.getElementById('directory-list').innerHTML = `<p class="text-center text-gray-500 py-10">Fetching data from server...</p>`;
             const [tutorsSnapshot, studentsSnapshot] = await Promise.all([
                 getDocs(query(collection(db, "tutors"), orderBy("name"))),
                 getDocs(collection(db, "students"))
             ]);
-            // Save newly fetched data to localStorage
             saveToLocalStorage('tutors', tutorsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
             saveToLocalStorage('students', studentsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
         }
@@ -1917,8 +1746,8 @@ function renderDirectoryFromCache(searchTerm = '') {
     directoryList.innerHTML = filteredTutors.map(tutor => {
         const assignedStudents = (studentsByTutor[tutor.email] || [])
             .filter(s =>
-                searchTerm === '' || // show all students if no search term
-                tutor.name.toLowerCase().includes(lowerCaseSearchTerm) || // show all if tutor name matches
+                searchTerm === '' ||
+                tutor.name.toLowerCase().includes(lowerCaseSearchTerm) ||
                 s.studentName.toLowerCase().includes(lowerCaseSearchTerm) ||
                 (s.parentName && s.parentName.toLowerCase().includes(lowerCaseSearchTerm)) ||
                 (s.parentPhone && String(s.parentPhone).toLowerCase().includes(lowerCaseSearchTerm))
@@ -1988,7 +1817,7 @@ function renderDirectoryFromCache(searchTerm = '') {
     });
 }
 
-// --- Updated Pay Advice Panel --- (UNCHANGED - kept as is)
+// --- Updated Pay Advice Panel ---
 async function renderPayAdvicePanel(container) {
     const canExport = window.userData?.permissions?.actions?.canExportPayAdvice === true;
     container.innerHTML = `
@@ -2039,8 +1868,7 @@ async function renderPayAdvicePanel(container) {
         const startDate = startDateInput.value ? new Date(startDateInput.value) : null;
         const endDate = endDateInput.value ? new Date(endDateInput.value) : null;
         if (startDate && endDate) {
-            // Don't reset gifts - FIXED: Keep existing gifts
-            currentPayData = []; // Reset data
+            currentPayData = [];
             endDate.setHours(23, 59, 59, 999);
             loadPayAdviceData(startDate, endDate);
         }
@@ -2159,7 +1987,7 @@ async function loadPayAdviceData(startDate, endDate) {
                 totalStudentFees: totalStudentFees,
                 managementFee: managementFee,
                 totalPay: totalStudentFees + managementFee,
-                tinNumber: tutor.tinNumber || '', // Added TIN number
+                tinNumber: tutor.tinNumber || '',
                 ...bankDetails
             });
         });
@@ -2217,7 +2045,7 @@ function renderPayAdviceTable() {
                 const giftAmount = parseFloat(giftInput);
                 if (!isNaN(giftAmount) && giftAmount >= 0) {
                     payAdviceGifts[tutorEmail] = giftAmount;
-                    renderPayAdviceTable(); // Re-render with updated gift
+                    renderPayAdviceTable();
                 } else {
                     alert("Please enter a valid, non-negative number.");
                 }
@@ -2226,13 +2054,12 @@ function renderPayAdviceTable() {
     });
 }
 
-// NEW: Export Pay Advice as 4 XLS Files
+// Export Pay Advice as 4 XLS Files
 async function exportPayAdviceAsXLS() {
     try {
         const currentDate = new Date();
         const monthYear = currentDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
         
-        // Calculate the splits for each tutor
         const processedData = currentPayData.map(tutor => {
             const giftAmount = payAdviceGifts[tutor.tutorEmail] || 0;
             const finalPay = tutor.totalPay + giftAmount;
@@ -2240,7 +2067,7 @@ async function exportPayAdviceAsXLS() {
             const firstHalf = finalPay / 2;
             const tenPercentDeduction = firstHalf * 0.1;
             const mainPayment = firstHalf - tenPercentDeduction;
-            const dataZoomPayment = firstHalf; // Full 50%
+            const dataZoomPayment = firstHalf;
             const tinRemittance = tenPercentDeduction;
             
             return {
@@ -2253,42 +2080,42 @@ async function exportPayAdviceAsXLS() {
             };
         });
 
-        // FILE 1: Main Payment (First Half MINUS 10%)
+        // FILE 1: Main Payment
         const mainPaymentData = processedData.map(tutor => [
             tutor.tutorName,
             tutor.beneficiaryBank,
-            '', // Beneficiary branch (blank)
+            '',
             tutor.beneficiaryAccount,
-            '', // Transaction Unique Reference (blank)
+            '',
             'NIP',
             tutor.mainPayment,
             'NGN',
             `${monthYear} Tutor Payment`
         ]);
 
-        // FILE 2: DataZoom Allocation (Second Half - Full 50%)
+        // FILE 2: DataZoom Allocation
         const dataZoomData = processedData.map(tutor => [
             tutor.tutorName,
             tutor.beneficiaryBank,
-            '', // Beneficiary branch (blank)
+            '',
             tutor.beneficiaryAccount,
-            '', // Transaction Unique Reference (blank)
+            '',
             'NIP',
             tutor.dataZoomPayment,
             'NGN',
             'DATAZOOMALLOCT'
         ]);
 
-        // FILE 3: TIN Remittance (The 10% Deducted)
+        // FILE 3: TIN Remittance
         const tinRemittanceData = processedData.map(tutor => [
             tutor.tutorName,
-            tutor.tinNumber || '', // TIN number (blank if not available)
+            tutor.tinNumber || '',
             tutor.tinRemittance,
             'NGN',
             monthYear
         ]);
 
-        // FILE 4: Full Pay Advice Report (Original)
+        // FILE 4: Full Pay Advice Report
         const fullPayAdviceData = processedData.map(tutor => [
             tutor.tutorName,
             tutor.studentCount,
@@ -2334,19 +2161,17 @@ async function exportPayAdviceAsXLS() {
     }
 }
 
-// NEW: Function to download multiple XLS files
+// Function to download multiple XLS files
 async function downloadMultipleXLSFiles(files) {
     for (const file of files) {
         await downloadAsXLS(file.data, file.headers, file.filename);
-        // Small delay between downloads to prevent browser issues
         await new Promise(resolve => setTimeout(resolve, 500));
     }
 }
 
-// NEW: Function to convert data to XLS format
+// Function to convert data to XLS format
 function downloadAsXLS(data, headers, filename) {
     return new Promise((resolve) => {
-        // Create HTML table for XLS format
         let html = '<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40"><head><meta charset="UTF-8"><!--[if gte mso 9]><xml><x:ExcelWorkbook><x:ExcelWorksheets><x:ExcelWorksheet><x:Name>Sheet1</x:Name><x:WorksheetOptions><x:DisplayGridlines/></x:WorksheetOptions></x:ExcelWorksheet></x:ExcelWorksheets></x:ExcelWorkbook></xml><![endif]--></head><body>';
         html += '<table border="1">';
         
@@ -2381,7 +2206,7 @@ function downloadAsXLS(data, headers, filename) {
     });
 }
 
-// --- Tutor Reports Panel --- (UNCHANGED - kept as is)
+// --- Tutor Reports Panel ---
 async function renderTutorReportsPanel(container) {
     const canDownload = window.userData?.permissions?.actions?.canDownloadReports === true;
     const canExport = window.userData?.permissions?.actions?.canExportPayAdvice === true;
@@ -2800,7 +2625,37 @@ async function renderTutorReportsPanel(container) {
     }
 }
 
-// SIMPLIFIED & RELIABLE PDF DOWNLOAD FUNCTIONS
+// FIXED: Date handling functions for parent feedback
+function formatFeedbackDate(timestamp) {
+    if (!timestamp) return 'Unknown date';
+    
+    try {
+        // Handle Firebase Timestamp
+        if (timestamp.toDate) {
+            return timestamp.toDate().toLocaleDateString();
+        }
+        // Handle Timestamp object with seconds
+        else if (timestamp.seconds) {
+            return new Date(timestamp.seconds * 1000).toLocaleDateString();
+        }
+        // Handle regular Date string or timestamp
+        else if (typeof timestamp === 'string' || typeof timestamp === 'number') {
+            const date = new Date(timestamp);
+            if (!isNaN(date.getTime())) {
+                return date.toLocaleDateString();
+            }
+        }
+        // Handle Date object
+        else if (timestamp instanceof Date) {
+            return timestamp.toLocaleDateString();
+        }
+        
+        return 'Unknown date';
+    } catch (error) {
+        console.error("Error formatting date:", error, timestamp);
+        return 'Invalid date';
+    }
+}
 
 // FIXED Global functions for event handlers
 window.previewReport = async function(reportId) {
@@ -2815,7 +2670,7 @@ window.previewReport = async function(reportId) {
     }
 };
 
-// SIMPLIFIED: Download using the same HTML as preview
+// Download using the same HTML as preview
 window.downloadSingleReport = async function(reportId, event) {
     const button = event.target;
     const originalText = button.innerHTML;
@@ -2836,7 +2691,7 @@ window.downloadSingleReport = async function(reportId, event) {
         progressBar.style.width = '0%';
         progressText.textContent = '0%';
 
-        // Use the SAME HTML generation as preview (proven to work)
+        // Use the SAME HTML generation as preview
         const { html, reportData } = await generateReportHTML(reportId);
         
         // Update progress
@@ -2889,7 +2744,7 @@ window.downloadSingleReport = async function(reportId, event) {
     }
 };
 
-// SIMPLIFIED: Bulk download using same reliable method
+// Bulk download using same reliable method
 window.zipAndDownloadTutorReports = async function(reports, tutorName, button) {
     const originalButtonText = button.innerHTML;
     
@@ -3024,7 +2879,7 @@ if (!document.querySelector('style[data-reports-panel]')) {
     document.head.appendChild(styleEl);
 }
 
-// --- Pending Approvals Panel --- (UNCHANGED - kept as is)
+// --- Pending Approvals Panel ---
 async function renderPendingApprovalsPanel(container) {
     container.innerHTML = `
         <div class="bg-white p-6 rounded-lg shadow-md">
@@ -3087,7 +2942,7 @@ function renderPendingApprovalsFromCache() {
     document.querySelectorAll('.reject-btn').forEach(button => button.addEventListener('click', () => handleRejectStudent(button.dataset.studentId)));
 }
 
-// --- Summer Break Panel --- (UNCHANGED - kept as is)
+// --- Summer Break Panel ---
 async function renderSummerBreakPanel(container) {
     container.innerHTML = `
         <div class="bg-white p-6 rounded-lg shadow-md">
@@ -3159,8 +3014,8 @@ function renderBreakStudentsFromCache() {
                         await updateDoc(doc(db, "students", studentId), { summerBreak: false, lastBreakEnd: Timestamp.now() });
                         document.getElementById('break-status-message').textContent = `Break ended successfully.`;
                         document.getElementById('break-status-message').className = 'text-center font-semibold mb-4 text-green-600';
-                        invalidateCache('breakStudents'); // Invalidate cache
-                        fetchAndRenderBreakStudents(); // Re-render list
+                        invalidateCache('breakStudents');
+                        fetchAndRenderBreakStudents();
                     } catch (error) {
                         console.error("Error ending summer break:", error);
                         document.getElementById('break-status-message').textContent = "Failed to end summer break.";
@@ -3172,7 +3027,7 @@ function renderBreakStudentsFromCache() {
     }
 }
 
-// --- Parent Feedback Panel --- (UNCHANGED - kept as is)
+// --- Parent Feedback Panel - FIXED DATE ISSUE ---
 async function renderParentFeedbackPanel(container) {
     container.innerHTML = `
         <div class="bg-white p-6 rounded-lg shadow-md">
@@ -3212,44 +3067,42 @@ async function fetchAndRenderParentFeedback(forceRefresh = false) {
             const feedbackSnapshot = await getDocs(query(collection(db, "parent_feedback"), orderBy("timestamp", "desc")));
             const feedbackData = feedbackSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
             
-            // Get all tutor submissions to find parent names
-            const submissionsSnapshot = await getDocs(collection(db, "tutor_submissions"));
-            const submissionsData = submissionsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-            
-            // Create a map of student names to parent names
-            const studentParentMap = {};
-            submissionsData.forEach(submission => {
-                if (submission.studentName && submission.parentName) {
-                    studentParentMap[submission.studentName] = submission.parentName;
-                }
-            });
-            
-            // Enhance feedback data with proper timestamps and parent names
+            // Enhance feedback data with proper timestamps
             const enhancedFeedbackData = feedbackData.map(feedback => {
-                // Convert timestamp to Firestore Timestamp format for submittedAt
-                let submittedAt = feedback.submittedAt;
-                if (feedback.timestamp && !submittedAt) {
-                    // Convert your timestamp string to Firestore Timestamp
-                    const date = new Date(feedback.timestamp);
-                    submittedAt = Timestamp.fromDate(date);
+                // FIXED: Handle different timestamp formats properly
+                let submittedDate = null;
+                
+                if (feedback.timestamp) {
+                    // Try to parse the timestamp
+                    if (feedback.timestamp.toDate) {
+                        // It's a Firebase Timestamp
+                        submittedDate = feedback.timestamp;
+                    } else if (feedback.timestamp.seconds) {
+                        // It's a Timestamp object with seconds
+                        submittedDate = Timestamp.fromDate(new Date(feedback.timestamp.seconds * 1000));
+                    } else if (typeof feedback.timestamp === 'string' || typeof feedback.timestamp === 'number') {
+                        // It's a string or number timestamp
+                        const date = new Date(feedback.timestamp);
+                        if (!isNaN(date.getTime())) {
+                            submittedDate = Timestamp.fromDate(date);
+                        }
+                    }
                 }
                 
-                // Get parent name from tutor submissions if available
-                let parentName = feedback.parentName;
-                if ((!parentName || parentName === "Unknown Parent") && feedback.studentName) {
-                    parentName = studentParentMap[feedback.studentName] || feedback.parentName;
+                // If no valid timestamp found, use current time
+                if (!submittedDate) {
+                    submittedDate = Timestamp.now();
                 }
                 
                 return {
                     ...feedback,
-                    submittedAt: submittedAt || Timestamp.now(),
-                    parentName: parentName || 'Unknown Parent',
-                    // Ensure all required fields have defaults
+                    submittedAt: submittedDate,
+                    parentName: feedback.parentName || 'Unknown Parent',
                     read: feedback.read || false,
                     message: feedback.message || '',
                     parentEmail: feedback.parentEmail || '',
                     parentPhone: feedback.parentPhone || '',
-                    responses: feedback.responses || [] // Initialize responses array if not exists
+                    responses: feedback.responses || []
                 };
             });
             
@@ -3280,22 +3133,8 @@ function renderParentFeedbackFromCache() {
     document.getElementById('feedback-unread-count').textContent = unreadCount;
 
     listContainer.innerHTML = feedbackMessages.map(message => {
-        // Handle both timestamp formats
-        let submittedDate = 'Unknown date';
-        if (message.submittedAt) {
-            if (message.submittedAt.toDate) {
-                // It's a Firestore Timestamp
-                submittedDate = message.submittedAt.toDate().toLocaleDateString();
-            } else if (message.submittedAt.seconds) {
-                // It's a Timestamp object
-                submittedDate = new Date(message.submittedAt.seconds * 1000).toLocaleDateString();
-            } else if (message.timestamp) {
-                // Use the original timestamp field
-                submittedDate = new Date(message.timestamp).toLocaleDateString();
-            }
-        } else if (message.timestamp) {
-            submittedDate = new Date(message.timestamp).toLocaleDateString();
-        }
+        // FIXED: Use the new formatFeedbackDate function
+        const submittedDate = formatFeedbackDate(message.submittedAt || message.timestamp);
         
         const readStatus = message.read ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800';
         const readText = message.read ? 'Read' : 'Unread';
@@ -3308,7 +3147,7 @@ function renderParentFeedbackFromCache() {
                     <div class="bg-blue-50 p-3 rounded-lg mb-2">
                         <div class="flex justify-between items-start mb-1">
                             <span class="font-medium text-blue-800">${response.responderName || 'Staff'}</span>
-                            <span class="text-xs text-gray-500">${new Date(response.responseDate?.seconds * 1000).toLocaleDateString()}</span>
+                            <span class="text-xs text-gray-500">${formatFeedbackDate(response.responseDate)}</span>
                         </div>
                         <p class="text-gray-700 text-sm">${response.responseText}</p>
                     </div>
@@ -3454,7 +3293,7 @@ async function handleSendResponse(messageId) {
         // Update the message with the new response
         await updateDoc(messageRef, {
             responses: [...currentResponses, newResponse],
-            read: true, // Mark as read when responding
+            read: true,
             readAt: Timestamp.now()
         });
 
@@ -3470,7 +3309,7 @@ async function handleSendResponse(messageId) {
 
         alert("Response sent successfully!");
         modal.remove();
-        renderParentFeedbackFromCache(); // Refresh the display
+        renderParentFeedbackFromCache();
 
     } catch (error) {
         console.error("Error sending response:", error);
@@ -3524,7 +3363,7 @@ async function handleDeleteFeedback(messageId) {
 // # REPORT GENERATION & ZIPPING
 // ##################################
 
-// ##### CORRECTED AND FINALIZED FUNCTION #####
+// CORRECTED AND FINALIZED FUNCTION
 async function generateReportHTML(reportId) {
     const reportDoc = await getDoc(doc(db, "tutor_submissions", reportId));
     if (!reportDoc.exists()) throw new Error("Report not found!");
@@ -3577,7 +3416,7 @@ async function generateReportHTML(reportId) {
                 }
                 .student-info p { margin: 5px 0; }
                 .report-section {
-                    page-break-inside: avoid; /* CRITICAL: Prevents section from splitting across pages */
+                    page-break-inside: avoid;
                     margin-bottom: 20px;
                     border: 1px solid #e5e7eb;
                     padding: 15px;
@@ -3656,7 +3495,6 @@ async function zipAndDownloadTutorReports(reports, tutorName, buttonElement) {
         let filesGenerated = 0;
         const reportGenerationPromises = reports.map(async (report) => {
             const { html, reportData } = await generateReportHTML(report.id);
-            // Use the same improved options for consistency
             const options = {
                 image:        { type: 'jpeg', quality: 0.98 },
                 html2canvas:  { scale: 2, useCORS: true },
@@ -3725,16 +3563,15 @@ onAuthStateChanged(auth, async (user) => {
                 // Setup navigation based on permissions
                 const navContainer = document.querySelector('nav');
                 if (navContainer) {
-                    navContainer.innerHTML = ''; // Clear existing nav
+                    navContainer.innerHTML = '';
                     
                     let firstVisibleTab = null;
                     
                     Object.entries(allNavItems).forEach(([navId, navItem]) => {
-    // TEMPORARY FIX: Always show referral tab for testing
-    const hasPermission = navId === 'navReferralsAdmin' || 
-                        !staffData.permissions || 
-                        !staffData.permissions.tabs || 
-                        staffData.permissions.tabs[navItem.perm] === true;
+                        const hasPermission = navId === 'navReferralsAdmin' || 
+                                            !staffData.permissions || 
+                                            !staffData.permissions.tabs || 
+                                            staffData.permissions.tabs[navItem.perm] === true;
                         
                         if (hasPermission) {
                             if (!firstVisibleTab) firstVisibleTab = navId;
