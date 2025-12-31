@@ -6,14 +6,18 @@
     <title>Blooming Kids House - Enrollment Portal</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     
+    <!-- Firebase SDKs -->
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
     
+    <!-- jQuery -->
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     
+    <!-- Input Mask -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery.inputmask/5.0.7/jquery.inputmask.min.js"></script>
     
+    <!-- PDF Generation -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     
@@ -185,7 +189,7 @@
 
         .form-control.select {
             cursor: pointer;
-            background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23555' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
+            background-image: url("data:image/svg+xml;charset=UTF8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23555' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
             background-repeat: no-repeat;
             background-position: right 15px center;
             background-size: 18px;
@@ -211,6 +215,11 @@
             display: flex;
             align-items: center;
             gap: 5px;
+            display: none;
+        }
+
+        .error-message.show {
+            display: flex;
         }
 
         .error-message i {
@@ -336,7 +345,7 @@
             border-left: 3px solid var(--primary);
         }
 
-        /* Academic Subjects Grid - FIXED */
+        /* Academic Subjects Grid */
         .subjects-grid {
             display: grid;
             grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
@@ -392,7 +401,7 @@
             font-weight: bold;
         }
 
-        /* Extracurricular Grid - FIXED */
+        /* Extracurricular Grid */
         .extracurricular-grid {
             display: grid;
             grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
@@ -470,7 +479,7 @@
             border-color: var(--primary);
         }
 
-        /* Test Prep Section - FIXED */
+        /* Test Prep Section */
         .test-prep-options {
             display: grid;
             grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
@@ -861,6 +870,11 @@
             margin-top: 20px;
             text-align: center;
             animation: fadeIn 0.5s ease;
+            display: none;
+        }
+
+        .confirmation-message.show {
+            display: block;
         }
 
         .confirmation-message h4 {
@@ -1140,6 +1154,7 @@
         <span>PDF Downloaded Successfully!</span>
     </div>
 
+    <!-- Invoice Modal -->
     <div id="invoice-modal" class="invoice-modal">
         <div class="invoice-content" id="invoice-content">
             <button class="close-invoice" id="close-invoice">&times;</button>
@@ -1190,7 +1205,8 @@
                     </tr>
                 </thead>
                 <tbody id="invoice-items">
-                    </tbody>
+                    <!-- Items will be populated here -->
+                </tbody>
             </table>
             
             <div class="invoice-total">
@@ -1199,20 +1215,20 @@
             
             <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #EEE; font-size: 14px; color: #666;">
                 <p><strong>Payment Instructions:</strong></p>
-                <p>Please make payment via Paystack using the payment link or bank transfer to <strong>(send the payment receipt to either of the numbers on WhatsApp):</p>
+                <p>Please make payment via Paystack using the payment link or bank transfer to (send the payment receipt to either of the numbers on WhatsApp):</p>
                 <p><strong>Bank:</strong> Providus Bank | <strong>Account:</strong> 5401988045 | <strong>Name:</strong> Blooming Kids House Ltd.</p>
-                <p>For inquiries, call 0707 896 1070, 0902 914 7024 or <strong>Email: bloomingkidshouse.learning@gmail.com</p>
+                <p>For inquiries, call 0707 896 1070, 0902 914 7024 or <strong>Email: bloomingkidshouse.learning@gmail.com</strong></p>
             </div>
         </div>
     </div>
 
+    <!-- Main Container -->
     <div class="container">
         <header class="header">
             <div class="logo-container">
                 <img src="https://res.cloudinary.com/dy2hxcyaf/image/upload/v1757700806/newbhlogo_umwqzy.svg" 
                      alt="Blooming Kids House Logo" 
-                     class="logo-img"
-                     
+                     class="logo-img">
                 <div class="logo-text">
                     <h1>Blooming Kids House</h1>
                     <p>Secure Your Child's Spot - Enrollment Portal</p>
@@ -1222,38 +1238,42 @@
         </header>
 
         <div class="main-content">
+            <!-- Enrollment Form -->
             <div class="form-card">
                 <h2><i class="fas fa-user-plus"></i> Student Enrollment Form</h2>
                 
+                <!-- Alert Area -->
                 <div id="alert-area"></div>
                 
+                <!-- Parent Information -->
                 <div class="form-section">
                     <h3><i class="fas fa-users"></i> Parent/Guardian Information</h3>
                     <div class="form-row">
                         <div class="form-group">
                             <label>Full Name <span class="required">*</span></label>
                             <input type="text" class="form-control" id="parentName" placeholder="John Doe" data-validate="required">
-                            <div class="error-message hidden" id="parentName-error"></div>
+                            <div class="error-message" id="parentName-error"></div>
                         </div>
                         <div class="form-group">
                             <label>Email Address <span class="required">*</span></label>
                             <input type="email" class="form-control" id="parentEmail" placeholder="john@example.com" data-validate="required,email">
-                            <div class="error-message hidden" id="parentEmail-error"></div>
+                            <div class="error-message" id="parentEmail-error"></div>
                         </div>
                     </div>
                     <div class="form-row">
                         <div class="form-group">
                             <label>Phone Number <span class="required">*</span></label>
-                            <input type="tel" class="form-control" id="parentPhone" placeholder="+23480123456789" value="" data-validate="required,phone">
-                            <div class="error-message hidden" id="parentPhone-error"></div>
+                            <input type="tel" class="form-control" id="parentPhone" placeholder="+23480123456789" data-validate="required,phone">
+                            <div class="error-message" id="parentPhone-error"></div>
                         </div>
                         <div class="form-group">
                             <label>Address <span class="required">*</span></label>
                             <input type="text" class="form-control" id="parentAddress" placeholder="State/Province" data-validate="required">
-                            <div class="error-message hidden" id="parentAddress-error"></div>
+                            <div class="error-message" id="parentAddress-error"></div>
                         </div>
                     </div>
                     
+                    <!-- Referral Section -->
                     <div class="referral-section">
                         <h4><i class="fas fa-gift"></i> Refer a Friend & Earn ₦5,000!</h4>
                         <div class="form-group">
@@ -1263,49 +1283,54 @@
                         </div>
                     </div>
                     
+                    <!-- Bank Details Section -->
                     <div class="bank-details-section" id="bank-details-section">
                         <h4><i class="fas fa-university"></i> Bank Details for Referral Payout</h4>
                         <div class="form-row">
                             <div class="form-group">
                                 <label>Bank Name <span class="required">*</span></label>
                                 <input type="text" class="form-control" id="bankName" placeholder="e.g., PROVIDUS BANK">
-                                <div class="error-message hidden" id="bankName-error"></div>
+                                <div class="error-message" id="bankName-error"></div>
                             </div>
                             <div class="form-group">
                                 <label>Account Number <span class="required">*</span></label>
                                 <input type="text" class="form-control" id="accountNumber" placeholder="5401988045">
-                                <div class="error-message hidden" id="accountNumber-error"></div>
+                                <div class="error-message" id="accountNumber-error"></div>
                             </div>
                         </div>
                         <div class="form-row">
                             <div class="form-group">
                                 <label>Account Name <span class="required">*</span></label>
                                 <input type="text" class="form-control" id="accountName" placeholder="BLOOMING KIDS HOUSE">
-                                <div class="error-message hidden" id="accountName-error"></div>
+                                <div class="error-message" id="accountName-error"></div>
                             </div>
                         </div>
                     </div>
                 </div>
 
+                <!-- Student Information -->
                 <div class="form-section">
                     <h3><i class="fas fa-graduation-cap"></i> Student Information</h3>
                     
                     <div id="students-container">
-                        </div>
+                        <!-- Students will be added here dynamically -->
+                    </div>
 
                     <button type="button" class="btn btn-add" id="add-student">
                         <i class="fas fa-plus-circle"></i> Add Another Student (Sibling)
                     </button>
                 </div>
 
+                <!-- Save Progress Section -->
                 <div class="save-progress">
                     <h4><i class="fas fa-save"></i> Save Registration & Receive Your Invoice</h4>
-                    <p>Need more time? Save your enrollment and continue later. We'll email you a resume link, please save the invoice and pay using the account details, when you are done with payment, kidly send to our WhatsApp number, Thank you.</p>
+                    <p>Need more time? Save your enrollment and continue later. We'll email you a resume link, please save the invoice and pay using the account details, when you are done with payment, kindly send to our WhatsApp number, Thank you.</p>
                     <button type="button" class="save-btn" id="save-progress-btn">
                         <i class="fas fa-envelope"></i> Save & Email Resume Link
                     </button>
                     
-                    <div id="confirmation-message" class="confirmation-message hidden">
+                    <!-- Confirmation Message -->
+                    <div id="confirmation-message" class="confirmation-message">
                         <h4><i class="fas fa-check-circle"></i> Application Saved Successfully!</h4>
                         <p>Your enrollment has been saved. You can return within 7 days to complete it.</p>
                         <p><strong>Application ID:</strong> <span id="saved-app-id"></span></p>
@@ -1321,16 +1346,19 @@
                     </div>
                 </div>
 
+                <!-- Submit Button -->
                 <button type="button" class="btn btn-primary btn-submit" id="submit-enrollment">
                     <i class="fas fa-lock"></i> Proceed to Secure Payment
                 </button>
                 
+                <!-- Info Note -->
                 <div class="alert alert-info" style="margin-top: 25px;">
                     <i class="fas fa-info-circle"></i> 
                     <strong>Note:</strong> After payment, you'll be redirected to set up your Parent Portal account immediately.
                 </div>
             </div>
 
+            <!-- Summary Panel -->
             <div class="summary-panel">
                 <h2><i class="fas fa-receipt"></i> Fee Summary</h2>
                 
@@ -1385,6 +1413,7 @@
                     <span id="total-fee">₦0</span>
                 </div>
 
+                <!-- Fee Breakdown -->
                 <div class="fee-breakdown">
                     <h4>Fee Breakdown by Student:</h4>
                     <div id="fee-details">
@@ -1392,6 +1421,7 @@
                     </div>
                 </div>
 
+                <!-- Payment Section -->
                 <div style="background: linear-gradient(135deg, #2E8B57 0%, #1E6B47 100%); color: white; border-radius: 10px; padding: 25px; margin-top: 30px; text-align: center;">
                     <h3 style="margin-bottom: 15px; font-size: 20px;"><i class="fas fa-shield-alt"></i> Secure Payment</h3>
                     <p style="opacity: 0.9; font-size: 15px; margin-bottom: 20px;">Your payment is processed securely via Paystack. All major cards and bank transfers accepted.</p>
@@ -1404,6 +1434,7 @@
                     </div>
                 </div>
 
+                <!-- Help Section -->
                 <div style="margin-top: 25px; padding-top: 20px; border-top: 1px solid #EEE;">
                     <p style="font-size: 14px; color: #666; text-align: center;">
                         <i class="fas fa-headset"></i> Need help? 
@@ -1413,22 +1444,25 @@
             </div>
         </div>
 
+        <!-- Footer -->
         <div class="footer">
             <p>© 2024 Blooming Kids House Ltd. All rights reserved.</p>
             <p style="margin-top: 5px;">This is a secure enrollment system. Your information is protected.</p>
         </div>
     </div>
 
+    <!-- Paystack SDK -->
     <script src="https://js.paystack.co/v1/inline.js"></script>
 
+    <!-- Main Application Script -->
     <script>
         // ==============================================
-        // COMPLETE UPDATED VERSION - FIXED PRORATION AND FEE DISPLAY
+        // ENROLLMENT PORTAL - CLEAN VERSION
         // ==============================================
 
         // CONFIGURATION
         const CONFIG = {
-            // Your Firebase Configuration
+            // Firebase Configuration
             FIREBASE_CONFIG: {
                 apiKey: "AIzaSyD1lJhsWMMs_qerLBSzk7wKhjLyI_11RJg",
                 authDomain: "bloomingkidsassessment.firebaseapp.com",
@@ -1438,7 +1472,7 @@
                 appId: "1:238975054977:web:87c70b4db044998a204980"
             },
             
-            // Academic Subjects (ONLY 8 subjects)
+            // Academic Subjects
             ACADEMIC_SUBJECTS: [
                 "Math",
                 "Language Arts", 
@@ -1487,15 +1521,15 @@
             // Constants
             CONSTANTS: {
                 ADDITIONAL_SUBJECT_FEE: 40000,
-                SIBLING_DISCOUNT: 10000, // FLAT DISCOUNT FOR 2+ STUDENTS
+                SIBLING_DISCOUNT: 10000,
                 BASE_SUBJECTS_INCLUDED: 2,
                 REFERRAL_BONUS: 5000,
-                FULL_FEE_THRESHOLD_DAY: 6 // 1st-6th = full fee, after 6th = prorated
+                FULL_FEE_THRESHOLD_DAY: 6
             }
         };
 
         // ==============================================
-        // APPLICATION STATE
+        // ENROLLMENT APPLICATION CLASS
         // ==============================================
         class EnrollmentApp {
             constructor() {
@@ -1506,18 +1540,15 @@
                 this.db = null;
                 this.appData = null;
                 this.isLoadingSavedData = false;
+                this.isSaving = false;
                 
                 this.initializeState();
             }
             
             async initializeState() {
-                console.log('Initializing enrollment application...');
-                
                 await this.initializeFirebase();
                 this.setupEventListeners();
                 await this.checkResumeLink();
-                
-                console.log('Enrollment application initialized');
             }
             
             async initializeFirebase() {
@@ -1529,11 +1560,11 @@
                     }
                     
                     this.db = firebase.firestore();
-                    console.log('Firebase initialized successfully');
+                    return true;
                     
                 } catch (error) {
-                    console.error('Firebase initialization error:', error);
-                    this.showAlert('Unable to connect to database. Some features may be limited.', 'warning');
+                    this.showAlert("Database connection issue. Working offline.", "warning");
+                    return false;
                 }
             }
             
@@ -1576,7 +1607,7 @@
                     }
                 });
                 
-                // Referral code
+                // Referral code validation
                 const referralInput = document.getElementById('referralCode');
                 if (referralInput) {
                     let validationTimer;
@@ -1602,19 +1633,19 @@
                         input.addEventListener('blur', () => this.validateField(input));
                         input.addEventListener('input', () => {
                             const errorElement = document.getElementById(`${input.id}-error`);
-                            if (errorElement) errorElement.classList.add('hidden');
+                            if (errorElement) errorElement.classList.remove('show');
                             input.classList.remove('error');
                         });
                     }
                 });
                 
-                // Auto-save when form changes (after 3 seconds of inactivity)
+                // Auto-save when form changes
                 let saveTimer;
                 const setupAutoSave = () => {
                     const formElements = document.querySelectorAll('.form-control, .subject-option, .extracurricular-card, .frequency-btn, .test-prep-hours');
                     formElements.forEach(element => {
                         element.addEventListener('change', () => {
-                            if (this.isLoadingSavedData) return;
+                            if (this.isLoadingSavedData || this.isSaving) return;
                             clearTimeout(saveTimer);
                             saveTimer = setTimeout(() => {
                                 if (this.currentApplicationId) {
@@ -1625,10 +1656,9 @@
                     });
                 };
                 
-                // Setup auto-save after a delay to ensure DOM is ready
                 setTimeout(setupAutoSave, 1000);
             }
-
+            
             // ==============================================
             // STUDENT MANAGEMENT
             // ==============================================
@@ -1662,12 +1692,12 @@
                         <div class="form-group">
                             <label>Student Full Name <span class="required">*</span></label>
                             <input type="text" class="form-control student-name" placeholder="Student Name" data-validate="required" value="${prefillData?.name || ''}">
-                            <div class="error-message hidden student-name-error"></div>
+                            <div class="error-message student-name-error"></div>
                         </div>
                         <div class="form-group">
                             <label>Date of Birth <span class="required">*</span></label>
                             <input type="date" class="form-control student-dob" data-validate="required" value="${prefillData?.dob || ''}">
-                            <div class="error-message hidden student-dob-error"></div>
+                            <div class="error-message student-dob-error"></div>
                         </div>
                     </div>
                     <div class="form-row">
@@ -1680,12 +1710,12 @@
                                 <option value="grade5-8" ${prefillData?.grade === 'grade5-8' ? 'selected' : ''}>Grade 5 to 8</option>
                                 <option value="grade9-12" ${prefillData?.grade === 'grade9-12' ? 'selected' : ''}>Grade 9 to 12</option>
                             </select>
-                            <div class="error-message hidden student-grade-error"></div>
+                            <div class="error-message student-grade-error"></div>
                         </div>
                         <div class="form-group">
                             <label>Preferred Start Date <span class="required">*</span></label>
                             <input type="date" class="form-control student-start-date" min="${new Date().toISOString().split('T')[0]}" data-validate="required" value="${prefillData?.startDate || defaultStartDate}">
-                            <div class="error-message hidden student-start-date-error"></div>
+                            <div class="error-message student-start-date-error"></div>
                         </div>
                     </div>
 
@@ -1777,13 +1807,10 @@
                     </div>
                 `).join('');
 
-                // 2. Extracurricular HTML - MODIFIED FOR GLOBAL DISCOVERY
+                // 2. Extracurricular HTML
                 const extracurriculars = CONFIG.EXTRACURRICULAR_FEES.map(activity => {
-                    // Check if this is the Global Discovery Club
                     const isGlobalDiscovery = activity.id === 'global_discovery';
                     
-                    // If it is Global Discovery, show ONE 'Monthly' button. 
-                    // Otherwise, show the standard Once/Twice buttons.
                     let buttonsHTML;
                     
                     if (isGlobalDiscovery) {
@@ -1942,13 +1969,13 @@
             updateRemoveButtons() {
                 const buttons = document.querySelectorAll('.remove-student');
                 buttons.forEach(btn => {
-                    if (this.studentCount > 1) btn.classList.remove('hidden');
-                    else btn.classList.add('hidden');
+                    if (this.studentCount > 1) btn.style.display = 'flex';
+                    else btn.style.display = 'none';
                 });
             }
 
             // ==============================================
-            // FEE CALCULATION - FIXED PRORATION LOGIC
+            // FEE CALCULATION
             // ==============================================
             
             calculateProratedAmount(totalAcademicFee, startDate) {
@@ -1991,9 +2018,6 @@
                     // Calculate deduction for display
                     const deductionAmount = totalAcademicFee - proratedAmountToPay;
                     
-                    console.log(`Prorated calculation: Start Date: ${startDate}, Day ${dayOfMonth} of ${daysInMonth}, ${daysRemaining} days remaining, Full Fee: ₦${totalAcademicFee}, To Pay: ₦${proratedAmountToPay}, Deduction: ₦${deductionAmount}`);
-                    
-                    // Return both: amount to pay AND deduction for display
                     return {
                         toPay: proratedAmountToPay,
                         deduction: deductionAmount,
@@ -2002,7 +2026,6 @@
                         dayOfMonth: dayOfMonth
                     };
                 } catch (error) {
-                    console.error('Error in prorated calculation:', error);
                     return {
                         toPay: totalAcademicFee,
                         deduction: 0,
@@ -2026,7 +2049,7 @@
                 
                 const studentEntries = document.querySelectorAll('.student-entry');
                 
-                // --- FEE BREAKDOWN PREPARATION ---
+                // Fee breakdown preparation
                 const breakdownContainer = document.getElementById('fee-details');
                 breakdownContainer.innerHTML = '';
                 
@@ -2094,7 +2117,7 @@
                         }
                     });
 
-                    // Add to Breakdown list
+                    // Add to breakdown list
                     const breakdownItem = document.createElement('div');
                     breakdownItem.className = 'student-fee';
                     breakdownItem.innerHTML = `
@@ -2118,7 +2141,7 @@
                     discount = CONFIG.CONSTANTS.SIBLING_DISCOUNT;
                 }
                 
-                let proratedAmountToPay = totalAcademicFeeAllStudents; // Default to full fee
+                let proratedAmountToPay = totalAcademicFeeAllStudents;
                 let prorationDeduction = 0;
                 let prorationExplanation = '';
                 
@@ -2134,10 +2157,10 @@
                 }
                 
                 const totalPayable = Math.max(0, 
-                    proratedAmountToPay +  // Use the prorated amount to pay (already reduced)
+                    proratedAmountToPay +
                     extracurricularTotal + 
                     testPrepTotal - 
-                    discount  // Only subtract sibling discount now
+                    discount
                 );
                 
                 // Update DOM
@@ -2206,21 +2229,22 @@
                 for (const rule of ruleList) {
                     if (rule === 'required' && !value) {
                         isValid = false;
-                        errorMessage = 'Required';
+                        errorMessage = 'Required field';
                         break;
                     }
                     if (rule === 'email') {
                         const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
                         if (!emailRegex.test(value)) {
                             isValid = false;
-                            errorMessage = 'Invalid Email';
+                            errorMessage = 'Invalid email address';
                             break;
                         }
                     }
                     if (rule === 'phone') {
-                        if (value.length < 10) {
+                        const phoneRegex = /^[\+]?[0-9\s\-\(\)]{10,}$/;
+                        if (!phoneRegex.test(value)) {
                             isValid = false;
-                            errorMessage = 'Invalid Phone';
+                            errorMessage = 'Invalid phone number';
                             break;
                         }
                     }
@@ -2231,12 +2255,12 @@
                 
                 if (errorElement) {
                     if (isValid) {
-                        errorElement.classList.add('hidden');
+                        errorElement.classList.remove('show');
                         input.classList.remove('error');
                         input.classList.add('valid');
                     } else {
                         errorElement.textContent = errorMessage;
-                        errorElement.classList.remove('hidden');
+                        errorElement.classList.add('show');
                         input.classList.add('error');
                         input.classList.remove('valid');
                     }
@@ -2276,7 +2300,7 @@
                         }
                     }
                 } catch (error) {
-                    console.error('Ref validation error', error);
+                    console.error('Referral validation error', error);
                 }
             }
             
@@ -2289,65 +2313,118 @@
             }
 
             // ==============================================
-            // SAVE/RESUME FUNCTIONALITY - COMPLETE FIX
+            // SAVE/RESUME FUNCTIONALITY
             // ==============================================
             
             async saveProgress() {
-                if(!this.validateForm()) {
-                    this.showAlert("Please complete required fields first", "danger");
+                if (this.isSaving) {
+                    this.showAlert("Already saving, please wait...", "warning");
                     return;
                 }
                 
+                if(!this.validateForm()) {
+                    this.showAlert("Please complete all required fields first", "danger");
+                    return;
+                }
+                
+                this.isSaving = true;
+                const saveBtn = document.getElementById('save-progress-btn');
+                const originalBtnText = saveBtn.innerHTML;
+                saveBtn.innerHTML = '<div class="spinner"></div> Saving...';
+                saveBtn.disabled = true;
+                
                 try {
+                    // 1. Collect form data
                     const enrollmentData = this.collectFormData();
                     
-                    // Generate or use existing application ID
+                    // 2. Generate or use existing application ID
                     if (!this.currentApplicationId) {
                         this.currentApplicationId = 'BKH-' + Date.now() + '-' + Math.random().toString(36).substr(2, 5).toUpperCase();
                     }
                     
+                    // 3. Prepare data for Firebase
                     enrollmentData.id = this.currentApplicationId;
                     enrollmentData.lastSaved = new Date().toISOString();
                     enrollmentData.status = 'draft';
                     enrollmentData.createdAt = enrollmentData.createdAt || new Date().toISOString();
                     
-                    // Save to Firebase
+                    // 4. Save to Firebase
                     if (this.db) {
-                        await this.db.collection('enrollments').doc(this.currentApplicationId).set(enrollmentData, { merge: true });
-                        console.log('Saved enrollment data with ID:', this.currentApplicationId);
+                        await this.db.collection('enrollments').doc(this.currentApplicationId).set(enrollmentData);
                         
-                        // Generate resume link
-                        const resumeLink = window.location.origin + window.location.pathname + '?resume=' + this.currentApplicationId;
+                        // 5. Verify the save by reading back
+                        const verifyDoc = await this.db.collection('enrollments').doc(this.currentApplicationId).get();
                         
-                        // Update UI
-                        document.getElementById('saved-app-id').textContent = this.currentApplicationId;
-                        document.getElementById('resume-link').textContent = resumeLink;
-                        document.getElementById('confirmation-message').classList.remove('hidden');
+                        if (verifyDoc.exists) {
+                            // Generate resume link
+                            const resumeLink = window.location.origin + window.location.pathname + '?resume=' + this.currentApplicationId;
+                            
+                            // Update UI
+                            document.getElementById('saved-app-id').textContent = this.currentApplicationId;
+                            document.getElementById('resume-link').textContent = resumeLink;
+                            document.getElementById('confirmation-message').classList.add('show');
+                            
+                            this.showAlert("Progress saved successfully! Data stored in Firebase.", "success");
+                            
+                            // Store in localStorage for backup
+                            localStorage.setItem('lastEnrollmentId', this.currentApplicationId);
+                            localStorage.setItem('lastEnrollmentData', JSON.stringify(enrollmentData));
+                            localStorage.setItem('lastSaveTimestamp', new Date().toISOString());
+                            
+                            return {
+                                success: true,
+                                appId: this.currentApplicationId,
+                                resumeLink: resumeLink
+                            };
+                        } else {
+                            throw new Error('Document not found after save');
+                        }
                         
-                        this.showAlert("Progress saved successfully! You can resume anytime using the link above.", "success");
-                        
-                        // Store in localStorage for quick access
-                        localStorage.setItem('lastEnrollmentId', this.currentApplicationId);
-                        localStorage.setItem('lastEnrollmentData', JSON.stringify(enrollmentData));
-                        
-                        return {
-                            success: true,
-                            appId: this.currentApplicationId,
-                            resumeLink: resumeLink
-                        };
                     } else {
-                        throw new Error('Database not available');
+                        throw new Error('Database connection not available');
                     }
                     
                 } catch (error) {
-                    console.error('Save error:', error);
-                    this.showAlert("Error saving progress. Please try again.", "danger");
+                    // Provide specific error messages
+                    let errorMsg = "Error saving progress. ";
+                    
+                    if (error.code === 'permission-denied') {
+                        errorMsg += "Permission denied. Check Firebase security rules.";
+                    } else if (error.code === 'unavailable') {
+                        errorMsg += "Network unavailable. Check your internet connection.";
+                    } else if (error.message.includes('quota')) {
+                        errorMsg += "Database quota exceeded. Contact administrator.";
+                    } else {
+                        errorMsg += error.message;
+                    }
+                    
+                    this.showAlert(errorMsg, "danger");
+                    
+                    // Fallback to localStorage
+                    try {
+                        const enrollmentData = this.collectFormData();
+                        const backupId = 'backup_' + Date.now();
+                        localStorage.setItem('enrollment_backup_' + backupId, JSON.stringify({
+                            ...enrollmentData,
+                            backupId: backupId,
+                            timestamp: new Date().toISOString()
+                        }));
+                        this.showAlert("Saved locally as backup. Data will sync when online.", "warning");
+                    } catch (localError) {
+                        console.error('Local storage backup failed:', localError);
+                    }
+                    
                     return { success: false, error: error.message };
+                    
+                } finally {
+                    this.isSaving = false;
+                    saveBtn.innerHTML = originalBtnText;
+                    saveBtn.disabled = false;
                 }
             }
             
             async autoSave() {
-                if (!this.currentApplicationId || this.isLoadingSavedData) return;
+                if (!this.currentApplicationId || this.isLoadingSavedData || this.isSaving) return;
                 
                 try {
                     const enrollmentData = this.collectFormData();
@@ -2355,7 +2432,9 @@
                     
                     if (this.db) {
                         await this.db.collection('enrollments').doc(this.currentApplicationId).update(enrollmentData);
-                        console.log('Auto-saved at:', new Date().toLocaleTimeString());
+                        
+                        // Also update localStorage
+                        localStorage.setItem('lastEnrollmentData', JSON.stringify(enrollmentData));
                     }
                 } catch (error) {
                     console.error('Auto-save error:', error);
@@ -2363,34 +2442,28 @@
             }
             
             collectFormData() {
-                // Get the total fee as a clean number
-                const totalFeeElement = document.getElementById('total-fee');
-                const totalFeeText = totalFeeElement ? totalFeeElement.textContent : '₦0';
+                // Get the total fee
+                const totalFeeText = document.getElementById('total-fee').textContent;
                 const totalFeeValue = parseInt(totalFeeText.replace(/[^0-9]/g, '')) || 0;
                 
                 // Get academic fee
-                const academicFeeElement = document.getElementById('total-academic-fee');
-                const academicFeeText = academicFeeElement ? academicFeeElement.textContent : '₦0';
+                const academicFeeText = document.getElementById('total-academic-fee').textContent;
                 const academicFeeValue = parseInt(academicFeeText.replace(/[^0-9]/g, '')) || 0;
                 
                 // Get extracurricular fee
-                const extracurricularFeeElement = document.getElementById('total-extracurricular-fee');
-                const extracurricularFeeText = extracurricularFeeElement ? extracurricularFeeElement.textContent : '₦0';
+                const extracurricularFeeText = document.getElementById('total-extracurricular-fee').textContent;
                 const extracurricularFeeValue = parseInt(extracurricularFeeText.replace(/[^0-9]/g, '')) || 0;
                 
                 // Get test prep fee
-                const testPrepFeeElement = document.getElementById('total-test-prep-fee');
-                const testPrepFeeText = testPrepFeeElement ? testPrepFeeElement.textContent : '₦0';
+                const testPrepFeeText = document.getElementById('total-test-prep-fee').textContent;
                 const testPrepFeeValue = parseInt(testPrepFeeText.replace(/[^0-9]/g, '')) || 0;
                 
                 // Get prorated amount
-                const proratedElement = document.getElementById('prorated-amount');
-                const proratedText = proratedElement ? proratedElement.textContent : '-₦0';
+                const proratedText = document.getElementById('prorated-amount').textContent;
                 const proratedValue = parseInt(proratedText.replace(/[^0-9]/g, '')) || 0;
                 
                 // Get discount amount
-                const discountElement = document.getElementById('discount-amount');
-                const discountText = discountElement ? discountElement.textContent : '-₦0';
+                const discountText = document.getElementById('discount-amount').textContent;
                 const discountValue = parseInt(discountText.replace(/[^0-9]/g, '')) || 0;
                 
                 const data = {
@@ -2473,42 +2546,41 @@
                         this.isLoadingSavedData = true;
                         this.showAlert("Loading your saved application...", "info");
                         
+                        let loadedData = null;
+                        
+                        // Try Firebase first
                         if (this.db) {
-                            const doc = await this.db.collection('enrollments').doc(resumeId).get();
-                            
-                            if (doc.exists) {
-                                this.appData = doc.data();
-                                this.currentApplicationId = resumeId;
-                                await this.loadSavedData(this.appData);
-                                this.showAlert("Application loaded successfully!", "success");
-                            } else {
-                                // Check localStorage as fallback
-                                const localData = localStorage.getItem('lastEnrollmentData');
-                                if (localData) {
-                                    this.appData = JSON.parse(localData);
-                                    this.currentApplicationId = resumeId;
-                                    await this.loadSavedData(this.appData);
-                                    this.showAlert("Application loaded from local storage!", "success");
-                                } else {
-                                    this.showAlert("Saved application not found. Starting fresh.", "warning");
-                                    this.addStudent();
+                            try {
+                                const doc = await this.db.collection('enrollments').doc(resumeId).get();
+                                
+                                if (doc.exists) {
+                                    this.appData = doc.data();
+                                    loadedData = this.appData;
                                 }
+                            } catch (firebaseError) {
+                                console.warn('Could not load from Firebase:', firebaseError);
                             }
-                        } else {
-                            // Fallback to localStorage if Firebase not available
+                        }
+                        
+                        // If Firebase failed or no data, try localStorage
+                        if (!loadedData) {
                             const localData = localStorage.getItem('lastEnrollmentData');
                             if (localData) {
                                 this.appData = JSON.parse(localData);
-                                this.currentApplicationId = resumeId;
-                                await this.loadSavedData(this.appData);
-                                this.showAlert("Application loaded from local storage!", "success");
-                            } else {
-                                this.showAlert("Starting fresh application.", "info");
-                                this.addStudent();
+                                loadedData = this.appData;
                             }
                         }
+                        
+                        if (loadedData) {
+                            this.currentApplicationId = resumeId;
+                            await this.loadSavedData(loadedData);
+                            this.showAlert("Application loaded successfully!", "success");
+                        } else {
+                            this.showAlert("Saved application not found. Starting fresh.", "warning");
+                            this.addStudent();
+                        }
+                        
                     } catch (error) {
-                        console.error('Error loading saved data:', error);
                         this.showAlert("Error loading saved data. Starting fresh.", "warning");
                         this.addStudent();
                     } finally {
@@ -2669,7 +2741,7 @@
 
             submitEnrollment() {
                 if(!this.validateForm()) {
-                    this.showAlert("Please fix errors before submitting", "danger");
+                    this.showAlert("Please fix all errors before submitting", "danger");
                     return;
                 }
                 
@@ -2677,31 +2749,41 @@
                 btn.innerHTML = '<div class="spinner"></div> Processing...';
                 btn.disabled = true;
                 
-                // Simulate payment processing
-                setTimeout(() => {
-                    this.showAlert("Enrollment Submitted Successfully! Redirecting to payment...", "success");
-                    btn.innerHTML = 'Success!';
-                    
-                    // In a real app, you would redirect to Paystack payment here
-                    // For now, just show the invoice
-                    this.showInvoice();
-                    
-                }, 2000);
+                // Save first, then proceed to payment
+                this.saveProgress().then(result => {
+                    if (result.success) {
+                        setTimeout(() => {
+                            this.showAlert("Enrollment Submitted Successfully! Redirecting to payment...", "success");
+                            btn.innerHTML = 'Success!';
+                            
+                            // Show the invoice
+                            this.showInvoice();
+                            
+                        }, 1000);
+                    } else {
+                        btn.innerHTML = '<i class="fas fa-lock"></i> Proceed to Secure Payment';
+                        btn.disabled = false;
+                        this.showAlert("Failed to save enrollment. Please try again.", "danger");
+                    }
+                });
             }
 
             copyResumeLink(btn) {
                 const text = document.getElementById('resume-link').textContent;
-                navigator.clipboard.writeText(text);
-                btn.textContent = "Copied!";
-                btn.classList.add('copied');
-                setTimeout(() => {
-                    btn.innerHTML = '<i class="fas fa-copy"></i> Copy Link';
-                    btn.classList.remove('copied');
-                }, 2000);
+                navigator.clipboard.writeText(text).then(() => {
+                    btn.textContent = "Copied!";
+                    btn.classList.add('copied');
+                    setTimeout(() => {
+                        btn.innerHTML = '<i class="fas fa-copy"></i> Copy Link';
+                        btn.classList.remove('copied');
+                    }, 2000);
+                });
             }
         }
 
-        // Initialize
+        // ==============================================
+        // INITIALIZE APPLICATION
+        // ==============================================
         document.addEventListener('DOMContentLoaded', () => {
             window.enrollmentApp = new EnrollmentApp();
         });
