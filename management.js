@@ -1,4 +1,3 @@
-
 import { auth, db } from './firebaseConfig.js';
 import { collection, getDocs, doc, getDoc, where, query, orderBy, Timestamp, writeBatch, updateDoc, deleteDoc, setDoc, addDoc, limit, startAfter } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
 import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-auth.js";
@@ -19,7 +18,8 @@ const sessionCache = {
     breakStudents: null,
     parentFeedback: null,
     referralDataMap: null,
-    enrollments: null, // NEW: Added enrollments cache
+    enrollments: null,
+    tutorAssignments: null, // NEW: Cache for tutor assignment history
 };
 
 /**
@@ -29,7 +29,7 @@ const sessionCache = {
  */
 function saveToLocalStorage(key, data) {
     // Don't cache reports to avoid quota issues
-    if (key === 'reports' || key === 'enrollments') {
+    if (key === 'reports' || key === 'enrollments' || key === 'tutorAssignments') {
         sessionCache[key] = data; // Keep in memory only
         return;
     }
@@ -202,7 +202,10 @@ function showEditStudentModal(studentId, studentData, collectionName) {
             closeManagementModal('edit-modal');
             
             // Invalidate the cache to force a refresh of the main view
-            if (collectionName === 'students') invalidateCache('students');
+            if (collectionName === 'students') {
+                invalidateCache('students');
+                invalidateCache('tutorAssignments'); // Invalidate tutor assignments cache
+            }
             if (collectionName === 'pending_students') invalidateCache('pendingStudents');
             
             // Re-load the current view to show changes
@@ -279,7 +282,21 @@ function showAssignStudentModal() {
             tutorName: selectedTutorData.name,
             status: 'approved',
             summerBreak: false,
-            createdAt: Timestamp.now()
+            createdAt: Timestamp.now(),
+            // NEW: Initialize tutor history
+            tutorHistory: [{
+                tutorEmail: selectedTutorData.email,
+                tutorName: selectedTutorData.name,
+                assignedDate: Timestamp.now(),
+                assignedBy: window.userData?.email || 'management',
+                isCurrent: true
+            }],
+            // NEW: Initialize grade history
+            gradeHistory: [{
+                grade: form.elements['assign-grade'].value,
+                changedDate: Timestamp.now(),
+                changedBy: window.userData?.email || 'management'
+            }]
         };
 
         try {
@@ -287,6 +304,7 @@ function showAssignStudentModal() {
             alert(`Student "${newStudentData.studentName}" assigned successfully to ${newStudentData.tutorName}!`);
             closeManagementModal('assign-modal');
             invalidateCache('students');
+            invalidateCache('tutorAssignments');
             renderManagementTutorView(document.getElementById('main-content'));
         } catch (error) {
             console.error("Error assigning student: ", error);
@@ -420,15 +438,36 @@ function showReassignStudentModal() {
             const oldTutor = studentData.tutorEmail;
             const newTutor = selectedTutorData.email;
 
+            // Get existing tutor history
+            const existingHistory = studentData.tutorHistory || [];
+            
+            // Mark current tutor as not current
+            const updatedHistory = existingHistory.map(entry => ({
+                ...entry,
+                isCurrent: false
+            }));
+            
+            // Add new tutor assignment to history
+            updatedHistory.push({
+                tutorEmail: newTutor,
+                tutorName: selectedTutorData.name,
+                assignedDate: Timestamp.now(),
+                assignedBy: window.userData?.email || 'management',
+                isCurrent: true,
+                previousTutor: oldTutor
+            });
+
             await updateDoc(studentRef, {
                 tutorEmail: newTutor,
                 tutorName: selectedTutorData.name,
-                lastUpdated: Timestamp.now()
+                lastUpdated: Timestamp.now(),
+                tutorHistory: updatedHistory
             });
 
             alert(`Student "${studentData.studentName}" reassigned from ${oldTutor} to ${selectedTutorData.name} successfully!`);
             closeManagementModal('reassign-modal');
             invalidateCache('students');
+            invalidateCache('tutorAssignments');
             renderManagementTutorView(document.getElementById('main-content'));
 
         } catch (error) {
@@ -443,8 +482,9 @@ async function handleDeleteStudent(studentId) {
         try {
             await deleteDoc(doc(db, "students", studentId));
             alert("Student deleted successfully!");
-            invalidateCache('students'); // Invalidate cache
-            renderManagementTutorView(document.getElementById('main-content')); // Rerender
+            invalidateCache('students');
+            invalidateCache('tutorAssignments');
+            renderManagementTutorView(document.getElementById('main-content'));
         } catch (error) {
             console.error("Error removing student: ", error);
             alert("Error deleting student. Check the console for details.");
@@ -464,13 +504,33 @@ async function handleApproveStudent(studentId) {
             const studentData = studentDoc.data();
             const batch = writeBatch(db);
             const newStudentRef = doc(db, "students", studentId);
-            batch.set(newStudentRef, { ...studentData, status: 'approved' });
+            
+            // Prepare student data with tutor history
+            const studentWithHistory = {
+                ...studentData,
+                status: 'approved',
+                tutorHistory: [{
+                    tutorEmail: studentData.tutorEmail,
+                    tutorName: studentData.tutorName || studentData.tutorEmail,
+                    assignedDate: Timestamp.now(),
+                    assignedBy: window.userData?.email || 'management',
+                    isCurrent: true
+                }],
+                gradeHistory: [{
+                    grade: studentData.grade || 'Unknown',
+                    changedDate: Timestamp.now(),
+                    changedBy: window.userData?.email || 'management'
+                }]
+            };
+            
+            batch.set(newStudentRef, studentWithHistory);
             batch.delete(studentRef);
             await batch.commit();
             alert("Student approved successfully!");
-            invalidateCache('pendingStudents'); // Invalidate cache
+            invalidateCache('pendingStudents');
             invalidateCache('students');
-            renderPendingApprovalsPanel(document.getElementById('main-content')); // Re-fetch and render the current panel
+            invalidateCache('tutorAssignments');
+            renderPendingApprovalsPanel(document.getElementById('main-content'));
         } catch (error) {
             console.error("Error approving student: ", error);
             alert("Error approving student. Check the console for details.");
@@ -483,8 +543,8 @@ async function handleRejectStudent(studentId) {
         try {
             await deleteDoc(doc(db, "pending_students", studentId));
             alert("Student rejected successfully!");
-            invalidateCache('pendingStudents'); // Invalidate cache
-            renderPendingApprovalsPanel(document.getElementById('main-content')); // Re-fetch and render
+            invalidateCache('pendingStudents');
+            renderPendingApprovalsPanel(document.getElementById('main-content'));
         } catch (error) {
             console.error("Error rejecting student: ", error);
             alert("Error rejecting student. Check the console for details.");
@@ -493,7 +553,7 @@ async function handleRejectStudent(studentId) {
 }
 
 // ##################################
-// # REFERRAL MANAGEMENT FUNCTIONS (PHASE 4: NEW)
+// # REFERRAL MANAGEMENT FUNCTIONS - FIXED PARENT NAMES
 // ##################################
 
 /**
@@ -504,8 +564,61 @@ function formatNaira(amount) {
 }
 
 /**
- * Loads the Referral Tracking dashboard for admin view.
- * @param {HTMLElement} mainContent The container element to render into.
+ * FIXED: Enhanced function to get parent name from multiple sources
+ */
+async function getParentNameFromMultipleSources(parentEmail, parentUid) {
+    try {
+        // 1. Try to get from parent_users collection first
+        if (parentUid) {
+            const parentDoc = await getDoc(doc(db, 'parent_users', parentUid));
+            if (parentDoc.exists()) {
+                const parentData = parentDoc.data();
+                if (parentData.name && parentData.name.trim() !== '') {
+                    return capitalize(parentData.name);
+                }
+            }
+        }
+        
+        // 2. Try to get from tutor_submissions (where parent names are often stored)
+        if (parentEmail) {
+            const submissionsQuery = query(
+                collection(db, 'tutor_submissions'),
+                where('parentEmail', '==', parentEmail),
+                limit(1)
+            );
+            const submissionsSnapshot = await getDocs(submissionsQuery);
+            if (!submissionsSnapshot.empty) {
+                const submissionData = submissionsSnapshot.docs[0].data();
+                if (submissionData.parentName && submissionData.parentName.trim() !== '') {
+                    return capitalize(submissionData.parentName);
+                }
+            }
+        }
+        
+        // 3. Try to get from enrollments (where parent info is comprehensive)
+        const enrollmentsQuery = query(
+            collection(db, 'enrollments'),
+            where('parent.email', '==', parentEmail),
+            limit(1)
+        );
+        const enrollmentsSnapshot = await getDocs(enrollmentsQuery);
+        if (!enrollmentsSnapshot.empty) {
+            const enrollmentData = enrollmentsSnapshot.docs[0].data();
+            if (enrollmentData.parent?.name && enrollmentData.parent.name.trim() !== '') {
+                return capitalize(enrollmentData.parent.name);
+            }
+        }
+        
+        // 4. Fallback to email or UID
+        return parentEmail || parentUid || 'Unknown Parent';
+    } catch (error) {
+        console.error("Error fetching parent name:", error);
+        return parentEmail || parentUid || 'Unknown Parent';
+    }
+}
+
+/**
+ * FIXED: Loads the Referral Tracking dashboard with proper parent names
  */
 async function renderReferralsAdminPanel(container) {
     container.innerHTML = '<div class="text-center py-8"><div class="loading-spinner mx-auto" style="width: 40px; height: 40px;"></div><p class="text-green-600 font-semibold mt-4">Loading referral tracking data...</p></div>';
@@ -520,28 +633,45 @@ async function renderReferralsAdminPanel(container) {
 
         const referralDataMap = {};
 
-        // 2. Process Parents (Initialization)
-        parentsSnapshot.forEach(doc => {
-            const data = doc.data();
-            referralDataMap[doc.id] = {
-                uid: doc.id,
-                name: capitalize(data.name || 'N/A'),
+        // 2. Process Parents with enhanced name fetching
+        for (const parentDoc of parentsSnapshot.docs) {
+            const data = parentDoc.data();
+            const parentUid = parentDoc.id;
+            
+            // Get parent name from multiple sources
+            const parentName = await getParentNameFromMultipleSources(data.email, parentUid);
+            
+            referralDataMap[parentUid] = {
+                uid: parentUid,
+                name: parentName,
                 email: data.email || 'N/A',
                 referralCode: data.referralCode || 'N/A',
                 referralEarnings: data.referralEarnings || 0,
-                // New parent fields
                 bankName: data.bankName || 'N/A',
                 accountNumber: data.accountNumber || 'N/A',
-                // Transaction aggregation fields
                 totalReferrals: 0,
                 pendingReferrals: 0,
                 approvedReferrals: 0,
                 paidReferrals: 0,
                 transactions: []
             };
-        });
+        }
 
         // 3. Process Transactions (Aggregation)
+        // Also fetch enrollments to get referral code usage
+        const enrollmentsSnapshot = await getDocs(collection(db, 'enrollments'));
+        const enrollmentsByReferralCode = {};
+        
+        enrollmentsSnapshot.docs.forEach(doc => {
+            const enrollment = doc.data();
+            if (enrollment.referral?.code) {
+                if (!enrollmentsByReferralCode[enrollment.referral.code]) {
+                    enrollmentsByReferralCode[enrollment.referral.code] = [];
+                }
+                enrollmentsByReferralCode[enrollment.referral.code].push(enrollment);
+            }
+        });
+
         transactionsSnapshot.forEach(doc => {
             const data = doc.data();
             const ownerUid = data.ownerUid;
@@ -551,7 +681,6 @@ async function renderReferralsAdminPanel(container) {
                 parentData.transactions.push({
                     id: doc.id,
                     ...data,
-                    // Convert Firebase Timestamp to a readable format
                     refereeJoinDate: data.refereeJoinDate ? data.refereeJoinDate.toDate().toLocaleDateString() : 'N/A'
                 });
 
@@ -562,10 +691,22 @@ async function renderReferralsAdminPanel(container) {
             }
         });
 
+        // 4. Update with enrollment referral data
+        Object.values(referralDataMap).forEach(parent => {
+            const enrollmentReferrals = enrollmentsByReferralCode[parent.referralCode] || [];
+            parent.totalReferrals += enrollmentReferrals.length;
+            parent.pendingReferrals += enrollmentReferrals.filter(e => 
+                e.status === 'pending' || e.status === 'draft'
+            ).length;
+            parent.approvedReferrals += enrollmentReferrals.filter(e => 
+                e.status === 'completed' || e.status === 'payment_received'
+            ).length;
+        });
+
         // Store in cache for quick modal access
         saveToLocalStorage('referralDataMap', referralDataMap);
 
-        // 4. Render HTML
+        // 5. Render HTML
         let tableRows = '';
         const sortedParents = Object.values(referralDataMap).sort((a, b) => b.referralEarnings - a.referralEarnings);
 
@@ -576,7 +717,9 @@ async function renderReferralsAdminPanel(container) {
                 tableRows += `
                     <tr class="border-b hover:bg-gray-50">
                         <td class="px-6 py-4 font-medium text-gray-900">${parent.name}</td>
-                        <td class="px-6 py-4">${parent.referralCode}</td>
+                        <td class="px-6 py-4">
+                            <span class="font-mono bg-gray-100 px-2 py-1 rounded">${parent.referralCode}</span>
+                        </td>
                         <td class="px-6 py-4 text-center">${parent.totalReferrals}</td>
                         <td class="px-6 py-4 text-center text-yellow-600 font-semibold">${parent.pendingReferrals}</td>
                         <td class="px-6 py-4 font-bold text-green-600">${formatNaira(parent.referralEarnings)}</td>
@@ -614,7 +757,7 @@ async function renderReferralsAdminPanel(container) {
             </div>
         `;
 
-        // Attach global functions to the window object so they can be called from onclick attributes
+        // Attach global functions to the window object
         window.showReferralDetailsModal = showReferralDetailsModal;
     } catch (error) {
         console.error("Error loading referral data: ", error);
@@ -780,7 +923,6 @@ async function updateReferralStatus(parentUid, transactionId, newStatus) {
     }
 }
 
-
 /**
  * Clears the parent's referralEarnings and marks all 'approved' transactions as 'paid'.
  * @param {string} parentUid The UID of the parent.
@@ -839,9 +981,172 @@ async function resetParentBalance(parentUid, currentEarnings) {
 }
 
 // ##################################
-// # ENROLLMENT MANAGEMENT PANEL - NEW
+// # ENROLLMENT MANAGEMENT PANEL - ENHANCED WITH TUTOR HISTORY
 // ##################################
 
+// NEW: Function to fetch tutor assignment history for students
+async function fetchTutorAssignmentHistory() {
+    try {
+        const studentsSnapshot = await getDocs(collection(db, "students"));
+        const tutorAssignments = {};
+        
+        studentsSnapshot.docs.forEach(doc => {
+            const studentData = doc.data();
+            const studentId = doc.id;
+            
+            if (studentData.tutorHistory && Array.isArray(studentData.tutorHistory)) {
+                tutorAssignments[studentId] = {
+                    studentName: studentData.studentName,
+                    currentTutor: studentData.tutorEmail,
+                    currentTutorName: studentData.tutorName,
+                    tutorHistory: studentData.tutorHistory.sort((a, b) => {
+                        const dateA = a.assignedDate?.toDate?.() || new Date(0);
+                        const dateB = b.assignedDate?.toDate?.() || new Date(0);
+                        return dateB - dateA;
+                    }),
+                    gradeHistory: studentData.gradeHistory || []
+                };
+            } else if (studentData.tutorEmail) {
+                // Legacy data: create history from current tutor
+                tutorAssignments[studentId] = {
+                    studentName: studentData.studentName,
+                    currentTutor: studentData.tutorEmail,
+                    currentTutorName: studentData.tutorName,
+                    tutorHistory: [{
+                        tutorEmail: studentData.tutorEmail,
+                        tutorName: studentData.tutorName || studentData.tutorEmail,
+                        assignedDate: studentData.createdAt || Timestamp.now(),
+                        assignedBy: 'system',
+                        isCurrent: true
+                    }],
+                    gradeHistory: studentData.gradeHistory || [{
+                        grade: studentData.grade || 'Unknown',
+                        changedDate: studentData.createdAt || Timestamp.now(),
+                        changedBy: 'system'
+                    }]
+                };
+            }
+        });
+        
+        saveToLocalStorage('tutorAssignments', tutorAssignments);
+        return tutorAssignments;
+    } catch (error) {
+        console.error("Error fetching tutor assignment history:", error);
+        return {};
+    }
+}
+
+// NEW: Function to display tutor history for a student
+function showTutorHistoryModal(studentId, studentData, tutorAssignments) {
+    const studentHistory = tutorAssignments[studentId];
+    if (!studentHistory) {
+        alert("No tutor history found for this student.");
+        return;
+    }
+
+    const tutorHistoryHTML = studentHistory.tutorHistory.map((assignment, index) => {
+        const assignedDate = assignment.assignedDate?.toDate?.() || new Date();
+        const isCurrent = assignment.isCurrent ? '<span class="ml-2 bg-green-100 text-green-800 text-xs px-2 py-1 rounded-full">Current</span>' : '';
+        
+        return `
+            <tr class="hover:bg-gray-50">
+                <td class="px-4 py-3">${index + 1}</td>
+                <td class="px-4 py-3 font-medium">${assignment.tutorName || assignment.tutorEmail}</td>
+                <td class="px-4 py-3">${assignment.tutorEmail}</td>
+                <td class="px-4 py-3">${assignedDate.toLocaleDateString()}</td>
+                <td class="px-4 py-3">${assignment.assignedBy || 'System'}</td>
+                <td class="px-4 py-3">${isCurrent}</td>
+            </tr>
+        `;
+    }).join('');
+
+    const gradeHistoryHTML = studentHistory.gradeHistory.map((gradeChange, index) => {
+        const changedDate = gradeChange.changedDate?.toDate?.() || new Date();
+        
+        return `
+            <tr class="hover:bg-gray-50">
+                <td class="px-4 py-3">${index + 1}</td>
+                <td class="px-4 py-3 font-medium">${gradeChange.grade}</td>
+                <td class="px-4 py-3">${changedDate.toLocaleDateString()}</td>
+                <td class="px-4 py-3">${gradeChange.changedBy || 'System'}</td>
+            </tr>
+        `;
+    }).join('');
+
+    const modalHtml = `
+        <div id="tutorHistoryModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-center justify-center">
+            <div class="relative p-8 bg-white w-full max-w-6xl rounded-lg shadow-2xl">
+                <button class="absolute top-2 right-2 text-gray-500 hover:text-gray-800 text-2xl font-bold" onclick="closeManagementModal('tutorHistoryModal')">&times;</button>
+                <h3 class="text-2xl font-bold mb-4 text-blue-700">Tutor & Grade History for ${studentData.studentName}</h3>
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                    <div class="bg-blue-50 p-4 rounded-lg">
+                        <h4 class="font-bold text-lg mb-2 text-blue-800">Current Information</h4>
+                        <p><strong>Tutor:</strong> ${studentData.tutorName || studentData.tutorEmail}</p>
+                        <p><strong>Grade:</strong> ${studentData.grade || 'N/A'}</p>
+                        <p><strong>Subjects:</strong> ${Array.isArray(studentData.subjects) ? studentData.subjects.join(', ') : studentData.subjects || 'N/A'}</p>
+                        <p><strong>Days/Week:</strong> ${studentData.days || 'N/A'}</p>
+                    </div>
+                    <div class="bg-green-50 p-4 rounded-lg">
+                        <h4 class="font-bold text-lg mb-2 text-green-800">Parent Information</h4>
+                        <p><strong>Parent:</strong> ${studentData.parentName || 'N/A'}</p>
+                        <p><strong>Phone:</strong> ${studentData.parentPhone || 'N/A'}</p>
+                        <p><strong>Email:</strong> ${studentData.parentEmail || 'N/A'}</p>
+                        <p><strong>Fee:</strong> ₦${(studentData.studentFee || 0).toLocaleString()}</p>
+                    </div>
+                </div>
+                
+                <div class="mb-8">
+                    <h4 class="text-xl font-bold mb-4 text-gray-800">Tutor Assignment History</h4>
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full divide-y divide-gray-200">
+                            <thead class="bg-gray-50">
+                                <tr>
+                                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">#</th>
+                                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Tutor Name</th>
+                                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Tutor Email</th>
+                                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Assigned Date</th>
+                                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Assigned By</th>
+                                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                                </tr>
+                            </thead>
+                            <tbody class="bg-white divide-y divide-gray-200">
+                                ${tutorHistoryHTML}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                
+                <div>
+                    <h4 class="text-xl font-bold mb-4 text-gray-800">Grade Progression History</h4>
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full divide-y divide-gray-200">
+                            <thead class="bg-gray-50">
+                                <tr>
+                                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">#</th>
+                                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Grade</th>
+                                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Changed Date</th>
+                                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Changed By</th>
+                                </tr>
+                            </thead>
+                            <tbody class="bg-white divide-y divide-gray-200">
+                                ${gradeHistoryHTML}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                
+                <div class="flex justify-end mt-6 pt-6 border-t">
+                    <button onclick="closeManagementModal('tutorHistoryModal')" class="px-4 py-2 bg-gray-300 text-gray-700 rounded hover:bg-gray-400">Close</button>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+}
+
+// ENHANCED: Enrollment panel with tutor history
 async function renderEnrollmentsPanel(container) {
     container.innerHTML = `
         <div class="bg-white p-6 rounded-lg shadow-md">
@@ -850,6 +1155,7 @@ async function renderEnrollmentsPanel(container) {
                 <div class="flex items-center gap-4">
                     <input type="search" id="enrollments-search" placeholder="Search enrollments..." class="p-2 border rounded-md w-64">
                     <button id="refresh-enrollments-btn" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Refresh</button>
+                    <button id="view-tutor-history-btn" class="bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700 hidden">View Tutor History</button>
                 </div>
             </div>
             
@@ -867,8 +1173,8 @@ async function renderEnrollmentsPanel(container) {
                     <p id="pending-enrollments" class="text-2xl font-extrabold">0</p>
                 </div>
                 <div class="bg-purple-100 p-3 rounded-lg text-center shadow w-full">
-                    <h4 class="font-bold text-purple-800 text-sm">Completed</h4>
-                    <p id="completed-enrollments" class="text-2xl font-extrabold">0</p>
+                    <h4 class="font-bold text-purple-800 text-sm">With Tutor History</h4>
+                    <p id="history-enrollments" class="text-2xl font-extrabold">0</p>
                 </div>
             </div>
 
@@ -883,6 +1189,11 @@ async function renderEnrollmentsPanel(container) {
                     </select>
                     <input type="date" id="date-from" class="p-2 border rounded-md" placeholder="From Date">
                     <input type="date" id="date-to" class="p-2 border rounded-md" placeholder="To Date">
+                    <select id="referral-filter" class="p-2 border rounded-md">
+                        <option value="">All Referrals</option>
+                        <option value="with_referral">With Referral Code</option>
+                        <option value="without_referral">Without Referral Code</option>
+                    </select>
                 </div>
             </div>
 
@@ -895,6 +1206,7 @@ async function renderEnrollmentsPanel(container) {
                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Students</th>
                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total Fee</th>
                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Referral Code</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Assigned Tutor(s)</th>
                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Created</th>
                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
@@ -902,7 +1214,7 @@ async function renderEnrollmentsPanel(container) {
                     </thead>
                     <tbody id="enrollments-list" class="bg-white divide-y divide-gray-200">
                         <tr>
-                            <td colspan="8" class="px-6 py-4 text-center text-gray-500">Loading enrollments...</td>
+                            <td colspan="9" class="px-6 py-4 text-center text-gray-500">Loading enrollments...</td>
                         </tr>
                     </tbody>
                 </table>
@@ -916,22 +1228,25 @@ async function renderEnrollmentsPanel(container) {
     document.getElementById('status-filter').addEventListener('change', applyEnrollmentFilters);
     document.getElementById('date-from').addEventListener('change', applyEnrollmentFilters);
     document.getElementById('date-to').addEventListener('change', applyEnrollmentFilters);
+    document.getElementById('referral-filter').addEventListener('change', applyEnrollmentFilters);
 
     // Load initial data
-    fetchAndRenderEnrollments();
+    await fetchAndRenderEnrollments();
 }
 
 async function fetchAndRenderEnrollments(forceRefresh = false) {
     if (forceRefresh) {
         invalidateCache('enrollments');
+        invalidateCache('tutorAssignments');
     }
 
     const enrollmentsList = document.getElementById('enrollments-list');
     if (!enrollmentsList) return;
 
     try {
+        // Fetch enrollments data
         if (!sessionCache.enrollments || forceRefresh) {
-            enrollmentsList.innerHTML = `<tr><td colspan="8" class="px-6 py-4 text-center text-gray-500">Fetching enrollments...</td></tr>`;
+            enrollmentsList.innerHTML = `<tr><td colspan="9" class="px-6 py-4 text-center text-gray-500">Fetching enrollments...</td></tr>`;
             
             const snapshot = await getDocs(query(collection(db, "enrollments"), orderBy("createdAt", "desc")));
             const enrollmentsData = snapshot.docs.map(doc => ({ 
@@ -942,15 +1257,21 @@ async function fetchAndRenderEnrollments(forceRefresh = false) {
             saveToLocalStorage('enrollments', enrollmentsData);
         }
         
+        // Fetch tutor assignment history
+        if (!sessionCache.tutorAssignments || forceRefresh) {
+            await fetchTutorAssignmentHistory();
+        }
+        
         renderEnrollmentsFromCache();
     } catch (error) {
         console.error("Error fetching enrollments:", error);
-        enrollmentsList.innerHTML = `<tr><td colspan="8" class="px-6 py-4 text-center text-red-500">Failed to load enrollments: ${error.message}</td></tr>`;
+        enrollmentsList.innerHTML = `<tr><td colspan="9" class="px-6 py-4 text-center text-red-500">Failed to load enrollments: ${error.message}</td></tr>`;
     }
 }
 
 function renderEnrollmentsFromCache(searchTerm = '') {
     const enrollments = sessionCache.enrollments || [];
+    const tutorAssignments = sessionCache.tutorAssignments || {};
     const enrollmentsList = document.getElementById('enrollments-list');
     if (!enrollmentsList) return;
 
@@ -958,6 +1279,7 @@ function renderEnrollmentsFromCache(searchTerm = '') {
     const statusFilter = document.getElementById('status-filter')?.value || '';
     const dateFrom = document.getElementById('date-from')?.value;
     const dateTo = document.getElementById('date-to')?.value;
+    const referralFilter = document.getElementById('referral-filter')?.value || '';
     
     const lowerCaseSearchTerm = searchTerm.toLowerCase();
     
@@ -993,6 +1315,10 @@ function renderEnrollmentsFromCache(searchTerm = '') {
             if (createdDate > toDate) return false;
         }
         
+        // Referral filter
+        if (referralFilter === 'with_referral' && !enrollment.referral?.code) return false;
+        if (referralFilter === 'without_referral' && enrollment.referral?.code) return false;
+        
         return true;
     });
 
@@ -1000,17 +1326,26 @@ function renderEnrollmentsFromCache(searchTerm = '') {
     const total = enrollments.length;
     const draft = enrollments.filter(e => e.status === 'draft').length;
     const pending = enrollments.filter(e => e.status === 'pending').length;
-    const completed = enrollments.filter(e => e.status === 'completed' || e.status === 'payment_received').length;
+    
+    // Count enrollments with students who have tutor history
+    const historyEnrollments = enrollments.filter(enrollment => {
+        return enrollment.students?.some(student => {
+            // Try to find student by name in tutor assignments
+            return Object.values(tutorAssignments).some(assignment => 
+                assignment.studentName === student.name
+            );
+        });
+    }).length;
     
     document.getElementById('total-enrollments').textContent = total;
     document.getElementById('draft-enrollments').textContent = draft;
     document.getElementById('pending-enrollments').textContent = pending;
-    document.getElementById('completed-enrollments').textContent = completed;
+    document.getElementById('history-enrollments').textContent = historyEnrollments;
 
     if (filteredEnrollments.length === 0) {
         enrollmentsList.innerHTML = `
             <tr>
-                <td colspan="8" class="px-6 py-4 text-center text-gray-500">
+                <td colspan="9" class="px-6 py-4 text-center text-gray-500">
                     No enrollments found${searchTerm ? ` for "${searchTerm}"` : ''}.
                 </td>
             </tr>
@@ -1027,7 +1362,6 @@ function renderEnrollmentsFromCache(searchTerm = '') {
         }
         
         if (typeof feeValue === 'string') {
-            // Remove all non-numeric characters except decimal point and minus sign
             const cleaned = feeValue
                 .replace(/[^0-9.-]/g, '')
                 .trim();
@@ -1039,6 +1373,31 @@ function renderEnrollmentsFromCache(searchTerm = '') {
         return 0;
     }
 
+    // Function to get tutor assignments for a student
+    function getTutorAssignmentsForStudent(studentName) {
+        const assignment = Object.values(tutorAssignments).find(a => 
+            a.studentName === studentName
+        );
+        
+        if (!assignment) return 'Not assigned yet';
+        
+        // Get all unique tutors from history
+        const uniqueTutors = [];
+        assignment.tutorHistory.forEach(history => {
+            if (!uniqueTutors.some(t => t.email === history.tutorEmail)) {
+                uniqueTutors.push({
+                    name: history.tutorName || history.tutorEmail,
+                    email: history.tutorEmail,
+                    isCurrent: history.isCurrent
+                });
+            }
+        });
+        
+        return uniqueTutors.map(tutor => 
+            `${tutor.name}${tutor.isCurrent ? ' (Current)' : ''}`
+        ).join(', ');
+    }
+
     // Render enrollments table
     const tableRows = filteredEnrollments.map(enrollment => {
         const createdAt = enrollment.createdAt ? new Date(enrollment.createdAt).toLocaleDateString() : 
@@ -1046,6 +1405,11 @@ function renderEnrollmentsFromCache(searchTerm = '') {
         
         const studentCount = enrollment.students?.length || 0;
         const studentNames = enrollment.students?.map(s => s.name).join(', ') || 'No students';
+        
+        // Get tutor assignments for each student
+        const tutorAssignmentsList = enrollment.students?.map(student => 
+            `${student.name}: ${getTutorAssignmentsForStudent(student.name)}`
+        ).join('; ') || 'No tutor assignments';
         
         // Status badge
         let statusBadge = '';
@@ -1064,12 +1428,15 @@ function renderEnrollmentsFromCache(searchTerm = '') {
                 statusBadge = `<span class="px-2 py-1 text-xs rounded-full bg-gray-100 text-gray-800">${enrollment.status || 'Unknown'}</span>`;
         }
         
-        // Total fee - Use consistent parsing
+        // Total fee
         const totalFeeAmount = parseFeeValue(enrollment.summary?.totalFee);
         const formattedFee = totalFeeAmount > 0 ? `₦${totalFeeAmount.toLocaleString()}` : '₦0';
         
         // Referral code
         const referralCode = enrollment.referral?.code || 'None';
+        const referralDisplay = referralCode !== 'None' ? 
+            `<span class="font-mono bg-indigo-100 px-2 py-1 rounded text-indigo-800">${referralCode}</span>` : 
+            '<span class="text-gray-500">None</span>';
         
         return `
             <tr class="hover:bg-gray-50">
@@ -1087,8 +1454,9 @@ function renderEnrollmentsFromCache(searchTerm = '') {
                     <div class="text-xs text-gray-500 truncate max-w-xs">${studentNames}</div>
                 </td>
                 <td class="px-6 py-4 text-sm font-semibold text-green-600">${formattedFee}</td>
-                <td class="px-6 py-4 text-sm">
-                    <span class="font-mono bg-gray-100 px-2 py-1 rounded">${referralCode}</span>
+                <td class="px-6 py-4 text-sm">${referralDisplay}</td>
+                <td class="px-6 py-4 text-sm text-gray-700 max-w-xs">
+                    <div class="text-xs">${tutorAssignmentsList}</div>
                 </td>
                 <td class="px-6 py-4">${statusBadge}</td>
                 <td class="px-6 py-4 text-sm text-gray-500">${createdAt}</td>
@@ -1107,6 +1475,23 @@ function renderEnrollmentsFromCache(searchTerm = '') {
     }).join('');
 
     enrollmentsList.innerHTML = tableRows;
+    
+    // Show view tutor history button if there are enrollments with tutor history
+    const viewHistoryBtn = document.getElementById('view-tutor-history-btn');
+    if (viewHistoryBtn) {
+        const hasHistory = Object.keys(tutorAssignments).length > 0;
+        if (hasHistory) {
+            viewHistoryBtn.classList.remove('hidden');
+            viewHistoryBtn.onclick = () => {
+                // Find the first student with history for demo
+                const firstStudentId = Object.keys(tutorAssignments)[0];
+                const firstStudent = sessionCache.students?.find(s => s.id === firstStudentId);
+                if (firstStudent) {
+                    showTutorHistoryModal(firstStudentId, firstStudent, tutorAssignments);
+                }
+            };
+        }
+    }
 }
 
 function filterEnrollments(searchTerm) {
@@ -1117,7 +1502,7 @@ function applyEnrollmentFilters() {
     renderEnrollmentsFromCache(document.getElementById('enrollments-search').value);
 }
 
-// Global function to show enrollment details modal
+// Global function to show enrollment details modal - ENHANCED
 window.showEnrollmentDetails = async function(enrollmentId) {
     try {
         const enrollmentDoc = await getDoc(doc(db, "enrollments", enrollmentId));
@@ -1132,7 +1517,10 @@ window.showEnrollmentDetails = async function(enrollmentId) {
         const createdAt = enrollment.createdAt ? new Date(enrollment.createdAt).toLocaleString() : 
                          enrollment.timestamp ? new Date(enrollment.timestamp).toLocaleString() : 'N/A';
         
-        // Build students details HTML
+        // Get tutor assignments for students
+        const tutorAssignments = sessionCache.tutorAssignments || {};
+        
+        // Build students details HTML with tutor history
         let studentsHTML = '';
         if (enrollment.students && enrollment.students.length > 0) {
             studentsHTML = enrollment.students.map(student => {
@@ -1151,6 +1539,26 @@ window.showEnrollmentDetails = async function(enrollmentId) {
                     testPrepHTML = `<p class="text-sm"><strong>Test Prep:</strong> ${student.testPrep.map(t => `${t.name} (${t.hours} hrs)`).join(', ')}</p>`;
                 }
                 
+                // Find tutor history for this student
+                const studentTutorHistory = Object.values(tutorAssignments).find(a => 
+                    a.studentName === student.name
+                );
+                
+                let tutorHistoryHTML = '';
+                if (studentTutorHistory) {
+                    tutorHistoryHTML = `
+                        <div class="mt-3 border-t pt-3">
+                            <h5 class="font-bold text-sm text-purple-700 mb-2">Tutor Assignment History:</h5>
+                            <ul class="text-xs space-y-1">
+                                ${studentTutorHistory.tutorHistory.map((history, idx) => {
+                                    const date = history.assignedDate?.toDate?.() || new Date();
+                                    return `<li>${idx + 1}. ${history.tutorName || history.tutorEmail} - ${date.toLocaleDateString()} ${history.isCurrent ? '(Current)' : ''}</li>`;
+                                }).join('')}
+                            </ul>
+                        </div>
+                    `;
+                }
+                
                 return `
                     <div class="border rounded-lg p-4 mb-3 bg-gray-50">
                         <h4 class="font-bold text-lg mb-2">${student.name || 'Unnamed Student'}</h4>
@@ -1162,6 +1570,7 @@ window.showEnrollmentDetails = async function(enrollmentId) {
                         ${subjectsHTML}
                         ${extracurricularHTML}
                         ${testPrepHTML}
+                        ${tutorHistoryHTML}
                     </div>
                 `;
             }).join('');
@@ -1176,7 +1585,6 @@ window.showEnrollmentDetails = async function(enrollmentId) {
             }
             
             if (typeof feeValue === 'string') {
-                // Remove all non-numeric characters except decimal point and minus sign
                 const cleaned = feeValue
                     .replace(/[^0-9.-]/g, '')
                     .trim();
@@ -1317,6 +1725,20 @@ window.updateEnrollmentStatus = async function(enrollmentId, newStatus) {
     }
 };
 
+// NEW: Global function to view tutor history for a specific student
+window.viewStudentTutorHistory = function(studentId) {
+    const tutorAssignments = sessionCache.tutorAssignments || {};
+    const students = sessionCache.students || [];
+    
+    const student = students.find(s => s.id === studentId);
+    if (!student) {
+        alert("Student not found!");
+        return;
+    }
+    
+    showTutorHistoryModal(studentId, student, tutorAssignments);
+};
+
 // ##################################
 // # PANEL RENDERING FUNCTIONS
 // ##################################
@@ -1331,6 +1753,7 @@ async function renderManagementTutorView(container) {
                     <input type="search" id="directory-search" placeholder="Search Tutors, Students, Parents..." class="p-2 border rounded-md w-64">
                     <button id="assign-student-btn" class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700">Assign New Student</button>
                     <button id="reassign-student-btn" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Reassign Student</button>
+                    <button id="view-tutor-history-directory-btn" class="bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700">View Tutor History</button>
                     <button id="refresh-directory-btn" class="bg-gray-600 text-white px-4 py-2 rounded hover:bg-gray-700">Refresh</button>
                 </div>
             </div>
@@ -1343,6 +1766,10 @@ async function renderManagementTutorView(container) {
                     <h4 class="font-bold text-yellow-800 text-sm">Total Students</h4>
                     <p id="student-count-badge" class="text-2xl font-extrabold">0</p>
                 </div>
+                <div class="bg-purple-100 p-3 rounded-lg text-center shadow w-full">
+                    <h4 class="font-bold text-purple-800 text-sm">Students with History</h4>
+                    <p id="history-count-badge" class="text-2xl font-extrabold">0</p>
+                </div>
             </div>
             <div id="directory-list" class="space-y-4">
                 <p class="text-center text-gray-500 py-10">Loading directory...</p>
@@ -1353,6 +1780,57 @@ async function renderManagementTutorView(container) {
     document.getElementById('reassign-student-btn').addEventListener('click', showReassignStudentModal);
     document.getElementById('refresh-directory-btn').addEventListener('click', () => fetchAndRenderDirectory(true));
     document.getElementById('directory-search').addEventListener('input', (e) => renderDirectoryFromCache(e.target.value));
+    
+    // NEW: View tutor history button
+    document.getElementById('view-tutor-history-directory-btn').addEventListener('click', async () => {
+        if (!sessionCache.tutorAssignments || Object.keys(sessionCache.tutorAssignments).length === 0) {
+            alert("No tutor history available. Please refresh the directory first.");
+            return;
+        }
+        
+        // Create a modal to select a student
+        const students = sessionCache.students || [];
+        if (students.length === 0) {
+            alert("No students found.");
+            return;
+        }
+        
+        const studentOptions = students.map(student => 
+            `<option value="${student.id}">${student.studentName} (${student.grade || 'No grade'})</option>`
+        ).join('');
+        
+        const modalHtml = `
+            <div id="select-student-modal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-center justify-center">
+                <div class="relative p-8 bg-white w-96 max-w-lg rounded-lg shadow-xl">
+                    <button class="absolute top-2 right-2 text-gray-500 hover:text-gray-800 text-2xl font-bold" onclick="closeManagementModal('select-student-modal')">&times;</button>
+                    <h3 class="text-xl font-bold mb-4">Select Student to View Tutor History</h3>
+                    <form id="select-student-form">
+                        <div class="mb-4">
+                            <label class="block text-sm font-medium mb-2">Select Student</label>
+                            <select id="select-student" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2">
+                                <option value="" disabled selected>Select a student...</option>
+                                ${studentOptions}
+                            </select>
+                        </div>
+                        <div class="flex justify-end mt-4">
+                            <button type="button" onclick="closeManagementModal('select-student-modal')" class="mr-2 px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300">Cancel</button>
+                            <button type="submit" class="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700">View History</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        `;
+        
+        document.body.insertAdjacentHTML('beforeend', modalHtml);
+        
+        document.getElementById('select-student-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const studentId = document.getElementById('select-student').value;
+            closeManagementModal('select-student-modal');
+            window.viewStudentTutorHistory(studentId);
+        });
+    });
+    
     fetchAndRenderDirectory();
 }
 
@@ -1360,6 +1838,7 @@ async function fetchAndRenderDirectory(forceRefresh = false) {
     if (forceRefresh) {
         invalidateCache('tutors');
         invalidateCache('students');
+        invalidateCache('tutorAssignments');
     }
 
     try {
@@ -1374,6 +1853,12 @@ async function fetchAndRenderDirectory(forceRefresh = false) {
             saveToLocalStorage('tutors', tutorsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
             saveToLocalStorage('students', studentsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
         }
+        
+        // Fetch tutor assignment history if needed
+        if (!sessionCache.tutorAssignments || forceRefresh) {
+            await fetchTutorAssignmentHistory();
+        }
+        
         renderDirectoryFromCache();
     } catch (error) {
         console.error("Error fetching directory data:", error);
@@ -1384,6 +1869,7 @@ async function fetchAndRenderDirectory(forceRefresh = false) {
 function renderDirectoryFromCache(searchTerm = '') {
     const tutors = sessionCache.tutors || [];
     const students = sessionCache.students || [];
+    const tutorAssignments = sessionCache.tutorAssignments || {};
     const directoryList = document.getElementById('directory-list');
     if (!directoryList) return;
 
@@ -1407,7 +1893,6 @@ function renderDirectoryFromCache(searchTerm = '') {
         const studentMatch = assignedStudents.some(s =>
             s.studentName.toLowerCase().includes(lowerCaseSearchTerm) ||
             (s.parentName && s.parentName.toLowerCase().includes(lowerCaseSearchTerm)) ||
-            // CORRECTED LINE: Safely converts phone number to a string before searching
             (s.parentPhone && String(s.parentPhone).toLowerCase().includes(lowerCaseSearchTerm))
         );
         return tutorMatch || studentMatch;
@@ -1420,6 +1905,10 @@ function renderDirectoryFromCache(searchTerm = '') {
 
     document.getElementById('tutor-count-badge').textContent = tutors.length;
     document.getElementById('student-count-badge').textContent = students.length;
+    
+    // Count students with tutor history
+    const studentsWithHistory = Object.keys(tutorAssignments).length;
+    document.getElementById('history-count-badge').textContent = studentsWithHistory;
 
     const canEditStudents = window.userData?.permissions?.actions?.canEditStudents === true;
     const canDeleteStudents = window.userData?.permissions?.actions?.canDeleteStudents === true;
@@ -1432,7 +1921,6 @@ function renderDirectoryFromCache(searchTerm = '') {
                 tutor.name.toLowerCase().includes(lowerCaseSearchTerm) || // show all if tutor name matches
                 s.studentName.toLowerCase().includes(lowerCaseSearchTerm) ||
                 (s.parentName && s.parentName.toLowerCase().includes(lowerCaseSearchTerm)) ||
-                // CORRECTED LINE: Safely converts phone number to a string before searching
                 (s.parentPhone && String(s.parentPhone).toLowerCase().includes(lowerCaseSearchTerm))
             );
 
@@ -1440,9 +1928,14 @@ function renderDirectoryFromCache(searchTerm = '') {
             .sort((a, b) => a.studentName.localeCompare(b.studentName))
             .map(student => {
                 const subjects = student.subjects && Array.isArray(student.subjects) ? student.subjects.join(', ') : 'N/A';
+                const studentHistory = tutorAssignments[student.id];
+                const historyButton = studentHistory ? 
+                    `<button class="view-history-btn bg-purple-500 text-white px-3 py-1 rounded-full text-xs ml-1" data-student-id="${student.id}">History</button>` : '';
+                
                 const actionButtons = `
                     ${canEditStudents ? `<button class="edit-student-btn bg-blue-500 text-white px-3 py-1 rounded-full text-xs" data-student-id="${student.id}">Edit</button>` : ''}
                     ${canDeleteStudents ? `<button class="delete-student-btn bg-red-500 text-white px-3 py-1 rounded-full text-xs" data-student-id="${student.id}">Delete</button>` : ''}
+                    ${historyButton}
                 `;
                 return `
                     <tr class="hover:bg-gray-50">
@@ -1453,7 +1946,7 @@ function renderDirectoryFromCache(searchTerm = '') {
                         <td class="px-4 py-2">${subjects}</td>
                         <td class="px-4 py-2">${student.parentName || 'N/A'}</td>
                         <td class="px-4 py-2">${student.parentPhone || 'N/A'}</td>
-                        ${showActionsColumn ? `<td class="px-4 py-2">${actionButtons}</td>` : ''}
+                        ${showActionsColumn || historyButton ? `<td class="px-4 py-2">${actionButtons}</td>` : ''}
                     </tr>
                 `;
             }).join('');
@@ -1488,9 +1981,14 @@ function renderDirectoryFromCache(searchTerm = '') {
     if (canDeleteStudents) {
         document.querySelectorAll('.delete-student-btn').forEach(button => button.addEventListener('click', () => handleDeleteStudent(button.dataset.studentId)));
     }
+    
+    // Add event listeners for history buttons
+    document.querySelectorAll('.view-history-btn').forEach(button => {
+        button.addEventListener('click', () => window.viewStudentTutorHistory(button.dataset.studentId));
+    });
 }
 
-// --- Updated Pay Advice Panel ---
+// --- Updated Pay Advice Panel --- (UNCHANGED - kept as is)
 async function renderPayAdvicePanel(container) {
     const canExport = window.userData?.permissions?.actions?.canExportPayAdvice === true;
     container.innerHTML = `
@@ -1883,7 +2381,7 @@ function downloadAsXLS(data, headers, filename) {
     });
 }
 
-// --- Tutor Reports Panel --- (SIMPLIFIED RELIABLE VERSION)
+// --- Tutor Reports Panel --- (UNCHANGED - kept as is)
 async function renderTutorReportsPanel(container) {
     const canDownload = window.userData?.permissions?.actions?.canDownloadReports === true;
     const canExport = window.userData?.permissions?.actions?.canExportPayAdvice === true;
@@ -2526,7 +3024,7 @@ if (!document.querySelector('style[data-reports-panel]')) {
     document.head.appendChild(styleEl);
 }
 
-// --- Pending Approvals Panel ---
+// --- Pending Approvals Panel --- (UNCHANGED - kept as is)
 async function renderPendingApprovalsPanel(container) {
     container.innerHTML = `
         <div class="bg-white p-6 rounded-lg shadow-md">
@@ -2589,7 +3087,7 @@ function renderPendingApprovalsFromCache() {
     document.querySelectorAll('.reject-btn').forEach(button => button.addEventListener('click', () => handleRejectStudent(button.dataset.studentId)));
 }
 
-// --- Summer Break Panel ---
+// --- Summer Break Panel --- (UNCHANGED - kept as is)
 async function renderSummerBreakPanel(container) {
     container.innerHTML = `
         <div class="bg-white p-6 rounded-lg shadow-md">
@@ -2674,7 +3172,7 @@ function renderBreakStudentsFromCache() {
     }
 }
 
-// --- Parent Feedback Panel ---
+// --- Parent Feedback Panel --- (UNCHANGED - kept as is)
 async function renderParentFeedbackPanel(container) {
     container.innerHTML = `
         <div class="bg-white p-6 rounded-lg shadow-md">
@@ -3195,7 +3693,7 @@ const allNavItems = {
     navPendingApprovals: { fn: renderPendingApprovalsPanel, perm: 'viewPendingApprovals', label: 'Pending Approvals' },
     navParentFeedback: { fn: renderParentFeedbackPanel, perm: 'viewParentFeedback', label: 'Parent Feedback' },
     navReferralsAdmin: { fn: renderReferralsAdminPanel, perm: 'viewReferralsAdmin', label: 'Referral Management' },
-    navEnrollments: { fn: renderEnrollmentsPanel, perm: 'viewEnrollments', label: 'Enrollments' } // NEW: Added enrollments tab
+    navEnrollments: { fn: renderEnrollmentsPanel, perm: 'viewEnrollments', label: 'Enrollments' }
 };
 
 // Global modal close function
@@ -3300,4 +3798,3 @@ onAuthStateChanged(auth, async (user) => {
 });
 
 // [End Updated management.js File]
-
