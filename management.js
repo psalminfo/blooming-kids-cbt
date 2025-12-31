@@ -1,3 +1,4 @@
+
 import { auth, db } from './firebaseConfig.js';
 import { collection, getDocs, doc, getDoc, where, query, orderBy, Timestamp, writeBatch, updateDoc, deleteDoc, setDoc, addDoc, limit, startAfter } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
 import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-auth.js";
@@ -495,9 +496,6 @@ async function handleRejectStudent(studentId) {
 // # REFERRAL MANAGEMENT FUNCTIONS (PHASE 4: NEW)
 // ##################################
 
-// Global cache variable
-let referralDataCache = {};
-
 /**
  * Utility function to format amount to Nigerian Naira.
  */
@@ -507,24 +505,20 @@ function formatNaira(amount) {
 
 /**
  * Loads the Referral Tracking dashboard for admin view.
- * @param {HTMLElement} container The container element to render into.
+ * @param {HTMLElement} mainContent The container element to render into.
  */
 async function renderReferralsAdminPanel(container) {
     container.innerHTML = '<div class="text-center py-8"><div class="loading-spinner mx-auto" style="width: 40px; height: 40px;"></div><p class="text-green-600 font-semibold mt-4">Loading referral tracking data...</p></div>';
 
     try {
-        // 1. Fetch all parents with referral codes AND enrollments with referral codes
+        // 1. Fetch all parents with referral codes and all referral transactions
         const parentsQuery = query(collection(db, 'parent_users'), where('referralCode', '!=', null));
-        const enrollmentsQuery = query(collection(db, 'enrollments'), where('referralCode', '!=', null));
-        
-        const [parentsSnapshot, transactionsSnapshot, enrollmentsSnapshot] = await Promise.all([
+        const [parentsSnapshot, transactionsSnapshot] = await Promise.all([
             getDocs(parentsQuery),
-            getDocs(collection(db, 'referral_transactions')),
-            getDocs(enrollmentsQuery)
+            getDocs(collection(db, 'referral_transactions'))
         ]);
 
         const referralDataMap = {};
-        const parentNameMap = {}; // For quick parent name lookup
 
         // 2. Process Parents (Initialization)
         parentsSnapshot.forEach(doc => {
@@ -545,31 +539,12 @@ async function renderReferralsAdminPanel(container) {
                 paidReferrals: 0,
                 transactions: []
             };
-            
-            // Store in name map for quick lookup
-            parentNameMap[data.referralCode] = {
-                uid: doc.id,
-                name: capitalize(data.name || 'N/A')
-            };
         });
 
-        // 3. Process Enrollments to find missing referral codes
-        enrollmentsSnapshot.forEach(doc => {
-            const data = doc.data();
-            const referralCode = data.referralCode;
-            
-            if (referralCode && !parentNameMap[referralCode]) {
-                // This referral code exists in enrollments but not in parent_users
-                // We need to handle this case - either create a placeholder or skip
-                console.warn(`Referral code ${referralCode} found in enrollments but no parent has this code`);
-            }
-        });
-
-        // 4. Process Transactions (Aggregation)
+        // 3. Process Transactions (Aggregation)
         transactionsSnapshot.forEach(doc => {
             const data = doc.data();
             const ownerUid = data.ownerUid;
-            
             if (referralDataMap[ownerUid]) {
                 const parentData = referralDataMap[ownerUid];
                 parentData.totalReferrals++;
@@ -577,25 +552,20 @@ async function renderReferralsAdminPanel(container) {
                     id: doc.id,
                     ...data,
                     // Convert Firebase Timestamp to a readable format
-                    refereeJoinDate: data.refereeJoinDate ? data.refereeJoinDate.toDate().toLocaleDateString() : 'N/A',
-                    // Make sure we have the parent name
-                    parentName: parentData.name || 'Unknown Parent'
+                    refereeJoinDate: data.refereeJoinDate ? data.refereeJoinDate.toDate().toLocaleDateString() : 'N/A'
                 });
 
                 const status = data.status || 'pending';
                 if (status === 'pending') parentData.pendingReferrals++;
                 else if (status === 'approved') parentData.approvedReferrals++;
                 else if (status === 'paid') parentData.paidReferrals++;
-            } else {
-                console.warn(`Transaction ${doc.id} references parent ${ownerUid} but parent not found`);
             }
         });
 
         // Store in cache for quick modal access
-        referralDataCache = referralDataMap; // Store in global variable
         saveToLocalStorage('referralDataMap', referralDataMap);
 
-        // 5. Render HTML
+        // 4. Render HTML
         let tableRows = '';
         const sortedParents = Object.values(referralDataMap).sort((a, b) => b.referralEarnings - a.referralEarnings);
 
@@ -657,19 +627,9 @@ async function renderReferralsAdminPanel(container) {
  * @param {string} parentUid The UID of the parent user.
  */
 function showReferralDetailsModal(parentUid) {
-    // Use the global cache instead of sessionCache
-    const parentData = referralDataCache[parentUid];
-    
-    // Fallback to localStorage if not in cache
+    const parentData = sessionCache.referralDataMap[parentUid];
     if (!parentData) {
-        const cachedData = getFromLocalStorage('referralDataMap');
-        if (cachedData && cachedData[parentUid]) {
-            parentData = cachedData[parentUid];
-        }
-    }
-    
-    if (!parentData) {
-        alert("Referral details not found. Please refresh the page and try again.");
+        alert("Referral details not found in cache.");
         return;
     }
     
@@ -798,16 +758,11 @@ async function updateReferralStatus(parentUid, transactionId, newStatus) {
         // If paying (approved -> paid), earnings are cleared in the resetParentBalance function, not here.
 
         if (earningsChange !== 0) {
-            // Get current earnings from cache first
-            const currentEarnings = referralDataCache[parentUid]?.referralEarnings || 0;
+            // Note: Firebase server-side increment would be safer here, but for simplicity, we use an update
+            const currentEarnings = sessionCache.referralDataMap[parentUid].referralEarnings;
             batch.update(parentRef, {
                 referralEarnings: currentEarnings + earningsChange
             });
-            
-            // Update cache
-            if (referralDataCache[parentUid]) {
-                referralDataCache[parentUid].referralEarnings = currentEarnings + earningsChange;
-            }
         }
 
         await batch.commit();
@@ -870,11 +825,6 @@ async function resetParentBalance(parentUid, currentEarnings) {
 
         await batch.commit();
 
-        // Update cache
-        if (referralDataCache[parentUid]) {
-            referralDataCache[parentUid].referralEarnings = 0;
-        }
-
         alert(`Payout complete. ${approvedSnapshot.size} transactions marked as PAID. Parent earnings reset to ₦0.`);
         
         // Refresh the whole view
@@ -885,55 +835,6 @@ async function resetParentBalance(parentUid, currentEarnings) {
     } catch (error) {
         console.error("Error processing payout and reset: ", error);
         alert("Failed to process payout. Check console for details.");
-    }
-}
-
-/**
- * Helper function to capitalize first letter of each word
- */
-function capitalize(str) {
-    return str.replace(/\b\w/g, char => char.toUpperCase());
-}
-
-/**
- * Helper function to save data to localStorage
- */
-function saveToLocalStorage(key, data) {
-    try {
-        localStorage.setItem(key, JSON.stringify(data));
-    } catch (e) {
-        console.error('Error saving to localStorage:', e);
-    }
-}
-
-/**
- * Helper function to get data from localStorage
- */
-function getFromLocalStorage(key) {
-    try {
-        const data = localStorage.getItem(key);
-        return data ? JSON.parse(data) : null;
-    } catch (e) {
-        console.error('Error reading from localStorage:', e);
-        return null;
-    }
-}
-
-/**
- * Helper function to invalidate cache
- */
-function invalidateCache(key) {
-    localStorage.removeItem(key);
-    referralDataCache = {};
-}
-
-/**
- * Helper function to close modals
- */
-function closeManagementModal(modalId) {
-    const modal = document.getElementById(modalId);
-    if (modal) {
-        modal.remove();
     }
 }
 
@@ -3399,5 +3300,4 @@ onAuthStateChanged(auth, async (user) => {
 });
 
 // [End Updated management.js File]
-
 
