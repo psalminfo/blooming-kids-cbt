@@ -1,3 +1,5 @@
+[file name]: tutor.js
+[file content begin]
 import { auth, db } from './firebaseConfig.js';
 import { collection, getDocs, doc, updateDoc, getDoc, where, query, addDoc, writeBatch, deleteDoc, setDoc } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
 import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-auth.js";
@@ -126,6 +128,55 @@ const SUBJECT_CATEGORIES = {
     "Foreign Language": ["French", "German", "Spanish", "Arabic"],
     "Specialized": ["Music", "Coding","ICT", "Chess", "Public Speaking", "English Proficiency", "Counseling Programs"]
 };
+
+// --- Phone Number Normalization Function ---
+function normalizePhoneNumber(phone) {
+    if (!phone) return '';
+    
+    // Remove all non-digit characters except leading +
+    let cleaned = phone.toString().trim();
+    
+    // If it already starts with +, keep it
+    if (cleaned.startsWith('+')) {
+        // Ensure there are only digits after the +
+        const digits = cleaned.substring(1).replace(/\D/g, '');
+        return '+' + digits;
+    }
+    
+    // If it starts with 0, assume it's a local number and add +234
+    if (cleaned.startsWith('0')) {
+        const digits = cleaned.replace(/\D/g, '');
+        if (digits.startsWith('0')) {
+            return '+234' + digits.substring(1);
+        }
+    }
+    
+    // If it starts with country code without +, add +
+    if (cleaned.match(/^234/)) {
+        const digits = cleaned.replace(/\D/g, '');
+        return '+' + digits;
+    }
+    
+    // If it's just digits, check length and add appropriate prefix
+    const digits = cleaned.replace(/\D/g, '');
+    
+    // For Nigerian numbers (10 digits starting with 7, 8, or 9)
+    if (digits.length === 10 && /^[789]/.test(digits)) {
+        return '+234' + digits;
+    }
+    
+    // For other international numbers, just add + if not present
+    if (digits.length >= 10 && !cleaned.startsWith('+')) {
+        return '+' + digits;
+    }
+    
+    // If we can't determine, return as is with + added if it's just digits
+    if (/^\d+$/.test(cleaned) && !cleaned.startsWith('+')) {
+        return '+' + cleaned;
+    }
+    
+    return cleaned;
+}
 
 // --- Firestore Functions for Report Persistence (Cross-Device) ---
 async function saveReportsToFirestore(tutorEmail, reports) {
@@ -1068,6 +1119,7 @@ async function renderStudentDatabase(container, tutor) {
                 grade: student.grade,
                 parentName: student.parentName, 
                 parentPhone: student.parentPhone,
+                normalizedParentPhone: normalizePhoneNumber(student.parentPhone), // ADDED: Normalized phone
                 reportMonth: currentMonthYear,
                 introduction: "Transitioning student - no monthly report required.",
                 topics: "Transitioning student - no monthly report required.",
@@ -1117,7 +1169,8 @@ async function renderStudentDatabase(container, tutor) {
                 grade: student.grade,
                 parentName: student.parentName, 
                 parentPhone: student.parentPhone,
-                reportMonth: currentMonthYear, // Add month to report data
+                normalizedParentPhone: normalizePhoneNumber(student.parentPhone), // ADDED: Normalized phone
+                reportMonth: currentMonthYear,
                 introduction: document.getElementById('report-intro').value,
                 topics: document.getElementById('report-topics').value,
                 progress: document.getElementById('report-progress').value,
@@ -1245,13 +1298,22 @@ async function renderStudentDatabase(container, tutor) {
         const batch = writeBatch(db);
         reportsArray.forEach(report => {
             const newReportRef = doc(collection(db, "tutor_submissions"));
-            batch.set(newReportRef, {
+            
+            // Ensure normalizedParentPhone is included in every report
+            const finalReportData = {
                 tutorEmail: tutor.email,
                 tutorName: tutor.name,
                 submittedAt: new Date(),
                 ...report,
                 ...accountDetails
-            });
+            };
+            
+            // Make sure normalizedParentPhone is set (use original if not already normalized)
+            if (!finalReportData.normalizedParentPhone && finalReportData.parentPhone) {
+                finalReportData.normalizedParentPhone = normalizePhoneNumber(finalReportData.parentPhone);
+            }
+            
+            batch.set(newReportRef, finalReportData);
         });
 
         try {
@@ -2026,6 +2088,7 @@ window.showReportModal = function(student) {
             grade: student.grade,
             parentName: student.parentName, 
             parentPhone: student.parentPhone,
+            normalizedParentPhone: normalizePhoneNumber(student.parentPhone), // ADDED: Normalized phone
             reportMonth: currentMonthYear,
             introduction: "Transitioning student - no monthly report required.",
             topics: "Transitioning student - no monthly report required.",
@@ -2137,6 +2200,7 @@ window.showReportModal = function(student) {
             grade: student.grade,
             parentName: student.parentName, 
             parentPhone: student.parentPhone,
+            normalizedParentPhone: normalizePhoneNumber(student.parentPhone), // ADDED: Normalized phone
             reportMonth: currentMonthYear,
             introduction: document.getElementById('report-intro').value,
             topics: document.getElementById('report-topics').value,
@@ -2188,6 +2252,4 @@ validationStyles.textContent = `
 `;
 document.head.appendChild(validationStyles);
 }
-
-
-
+[file content end]
