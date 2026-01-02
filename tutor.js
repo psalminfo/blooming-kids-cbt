@@ -364,48 +364,6 @@ style.textContent = `
         background: linear-gradient(135deg, #d97706 0%, #b45309 100%) !important;
     }
 
-    /* Calendar Grid Styles */
-    .calendar-wrapper {
-        overflow-x: auto;
-    }
-    .calendar-table {
-        width: 100%;
-        border-collapse: collapse;
-        min-width: 800px;
-    }
-    .calendar-table th, .calendar-table td {
-        border: 1px solid #e5e7eb;
-        padding: 8px;
-        text-align: center;
-        vertical-align: top;
-    }
-    .calendar-table th {
-        background-color: #f3f4f6;
-        font-weight: bold;
-        color: #374151;
-    }
-    .calendar-time-col {
-        width: 80px;
-        background-color: #f9fafb;
-        font-weight: 500;
-        font-size: 0.8rem;
-    }
-    .calendar-cell {
-        height: 60px;
-        position: relative;
-    }
-    .calendar-event {
-        background-color: #d1fae5;
-        border-left: 3px solid #10b981;
-        color: #065f46;
-        padding: 2px 4px;
-        margin-bottom: 2px;
-        font-size: 0.75rem;
-        border-radius: 2px;
-        text-align: left;
-        cursor: pointer;
-    }
-
     /* Responsive Design */
     @media (max-width: 768px) {
         .hero-section {
@@ -606,8 +564,7 @@ async function checkAndShowSchedulePopup(tutor) {
         });
         
         if (studentsWithoutSchedule.length > 0) {
-            const student = studentsWithoutSchedule[0];
-            showSchedulePopup(student, tutor, studentsWithoutSchedule.length);
+            showBulkSchedulePopup(studentsWithoutSchedule, tutor);
             return true;
         }
         
@@ -618,13 +575,18 @@ async function checkAndShowSchedulePopup(tutor) {
     }
 }
 
-function showSchedulePopup(student, tutor, remainingCount = 0) {
+function showBulkSchedulePopup(students, tutor) {
+    if (students.length === 0) return;
+    
+    const currentStudent = students[0];
+    const remainingCount = students.length - 1;
+    
     const popupHTML = `
         <div class="modal-overlay">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h3 class="modal-title">📅 Set Class Schedule for ${student.studentName}</h3>
-                    ${remainingCount > 1 ? `<span class="badge badge-info">${remainingCount-1} more students pending</span>` : ''}
+                    <h3 class="modal-title">📅 Set Class Schedule for ${currentStudent.studentName}</h3>
+                    ${remainingCount > 0 ? `<span class="badge badge-info">${remainingCount} more to setup</span>` : ''}
                 </div>
                 <div class="modal-body">
                     <p class="text-sm text-gray-600 mb-4">Please set the weekly class schedule for this student. You can add multiple time slots.</p>
@@ -661,8 +623,8 @@ function showSchedulePopup(student, tutor, remainingCount = 0) {
                 </div>
                 <div class="modal-footer">
                     <button id="skip-schedule-btn" class="btn btn-secondary">Skip for Now</button>
-                    <button id="save-schedule-btn" class="btn btn-primary" data-student-id="${student.id}">
-                        ${remainingCount > 1 ? 'Save & Next Student' : 'Save Schedule'}
+                    <button id="save-schedule-btn" class="btn btn-primary" data-student-id="${currentStudent.id}">
+                        Save Schedule
                     </button>
                 </div>
             </div>
@@ -692,6 +654,7 @@ function showSchedulePopup(student, tutor, remainingCount = 0) {
         const scheduleEntries = document.querySelectorAll('.schedule-entry');
         const schedule = [];
         
+        let hasError = false;
         scheduleEntries.forEach(entry => {
             const day = entry.querySelector('.schedule-day').value;
             const start = entry.querySelector('.schedule-start').value;
@@ -699,11 +662,14 @@ function showSchedulePopup(student, tutor, remainingCount = 0) {
             
             if (start >= end) {
                 showCustomAlert('End time must be after start time.');
+                hasError = true;
                 return;
             }
             
             schedule.push({ day, start, end });
         });
+        
+        if (hasError) return;
         
         if (schedule.length === 0) {
             showCustomAlert('Please add at least one schedule entry.');
@@ -711,13 +677,13 @@ function showSchedulePopup(student, tutor, remainingCount = 0) {
         }
         
         try {
-            const studentRef = doc(db, "students", student.id);
+            const studentRef = doc(db, "students", currentStudent.id);
             await updateDoc(studentRef, { schedule });
             
             const scheduleRef = doc(collection(db, "schedules"));
             await setDoc(scheduleRef, {
-                studentId: student.id,
-                studentName: student.studentName,
+                studentId: currentStudent.id,
+                studentName: currentStudent.studentName,
                 tutorEmail: tutor.email,
                 tutorName: tutor.name,
                 schedule: schedule,
@@ -725,12 +691,16 @@ function showSchedulePopup(student, tutor, remainingCount = 0) {
             });
             
             popup.remove();
-            showCustomAlert('✅ Schedule saved!');
+            showCustomAlert('✅ Schedule saved successfully!');
             
-            // Immediate check for next student to create "wizard" feel
-            setTimeout(() => {
-                checkAndShowSchedulePopup(tutor);
-            }, 500);
+            // Remove this student from the list and show next one
+            students.shift();
+            
+            if (students.length > 0) {
+                setTimeout(() => {
+                    showBulkSchedulePopup(students, tutor);
+                }, 1000);
+            }
             
         } catch (error) {
             console.error("Error saving schedule:", error);
@@ -740,13 +710,18 @@ function showSchedulePopup(student, tutor, remainingCount = 0) {
     
     document.getElementById('skip-schedule-btn').addEventListener('click', () => {
         popup.remove();
-        setTimeout(() => {
-            checkAndShowSchedulePopup(tutor);
-        }, 500);
+        // Remove this student from the list and show next one
+        students.shift();
+        
+        if (students.length > 0) {
+            setTimeout(() => {
+                showBulkSchedulePopup(students, tutor);
+            }, 500);
+        }
     });
 }
 
-// --- NEW: Daily Topic Functions (SIMPLIFIED AS REQUESTED) ---
+// --- NEW: Daily Topic Functions ---
 function showDailyTopicModal(student) {
     const modalHTML = `
         <div class="modal-overlay">
@@ -756,14 +731,14 @@ function showDailyTopicModal(student) {
                 </div>
                 <div class="modal-body">
                     <div class="form-group">
-                        <label class="form-label">Topics Covered Today</label>
-                        <textarea id="topic-description" class="form-input form-textarea" placeholder="Enter the topics covered in today's class..." style="min-height: 150px;" required></textarea>
+                        <label class="form-label">Topics Covered Today *</label>
+                        <textarea id="topic-title" class="form-input form-textarea" rows="4" placeholder="Enter the topics covered in today's class..." required></textarea>
                     </div>
                 </div>
                 <div class="modal-footer">
                     <button id="cancel-topic-btn" class="btn btn-secondary">Cancel</button>
                     <button id="save-topic-btn" class="btn btn-primary" data-student-id="${student.id}">
-                        Save Topic
+                        Save Today's Topic
                     </button>
                 </div>
             </div>
@@ -776,28 +751,26 @@ function showDailyTopicModal(student) {
     
     document.getElementById('cancel-topic-btn').addEventListener('click', () => modal.remove());
     document.getElementById('save-topic-btn').addEventListener('click', async () => {
-        const topicDescription = document.getElementById('topic-description').value.trim();
-        
-        if (!topicDescription) {
-            showCustomAlert('Please enter the topics covered.');
-            return;
-        }
-        
         const topicData = {
             studentId: student.id,
             studentName: student.studentName,
             tutorEmail: window.tutorData.email,
             tutorName: window.tutorData.name,
-            description: topicDescription,
+            title: document.getElementById('topic-title').value.trim(),
             date: new Date().toISOString().split('T')[0],
             createdAt: new Date()
         };
+        
+        if (!topicData.title) {
+            showCustomAlert('Please enter the topics covered today.');
+            return;
+        }
         
         try {
             const topicRef = doc(collection(db, "daily_topics"));
             await setDoc(topicRef, topicData);
             modal.remove();
-            showCustomAlert('✅ Topic saved successfully!');
+            showCustomAlert('✅ Today\'s topics saved successfully!');
         } catch (error) {
             console.error("Error saving topic:", error);
             showCustomAlert('❌ Error saving topic. Please try again.');
@@ -963,9 +936,17 @@ function showStudentScheduleModal(student) {
                             `).join('')}
                         </div>
                     </div>
+                    
+                    <div class="form-group">
+                        <label class="form-label">Add Note to Schedule</label>
+                        <textarea id="schedule-note" class="form-input form-textarea" placeholder="Add any notes about the schedule..."></textarea>
+                    </div>
                 </div>
                 <div class="modal-footer">
                     <button id="close-schedule-btn" class="btn btn-secondary">Close</button>
+                    <button id="update-schedule-btn" class="btn btn-primary" data-student-id="${student.id}">
+                        Update Schedule
+                    </button>
                 </div>
             </div>
         </div>
@@ -1015,6 +996,10 @@ function showStudentScheduleModal(student) {
     });
     
     document.getElementById('close-schedule-btn').addEventListener('click', () => modal.remove());
+    document.getElementById('update-schedule-btn').addEventListener('click', async () => {
+        modal.remove();
+        showCustomAlert('Schedule note saved.');
+    });
 }
 
 function formatTime(timeString) {
@@ -2744,13 +2729,13 @@ async function renderStudentDatabase(container, tutor) {
         const viewScheduleBtn = document.getElementById('view-schedule-summary');
         if (viewScheduleBtn) {
             viewScheduleBtn.addEventListener('click', () => {
-                showScheduleSummaryModal(students);
+                showFullCalendarView(students);
             });
         }
     }
 
-    // NEW: Schedule Summary Modal (UPDATED TO CALENDAR GRID VIEW)
-    function showScheduleSummaryModal(students) {
+    // NEW: Full Calendar View
+    function showFullCalendarView(students) {
         const studentsWithSchedule = students.filter(s => s.schedule && s.schedule.length > 0);
         
         if (studentsWithSchedule.length === 0) {
@@ -2758,74 +2743,107 @@ async function renderStudentDatabase(container, tutor) {
             return;
         }
         
-        // Define Hours (8 AM to 8 PM)
-        const hours = [];
-        for (let i = 8; i <= 20; i++) {
-            const period = i >= 12 ? 'PM' : 'AM';
-            const hour = i > 12 ? i - 12 : i;
-            hours.push({
-                val: i,
-                label: `${hour}:00 ${period}`
+        // Group schedules by day and time
+        let scheduleByDay = {};
+        DAYS_OF_WEEK.forEach(day => {
+            scheduleByDay[day] = [];
+        });
+        
+        studentsWithSchedule.forEach(student => {
+            student.schedule.forEach(slot => {
+                scheduleByDay[slot.day].push({
+                    student: student.studentName,
+                    grade: student.grade,
+                    start: slot.start,
+                    end: slot.end,
+                    time: `${formatTime(slot.start)} - ${formatTime(slot.end)}`
+                });
             });
-        }
-
+        });
+        
+        // Sort each day's schedule by start time
+        DAYS_OF_WEEK.forEach(day => {
+            scheduleByDay[day].sort((a, b) => {
+                return a.start.localeCompare(b.start);
+            });
+        });
+        
         const modalHTML = `
             <div class="modal-overlay">
-                <div class="modal-content" style="max-width: 95vw; height: 90vh;">
+                <div class="modal-content max-w-6xl">
                     <div class="modal-header">
-                        <h3 class="modal-title">📅 Weekly Class Calendar</h3>
-                        <button id="print-full-schedule-btn" class="btn btn-secondary btn-sm">📄 Print/PDF</button>
+                        <h3 class="modal-title">📅 Full Weekly Schedule Calendar</h3>
+                        <button id="print-full-calendar-btn" class="btn btn-secondary btn-sm">📄 Print/PDF</button>
                     </div>
-                    <div class="modal-body p-0" style="overflow-x: auto;">
-                        <div class="calendar-wrapper p-4">
-                            <table class="calendar-table" id="calendar-grid">
+                    <div class="modal-body">
+                        <p class="text-sm text-gray-600 mb-4">Showing all ${studentsWithSchedule.length} student(s) schedules in one view</p>
+                        <div class="overflow-x-auto">
+                            <table class="table">
                                 <thead>
                                     <tr>
-                                        <th class="calendar-time-col">Time</th>
+                                        <th>Time</th>
                                         ${DAYS_OF_WEEK.map(day => `<th>${day}</th>`).join('')}
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    ${hours.map(hour => `
-                                        <tr>
-                                            <td class="calendar-time-col">${hour.label}</td>
-                                            ${DAYS_OF_WEEK.map(day => {
-                                                const events = [];
-                                                studentsWithSchedule.forEach(student => {
-                                                    student.schedule.forEach(slot => {
-                                                        if (slot.day === day) {
-                                                            const [startHour] = slot.start.split(':').map(Number);
-                                                            // Simple logic: if class starts in this hour or overlaps significantly
-                                                            // Better logic requires minute precision, but this fits the simplified request
-                                                            if (startHour === hour.val) {
-                                                                events.push({
-                                                                    name: student.studentName,
-                                                                    time: `${formatTime(slot.start)} - ${formatTime(slot.end)}`
-                                                                });
-                                                            }
-                                                        }
-                                                    });
-                                                });
-                                                
-                                                return `
-                                                    <td class="calendar-cell">
-                                                        ${events.map(ev => `
-                                                            <div class="calendar-event">
-                                                                <strong>${ev.name}</strong><br>
-                                                                ${ev.time}
-                                                            </div>
-                                                        `).join('')}
-                                                    </td>
-                                                `;
-                                            }).join('')}
-                                        </tr>
-                                    `).join('')}
+                                    ${TIME_SLOTS.map((slot, index) => {
+                                        // Only show every other time slot to reduce height
+                                        if (index % 2 === 0) {
+                                            const hour = Math.floor(index / 2);
+                                            const displayHour = hour % 12 || 12;
+                                            const period = hour >= 12 ? 'PM' : 'AM';
+                                            const timeLabel = `${displayHour}:00 ${period}`;
+                                            
+                                            return `
+                                                <tr>
+                                                    <td class="font-medium bg-gray-50">${timeLabel}</td>
+                                                    ${DAYS_OF_WEEK.map(day => {
+                                                        const events = scheduleByDay[day].filter(event => {
+                                                            const eventStartHour = parseInt(event.start.split(':')[0]);
+                                                            return eventStartHour === hour || eventStartHour === hour;
+                                                        });
+                                                        
+                                                        if (events.length === 0) return '<td></td>';
+                                                        
+                                                        return `<td>
+                                                            ${events.map(event => `
+                                                                <div class="mb-2 p-2 bg-blue-50 border border-blue-200 rounded">
+                                                                    <div class="font-medium">${event.student}</div>
+                                                                    <div class="text-xs text-gray-600">${event.grade}</div>
+                                                                    <div class="text-xs font-semibold text-blue-600">${event.time}</div>
+                                                                </div>
+                                                            `).join('')}
+                                                        </td>`;
+                                                    }).join('')}
+                                                </tr>
+                                            `;
+                                        }
+                                        return '';
+                                    }).join('')}
                                 </tbody>
                             </table>
                         </div>
+                        
+                        <div class="mt-6 bg-gray-50 p-4 rounded-lg">
+                            <h4 class="font-bold mb-3">Schedule Summary by Student</h4>
+                            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                ${studentsWithSchedule.map(student => `
+                                    <div class="bg-white p-3 rounded border">
+                                        <div class="font-medium">${student.studentName}</div>
+                                        <div class="text-sm text-gray-600">${student.grade}</div>
+                                        <div class="text-xs mt-2">
+                                            ${student.schedule.map(slot => `
+                                                <div class="text-blue-600">${slot.day}: ${formatTime(slot.start)} - ${formatTime(slot.end)}</div>
+                                            `).join('')}
+                                        </div>
+                                    </div>
+                                `).join('')}
+                            </div>
+                        </div>
                     </div>
                     <div class="modal-footer">
-                        <button id="close-schedule-summary-btn" class="btn btn-secondary">Close</button>
+                        <button id="edit-schedule-btn" class="btn btn-info">✏️ Edit Schedule</button>
+                        <button id="close-calendar-btn" class="btn btn-secondary">Close</button>
                     </div>
                 </div>
             </div>
@@ -2835,36 +2853,84 @@ async function renderStudentDatabase(container, tutor) {
         modal.innerHTML = modalHTML;
         document.body.appendChild(modal);
         
-        document.getElementById('print-full-schedule-btn').addEventListener('click', () => {
-            const calendarContent = document.getElementById('calendar-grid').outerHTML;
+        document.getElementById('print-full-calendar-btn').addEventListener('click', () => {
+            let printContent = `
+                <h2>Full Weekly Schedule Calendar</h2>
+                <p>Tutor: ${window.tutorData.name}</p>
+                <p>Generated on: ${new Date().toLocaleDateString()}</p>
+                <hr>
+                <table style="width: 100%; border-collapse: collapse; margin-top: 20px;">
+                    <thead>
+                        <tr>
+                            <th style="border: 1px solid #ddd; padding: 8px; background: #f5f5f5;">Time</th>
+                            ${DAYS_OF_WEEK.map(day => `<th style="border: 1px solid #ddd; padding: 8px; background: #f5f5f5;">${day}</th>`).join('')}
+                        </tr>
+                    </thead>
+                    <tbody>
+            `;
+            
+            TIME_SLOTS.forEach((slot, index) => {
+                if (index % 2 === 0) {
+                    const hour = Math.floor(index / 2);
+                    const displayHour = hour % 12 || 12;
+                    const period = hour >= 12 ? 'PM' : 'AM';
+                    const timeLabel = `${displayHour}:00 ${period}`;
+                    
+                    printContent += `<tr><td style="border: 1px solid #ddd; padding: 8px; font-weight: bold;">${timeLabel}</td>`;
+                    
+                    DAYS_OF_WEEK.forEach(day => {
+                        const events = scheduleByDay[day].filter(event => {
+                            const eventStartHour = parseInt(event.start.split(':')[0]);
+                            return eventStartHour === hour;
+                        });
+                        
+                        if (events.length === 0) {
+                            printContent += '<td style="border: 1px solid #ddd; padding: 8px;"></td>';
+                        } else {
+                            printContent += `<td style="border: 1px solid #ddd; padding: 8px;">`;
+                            events.forEach(event => {
+                                printContent += `<div style="margin: 4px 0; padding: 4px; background: #e8f4fd; border-left: 3px solid #2196F3;">
+                                    <strong>${event.student}</strong><br>
+                                    <small>${event.grade} • ${event.time}</small>
+                                </div>`;
+                            });
+                            printContent += `</td>`;
+                        }
+                    });
+                    
+                    printContent += `</tr>`;
+                }
+            });
+            
+            printContent += `</tbody></table>`;
+            
+            printContent += `<h3 style="margin-top: 30px;">Schedule Summary by Student</h3>`;
+            studentsWithSchedule.forEach(student => {
+                printContent += `
+                    <div style="margin: 10px 0; padding: 10px; border: 1px solid #ddd; page-break-inside: avoid;">
+                        <strong>${student.studentName}</strong> (${student.grade})<br>
+                        ${student.schedule.map(slot => 
+                            `${slot.day}: ${formatTime(slot.start)} - ${formatTime(slot.end)}<br>`
+                        ).join('')}
+                    </div>
+                `;
+            });
             
             const printWindow = window.open('', '_blank');
             printWindow.document.write(`
                 <html>
                     <head>
-                        <title>Weekly Class Schedule</title>
+                        <title>Full Weekly Schedule Calendar</title>
                         <style>
                             body { font-family: Arial, sans-serif; padding: 20px; }
                             h2 { color: #333; }
-                            table { width: 100%; border-collapse: collapse; margin-top: 20px; font-size: 12px; }
-                            th, td { border: 1px solid #ccc; padding: 8px; text-align: center; vertical-align: top; }
-                            th { background-color: #f3f4f6; font-weight: bold; }
-                            .calendar-time-col { width: 60px; background-color: #f9fafb; font-weight: bold; }
-                            .calendar-event { 
-                                background-color: #d1fae5; 
-                                border: 1px solid #10b981; 
-                                color: #065f46; 
-                                padding: 2px; 
-                                margin-bottom: 2px; 
-                                font-size: 10px; 
-                                border-radius: 2px; 
-                                text-align: left;
-                            }
+                            table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+                            th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+                            th { background-color: #f5f5f5; }
                         </style>
                     </head>
                     <body>
-                        <h2>Weekly Class Schedule - ${window.tutorData.name}</h2>
-                        ${calendarContent}
+                        ${printContent}
                         <script>
                             window.onload = function() {
                                 window.print();
@@ -2876,7 +2942,18 @@ async function renderStudentDatabase(container, tutor) {
             `);
         });
         
-        document.getElementById('close-schedule-summary-btn').addEventListener('click', () => {
+        document.getElementById('edit-schedule-btn').addEventListener('click', () => {
+            modal.remove();
+            // Show edit modal for first student without schedule
+            const studentsWithoutSchedule = students.filter(s => !s.schedule || s.schedule.length === 0);
+            if (studentsWithoutSchedule.length > 0) {
+                showBulkSchedulePopup(studentsWithoutSchedule, tutor);
+            } else {
+                showCustomAlert('All students have schedules. Use individual student schedule editing.');
+            }
+        });
+        
+        document.getElementById('close-calendar-btn').addEventListener('click', () => {
             modal.remove();
         });
     }
