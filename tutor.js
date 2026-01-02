@@ -1041,7 +1041,7 @@ async function renderStudentDatabase(container, tutor) {
                     statusHTML = `<span class="status-indicator ${isReportSaved ? 'text-green-600 font-semibold' : 'text-gray-500'}">${isReportSaved ? 'Report Saved' : 'Pending Report'}</span>${transitioningIndicator}`;
 
                     if (isSummerBreakEnabled && !isStudentOnBreak) {
-                        actionsHTML += `<button class="summer-break-btn bg-yellow-500 text-white px-3 py-1 rounded" data-student-id="${student.id}">Summer Break</button>`;
+                        actionsHTML += `<button class="summer-break-btn bg-yellow-500 text-white px-3 py-1 rounded" data-student-id="${student.id}">Break</button>`;
                     } else if (isStudentOnBreak) {
                         actionsHTML += `<span class="text-gray-400">On Break</span>`;
                     }
@@ -1548,10 +1548,10 @@ async function renderStudentDatabase(container, tutor) {
         const student = students.find(s => s.id === studentId);
         
         // Add confirmation dialog
-        if (confirm(`Are you sure you want to put ${student.studentName} on summer break?`)) {
+        if (confirm(`Are you sure you want to put ${student.studentName} on Break?`)) {
             const studentRef = doc(db, "students", studentId);
             await updateDoc(studentRef, { summerBreak: true });
-            showCustomAlert(`${student.studentName} has been marked as on summer break.`);
+            showCustomAlert(`${student.studentName} has been marked as on Break.`);
             renderStudentDatabase(container, tutor);
         }
     });
@@ -2250,3 +2250,4 @@ validationStyles.textContent = `
 `;
 document.head.appendChild(validationStyles);
 }
+
