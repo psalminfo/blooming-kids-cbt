@@ -182,7 +182,7 @@ style.textContent = `
         background-color: var(--light-color);
     }
 
-    /* Form Styles */
+    /* Form Styles - ENHANCED WIDTH */
     .form-group {
         margin-bottom: 1.25rem;
     }
@@ -196,10 +196,11 @@ style.textContent = `
 
     .form-input {
         width: 100%;
-        padding: 0.625rem;
+        padding: 0.75rem 1rem; /* Increased padding */
         border: 1px solid var(--border-color);
         border-radius: var(--radius);
         transition: border-color 0.2s ease, box-shadow 0.2s ease;
+        font-size: 1rem; /* Larger font */
     }
 
     .form-input:focus {
@@ -209,11 +210,13 @@ style.textContent = `
     }
 
     .form-textarea {
-        min-height: 100px;
+        min-height: 120px; /* Increased height */
         resize: vertical;
+        padding: 0.75rem 1rem; /* Increased padding */
+        font-size: 1rem; /* Larger font */
     }
 
-    /* Modal Enhancements */
+    /* Modal Enhancements - WIDER MODALS */
     .modal-overlay {
         position: fixed;
         inset: 0;
@@ -231,7 +234,7 @@ style.textContent = `
         border-radius: var(--radius-lg);
         box-shadow: var(--shadow-lg);
         width: 100%;
-        max-width: 32rem;
+        max-width: 48rem; /* Increased from 32rem to 48rem */
         max-height: 90vh;
         overflow-y: auto;
         animation: slideIn 0.3s ease;
@@ -385,6 +388,78 @@ style.textContent = `
         .action-buttons .btn {
             width: 100%;
         }
+        
+        .modal-content {
+            max-width: 95%;
+        }
+    }
+
+    /* Calendar View Styles */
+    .calendar-view {
+        display: grid;
+        grid-template-columns: repeat(7, 1fr);
+        gap: 0.5rem;
+        margin-bottom: 1rem;
+    }
+
+    .calendar-day {
+        background: var(--light-color);
+        border: 1px solid var(--border-color);
+        border-radius: var(--radius);
+        padding: 0.75rem;
+        min-height: 100px;
+    }
+
+    .calendar-day-header {
+        font-weight: 600;
+        font-size: 0.875rem;
+        color: var(--dark-color);
+        margin-bottom: 0.5rem;
+        padding-bottom: 0.25rem;
+        border-bottom: 1px solid var(--border-color);
+    }
+
+    .calendar-event {
+        background: white;
+        border-left: 3px solid var(--primary-color);
+        padding: 0.375rem;
+        margin-bottom: 0.25rem;
+        font-size: 0.75rem;
+        border-radius: var(--radius-sm);
+        box-shadow: var(--shadow-sm);
+    }
+
+    .calendar-event-time {
+        font-size: 0.7rem;
+        color: var(--dark-color);
+        opacity: 0.8;
+    }
+
+    /* Student Actions Container */
+    .student-actions-container {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        gap: 1rem;
+        margin-top: 1.5rem;
+    }
+
+    .student-action-card {
+        border: 1px solid var(--border-color);
+        border-radius: var(--radius);
+        padding: 1rem;
+        transition: all 0.2s ease;
+    }
+
+    .student-action-card:hover {
+        transform: translateY(-2px);
+        box-shadow: var(--shadow);
+    }
+
+    /* Wider report textareas */
+    .report-textarea {
+        min-height: 150px;
+        font-size: 1.05rem;
+        line-height: 1.5;
     }
 `;
 document.head.appendChild(style);
@@ -493,18 +568,32 @@ const SUBJECT_CATEGORIES = {
     "Specialized": ["Music", "Coding","ICT", "Chess", "Public Speaking", "English Proficiency", "Counseling Programs"]
 };
 
-// --- NEW: Schedule Days and Times ---
+// --- UPDATED: Schedule Days and Times with 11PM to 12AM ---
 const DAYS_OF_WEEK = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
-const TIME_SLOTS = Array.from({length: 48}, (_, i) => {
+const TIME_SLOTS = Array.from({length: 49}, (_, i) => { // Increased from 48 to 49 to include 23:30-00:00
     const hour = Math.floor(i / 2);
     const minute = i % 2 === 0 ? "00" : "30";
     const period = hour >= 12 ? "PM" : "AM";
     const displayHour = hour % 12 || 12;
+    let label;
+    
+    // Handle 00:00 (midnight)
+    if (hour === 0 && minute === "00") {
+        label = "12:00 AM (Midnight)";
+    } else if (hour === 12 && minute === "00") {
+        label = "12:00 PM (Noon)";
+    } else {
+        label = `${displayHour}:${minute} ${period}`;
+    }
+    
     return {
         value: `${hour.toString().padStart(2, '0')}:${minute}`,
-        label: `${displayHour}:${minute} ${period}`
+        label: label
     };
 });
+
+// Add 11:30 PM to 12:00 AM slots
+TIME_SLOTS.push({value: "23:30", label: "11:30 PM"});
 
 // --- Phone Number Normalization Function ---
 function normalizePhoneNumber(phone) {
@@ -546,7 +635,11 @@ function normalizePhoneNumber(phone) {
     return cleaned;
 }
 
-// --- NEW: Schedule Management Functions ---
+// --- UPDATED: Schedule Management Functions for ALL students ---
+let allStudents = [];
+let currentStudentIndex = 0;
+let schedulePopup = null;
+
 async function checkAndShowSchedulePopup(tutor) {
     try {
         const studentsQuery = query(
@@ -555,17 +648,18 @@ async function checkAndShowSchedulePopup(tutor) {
         );
         const studentsSnapshot = await getDocs(studentsQuery);
         
-        const studentsWithoutSchedule = [];
+        allStudents = [];
         studentsSnapshot.forEach(doc => {
             const student = { id: doc.id, ...doc.data() };
             if (!student.schedule || student.schedule.length === 0) {
-                studentsWithoutSchedule.push(student);
+                allStudents.push(student);
             }
         });
         
-        if (studentsWithoutSchedule.length > 0) {
-            const student = studentsWithoutSchedule[0];
-            showSchedulePopup(student, tutor, studentsWithoutSchedule.length);
+        currentStudentIndex = 0;
+        
+        if (allStudents.length > 0) {
+            showBulkSchedulePopup(allStudents[0], tutor, allStudents.length);
             return true;
         }
         
@@ -576,16 +670,23 @@ async function checkAndShowSchedulePopup(tutor) {
     }
 }
 
-function showSchedulePopup(student, tutor, remainingCount = 0) {
+function showBulkSchedulePopup(student, tutor, totalCount = 0) {
+    if (schedulePopup && document.body.contains(schedulePopup)) {
+        schedulePopup.remove();
+    }
+    
     const popupHTML = `
         <div class="modal-overlay">
-            <div class="modal-content">
+            <div class="modal-content max-w-2xl">
                 <div class="modal-header">
-                    <h3 class="modal-title">📅 Set Class Schedule for ${student.studentName}</h3>
-                    ${remainingCount > 1 ? `<span class="badge badge-info">${remainingCount-1} more to setup</span>` : ''}
+                    <h3 class="modal-title">📅 Set Schedule for ${student.studentName}</h3>
+                    <span class="badge badge-info">${currentStudentIndex + 1} of ${totalCount}</span>
                 </div>
                 <div class="modal-body">
-                    <p class="text-sm text-gray-600 mb-4">Please set the weekly class schedule for this student. You can add multiple time slots.</p>
+                    <div class="mb-4 p-3 bg-blue-50 rounded-lg">
+                        <p class="text-sm text-blue-700">Student: <strong>${student.studentName}</strong> | Grade: ${student.grade}</p>
+                        <p class="text-xs text-blue-600">${student.subjects ? student.subjects.join(', ') : 'No subjects'}</p>
+                    </div>
                     
                     <div id="schedule-entries" class="space-y-4">
                         <div class="schedule-entry bg-gray-50 p-4 rounded-lg border">
@@ -618,18 +719,18 @@ function showSchedulePopup(student, tutor, remainingCount = 0) {
                     </button>
                 </div>
                 <div class="modal-footer">
-                    <button id="skip-schedule-btn" class="btn btn-secondary">Skip for Now</button>
+                    <button id="skip-schedule-btn" class="btn btn-secondary">Skip This Student</button>
                     <button id="save-schedule-btn" class="btn btn-primary" data-student-id="${student.id}">
-                        Save Schedule
+                        Save & Next Student
                     </button>
                 </div>
             </div>
         </div>
     `;
     
-    const popup = document.createElement('div');
-    popup.innerHTML = popupHTML;
-    document.body.appendChild(popup);
+    schedulePopup = document.createElement('div');
+    schedulePopup.innerHTML = popupHTML;
+    document.body.appendChild(schedulePopup);
     
     document.getElementById('add-schedule-entry').addEventListener('click', () => {
         const scheduleEntries = document.getElementById('schedule-entries');
@@ -649,6 +750,7 @@ function showSchedulePopup(student, tutor, remainingCount = 0) {
     document.getElementById('save-schedule-btn').addEventListener('click', async () => {
         const scheduleEntries = document.querySelectorAll('.schedule-entry');
         const schedule = [];
+        let hasError = false;
         
         scheduleEntries.forEach(entry => {
             const day = entry.querySelector('.schedule-day').value;
@@ -657,11 +759,14 @@ function showSchedulePopup(student, tutor, remainingCount = 0) {
             
             if (start >= end) {
                 showCustomAlert('End time must be after start time.');
+                hasError = true;
                 return;
             }
             
             schedule.push({ day, start, end });
         });
+        
+        if (hasError) return;
         
         if (schedule.length === 0) {
             showCustomAlert('Please add at least one schedule entry.');
@@ -676,18 +781,27 @@ function showSchedulePopup(student, tutor, remainingCount = 0) {
             await setDoc(scheduleRef, {
                 studentId: student.id,
                 studentName: student.studentName,
-                tutorEmail: tutor.email,
-                tutorName: tutor.name,
+                tutorEmail: window.tutorData.email,
+                tutorName: window.tutorData.name,
                 schedule: schedule,
                 createdAt: new Date()
             });
             
-            popup.remove();
-            showCustomAlert('✅ Schedule saved successfully!');
+            showCustomAlert('✅ Schedule saved!');
             
-            setTimeout(() => {
-                checkAndShowSchedulePopup(tutor);
-            }, 1000);
+            // Move to next student
+            currentStudentIndex++;
+            schedulePopup.remove();
+            
+            if (currentStudentIndex < allStudents.length) {
+                setTimeout(() => {
+                    showBulkSchedulePopup(allStudents[currentStudentIndex], tutor, allStudents.length);
+                }, 500);
+            } else {
+                setTimeout(() => {
+                    showCustomAlert('🎉 All students have been scheduled!');
+                }, 500);
+            }
             
         } catch (error) {
             console.error("Error saving schedule:", error);
@@ -696,37 +810,33 @@ function showSchedulePopup(student, tutor, remainingCount = 0) {
     });
     
     document.getElementById('skip-schedule-btn').addEventListener('click', () => {
-        popup.remove();
-        setTimeout(() => {
-            checkAndShowSchedulePopup(tutor);
-        }, 500);
+        // Skip current student and move to next
+        currentStudentIndex++;
+        schedulePopup.remove();
+        
+        if (currentStudentIndex < allStudents.length) {
+            setTimeout(() => {
+                showBulkSchedulePopup(allStudents[currentStudentIndex], tutor, allStudents.length);
+            }, 500);
+        }
     });
 }
 
-// --- NEW: Daily Topic Functions ---
+// --- UPDATED: Daily Topic Functions (Simplified) ---
 function showDailyTopicModal(student) {
     const modalHTML = `
         <div class="modal-overlay">
-            <div class="modal-content">
+            <div class="modal-content max-w-lg">
                 <div class="modal-header">
                     <h3 class="modal-title">📚 Today's Topic for ${student.studentName}</h3>
                 </div>
                 <div class="modal-body">
                     <div class="form-group">
-                        <label class="form-label">Topic Title *</label>
-                        <input type="text" id="topic-title" class="form-input" placeholder="e.g., Introduction to Fractions" required>
+                        <label class="form-label">Today's Topics *</label>
+                        <textarea id="topic-topics" class="form-input form-textarea report-textarea" placeholder="Enter today's topics, one per line or separated by commas..." required></textarea>
                     </div>
-                    <div class="form-group">
-                        <label class="form-label">Topic Description *</label>
-                        <textarea id="topic-description" class="form-input form-textarea" placeholder="Describe what was covered in today's class..." required></textarea>
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label">Key Learning Points</label>
-                        <textarea id="topic-key-points" class="form-input form-textarea" placeholder="List key points learned (one per line)..."></textarea>
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label">Homework Assigned (if any)</label>
-                        <textarea id="topic-homework" class="form-input" placeholder="Optional: Homework assigned for today"></textarea>
+                    <div class="mt-2 text-sm text-gray-500">
+                        <p>Example: Fractions, Decimals, Basic Algebra</p>
                     </div>
                 </div>
                 <div class="modal-footer">
@@ -750,16 +860,13 @@ function showDailyTopicModal(student) {
             studentName: student.studentName,
             tutorEmail: window.tutorData.email,
             tutorName: window.tutorData.name,
-            title: document.getElementById('topic-title').value.trim(),
-            description: document.getElementById('topic-description').value.trim(),
-            keyPoints: document.getElementById('topic-key-points').value.split('\n').filter(point => point.trim()),
-            homework: document.getElementById('topic-homework').value.trim(),
+            topics: document.getElementById('topic-topics').value.trim(),
             date: new Date().toISOString().split('T')[0],
             createdAt: new Date()
         };
         
-        if (!topicData.title || !topicData.description) {
-            showCustomAlert('Please fill in all required fields (title and description).');
+        if (!topicData.topics) {
+            showCustomAlert('Please enter today\'s topics.');
             return;
         }
         
@@ -767,7 +874,7 @@ function showDailyTopicModal(student) {
             const topicRef = doc(collection(db, "daily_topics"));
             await setDoc(topicRef, topicData);
             modal.remove();
-            showCustomAlert('✅ Today\'s topic saved successfully! Parents can now view this in their portal.');
+            showCustomAlert('✅ Today\'s topic saved successfully!');
         } catch (error) {
             console.error("Error saving topic:", error);
             showCustomAlert('❌ Error saving topic. Please try again.');
@@ -775,59 +882,29 @@ function showDailyTopicModal(student) {
     });
 }
 
-// --- NEW: Homework Assignment Functions ---
-function showHomeworkModal(student) {
-    const nextWeek = new Date();
-    nextWeek.setDate(nextWeek.getDate() + 7);
-    const maxDate = nextWeek.toISOString().split('T')[0];
-    
+// --- NEW: View Schedule Calendar for All Students ---
+function showScheduleCalendarModal() {
     const modalHTML = `
         <div class="modal-overlay">
-            <div class="modal-content">
+            <div class="modal-content max-w-6xl">
                 <div class="modal-header">
-                    <h3 class="modal-title">📝 Assign Homework for ${student.studentName}</h3>
+                    <h3 class="modal-title">📅 Weekly Schedule Calendar</h3>
+                    <div class="action-buttons">
+                        <button id="print-calendar-btn" class="btn btn-secondary btn-sm">📄 Print/PDF</button>
+                        <button id="edit-schedule-btn" class="btn btn-primary btn-sm">✏️ Edit Schedules</button>
+                    </div>
                 </div>
                 <div class="modal-body">
-                    <div class="form-group">
-                        <label class="form-label">Homework Title *</label>
-                        <input type="text" id="hw-title" class="form-input" placeholder="e.g., Math Worksheet #3" required>
+                    <div id="calendar-loading" class="text-center">
+                        <div class="spinner mx-auto mb-2"></div>
+                        <p class="text-gray-500">Loading schedule calendar...</p>
                     </div>
-                    <div class="form-group">
-                        <label class="form-label">Description *</label>
-                        <textarea id="hw-description" class="form-input form-textarea" placeholder="Detailed instructions for the homework..." required></textarea>
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label">Due Date *</label>
-                        <input type="date" id="hw-due-date" class="form-input" min="${new Date().toISOString().split('T')[0]}" max="${maxDate}" required>
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label">Upload File (Optional)</label>
-                        <div class="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center">
-                            <input type="file" id="hw-file" class="hidden" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png">
-                            <label for="hw-file" class="cursor-pointer">
-                                <div class="text-gray-500 mb-2">
-                                    <svg class="w-8 h-8 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path>
-                                    </svg>
-                                </div>
-                                <span class="text-sm font-medium text-primary-color">Click to upload</span>
-                                <span class="text-xs text-gray-500 block">PDF, DOC, JPG, PNG (Max 10MB)</span>
-                            </label>
-                            <div id="file-name" class="mt-2 text-sm text-gray-600 hidden"></div>
-                        </div>
-                    </div>
-                    <div class="form-group">
-                        <label class="flex items-center">
-                            <input type="checkbox" id="hw-reminder" class="rounded">
-                            <span class="ml-2 text-sm">Send reminder to parent 1 day before due date</span>
-                        </label>
+                    <div id="calendar-view" class="hidden">
+                        <!-- Calendar will be loaded here -->
                     </div>
                 </div>
                 <div class="modal-footer">
-                    <button id="cancel-hw-btn" class="btn btn-secondary">Cancel</button>
-                    <button id="save-hw-btn" class="btn btn-primary" data-student-id="${student.id}">
-                        Assign Homework
-                    </button>
+                    <button id="close-calendar-btn" class="btn btn-secondary">Close</button>
                 </div>
             </div>
         </div>
@@ -837,166 +914,209 @@ function showHomeworkModal(student) {
     modal.innerHTML = modalHTML;
     document.body.appendChild(modal);
     
-    const fileInput = document.getElementById('hw-file');
-    const fileName = document.getElementById('file-name');
+    // Load and display calendar
+    loadScheduleCalendar();
     
-    fileInput.addEventListener('change', (e) => {
-        if (e.target.files.length > 0) {
-            const file = e.target.files[0];
-            if (file.size > 10 * 1024 * 1024) {
-                showCustomAlert('File size must be less than 10MB.');
-                fileInput.value = '';
-                fileName.classList.add('hidden');
-                return;
-            }
-            fileName.textContent = `Selected: ${file.name}`;
-            fileName.classList.remove('hidden');
-        }
+    document.getElementById('print-calendar-btn').addEventListener('click', () => {
+        printCalendar();
     });
     
-    document.getElementById('cancel-hw-btn').addEventListener('click', () => modal.remove());
-    document.getElementById('save-hw-btn').addEventListener('click', async () => {
-        const hwData = {
-            studentId: student.id,
-            studentName: student.studentName,
-            parentPhone: student.parentPhone,
-            tutorEmail: window.tutorData.email,
-            tutorName: window.tutorData.name,
-            title: document.getElementById('hw-title').value.trim(),
-            description: document.getElementById('hw-description').value.trim(),
-            dueDate: document.getElementById('hw-due-date').value,
-            sendReminder: document.getElementById('hw-reminder').checked,
-            assignedDate: new Date(),
-            status: 'assigned',
-            submissions: []
-        };
-        
-        if (!hwData.title || !hwData.description || !hwData.dueDate) {
-            showCustomAlert('Please fill in all required fields (title, description, due date).');
-            return;
-        }
-        
-        const dueDate = new Date(hwData.dueDate);
-        const today = new Date();
-        const maxDueDate = new Date(today);
-        maxDueDate.setDate(maxDueDate.getDate() + 7);
-        
-        if (dueDate < today) {
-            showCustomAlert('Due date cannot be in the past.');
-            return;
-        }
-        
-        if (dueDate > maxDueDate) {
-            showCustomAlert('Due date must be within 7 days from today.');
-            return;
-        }
-        
-        try {
-            const hwRef = doc(collection(db, "homework_assignments"));
-            await setDoc(hwRef, hwData);
-            
-            modal.remove();
-            showCustomAlert('✅ Homework assigned successfully! Parents will be notified.');
-        } catch (error) {
-            console.error("Error assigning homework:", error);
-            showCustomAlert('❌ Error assigning homework. Please try again.');
-        }
+    document.getElementById('edit-schedule-btn').addEventListener('click', () => {
+        modal.remove();
+        checkAndShowSchedulePopup(window.tutorData);
+    });
+    
+    document.getElementById('close-calendar-btn').addEventListener('click', () => {
+        modal.remove();
     });
 }
 
-// --- NEW: View Schedule Functions ---
-function showStudentScheduleModal(student) {
-    if (!student.schedule || student.schedule.length === 0) {
-        showCustomAlert('No schedule set for this student. Please set schedule first.');
-        return;
+async function loadScheduleCalendar() {
+    try {
+        const studentsQuery = query(
+            collection(db, "students"), 
+            where("tutorEmail", "==", window.tutorData.email)
+        );
+        const studentsSnapshot = await getDocs(studentsQuery);
+        
+        const studentsWithSchedule = [];
+        studentsSnapshot.forEach(doc => {
+            const student = { id: doc.id, ...doc.data() };
+            if (student.schedule && student.schedule.length > 0) {
+                studentsWithSchedule.push(student);
+            }
+        });
+        
+        if (studentsWithSchedule.length === 0) {
+            document.getElementById('calendar-view').innerHTML = `
+                <div class="text-center p-8">
+                    <div class="text-gray-400 text-4xl mb-3">📅</div>
+                    <h4 class="font-bold text-gray-600 mb-2">No Schedules Found</h4>
+                    <p class="text-gray-500 mb-4">No students have schedules set up yet.</p>
+                    <button id="setup-schedules-btn" class="btn btn-primary">Set Up Schedules</button>
+                </div>
+            `;
+            
+            document.getElementById('setup-schedules-btn').addEventListener('click', () => {
+                document.querySelector('.modal-overlay').remove();
+                checkAndShowSchedulePopup(window.tutorData);
+            });
+        } else {
+            renderCalendarView(studentsWithSchedule);
+        }
+        
+        document.getElementById('calendar-loading').classList.add('hidden');
+        document.getElementById('calendar-view').classList.remove('hidden');
+        
+    } catch (error) {
+        console.error("Error loading calendar:", error);
+        document.getElementById('calendar-view').innerHTML = `
+            <div class="text-center text-red-600 p-8">
+                <div class="text-4xl mb-3">⚠️</div>
+                <h4 class="font-bold mb-2">Failed to Load Schedule</h4>
+                <p class="text-gray-500">Please try again later.</p>
+            </div>
+        `;
+        document.getElementById('calendar-loading').classList.add('hidden');
+        document.getElementById('calendar-view').classList.remove('hidden');
     }
+}
+
+function renderCalendarView(students) {
+    // Group schedules by day
+    const scheduleByDay = {};
+    DAYS_OF_WEEK.forEach(day => {
+        scheduleByDay[day] = [];
+    });
     
-    const modalHTML = `
-        <div class="modal-overlay">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h3 class="modal-title">📅 Schedule for ${student.studentName}</h3>
-                    <button id="print-schedule-btn" class="btn btn-secondary btn-sm">📄 Print/PDF</button>
+    students.forEach(student => {
+        student.schedule.forEach(slot => {
+            scheduleByDay[slot.day].push({
+                student: student.studentName,
+                grade: student.grade,
+                start: slot.start,
+                end: slot.end,
+                time: `${formatTime(slot.start)} - ${formatTime(slot.end)}`
+            });
+        });
+    });
+    
+    // Sort events by time
+    DAYS_OF_WEEK.forEach(day => {
+        scheduleByDay[day].sort((a, b) => {
+            return a.start.localeCompare(b.start);
+        });
+    });
+    
+    // Generate calendar HTML
+    let calendarHTML = `
+        <div class="calendar-view">
+    `;
+    
+    DAYS_OF_WEEK.forEach(day => {
+        const dayEvents = scheduleByDay[day];
+        calendarHTML += `
+            <div class="calendar-day">
+                <div class="calendar-day-header">${day}</div>
+                <div class="calendar-day-events">
+                    ${dayEvents.length === 0 ? 
+                        '<div class="text-sm text-gray-400 text-center mt-4">No classes</div>' : 
+                        dayEvents.map(event => `
+                            <div class="calendar-event">
+                                <div class="font-medium text-xs">${event.student}</div>
+                                <div class="calendar-event-time">${event.time}</div>
+                                <div class="text-xs text-gray-500">${event.grade}</div>
+                            </div>
+                        `).join('')
+                    }
                 </div>
-                <div class="modal-body">
-                    <div class="bg-gray-50 p-4 rounded-lg mb-4">
-                        <h4 class="font-semibold mb-2">Weekly Class Schedule</h4>
-                        <div class="space-y-2">
-                            ${student.schedule.map(slot => `
-                                <div class="flex items-center justify-between bg-white p-3 rounded border">
-                                    <div>
-                                        <span class="font-medium">${slot.day}</span>
-                                        <span class="text-gray-500 ml-2">${formatTime(slot.start)} - ${formatTime(slot.end)}</span>
-                                    </div>
-                                    <span class="badge badge-success">Active</span>
-                                </div>
-                            `).join('')}
-                        </div>
-                    </div>
-                    
-                    <div class="form-group">
-                        <label class="form-label">Add Note to Schedule</label>
-                        <textarea id="schedule-note" class="form-input form-textarea" placeholder="Add any notes about the schedule..."></textarea>
-                    </div>
+            </div>
+        `;
+    });
+    
+    calendarHTML += `</div>`;
+    
+    // Add summary
+    calendarHTML += `
+        <div class="mt-6 p-4 bg-gray-50 rounded-lg">
+            <h4 class="font-bold text-lg mb-3">Schedule Summary</h4>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <p class="text-sm"><span class="font-semibold">Total Students with Schedule:</span> ${students.length}</p>
+                    <p class="text-sm"><span class="font-semibold">Total Weekly Classes:</span> ${Object.values(scheduleByDay).reduce((total, day) => total + day.length, 0)}</p>
                 </div>
-                <div class="modal-footer">
-                    <button id="close-schedule-btn" class="btn btn-secondary">Close</button>
-                    <button id="update-schedule-btn" class="btn btn-primary" data-student-id="${student.id}">
-                        Update Schedule
-                    </button>
+                <div>
+                    <p class="text-sm"><span class="font-semibold">Most Scheduled Day:</span> ${getMostScheduledDay(scheduleByDay)}</p>
+                    <p class="text-sm"><span class="font-semibold">Earliest Class:</span> ${getEarliestClass(scheduleByDay)}</p>
                 </div>
             </div>
         </div>
     `;
     
-    const modal = document.createElement('div');
-    modal.innerHTML = modalHTML;
-    document.body.appendChild(modal);
+    document.getElementById('calendar-view').innerHTML = calendarHTML;
+}
+
+function getMostScheduledDay(scheduleByDay) {
+    let maxDay = '';
+    let maxCount = 0;
     
-    document.getElementById('print-schedule-btn').addEventListener('click', () => {
-        const scheduleContent = `
-            <h2>Schedule for ${student.studentName}</h2>
-            <p>Grade: ${student.grade}</p>
-            <p>Tutor: ${window.tutorData.name}</p>
-            <h3>Weekly Class Schedule:</h3>
-            <ul>
-                ${student.schedule.map(slot => 
-                    `<li>${slot.day}: ${formatTime(slot.start)} - ${formatTime(slot.end)}</li>`
-                ).join('')}
-            </ul>
-            <p>Generated on: ${new Date().toLocaleDateString()}</p>
-        `;
-        
-        const printWindow = window.open('', '_blank');
-        printWindow.document.write(`
-            <html>
-                <head>
-                    <title>Schedule - ${student.studentName}</title>
-                    <style>
-                        body { font-family: Arial, sans-serif; padding: 20px; }
-                        h2 { color: #333; }
-                        ul { list-style: none; padding: 0; }
-                        li { margin: 10px 0; padding: 10px; background: #f5f5f5; }
-                    </style>
-                </head>
-                <body>
-                    ${scheduleContent}
-                    <script>
-                        window.onload = function() {
-                            window.print();
-                            setTimeout(() => window.close(), 1000);
-                        }
-                    </script>
-                </body>
-            </html>
-        `);
+    DAYS_OF_WEEK.forEach(day => {
+        if (scheduleByDay[day].length > maxCount) {
+            maxCount = scheduleByDay[day].length;
+            maxDay = day;
+        }
     });
     
-    document.getElementById('close-schedule-btn').addEventListener('click', () => modal.remove());
-    document.getElementById('update-schedule-btn').addEventListener('click', async () => {
-        modal.remove();
-        showCustomAlert('Schedule note saved.');
+    return maxDay ? `${maxDay} (${maxCount} classes)` : 'None';
+}
+
+function getEarliestClass(scheduleByDay) {
+    let earliestTime = "23:59";
+    let earliestInfo = "";
+    
+    DAYS_OF_WEEK.forEach(day => {
+        scheduleByDay[day].forEach(event => {
+            if (event.start < earliestTime) {
+                earliestTime = event.start;
+                earliestInfo = `${formatTime(event.start)} (${event.student} - ${day})`;
+            }
+        });
     });
+    
+    return earliestInfo || "No classes scheduled";
+}
+
+function printCalendar() {
+    const calendarContent = document.getElementById('calendar-view').innerHTML;
+    const printWindow = window.open('', '_blank');
+    printWindow.document.write(`
+        <html>
+            <head>
+                <title>Weekly Schedule Calendar</title>
+                <style>
+                    body { font-family: Arial, sans-serif; padding: 20px; }
+                    .calendar-view { display: grid; grid-template-columns: repeat(7, 1fr); gap: 10px; }
+                    .calendar-day { border: 1px solid #ddd; padding: 10px; min-height: 120px; }
+                    .calendar-day-header { font-weight: bold; border-bottom: 1px solid #ddd; margin-bottom: 5px; }
+                    .calendar-event { background: #f5f5f5; padding: 5px; margin-bottom: 3px; font-size: 11px; }
+                    @media print { body { font-size: 12px; } }
+                </style>
+            </head>
+            <body>
+                <h2>Weekly Schedule Calendar</h2>
+                <p>Tutor: ${window.tutorData.name}</p>
+                <p>Generated on: ${new Date().toLocaleDateString()}</p>
+                <hr>
+                ${calendarContent}
+                <script>
+                    window.onload = function() {
+                        window.print();
+                        setTimeout(() => window.close(), 1000);
+                    }
+                </script>
+            </body>
+        </html>
+    `);
 }
 
 function formatTime(timeString) {
@@ -1278,13 +1398,40 @@ onSnapshot(settingsDocRef, (docSnap) => {
 });
 
 // ##################################################################
-// # ENHANCED TUTOR DASHBOARD
+// # ENHANCED TUTOR DASHBOARD - WITH STUDENT ACTIONS MOVED HERE
 // ##################################################################
 function renderTutorDashboard(container, tutor) {
     container.innerHTML = `
         <div class="hero-section">
             <h1 class="hero-title">Welcome, ${tutor.name || 'Tutor'}! 👋</h1>
             <p class="hero-subtitle">Manage your students, submit reports, and track progress</p>
+        </div>
+        
+        <div class="student-actions-container mb-6">
+            <div class="student-action-card">
+                <h3 class="font-bold text-lg mb-3">📅 Schedule Management</h3>
+                <p class="text-sm text-gray-600 mb-4">Set up and view class schedules for all students</p>
+                <button id="view-full-calendar-btn" class="btn btn-info w-full mb-2">View Schedule Calendar</button>
+                <button id="setup-all-schedules-btn" class="btn btn-primary w-full">Set Up Schedules</button>
+            </div>
+            
+            <div class="student-action-card">
+                <h3 class="font-bold text-lg mb-3">📚 Today's Topic</h3>
+                <p class="text-sm text-gray-600 mb-4">Record topics covered in today's classes</p>
+                <select id="select-student-topic" class="form-input mb-3">
+                    <option value="">Select a student...</option>
+                </select>
+                <button id="add-topic-btn" class="btn btn-secondary w-full" disabled>Add Today's Topic</button>
+            </div>
+            
+            <div class="student-action-card">
+                <h3 class="font-bold text-lg mb-3">📝 Assign Homework</h3>
+                <p class="text-sm text-gray-600 mb-4">Assign homework to your students</p>
+                <select id="select-student-hw" class="form-input mb-3">
+                    <option value="">Select a student...</option>
+                </select>
+                <button id="assign-hw-btn" class="btn btn-warning w-full" disabled>Assign Homework</button>
+            </div>
         </div>
         
         <div class="card">
@@ -1347,6 +1494,42 @@ function renderTutorDashboard(container, tutor) {
         </div>
     `;
 
+    // Load student dropdowns
+    loadStudentDropdowns(tutor.email);
+
+    // Add event listeners for new buttons
+    document.getElementById('view-full-calendar-btn').addEventListener('click', showScheduleCalendarModal);
+    document.getElementById('setup-all-schedules-btn').addEventListener('click', () => {
+        checkAndShowSchedulePopup(tutor);
+    });
+    
+    document.getElementById('add-topic-btn').addEventListener('click', () => {
+        const studentId = document.getElementById('select-student-topic').value;
+        const students = getStudentsFromCache();
+        const student = students.find(s => s.id === studentId);
+        if (student) {
+            showDailyTopicModal(student);
+        }
+    });
+    
+    document.getElementById('assign-hw-btn').addEventListener('click', () => {
+        const studentId = document.getElementById('select-student-hw').value;
+        const students = getStudentsFromCache();
+        const student = students.find(s => s.id === studentId);
+        if (student) {
+            showHomeworkModal(student);
+        }
+    });
+    
+    // Enable buttons when students are selected
+    document.getElementById('select-student-topic').addEventListener('change', (e) => {
+        document.getElementById('add-topic-btn').disabled = !e.target.value;
+    });
+    
+    document.getElementById('select-student-hw').addEventListener('change', (e) => {
+        document.getElementById('assign-hw-btn').disabled = !e.target.value;
+    });
+
     document.getElementById('toggle-graded-btn').addEventListener('click', () => {
         const gradedContainer = document.getElementById('gradedReportsContainer');
         const toggleBtn = document.getElementById('toggle-graded-btn');
@@ -1367,6 +1550,47 @@ function renderTutorDashboard(container, tutor) {
     });
 
     loadTutorReports(tutor.email);
+}
+
+// Cache for students
+let studentCache = [];
+
+async function loadStudentDropdowns(tutorEmail) {
+    try {
+        const studentsQuery = query(collection(db, "students"), where("tutorEmail", "==", tutorEmail));
+        const studentsSnapshot = await getDocs(studentsQuery);
+        
+        studentCache = [];
+        const students = [];
+        studentsSnapshot.forEach(doc => {
+            const student = { id: doc.id, ...doc.data() };
+            students.push(student);
+            studentCache.push(student);
+        });
+        
+        const topicSelect = document.getElementById('select-student-topic');
+        const hwSelect = document.getElementById('select-student-hw');
+        
+        // Clear existing options except first
+        while (topicSelect.options.length > 1) topicSelect.remove(1);
+        while (hwSelect.options.length > 1) hwSelect.remove(1);
+        
+        students.forEach(student => {
+            const option = document.createElement('option');
+            option.value = student.id;
+            option.textContent = `${student.studentName} (${student.grade})`;
+            
+            const option2 = option.cloneNode(true);
+            topicSelect.appendChild(option);
+            hwSelect.appendChild(option2);
+        });
+    } catch (error) {
+        console.error("Error loading student dropdowns:", error);
+    }
+}
+
+function getStudentsFromCache() {
+    return studentCache;
 }
 
 async function loadTutorReports(tutorEmail, parentName = null, statusFilter = null) {
@@ -2000,9 +2224,6 @@ async function renderStudentDatabase(container, tutor) {
         let studentsHTML = `
             <div class="flex justify-between items-center mb-6">
                 <h2 class="text-2xl font-bold text-gray-800">📚 My Students (${studentsCount})</h2>
-                <button id="view-schedule-summary" class="btn btn-secondary">
-                    📅 View Schedule Summary
-                </button>
             </div>
         `;
         
@@ -2105,15 +2326,6 @@ async function renderStudentDatabase(container, tutor) {
                         actionsHTML += `<span class="text-gray-400">Submission Disabled</span>`;
                     }
                     
-                    // NEW: Add action buttons for schedule, daily topic, and homework
-                    if (!student.isPending && !isStudentOnBreak) {
-                        actionsHTML += `
-                            <button class="btn btn-info btn-sm view-schedule-btn" data-student-id="${student.id}">📅 Schedule</button>
-                            <button class="btn btn-secondary btn-sm daily-topic-btn" data-student-id="${student.id}">📚 Today's Topic</button>
-                            <button class="btn btn-warning btn-sm homework-btn" data-student-id="${student.id}">📝 Assign HW</button>
-                        `;
-                    }
-                    
                     if (showEditDeleteButtons && !isStudentOnBreak) {
                         actionsHTML += `
                             <button class="btn btn-info btn-sm edit-student-btn-tutor" data-student-id="${student.id}" data-collection="${student.collection}">✏️ Edit</button>
@@ -2213,27 +2425,27 @@ async function renderStudentDatabase(container, tutor) {
             <div class="space-y-4">
                 <div class="form-group">
                     <label class="form-label">Introduction</label>
-                    <textarea id="report-intro" class="form-input form-textarea" rows="2">${existingReport.introduction || ''}</textarea>
+                    <textarea id="report-intro" class="form-input form-textarea report-textarea" rows="3">${existingReport.introduction || ''}</textarea>
                 </div>
                 <div class="form-group">
                     <label class="form-label">Topics & Remarks</label>
-                    <textarea id="report-topics" class="form-input form-textarea" rows="3">${existingReport.topics || ''}</textarea>
+                    <textarea id="report-topics" class="form-input form-textarea report-textarea" rows="4">${existingReport.topics || ''}</textarea>
                 </div>
                 <div class="form-group">
                     <label class="form-label">Progress & Achievements</label>
-                    <textarea id="report-progress" class="form-input form-textarea" rows="2">${existingReport.progress || ''}</textarea>
+                    <textarea id="report-progress" class="form-input form-textarea report-textarea" rows="3">${existingReport.progress || ''}</textarea>
                 </div>
                 <div class="form-group">
                     <label class="form-label">Strengths & Weaknesses</label>
-                    <textarea id="report-sw" class="form-input form-textarea" rows="2">${existingReport.strengthsWeaknesses || ''}</textarea>
+                    <textarea id="report-sw" class="form-input form-textarea report-textarea" rows="3">${existingReport.strengthsWeaknesses || ''}</textarea>
                 </div>
                 <div class="form-group">
                     <label class="form-label">Recommendations</label>
-                    <textarea id="report-recs" class="form-input form-textarea" rows="2">${existingReport.recommendations || ''}</textarea>
+                    <textarea id="report-recs" class="form-input form-textarea report-textarea" rows="3">${existingReport.recommendations || ''}</textarea>
                 </div>
                 <div class="form-group">
                     <label class="form-label">General Comments</label>
-                    <textarea id="report-general" class="form-input form-textarea" rows="2">${existingReport.generalComments || ''}</textarea>
+                    <textarea id="report-general" class="form-input form-textarea report-textarea" rows="3">${existingReport.generalComments || ''}</textarea>
                 </div>
                 <div class="modal-footer">
                     <button id="cancel-report-btn" class="btn btn-secondary">Cancel</button>
@@ -2243,7 +2455,7 @@ async function renderStudentDatabase(container, tutor) {
         
         const reportModal = document.createElement('div');
         reportModal.className = 'modal-overlay';
-        reportModal.innerHTML = `<div class="modal-content max-w-2xl">${reportFormHTML}</div>`;
+        reportModal.innerHTML = `<div class="modal-content max-w-4xl">${reportFormHTML}</div>`; // Wider modal
         document.body.appendChild(reportModal);
 
         document.getElementById('cancel-report-btn').addEventListener('click', () => reportModal.remove());
@@ -2288,7 +2500,7 @@ async function renderStudentDatabase(container, tutor) {
 
         const feeModal = document.createElement('div');
         feeModal.className = 'modal-overlay';
-        feeModal.innerHTML = `<div class="modal-content">${feeConfirmationHTML}</div>`;
+        feeModal.innerHTML = `<div class="modal-content max-w-lg">${feeConfirmationHTML}</div>`;
         document.body.appendChild(feeModal);
 
         const isSingleApprovedStudent = approvedStudents.filter(s => !s.summerBreak && !submittedStudentIds.has(s.id)).length === 1;
@@ -2352,7 +2564,7 @@ async function renderStudentDatabase(container, tutor) {
             </div>`;
         const accountModal = document.createElement('div');
         accountModal.className = 'modal-overlay';
-        accountModal.innerHTML = `<div class="modal-content">${accountFormHTML}</div>`;
+        accountModal.innerHTML = `<div class="modal-content max-w-lg">${accountFormHTML}</div>`;
         document.body.appendChild(accountModal);
 
         document.getElementById('cancel-account-btn').addEventListener('click', () => accountModal.remove());
@@ -2407,22 +2619,6 @@ async function renderStudentDatabase(container, tutor) {
             console.error("Error submitting reports:", error);
             showCustomAlert(`❌ Error: ${error.message}`);
         }
-    }
-
-    function showCustomAlert(message) {
-        const alertModal = document.createElement('div');
-        alertModal.className = 'modal-overlay';
-        alertModal.innerHTML = `
-            <div class="modal-content max-w-sm">
-                <div class="modal-body">
-                    <p class="mb-4 text-center">${message}</p>
-                    <div class="flex justify-center">
-                        <button id="alert-ok-btn" class="btn btn-primary">OK</button>
-                    </div>
-                </div>
-            </div>`;
-        document.body.appendChild(alertModal);
-        document.getElementById('alert-ok-btn').addEventListener('click', () => alertModal.remove());
     }
 
     function showTransitioningConfirmation() {
@@ -2690,161 +2886,6 @@ async function renderStudentDatabase(container, tutor) {
                 }
             });
         });
-
-        // NEW: Attach event listeners for new functionality
-        document.querySelectorAll('.view-schedule-btn').forEach(btn => {
-            btn.addEventListener('click', () => {
-                const studentId = btn.getAttribute('data-student-id');
-                const student = students.find(s => s.id === studentId);
-                if (student) {
-                    showStudentScheduleModal(student);
-                }
-            });
-        });
-
-        document.querySelectorAll('.daily-topic-btn').forEach(btn => {
-            btn.addEventListener('click', () => {
-                const studentId = btn.getAttribute('data-student-id');
-                const student = students.find(s => s.id === studentId);
-                if (student) {
-                    showDailyTopicModal(student);
-                }
-            });
-        });
-
-        document.querySelectorAll('.homework-btn').forEach(btn => {
-            btn.addEventListener('click', () => {
-                const studentId = btn.getAttribute('data-student-id');
-                const student = students.find(s => s.id === studentId);
-                if (student) {
-                    showHomeworkModal(student);
-                }
-            });
-        });
-
-        // View schedule summary button
-        const viewScheduleBtn = document.getElementById('view-schedule-summary');
-        if (viewScheduleBtn) {
-            viewScheduleBtn.addEventListener('click', () => {
-                showScheduleSummaryModal(students);
-            });
-        }
-    }
-
-    // NEW: Schedule Summary Modal
-    function showScheduleSummaryModal(students) {
-        const studentsWithSchedule = students.filter(s => s.schedule && s.schedule.length > 0);
-        
-        if (studentsWithSchedule.length === 0) {
-            showCustomAlert('No students have schedules set up yet.');
-            return;
-        }
-        
-        let scheduleByDay = {};
-        DAYS_OF_WEEK.forEach(day => {
-            scheduleByDay[day] = [];
-        });
-        
-        studentsWithSchedule.forEach(student => {
-            student.schedule.forEach(slot => {
-                scheduleByDay[slot.day].push({
-                    student: student.studentName,
-                    grade: student.grade,
-                    time: `${formatTime(slot.start)} - ${formatTime(slot.end)}`
-                });
-            });
-        });
-        
-        const modalHTML = `
-            <div class="modal-overlay">
-                <div class="modal-content max-w-4xl">
-                    <div class="modal-header">
-                        <h3 class="modal-title">📅 Weekly Schedule Summary</h3>
-                        <button id="print-full-schedule-btn" class="btn btn-secondary btn-sm">📄 Print/PDF</button>
-                    </div>
-                    <div class="modal-body">
-                        <p class="text-sm text-gray-600 mb-4">Showing schedules for ${studentsWithSchedule.length} student(s)</p>
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            ${DAYS_OF_WEEK.map(day => {
-                                const daySchedule = scheduleByDay[day];
-                                if (daySchedule.length === 0) return '';
-                                
-                                return `
-                                    <div class="bg-gray-50 p-4 rounded-lg">
-                                        <h4 class="font-bold text-lg mb-3">${day}</h4>
-                                        <div class="space-y-2">
-                                            ${daySchedule.map(item => `
-                                                <div class="bg-white p-3 rounded border">
-                                                    <div class="font-medium">${item.student}</div>
-                                                    <div class="text-sm text-gray-500">${item.grade} • ${item.time}</div>
-                                                </div>
-                                            `).join('')}
-                                        </div>
-                                    </div>
-                                `;
-                            }).join('')}
-                        </div>
-                    </div>
-                    <div class="modal-footer">
-                        <button id="close-schedule-summary-btn" class="btn btn-secondary">Close</button>
-                    </div>
-                </div>
-            </div>
-        `;
-        
-        const modal = document.createElement('div');
-        modal.innerHTML = modalHTML;
-        document.body.appendChild(modal);
-        
-        document.getElementById('print-full-schedule-btn').addEventListener('click', () => {
-            let printContent = `
-                <h2>Weekly Schedule Summary</h2>
-                <p>Generated on: ${new Date().toLocaleDateString()}</p>
-                <p>Tutor: ${window.tutorData.name}</p>
-                <hr>
-            `;
-            
-            DAYS_OF_WEEK.forEach(day => {
-                const daySchedule = scheduleByDay[day];
-                if (daySchedule.length > 0) {
-                    printContent += `<h3>${day}</h3>`;
-                    printContent += '<ul>';
-                    daySchedule.forEach(item => {
-                        printContent += `<li><strong>${item.student}</strong> (${item.grade}) - ${item.time}</li>`;
-                    });
-                    printContent += '</ul>';
-                }
-            });
-            
-            const printWindow = window.open('', '_blank');
-            printWindow.document.write(`
-                <html>
-                    <head>
-                        <title>Weekly Schedule Summary</title>
-                        <style>
-                            body { font-family: Arial, sans-serif; padding: 20px; }
-                            h2 { color: #333; }
-                            h3 { color: #666; margin-top: 20px; }
-                            ul { list-style: none; padding: 0; }
-                            li { margin: 8px 0; padding: 8px; background: #f5f5f5; }
-                        </style>
-                    </head>
-                    <body>
-                        ${printContent}
-                        <script>
-                            window.onload = function() {
-                                window.print();
-                                setTimeout(() => window.close(), 1000);
-                            }
-                        </script>
-                    </body>
-                </html>
-            `);
-        });
-        
-        document.getElementById('close-schedule-summary-btn').addEventListener('click', () => {
-            modal.remove();
-        });
     }
 
     renderUI();
@@ -3057,4 +3098,21 @@ function renderAutoStudentsList(students) {
             }
         });
     });
+}
+
+// Utility function for showing custom alerts
+function showCustomAlert(message) {
+    const alertModal = document.createElement('div');
+    alertModal.className = 'modal-overlay';
+    alertModal.innerHTML = `
+        <div class="modal-content max-w-sm">
+            <div class="modal-body">
+                <p class="mb-4 text-center">${message}</p>
+                <div class="flex justify-center">
+                    <button id="alert-ok-btn" class="btn btn-primary">OK</button>
+                </div>
+            </div>
+        </div>`;
+    document.body.appendChild(alertModal);
+    document.getElementById('alert-ok-btn').addEventListener('click', () => alertModal.remove());
 }
