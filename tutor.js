@@ -1,5 +1,3 @@
-[file name]: tutor (3).js
-[file content begin]
 import { auth, db } from './firebaseConfig.js';
 import { collection, getDocs, doc, updateDoc, getDoc, where, query, addDoc, writeBatch, deleteDoc, setDoc } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
 import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-auth.js";
@@ -3060,4 +3058,3 @@ function renderAutoStudentsList(students) {
         });
     });
 }
-[file content end]
