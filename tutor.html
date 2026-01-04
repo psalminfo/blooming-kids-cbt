@@ -6,7 +6,12 @@
     <title>Tutor Portal - Blooming Kids House</title>
     
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" />
-   
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    
+    <!-- Removed broken links -->
+    <!-- <link rel="stylesheet" href="fonts/material-design-iconic-font/css/material-design-iconic-font.min.css"> -->
+    <!-- <link rel="stylesheet" href="css/style.css"> -->
+    
     <script async src="https://www.googletagmanager.com/gtag/js?id=G-NBTVEGH1SL"></script>
     <script>
         window.dataLayer = window.dataLayer || [];
@@ -14,468 +19,743 @@
         gtag('js', new Date());
         gtag('config', 'G-NBTVEGH1SL');
     </script>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
-    <link rel="stylesheet" href="fonts/material-design-iconic-font/css/material-design-iconic-font.min.css">
-    <link rel="stylesheet" href="css/style.css">
     
     <style>
-        /* Custom Styles for Nav Buttons - RETAINED */
-        .nav-btn {
-            padding: 8px 16px;
-            border-bottom: 2px solid transparent;
-            transition: all 0.3s ease;
-            white-space: nowrap;
+        /* Modern WordPress-inspired Styles */
+        :root {
+            --primary-color: #16a34a;
+            --primary-hover: #15803d;
+            --secondary-color: #3b82f6;
+            --accent-color: #8b5cf6;
+            --light-bg: #f8fafc;
+            --dark-bg: #111827;
+            --card-bg: #ffffff;
+            --dark-card: #1f2937;
+            --text-dark: #1e293b;
+            --text-light: #64748b;
+            --border-light: #e2e8f0;
+            --border-dark: #374151;
+            --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+            --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+            --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+            --radius: 8px;
+            --radius-lg: 12px;
+            --radius-xl: 16px;
+            --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         }
-        .nav-btn.active {
-            border-bottom-color: #16a34a; /* green-600 */
-            color: #16a34a;
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background-color: var(--light-bg);
+            color: var(--text-dark);
+            transition: var(--transition);
         }
-        
-        /* Overrides to fit Dashboard into Colorlib wrapper structure */
-        .wrapper {
-            padding: 10px 0;
+
+        .dark body {
+            background-color: var(--dark-bg);
+            color: #f3f4f6;
+        }
+
+        /* Hero Section with Image */
+        .hero-section {
+            position: relative;
+            overflow: hidden;
+            border-radius: var(--radius-xl);
+            margin-bottom: 2rem;
+            box-shadow: var(--shadow-xl);
+        }
+
+        .hero-overlay {
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(135deg, rgba(22, 163, 74, 0.85) 0%, rgba(139, 92, 246, 0.85) 100%);
+            z-index: 1;
+        }
+
+        .hero-content {
+            position: relative;
+            z-index: 2;
+            padding: 4rem 2rem;
+            text-align: center;
+            color: white;
+        }
+
+        /* WordPress-like Card Design */
+        .wp-card {
+            background: var(--card-bg);
+            border-radius: var(--radius-lg);
+            border: 1px solid var(--border-light);
+            box-shadow: var(--shadow);
+            padding: 1.5rem;
+            transition: var(--transition);
+            margin-bottom: 1.5rem;
+        }
+
+        .wp-card:hover {
+            box-shadow: var(--shadow-lg);
+            transform: translateY(-2px);
+        }
+
+        .dark .wp-card {
+            background: var(--dark-card);
+            border-color: var(--border-dark);
+        }
+
+        /* Dashboard Grid */
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 1.5rem;
+            margin: 2rem 0;
+        }
+
+        /* Stats Cards */
+        .stat-card {
+            padding: 1.5rem;
+            border-radius: var(--radius);
+            background: linear-gradient(135deg, var(--primary-color) 0%, var(--secondary-color) 100%);
+            color: white;
+            text-align: center;
+        }
+
+        .stat-icon {
+            font-size: 2.5rem;
+            margin-bottom: 1rem;
+            opacity: 0.9;
+        }
+
+        /* Navigation Tabs - WordPress Style */
+        .wp-tabs {
             display: flex;
-            justify-content: center;
-            align-items: flex-start;
-            min-height: 100vh;
-            background-image: url('images/bg-registration-form-2.jpg') !important;
-            background-size: cover;
-            background-position: center;
-            transition: background-color 0.3s;
-        }
-        .inner {
-            max-width: 1280px; 
-            width: 95%; 
-            padding: 20px;
-            /* LIGHT MODE: White background and dark text defaults are retained (Black on White) */
-            background: #ffffff; 
-            border-radius: 10px;
-            box-shadow: 0 0 10px rgba(0, 0, 0, 0.2);
-            min-height: 80vh; 
-            transition: background-color 0.3s, color 0.3s;
-            margin: 10px 0;
-        }
-        
-        /* Ensure Dashboard title elements are styled for the new UI */
-        .dashboard-header {
-            color: #333; /* LIGHT MODE: Dark text for headers */
-            text-shadow: none;
-            transition: color 0.3s;
+            border-bottom: 2px solid var(--border-light);
+            margin-bottom: 2rem;
+            gap: 0.5rem;
         }
 
-        /* Network Error Overlay Styles - HIDDEN BY DEFAULT */
-        #networkErrorOverlay {
-            display: none; /* Hidden by default */
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0, 0, 0, 0.85);
-            z-index: 10000;
-            justify-content: center;
+        .wp-tab {
+            padding: 0.875rem 1.5rem;
+            background: transparent;
+            border: none;
+            font-size: 0.95rem;
+            font-weight: 500;
+            color: var(--text-light);
+            border-bottom: 3px solid transparent;
+            cursor: pointer;
+            transition: var(--transition);
+            border-radius: var(--radius) var(--radius) 0 0;
+        }
+
+        .wp-tab:hover {
+            color: var(--primary-color);
+            background: rgba(22, 163, 74, 0.05);
+        }
+
+        .wp-tab.active {
+            color: var(--primary-color);
+            border-bottom-color: var(--primary-color);
+            background: rgba(22, 163, 74, 0.1);
+        }
+
+        .dark .wp-tabs {
+            border-bottom-color: var(--border-dark);
+        }
+
+        .dark .wp-tab.active {
+            background: rgba(22, 163, 74, 0.2);
+        }
+
+        /* Buttons - WordPress Style */
+        .wp-button {
+            display: inline-flex;
             align-items: center;
-            backdrop-filter: blur(5px);
+            justify-content: center;
+            padding: 0.75rem 1.5rem;
+            font-size: 0.95rem;
+            font-weight: 500;
+            border-radius: var(--radius);
+            border: 1px solid transparent;
+            cursor: pointer;
+            transition: var(--transition);
+            text-decoration: none;
         }
 
-        .error-content {
-            background: white;
+        .wp-button-primary {
+            background: var(--primary-color);
+            color: white;
+        }
+
+        .wp-button-primary:hover {
+            background: var(--primary-hover);
+            transform: translateY(-1px);
+            box-shadow: var(--shadow);
+        }
+
+        .wp-button-secondary {
+            background: var(--secondary-color);
+            color: white;
+        }
+
+        .wp-button-outline {
+            background: transparent;
+            border-color: var(--border-light);
+            color: var(--text-dark);
+        }
+
+        .dark .wp-button-outline {
+            border-color: var(--border-dark);
+            color: #f3f4f6;
+        }
+
+        /* Header */
+        .main-header {
+            background: var(--card-bg);
+            border-radius: var(--radius-lg);
+            padding: 1.5rem 2rem;
+            margin-bottom: 2rem;
+            box-shadow: var(--shadow);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .dark .main-header {
+            background: var(--dark-card);
+        }
+
+        .logo-container {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .logo {
+            height: 48px;
+            filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.1));
+        }
+
+        .dark .logo {
+            filter: brightness(1.2) drop-shadow(0 0 8px rgba(255, 255, 255, 0.1));
+        }
+
+        /* Action Buttons */
+        .action-buttons {
+            display: flex;
+            gap: 0.75rem;
+            align-items: center;
+        }
+
+        .icon-button {
+            width: 44px;
+            height: 44px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: var(--light-bg);
+            border: 1px solid var(--border-light);
+            color: var(--text-dark);
+            cursor: pointer;
+            transition: var(--transition);
+        }
+
+        .icon-button:hover {
+            background: var(--primary-color);
+            color: white;
+            border-color: var(--primary-color);
+            transform: scale(1.05);
+        }
+
+        .dark .icon-button {
+            background: var(--border-dark);
+            border-color: var(--border-dark);
+            color: #f3f4f6;
+        }
+
+        /* Content Area */
+        .content-area {
+            min-height: 400px;
+            padding: 2rem;
+            background: var(--card-bg);
+            border-radius: var(--radius-lg);
+            box-shadow: var(--shadow);
+        }
+
+        .dark .content-area {
+            background: var(--dark-card);
+        }
+
+        /* Table Styles */
+        .wp-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 1rem 0;
+        }
+
+        .wp-table th {
+            background: var(--light-bg);
+            padding: 1rem;
+            text-align: left;
+            font-weight: 600;
+            color: var(--text-dark);
+            border-bottom: 2px solid var(--border-light);
+        }
+
+        .wp-table td {
+            padding: 1rem;
+            border-bottom: 1px solid var(--border-light);
+        }
+
+        .dark .wp-table th {
+            background: var(--border-dark);
+            color: #f3f4f6;
+            border-bottom-color: var(--border-dark);
+        }
+
+        .dark .wp-table td {
+            border-bottom-color: var(--border-dark);
+        }
+
+        /* Form Elements */
+        .wp-input {
+            width: 100%;
+            padding: 0.75rem 1rem;
+            border: 1px solid var(--border-light);
+            border-radius: var(--radius);
+            background: var(--card-bg);
+            color: var(--text-dark);
+            font-size: 0.95rem;
+            transition: var(--transition);
+        }
+
+        .wp-input:focus {
+            outline: none;
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 3px rgba(22, 163, 74, 0.1);
+        }
+
+        .dark .wp-input {
+            background: var(--dark-card);
+            border-color: var(--border-dark);
+            color: #f3f4f6;
+        }
+
+        /* Loading Skeleton */
+        .skeleton {
+            background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+            background-size: 200% 100%;
+            animation: loading 1.5s infinite;
+            border-radius: var(--radius);
+        }
+
+        .dark .skeleton {
+            background: linear-gradient(90deg, #374151 25%, #4b5563 50%, #374151 75%);
+        }
+
+        @keyframes loading {
+            0% { background-position: 200% 0; }
+            100% { background-position: -200% 0; }
+        }
+
+        /* Network Error Overlay - Updated */
+        #networkErrorOverlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.85);
+            z-index: 9999;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            backdrop-filter: blur(10px);
+        }
+
+        .error-card {
+            background: var(--card-bg);
             padding: 3rem;
-            border-radius: 15px;
+            border-radius: var(--radius-xl);
             text-align: center;
             max-width: 500px;
-            box-shadow: 0 20px 40px rgba(0,0,0,0.3);
+            box-shadow: var(--shadow-xl);
             animation: fadeIn 0.5s ease-out;
         }
 
-        .dark .error-content {
-            background: #1f2937;
-            color: white;
+        .dark .error-card {
+            background: var(--dark-card);
         }
 
-        .error-icon {
-            font-size: 4rem;
-            color: #f59e0b;
-            margin-bottom: 1rem;
-        }
-
-        .error-buttons {
-            display: flex;
-            gap: 15px;
-            justify-content: center;
-            margin-top: 2rem;
-            flex-wrap: wrap;
-        }
-
-        .error-btn {
-            padding: 12px 24px;
-            border-radius: 8px;
-            text-decoration: none;
-            font-weight: 600;
-            transition: all 0.3s ease;
-            border: none;
-            cursor: pointer;
-        }
-
-        .error-btn.primary {
-            background: #16a34a;
-            color: white;
-        }
-
-        .error-btn.secondary {
-            background: #f59e0b;
-            color: white;
-        }
-
-        .error-btn:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
-        }
-
+        /* Animations */
         @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(-20px); }
+            from { opacity: 0; transform: translateY(20px); }
             to { opacity: 1; transform: translateY(0); }
         }
 
-        /* Network Warning Banner - HIDDEN BY DEFAULT */
-        #networkWarning {
-            display: none; /* Hidden by default */
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            background: #fef3cd;
-            border-bottom: 2px solid #f59e0b;
-            padding: 12px 20px;
-            text-align: center;
-            z-index: 9999;
-            font-weight: 500;
+        @keyframes slideIn {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
         }
 
-        .dark #networkWarning {
-            background: #78350f;
-            border-bottom-color: #f59e0b;
-            color: white;
-        }
-
-        #networkWarning .close-btn {
-            background: none;
-            border: none;
-            font-size: 1.2rem;
-            cursor: pointer;
-            margin-left: 15px;
-            padding: 5px 10px;
-            border-radius: 3px;
-        }
-
-        .dark #networkWarning .close-btn {
-            color: white;
-        }
-
-        /* Loading States */
-        .loading {
-            opacity: 0.6;
-            pointer-events: none;
-        }
-
-        /* Mobile-first responsive design */
+        /* Responsive Design */
         @media (max-width: 768px) {
-            .wrapper {
-                padding: 5px 0;
-            }
-            .inner {
-                width: 98%;
-                padding: 15px;
-                margin: 5px 0;
+            .hero-content {
+                padding: 3rem 1rem;
             }
             
-            .header-container {
+            .main-header {
                 flex-direction: column;
-                align-items: flex-start !important;
-                gap: 15px;
-            }
-            
-            .logo-title-container {
-                flex-direction: column;
-                align-items: flex-start !important;
-                text-align: left;
-                width: 100%;
+                gap: 1rem;
+                text-align: center;
+                padding: 1.5rem;
             }
             
             .action-buttons {
                 width: 100%;
-                justify-content: space-between;
-                gap: 10px;
+                justify-content: center;
             }
             
-            .action-buttons .btn-mobile {
-                flex: 1;
-                min-width: 0;
-                padding: 10px 8px;
-                font-size: 0.875rem;
+            .dashboard-grid {
+                grid-template-columns: 1fr;
             }
             
-            #tutorNameHeading {
-                font-size: 1.5rem;
-                margin-top: 10px;
-            }
-            
-            #logoImg {
-                height: 50px !important;
-            }
-            
-            .nav-container {
+            .wp-tabs {
                 overflow-x: auto;
-                padding-bottom: 5px;
+                padding-bottom: 0.5rem;
             }
             
-            .nav-buttons {
-                display: flex;
-                min-width: max-content;
-                gap: 10px;
-            }
-            
-            .nav-btn {
-                padding: 8px 12px;
-                font-size: 1rem;
-            }
-
-            .error-content {
-                margin: 20px;
-                padding: 2rem;
-            }
-
-            .error-buttons {
-                flex-direction: column;
-            }
-
-            .error-btn {
-                width: 100%;
+            .content-area {
+                padding: 1.5rem;
             }
         }
 
         @media (max-width: 480px) {
-            .inner {
-                padding: 12px;
-                border-radius: 8px;
+            .hero-content {
+                padding: 2rem 1rem;
             }
             
-            .action-buttons {
-                flex-direction: column;
+            .wp-card {
+                padding: 1rem;
             }
             
-            .action-buttons .btn-mobile {
-                width: 100%;
-            }
-            
-            #tutorNameHeading {
-                font-size: 1.25rem;
-            }
-            
-            .nav-btn {
-                padding: 6px 10px;
-                font-size: 0.9rem;
-            }
-
-            .error-content {
-                padding: 1.5rem;
-                margin: 15px;
+            .error-card {
+                margin: 1rem;
+                padding: 2rem;
             }
         }
 
-        /* --- DARK MODE STYLES (White on Dark Gray) --- */
-        .dark .wrapper {
-            background-color: #111827 !important; /* Very Dark gray/near black wrapper background for max contrast */
-            background-image: linear-gradient(rgba(17, 24, 39, 0.9), rgba(17, 24, 39, 0.9)), url('images/bg-registration-form-2.jpg') !important;
-            background-blend-mode: overlay;
-        }
-        
-        /* NEW: Fix logo contrast in dark mode */
-        .dark #logoImg {
-            /* Adjust brightness and add a white drop-shadow to make the dark logo visible */
-            filter: brightness(2) drop-shadow(0 0 5px rgba(255, 255, 255, 0.5));
+        /* Utility Classes */
+        .glass-effect {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
         }
 
-        .dark .inner {
-            background: #1f2937; /* Very Dark gray/near black for the main content panel */
-            box-shadow: 0 0 15px rgba(0, 0, 0, 0.5);
-        }
-        
-        /* Expanded General text color override to ensure pure white contrast on all elements */
-        .dark .inner, 
-        .dark .inner p, 
-        .dark .inner span, 
-        .dark .inner a, 
-        .dark .inner label, 
-        .dark .inner div, 
-        .dark .inner button,
-        .dark .inner input, /* Explicitly target input fields */
-        .dark .inner select, /* Explicitly target select fields */
-        .dark .inner textarea, /* Explicitly target textarea fields */
-        .dark .inner h1, .dark .inner h2, .dark .inner h3 {
-             color: #ffffff !important; /* ENFORCED PURE WHITE */
-        }
-        
-        /* ⭐⭐ NEW: Ensure high-contrast placeholder text in input/textarea fields ⭐⭐ */
-        .dark .inner input::placeholder,
-        .dark .inner textarea::placeholder {
-            color: #cccccc !important; /* Light gray for placeholder, still high contrast */
-            opacity: 1 !important; /* Ensure full visibility */
-        }
-        
-        /* ⭐⭐ NEW: Form elements styling for dark mode ⭐⭐ */
-        .dark .inner input:not([type="checkbox"]):not([type="radio"]),
-        .dark .inner select,
-        .dark .inner textarea {
-            background-color: #374151 !important;
-            border-color: #4b5563 !important;
-            color: #ffffff !important;
-        }
-        
-        /* ⭐⭐ NEW: Table and data container styling for dark mode ⭐⭐ */
-        .dark .inner table, 
-        .dark .inner .bg-white {
-            background-color: #374151 !important;
-            color: #ffffff !important;
-        }
-        
-        .dark .inner table td, 
-        .dark .inner table th {
-            border-color: #4b5563 !important;
-            color: #ffffff !important;
-        }
-        
-        /* ⭐⭐ NEW: Card and content container styling for dark mode ⭐⭐ */
-        .dark .inner .bg-gray-50 {
-            background-color: #374151 !important;
-        }
-        
-        /* ⭐⭐ NEW: Focus states for accessibility ⭐⭐ */
-        .dark .inner button:focus,
-        .dark .inner input:focus,
-        .dark .inner select:focus {
-            outline: 2px solid #3b82f6 !important;
-            outline-offset: 2px !important;
-        }
-        
-        /* ⭐⭐ NEW: Smooth transitions for all theme-able properties ⭐⭐ */
-        .inner * {
-            transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
+        .dark .glass-effect {
+            background: rgba(31, 41, 55, 0.7);
+            border: 1px solid rgba(75, 85, 99, 0.3);
         }
 
-        /* Override specific bright elements in dark mode (headers should be white) */
-        .dark .dashboard-header {
-            color: #ffffff !important;
-        }
-        
-        /* Override nav link colors in dark mode - FIXED SYNTAX ERROR */
-        .dark .nav-btn {
-            color: #e5e7eb !important; /* Better contrast light gray for inactive tabs */
-        }
-        .dark .nav-btn.active {
-            border-bottom-color: #10b981 !important; /* Brighter green for active tab */
-            color: #10b981 !important;
-        }
-        .dark #logoutBtn, .dark #whatsappBtn {
-             /* Ensure buttons maintain contrast */
-             filter: brightness(1.2);
-        }
-
-        /* Hide scrollbar for nav but keep functionality */
-        .nav-container::-webkit-scrollbar {
-            display: none;
-        }
-        .nav-container {
-            -ms-overflow-style: none;
-            scrollbar-width: none;
+        .gradient-text {
+            background: linear-gradient(135deg, var(--primary-color), var(--accent-color));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
         }
     </style>
 </head>
-<body>
-
-    <!-- Network Error Overlay - HIDDEN BY DEFAULT -->
-    <div id="networkErrorOverlay">
-        <div class="error-content">
-            <div class="error-icon">
-                <i class="fas fa-wifi"></i>
+<body class="antialiased">
+    <!-- Network Error Overlay -->
+    <div id="networkErrorOverlay" style="display: none;">
+        <div class="error-card">
+            <div class="text-5xl mb-4 text-yellow-500">
+                <i class="fas fa-wifi-slash"></i>
             </div>
             <h2 class="text-2xl font-bold mb-4">Connection Issue</h2>
             <p class="text-lg mb-2" id="errorMessage">We're having trouble connecting to the server.</p>
             <p class="text-gray-600 dark:text-gray-300 mb-6">This might be due to network problems or temporary server issues.</p>
-            <div class="error-buttons">
-                <button onclick="window.location.reload()" class="error-btn primary">
+            <div class="flex gap-3 justify-center">
+                <button onclick="window.location.reload()" class="wp-button wp-button-primary">
                     <i class="fas fa-redo mr-2"></i>Try Again
                 </button>
-                <button onclick="checkConnectivity()" class="error-btn secondary">
+                <button onclick="checkConnectivity()" class="wp-button wp-button-secondary">
                     <i class="fas fa-network-wired mr-2"></i>Check Connection
                 </button>
             </div>
         </div>
     </div>
 
-    <!-- Network Warning Banner - HIDDEN BY DEFAULT -->
-    <div id="networkWarning">
-        <span id="warningMessage">You appear to be offline. Some features may not work properly.</span>
-        <button class="close-btn" onclick="hideNetworkWarning()">×</button>
+    <!-- Network Warning Banner -->
+    <div id="networkWarning" class="hidden fixed top-0 left-0 right-0 bg-yellow-100 dark:bg-yellow-900 border-b border-yellow-400 dark:border-yellow-600 p-3 text-center z-50">
+        <span id="warningMessage" class="text-yellow-800 dark:text-yellow-100"></span>
+        <button onclick="hideNetworkWarning()" class="ml-2 text-yellow-800 dark:text-yellow-100 hover:text-yellow-600">×</button>
     </div>
 
-    <div class="wrapper">
-        <div class="inner">
-            <div class="max-w-7xl mx-auto">
-                <!-- Updated header with mobile-friendly classes -->
-                <div class="flex justify-between items-center mb-6 header-container">
-                    <div class="flex items-center logo-title-container">
-                        <img id="logoImg" src="https://res.cloudinary.com/dy2hxcyaf/image/upload/v1757700806/newbhlogo_umwqzy.svg" alt="Blooming Kids House Logo" class="h-16 w-auto mr-4 mobile-logo" style="filter: drop-shadow(0 0 5px rgba(0, 0, 0, 0.2));">
-                        
-                        <h1 id="tutorNameHeading" class="text-3xl font-bold dashboard-header mobile-title">Welcome, Tutor!</h1>
-                    </div>
-                    
-                    <div class="flex space-x-3 items-center action-buttons">
-                        <button id="modeToggle" class="p-3 rounded-full bg-gray-200 hover:bg-gray-300 text-gray-700 dark:bg-gray-600 dark:hover:bg-gray-700 dark:text-white transition-colors duration-300 shadow-md btn-mobile" aria-label="Toggle dark mode">
-                            <i class="fas fa-moon" id="modeIcon"></i>
-                        </button>
-
-                        <a id="whatsappBtn" 
-                           href="https://wa.me/2348158768689" 
-                           target="_blank" 
-                           class="bg-green-500 text-white px-4 py-2 rounded flex items-center hover:bg-green-600 shadow-md transition-colors duration-300 btn-mobile"
-                           title="Contact Tech Support via WhatsApp">
-                            <i class="fab fa-whatsapp mr-2 text-lg"></i> 
-                            <span class="mobile-text">Tech Support</span>
-                        </a>
-
-                        <button id="logoutBtn" class="bg-yellow-400 text-white px-4 py-2 rounded hover:bg-yellow-500 shadow-md btn-mobile">
-                            <span class="mobile-text">Logout</span>
-                        </button>
-                    </div>
-                </div>
-                
-                <!-- Updated nav with mobile scrolling -->
-                <nav class="mb-6 border-b border-gray-200 dark:border-gray-700 nav-container">
-                    <div class="flex space-x-4 nav-buttons">
-                        <button id="navDashboard" class="nav-btn text-lg font-semibold active dashboard-header">Dashboard</button>
-                        <button id="navStudentDatabase" class="nav-btn text-lg font-semibold text-gray-500 hover:text-green-600">Student Database</button>
-                    </div>
-                </nav>
-
-                <div id="mainContent">
-                    <p class="text-center text-gray-600 mt-12 mobile-content">Checking user permissions...</p>
+    <div class="min-h-screen p-4 md:p-6">
+        <div class="max-w-7xl mx-auto">
+            <!-- Hero Section with Image -->
+            <div class="hero-section">
+                <img 
+                    src="https://res.cloudinary.com/dy2hxcyaf/image/upload/v1767511634/0eba85cdd30407bc616950834aa7f4d1_black_homeschool-1000-c-90_yyy1il.jpg" 
+                    alt="Education Hero" 
+                    class="w-full h-64 md:h-80 object-cover"
+                    onerror="this.src='https://images.unsplash.com/photo-1523050854058-8df90110c9f1?ixlib=rb-4.0.3&auto=format&fit=crop&w=1600&q=80'"
+                >
+                <div class="hero-overlay"></div>
+                <div class="hero-content">
+                    <h1 class="text-4xl md:text-5xl font-bold mb-4">Welcome to Blooming Kids House</h1>
+                    <p class="text-xl opacity-90">Empowering tutors to shape young minds with excellence</p>
                 </div>
             </div>
+
+            <!-- Main Header -->
+            <header class="main-header">
+                <div class="logo-container">
+                    <img 
+                        src="https://res.cloudinary.com/dy2hxcyaf/image/upload/v1757700806/newbhlogo_umwqzy.svg" 
+                        alt="Blooming Kids House Logo" 
+                        class="logo"
+                    >
+                    <div>
+                        <h1 id="tutorNameHeading" class="text-2xl font-bold">Welcome, <span class="gradient-text">Tutor!</span></h1>
+                        <p class="text-gray-600 dark:text-gray-400 text-sm">Your dashboard is ready</p>
+                    </div>
+                </div>
+
+                <div class="action-buttons">
+                    <button id="modeToggle" class="icon-button" aria-label="Toggle theme">
+                        <i id="modeIcon" class="fas fa-moon"></i>
+                    </button>
+                    
+                    <a href="https://wa.me/2348158768689" target="_blank" class="icon-button wp-button-primary" title="Tech Support">
+                        <i class="fab fa-whatsapp"></i>
+                    </a>
+                    
+                    <button id="logoutBtn" class="wp-button wp-button-outline">
+                        <i class="fas fa-sign-out-alt mr-2"></i>Logout
+                    </button>
+                </div>
+            </header>
+
+            <!-- Navigation Tabs -->
+            <div class="wp-tabs">
+                <button id="navDashboard" class="wp-tab active">
+                    <i class="fas fa-tachometer-alt mr-2"></i>Dashboard
+                </button>
+                <button id="navStudentDatabase" class="wp-tab">
+                    <i class="fas fa-database mr-2"></i>Student Database
+                </button>
+                <button class="wp-tab">
+                    <i class="fas fa-calendar-alt mr-2"></i>Schedule
+                </button>
+                <button class="wp-tab">
+                    <i class="fas fa-chart-line mr-2"></i>Reports
+                </button>
+            </div>
+
+            <!-- Main Content Area -->
+            <div class="content-area">
+                <div id="mainContent">
+                    <!-- Dashboard Content -->
+                    <div id="dashboardContent" class="space-y-6">
+                        <!-- Stats Overview -->
+                        <div class="dashboard-grid">
+                            <div class="wp-card">
+                                <div class="flex items-center justify-between">
+                                    <div>
+                                        <p class="text-gray-600 dark:text-gray-400 text-sm">Total Students</p>
+                                        <h3 class="text-3xl font-bold mt-1">48</h3>
+                                    </div>
+                                    <div class="stat-icon text-blue-500">
+                                        <i class="fas fa-users"></i>
+                                    </div>
+                                </div>
+                                <div class="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+                                    <span class="text-green-600 dark:text-green-400 text-sm font-medium">
+                                        <i class="fas fa-arrow-up mr-1"></i>12% from last month
+                                    </span>
+                                </div>
+                            </div>
+
+                            <div class="wp-card">
+                                <div class="flex items-center justify-between">
+                                    <div>
+                                        <p class="text-gray-600 dark:text-gray-400 text-sm">Active Sessions</p>
+                                        <h3 class="text-3xl font-bold mt-1">7</h3>
+                                    </div>
+                                    <div class="stat-icon text-green-500">
+                                        <i class="fas fa-chalkboard-teacher"></i>
+                                    </div>
+                                </div>
+                                <div class="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+                                    <span class="text-blue-600 dark:text-blue-400 text-sm font-medium">
+                                        <i class="fas fa-circle mr-1"></i>3 more today
+                                    </span>
+                                </div>
+                            </div>
+
+                            <div class="wp-card">
+                                <div class="flex items-center justify-between">
+                                    <div>
+                                        <p class="text-gray-600 dark:text-gray-400 text-sm">Pending Tasks</p>
+                                        <h3 class="text-3xl font-bold mt-1">5</h3>
+                                    </div>
+                                    <div class="stat-icon text-purple-500">
+                                        <i class="fas fa-tasks"></i>
+                                    </div>
+                                </div>
+                                <div class="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+                                    <span class="text-yellow-600 dark:text-yellow-400 text-sm font-medium">
+                                        <i class="fas fa-clock mr-1"></i>Due this week
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Recent Activity -->
+                        <div class="wp-card">
+                            <h2 class="text-xl font-bold mb-4 flex items-center">
+                                <i class="fas fa-history mr-2 text-gray-500"></i>Recent Activity
+                            </h2>
+                            <div class="space-y-3">
+                                <div class="flex items-center p-3 hover:bg-gray-50 dark:hover:bg-gray-800 rounded-lg transition-colors">
+                                    <div class="flex-shrink-0 w-10 h-10 bg-green-100 dark:bg-green-900 rounded-full flex items-center justify-center mr-3">
+                                        <i class="fas fa-user-check text-green-600 dark:text-green-400"></i>
+                                    </div>
+                                    <div class="flex-grow">
+                                        <p class="font-medium">New student enrolled</p>
+                                        <p class="text-sm text-gray-600 dark:text-gray-400">Emily Johnson joined Grade 5 Mathematics</p>
+                                    </div>
+                                    <span class="text-sm text-gray-500">2 hours ago</span>
+                                </div>
+                                
+                                <div class="flex items-center p-3 hover:bg-gray-50 dark:hover:bg-gray-800 rounded-lg transition-colors">
+                                    <div class="flex-shrink-0 w-10 h-10 bg-blue-100 dark:bg-blue-900 rounded-full flex items-center justify-center mr-3">
+                                        <i class="fas fa-file-upload text-blue-600 dark:text-blue-400"></i>
+                                    </div>
+                                    <div class="flex-grow">
+                                        <p class="font-medium">Assignment submitted</p>
+                                        <p class="text-sm text-gray-600 dark:text-gray-400">Mark Davis submitted Science project</p>
+                                    </div>
+                                    <span class="text-sm text-gray-500">Yesterday</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Quick Actions -->
+                        <div class="wp-card">
+                            <h2 class="text-xl font-bold mb-4 flex items-center">
+                                <i class="fas fa-bolt mr-2 text-yellow-500"></i>Quick Actions
+                            </h2>
+                            <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+                                <button class="wp-button wp-button-outline flex flex-col items-center justify-center p-4 h-32">
+                                    <i class="fas fa-user-plus text-2xl mb-2 text-blue-500"></i>
+                                    <span>Add Student</span>
+                                </button>
+                                <button class="wp-button wp-button-outline flex flex-col items-center justify-center p-4 h-32">
+                                    <i class="fas fa-file-alt text-2xl mb-2 text-green-500"></i>
+                                    <span>Create Report</span>
+                                </button>
+                                <button class="wp-button wp-button-outline flex flex-col items-center justify-center p-4 h-32">
+                                    <i class="fas fa-video text-2xl mb-2 text-purple-500"></i>
+                                    <span>Start Session</span>
+                                </button>
+                                <button class="wp-button wp-button-outline flex flex-col items-center justify-center p-4 h-32">
+                                    <i class="fas fa-comment-alt text-2xl mb-2 text-red-500"></i>
+                                    <span>Send Message</span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Student Database Content (Hidden by default) -->
+                    <div id="studentDatabaseContent" class="hidden">
+                        <div class="flex justify-between items-center mb-6">
+                            <h2 class="text-2xl font-bold">Student Database</h2>
+                            <button class="wp-button wp-button-primary">
+                                <i class="fas fa-plus mr-2"></i>Add New Student
+                            </button>
+                        </div>
+                        
+                        <div class="wp-card">
+                            <div class="flex flex-col md:flex-row md:items-center justify-between mb-4">
+                                <div class="relative mb-3 md:mb-0">
+                                    <input type="text" placeholder="Search students..." class="wp-input pl-10" style="width: 300px;">
+                                    <i class="fas fa-search absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
+                                </div>
+                                <div class="flex gap-2">
+                                    <select class="wp-input" style="width: auto;">
+                                        <option>Filter by Grade</option>
+                                        <option>Grade 1</option>
+                                        <option>Grade 2</option>
+                                    </select>
+                                    <select class="wp-input" style="width: auto;">
+                                        <option>Sort by</option>
+                                        <option>Name A-Z</option>
+                                        <option>Recent</option>
+                                    </select>
+                                </div>
+                            </div>
+                            
+                            <div class="overflow-x-auto">
+                                <table class="wp-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Student Name</th>
+                                            <th>Grade</th>
+                                            <th>Subjects</th>
+                                            <th>Last Activity</th>
+                                            <th>Status</th>
+                                            <th>Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr>
+                                            <td class="font-medium">John Smith</td>
+                                            <td>Grade 5</td>
+                                            <td>Math, Science</td>
+                                            <td>Today, 10:30 AM</td>
+                                            <td><span class="px-2 py-1 bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200 rounded-full text-xs">Active</span></td>
+                                            <td>
+                                                <button class="icon-button text-sm">
+                                                    <i class="fas fa-eye"></i>
+                                                </button>
+                                            </td>
+                                        </tr>
+                                        <tr>
+                                            <td class="font-medium">Sarah Johnson</td>
+                                            <td>Grade 4</td>
+                                            <td>English, History</td>
+                                            <td>Yesterday</td>
+                                            <td><span class="px-2 py-1 bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200 rounded-full text-xs">Active</span></td>
+                                            <td>
+                                                <button class="icon-button text-sm">
+                                                    <i class="fas fa-eye"></i>
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Footer -->
+            <footer class="mt-8 text-center text-gray-600 dark:text-gray-400 text-sm">
+                <p>© 2024 Blooming Kids House. All rights reserved.</p>
+                <p class="mt-1">Tutor Portal v2.0 • Designed for excellence in education</p>
+            </footer>
         </div>
     </div>
-    
-    <script type="module" src="tutor.js"></script>
 
     <script>
-        // Network Error Handling System - FIXED VERSION
         document.addEventListener('DOMContentLoaded', () => {
             const body = document.body;
             const toggleButton = document.getElementById('modeToggle');
             const modeIcon = document.getElementById('modeIcon');
             const modeKey = 'tutor_theme';
-
-            // Function to set the theme
+            
+            // Theme Management
             const setTheme = (theme) => {
                 if (theme === 'dark') {
                     body.classList.add('dark');
@@ -490,133 +770,97 @@
                 }
             };
 
-            // 1. Load saved theme or default to light
+            // Load saved theme
             const savedTheme = localStorage.getItem(modeKey);
             if (savedTheme) {
                 setTheme(savedTheme);
             } else if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
-                // Check system preference if no saved theme
                 setTheme('dark');
             } else {
                 setTheme('light');
             }
 
-            // 2. Add event listener to toggle theme on click
+            // Toggle theme
             toggleButton.addEventListener('click', () => {
                 const currentTheme = body.classList.contains('dark') ? 'dark' : 'light';
                 const newTheme = currentTheme === 'light' ? 'dark' : 'light';
                 setTheme(newTheme);
             });
 
-            // 3. Mobile-specific enhancements
-            function handleResize() {
-                const isMobile = window.innerWidth < 768;
-                
-                // Add mobile-specific classes for further customization
-                if (isMobile) {
-                    document.body.classList.add('mobile-view');
-                    document.body.classList.remove('desktop-view');
-                } else {
-                    document.body.classList.add('desktop-view');
-                    document.body.classList.remove('mobile-view');
-                }
-            }
-
-            // Initial check
-            handleResize();
+            // Tab Navigation
+            const navDashboard = document.getElementById('navDashboard');
+            const navStudentDatabase = document.getElementById('navStudentDatabase');
+            const dashboardContent = document.getElementById('dashboardContent');
+            const studentDatabaseContent = document.getElementById('studentDatabaseContent');
+            const tutorNameHeading = document.getElementById('tutorNameHeading');
             
-            // Listen for resize events
-            window.addEventListener('resize', handleResize);
+            // Set default content
+            dashboardContent.classList.remove('hidden');
+            studentDatabaseContent.classList.add('hidden');
 
-            // 4. Initialize Network Monitoring - BUT DON'T TRIGGER IMMEDIATELY
+            navDashboard.addEventListener('click', () => {
+                navDashboard.classList.add('active');
+                navStudentDatabase.classList.remove('active');
+                dashboardContent.classList.remove('hidden');
+                studentDatabaseContent.classList.add('hidden');
+            });
+
+            navStudentDatabase.addEventListener('click', () => {
+                navStudentDatabase.classList.add('active');
+                navDashboard.classList.remove('active');
+                studentDatabaseContent.classList.remove('hidden');
+                dashboardContent.classList.add('hidden');
+            });
+
+            // Logout button
+            document.getElementById('logoutBtn').addEventListener('click', () => {
+                if (confirm('Are you sure you want to logout?')) {
+                    // Add logout logic here
+                    window.location.href = '/login';
+                }
+            });
+
+            // Network Monitoring
             initializeNetworkMonitoring();
+            
+            // Simulate loading tutor name (replace with actual API call)
+            setTimeout(() => {
+                tutorNameHeading.innerHTML = 'Welcome, <span class="gradient-text">Alex Johnson!</span>';
+            }, 1000);
         });
 
-        // Network Monitoring Functions - FIXED
+        // Network Monitoring Functions
         function initializeNetworkMonitoring() {
-            console.log('Network monitoring initialized - errors will only show on actual network issues');
+            console.log('Network monitoring initialized');
 
-            // Monitor online/offline status
-            window.addEventListener('online', function() {
+            window.addEventListener('online', () => {
                 hideNetworkWarning();
                 hideNetworkError();
-                console.log('Connection restored - back online');
-                
-                // Show success message only if we were previously showing an error
-                if (window.wasShowingError) {
-                    showTemporaryMessage('Connection restored!', 'success');
-                    window.wasShowingError = false;
-                }
+                showTemporaryMessage('Connection restored!', 'success');
             });
 
-            window.addEventListener('offline', function() {
+            window.addEventListener('offline', () => {
                 showNetworkWarning('You appear to be offline. Some features may not work properly.');
-                console.log('Connection lost - offline');
-                window.wasShowingError = true;
             });
 
-            // Monitor page resource loading errors - BUT BE MORE SELECTIVE
-            window.addEventListener('error', function(e) {
-                // Only handle critical resources, ignore analytics and non-essential stuff
-                if (e.target && 
-                   (e.target.tagName === 'SCRIPT' && !e.target.src?.includes('gtag') && !e.target.src?.includes('analytics')) ||
-                   (e.target.tagName === 'LINK' && e.target.rel === 'stylesheet') ||
-                   (e.target.tagName === 'IMG' && e.target.classList.contains('critical-image'))) {
-                    
-                    console.warn('Critical resource loading failed:', e.target.href || e.target.src);
-                    
-                    // Only show warning for critical failures
-                    if (!navigator.onLine) {
-                        showNetworkWarning('Some critical resources failed to load due to network issues.');
-                    }
-                }
-            });
-
-            // Override fetch to catch API errors - BUT ONLY SHOW ON ACTUAL NETWORK FAILURES
+            // Monitor fetch errors
             const originalFetch = window.fetch;
             window.fetch = function(...args) {
                 return originalFetch.apply(this, args)
-                    .then(response => {
-                        if (!response.ok) {
-                            // Don't show overlay for client errors (4xx) - these are not network issues
-                            if (response.status >= 400 && response.status < 500) {
-                                // These are application errors, not network errors
-                                console.log('Application error (not network):', response.status);
-                                return response;
-                            }
-                            // For server errors (5xx), show warning but not full overlay
-                            if (response.status >= 500) {
-                                showNetworkWarning('Server is experiencing issues. Please try again later.');
-                            }
-                        }
-                        return response;
-                    })
                     .catch(error => {
-                        console.error('Fetch error:', error);
-                        
-                        // ONLY show network error for actual network issues
                         if (error.name === 'TypeError' && error.message.includes('Failed to fetch')) {
-                            // This is a real network failure
                             if (!navigator.onLine) {
                                 showNetworkError('Cannot connect to server. Please check your internet connection.');
                             } else {
                                 showNetworkError('Server is unreachable. Please try again later.');
                             }
-                            window.wasShowingError = true;
                         }
                         throw error;
                     });
             };
-
-            // Periodic connectivity check - BUT ONLY RUN IF OFFLINE
-            setInterval(() => {
-                if (!navigator.onLine) {
-                    checkConnectivity();
-                }
-            }, 30000); // Check every 30 seconds only when offline
         }
 
-        function showNetworkError(message = 'Connection issue detected') {
+        function showNetworkError(message) {
             const overlay = document.getElementById('networkErrorOverlay');
             const errorMessage = document.getElementById('errorMessage');
             
@@ -626,20 +870,15 @@
             
             overlay.style.display = 'flex';
             document.body.style.overflow = 'hidden';
-            window.isShowingError = true;
         }
 
         function hideNetworkError() {
             const overlay = document.getElementById('networkErrorOverlay');
             overlay.style.display = 'none';
             document.body.style.overflow = 'auto';
-            window.isShowingError = false;
         }
 
         function showNetworkWarning(message) {
-            // Don't show warning if we're already showing the full error overlay
-            if (window.isShowingError) return;
-            
             const warning = document.getElementById('networkWarning');
             const messageElement = document.getElementById('warningMessage');
             
@@ -647,12 +886,10 @@
                 messageElement.textContent = message;
             }
             
-            warning.style.display = 'block';
-            window.isShowingWarning = true;
+            warning.classList.remove('hidden');
             
-            // Auto-hide after 10 seconds if not a critical error and we're back online
             setTimeout(() => {
-                if (navigator.onLine && window.isShowingWarning) {
+                if (navigator.onLine) {
                     hideNetworkWarning();
                 }
             }, 10000);
@@ -660,112 +897,36 @@
 
         function hideNetworkWarning() {
             const warning = document.getElementById('networkWarning');
-            warning.style.display = 'none';
-            window.isShowingWarning = false;
+            warning.classList.add('hidden');
         }
 
         function checkConnectivity() {
-            // Only check if we're showing an error or offline
-            if (!navigator.onLine || window.isShowingError || window.isShowingWarning) {
-                fetch('https://www.google.com/favicon.ico', { 
-                    mode: 'no-cors',
-                    cache: 'no-store',
-                    headers: {
-                        'Cache-Control': 'no-cache'
-                    }
-                })
+            fetch('https://www.google.com/favicon.ico', { mode: 'no-cors' })
                 .then(() => {
-                    // If we reach here, we have internet
                     hideNetworkWarning();
                     hideNetworkError();
-                    if (window.wasShowingError) {
-                        showTemporaryMessage('Connection is working properly!', 'success');
-                    }
+                    showTemporaryMessage('Connection is working properly!', 'success');
                 })
                 .catch(() => {
-                    // No internet connection - but don't show another error if one is already showing
-                    if (!window.isShowingError) {
-                        showNetworkError('No internet connection detected. Please check your network settings.');
-                    }
+                    showNetworkError('No internet connection detected.');
                 });
-            }
         }
 
-        function showTemporaryMessage(message, type = 'info') {
-            // Create temporary message element
+        function showTemporaryMessage(message, type) {
             const messageEl = document.createElement('div');
             messageEl.textContent = message;
-            messageEl.style.cssText = `
-                position: fixed;
-                top: 20px;
-                right: 20px;
-                background: ${type === 'success' ? '#10b981' : '#3b82f6'};
-                color: white;
-                padding: 12px 20px;
-                border-radius: 8px;
-                z-index: 10001;
-                box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-                animation: slideIn 0.3s ease-out;
-            `;
+            messageEl.className = `fixed top-4 right-4 px-4 py-3 rounded-lg shadow-lg z-50 ${
+                type === 'success' ? 'bg-green-500 text-white' : 'bg-blue-500 text-white'
+            }`;
+            messageEl.style.animation = 'slideIn 0.3s ease-out';
             
             document.body.appendChild(messageEl);
             
-            // Remove after 3 seconds
             setTimeout(() => {
                 messageEl.style.animation = 'slideOut 0.3s ease-in';
-                setTimeout(() => {
-                    if (messageEl.parentNode) {
-                        messageEl.parentNode.removeChild(messageEl);
-                    }
-                }, 300);
+                setTimeout(() => messageEl.remove(), 300);
             }, 3000);
         }
-
-        // Add CSS for slide animations
-        const style = document.createElement('style');
-        style.textContent = `
-            @keyframes slideIn {
-                from { transform: translateX(100%); opacity: 0; }
-                to { transform: translateX(0); opacity: 1; }
-            }
-            @keyframes slideOut {
-                from { transform: translateX(0); opacity: 1; }
-                to { transform: translateX(100%); opacity: 0; }
-            }
-        `;
-        document.head.appendChild(style);
-
-        // Global error handler for uncaught errors - MORE SELECTIVE
-        window.addEventListener('unhandledrejection', (event) => {
-            console.error('Unhandled promise rejection:', event.reason);
-            
-            // Only show network errors, not programming errors
-            if (event.reason && 
-                (event.reason.message.includes('Failed to fetch') || 
-                 event.reason.message.includes('NetworkError') ||
-                 event.reason.message.includes('Load failed'))) {
-                
-                if (!navigator.onLine) {
-                    showNetworkWarning('A network error occurred. Please check your connection.');
-                }
-            }
-        });
-
-        // Handle 404 errors for wrong URLs
-        window.addEventListener('DOMContentLoaded', () => {
-            // Check if we're on a valid route
-            const validRoutes = ['/tutor', '/tutor/dashboard', '/tutor/students'];
-            const currentPath = window.location.pathname;
-            
-            // If we're on a completely invalid route, show error
-            if (!validRoutes.some(route => currentPath.includes(route)) && 
-                currentPath !== '/' && 
-                !currentPath.includes('index')) {
-                
-                // This is a 404 situation - wrong URL
-                showNetworkError('Page not found. The URL you entered may be incorrect.');
-            }
-        });
     </script>
 </body>
 </html>
