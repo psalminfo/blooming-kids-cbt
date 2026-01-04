@@ -441,6 +441,7 @@ style.textContent = `
         grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
         gap: 1rem;
         margin-top: 1.5rem;
+        margin-bottom: 2rem;
     }
 
     .student-action-card {
@@ -460,6 +461,22 @@ style.textContent = `
         min-height: 150px;
         font-size: 1.05rem;
         line-height: 1.5;
+    }
+
+    /* Edit Schedule Button */
+    .edit-schedule-btn {
+        background-color: var(--info-color);
+        color: white;
+        border: none;
+        padding: 0.375rem 0.75rem;
+        border-radius: var(--radius);
+        font-size: 0.75rem;
+        cursor: pointer;
+        transition: all 0.2s ease;
+    }
+
+    .edit-schedule-btn:hover {
+        background-color: #2563eb;
     }
 `;
 document.head.appendChild(style);
@@ -573,16 +590,16 @@ const DAYS_OF_WEEK = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "S
 const TIME_SLOTS = Array.from({length: 49}, (_, i) => { // Increased from 48 to 49 to include 23:30-00:00
     const hour = Math.floor(i / 2);
     const minute = i % 2 === 0 ? "00" : "30";
-    const period = hour >= 12 ? "PM" : "AM";
-    const displayHour = hour % 12 || 12;
     let label;
     
-    // Handle 00:00 (midnight)
+    // Handle 00:00 (midnight) - special case
     if (hour === 0 && minute === "00") {
         label = "12:00 AM (Midnight)";
     } else if (hour === 12 && minute === "00") {
         label = "12:00 PM (Noon)";
     } else {
+        const period = hour >= 12 ? 'PM' : 'AM';
+        const displayHour = hour % 12 || 12;
         label = `${displayHour}:${minute} ${period}`;
     }
     
@@ -592,8 +609,32 @@ const TIME_SLOTS = Array.from({length: 49}, (_, i) => { // Increased from 48 to 
     };
 });
 
-// Add 11:30 PM to 12:00 AM slots
+// Add 23:30 separately to ensure it's included
 TIME_SLOTS.push({value: "23:30", label: "11:30 PM"});
+
+// Special handling for 00:00 - make sure it's at the end for proper sorting
+const midnightSlot = TIME_SLOTS.find(slot => slot.value === "00:00");
+if (midnightSlot) {
+    // Remove from current position and add to end
+    const index = TIME_SLOTS.indexOf(midnightSlot);
+    TIME_SLOTS.splice(index, 1);
+    TIME_SLOTS.push(midnightSlot);
+}
+
+// Sort by time value for proper ordering
+TIME_SLOTS.sort((a, b) => {
+    // Handle midnight (00:00) as last
+    if (a.value === "00:00") return 1;
+    if (b.value === "00:00") return -1;
+    
+    // Convert to minutes for comparison
+    const timeToMinutes = (time) => {
+        const [hours, minutes] = time.split(':').map(Number);
+        return hours * 60 + minutes;
+    };
+    
+    return timeToMinutes(a.value) - timeToMinutes(b.value);
+});
 
 // --- Phone Number Normalization Function ---
 function normalizePhoneNumber(phone) {
@@ -757,7 +798,18 @@ function showBulkSchedulePopup(student, tutor, totalCount = 0) {
             const start = entry.querySelector('.schedule-start').value;
             const end = entry.querySelector('.schedule-end').value;
             
-            if (start >= end) {
+            // Convert times to minutes for comparison
+            const timeToMinutes = (time) => {
+                const [hours, minutes] = time.split(':').map(Number);
+                // Handle midnight (00:00) as 24:00 for comparison purposes
+                if (hours === 0 && minutes === 0) return 24 * 60;
+                return hours * 60 + minutes;
+            };
+            
+            const startMinutes = timeToMinutes(start);
+            const endMinutes = timeToMinutes(end);
+            
+            if (startMinutes >= endMinutes) {
                 showCustomAlert('End time must be after start time.');
                 hasError = true;
                 return;
@@ -882,6 +934,102 @@ function showDailyTopicModal(student) {
     });
 }
 
+// --- NEW: Homework Assignment Functions ---
+function showHomeworkModal(student) {
+    const nextWeek = new Date();
+    nextWeek.setDate(nextWeek.getDate() + 7);
+    const maxDate = nextWeek.toISOString().split('T')[0];
+    
+    const modalHTML = `
+        <div class="modal-overlay">
+            <div class="modal-content max-w-lg">
+                <div class="modal-header">
+                    <h3 class="modal-title">📝 Assign Homework for ${student.studentName}</h3>
+                </div>
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label class="form-label">Homework Title *</label>
+                        <input type="text" id="hw-title" class="form-input" placeholder="e.g., Math Worksheet #3" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Description *</label>
+                        <textarea id="hw-description" class="form-input form-textarea report-textarea" placeholder="Detailed instructions for the homework..." required></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Due Date *</label>
+                        <input type="date" id="hw-due-date" class="form-input" min="${new Date().toISOString().split('T')[0]}" max="${maxDate}" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="flex items-center space-x-2">
+                            <input type="checkbox" id="hw-reminder" class="rounded">
+                            <span class="text-sm">Send reminder to parent 1 day before due date</span>
+                        </label>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button id="cancel-hw-btn" class="btn btn-secondary">Cancel</button>
+                    <button id="save-hw-btn" class="btn btn-primary" data-student-id="${student.id}">
+                        Assign Homework
+                    </button>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    const modal = document.createElement('div');
+    modal.innerHTML = modalHTML;
+    document.body.appendChild(modal);
+    
+    document.getElementById('cancel-hw-btn').addEventListener('click', () => modal.remove());
+    document.getElementById('save-hw-btn').addEventListener('click', async () => {
+        const hwData = {
+            studentId: student.id,
+            studentName: student.studentName,
+            parentPhone: student.parentPhone,
+            tutorEmail: window.tutorData.email,
+            tutorName: window.tutorData.name,
+            title: document.getElementById('hw-title').value.trim(),
+            description: document.getElementById('hw-description').value.trim(),
+            dueDate: document.getElementById('hw-due-date').value,
+            sendReminder: document.getElementById('hw-reminder').checked,
+            assignedDate: new Date(),
+            status: 'assigned',
+            submissions: []
+        };
+        
+        if (!hwData.title || !hwData.description || !hwData.dueDate) {
+            showCustomAlert('Please fill in all required fields (title, description, due date).');
+            return;
+        }
+        
+        const dueDate = new Date(hwData.dueDate);
+        const today = new Date();
+        const maxDueDate = new Date(today);
+        maxDueDate.setDate(maxDueDate.getDate() + 7);
+        
+        if (dueDate < today) {
+            showCustomAlert('Due date cannot be in the past.');
+            return;
+        }
+        
+        if (dueDate > maxDueDate) {
+            showCustomAlert('Due date must be within 7 days from today.');
+            return;
+        }
+        
+        try {
+            const hwRef = doc(collection(db, "homework_assignments"));
+            await setDoc(hwRef, hwData);
+            
+            modal.remove();
+            showCustomAlert('✅ Homework assigned successfully! Parents will be notified.');
+        } catch (error) {
+            console.error("Error assigning homework:", error);
+            showCustomAlert('❌ Error assigning homework. Please try again.');
+        }
+    });
+}
+
 // --- NEW: View Schedule Calendar for All Students ---
 function showScheduleCalendarModal() {
     const modalHTML = `
@@ -996,7 +1144,8 @@ function renderCalendarView(students) {
                 grade: student.grade,
                 start: slot.start,
                 end: slot.end,
-                time: `${formatTime(slot.start)} - ${formatTime(slot.end)}`
+                time: `${formatTime(slot.start)} - ${formatTime(slot.end)}`,
+                studentId: student.id
             });
         });
     });
@@ -1026,6 +1175,7 @@ function renderCalendarView(students) {
                                 <div class="font-medium text-xs">${event.student}</div>
                                 <div class="calendar-event-time">${event.time}</div>
                                 <div class="text-xs text-gray-500">${event.grade}</div>
+                                <button class="edit-schedule-btn mt-1" data-student-id="${event.studentId}">Edit</button>
                             </div>
                         `).join('')
                     }
@@ -1054,6 +1204,162 @@ function renderCalendarView(students) {
     `;
     
     document.getElementById('calendar-view').innerHTML = calendarHTML;
+    
+    // Add event listeners for edit buttons
+    document.querySelectorAll('.edit-schedule-btn').forEach(btn => {
+        btn.addEventListener('click', async (e) => {
+            const studentId = e.target.getAttribute('data-student-id');
+            const student = students.find(s => s.id === studentId);
+            if (student) {
+                document.querySelector('.modal-overlay').remove();
+                showEditScheduleModal(student);
+            }
+        });
+    });
+}
+
+// NEW: Function to edit individual student schedule
+function showEditScheduleModal(student) {
+    const modalHTML = `
+        <div class="modal-overlay">
+            <div class="modal-content max-w-2xl">
+                <div class="modal-header">
+                    <h3 class="modal-title">✏️ Edit Schedule for ${student.studentName}</h3>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-4 p-3 bg-blue-50 rounded-lg">
+                        <p class="text-sm text-blue-700">Student: <strong>${student.studentName}</strong> | Grade: ${student.grade}</p>
+                    </div>
+                    
+                    <div id="schedule-entries" class="space-y-4">
+                        ${student.schedule && student.schedule.length > 0 ? 
+                            student.schedule.map(slot => `
+                                <div class="schedule-entry bg-gray-50 p-4 rounded-lg border">
+                                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                        <div>
+                                            <label class="form-label">Day of Week</label>
+                                            <select class="form-input schedule-day">
+                                                ${DAYS_OF_WEEK.map(day => `<option value="${day}" ${day === slot.day ? 'selected' : ''}>${day}</option>`).join('')}
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label class="form-label">Start Time</label>
+                                            <select class="form-input schedule-start">
+                                                ${TIME_SLOTS.map(timeSlot => `<option value="${timeSlot.value}" ${timeSlot.value === slot.start ? 'selected' : ''}>${timeSlot.label}</option>`).join('')}
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label class="form-label">End Time</label>
+                                            <select class="form-input schedule-end">
+                                                ${TIME_SLOTS.map(timeSlot => `<option value="${timeSlot.value}" ${timeSlot.value === slot.end ? 'selected' : ''}>${timeSlot.label}</option>`).join('')}
+                                            </select>
+                                        </div>
+                                    </div>
+                                    <button class="btn btn-danger btn-sm mt-2 remove-schedule-btn">Remove</button>
+                                </div>
+                            `).join('') : 
+                            `<div class="text-center text-gray-500">No schedule set for this student</div>`
+                        }
+                    </div>
+                    
+                    <button id="add-schedule-entry" class="btn btn-secondary btn-sm mt-2">
+                        ＋ Add Another Time Slot
+                    </button>
+                </div>
+                <div class="modal-footer">
+                    <button id="cancel-edit-schedule-btn" class="btn btn-secondary">Cancel</button>
+                    <button id="save-edit-schedule-btn" class="btn btn-primary" data-student-id="${student.id}">
+                        Save Schedule
+                    </button>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    const modal = document.createElement('div');
+    modal.innerHTML = modalHTML;
+    document.body.appendChild(modal);
+    
+    document.getElementById('add-schedule-entry').addEventListener('click', () => {
+        const scheduleEntries = document.getElementById('schedule-entries');
+        const newEntry = scheduleEntries.querySelector('.schedule-entry:last-child').cloneNode(true);
+        // Clear selections for new entry
+        newEntry.querySelector('.schedule-day').selectedIndex = 0;
+        newEntry.querySelector('.schedule-start').selectedIndex = 0;
+        newEntry.querySelector('.schedule-end').selectedIndex = 0;
+        scheduleEntries.appendChild(newEntry);
+    });
+    
+    document.addEventListener('click', (e) => {
+        if (e.target.classList.contains('remove-schedule-btn')) {
+            const scheduleEntries = document.querySelectorAll('.schedule-entry');
+            if (scheduleEntries.length > 1) {
+                e.target.closest('.schedule-entry').remove();
+            } else {
+                showCustomAlert('You must have at least one schedule entry.');
+            }
+        }
+    });
+    
+    document.getElementById('cancel-edit-schedule-btn').addEventListener('click', () => {
+        modal.remove();
+        showScheduleCalendarModal();
+    });
+    
+    document.getElementById('save-edit-schedule-btn').addEventListener('click', async () => {
+        const scheduleEntries = document.querySelectorAll('.schedule-entry');
+        const schedule = [];
+        let hasError = false;
+        
+        scheduleEntries.forEach(entry => {
+            const day = entry.querySelector('.schedule-day').value;
+            const start = entry.querySelector('.schedule-start').value;
+            const end = entry.querySelector('.schedule-end').value;
+            
+            // Convert times to minutes for comparison
+            const timeToMinutes = (time) => {
+                const [hours, minutes] = time.split(':').map(Number);
+                // Handle midnight (00:00) as 24:00 for comparison purposes
+                if (hours === 0 && minutes === 0) return 24 * 60;
+                return hours * 60 + minutes;
+            };
+            
+            const startMinutes = timeToMinutes(start);
+            const endMinutes = timeToMinutes(end);
+            
+            if (startMinutes >= endMinutes) {
+                showCustomAlert('End time must be after start time.');
+                hasError = true;
+                return;
+            }
+            
+            schedule.push({ day, start, end });
+        });
+        
+        if (hasError) return;
+        
+        if (schedule.length === 0) {
+            showCustomAlert('Please add at least one schedule entry.');
+            return;
+        }
+        
+        try {
+            const studentRef = doc(db, "students", student.id);
+            await updateDoc(studentRef, { schedule });
+            
+            modal.remove();
+            showCustomAlert('✅ Schedule updated successfully!');
+            
+            // Reload the calendar view
+            setTimeout(() => {
+                showScheduleCalendarModal();
+            }, 500);
+            
+        } catch (error) {
+            console.error("Error updating schedule:", error);
+            showCustomAlert('❌ Error updating schedule. Please try again.');
+        }
+    });
 }
 
 function getMostScheduledDay(scheduleByDay) {
@@ -1076,6 +1382,7 @@ function getEarliestClass(scheduleByDay) {
     
     DAYS_OF_WEEK.forEach(day => {
         scheduleByDay[day].forEach(event => {
+            // Compare time strings directly
             if (event.start < earliestTime) {
                 earliestTime = event.start;
                 earliestInfo = `${formatTime(event.start)} (${event.student} - ${day})`;
@@ -1099,6 +1406,7 @@ function printCalendar() {
                     .calendar-day { border: 1px solid #ddd; padding: 10px; min-height: 120px; }
                     .calendar-day-header { font-weight: bold; border-bottom: 1px solid #ddd; margin-bottom: 5px; }
                     .calendar-event { background: #f5f5f5; padding: 5px; margin-bottom: 3px; font-size: 11px; }
+                    .edit-schedule-btn { display: none; }
                     @media print { body { font-size: 12px; } }
                 </style>
             </head>
@@ -1121,6 +1429,12 @@ function printCalendar() {
 
 function formatTime(timeString) {
     const [hour, minute] = timeString.split(':').map(Number);
+    
+    // Handle midnight (00:00)
+    if (hour === 0 && minute === 0) {
+        return "12:00 AM (Midnight)";
+    }
+    
     const period = hour >= 12 ? 'PM' : 'AM';
     const displayHour = hour % 12 || 12;
     return `${displayHour}:${minute.toString().padStart(2, '0')} ${period}`;
@@ -1407,7 +1721,7 @@ function renderTutorDashboard(container, tutor) {
             <p class="hero-subtitle">Manage your students, submit reports, and track progress</p>
         </div>
         
-        <div class="student-actions-container mb-6">
+        <div class="student-actions-container">
             <div class="student-action-card">
                 <h3 class="font-bold text-lg mb-3">📅 Schedule Management</h3>
                 <p class="text-sm text-gray-600 mb-4">Set up and view class schedules for all students</p>
@@ -1498,56 +1812,85 @@ function renderTutorDashboard(container, tutor) {
     loadStudentDropdowns(tutor.email);
 
     // Add event listeners for new buttons
-    document.getElementById('view-full-calendar-btn').addEventListener('click', showScheduleCalendarModal);
-    document.getElementById('setup-all-schedules-btn').addEventListener('click', () => {
-        checkAndShowSchedulePopup(tutor);
-    });
+    const viewCalendarBtn = document.getElementById('view-full-calendar-btn');
+    if (viewCalendarBtn) {
+        viewCalendarBtn.addEventListener('click', showScheduleCalendarModal);
+    }
     
-    document.getElementById('add-topic-btn').addEventListener('click', () => {
-        const studentId = document.getElementById('select-student-topic').value;
-        const students = getStudentsFromCache();
-        const student = students.find(s => s.id === studentId);
-        if (student) {
-            showDailyTopicModal(student);
-        }
-    });
+    const setupSchedulesBtn = document.getElementById('setup-all-schedules-btn');
+    if (setupSchedulesBtn) {
+        setupSchedulesBtn.addEventListener('click', () => {
+            checkAndShowSchedulePopup(tutor);
+        });
+    }
     
-    document.getElementById('assign-hw-btn').addEventListener('click', () => {
-        const studentId = document.getElementById('select-student-hw').value;
-        const students = getStudentsFromCache();
-        const student = students.find(s => s.id === studentId);
-        if (student) {
-            showHomeworkModal(student);
-        }
-    });
+    const addTopicBtn = document.getElementById('add-topic-btn');
+    if (addTopicBtn) {
+        addTopicBtn.addEventListener('click', () => {
+            const studentId = document.getElementById('select-student-topic').value;
+            const student = getStudentFromCache(studentId);
+            if (student) {
+                showDailyTopicModal(student);
+            }
+        });
+    }
+    
+    const assignHwBtn = document.getElementById('assign-hw-btn');
+    if (assignHwBtn) {
+        assignHwBtn.addEventListener('click', () => {
+            const studentId = document.getElementById('select-student-hw').value;
+            const student = getStudentFromCache(studentId);
+            if (student) {
+                showHomeworkModal(student);
+            }
+        });
+    }
     
     // Enable buttons when students are selected
-    document.getElementById('select-student-topic').addEventListener('change', (e) => {
-        document.getElementById('add-topic-btn').disabled = !e.target.value;
-    });
+    const topicSelect = document.getElementById('select-student-topic');
+    if (topicSelect) {
+        topicSelect.addEventListener('change', (e) => {
+            const addTopicBtn = document.getElementById('add-topic-btn');
+            if (addTopicBtn) {
+                addTopicBtn.disabled = !e.target.value;
+            }
+        });
+    }
     
-    document.getElementById('select-student-hw').addEventListener('change', (e) => {
-        document.getElementById('assign-hw-btn').disabled = !e.target.value;
-    });
+    const hwSelect = document.getElementById('select-student-hw');
+    if (hwSelect) {
+        hwSelect.addEventListener('change', (e) => {
+            const assignHwBtn = document.getElementById('assign-hw-btn');
+            if (assignHwBtn) {
+                assignHwBtn.disabled = !e.target.value;
+            }
+        });
+    }
 
-    document.getElementById('toggle-graded-btn').addEventListener('click', () => {
-        const gradedContainer = document.getElementById('gradedReportsContainer');
-        const toggleBtn = document.getElementById('toggle-graded-btn');
-        
-        if (gradedContainer.classList.contains('hidden')) {
-            gradedContainer.classList.remove('hidden');
-            toggleBtn.innerHTML = '👁️ Hide';
-        } else {
-            gradedContainer.classList.add('hidden');
-            toggleBtn.innerHTML = '👁️ Show';
-        }
-    });
+    const toggleGradedBtn = document.getElementById('toggle-graded-btn');
+    if (toggleGradedBtn) {
+        toggleGradedBtn.addEventListener('click', () => {
+            const gradedContainer = document.getElementById('gradedReportsContainer');
+            const toggleBtn = document.getElementById('toggle-graded-btn');
+            
+            if (gradedContainer.classList.contains('hidden')) {
+                gradedContainer.classList.remove('hidden');
+                toggleBtn.innerHTML = '👁️ Hide';
+            } else {
+                gradedContainer.classList.add('hidden');
+                toggleBtn.innerHTML = '👁️ Show';
+            }
+        });
+    }
 
-    document.getElementById('searchBtn').addEventListener('click', async () => {
-        const name = document.getElementById('searchName').value.trim();
-        const status = document.getElementById('filterStatus').value;
-        await loadTutorReports(tutor.email, name || null, status || null);
-    });
+    const searchBtn = document.getElementById('searchBtn');
+    if (searchBtn) {
+        searchBtn.addEventListener('click', async () => {
+            const name = document.getElementById('searchName').value.trim();
+            const status = document.getElementById('filterStatus').value;
+            await loadTutorReports(tutor.email, name || null, status || null);
+        });
+    }
 
     loadTutorReports(tutor.email);
 }
@@ -1571,31 +1914,35 @@ async function loadStudentDropdowns(tutorEmail) {
         const topicSelect = document.getElementById('select-student-topic');
         const hwSelect = document.getElementById('select-student-hw');
         
-        // Clear existing options except first
-        while (topicSelect.options.length > 1) topicSelect.remove(1);
-        while (hwSelect.options.length > 1) hwSelect.remove(1);
-        
-        students.forEach(student => {
-            const option = document.createElement('option');
-            option.value = student.id;
-            option.textContent = `${student.studentName} (${student.grade})`;
+        if (topicSelect && hwSelect) {
+            // Clear existing options except first
+            while (topicSelect.options.length > 1) topicSelect.remove(1);
+            while (hwSelect.options.length > 1) hwSelect.remove(1);
             
-            const option2 = option.cloneNode(true);
-            topicSelect.appendChild(option);
-            hwSelect.appendChild(option2);
-        });
+            students.forEach(student => {
+                const option = document.createElement('option');
+                option.value = student.id;
+                option.textContent = `${student.studentName} (${student.grade})`;
+                
+                const option2 = option.cloneNode(true);
+                topicSelect.appendChild(option);
+                hwSelect.appendChild(option2);
+            });
+        }
     } catch (error) {
         console.error("Error loading student dropdowns:", error);
     }
 }
 
-function getStudentsFromCache() {
-    return studentCache;
+function getStudentFromCache(studentId) {
+    return studentCache.find(s => s.id === studentId);
 }
 
 async function loadTutorReports(tutorEmail, parentName = null, statusFilter = null) {
     const pendingReportsContainer = document.getElementById('pendingReportsContainer');
     const gradedReportsContainer = document.getElementById('gradedReportsContainer');
+    
+    if (!pendingReportsContainer) return;
     
     pendingReportsContainer.innerHTML = `
         <div class="card">
@@ -1819,7 +2166,10 @@ async function loadTutorReports(tutorEmail, parentName = null, statusFilter = nu
             }
         });
 
-        document.getElementById('pending-count').textContent = `${pendingCount} Pending`;
+        const pendingCountElement = document.getElementById('pending-count');
+        if (pendingCountElement) {
+            pendingCountElement.textContent = `${pendingCount} Pending`;
+        }
         
         pendingReportsContainer.innerHTML = pendingHTML || `
             <div class="card">
@@ -2154,7 +2504,9 @@ function showEditStudentModal(student) {
             showCustomAlert('✅ Student details updated successfully!');
             
             const mainContent = document.getElementById('mainContent');
-            renderStudentDatabase(mainContent, window.tutorData);
+            if (mainContent && window.tutorData) {
+                renderStudentDatabase(mainContent, window.tutorData);
+            }
         } catch (error) {
             console.error("Error updating student:", error);
             showCustomAlert(`❌ An error occurred: ${error.message}`);
@@ -2892,7 +3244,7 @@ async function renderStudentDatabase(container, tutor) {
 }
 
 // ##################################################################
-// # MAIN APP INITIALIZATION
+// # MAIN APP INITIALIZATION - FIXED EVENT LISTENERS
 // ##################################################################
 document.addEventListener('DOMContentLoaded', async () => {
     onAuthStateChanged(auth, async (user) => {
@@ -2936,32 +3288,44 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     });
 
-    document.getElementById('logoutBtn').addEventListener('click', () => {
-        signOut(auth).then(() => {
-            window.location.href = 'tutor-auth.html';
-        }).catch(error => {
-            console.error("Error signing out:", error);
-            showCustomAlert('❌ Error signing out. Please try again.');
+    const logoutBtn = document.getElementById('logoutBtn');
+    if (logoutBtn) {
+        logoutBtn.addEventListener('click', () => {
+            signOut(auth).then(() => {
+                window.location.href = 'tutor-auth.html';
+            }).catch(error => {
+                console.error("Error signing out:", error);
+                showCustomAlert('❌ Error signing out. Please try again.');
+            });
         });
-    });
+    }
 
-    document.getElementById('navDashboard').addEventListener('click', () => {
-        if (window.tutorData) {
-            renderTutorDashboard(document.getElementById('mainContent'), window.tutorData);
-        }
-    });
+    const navDashboard = document.getElementById('navDashboard');
+    if (navDashboard) {
+        navDashboard.addEventListener('click', () => {
+            if (window.tutorData) {
+                renderTutorDashboard(document.getElementById('mainContent'), window.tutorData);
+            }
+        });
+    }
 
-    document.getElementById('navStudentDatabase').addEventListener('click', () => {
-        if (window.tutorData) {
-            renderStudentDatabase(document.getElementById('mainContent'), window.tutorData);
-        }
-    });
+    const navStudentDatabase = document.getElementById('navStudentDatabase');
+    if (navStudentDatabase) {
+        navStudentDatabase.addEventListener('click', () => {
+            if (window.tutorData) {
+                renderStudentDatabase(document.getElementById('mainContent'), window.tutorData);
+            }
+        });
+    }
 
-    document.getElementById('navAutoStudents').addEventListener('click', () => {
-        if (window.tutorData) {
-            renderAutoRegisteredStudents(document.getElementById('mainContent'), window.tutorData);
-        }
-    });
+    const navAutoStudents = document.getElementById('navAutoStudents');
+    if (navAutoStudents) {
+        navAutoStudents.addEventListener('click', () => {
+            if (window.tutorData) {
+                renderAutoRegisteredStudents(document.getElementById('mainContent'), window.tutorData);
+            }
+        });
+    }
 });
 
 // ##################################################################
