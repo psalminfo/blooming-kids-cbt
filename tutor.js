@@ -478,6 +478,77 @@ style.textContent = `
     .edit-schedule-btn:hover {
         background-color: #2563eb;
     }
+
+    /* File Upload Styles */
+    .file-upload-container {
+        border: 2px dashed var(--border-color);
+        border-radius: var(--radius);
+        padding: 1.5rem;
+        text-align: center;
+        transition: all 0.2s ease;
+        cursor: pointer;
+    }
+
+    .file-upload-container:hover {
+        border-color: var(--primary-color);
+        background-color: var(--primary-light);
+    }
+
+    .file-upload-label {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        cursor: pointer;
+    }
+
+    .file-upload-icon {
+        font-size: 2rem;
+        margin-bottom: 0.5rem;
+        color: var(--primary-color);
+    }
+
+    .file-preview {
+        margin-top: 1rem;
+        padding: 0.75rem;
+        background-color: var(--light-color);
+        border-radius: var(--radius);
+    }
+
+    .file-name {
+        font-size: 0.875rem;
+        color: var(--dark-color);
+        margin-bottom: 0.25rem;
+    }
+
+    .file-size {
+        font-size: 0.75rem;
+        color: var(--dark-color);
+        opacity: 0.7;
+    }
+
+    /* Email Settings Section */
+    .email-settings {
+        background-color: var(--light-color);
+        border-radius: var(--radius);
+        padding: 1rem;
+        margin-top: 1rem;
+    }
+
+    .email-preview {
+        background-color: white;
+        border: 1px solid var(--border-color);
+        border-radius: var(--radius-sm);
+        padding: 1rem;
+        margin-top: 1rem;
+        font-size: 0.875rem;
+        line-height: 1.5;
+    }
+
+    .email-preview-header {
+        border-bottom: 1px solid var(--border-color);
+        padding-bottom: 0.5rem;
+        margin-bottom: 1rem;
+    }
 `;
 document.head.appendChild(style);
 
@@ -934,7 +1005,7 @@ function showDailyTopicModal(student) {
     });
 }
 
-// --- NEW: Homework Assignment Functions ---
+// --- UPDATED: Homework Assignment Functions with File Upload ---
 function showHomeworkModal(student) {
     const nextWeek = new Date();
     nextWeek.setDate(nextWeek.getDate() + 7);
@@ -942,7 +1013,7 @@ function showHomeworkModal(student) {
     
     const modalHTML = `
         <div class="modal-overlay">
-            <div class="modal-content max-w-lg">
+            <div class="modal-content max-w-2xl">
                 <div class="modal-header">
                     <h3 class="modal-title">📝 Assign Homework for ${student.studentName}</h3>
                 </div>
@@ -959,11 +1030,45 @@ function showHomeworkModal(student) {
                         <label class="form-label">Due Date *</label>
                         <input type="date" id="hw-due-date" class="form-input" min="${new Date().toISOString().split('T')[0]}" max="${maxDate}" required>
                     </div>
+                    
                     <div class="form-group">
-                        <label class="flex items-center space-x-2">
-                            <input type="checkbox" id="hw-reminder" class="rounded">
-                            <span class="text-sm">Send reminder to parent 1 day before due date</span>
-                        </label>
+                        <label class="form-label">Upload File (Optional)</label>
+                        <div class="file-upload-container" id="file-upload-container">
+                            <input type="file" id="hw-file" class="hidden" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.txt,.ppt,.pptx">
+                            <label for="hw-file" class="file-upload-label">
+                                <div class="file-upload-icon">📎</div>
+                                <span class="text-sm font-medium text-primary-color">Click to upload file</span>
+                                <span class="text-xs text-gray-500 block mt-1">PDF, DOC, JPG, PNG, TXT, PPT (Max 10MB)</span>
+                            </label>
+                            <div id="file-preview" class="file-preview hidden">
+                                <div class="flex items-center justify-between">
+                                    <div>
+                                        <div class="file-name" id="file-name"></div>
+                                        <div class="file-size" id="file-size"></div>
+                                    </div>
+                                    <button type="button" id="remove-file-btn" class="btn btn-danger btn-sm">Remove</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="email-settings">
+                        <div class="form-group">
+                            <label class="flex items-center space-x-2">
+                                <input type="checkbox" id="hw-reminder" class="rounded" checked>
+                                <span class="text-sm font-semibold">Send Email Reminder to Parent</span>
+                            </label>
+                            <p class="text-xs text-gray-500 mt-1">Parent will receive an email reminder 1 day before due date</p>
+                        </div>
+                        
+                        <div id="email-preview" class="email-preview hidden">
+                            <div class="email-preview-header">
+                                <strong>Email Preview:</strong>
+                            </div>
+                            <p><strong>Subject:</strong> <span id="email-subject">Homework Reminder for ${student.studentName}</span></p>
+                            <p><strong>To:</strong> ${student.parentEmail || 'Parent email will be used'}</p>
+                            <p><strong>Message:</strong> <span id="email-message">Don't forget! ${student.studentName} has homework due tomorrow. Please check the assignment details.</span></p>
+                        </div>
                     </div>
                 </div>
                 <div class="modal-footer">
@@ -980,11 +1085,61 @@ function showHomeworkModal(student) {
     modal.innerHTML = modalHTML;
     document.body.appendChild(modal);
     
+    // File upload handling
+    const fileInput = document.getElementById('hw-file');
+    const filePreview = document.getElementById('file-preview');
+    const fileName = document.getElementById('file-name');
+    const fileSize = document.getElementById('file-size');
+    const removeFileBtn = document.getElementById('remove-file-btn');
+    const emailPreview = document.getElementById('email-preview');
+    const emailSubject = document.getElementById('email-subject');
+    const emailMessage = document.getElementById('email-message');
+    
+    fileInput.addEventListener('change', (e) => {
+        if (e.target.files.length > 0) {
+            const file = e.target.files[0];
+            if (file.size > 10 * 1024 * 1024) { // 10MB limit
+                showCustomAlert('File size must be less than 10MB.');
+                fileInput.value = '';
+                return;
+            }
+            
+            fileName.textContent = file.name;
+            fileSize.textContent = formatFileSize(file.size);
+            filePreview.classList.remove('hidden');
+            
+            // Update email preview if file is attached
+            emailMessage.textContent = `Don't forget! ${student.studentName} has homework due tomorrow. A file has been attached to this assignment.`;
+        }
+    });
+    
+    removeFileBtn.addEventListener('click', () => {
+        fileInput.value = '';
+        filePreview.classList.add('hidden');
+        emailMessage.textContent = `Don't forget! ${student.studentName} has homework due tomorrow. Please check the assignment details.`;
+    });
+    
+    // Email preview toggle
+    const reminderCheckbox = document.getElementById('hw-reminder');
+    reminderCheckbox.addEventListener('change', () => {
+        if (reminderCheckbox.checked) {
+            emailPreview.classList.remove('hidden');
+            // Update email subject with homework title when typed
+            const titleInput = document.getElementById('hw-title');
+            titleInput.addEventListener('input', () => {
+                emailSubject.textContent = `Homework Reminder: ${titleInput.value || 'Assignment'} for ${student.studentName}`;
+            });
+        } else {
+            emailPreview.classList.add('hidden');
+        }
+    });
+    
     document.getElementById('cancel-hw-btn').addEventListener('click', () => modal.remove());
     document.getElementById('save-hw-btn').addEventListener('click', async () => {
         const hwData = {
             studentId: student.id,
             studentName: student.studentName,
+            parentEmail: student.parentEmail || '',
             parentPhone: student.parentPhone,
             tutorEmail: window.tutorData.email,
             tutorName: window.tutorData.name,
@@ -1018,16 +1173,90 @@ function showHomeworkModal(student) {
         }
         
         try {
+            // Upload file if selected
+            let fileUrl = '';
+            if (fileInput.files.length > 0) {
+                fileUrl = await uploadHomeworkFile(fileInput.files[0], student.id);
+                hwData.fileUrl = fileUrl;
+                hwData.fileName = fileInput.files[0].name;
+                hwData.fileSize = fileInput.files[0].size;
+            }
+            
+            // Create homework assignment
             const hwRef = doc(collection(db, "homework_assignments"));
             await setDoc(hwRef, hwData);
             
+            // Schedule email reminder if enabled
+            if (hwData.sendReminder && hwData.parentEmail) {
+                await scheduleEmailReminder(hwData, fileUrl);
+            }
+            
             modal.remove();
-            showCustomAlert('✅ Homework assigned successfully! Parents will be notified.');
+            showCustomAlert('✅ Homework assigned successfully! ' + 
+                (hwData.sendReminder && hwData.parentEmail ? 'Email reminder will be sent 1 day before due date.' : ''));
+            
         } catch (error) {
             console.error("Error assigning homework:", error);
             showCustomAlert('❌ Error assigning homework. Please try again.');
         }
     });
+}
+
+// Helper function to format file size
+function formatFileSize(bytes) {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+}
+
+// Simulated file upload function (you'll need to implement actual upload)
+async function uploadHomeworkFile(file, studentId) {
+    // In a real implementation, you would upload to Firebase Storage or similar
+    // For now, we'll return a simulated URL
+    return new Promise((resolve) => {
+        setTimeout(() => {
+            const fileName = `homework_${studentId}_${Date.now()}_${file.name}`;
+            resolve(`https://example.com/uploads/${fileName}`);
+        }, 500);
+    });
+}
+
+// Function to schedule email reminder
+async function scheduleEmailReminder(hwData, fileUrl = '') {
+    try {
+        // Calculate reminder date (1 day before due date)
+        const dueDate = new Date(hwData.dueDate);
+        const reminderDate = new Date(dueDate);
+        reminderDate.setDate(reminderDate.getDate() - 1);
+        
+        const reminderData = {
+            homeworkId: hwData.id,
+            studentId: hwData.studentId,
+            studentName: hwData.studentName,
+            parentEmail: hwData.parentEmail,
+            tutorEmail: hwData.tutorEmail,
+            tutorName: hwData.tutorName,
+            title: hwData.title,
+            description: hwData.description,
+            dueDate: hwData.dueDate,
+            reminderDate: reminderDate,
+            fileUrl: fileUrl,
+            fileName: hwData.fileName,
+            status: 'scheduled',
+            createdAt: new Date()
+        };
+        
+        // Save reminder to database
+        const reminderRef = doc(collection(db, "email_reminders"));
+        await setDoc(reminderRef, reminderData);
+        
+        console.log('Email reminder scheduled for:', reminderDate);
+        
+    } catch (error) {
+        console.error("Error scheduling email reminder:", error);
+    }
 }
 
 // --- NEW: View Schedule Calendar for All Students ---
@@ -1071,7 +1300,9 @@ function showScheduleCalendarModal() {
     
     document.getElementById('edit-schedule-btn').addEventListener('click', () => {
         modal.remove();
-        checkAndShowSchedulePopup(window.tutorData);
+        if (window.tutorData) {
+            checkAndShowSchedulePopup(window.tutorData);
+        }
     });
     
     document.getElementById('close-calendar-btn').addEventListener('click', () => {
@@ -1107,7 +1338,9 @@ async function loadScheduleCalendar() {
             
             document.getElementById('setup-schedules-btn').addEventListener('click', () => {
                 document.querySelector('.modal-overlay').remove();
-                checkAndShowSchedulePopup(window.tutorData);
+                if (window.tutorData) {
+                    checkAndShowSchedulePopup(window.tutorData);
+                }
             });
         } else {
             renderCalendarView(studentsWithSchedule);
@@ -1218,7 +1451,7 @@ function renderCalendarView(students) {
     });
 }
 
-// NEW: Function to edit individual student schedule
+// Function to edit individual student schedule
 function showEditScheduleModal(student) {
     const modalHTML = `
         <div class="modal-overlay">
