@@ -227,13 +227,18 @@ function showEditStudentModal(studentId, studentData, collectionName) {
 }
 
 function showAssignStudentModal() {
+    // Get only active tutors (not inactive or on leave)
     const tutors = sessionCache.tutors || [];
-    if (tutors.length === 0) {
-        alert("Tutor list is not available. Please refresh the directory and try again.");
+    const activeTutors = tutors.filter(tutor => 
+        !tutor.status || tutor.status === 'active'
+    );
+    
+    if (activeTutors.length === 0) {
+        alert("No active tutors available. Please refresh the directory and try again.");
         return;
     }
 
-    const tutorOptions = tutors
+    const tutorOptions = activeTutors
         .sort((a, b) => a.name.localeCompare(b.name))
         .map(tutor => `<option value='${JSON.stringify({email: tutor.email, name: tutor.name})}'>${tutor.name} (${tutor.email})</option>`)
         .join('');
@@ -315,13 +320,18 @@ function showAssignStudentModal() {
 
 // NEW FUNCTION: Reassign Student Modal
 function showReassignStudentModal() {
+    // Get only active tutors (not inactive or on leave)
     const tutors = sessionCache.tutors || [];
-    if (tutors.length === 0) {
-        alert("Tutor list is not available. Please refresh the directory and try again.");
+    const activeTutors = tutors.filter(tutor => 
+        !tutor.status || tutor.status === 'active'
+    );
+    
+    if (activeTutors.length === 0) {
+        alert("No active tutors available. Please refresh the directory and try again.");
         return;
     }
 
-    const tutorOptions = tutors
+    const tutorOptions = activeTutors
         .sort((a, b) => a.name.localeCompare(b.name))
         .map(tutor => `<option value='${JSON.stringify({email: tutor.email, name: tutor.name})}'>${tutor.name} (${tutor.email})</option>`)
         .join('');
@@ -367,10 +377,14 @@ function showReassignStudentModal() {
         }
 
         try {
+            // Get only active students (not archived, graduated, or transferred)
             const studentsSnapshot = await getDocs(collection(db, "students"));
             const allStudents = studentsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            const activeStudents = allStudents.filter(student => 
+                !student.status || student.status === 'active' || student.status === 'approved'
+            );
             
-            const searchResults = allStudents.filter(student => 
+            const searchResults = activeStudents.filter(student => 
                 student.studentName.toLowerCase().includes(searchTerm.toLowerCase())
             );
 
@@ -378,7 +392,7 @@ function showReassignStudentModal() {
             resultsContainer.classList.remove('hidden');
             
             if (searchResults.length === 0) {
-                resultsContainer.innerHTML = '<p class="text-sm text-gray-500">No students found matching your search.</p>';
+                resultsContainer.innerHTML = '<p class="text-sm text-gray-500">No active students found matching your search.</p>';
                 return;
             }
 
@@ -924,12 +938,18 @@ async function resetParentBalance(parentUid, currentEarnings) {
 // Function to fetch tutor assignment history for students
 async function fetchTutorAssignmentHistory() {
     try {
-        const studentsSnapshot = await getDocs(collection(db, "students"));
+        // Get only active students
+        const studentsSnapshot = await getDocs(query(collection(db, "students")));
         const tutorAssignments = {};
         
         studentsSnapshot.docs.forEach(doc => {
             const studentData = doc.data();
             const studentId = doc.id;
+            
+            // Skip archived, graduated, or transferred students
+            if (studentData.status === 'archived' || studentData.status === 'graduated' || studentData.status === 'transferred') {
+                return;
+            }
             
             if (studentData.tutorHistory && Array.isArray(studentData.tutorHistory)) {
                 tutorAssignments[studentId] = {
@@ -1701,10 +1721,12 @@ function renderInactiveTutorsFromCache(searchTerm = '') {
 }
 
 function showMarkInactiveModal() {
-    const activeTutors = sessionCache.tutors || [];
+    const allTutors = sessionCache.tutors || [];
     const inactiveTutors = sessionCache.inactiveTutors || [];
-    const activeTutorsFiltered = activeTutors.filter(tutor => 
-        !inactiveTutors.find(inactive => inactive.id === tutor.id)
+    
+    // Get only active tutors (not already inactive or on leave)
+    const activeTutorsFiltered = allTutors.filter(tutor => 
+        !tutor.status || tutor.status === 'active'
     );
     
     if (activeTutorsFiltered.length === 0) {
@@ -1808,7 +1830,7 @@ async function handleReactivateTutor(tutorId) {
 
 async function showTutorHistory(tutorId) {
     try {
-        // Fetch tutor's students
+        // Fetch tutor's students (including archived ones for history)
         const studentsSnapshot = await getDocs(query(collection(db, "students"), where("tutorEmail", "==", tutorId)));
         const students = studentsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         
@@ -1819,13 +1841,19 @@ async function showTutorHistory(tutorId) {
         const tutorDoc = await getDoc(doc(db, "tutors", tutorId));
         const tutorData = tutorDoc.data();
         
-        const studentsHTML = students.map(student => `
-            <div class="border rounded p-3 mb-2">
-                <p><strong>${student.studentName}</strong> (Grade: ${student.grade})</p>
-                <p class="text-sm text-gray-600">Fee: ₦${(student.studentFee || 0).toLocaleString()}</p>
-                ${student.tutorHistory ? `<p class="text-xs text-gray-500">Assigned: ${student.tutorHistory[0]?.assignedDate?.toDate?.().toLocaleDateString() || 'Unknown'}</p>` : ''}
-            </div>
-        `).join('');
+        const studentsHTML = students.map(student => {
+            const statusBadge = student.status === 'archived' ? '<span class="ml-2 bg-gray-100 text-gray-800 text-xs px-2 py-1 rounded-full">Archived</span>' :
+                            student.status === 'graduated' ? '<span class="ml-2 bg-green-100 text-green-800 text-xs px-2 py-1 rounded-full">Graduated</span>' :
+                            student.status === 'transferred' ? '<span class="ml-2 bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full">Transferred</span>' : '';
+            
+            return `
+                <div class="border rounded p-3 mb-2">
+                    <p><strong>${student.studentName}</strong> (Grade: ${student.grade}) ${statusBadge}</p>
+                    <p class="text-sm text-gray-600">Fee: ₦${(student.studentFee || 0).toLocaleString()}</p>
+                    ${student.tutorHistory ? `<p class="text-xs text-gray-500">Assigned: ${student.tutorHistory[0]?.assignedDate?.toDate?.().toLocaleDateString() || 'Unknown'}</p>` : ''}
+                </div>
+            `;
+        }).join('');
         
         const reportsHTML = reports.slice(0, 10).map(report => `
             <div class="border rounded p-2 mb-2">
@@ -1947,7 +1975,7 @@ async function fetchAndRenderArchivedStudents(forceRefresh = false) {
             
             // Categorize students by status
             const archivedStudents = allStudents.filter(student => student.status === 'archived' || student.status === 'graduated' || student.status === 'transferred');
-            const activeStudents = allStudents.filter(student => !student.status || student.status === 'active');
+            const activeStudents = allStudents.filter(student => !student.status || student.status === 'active' || student.status === 'approved');
             
             saveToLocalStorage('archivedStudents', archivedStudents);
             
@@ -2050,10 +2078,12 @@ function renderArchivedStudentsFromCache(searchTerm = '') {
 }
 
 function showArchiveStudentModal() {
-    const activeStudents = sessionCache.students || [];
+    const allStudents = sessionCache.students || [];
     const archivedStudents = sessionCache.archivedStudents || [];
-    const activeStudentsFiltered = activeStudents.filter(student => 
-        !archivedStudents.find(archived => archived.id === student.id)
+    
+    // Get only active students (not archived, graduated, or transferred)
+    const activeStudentsFiltered = allStudents.filter(student => 
+        !student.status || student.status === 'active' || student.status === 'approved'
     );
     
     if (activeStudentsFiltered.length === 0) {
@@ -2180,11 +2210,11 @@ async function renderManagementTutorView(container) {
             </div>
             <div class="flex space-x-4 mb-4">
                 <div class="bg-green-100 p-3 rounded-lg text-center shadow w-full">
-                    <h4 class="font-bold text-green-800 text-sm">Total Tutors</h4>
+                    <h4 class="font-bold text-green-800 text-sm">Active Tutors</h4>
                     <p id="tutor-count-badge" class="text-2xl font-extrabold">0</p>
                 </div>
                 <div class="bg-yellow-100 p-3 rounded-lg text-center shadow w-full">
-                    <h4 class="font-bold text-yellow-800 text-sm">Total Students</h4>
+                    <h4 class="font-bold text-yellow-800 text-sm">Active Students</h4>
                     <p id="student-count-badge" class="text-2xl font-extrabold">0</p>
                 </div>
                 <div class="bg-purple-100 p-3 rounded-lg text-center shadow w-full">
@@ -2211,12 +2241,16 @@ async function renderManagementTutorView(container) {
         
         // Create a modal to select a student
         const students = sessionCache.students || [];
-        if (students.length === 0) {
-            alert("No students found.");
+        const activeStudents = students.filter(student => 
+            !student.status || student.status === 'active' || student.status === 'approved'
+        );
+        
+        if (activeStudents.length === 0) {
+            alert("No active students found.");
             return;
         }
         
-        const studentOptions = students.map(student => 
+        const studentOptions = activeStudents.map(student => 
             `<option value="${student.id}">${student.studentName} (${student.grade || 'No grade'})</option>`
         ).join('');
         
@@ -2270,11 +2304,23 @@ async function fetchAndRenderDirectory(forceRefresh = false) {
                 getDocs(query(collection(db, "tutors"), orderBy("name"))),
                 getDocs(collection(db, "students"))
             ]);
-            saveToLocalStorage('tutors', tutorsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-            saveToLocalStorage('students', studentsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+            
+            // Filter out inactive tutors and archived students
+            const allTutors = tutorsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            const activeTutors = allTutors.filter(tutor => 
+                !tutor.status || tutor.status === 'active'
+            );
+            
+            const allStudents = studentsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            const activeStudents = allStudents.filter(student => 
+                !student.status || student.status === 'active' || student.status === 'approved'
+            );
+            
+            saveToLocalStorage('tutors', activeTutors); // Only store active tutors
+            saveToLocalStorage('students', activeStudents); // Only store active students
         }
         
-        // Fetch tutor assignment history if needed
+        // Fetch tutor assignment history if needed (only for active students)
         if (!sessionCache.tutorAssignments || forceRefresh) {
             await fetchTutorAssignmentHistory();
         }
@@ -2300,6 +2346,8 @@ function renderDirectoryFromCache(searchTerm = '') {
 
     const lowerCaseSearchTerm = searchTerm.toLowerCase();
     const studentsByTutor = {};
+    
+    // Group active students by their tutor
     students.forEach(student => {
         if (!studentsByTutor[student.tutorEmail]) {
             studentsByTutor[student.tutorEmail] = [];
@@ -2307,6 +2355,7 @@ function renderDirectoryFromCache(searchTerm = '') {
         studentsByTutor[student.tutorEmail].push(student);
     });
 
+    // Filter active tutors
     const filteredTutors = tutors.filter(tutor => {
         const assignedStudents = studentsByTutor[tutor.email] || [];
         const tutorMatch = tutor.name.toLowerCase().includes(lowerCaseSearchTerm);
@@ -2425,7 +2474,7 @@ async function renderPayAdvicePanel(container) {
                 </div>
                 <div class="flex items-center space-x-4 col-span-2">
                     <div class="bg-green-100 p-3 rounded-lg text-center shadow w-full"><h4 class="font-bold text-green-800 text-sm">Active Tutors</h4><p id="pay-tutor-count" class="text-2xl font-extrabold">0</p></div>
-                    <div class="bg-yellow-100 p-3 rounded-lg text-center shadow w-full"><h4 class="font-bold text-yellow-800 text-sm">Total Students</h4><p id="pay-student-count" class="text-2xl font-extrabold">0</p></div>
+                    <div class="bg-yellow-100 p-3 rounded-lg text-center shadow w-full"><h4 class="font-bold text-yellow-800 text-sm">Active Students</h4><p id="pay-student-count" class="text-2xl font-extrabold">0</p></div>
                     ${canExport ? `<button id="export-pay-xls-btn" class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 h-full">Download 4 XLS Files</button>` : ''}
                 </div>
             </div>
@@ -2558,12 +2607,21 @@ async function loadPayAdviceData(startDate, endDate) {
             const tutor = doc.data();
             const tutorEmail = tutor.email;
             
+            // Skip inactive tutors in pay calculations
+            if (tutor.status === 'inactive' || tutor.status === 'on_leave') {
+                return;
+            }
+            
             const reportedStudentNames = tutorStudentPairs[tutorEmail] || new Set();
             
             const reportedStudents = allStudents.filter(s => 
                 s.tutorEmail === tutorEmail && 
                 reportedStudentNames.has(s.studentName) &&
-                s.summerBreak !== true
+                s.summerBreak !== true &&
+                // Skip archived, graduated, or transferred students
+                s.status !== 'archived' &&
+                s.status !== 'graduated' &&
+                s.status !== 'transferred'
             );
             
             const totalStudentFees = reportedStudents.reduce((sum, s) => sum + (s.studentFee || 0), 0);
@@ -3216,29 +3274,43 @@ async function renderTutorReportsPanel(container) {
     }
 }
 
-// FIXED: Date handling functions for parent feedback
+// FIXED: Date handling functions for parent feedback - UPDATED VERSION
 function formatFeedbackDate(timestamp) {
     if (!timestamp) return 'Unknown date';
     
     try {
-        // Handle Firebase Timestamp
-        if (timestamp.toDate) {
-            return timestamp.toDate().toLocaleDateString();
+        let date = null;
+        
+        // Case 1: Firebase Timestamp with toDate() method
+        if (timestamp && typeof timestamp.toDate === 'function') {
+            date = timestamp.toDate();
         }
-        // Handle Timestamp object with seconds
-        else if (timestamp.seconds) {
-            return new Date(timestamp.seconds * 1000).toLocaleDateString();
+        // Case 2: Object with seconds/nanoseconds (Firestore format)
+        else if (timestamp && typeof timestamp === 'object' && timestamp.seconds) {
+            date = new Date(timestamp.seconds * 1000 + (timestamp.nanoseconds || 0) / 1000000);
         }
-        // Handle regular Date string or timestamp
-        else if (typeof timestamp === 'string' || typeof timestamp === 'number') {
-            const date = new Date(timestamp);
-            if (!isNaN(date.getTime())) {
-                return date.toLocaleDateString();
-            }
+        // Case 3: ISO string
+        else if (typeof timestamp === 'string') {
+            date = new Date(timestamp);
         }
-        // Handle Date object
+        // Case 4: Number (milliseconds since epoch)
+        else if (typeof timestamp === 'number') {
+            date = new Date(timestamp);
+        }
+        // Case 5: Already a Date object
         else if (timestamp instanceof Date) {
-            return timestamp.toLocaleDateString();
+            date = timestamp;
+        }
+        
+        // Check if we got a valid date
+        if (date && !isNaN(date.getTime())) {
+            return date.toLocaleDateString('en-US', {
+                year: 'numeric',
+                month: 'short',
+                day: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit'
+            });
         }
         
         return 'Unknown date';
@@ -3558,8 +3630,16 @@ async function fetchAndRenderBreakStudents(forceRefresh = false) {
     try {
         if (!sessionCache.breakStudents) {
             listContainer.innerHTML = `<p class="text-center text-gray-500 py-10">Fetching student break status...</p>`;
+            // Get only active students on break
             const snapshot = await getDocs(query(collection(db, "students"), where("summerBreak", "==", true)));
-            saveToLocalStorage('breakStudents', snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+            const allBreakStudents = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            
+            // Filter out archived, graduated, or transferred students from summer break list
+            const activeBreakStudents = allBreakStudents.filter(student => 
+                !student.status || student.status === 'active' || student.status === 'approved'
+            );
+            
+            saveToLocalStorage('breakStudents', activeBreakStudents);
         }
         renderBreakStudentsFromCache();
     } catch(error) {
@@ -3575,7 +3655,7 @@ function renderBreakStudentsFromCache() {
 
     const canEndBreak = window.userData?.permissions?.actions?.canEndBreak === true;
     if (breakStudents.length === 0) {
-        listContainer.innerHTML = `<p class="text-center text-gray-500">No students are on break.</p>`;
+        listContainer.innerHTML = `<p class="text-center text-gray-500">No active students are on break.</p>`;
         return;
     }
     
@@ -3658,31 +3738,38 @@ async function fetchAndRenderParentFeedback(forceRefresh = false) {
             const feedbackSnapshot = await getDocs(query(collection(db, "parent_feedback"), orderBy("timestamp", "desc")));
             const feedbackData = feedbackSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
             
-            // Enhance feedback data with proper timestamps
+            // Enhance feedback data with proper timestamps - FIXED VERSION
             const enhancedFeedbackData = feedbackData.map(feedback => {
-                // FIXED: Handle different timestamp formats properly
                 let submittedDate = null;
                 
+                // Handle different timestamp formats
                 if (feedback.timestamp) {
-                    // Try to parse the timestamp
-                    if (feedback.timestamp.toDate) {
-                        // It's a Firebase Timestamp
+                    // If it's a Firebase Timestamp object with toDate method
+                    if (typeof feedback.timestamp.toDate === 'function') {
                         submittedDate = feedback.timestamp;
-                    } else if (feedback.timestamp.seconds) {
-                        // It's a Timestamp object with seconds
-                        submittedDate = Timestamp.fromDate(new Date(feedback.timestamp.seconds * 1000));
-                    } else if (typeof feedback.timestamp === 'string' || typeof feedback.timestamp === 'number') {
-                        // It's a string or number timestamp
+                    }
+                    // If it's a Timestamp object with seconds property
+                    else if (feedback.timestamp.seconds) {
+                        submittedDate = {
+                            toDate: () => new Date(feedback.timestamp.seconds * 1000)
+                        };
+                    }
+                    // If it's an ISO string
+                    else if (typeof feedback.timestamp === 'string') {
                         const date = new Date(feedback.timestamp);
                         if (!isNaN(date.getTime())) {
-                            submittedDate = Timestamp.fromDate(date);
+                            submittedDate = {
+                                toDate: () => date
+                            };
                         }
                     }
                 }
                 
                 // If no valid timestamp found, use current time
                 if (!submittedDate) {
-                    submittedDate = Timestamp.now();
+                    submittedDate = {
+                        toDate: () => new Date()
+                    };
                 }
                 
                 return {
