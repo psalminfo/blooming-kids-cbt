@@ -2198,31 +2198,87 @@ async function loadPayAdviceData(startDate, endDate) {
 
 
 // ##################################################################
-// # SECTION 6: SUMMER BREAK PANEL (OPTIMIZED)
+// # SECTION 6: SUMMER BREAK PANEL (OPTIMIZED WITH SEARCH & SORT)
 // ##################################################################
 async function renderSummerBreakPanel(container) {
     container.innerHTML = `
         <div class="bg-white p-6 rounded-lg shadow-md">
             <div class="flex justify-between items-center mb-4">
                 <h2 class="text-2xl font-bold text-green-700">Students on Summer Break</h2>
-                <button id="refresh-break-btn" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Refresh</button>
-        
-             </div>
-            <div id="break-students-list" class="space-y-4"><p class="text-gray-500 text-center">Loading students...</p></div>
+                <div class="flex items-center space-x-2">
+                    <button id="refresh-break-btn" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Refresh</button>
+                    <button id="sort-alphabetically-btn" class="bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700">Sort A-Z</button>
+                </div>
+            </div>
+            
+            <!-- Search Bar -->
+            <div class="mb-6">
+                <label for="break-student-search" class="block text-sm font-medium text-gray-700 mb-2">
+                    Search Students by Name, Tutor, or Grade:
+                </label>
+                <div class="relative">
+                    <input 
+                        type="search" 
+                        id="break-student-search" 
+                        class="w-full p-3 pl-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500" 
+                        placeholder="Type to search students..."
+                    >
+                    <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                        <svg class="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                        </svg>
+                    </div>
+                </div>
+                <div class="flex items-center justify-between mt-2">
+                    <p id="break-student-count" class="text-sm text-gray-600">
+                        Loading students...
+                    </p>
+                    <button id="clear-search-btn" class="text-sm text-blue-600 hover:text-blue-800 hidden">
+                        Clear Search
+                    </button>
+                </div>
+            </div>
+            
+            <!-- Student List -->
+            <div id="break-students-list" class="space-y-4">
+                <p class="text-gray-500 text-center">Loading students...</p>
+            </div>
+            
+            <!-- No Results Message -->
+            <div id="no-break-results" class="hidden text-center p-8 border-2 border-dashed border-gray-300 rounded-lg">
+                <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                </svg>
+                <h3 class="mt-2 text-sm font-medium text-gray-900">No students found</h3>
+                <p class="mt-1 text-sm text-gray-500">Try adjusting your search or filter</p>
+            </div>
         </div>
     `;
+    
+    // Add event listeners
     document.getElementById('refresh-break-btn').addEventListener('click', () => fetchAndRenderBreakStudents(true));
+    document.getElementById('sort-alphabetically-btn').addEventListener('click', sortBreakStudentsAlphabetically);
+    document.getElementById('break-student-search').addEventListener('input', handleBreakStudentSearch);
+    document.getElementById('clear-search-btn').addEventListener('click', clearBreakStudentSearch);
+    
     fetchAndRenderBreakStudents();
 }
 
 async function fetchAndRenderBreakStudents(forceRefresh = false) {
     if (forceRefresh) invalidateCache('breakStudents');
+    
     try {
         if (!sessionCache.breakStudents) {
             document.getElementById('break-students-list').innerHTML = `<p class="text-gray-500 text-center">Fetching data...</p>`;
             const snapshot = await getDocs(query(collection(db, "students"), where("summerBreak", "==", true)));
-            saveToLocalStorage('breakStudents', snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+            
+            // Sort alphabetically by default
+            const students = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }))
+                .sort((a, b) => a.studentName?.localeCompare(b.studentName || ''));
+            
+            saveToLocalStorage('breakStudents', students);
         }
+        
         renderBreakStudentsFromCache();
     } catch(error) {
         console.error("Error fetching summer break students:", error);
@@ -2232,21 +2288,154 @@ async function fetchAndRenderBreakStudents(forceRefresh = false) {
 
 function renderBreakStudentsFromCache() {
     const listContainer = document.getElementById('break-students-list');
-    const breakStudents = sessionCache.breakStudents || [];
-
-    if (breakStudents.length === 0) {
-        listContainer.innerHTML = `<p class="text-gray-500 text-center">No students are on break.</p>`;
-        return;
+    const countContainer = document.getElementById('break-student-count');
+    const noResultsContainer = document.getElementById('no-break-results');
+    const clearSearchBtn = document.getElementById('clear-search-btn');
+    
+    let breakStudents = sessionCache.breakStudents || [];
+    
+    // Apply search filter if there's a search term
+    const searchTerm = document.getElementById('break-student-search').value.toLowerCase().trim();
+    if (searchTerm) {
+        breakStudents = breakStudents.filter(student => 
+            student.studentName?.toLowerCase().includes(searchTerm) ||
+            student.tutorEmail?.toLowerCase().includes(searchTerm) ||
+            student.grade?.toString().includes(searchTerm) ||
+            student.parentName?.toLowerCase().includes(searchTerm)
+        );
+        clearSearchBtn.classList.remove('hidden');
+    } else {
+        clearSearchBtn.classList.add('hidden');
     }
+    
+    // Update count
+    const totalStudents = sessionCache.breakStudents?.length || 0;
+    const filteredCount = breakStudents.length;
+    
+    if (searchTerm) {
+        countContainer.textContent = `Showing ${filteredCount} of ${totalStudents} students matching "${searchTerm}"`;
+    } else {
+        countContainer.textContent = `Total: ${totalStudents} students on summer break`;
+    }
+    
+    // Show/hide no results message
+    if (breakStudents.length === 0) {
+        listContainer.innerHTML = '';
+        noResultsContainer.classList.remove('hidden');
+        return;
+    } else {
+        noResultsContainer.classList.add('hidden');
+    }
+    
+    // Render student list
     listContainer.innerHTML = breakStudents.map(student => {
-        return `<div class="border p-4 rounded-lg flex justify-between items-center"><div><p><strong>Student:</strong> ${student.studentName}</p><p><strong>Tutor:</strong> ${student.tutorEmail}</p></div><button class="remove-break-btn bg-yellow-600 text-white px-4 py-2 rounded" data-student-id="${student.id}">End Break</button></div>`;
+        return `
+            <div class="border border-gray-200 rounded-lg p-4 hover:bg-gray-50 transition-colors duration-200">
+                <div class="flex justify-between items-start">
+                    <div class="flex-1">
+                        <div class="flex items-center mb-2">
+                            <svg class="h-5 w-5 text-yellow-500 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                                <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clip-rule="evenodd"/>
+                            </svg>
+                            <h3 class="font-semibold text-lg text-gray-800">${student.studentName}</h3>
+                            ${student.grade ? `<span class="ml-2 px-2 py-1 text-xs font-medium bg-blue-100 text-blue-800 rounded-full">Grade ${student.grade}</span>` : ''}
+                        </div>
+                        
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm text-gray-600">
+                            <div>
+                                <span class="font-medium">Tutor:</span>
+                                <span class="ml-2">${student.tutorEmail || 'Not assigned'}</span>
+                            </div>
+                            <div>
+                                <span class="font-medium">Parent:</span>
+                                <span class="ml-2">${student.parentName || 'Not specified'}</span>
+                            </div>
+                            ${student.subjects?.length > 0 ? `
+                                <div>
+                                    <span class="font-medium">Subjects:</span>
+                                    <span class="ml-2">${student.subjects.join(', ')}</span>
+                                </div>
+                            ` : ''}
+                            ${student.studentFee ? `
+                                <div>
+                                    <span class="font-medium">Fee:</span>
+                                    <span class="ml-2">₦${student.studentFee.toLocaleString()}</span>
+                                </div>
+                            ` : ''}
+                        </div>
+                    </div>
+                    
+                    <div class="flex flex-col items-end space-y-2">
+                        <button 
+                            class="remove-break-btn bg-yellow-600 hover:bg-yellow-700 text-white px-4 py-2 rounded transition-colors duration-200 flex items-center"
+                            data-student-id="${student.id}"
+                        >
+                            <svg class="h-4 w-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                            </svg>
+                            End Break
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `;
     }).join('');
-    listContainer.querySelectorAll('.remove-break-btn').forEach(btn => btn.addEventListener('click', async (e) => {
-        await updateDoc(doc(db, "students", e.target.dataset.studentId), { summerBreak: false });
-        invalidateCache('students'); // Invalidate main student list
-        invalidateCache('breakStudents'); // Invalidate this list
-        fetchAndRenderBreakStudents(); // Re-fetch and re-render this panel
-    }));
+    
+    // Add event listeners to remove buttons
+    listContainer.querySelectorAll('.remove-break-btn').forEach(btn => {
+        btn.addEventListener('click', async (e) => {
+            if (confirm(`End summer break for this student? They will return to active status.`)) {
+                const studentId = e.currentTarget.dataset.studentId;
+                await updateDoc(doc(db, "students", studentId), { summerBreak: false });
+                
+                // Update caches
+                invalidateCache('students');
+                invalidateCache('breakStudents');
+                
+                // Re-fetch and re-render
+                fetchAndRenderBreakStudents();
+            }
+        });
+    });
+}
+
+function sortBreakStudentsAlphabetically() {
+    if (!sessionCache.breakStudents) return;
+    
+    // Sort students alphabetically by name
+    const sortedStudents = [...sessionCache.breakStudents].sort((a, b) => 
+        (a.studentName || '').localeCompare(b.studentName || '')
+    );
+    
+    // Update cache with sorted data
+    sessionCache.breakStudents = sortedStudents;
+    saveToLocalStorage('breakStudents', sortedStudents);
+    
+    // Re-render the list
+    renderBreakStudentsFromCache();
+    
+    // Show success message
+    const sortBtn = document.getElementById('sort-alphabetically-btn');
+    const originalText = sortBtn.textContent;
+    sortBtn.textContent = 'Sorted!';
+    sortBtn.classList.remove('bg-purple-600');
+    sortBtn.classList.add('bg-green-600');
+    
+    setTimeout(() => {
+        sortBtn.textContent = originalText;
+        sortBtn.classList.remove('bg-green-600');
+        sortBtn.classList.add('bg-purple-600');
+    }, 1500);
+}
+
+function handleBreakStudentSearch(e) {
+    const searchTerm = e.target.value.toLowerCase().trim();
+    renderBreakStudentsFromCache();
+}
+
+function clearBreakStudentSearch() {
+    document.getElementById('break-student-search').value = '';
+    renderBreakStudentsFromCache();
 }
 
 // ##################################################################
@@ -2467,4 +2656,5 @@ onAuthStateChanged(auth, async (user) => {
 });
 
 // [End Fully Updated admin.js File]
+
 
