@@ -20,6 +20,8 @@ const sessionCache = {
     referralDataMap: null,
     enrollments: null,
     tutorAssignments: null,
+    archivedStudents: null, // NEW: Cache for archived students
+    inactiveTutors: null,   // NEW: Cache for inactive tutors
 };
 
 /**
@@ -224,6 +226,7 @@ function showEditStudentModal(studentId, studentData, collectionName) {
     });
 }
 
+// UPDATED: Now only shows active tutors
 function showAssignStudentModal() {
     const tutors = sessionCache.tutors || [];
     if (tutors.length === 0) {
@@ -280,7 +283,7 @@ function showAssignStudentModal() {
             studentFee: Number(form.elements['assign-studentFee'].value) || 0,
             tutorEmail: selectedTutorData.email,
             tutorName: selectedTutorData.name,
-            status: 'approved',
+            status: 'active', // NEW: Set as active by default
             summerBreak: false,
             createdAt: Timestamp.now(),
             tutorHistory: [{
@@ -311,7 +314,7 @@ function showAssignStudentModal() {
     });
 }
 
-// NEW FUNCTION: Reassign Student Modal
+// NEW FUNCTION: Reassign Student Modal - UPDATED: Only shows active tutors
 function showReassignStudentModal() {
     const tutors = sessionCache.tutors || [];
     if (tutors.length === 0) {
@@ -356,7 +359,7 @@ function showReassignStudentModal() {
     `;
     document.body.insertAdjacentHTML('beforeend', modalHtml);
 
-    // Search student functionality
+    // Search student functionality - UPDATED: Only search active students
     document.getElementById('search-student-btn').addEventListener('click', async () => {
         const searchTerm = document.getElementById('reassign-student-search').value.trim();
         if (!searchTerm) {
@@ -365,7 +368,8 @@ function showReassignStudentModal() {
         }
 
         try {
-            const studentsSnapshot = await getDocs(collection(db, "students"));
+            const studentsQuery = query(collection(db, "students"), where("status", "==", "active"));
+            const studentsSnapshot = await getDocs(studentsQuery);
             const allStudents = studentsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
             
             const searchResults = allStudents.filter(student => 
@@ -506,7 +510,7 @@ async function handleApproveStudent(studentId) {
             // Prepare student data with tutor history
             const studentWithHistory = {
                 ...studentData,
-                status: 'approved',
+                status: 'active', // NEW: Set as active
                 tutorHistory: [{
                     tutorEmail: studentData.tutorEmail,
                     tutorName: studentData.tutorName || studentData.tutorEmail,
@@ -549,6 +553,940 @@ async function handleRejectStudent(studentId) {
         }
     }
 }
+
+// ##################################
+// # NEW: PAST STAFF MANAGEMENT FUNCTIONS
+// ##################################
+
+/**
+ * Fetches all tutors with their status (active/inactive)
+ */
+async function fetchAllTutorsWithStatus() {
+    try {
+        const tutorsSnapshot = await getDocs(query(collection(db, "tutors"), orderBy("name")));
+        const tutors = tutorsSnapshot.docs.map(doc => ({ 
+            id: doc.id, 
+            ...doc.data(),
+            // Default to active if status not set (for backward compatibility)
+            status: doc.data().status || 'active',
+            inactiveDate: doc.data().inactiveDate || null
+        }));
+        
+        // Separate active and inactive tutors
+        const activeTutors = tutors.filter(t => t.status === 'active');
+        const inactiveTutors = tutors.filter(t => t.status === 'inactive');
+        
+        saveToLocalStorage('tutors', activeTutors);
+        saveToLocalStorage('inactiveTutors', inactiveTutors);
+        
+        return { activeTutors, inactiveTutors };
+    } catch (error) {
+        console.error("Error fetching tutors with status:", error);
+        return { activeTutors: [], inactiveTutors: [] };
+    }
+}
+
+/**
+ * Renders the Past Staff Management panel
+ */
+async function renderPastStaffPanel(container) {
+    container.innerHTML = `
+        <div class="bg-white p-6 rounded-lg shadow-md">
+            <div class="flex justify-between items-center mb-6">
+                <h2 class="text-2xl font-bold text-green-700">Past Staff Management</h2>
+                <button id="refresh-past-staff-btn" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Refresh</button>
+            </div>
+            
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                <div class="bg-green-100 p-4 rounded-lg text-center shadow">
+                    <h4 class="font-bold text-green-800 text-sm">Active Tutors</h4>
+                    <p id="active-tutors-count" class="text-3xl font-extrabold mt-2">0</p>
+                </div>
+                <div class="bg-yellow-100 p-4 rounded-lg text-center shadow">
+                    <h4 class="font-bold text-yellow-800 text-sm">Inactive Tutors</h4>
+                    <p id="inactive-tutors-count" class="text-3xl font-extrabold mt-2">0</p>
+                </div>
+                <div class="bg-purple-100 p-4 rounded-lg text-center shadow">
+                    <h4 class="font-bold text-purple-800 text-sm">Total Staff</h4>
+                    <p id="total-staff-count" class="text-3xl font-extrabold mt-2">0</p>
+                </div>
+            </div>
+            
+            <div class="mb-6">
+                <h3 class="text-xl font-bold text-gray-700 mb-4">Active Tutors Directory</h3>
+                <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-gray-200">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Tutor Name</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Email</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Phone</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="active-tutors-list" class="bg-white divide-y divide-gray-200">
+                            <tr><td colspan="5" class="px-6 py-4 text-center text-gray-500">Loading active tutors...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            
+            <div>
+                <h3 class="text-xl font-bold text-gray-700 mb-4">Inactive / Past Staff</h3>
+                <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-gray-200">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Tutor Name</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Email</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Inactive Date</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Last Active</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="inactive-tutors-list" class="bg-white divide-y divide-gray-200">
+                            <tr><td colspan="5" class="px-6 py-4 text-center text-gray-500">Loading inactive staff...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            
+            <div class="mt-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
+                <h4 class="font-bold text-blue-800 mb-2">📝 Important Notes:</h4>
+                <ul class="text-sm text-blue-700 space-y-1">
+                    <li>• Inactive tutors are preserved for historical records and reporting</li>
+                    <li>• All data (reports, payments, assignments) remains intact</li>
+                    <li>• Inactive tutors won't appear in active tutor dropdowns</li>
+                    <li>• Can be reactivated if they return to work</li>
+                </ul>
+            </div>
+        </div>
+    `;
+    
+    document.getElementById('refresh-past-staff-btn').addEventListener('click', () => fetchAndRenderPastStaff(true));
+    fetchAndRenderPastStaff();
+}
+
+/**
+ * Fetches and renders past staff data
+ */
+async function fetchAndRenderPastStaff(forceRefresh = false) {
+    if (forceRefresh) {
+        invalidateCache('tutors');
+        invalidateCache('inactiveTutors');
+    }
+    
+    try {
+        const { activeTutors, inactiveTutors } = await fetchAllTutorsWithStatus();
+        
+        // Update counts
+        document.getElementById('active-tutors-count').textContent = activeTutors.length;
+        document.getElementById('inactive-tutors-count').textContent = inactiveTutors.length;
+        document.getElementById('total-staff-count').textContent = activeTutors.length + inactiveTutors.length;
+        
+        // Render active tutors
+        const activeTutorsList = document.getElementById('active-tutors-list');
+        if (activeTutorsList) {
+            activeTutorsList.innerHTML = activeTutors.map(tutor => `
+                <tr class="hover:bg-gray-50">
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <div class="flex items-center">
+                            <div class="ml-4">
+                                <div class="text-sm font-medium text-gray-900">${tutor.name}</div>
+                            </div>
+                        </div>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <div class="text-sm text-gray-900">${tutor.email}</div>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <div class="text-sm text-gray-900">${tutor.phone || 'N/A'}</div>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
+                            Active
+                        </span>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                        <button onclick="markTutorInactive('${tutor.id}', '${tutor.name.replace(/'/g, "\\'")}')" 
+                                class="text-red-600 hover:text-red-900 mr-3">
+                            Mark Inactive
+                        </button>
+                        <button onclick="viewTutorDetails('${tutor.id}')" 
+                                class="text-blue-600 hover:text-blue-900">
+                            View Details
+                        </button>
+                    </td>
+                </tr>
+            `).join('') || '<tr><td colspan="5" class="px-6 py-4 text-center text-gray-500">No active tutors found</td></tr>';
+        }
+        
+        // Render inactive tutors
+        const inactiveTutorsList = document.getElementById('inactive-tutors-list');
+        if (inactiveTutorsList) {
+            inactiveTutorsList.innerHTML = inactiveTutors.map(tutor => {
+                const inactiveDate = tutor.inactiveDate ? 
+                    new Date(tutor.inactiveDate.seconds * 1000).toLocaleDateString() : 
+                    'Unknown';
+                
+                return `
+                    <tr class="hover:bg-gray-50">
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <div class="flex items-center">
+                                <div class="ml-4">
+                                    <div class="text-sm font-medium text-gray-900">${tutor.name}</div>
+                                </div>
+                            </div>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <div class="text-sm text-gray-900">${tutor.email}</div>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <div class="text-sm text-gray-500">${inactiveDate}</div>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <div class="text-sm text-gray-500">${tutor.lastActive || 'N/A'}</div>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                            <button onclick="reactivateTutor('${tutor.id}', '${tutor.name.replace(/'/g, "\\'")}')" 
+                                    class="text-green-600 hover:text-green-900 mr-3">
+                                Reactivate
+                            </button>
+                            <button onclick="viewTutorDetails('${tutor.id}')" 
+                                    class="text-blue-600 hover:text-blue-900">
+                                View Details
+                            </button>
+                        </td>
+                    </tr>
+                `;
+            }).join('') || '<tr><td colspan="5" class="px-6 py-4 text-center text-gray-500">No inactive staff found</td></tr>';
+        }
+        
+    } catch (error) {
+        console.error("Error fetching past staff data:", error);
+        const activeTutorsList = document.getElementById('active-tutors-list');
+        const inactiveTutorsList = document.getElementById('inactive-tutors-list');
+        
+        if (activeTutorsList) {
+            activeTutorsList.innerHTML = '<tr><td colspan="5" class="px-6 py-4 text-center text-red-500">Failed to load active tutors</td></tr>';
+        }
+        if (inactiveTutorsList) {
+            inactiveTutorsList.innerHTML = '<tr><td colspan="5" class="px-6 py-4 text-center text-red-500">Failed to load inactive staff</td></tr>';
+        }
+    }
+}
+
+/**
+ * Marks a tutor as inactive (soft delete)
+ */
+window.markTutorInactive = async function(tutorId, tutorName) {
+    if (!confirm(`Are you sure you want to mark "${tutorName}" as inactive?\n\nThis will:\n• Remove them from active tutor lists\n• Preserve all their data\n• Allow reassignment of their students\n• Keep all historical records`)) {
+        return;
+    }
+    
+    try {
+        // First, check if the tutor has any active students
+        const studentsQuery = query(
+            collection(db, "students"),
+            where("tutorEmail", "==", (await getDoc(doc(db, "tutors", tutorId))).data().email),
+            where("status", "==", "active")
+        );
+        
+        const studentsSnapshot = await getDocs(studentsQuery);
+        const activeStudents = studentsSnapshot.docs;
+        
+        if (activeStudents.length > 0) {
+            if (!confirm(`This tutor has ${activeStudents.length} active student(s).\n\nDo you want to proceed and reassign their students later?`)) {
+                return;
+            }
+        }
+        
+        // Update tutor status
+        await updateDoc(doc(db, "tutors", tutorId), {
+            status: 'inactive',
+            inactiveDate: Timestamp.now(),
+            lastUpdated: Timestamp.now()
+        });
+        
+        // Update cache
+        invalidateCache('tutors');
+        invalidateCache('inactiveTutors');
+        
+        alert(`Tutor "${tutorName}" marked as inactive successfully!`);
+        fetchAndRenderPastStaff(true);
+        
+    } catch (error) {
+        console.error("Error marking tutor inactive:", error);
+        alert("Failed to mark tutor as inactive. Please try again.");
+    }
+};
+
+/**
+ * Reactivates a previously inactive tutor
+ */
+window.reactivateTutor = async function(tutorId, tutorName) {
+    if (!confirm(`Reactivate "${tutorName}"?\n\nThey will appear in active tutor lists again.`)) {
+        return;
+    }
+    
+    try {
+        await updateDoc(doc(db, "tutors", tutorId), {
+            status: 'active',
+            inactiveDate: null,
+            lastUpdated: Timestamp.now()
+        });
+        
+        // Update cache
+        invalidateCache('tutors');
+        invalidateCache('inactiveTutors');
+        
+        alert(`Tutor "${tutorName}" reactivated successfully!`);
+        fetchAndRenderPastStaff(true);
+        
+    } catch (error) {
+        console.error("Error reactivating tutor:", error);
+        alert("Failed to reactivate tutor. Please try again.");
+    }
+};
+
+/**
+ * Shows detailed view of a tutor's information
+ */
+window.viewTutorDetails = async function(tutorId) {
+    try {
+        const tutorDoc = await getDoc(doc(db, "tutors", tutorId));
+        if (!tutorDoc.exists()) {
+            alert("Tutor not found!");
+            return;
+        }
+        
+        const tutorData = tutorDoc.data();
+        const inactiveDate = tutorData.inactiveDate ? 
+            new Date(tutorData.inactiveDate.seconds * 1000).toLocaleDateString() : 
+            'Still active';
+        
+        const modalHtml = `
+            <div id="tutorDetailsModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-center justify-center">
+                <div class="relative p-8 bg-white w-full max-w-2xl rounded-lg shadow-2xl">
+                    <button class="absolute top-2 right-2 text-gray-500 hover:text-gray-800 text-2xl font-bold" onclick="closeManagementModal('tutorDetailsModal')">&times;</button>
+                    <h3 class="text-2xl font-bold mb-4 text-blue-700">Tutor Details: ${tutorData.name}</h3>
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                        <div class="bg-blue-50 p-4 rounded-lg">
+                            <h4 class="font-bold text-blue-800 mb-2">Basic Information</h4>
+                            <p><strong>Email:</strong> ${tutorData.email || 'N/A'}</p>
+                            <p><strong>Phone:</strong> ${tutorData.phone || 'N/A'}</p>
+                            <p><strong>Status:</strong> 
+                                <span class="px-2 py-1 text-xs rounded-full ${tutorData.status === 'active' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}">
+                                    ${tutorData.status || 'active'}
+                                </span>
+                            </p>
+                            ${tutorData.status === 'inactive' ? `<p><strong>Inactive Since:</strong> ${inactiveDate}</p>` : ''}
+                        </div>
+                        
+                        <div class="bg-green-50 p-4 rounded-lg">
+                            <h4 class="font-bold text-green-800 mb-2">Additional Information</h4>
+                            <p><strong>Bank:</strong> ${tutorData.beneficiaryBank || 'N/A'}</p>
+                            <p><strong>Account:</strong> ${tutorData.beneficiaryAccount || 'N/A'}</p>
+                            <p><strong>TIN:</strong> ${tutorData.tinNumber || 'N/A'}</p>
+                            <p><strong>Management Staff:</strong> ${tutorData.isManagementStaff ? 'Yes' : 'No'}</p>
+                        </div>
+                    </div>
+                    
+                    <div class="flex justify-end mt-6 pt-6 border-t">
+                        <button onclick="closeManagementModal('tutorDetailsModal')" class="px-4 py-2 bg-gray-300 text-gray-700 rounded hover:bg-gray-400">Close</button>
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        document.body.insertAdjacentHTML('beforeend', modalHtml);
+        
+    } catch (error) {
+        console.error("Error viewing tutor details:", error);
+        alert("Failed to load tutor details.");
+    }
+};
+
+// ##################################
+// # NEW: ARCHIVED STUDENTS MANAGEMENT FUNCTIONS
+// ##################################
+
+/**
+ * Fetches all students with their status
+ */
+async function fetchAllStudentsWithStatus() {
+    try {
+        const studentsSnapshot = await getDocs(collection(db, "students"));
+        const students = studentsSnapshot.docs.map(doc => ({ 
+            id: doc.id, 
+            ...doc.data(),
+            // Default to active if status not set (for backward compatibility)
+            status: doc.data().status || 'active',
+            archivedDate: doc.data().archivedDate || null,
+            archivedReason: doc.data().archivedReason || null
+        }));
+        
+        // Separate active and archived students
+        const activeStudents = students.filter(s => s.status === 'active');
+        const archivedStudents = students.filter(s => s.status === 'archived');
+        
+        saveToLocalStorage('students', activeStudents);
+        saveToLocalStorage('archivedStudents', archivedStudents);
+        
+        return { activeStudents, archivedStudents };
+    } catch (error) {
+        console.error("Error fetching students with status:", error);
+        return { activeStudents: [], archivedStudents: [] };
+    }
+}
+
+/**
+ * Renders the Archived Students panel
+ */
+async function renderArchivedStudentsPanel(container) {
+    container.innerHTML = `
+        <div class="bg-white p-6 rounded-lg shadow-md">
+            <div class="flex justify-between items-center mb-6">
+                <h2 class="text-2xl font-bold text-green-700">Archived Students Management</h2>
+                <div class="flex gap-2">
+                    <button id="refresh-archived-btn" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Refresh</button>
+                    <button id="bulk-archive-btn" class="bg-yellow-600 text-white px-4 py-2 rounded hover:bg-yellow-700">Bulk Archive</button>
+                </div>
+            </div>
+            
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+                <div class="bg-green-100 p-4 rounded-lg text-center shadow">
+                    <h4 class="font-bold text-green-800 text-sm">Active Students</h4>
+                    <p id="active-students-count" class="text-3xl font-extrabold mt-2">0</p>
+                </div>
+                <div class="bg-yellow-100 p-4 rounded-lg text-center shadow">
+                    <h4 class="font-bold text-yellow-800 text-sm">Archived Students</h4>
+                    <p id="archived-students-count" class="text-3xl font-extrabold mt-2">0</p>
+                </div>
+                <div class="bg-purple-100 p-4 rounded-lg text-center shadow">
+                    <h4 class="font-bold text-purple-800 text-sm">On Break</h4>
+                    <p id="break-students-count" class="text-3xl font-extrabold mt-2">0</p>
+                </div>
+                <div class="bg-blue-100 p-4 rounded-lg text-center shadow">
+                    <h4 class="font-bold text-blue-800 text-sm">Total Students</h4>
+                    <p id="total-students-count" class="text-3xl font-extrabold mt-2">0</p>
+                </div>
+            </div>
+            
+            <div class="mb-6">
+                <h3 class="text-xl font-bold text-gray-700 mb-4">Active Students</h3>
+                <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-gray-200">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Student Name</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Grade</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Tutor</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Parent</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="active-students-list" class="bg-white divide-y divide-gray-200">
+                            <tr><td colspan="6" class="px-6 py-4 text-center text-gray-500">Loading active students...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            
+            <div>
+                <h3 class="text-xl font-bold text-gray-700 mb-4">Archived / Past Students</h3>
+                <div class="flex items-center mb-4">
+                    <input type="text" id="archive-search" placeholder="Search archived students..." class="p-2 border rounded-md w-64">
+                    <select id="archive-reason-filter" class="ml-2 p-2 border rounded-md">
+                        <option value="">All Reasons</option>
+                        <option value="graduated">Graduated</option>
+                        <option value="transferred">Transferred</option>
+                        <option value="discontinued">Discontinued</option>
+                        <option value="other">Other</option>
+                    </select>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-gray-200">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Student Name</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Grade</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Last Tutor</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Archived Date</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Reason</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="archived-students-list" class="bg-white divide-y divide-gray-200">
+                            <tr><td colspan="6" class="px-6 py-4 text-center text-gray-500">Loading archived students...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            
+            <div class="mt-6 p-4 bg-green-50 rounded-lg border border-green-200">
+                <h4 class="font-bold text-green-800 mb-2">📚 Student Archival Benefits:</h4>
+                <ul class="text-sm text-green-700 space-y-1">
+                    <li>• Preserves complete learning history and reports</li>
+                    <li>• Removes from active lists while keeping all data</li>
+                    <li>• Allows historical reporting and analytics</li>
+                    <li>• Can be reactivated if they return</li>
+                    <li>• No impact on tutor assignments or payments</li>
+                </ul>
+            </div>
+        </div>
+    `;
+    
+    document.getElementById('refresh-archived-btn').addEventListener('click', () => fetchAndRenderArchivedStudents(true));
+    document.getElementById('bulk-archive-btn').addEventListener('click', showBulkArchiveModal);
+    document.getElementById('archive-search').addEventListener('input', filterArchivedStudents);
+    document.getElementById('archive-reason-filter').addEventListener('change', filterArchivedStudents);
+    
+    fetchAndRenderArchivedStudents();
+}
+
+/**
+ * Fetches and renders archived students data
+ */
+async function fetchAndRenderArchivedStudents(forceRefresh = false) {
+    if (forceRefresh) {
+        invalidateCache('students');
+        invalidateCache('archivedStudents');
+        invalidateCache('breakStudents');
+    }
+    
+    try {
+        const { activeStudents, archivedStudents } = await fetchAllStudentsWithStatus();
+        
+        // Get break students count
+        const breakStudentsCount = activeStudents.filter(s => s.summerBreak === true).length;
+        
+        // Update counts
+        document.getElementById('active-students-count').textContent = activeStudents.length;
+        document.getElementById('archived-students-count').textContent = archivedStudents.length;
+        document.getElementById('break-students-count').textContent = breakStudentsCount;
+        document.getElementById('total-students-count').textContent = activeStudents.length + archivedStudents.length;
+        
+        // Render active students
+        renderActiveStudentsList(activeStudents);
+        
+        // Render archived students
+        renderArchivedStudentsList(archivedStudents);
+        
+    } catch (error) {
+        console.error("Error fetching archived students data:", error);
+        const activeList = document.getElementById('active-students-list');
+        const archivedList = document.getElementById('archived-students-list');
+        
+        if (activeList) {
+            activeList.innerHTML = '<tr><td colspan="6" class="px-6 py-4 text-center text-red-500">Failed to load active students</td></tr>';
+        }
+        if (archivedList) {
+            archivedList.innerHTML = '<tr><td colspan="6" class="px-6 py-4 text-center text-red-500">Failed to load archived students</td></tr>';
+        }
+    }
+}
+
+/**
+ * Renders the active students list
+ */
+function renderActiveStudentsList(activeStudents) {
+    const activeStudentsList = document.getElementById('active-students-list');
+    if (!activeStudentsList) return;
+    
+    activeStudentsList.innerHTML = activeStudents.map(student => {
+        const breakStatus = student.summerBreak ? 
+            '<span class="px-2 py-1 text-xs rounded-full bg-yellow-100 text-yellow-800">On Break</span>' :
+            '<span class="px-2 py-1 text-xs rounded-full bg-green-100 text-green-800">Active</span>';
+        
+        return `
+            <tr class="hover:bg-gray-50">
+                <td class="px-6 py-4 whitespace-nowrap">
+                    <div class="text-sm font-medium text-gray-900">${student.studentName}</div>
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap">
+                    <div class="text-sm text-gray-900">${student.grade || 'N/A'}</div>
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap">
+                    <div class="text-sm text-gray-900">${student.tutorName || student.tutorEmail || 'N/A'}</div>
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap">
+                    <div class="text-sm text-gray-900">${student.parentName || 'N/A'}</div>
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap">
+                    ${breakStatus}
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                    <button onclick="archiveStudentPrompt('${student.id}', '${student.studentName.replace(/'/g, "\\'")}')" 
+                            class="text-yellow-600 hover:text-yellow-900 mr-3">
+                        Archive
+                    </button>
+                    <button onclick="handleEditStudent('${student.id}')" 
+                            class="text-blue-600 hover:text-blue-900">
+                        Edit
+                    </button>
+                </td>
+            </tr>
+        `;
+    }).join('') || '<tr><td colspan="6" class="px-6 py-4 text-center text-gray-500">No active students found</td></tr>';
+}
+
+/**
+ * Renders the archived students list with filtering
+ */
+function renderArchivedStudentsList(archivedStudents, searchTerm = '', reasonFilter = '') {
+    const archivedStudentsList = document.getElementById('archived-students-list');
+    if (!archivedStudentsList) return;
+    
+    // Filter students
+    let filteredStudents = archivedStudents;
+    
+    if (searchTerm) {
+        const lowerSearch = searchTerm.toLowerCase();
+        filteredStudents = filteredStudents.filter(student =>
+            student.studentName.toLowerCase().includes(lowerSearch) ||
+            (student.parentName && student.parentName.toLowerCase().includes(lowerSearch)) ||
+            (student.tutorName && student.tutorName.toLowerCase().includes(lowerSearch))
+        );
+    }
+    
+    if (reasonFilter) {
+        filteredStudents = filteredStudents.filter(student =>
+            student.archivedReason === reasonFilter
+        );
+    }
+    
+    archivedStudentsList.innerHTML = filteredStudents.map(student => {
+        const archivedDate = student.archivedDate ? 
+            new Date(student.archivedDate.seconds * 1000).toLocaleDateString() : 
+            'Unknown';
+        
+        // Color code for different archive reasons
+        let reasonColor = 'gray';
+        let reasonText = student.archivedReason || 'Not specified';
+        
+        if (student.archivedReason === 'graduated') {
+            reasonColor = 'green';
+            reasonText = 'Graduated';
+        } else if (student.archivedReason === 'transferred') {
+            reasonColor = 'blue';
+            reasonText = 'Transferred';
+        } else if (student.archivedReason === 'discontinued') {
+            reasonColor = 'red';
+            reasonText = 'Discontinued';
+        } else if (student.archivedReason === 'financial') {
+            reasonColor = 'orange';
+            reasonText = 'Financial';
+        } else if (student.archivedReason === 'relocation') {
+            reasonColor = 'purple';
+            reasonText = 'Relocated';
+        }
+        
+        return `
+            <tr class="hover:bg-gray-50">
+                <td class="px-6 py-4 whitespace-nowrap">
+                    <div class="text-sm font-medium text-gray-900">${student.studentName}</div>
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap">
+                    <div class="text-sm text-gray-900">${student.grade || 'N/A'}</div>
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap">
+                    <div class="text-sm text-gray-900">${student.tutorName || student.tutorEmail || 'N/A'}</div>
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap">
+                    <div class="text-sm text-gray-500">${archivedDate}</div>
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap">
+                    <span class="px-2 py-1 text-xs rounded-full bg-${reasonColor}-100 text-${reasonColor}-800">
+                        ${reasonText}
+                    </span>
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                    <button onclick="reactivateStudent('${student.id}', '${student.studentName.replace(/'/g, "\\'")}')" 
+                            class="text-green-600 hover:text-green-900 mr-3">
+                        Reactivate
+                    </button>
+                    <button onclick="viewStudentHistory('${student.id}')" 
+                            class="text-blue-600 hover:text-blue-900">
+                        History
+                    </button>
+                </td>
+            </tr>
+        `;
+    }).join('') || '<tr><td colspan="6" class="px-6 py-4 text-center text-gray-500">No archived students found</td></tr>';
+}
+
+/**
+ * Filters archived students based on search and reason
+ */
+function filterArchivedStudents() {
+    const searchTerm = document.getElementById('archive-search').value;
+    const reasonFilter = document.getElementById('archive-reason-filter').value;
+    
+    if (sessionCache.archivedStudents) {
+        renderArchivedStudentsList(sessionCache.archivedStudents, searchTerm, reasonFilter);
+    }
+}
+
+/**
+ * Shows prompt to archive a single student
+ */
+window.archiveStudentPrompt = async function(studentId, studentName) {
+    const modalHtml = `
+        <div id="archiveStudentModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-center justify-center">
+            <div class="relative p-8 bg-white w-96 max-w-lg rounded-lg shadow-xl">
+                <button class="absolute top-2 right-2 text-gray-500 hover:text-gray-800 text-2xl font-bold" onclick="closeManagementModal('archiveStudentModal')">&times;</button>
+                <h3 class="text-xl font-bold mb-4">Archive Student</h3>
+                <form id="archive-student-form">
+                    <input type="hidden" id="archive-student-id" value="${studentId}">
+                    <div class="mb-4">
+                        <p class="text-gray-700 mb-2">Archive student: <strong>${studentName}</strong></p>
+                        <p class="text-sm text-gray-500 mb-4">This will preserve all data but remove from active lists.</p>
+                    </div>
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium mb-2">Archive Reason *</label>
+                        <select id="archive-reason" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2">
+                            <option value="">Select a reason...</option>
+                            <option value="graduated">Graduated/Completed Program</option>
+                            <option value="transferred">Transferred to Another Tutor/School</option>
+                            <option value="discontinued">Discontinued Studies</option>
+                            <option value="financial">Financial Reasons</option>
+                            <option value="relocation">Family Relocation</option>
+                            <option value="other">Other</option>
+                        </select>
+                    </div>
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium mb-2">Additional Notes (Optional)</label>
+                        <textarea id="archive-notes" rows="3" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2" placeholder="Any additional information..."></textarea>
+                    </div>
+                    <div class="flex justify-end space-x-3">
+                        <button type="button" onclick="closeManagementModal('archiveStudentModal')" class="px-4 py-2 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400">Cancel</button>
+                        <button type="submit" class="px-4 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700">Archive Student</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    `;
+    
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+    
+    document.getElementById('archive-student-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        await archiveSingleStudent(studentId);
+    });
+};
+
+/**
+ * Archives a single student
+ */
+async function archiveSingleStudent(studentId) {
+    const reason = document.getElementById('archive-reason').value;
+    const notes = document.getElementById('archive-notes').value;
+    
+    if (!reason) {
+        alert("Please select an archive reason.");
+        return;
+    }
+    
+    try {
+        await updateDoc(doc(db, "students", studentId), {
+            status: 'archived',
+            archivedDate: Timestamp.now(),
+            archivedReason: reason,
+            archivedNotes: notes || '',
+            archivedBy: window.userData?.email || 'management',
+            lastUpdated: Timestamp.now()
+        });
+        
+        // Update cache
+        invalidateCache('students');
+        invalidateCache('archivedStudents');
+        
+        closeManagementModal('archiveStudentModal');
+        alert("Student archived successfully!");
+        fetchAndRenderArchivedStudents(true);
+        
+    } catch (error) {
+        console.error("Error archiving student:", error);
+        alert("Failed to archive student. Please try again.");
+    }
+}
+
+/**
+ * Shows bulk archive modal for multiple students
+ */
+async function showBulkArchiveModal() {
+    try {
+        // Get active students
+        const { activeStudents } = await fetchAllStudentsWithStatus();
+        
+        if (activeStudents.length === 0) {
+            alert("No active students to archive.");
+            return;
+        }
+        
+        const studentsList = activeStudents.map(student => `
+            <div class="flex items-center mb-2 p-2 border rounded hover:bg-gray-50">
+                <input type="checkbox" id="student-${student.id}" value="${student.id}" class="mr-3">
+                <label for="student-${student.id}" class="flex-1">
+                    <span class="font-medium">${student.studentName}</span>
+                    <span class="text-sm text-gray-500 ml-3">Grade: ${student.grade || 'N/A'}</span>
+                    <span class="text-sm text-gray-500 ml-3">Tutor: ${student.tutorName || 'N/A'}</span>
+                </label>
+            </div>
+        `).join('');
+        
+        const modalHtml = `
+            <div id="bulkArchiveModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-center justify-center">
+                <div class="relative p-8 bg-white w-full max-w-2xl rounded-lg shadow-xl">
+                    <button class="absolute top-2 right-2 text-gray-500 hover:text-gray-800 text-2xl font-bold" onclick="closeManagementModal('bulkArchiveModal')">&times;</button>
+                    <h3 class="text-xl font-bold mb-4">Bulk Archive Students</h3>
+                    <div class="mb-4">
+                        <div class="flex justify-between items-center mb-2">
+                            <p class="text-gray-700">Select multiple students to archive at once:</p>
+                            <button type="button" id="select-all-btn" class="text-sm text-blue-600 hover:text-blue-800">Select All</button>
+                        </div>
+                        <div id="bulk-students-list" class="max-h-60 overflow-y-auto border rounded p-3">
+                            ${studentsList}
+                        </div>
+                    </div>
+                    <form id="bulk-archive-form">
+                        <div class="mb-4">
+                            <label class="block text-sm font-medium mb-2">Archive Reason for All Selected *</label>
+                            <select id="bulk-archive-reason" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2">
+                                <option value="">Select a reason...</option>
+                                <option value="graduated">Graduated/Completed Program</option>
+                                <option value="transferred">Transferred to Another Tutor/School</option>
+                                <option value="discontinued">Discontinued Studies</option>
+                                <option value="financial">Financial Reasons</option>
+                                <option value="relocation">Family Relocation</option>
+                                <option value="other">Other</option>
+                            </select>
+                        </div>
+                        <div class="flex justify-end space-x-3">
+                            <button type="button" onclick="closeManagementModal('bulkArchiveModal')" class="px-4 py-2 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400">Cancel</button>
+                            <button type="submit" class="px-4 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700">Archive Selected Students</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        `;
+        
+        document.body.insertAdjacentHTML('beforeend', modalHtml);
+        
+        // Select all functionality
+        document.getElementById('select-all-btn').addEventListener('click', () => {
+            const checkboxes = document.querySelectorAll('#bulk-students-list input[type="checkbox"]');
+            const allChecked = Array.from(checkboxes).every(cb => cb.checked);
+            checkboxes.forEach(cb => cb.checked = !allChecked);
+        });
+        
+        document.getElementById('bulk-archive-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            await archiveBulkStudents();
+        });
+        
+    } catch (error) {
+        console.error("Error showing bulk archive modal:", error);
+        alert("Failed to load students for bulk archive.");
+    }
+}
+
+/**
+ * Archives multiple students at once
+ */
+async function archiveBulkStudents() {
+    const reason = document.getElementById('bulk-archive-reason').value;
+    
+    if (!reason) {
+        alert("Please select an archive reason.");
+        return;
+    }
+    
+    const checkboxes = document.querySelectorAll('#bulk-students-list input[type="checkbox"]:checked');
+    const selectedIds = Array.from(checkboxes).map(cb => cb.value);
+    
+    if (selectedIds.length === 0) {
+        alert("Please select at least one student to archive.");
+        return;
+    }
+    
+    if (!confirm(`Archive ${selectedIds.length} student(s)? This action cannot be undone.`)) {
+        return;
+    }
+    
+    try {
+        const batch = writeBatch(db);
+        const timestamp = Timestamp.now();
+        const archiver = window.userData?.email || 'management';
+        
+        selectedIds.forEach(studentId => {
+            const studentRef = doc(db, "students", studentId);
+            batch.update(studentRef, {
+                status: 'archived',
+                archivedDate: timestamp,
+                archivedReason: reason,
+                archivedBy: archiver,
+                lastUpdated: timestamp
+            });
+        });
+        
+        await batch.commit();
+        
+        // Update cache
+        invalidateCache('students');
+        invalidateCache('archivedStudents');
+        
+        closeManagementModal('bulkArchiveModal');
+        alert(`${selectedIds.length} student(s) archived successfully!`);
+        fetchAndRenderArchivedStudents(true);
+        
+    } catch (error) {
+        console.error("Error bulk archiving students:", error);
+        alert("Failed to archive students. Please try again.");
+    }
+}
+
+/**
+ * Reactivates an archived student
+ */
+window.reactivateStudent = async function(studentId, studentName) {
+    if (!confirm(`Reactivate "${studentName}"?\n\nThey will appear in active student lists again.`)) {
+        return;
+    }
+    
+    try {
+        await updateDoc(doc(db, "students", studentId), {
+            status: 'active',
+            archivedDate: null,
+            archivedReason: null,
+            archivedNotes: null,
+            archivedBy: null,
+            lastUpdated: Timestamp.now()
+        });
+        
+        // Update cache
+        invalidateCache('students');
+        invalidateCache('archivedStudents');
+        
+        alert(`Student "${studentName}" reactivated successfully!`);
+        fetchAndRenderArchivedStudents(true);
+        
+    } catch (error) {
+        console.error("Error reactivating student:", error);
+        alert("Failed to reactivate student. Please try again.");
+    }
+};
+
+/**
+ * Views student history (reuses existing function)
+ */
+window.viewStudentHistory = function(studentId) {
+    window.viewStudentTutorHistory(studentId);
+};
 
 // ##################################
 // # REFERRAL MANAGEMENT FUNCTIONS - FIXED
@@ -1570,10 +2508,53 @@ window.viewStudentTutorHistory = function(studentId) {
 };
 
 // ##################################
-// # PANEL RENDERING FUNCTIONS
+// # UPDATED EXISTING FUNCTIONS FOR STATUS SUPPORT
 // ##################################
 
-// --- Tutor & Student Directory Panel ---
+// Updated function to fetch only active tutors for dropdowns
+async function fetchActiveTutors() {
+    try {
+        const tutorsQuery = query(
+            collection(db, "tutors"),
+            where("status", "==", "active"),
+            orderBy("name")
+        );
+        const tutorsSnapshot = await getDocs(tutorsQuery);
+        const activeTutors = tutorsSnapshot.docs.map(doc => ({ 
+            id: doc.id, 
+            ...doc.data() 
+        }));
+        
+        saveToLocalStorage('tutors', activeTutors);
+        return activeTutors;
+    } catch (error) {
+        console.error("Error fetching active tutors:", error);
+        return [];
+    }
+}
+
+// Updated function to fetch only active students
+async function fetchActiveStudents() {
+    try {
+        const studentsQuery = query(
+            collection(db, "students"),
+            where("status", "==", "active")
+        );
+        const studentsSnapshot = await getDocs(studentsQuery);
+        const activeStudents = studentsSnapshot.docs.map(doc => ({ 
+            id: doc.id, 
+            ...doc.data() 
+        }));
+        
+        saveToLocalStorage('students', activeStudents);
+        return activeStudents;
+    } catch (error) {
+        console.error("Error fetching active students:", error);
+        return [];
+    }
+}
+
+// Updated tutor directory view to use active tutors only
 async function renderManagementTutorView(container) {
     container.innerHTML = `
         <div class="bg-white p-6 rounded-lg shadow-md">
@@ -1589,11 +2570,11 @@ async function renderManagementTutorView(container) {
             </div>
             <div class="flex space-x-4 mb-4">
                 <div class="bg-green-100 p-3 rounded-lg text-center shadow w-full">
-                    <h4 class="font-bold text-green-800 text-sm">Total Tutors</h4>
+                    <h4 class="font-bold text-green-800 text-sm">Active Tutors</h4>
                     <p id="tutor-count-badge" class="text-2xl font-extrabold">0</p>
                 </div>
                 <div class="bg-yellow-100 p-3 rounded-lg text-center shadow w-full">
-                    <h4 class="font-bold text-yellow-800 text-sm">Total Students</h4>
+                    <h4 class="font-bold text-yellow-800 text-sm">Active Students</h4>
                     <p id="student-count-badge" class="text-2xl font-extrabold">0</p>
                 </div>
                 <div class="bg-purple-100 p-3 rounded-lg text-center shadow w-full">
@@ -1621,7 +2602,7 @@ async function renderManagementTutorView(container) {
         // Create a modal to select a student
         const students = sessionCache.students || [];
         if (students.length === 0) {
-            alert("No students found.");
+            alert("No active students found.");
             return;
         }
         
@@ -1664,6 +2645,7 @@ async function renderManagementTutorView(container) {
     fetchAndRenderDirectory();
 }
 
+// Updated directory fetch function
 async function fetchAndRenderDirectory(forceRefresh = false) {
     if (forceRefresh) {
         invalidateCache('tutors');
@@ -1672,21 +2654,25 @@ async function fetchAndRenderDirectory(forceRefresh = false) {
     }
 
     try {
-        // If cache is empty, fetch from server.
-        if (!sessionCache.tutors || !sessionCache.students) {
-            document.getElementById('directory-list').innerHTML = `<p class="text-center text-gray-500 py-10">Fetching data from server...</p>`;
-            const [tutorsSnapshot, studentsSnapshot] = await Promise.all([
-                getDocs(query(collection(db, "tutors"), orderBy("name"))),
-                getDocs(collection(db, "students"))
-            ]);
-            saveToLocalStorage('tutors', tutorsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-            saveToLocalStorage('students', studentsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-        }
+        // Fetch only active tutors and students
+        const [activeTutors, activeStudents] = await Promise.all([
+            fetchActiveTutors(),
+            fetchActiveStudents()
+        ]);
         
         // Fetch tutor assignment history if needed
         if (!sessionCache.tutorAssignments || forceRefresh) {
             await fetchTutorAssignmentHistory();
         }
+        
+        // Update counts
+        document.getElementById('tutor-count-badge').textContent = activeTutors.length;
+        document.getElementById('student-count-badge').textContent = activeStudents.length;
+        
+        // Count students with tutor history
+        const tutorAssignments = sessionCache.tutorAssignments || {};
+        const studentsWithHistory = Object.keys(tutorAssignments).length;
+        document.getElementById('history-count-badge').textContent = studentsWithHistory;
         
         renderDirectoryFromCache();
     } catch (error) {
@@ -1731,13 +2717,6 @@ function renderDirectoryFromCache(searchTerm = '') {
         directoryList.innerHTML = `<p class="text-center text-gray-500 py-10">No results found for "${searchTerm}".</p>`;
         return;
     }
-
-    document.getElementById('tutor-count-badge').textContent = tutors.length;
-    document.getElementById('student-count-badge').textContent = students.length;
-    
-    // Count students with tutor history
-    const studentsWithHistory = Object.keys(tutorAssignments).length;
-    document.getElementById('history-count-badge').textContent = studentsWithHistory;
 
     const canEditStudents = window.userData?.permissions?.actions?.canEditStudents === true;
     const canDeleteStudents = window.userData?.permissions?.actions?.canDeleteStudents === true;
@@ -1889,6 +2868,7 @@ async function renderPayAdvicePanel(container) {
     }
 }
 
+// UPDATED: Pay advice to only consider active students and tutors
 async function loadPayAdviceData(startDate, endDate) {
     const tableBody = document.getElementById('pay-advice-table-body');
     if (!tableBody) return;
@@ -1947,7 +2927,7 @@ async function loadPayAdviceData(startDate, endDate) {
             }
 
             const queryPromises = chunks.map(chunk =>
-                getDocs(query(collection(db, "tutors"), where("email", "in", chunk)))
+                getDocs(query(collection(db, "tutors"), where("email", "in", chunk), where("status", "==", "active")))
             );
 
             const querySnapshots = await Promise.all(queryPromises);
@@ -1956,7 +2936,7 @@ async function loadPayAdviceData(startDate, endDate) {
 
         const [tutorDocs, studentsSnapshot] = await Promise.all([
             fetchTutorsInChunks(activeTutorEmailsArray),
-            getDocs(collection(db, "students"))
+            getDocs(query(collection(db, "students"), where("status", "==", "active")))
         ]);
 
         const allStudents = studentsSnapshot.docs.map(doc => doc.data());
@@ -2967,7 +3947,7 @@ async function fetchAndRenderBreakStudents(forceRefresh = false) {
     try {
         if (!sessionCache.breakStudents) {
             listContainer.innerHTML = `<p class="text-center text-gray-500 py-10">Fetching student break status...</p>`;
-            const snapshot = await getDocs(query(collection(db, "students"), where("summerBreak", "==", true)));
+            const snapshot = await getDocs(query(collection(db, "students"), where("summerBreak", "==", true), where("status", "==", "active")));
             saveToLocalStorage('breakStudents', snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
         }
         renderBreakStudentsFromCache();
@@ -3519,10 +4499,10 @@ async function zipAndDownloadTutorReports(reports, tutorName, buttonElement) {
 }
 
 // ##################################
-// # AUTHENTICATION & INITIALIZATION
+// # UPDATED NAVIGATION ITEMS WITH NEW TABS
 // ##################################
 
-// Define all navigation items
+// Define all navigation items including the new ones
 const allNavItems = {
     navTutorManagement: { fn: renderManagementTutorView, perm: 'viewTutorManagement', label: 'Tutor Directory' },
     navPayAdvice: { fn: renderPayAdvicePanel, perm: 'viewPayAdvice', label: 'Pay Advice' },
@@ -3531,7 +4511,9 @@ const allNavItems = {
     navPendingApprovals: { fn: renderPendingApprovalsPanel, perm: 'viewPendingApprovals', label: 'Pending Approvals' },
     navParentFeedback: { fn: renderParentFeedbackPanel, perm: 'viewParentFeedback', label: 'Parent Feedback' },
     navReferralsAdmin: { fn: renderReferralsAdminPanel, perm: 'viewReferralsAdmin', label: 'Referral Management' },
-    navEnrollments: { fn: renderEnrollmentsPanel, perm: 'viewEnrollments', label: 'Enrollments' }
+    navEnrollments: { fn: renderEnrollmentsPanel, perm: 'viewEnrollments', label: 'Enrollments' },
+    navPastStaff: { fn: renderPastStaffPanel, perm: 'viewPastStaff', label: 'Past Staff' }, // NEW TAB
+    navArchivedStudents: { fn: renderArchivedStudentsPanel, perm: 'viewArchivedStudents', label: 'Archived Students' } // NEW TAB
 };
 
 // Global modal close function
@@ -3633,5 +4615,3 @@ onAuthStateChanged(auth, async (user) => {
         window.location.href = "management-auth.html";
     }
 });
-
-// [End Updated management.js File]
