@@ -1,5 +1,3 @@
-// [Begin Fully Updated admin.js File]
-
 import { auth, db } from './firebaseConfig.js';
 import { collection, getDocs, doc, addDoc, query, where, getDoc, updateDoc, setDoc, deleteDoc, orderBy, writeBatch, Timestamp } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
 import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-auth.js";
@@ -96,7 +94,9 @@ async function updateStaffPermissions(staffEmail, newRole) {
             viewPendingApprovals: false, 
             viewStaffManagement: false, 
             viewParentFeedback: false, 
-            viewEnrollments: false 
+            viewEnrollments: false,
+            viewInactiveTutors: false,  // ← Add this
+            viewArchivedStudents: false // ← Add this
         }, 
         actions: { 
             canDownloadReports: false, 
@@ -115,7 +115,9 @@ async function updateStaffPermissions(staffEmail, newRole) {
             viewPendingApprovals: false, 
             viewStaffManagement: false, 
             viewParentFeedback: false, 
-            viewEnrollments: false 
+            viewEnrollments: false,
+            viewInactiveTutors: false,  // ← Add this
+            viewArchivedStudents: false // ← Add this
         }, 
         actions: { 
             canDownloadReports: false, 
@@ -134,7 +136,9 @@ async function updateStaffPermissions(staffEmail, newRole) {
             viewPendingApprovals: true, 
             viewStaffManagement: false, 
             viewParentFeedback: true, 
-            viewEnrollments: true
+            viewEnrollments: true,
+            viewInactiveTutors: true,   // ← Add this (managers can view inactive tutors)
+            viewArchivedStudents: true  // ← Add this (managers can view archived students)
         }, 
         actions: { 
             canDownloadReports: false, 
@@ -153,7 +157,9 @@ async function updateStaffPermissions(staffEmail, newRole) {
             viewPendingApprovals: true, 
             viewStaffManagement: true, 
             viewParentFeedback: true, 
-            viewEnrollments: true
+            viewEnrollments: true,
+            viewInactiveTutors: true,   // ← Add this
+            viewArchivedStudents: true  // ← Add this
         }, 
         actions: { 
             canDownloadReports: true, 
@@ -172,7 +178,9 @@ async function updateStaffPermissions(staffEmail, newRole) {
             viewPendingApprovals: true, 
             viewStaffManagement: true, 
             viewParentFeedback: true, 
-            viewEnrollments: true
+            viewEnrollments: true,
+            viewInactiveTutors: true,
+            viewArchivedStudents: true
         }, 
         actions: { 
             canDownloadReports: true, 
@@ -2331,6 +2339,8 @@ async function openPermissionsModal(staffId) {
                             <label class="flex items-center"><input type="checkbox" id="p-viewStaffManagement" class="mr-2" ${permissions.tabs?.viewStaffManagement ? 'checked' : ''}> Staff Management</label>
                             <label class="flex items-center"><input type="checkbox" id="p-viewParentFeedback" class="mr-2" ${permissions.tabs?.viewParentFeedback ? 'checked' : ''}> Parent Feedback</label>
                             <label class="flex items-center"><input type="checkbox" id="p-viewEnrollments" class="mr-2" ${permissions.tabs?.viewEnrollments ? 'checked' : ''}> Enrollments</label>
+                            <label class="flex items-center"><input type="checkbox" id="p-viewInactiveTutors" class="mr-2" ${permissions.tabs?.viewInactiveTutors ? 'checked' : ''}> Inactive Tutors</label>
+                            <label class="flex items-center"><input type="checkbox" id="p-viewArchivedStudents" class="mr-2" ${permissions.tabs?.viewArchivedStudents ? 'checked' : ''}> Archived Students</label>
                         </div>
                     </div>
                     <div class="border-t pt-4">
@@ -2362,7 +2372,9 @@ async function openPermissionsModal(staffId) {
                 viewPendingApprovals: document.getElementById('p-viewPendingApprovals').checked, 
                 viewStaffManagement: document.getElementById('p-viewStaffManagement').checked, 
                 viewParentFeedback: document.getElementById('p-viewParentFeedback').checked,
-                viewEnrollments: document.getElementById('p-viewEnrollments').checked
+                viewEnrollments: document.getElementById('p-viewEnrollments').checked,
+                viewInactiveTutors: document.getElementById('p-viewInactiveTutors').checked,
+                viewArchivedStudents: document.getElementById('p-viewArchivedStudents').checked
             },
             actions: { 
                 canDownloadReports: document.getElementById('p-canDownloadReports').checked, 
@@ -2455,3 +2467,4 @@ onAuthStateChanged(auth, async (user) => {
 });
 
 // [End Fully Updated admin.js File]
+
