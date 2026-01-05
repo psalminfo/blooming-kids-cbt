@@ -78,12 +78,32 @@ function formatNaira(amount) {
 // ======================================================
 
 async function renderDashboardPanel(container) {
+    // Get user permissions
+    const userPermissions = window.userData?.permissions?.tabs || {};
+    
+    // Determine which cards to show based on permissions
+    const showTutorsCard = userPermissions.viewTutorManagement === true;
+    const showStudentsCard = userPermissions.viewTutorManagement === true;
+    const showPendingCard = userPermissions.viewPendingApprovals === true;
+    const showEnrollmentsCard = userPermissions.viewEnrollments === true;
+    
+    // Count how many cards we'll show (for grid layout)
+    const visibleCardsCount = [showTutorsCard, showStudentsCard, showPendingCard, showEnrollmentsCard]
+        .filter(Boolean).length;
+    
+    // Determine grid columns based on visible cards
+    let gridCols = 'grid-cols-1';
+    if (visibleCardsCount === 2) gridCols = 'md:grid-cols-2';
+    else if (visibleCardsCount === 3) gridCols = 'md:grid-cols-3 lg:grid-cols-3';
+    else if (visibleCardsCount >= 4) gridCols = 'md:grid-cols-2 lg:grid-cols-4';
+    
     container.innerHTML = `
         <div class="bg-white p-6 rounded-lg shadow-md">
             <h2 class="text-2xl font-bold text-green-700 mb-6">Management Dashboard</h2>
             
-            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-                <!-- Active Tutors Card -->
+            <div class="grid ${gridCols} gap-6 mb-8">
+                <!-- Active Tutors Card (only if user has permission) -->
+                ${showTutorsCard ? `
                 <div class="bg-gradient-to-r from-blue-50 to-blue-100 border border-blue-200 rounded-xl p-6 shadow-sm hover:shadow-md transition-shadow duration-300">
                     <div class="flex items-center mb-4">
                         <div class="w-12 h-12 bg-blue-500 rounded-lg flex items-center justify-center mr-4">
@@ -103,8 +123,10 @@ async function renderDashboardPanel(container) {
                         </div>
                     </div>
                 </div>
+                ` : ''}
 
-                <!-- Active Students Card -->
+                <!-- Active Students Card (only if user has permission) -->
+                ${showStudentsCard ? `
                 <div class="bg-gradient-to-r from-green-50 to-green-100 border border-green-200 rounded-xl p-6 shadow-sm hover:shadow-md transition-shadow duration-300">
                     <div class="flex items-center mb-4">
                         <div class="w-12 h-12 bg-green-500 rounded-lg flex items-center justify-center mr-4">
@@ -124,8 +146,10 @@ async function renderDashboardPanel(container) {
                         </div>
                     </div>
                 </div>
+                ` : ''}
 
-                <!-- Pending Approvals Card -->
+                <!-- Pending Approvals Card (only if user has permission) -->
+                ${showPendingCard ? `
                 <div class="bg-gradient-to-r from-yellow-50 to-yellow-100 border border-yellow-200 rounded-xl p-6 shadow-sm hover:shadow-md transition-shadow duration-300">
                     <div class="flex items-center mb-4">
                         <div class="w-12 h-12 bg-yellow-500 rounded-lg flex items-center justify-center mr-4">
@@ -145,8 +169,10 @@ async function renderDashboardPanel(container) {
                         </div>
                     </div>
                 </div>
+                ` : ''}
 
-                <!-- Total Enrollments Card -->
+                <!-- Total Enrollments Card (only if user has permission) -->
+                ${showEnrollmentsCard ? `
                 <div class="bg-gradient-to-r from-purple-50 to-purple-100 border border-purple-200 rounded-xl p-6 shadow-sm hover:shadow-md transition-shadow duration-300">
                     <div class="flex items-center mb-4">
                         <div class="w-12 h-12 bg-purple-500 rounded-lg flex items-center justify-center mr-4">
@@ -166,9 +192,21 @@ async function renderDashboardPanel(container) {
                         </div>
                     </div>
                 </div>
+                ` : ''}
             </div>
 
-            <!-- Quick Actions Section -->
+            <!-- Show message if no cards are visible -->
+            ${visibleCardsCount === 0 ? `
+                <div class="text-center py-8 bg-gray-50 rounded-lg border">
+                    <i class="fas fa-chart-bar text-gray-400 text-4xl mb-4"></i>
+                    <h3 class="text-xl font-bold text-gray-600 mb-2">No Dashboard Access</h3>
+                    <p class="text-gray-500">You don't have permission to view any dashboard metrics.</p>
+                    <p class="text-sm text-gray-400 mt-2">Contact an administrator for access.</p>
+                </div>
+            ` : ''}
+
+            <!-- Quick Actions Section (only if user has Tutor Management permission) -->
+            ${showTutorsCard ? `
             <div class="mt-8 p-6 bg-gray-50 rounded-xl border">
                 <h3 class="text-xl font-bold text-gray-800 mb-4">Quick Actions</h3>
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -183,14 +221,17 @@ async function renderDashboardPanel(container) {
                     </button>
                 </div>
             </div>
+            ` : ''}
 
-            <!-- Last Updated Info -->
+            <!-- Last Updated Info (only if at least one card is visible) -->
+            ${visibleCardsCount > 0 ? `
             <div class="mt-6 text-center text-sm text-gray-500">
                 <p>Data loaded from cache. Click individual refresh buttons to update specific metrics.</p>
                 <button onclick="refreshAllDashboardData()" class="mt-2 bg-gray-200 hover:bg-gray-300 text-gray-800 px-4 py-2 rounded-lg text-sm font-medium">
                     <i class="fas fa-sync-alt mr-1"></i> Refresh All Data
                 </button>
             </div>
+            ` : ''}
         </div>
     `;
 
@@ -199,147 +240,77 @@ async function renderDashboardPanel(container) {
 
 async function loadDashboardData() {
     try {
-        // Load Active Tutors count
-        if (!sessionCache.tutors) {
-            const tutorsSnapshot = await getDocs(query(collection(db, "tutors")));
-            const allTutors = tutorsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-            const activeTutors = allTutors.filter(tutor => 
-                !tutor.status || tutor.status === 'active'
-            );
-            saveToLocalStorage('tutors', activeTutors);
+        const userPermissions = window.userData?.permissions?.tabs || {};
+        
+        // Load Active Tutors count (only if user has permission)
+        if (userPermissions.viewTutorManagement === true) {
+            if (!sessionCache.tutors) {
+                const tutorsSnapshot = await getDocs(query(collection(db, "tutors")));
+                const allTutors = tutorsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                const activeTutors = allTutors.filter(tutor => 
+                    !tutor.status || tutor.status === 'active'
+                );
+                saveToLocalStorage('tutors', activeTutors);
+            }
+            const activeTutorsCount = (sessionCache.tutors || []).length;
+            const tutorsElement = document.getElementById('dashboard-active-tutors');
+            if (tutorsElement) tutorsElement.textContent = activeTutorsCount;
         }
-        const activeTutorsCount = (sessionCache.tutors || []).length;
-        document.getElementById('dashboard-active-tutors').textContent = activeTutorsCount;
 
-        // Load Active Students count
-        if (!sessionCache.students) {
-            const studentsSnapshot = await getDocs(query(collection(db, "students")));
-            const allStudents = studentsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-            const activeStudents = allStudents.filter(student => 
-                !student.status || student.status === 'active' || student.status === 'approved'
-            );
-            saveToLocalStorage('students', activeStudents);
+        // Load Active Students count (only if user has permission)
+        if (userPermissions.viewTutorManagement === true) {
+            if (!sessionCache.students) {
+                const studentsSnapshot = await getDocs(query(collection(db, "students")));
+                const allStudents = studentsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                const activeStudents = allStudents.filter(student => 
+                    !student.status || student.status === 'active' || student.status === 'approved'
+                );
+                saveToLocalStorage('students', activeStudents);
+            }
+            const activeStudentsCount = (sessionCache.students || []).length;
+            const studentsElement = document.getElementById('dashboard-active-students');
+            if (studentsElement) studentsElement.textContent = activeStudentsCount;
         }
-        const activeStudentsCount = (sessionCache.students || []).length;
-        document.getElementById('dashboard-active-students').textContent = activeStudentsCount;
 
-        // Load Pending Approvals count
-        if (!sessionCache.pendingStudents) {
-            const pendingSnapshot = await getDocs(query(collection(db, "pending_students")));
-            const pendingStudents = pendingSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-            saveToLocalStorage('pendingStudents', pendingStudents);
+        // Load Pending Approvals count (only if user has permission)
+        if (userPermissions.viewPendingApprovals === true) {
+            if (!sessionCache.pendingStudents) {
+                const pendingSnapshot = await getDocs(query(collection(db, "pending_students")));
+                const pendingStudents = pendingSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                saveToLocalStorage('pendingStudents', pendingStudents);
+            }
+            const pendingApprovalsCount = (sessionCache.pendingStudents || []).length;
+            const pendingElement = document.getElementById('dashboard-pending-approvals');
+            if (pendingElement) pendingElement.textContent = pendingApprovalsCount;
         }
-        const pendingApprovalsCount = (sessionCache.pendingStudents || []).length;
-        document.getElementById('dashboard-pending-approvals').textContent = pendingApprovalsCount;
 
-        // Load Total Enrollments count
-        if (!sessionCache.enrollments) {
-            const enrollmentsSnapshot = await getDocs(query(collection(db, "enrollments")));
-            const enrollmentsData = enrollmentsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-            saveToLocalStorage('enrollments', enrollmentsData);
+        // Load Total Enrollments count (only if user has permission)
+        if (userPermissions.viewEnrollments === true) {
+            if (!sessionCache.enrollments) {
+                const enrollmentsSnapshot = await getDocs(query(collection(db, "enrollments")));
+                const enrollmentsData = enrollmentsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                saveToLocalStorage('enrollments', enrollmentsData);
+            }
+            const totalEnrollmentsCount = (sessionCache.enrollments || []).length;
+            const enrollmentsElement = document.getElementById('dashboard-total-enrollments');
+            if (enrollmentsElement) enrollmentsElement.textContent = totalEnrollmentsCount;
         }
-        const totalEnrollmentsCount = (sessionCache.enrollments || []).length;
-        document.getElementById('dashboard-total-enrollments').textContent = totalEnrollmentsCount;
 
     } catch (error) {
         console.error("Error loading dashboard data:", error);
         
-        document.getElementById('dashboard-active-tutors').textContent = 'Error';
-        document.getElementById('dashboard-active-students').textContent = 'Error';
-        document.getElementById('dashboard-pending-approvals').textContent = 'Error';
-        document.getElementById('dashboard-total-enrollments').textContent = 'Error';
+        // Set error state only for visible cards
+        const tutorsElement = document.getElementById('dashboard-active-tutors');
+        const studentsElement = document.getElementById('dashboard-active-students');
+        const pendingElement = document.getElementById('dashboard-pending-approvals');
+        const enrollmentsElement = document.getElementById('dashboard-total-enrollments');
+        
+        if (tutorsElement) tutorsElement.textContent = 'Error';
+        if (studentsElement) studentsElement.textContent = 'Error';
+        if (pendingElement) pendingElement.textContent = 'Error';
+        if (enrollmentsElement) enrollmentsElement.textContent = 'Error';
     }
 }
-
-window.refreshDashboardCache = async function(cacheKey) {
-    try {
-        const button = event.target.closest('button');
-        const originalText = button.innerHTML;
-        button.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i>';
-        button.disabled = true;
-
-        invalidateCache(cacheKey);
-        
-        if (cacheKey === 'tutors') {
-            const tutorsSnapshot = await getDocs(query(collection(db, "tutors")));
-            const allTutors = tutorsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-            const activeTutors = allTutors.filter(tutor => 
-                !tutor.status || tutor.status === 'active'
-            );
-            saveToLocalStorage('tutors', activeTutors);
-            document.getElementById('dashboard-active-tutors').textContent = activeTutors.length;
-        }
-        else if (cacheKey === 'students') {
-            const studentsSnapshot = await getDocs(query(collection(db, "students")));
-            const allStudents = studentsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-            const activeStudents = allStudents.filter(student => 
-                !student.status || student.status === 'active' || student.status === 'approved'
-            );
-            saveToLocalStorage('students', activeStudents);
-            document.getElementById('dashboard-active-students').textContent = activeStudents.length;
-        }
-        else if (cacheKey === 'pendingStudents') {
-            const pendingSnapshot = await getDocs(query(collection(db, "pending_students")));
-            const pendingStudents = pendingSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-            saveToLocalStorage('pendingStudents', pendingStudents);
-            document.getElementById('dashboard-pending-approvals').textContent = pendingStudents.length;
-        }
-        else if (cacheKey === 'enrollments') {
-            const enrollmentsSnapshot = await getDocs(query(collection(db, "enrollments")));
-            const enrollmentsData = enrollmentsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-            saveToLocalStorage('enrollments', enrollmentsData);
-            document.getElementById('dashboard-total-enrollments').textContent = enrollmentsData.length;
-        }
-
-        button.innerHTML = '<i class="fas fa-check mr-1"></i> Refreshed';
-        setTimeout(() => {
-            button.innerHTML = originalText;
-            button.disabled = false;
-        }, 1500);
-
-    } catch (error) {
-        console.error(`Error refreshing ${cacheKey}:`, error);
-        
-        const button = event.target.closest('button');
-        button.innerHTML = '<i class="fas fa-exclamation-triangle mr-1"></i> Error';
-        setTimeout(() => {
-            button.innerHTML = '<i class="fas fa-sync-alt mr-1"></i> Refresh';
-            button.disabled = false;
-        }, 2000);
-    }
-};
-
-window.refreshAllDashboardData = async function() {
-    try {
-        const button = event.target;
-        const originalText = button.innerHTML;
-        button.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i> Refreshing...';
-        button.disabled = true;
-
-        invalidateCache('tutors');
-        invalidateCache('students');
-        invalidateCache('pendingStudents');
-        invalidateCache('enrollments');
-
-        await loadDashboardData();
-
-        button.innerHTML = '<i class="fas fa-check mr-1"></i> All Data Refreshed';
-        setTimeout(() => {
-            button.innerHTML = originalText;
-            button.disabled = false;
-        }, 2000);
-
-    } catch (error) {
-        console.error("Error refreshing all dashboard data:", error);
-        
-        const button = event.target;
-        button.innerHTML = '<i class="fas fa-exclamation-triangle mr-1"></i> Error';
-        setTimeout(() => {
-            button.innerHTML = '<i class="fas fa-sync-alt mr-1"></i> Refresh All Data';
-            button.disabled = false;
-        }, 2000);
-    }
-};
 
 // ======================================================
 // SECTION 3: TUTOR MANAGEMENT PANELS
@@ -4713,3 +4684,4 @@ onAuthStateChanged(auth, async (user) => {
         window.location.href = "management-auth.html";
     }
 });
+
