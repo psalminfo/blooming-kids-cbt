@@ -115,6 +115,325 @@ function convertPayAdviceToCSV(data) {
 }
 
 // ##################################
+// # NEW: MODERN DASHBOARD FUNCTIONS
+// ##################################
+
+/**
+ * Creates the sidebar navigation based on user permissions
+ */
+function createSidebarNavigation(userData) {
+    const navContainer = document.getElementById('navContainer');
+    const navGroups = {
+        'Dashboard': [
+            { id: 'navDashboard', icon: 'fa-tachometer-alt', label: 'Dashboard Home', perm: 'viewDashboard' }
+        ],
+        'Student Management': [
+            { id: 'navTutorManagement', icon: 'fa-user-graduate', label: 'Tutor Directory', perm: 'viewTutorManagement' },
+            { id: 'navPendingApprovals', icon: 'fa-clock', label: 'Pending Approvals', perm: 'viewPendingApprovals' },
+            { id: 'navArchivedStudents', icon: 'fa-archive', label: 'Archived Students', perm: 'viewArchivedStudents' },
+            { id: 'navSummerBreak', icon: 'fa-umbrella-beach', label: 'Summer Break', perm: 'viewSummerBreak' }
+        ],
+        'Tutor Management': [
+            { id: 'navTutorReports', icon: 'fa-chalkboard-teacher', label: 'Tutor Reports', perm: 'viewTutorReports' },
+            { id: 'navInactiveTutors', icon: 'fa-user-slash', label: 'Inactive Tutors', perm: 'viewInactiveTutors' }
+        ],
+        'Financial Management': [
+            { id: 'navPayAdvice', icon: 'fa-money-check-alt', label: 'Pay Advice', perm: 'viewPayAdvice' },
+            { id: 'navReferralsAdmin', icon: 'fa-hand-holding-usd', label: 'Referral Management', perm: 'viewReferralsAdmin' }
+        ],
+        'Communication': [
+            { id: 'navParentFeedback', icon: 'fa-comments', label: 'Parent Feedback', perm: 'viewParentFeedback' }
+        ],
+        'Operations': [
+            { id: 'navEnrollments', icon: 'fa-file-signature', label: 'Enrollment Management', perm: 'viewEnrollments' }
+        ]
+    };
+    
+    // Build navigation based on permissions
+    let navHTML = '';
+    
+    Object.entries(navGroups).forEach(([groupName, items]) => {
+        // Filter items based on user permissions
+        const accessibleItems = items.filter(item => {
+            const hasPermission = !userData.permissions?.tabs || 
+                                userData.permissions.tabs[item.perm] === true ||
+                                item.perm === 'viewDashboard'; // Dashboard always accessible
+            return hasPermission;
+        });
+        
+        if (accessibleItems.length > 0) {
+            navHTML += `
+                <div class="nav-group">
+                    <div class="nav-group-header" onclick="toggleNavGroup(this)">
+                        <div class="group-title">
+                            <i class="fas fa-folder"></i>
+                            <span>${groupName}</span>
+                        </div>
+                        <i class="fas fa-chevron-down group-arrow"></i>
+                    </div>
+                    <div class="nav-items" style="max-height: ${accessibleItems.length * 50}px">
+                        ${accessibleItems.map(item => `
+                            <div class="nav-item" id="${item.id}" data-perm="${item.perm}">
+                                <i class="fas ${item.icon} nav-icon"></i>
+                                <span class="nav-text">${item.label}</span>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+            `;
+        }
+    });
+    
+    navContainer.innerHTML = navHTML;
+    
+    // Connect sidebar items to existing navigation system
+    document.querySelectorAll('.nav-item').forEach(item => {
+        item.addEventListener('click', function() {
+            const navId = this.id;
+            
+            // Update active state
+            document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
+            this.classList.add('active');
+            
+            // Update page title
+            document.getElementById('pageTitle').textContent = 
+                this.querySelector('.nav-text').textContent;
+            
+            // Close mobile menu
+            if (window.innerWidth <= 768) {
+                document.getElementById('sidebar').classList.remove('mobile-open');
+            }
+            
+            // Call existing navigation function
+            if (allNavItems[navId]) {
+                allNavItems[navId].fn(document.getElementById('main-content'));
+            }
+        });
+    });
+}
+
+/**
+ * Toggles navigation group collapse/expand
+ */
+function toggleNavGroup(header) {
+    const group = header.parentElement;
+    group.classList.toggle('collapsed');
+}
+
+/**
+ * Sets up sidebar toggle functionality
+ */
+function setupSidebarToggle() {
+    const toggleBtn = document.getElementById('toggleSidebar');
+    const mobileBtn = document.getElementById('mobileMenuBtn');
+    const sidebar = document.getElementById('sidebar');
+    
+    if (toggleBtn) {
+        toggleBtn.addEventListener('click', function() {
+            document.body.classList.toggle('sidebar-collapsed');
+            const icon = this.querySelector('i');
+            icon.classList.toggle('fa-chevron-left');
+            icon.classList.toggle('fa-chevron-right');
+        });
+    }
+    
+    if (mobileBtn) {
+        mobileBtn.addEventListener('click', function() {
+            sidebar.classList.toggle('mobile-open');
+        });
+    }
+    
+    // Close mobile menu when clicking outside
+    document.addEventListener('click', function(event) {
+        const sidebar = document.getElementById('sidebar');
+        const mobileBtn = document.getElementById('mobileMenuBtn');
+        
+        if (window.innerWidth <= 768 && 
+            sidebar && 
+            !sidebar.contains(event.target) && 
+            mobileBtn && 
+            !mobileBtn.contains(event.target)) {
+            sidebar.classList.remove('mobile-open');
+        }
+    });
+}
+
+/**
+ * Dashboard Home Panel
+ */
+async function renderDashboardHome(container) {
+    container.innerHTML = `
+        <div class="content-card">
+            <div class="card-header">
+                <h2 class="card-title">Dashboard Overview</h2>
+                <div class="card-actions">
+                    <button class="btn btn-secondary" onclick="refreshAllData()">
+                        <i class="fas fa-sync-alt"></i>
+                        Refresh All
+                    </button>
+                </div>
+            </div>
+            
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-header">
+                        <h3 class="stat-title">Active Tutors</h3>
+                        <div class="stat-icon bg-green-100 text-green-600">
+                            <i class="fas fa-chalkboard-teacher"></i>
+                        </div>
+                    </div>
+                    <p class="stat-value" id="dashboard-tutor-count">0</p>
+                    <p class="stat-trend trend-up">
+                        <i class="fas fa-arrow-up"></i>
+                        Loading...
+                    </p>
+                </div>
+                
+                <div class="stat-card">
+                    <div class="stat-header">
+                        <h3 class="stat-title">Active Students</h3>
+                        <div class="stat-icon bg-blue-100 text-blue-600">
+                            <i class="fas fa-user-graduate"></i>
+                        </div>
+                    </div>
+                    <p class="stat-value" id="dashboard-student-count">0</p>
+                    <p class="stat-trend trend-up">
+                        <i class="fas fa-arrow-up"></i>
+                        Loading...
+                    </p>
+                </div>
+                
+                <div class="stat-card">
+                    <div class="stat-header">
+                        <h3 class="stat-title">Pending Approvals</h3>
+                        <div class="stat-icon bg-yellow-100 text-yellow-600">
+                            <i class="fas fa-clock"></i>
+                        </div>
+                    </div>
+                    <p class="stat-value" id="dashboard-pending-count">0</p>
+                    <p class="stat-trend trend-down">
+                        <i class="fas fa-exclamation-circle"></i>
+                        Needs attention
+                    </p>
+                </div>
+                
+                <div class="stat-card">
+                    <div class="stat-header">
+                        <h3 class="stat-title">Monthly Revenue</h3>
+                        <div class="stat-icon bg-purple-100 text-purple-600">
+                            <i class="fas fa-money-bill-wave"></i>
+                        </div>
+                    </div>
+                    <p class="stat-value" id="dashboard-revenue">₦0</p>
+                    <p class="stat-trend trend-up">
+                        <i class="fas fa-arrow-up"></i>
+                        Loading...
+                    </p>
+                </div>
+            </div>
+            
+            <div class="mt-6 grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div class="content-card">
+                    <h3 class="text-lg font-bold mb-4">Quick Actions</h3>
+                    <div class="space-y-3">
+                        <button class="btn btn-primary w-full justify-start" onclick="showAssignStudentModal()">
+                            <i class="fas fa-user-plus"></i>
+                            Assign New Student
+                        </button>
+                        <button class="btn btn-secondary w-full justify-start" onclick="showReassignStudentModal()">
+                            <i class="fas fa-exchange-alt"></i>
+                            Reassign Student
+                        </button>
+                        <button class="btn btn-secondary w-full justify-start" onclick="fetchAndRenderDirectory(true)">
+                            <i class="fas fa-sync-alt"></i>
+                            Refresh Directory
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="content-card">
+                    <h3 class="text-lg font-bold mb-4">Recent Activity</h3>
+                    <div class="space-y-3" id="recent-activity">
+                        <p class="text-gray-500 text-sm">Loading recent activity...</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    // Load dashboard data
+    loadDashboardData();
+}
+
+async function loadDashboardData() {
+    try {
+        // Load ACTIVE tutors only (exclude inactive/on_leave)
+        const tutorsSnapshot = await getDocs(query(collection(db, "tutors"), where("status", "not-in", ["inactive", "on_leave"])));
+        document.getElementById('dashboard-tutor-count').textContent = tutorsSnapshot.size;
+        
+        // Load ACTIVE students only (exclude archived/graduated/transferred)
+        const studentsSnapshot = await getDocs(query(collection(db, "students"), where("status", "not-in", ["archived", "graduated", "transferred"])));
+        document.getElementById('dashboard-student-count').textContent = studentsSnapshot.size;
+        
+        // Load pending approvals
+        const pendingSnapshot = await getDocs(collection(db, "pending_students"));
+        document.getElementById('dashboard-pending-count').textContent = pendingSnapshot.size;
+        
+        // Calculate revenue from ACTIVE students only
+        let totalRevenue = 0;
+        studentsSnapshot.forEach(doc => {
+            const student = doc.data();
+            totalRevenue += student.studentFee || 0;
+        });
+        document.getElementById('dashboard-revenue').textContent = `₦${totalRevenue.toLocaleString()}`;
+        
+        // Load recent activity
+        const recentReports = await getDocs(query(
+            collection(db, "tutor_submissions"), 
+            orderBy("submittedAt", "desc"), 
+            limit(5)
+        ));
+        
+        const activityContainer = document.getElementById('recent-activity');
+        if (recentReports.empty) {
+            activityContainer.innerHTML = '<p class="text-gray-500 text-sm">No recent activity</p>';
+        } else {
+            activityContainer.innerHTML = recentReports.docs.map(doc => {
+                const report = doc.data();
+                const date = report.submittedAt ? 
+                    new Date(report.submittedAt.seconds * 1000).toLocaleDateString() : 
+                    'Unknown date';
+                return `
+                    <div class="flex items-center justify-between p-2 bg-gray-50 rounded">
+                        <div>
+                            <p class="text-sm font-medium">${report.studentName || 'Unknown'}</p>
+                            <p class="text-xs text-gray-500">Report submitted by ${report.tutorName || 'Tutor'}</p>
+                        </div>
+                        <span class="text-xs text-gray-500">${date}</span>
+                    </div>
+                `;
+            }).join('');
+        }
+        
+    } catch (error) {
+        console.error("Error loading dashboard data:", error);
+        const activityContainer = document.getElementById('recent-activity');
+        if (activityContainer) {
+            activityContainer.innerHTML = `<p class="text-red-500 text-sm">Error loading activity</p>`;
+        }
+    }
+}
+
+function refreshAllData() {
+    // Invalidate all caches
+    for (const key in sessionCache) {
+        invalidateCache(key);
+    }
+    // Reload dashboard
+    loadDashboardData();
+}
+
+// ##################################
 // # ACTION HANDLER FUNCTIONS
 // ##################################
 
@@ -211,7 +530,7 @@ function showEditStudentModal(studentId, studentData, collectionName) {
             if (collectionName === 'pending_students') invalidateCache('pendingStudents');
             
             // Re-load the current view to show changes
-            const currentNavId = document.querySelector('.nav-btn.active')?.id;
+            const currentNavId = document.querySelector('.nav-item.active')?.id;
             const mainContent = document.getElementById('main-content');
             if (currentNavId && allNavItems[currentNavId] && mainContent) {
                 allNavItems[currentNavId].fn(mainContent);
@@ -234,6 +553,7 @@ function showAssignStudentModal() {
     }
 
     const tutorOptions = tutors
+        .filter(tutor => !tutor.status || tutor.status === 'active') // Only show active tutors
         .sort((a, b) => a.name.localeCompare(b.name))
         .map(tutor => `<option value='${JSON.stringify({email: tutor.email, name: tutor.name})}'>${tutor.name} (${tutor.email})</option>`)
         .join('');
@@ -282,7 +602,7 @@ function showAssignStudentModal() {
             studentFee: Number(form.elements['assign-studentFee'].value) || 0,
             tutorEmail: selectedTutorData.email,
             tutorName: selectedTutorData.name,
-            status: 'approved',
+            status: 'active',
             summerBreak: false,
             createdAt: Timestamp.now(),
             tutorHistory: [{
@@ -322,6 +642,7 @@ function showReassignStudentModal() {
     }
 
     const tutorOptions = tutors
+        .filter(tutor => !tutor.status || tutor.status === 'active') // Only show active tutors
         .sort((a, b) => a.name.localeCompare(b.name))
         .map(tutor => `<option value='${JSON.stringify({email: tutor.email, name: tutor.name})}'>${tutor.name} (${tutor.email})</option>`)
         .join('');
@@ -367,7 +688,7 @@ function showReassignStudentModal() {
         }
 
         try {
-            const studentsSnapshot = await getDocs(collection(db, "students"));
+            const studentsSnapshot = await getDocs(query(collection(db, "students"), where("status", "not-in", ["archived", "graduated", "transferred"])));
             const allStudents = studentsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
             
             const searchResults = allStudents.filter(student => 
@@ -378,7 +699,7 @@ function showReassignStudentModal() {
             resultsContainer.classList.remove('hidden');
             
             if (searchResults.length === 0) {
-                resultsContainer.innerHTML = '<p class="text-sm text-gray-500">No students found matching your search.</p>';
+                resultsContainer.innerHTML = '<p class="text-sm text-gray-500">No active students found matching your search.</p>';
                 return;
             }
 
@@ -508,7 +829,7 @@ async function handleApproveStudent(studentId) {
             // Prepare student data with tutor history
             const studentWithHistory = {
                 ...studentData,
-                status: 'approved',
+                status: 'active',
                 tutorHistory: [{
                     tutorEmail: studentData.tutorEmail,
                     tutorName: studentData.tutorName || studentData.tutorEmail,
@@ -924,7 +1245,7 @@ async function resetParentBalance(parentUid, currentEarnings) {
 // Function to fetch tutor assignment history for students
 async function fetchTutorAssignmentHistory() {
     try {
-        const studentsSnapshot = await getDocs(collection(db, "students"));
+        const studentsSnapshot = await getDocs(query(collection(db, "students"), where("status", "not-in", ["archived", "graduated", "transferred"])));
         const tutorAssignments = {};
         
         studentsSnapshot.docs.forEach(doc => {
@@ -1704,7 +2025,7 @@ function showMarkInactiveModal() {
     const activeTutors = sessionCache.tutors || [];
     const inactiveTutors = sessionCache.inactiveTutors || [];
     const activeTutorsFiltered = activeTutors.filter(tutor => 
-        !inactiveTutors.find(inactive => inactive.id === tutor.id)
+        !tutor.status || tutor.status === 'active'
     );
     
     if (activeTutorsFiltered.length === 0) {
@@ -1808,8 +2129,12 @@ async function handleReactivateTutor(tutorId) {
 
 async function showTutorHistory(tutorId) {
     try {
-        // Fetch tutor's students
-        const studentsSnapshot = await getDocs(query(collection(db, "students"), where("tutorEmail", "==", tutorId)));
+        // Fetch tutor's ACTIVE students only
+        const studentsSnapshot = await getDocs(query(
+            collection(db, "students"), 
+            where("tutorEmail", "==", tutorId),
+            where("status", "not-in", ["archived", "graduated", "transferred"])
+        ));
         const students = studentsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         
         // Fetch tutor's reports
@@ -1843,7 +2168,7 @@ async function showTutorHistory(tutorId) {
                     <div class="grid grid-cols-2 gap-6">
                         <div>
                             <h4 class="font-bold text-lg mb-3">Assigned Students (${students.length})</h4>
-                            ${studentsHTML || '<p class="text-gray-500">No students assigned.</p>'}
+                            ${studentsHTML || '<p class="text-gray-500">No active students assigned.</p>'}
                         </div>
                         <div>
                             <h4 class="font-bold text-lg mb-3">Recent Reports (${reports.length})</h4>
@@ -1854,7 +2179,7 @@ async function showTutorHistory(tutorId) {
                     <div class="mt-6 pt-6 border-t">
                         <div class="grid grid-cols-3 gap-4">
                             <div class="bg-gray-100 p-3 rounded">
-                                <p class="text-sm font-medium">Total Students</p>
+                                <p class="text-sm font-medium">Total Active Students</p>
                                 <p class="text-2xl font-bold">${students.length}</p>
                             </div>
                             <div class="bg-gray-100 p-3 rounded">
@@ -2053,7 +2378,7 @@ function showArchiveStudentModal() {
     const activeStudents = sessionCache.students || [];
     const archivedStudents = sessionCache.archivedStudents || [];
     const activeStudentsFiltered = activeStudents.filter(student => 
-        !archivedStudents.find(archived => archived.id === student.id)
+        !student.status || student.status === 'active'
     );
     
     if (activeStudentsFiltered.length === 0) {
@@ -2211,12 +2536,14 @@ async function renderManagementTutorView(container) {
         
         // Create a modal to select a student
         const students = sessionCache.students || [];
-        if (students.length === 0) {
-            alert("No students found.");
+        const activeStudents = students.filter(student => !student.status || student.status === 'active');
+        
+        if (activeStudents.length === 0) {
+            alert("No active students found.");
             return;
         }
         
-        const studentOptions = students.map(student => 
+        const studentOptions = activeStudents.map(student => 
             `<option value="${student.id}">${student.studentName} (${student.grade || 'No grade'})</option>`
         ).join('');
         
@@ -2268,7 +2595,7 @@ async function fetchAndRenderDirectory(forceRefresh = false) {
             document.getElementById('directory-list').innerHTML = `<p class="text-center text-gray-500 py-10">Fetching data from server...</p>`;
             const [tutorsSnapshot, studentsSnapshot] = await Promise.all([
                 getDocs(query(collection(db, "tutors"), orderBy("name"))),
-                getDocs(collection(db, "students"))
+                getDocs(query(collection(db, "students"), where("status", "not-in", ["archived", "graduated", "transferred"])))
             ]);
             saveToLocalStorage('tutors', tutorsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
             saveToLocalStorage('students', studentsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
@@ -2307,7 +2634,9 @@ function renderDirectoryFromCache(searchTerm = '') {
         studentsByTutor[student.tutorEmail].push(student);
     });
 
-    const filteredTutors = tutors.filter(tutor => {
+    // Filter: Show only ACTIVE tutors (not inactive/on_leave)
+    const activeTutors = tutors.filter(tutor => !tutor.status || tutor.status === 'active');
+    const filteredTutors = activeTutors.filter(tutor => {
         const assignedStudents = studentsByTutor[tutor.email] || [];
         const tutorMatch = tutor.name.toLowerCase().includes(lowerCaseSearchTerm);
         const studentMatch = assignedStudents.some(s =>
@@ -2323,7 +2652,7 @@ function renderDirectoryFromCache(searchTerm = '') {
         return;
     }
 
-    document.getElementById('tutor-count-badge').textContent = tutors.length;
+    document.getElementById('tutor-count-badge').textContent = activeTutors.length;
     document.getElementById('student-count-badge').textContent = students.length;
     
     // Count students with tutor history
@@ -2547,7 +2876,7 @@ async function loadPayAdviceData(startDate, endDate) {
 
         const [tutorDocs, studentsSnapshot] = await Promise.all([
             fetchTutorsInChunks(activeTutorEmailsArray),
-            getDocs(collection(db, "students"))
+            getDocs(query(collection(db, "students"), where("status", "not-in", ["archived", "graduated", "transferred"])))
         ]);
 
         const allStudents = studentsSnapshot.docs.map(doc => doc.data());
@@ -2557,6 +2886,9 @@ async function loadPayAdviceData(startDate, endDate) {
         tutorDocs.forEach(doc => {
             const tutor = doc.data();
             const tutorEmail = tutor.email;
+            
+            // Only include ACTIVE tutors in pay advice
+            if (tutor.status && tutor.status !== 'active') return;
             
             const reportedStudentNames = tutorStudentPairs[tutorEmail] || new Set();
             
@@ -3558,7 +3890,7 @@ async function fetchAndRenderBreakStudents(forceRefresh = false) {
     try {
         if (!sessionCache.breakStudents) {
             listContainer.innerHTML = `<p class="text-center text-gray-500 py-10">Fetching student break status...</p>`;
-            const snapshot = await getDocs(query(collection(db, "students"), where("summerBreak", "==", true)));
+            const snapshot = await getDocs(query(collection(db, "students"), where("summerBreak", "==", true), where("status", "not-in", ["archived", "graduated", "transferred"])));
             saveToLocalStorage('breakStudents', snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
         }
         renderBreakStudentsFromCache();
@@ -3575,7 +3907,7 @@ function renderBreakStudentsFromCache() {
 
     const canEndBreak = window.userData?.permissions?.actions?.canEndBreak === true;
     if (breakStudents.length === 0) {
-        listContainer.innerHTML = `<p class="text-center text-gray-500">No students are on break.</p>`;
+        listContainer.innerHTML = `<p class="text-center text-gray-500">No active students are on break.</p>`;
         return;
     }
     
@@ -4115,6 +4447,7 @@ async function zipAndDownloadTutorReports(reports, tutorName, buttonElement) {
 
 // Define all navigation items
 const allNavItems = {
+    navDashboard: { fn: renderDashboardHome, perm: 'viewDashboard', label: 'Dashboard Home' },
     navTutorManagement: { fn: renderManagementTutorView, perm: 'viewTutorManagement', label: 'Tutor Directory' },
     navPayAdvice: { fn: renderPayAdvicePanel, perm: 'viewPayAdvice', label: 'Pay Advice' },
     navTutorReports: { fn: renderTutorReportsPanel, perm: 'viewTutorReports', label: 'Tutor Reports' },
@@ -4137,7 +4470,7 @@ window.closeManagementModal = function(modalId) {
 
 onAuthStateChanged(auth, async (user) => {
     const mainContent = document.getElementById('main-content');
-    const logoutBtn = document.getElementById('logoutBtn');
+    const logoutBtn = document.getElementById('sidebarLogoutBtn');
     
     if (user) {
         console.log("User authenticated:", user.email);
@@ -4150,57 +4483,51 @@ onAuthStateChanged(auth, async (user) => {
                 const staffData = staffDocSnap.data();
                 window.userData = staffData;
                 
+                // UPDATE WELCOME MESSAGE
                 document.getElementById('welcome-message').textContent = `Welcome, ${staffData.name}`;
                 document.getElementById('user-role').textContent = `Role: ${capitalize(staffData.role)}`;
-
-                // Setup navigation based on permissions
-                const navContainer = document.querySelector('nav');
-                if (navContainer) {
-                    navContainer.innerHTML = '';
-                    
-                    let firstVisibleTab = null;
-                    
-                    Object.entries(allNavItems).forEach(([navId, navItem]) => {
-                        const hasPermission = navId === 'navReferralsAdmin' || 
-                                            !staffData.permissions || 
-                                            !staffData.permissions.tabs || 
-                                            staffData.permissions.tabs[navItem.perm] === true;
+                
+                // SETUP MODERN SIDEBAR (REPLACE THE OLD NAV SETUP)
+                createSidebarNavigation(staffData);
+                setupSidebarToggle();
+                
+                // Setup search functionality
+                const searchInput = document.getElementById('navSearch');
+                if (searchInput) {
+                    searchInput.addEventListener('input', function(e) {
+                        const searchTerm = e.target.value.toLowerCase();
+                        const allItems = document.querySelectorAll('.nav-item');
                         
-                        if (hasPermission) {
-                            if (!firstVisibleTab) firstVisibleTab = navId;
-                            
-                            const button = document.createElement('button');
-                            button.id = navId;
-                            button.className = 'nav-btn text-lg font-semibold text-gray-500 hover:text-green-700 px-4 py-2 rounded-lg transition-colors';
-                            button.textContent = navItem.label;
-                            navContainer.appendChild(button);
-                            
-                            button.addEventListener('click', () => {
-                                // Update active state
-                                document.querySelectorAll('.nav-btn').forEach(btn => {
-                                    btn.classList.remove('active', 'bg-green-100', 'text-green-700');
-                                });
-                                button.classList.add('active', 'bg-green-100', 'text-green-700');
-                                
-                                // Load the panel
-                                navItem.fn(mainContent);
-                            });
-                        }
+                        allItems.forEach(item => {
+                            const text = item.querySelector('.nav-text').textContent.toLowerCase();
+                            if (text.includes(searchTerm)) {
+                                item.style.display = 'flex';
+                            } else {
+                                item.style.display = 'none';
+                            }
+                        });
                     });
-
-                    // Activate and load the first visible tab
-                    if (firstVisibleTab) {
-                        const firstButton = document.getElementById(firstVisibleTab);
-                        if (firstButton) {
-                            firstButton.classList.add('active', 'bg-green-100', 'text-green-700');
-                            allNavItems[firstVisibleTab].fn(mainContent);
-                        }
-                    } else {
-                        mainContent.innerHTML = `<p class="text-center mt-12 text-yellow-600">No accessible panels available for your role.</p>`;
+                }
+                
+                // Set default active item (Dashboard or first available)
+                const defaultNavId = 'navDashboard';
+                const defaultItem = document.getElementById(defaultNavId);
+                if (defaultItem) {
+                    defaultItem.classList.add('active');
+                    document.getElementById('pageTitle').textContent = 'Dashboard Home';
+                    allNavItems[defaultNavId].fn(document.getElementById('main-content'));
+                } else {
+                    // Fallback to Tutor Directory if Dashboard not available
+                    const fallbackNavId = 'navTutorManagement';
+                    const fallbackItem = document.getElementById(fallbackNavId);
+                    if (fallbackItem) {
+                        fallbackItem.classList.add('active');
+                        document.getElementById('pageTitle').textContent = 'Tutor Directory';
+                        allNavItems[fallbackNavId].fn(document.getElementById('main-content'));
                     }
                 }
-
-                // Setup logout button
+                
+                // SETUP LOGOUT BUTTON
                 if (logoutBtn) {
                     logoutBtn.addEventListener('click', () => {
                         signOut(auth).then(() => {
@@ -4208,6 +4535,7 @@ onAuthStateChanged(auth, async (user) => {
                         });
                     });
                 }
+                
             } else {
                 // User not approved or doesn't exist in staff collection
                 if (mainContent) {
