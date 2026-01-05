@@ -253,27 +253,29 @@
             transform: rotate(45deg);
         }
 
-        /* Enroll Card Specific */
-.enroll-card .card-content {
-    display: flex;
-    flex-direction: column;
-    justify-content: flex-start;
-    align-items: center;
-    text-align: center;
-    padding: 40px 30px;
-    overflow-y: visible;
-}
+        /* Enroll Card Specific - FIXED */
+        .enroll-card .card-content {
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            align-items: center;
+            text-align: center;
+            padding: 40px 30px;
+            overflow-y: visible;
+            height: 100%;
+        }
 
         .enroll-icon {
             font-size: 80px;
             color: var(--primary);
-            margin-bottom: 30px;
+            margin-bottom: 20px;
         }
 
         .enroll-features {
             text-align: left;
-            margin: 30px 0;
+            margin: 20px 0;
             width: 100%;
+            flex-grow: 1;
         }
 
         .feature {
@@ -870,7 +872,7 @@
                 </div>
             </div>
 
-            <!-- Enroll Now Card -->
+            <!-- Enroll Now Card - UPDATED -->
             <div class="card enroll-card animate-up delay-2">
                 <div class="card-header">
                     <i class="fas fa-graduation-cap"></i>
@@ -882,12 +884,12 @@
                         <i class="fas fa-seedling"></i>
                     </div>
                     
-                    <!-- FIXED: Added target="_blank" for mobile compatibility -->
+                    <!-- Enroll Now Button moved to top -->
                     <a href="https://bkh.netlify.app/enrollment-portal.html" class="btn btn-primary btn-large" target="_blank" rel="noopener noreferrer" style="margin-bottom: 30px;">
                         <i class="fas fa-user-plus"></i> Enroll Now
                     </a>
                     
-                    <p style="font-size: 18px; margin-bottom: 30px; color: #555;">
+                    <p style="font-size: 18px; margin-bottom: 20px; color: #555;">
                         Join over 1500+ students who have transformed their academic journey with our personalized tutoring approach.
                     </p>
                     
@@ -980,58 +982,58 @@
         </div>
     </section>
 
-    <!-- Programs Section -->
+    <!-- Programs Section - UPDATED -->
     <section class="programs-section" id="programs">
         <h2>Our Academic Programs</h2>
-       <div class="programs-grid">
-    <div class="program-card">
-        <i class="fas fa-baby"></i>
-        <h3>Preschool to Grade 1</h3>
-        <p>Building strong foundations in reading, writing, and basic math skills through interactive learning.</p>
-    </div>
-    
-    <div class="program-card">
-        <i class="fas fa-child"></i>
-        <h3>Grade 2 to 4</h3>
-        <p>Developing core academic skills and confidence in all major subjects with personalized attention.</p>
-    </div>
-    
-    <div class="program-card">
-        <i class="fas fa-user-graduate"></i>
-        <h3>Grade 5 to 8</h3>
-        <p>Preparing for higher grades with comprehensive subject coverage and exam preparation techniques.</p>
-    </div>
-    
-    <div class="program-card">
-        <i class="fas fa-graduation-cap"></i>
-        <h3>Grade 9 to 12 (Core Subjects)</h3>
-        <p>Advanced tutoring for O'Level and A'Level preparation with focus on university entrance requirements.</p>
-    </div>
-    
-    <div class="program-card">
-        <i class="fas fa-sun"></i>
-        <h3>Holiday Programs</h3>
-        <p>Special intensive courses during school breaks to catch up or get ahead in challenging subjects.</p>
-    </div>
-    
-    <div class="program-card">
-        <i class="fas fa-users"></i>
-        <h3>Group Sessions</h3>
-        <p>Small group tutoring for collaborative learning and peer support at discounted rates.</p>
-    </div>
+        <div class="programs-grid">
+            <div class="program-card">
+                <i class="fas fa-baby"></i>
+                <h3>Preschool to Grade 1</h3>
+                <p>Building strong foundations in reading, writing, and basic math skills through interactive learning.</p>
+            </div>
+            
+            <div class="program-card">
+                <i class="fas fa-child"></i>
+                <h3>Grade 2 to 4</h3>
+                <p>Developing core academic skills and confidence in all major subjects with personalized attention.</p>
+            </div>
+            
+            <div class="program-card">
+                <i class="fas fa-user-graduate"></i>
+                <h3>Grade 5 to 8</h3>
+                <p>Preparing for higher grades with comprehensive subject coverage and exam preparation techniques.</p>
+            </div>
+            
+            <div class="program-card">
+                <i class="fas fa-graduation-cap"></i>
+                <h3>Grade 9 to 12 (Core Subjects)</h3>
+                <p>Advanced tutoring for O'Level and A'Level preparation with focus on university entrance requirements.</p>
+            </div>
+            
+            <div class="program-card">
+                <i class="fas fa-sun"></i>
+                <h3>Holiday Programs</h3>
+                <p>Special intensive courses during school breaks to catch up or get ahead in challenging subjects.</p>
+            </div>
+            
+            <div class="program-card">
+                <i class="fas fa-users"></i>
+                <h3>Group Sessions</h3>
+                <p>Small group tutoring for collaborative learning and peer support at discounted rates.</p>
+            </div>
 
-    <div class="program-card">
-        <i class="fas fa-palette"></i>
-        <h3>Creative Tech Courses</h3>
-        <p>Comic Book Design, Graphic Designing & Tech Courses. Build creative and technical skills in a hands-on environment.</p>
-    </div>
-    
-    <div class="program-card">
-        <i class="fas fa-music"></i>
-        <h3>Enrichment Programs</h3>
-        <p>Kids Music Lessons, Foreign Language, Native Language, Bible Study, Chess Class. Explore diverse interests in a supportive setting.</p>
-    </div>
-</div>
+            <div class="program-card">
+                <i class="fas fa-palette"></i>
+                <h3>Creative Tech Courses</h3>
+                <p>Comic Book Design, Graphic Designing & Tech Courses. Build creative and technical skills in a hands-on environment.</p>
+            </div>
+            
+            <div class="program-card">
+                <i class="fas fa-music"></i>
+                <h3>Enrichment Programs</h3>
+                <p>Kids Music Lessons, Foreign Language, Native Language, Bible Study, Chess Class. Explore diverse interests in a supportive setting.</p>
+            </div>
+        </div>
     </section>
 
     <!-- Testimonials Section -->
