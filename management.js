@@ -3609,17 +3609,42 @@ function renderPendingApprovalsFromCache() {
 async function renderSummerBreakPanel(container) {
     container.innerHTML = `
         <div class="bg-white p-6 rounded-lg shadow-md">
-            <div class="flex justify-between items-center mb-4">
+            <div class="flex justify-between items-center mb-4 flex-wrap gap-4">
                 <h2 class="text-2xl font-bold text-green-700">Students on Summer Break</h2>
-                <button id="refresh-break-btn" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Refresh</button>
+                <div class="flex items-center gap-4 flex-wrap">
+                    <input type="search" id="break-search" placeholder="Search students by name, tutor, or parent..." 
+                           class="p-2 border rounded-md w-64 focus:ring-2 focus:ring-green-500 focus:border-transparent">
+                    <button id="refresh-break-btn" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 flex items-center">
+                        <i class="fas fa-sync-alt mr-2"></i> Refresh
+                    </button>
+                </div>
             </div>
+            
+            <div class="flex space-x-4 mb-6">
+                <div class="bg-yellow-100 p-3 rounded-lg text-center shadow w-full">
+                    <h4 class="font-bold text-yellow-800 text-sm">Students on Break</h4>
+                    <p id="break-count-badge" class="text-2xl font-extrabold">0</p>
+                </div>
+                <div class="bg-green-100 p-3 rounded-lg text-center shadow w-full">
+                    <h4 class="font-bold text-green-800 text-sm">Active Tutors</h4>
+                    <p id="break-tutor-count" class="text-2xl font-extrabold">0</p>
+                </div>
+            </div>
+            
             <div id="break-status-message" class="text-center font-semibold mb-4 hidden"></div>
+            
             <div id="break-students-list" class="space-y-4">
-                <p class="text-center">Loading...</p>
+                <div class="text-center py-10">
+                    <div class="loading-spinner mx-auto" style="width: 40px; height: 40px;"></div>
+                    <p class="text-green-600 font-semibold mt-4">Loading summer break students...</p>
+                </div>
             </div>
         </div>
     `;
+    
     document.getElementById('refresh-break-btn').addEventListener('click', () => fetchAndRenderBreakStudents(true));
+    document.getElementById('break-search').addEventListener('input', (e) => renderBreakStudentsFromCache(e.target.value));
+    
     fetchAndRenderBreakStudents();
 }
 
@@ -3629,8 +3654,12 @@ async function fetchAndRenderBreakStudents(forceRefresh = false) {
 
     try {
         if (!sessionCache.breakStudents) {
-            listContainer.innerHTML = `<p class="text-center text-gray-500 py-10">Fetching student break status...</p>`;
-            // Get only active students on break
+            listContainer.innerHTML = `<div class="text-center py-10">
+                <div class="loading-spinner mx-auto" style="width: 40px; height: 40px;"></div>
+                <p class="text-green-600 font-semibold mt-4">Fetching student break status...</p>
+            </div>`;
+            
+            // Get all students on summer break
             const snapshot = await getDocs(query(collection(db, "students"), where("summerBreak", "==", true)));
             const allBreakStudents = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
             
@@ -3644,53 +3673,218 @@ async function fetchAndRenderBreakStudents(forceRefresh = false) {
         renderBreakStudentsFromCache();
     } catch(error) {
         console.error("Error fetching break students:", error);
-        listContainer.innerHTML = `<p class="text-center text-red-500 py-10">Failed to load data.</p>`;
+        const listContainer = document.getElementById('break-students-list');
+        if (listContainer) {
+            listContainer.innerHTML = `
+                <div class="text-center py-10 text-red-600">
+                    <p class="font-semibold">Failed to load summer break data</p>
+                    <p class="text-sm mt-2">${error.message}</p>
+                    <button onclick="fetchAndRenderBreakStudents(true)" class="mt-4 bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">
+                        Try Again
+                    </button>
+                </div>
+            `;
+        }
     }
 }
 
-function renderBreakStudentsFromCache() {
+function renderBreakStudentsFromCache(searchTerm = '') {
     const breakStudents = sessionCache.breakStudents || [];
     const listContainer = document.getElementById('break-students-list');
     if (!listContainer) return;
 
     const canEndBreak = window.userData?.permissions?.actions?.canEndBreak === true;
-    if (breakStudents.length === 0) {
-        listContainer.innerHTML = `<p class="text-center text-gray-500">No active students are on break.</p>`;
+    
+    // Apply search filter
+    const lowerCaseSearchTerm = searchTerm.toLowerCase();
+    let filteredStudents = breakStudents;
+    
+    if (searchTerm) {
+        filteredStudents = breakStudents.filter(student => 
+            student.studentName?.toLowerCase().includes(lowerCaseSearchTerm) ||
+            student.tutorEmail?.toLowerCase().includes(lowerCaseSearchTerm) ||
+            student.tutorName?.toLowerCase().includes(lowerCaseSearchTerm) ||
+            student.parentName?.toLowerCase().includes(lowerCaseSearchTerm) ||
+            student.parentPhone?.toLowerCase().includes(lowerCaseSearchTerm)
+        );
+    }
+    
+    // Count unique tutors
+    const uniqueTutors = [...new Set(breakStudents.map(s => s.tutorEmail))].filter(Boolean);
+    
+    // Update counters
+    document.getElementById('break-count-badge').textContent = breakStudents.length;
+    document.getElementById('break-tutor-count').textContent = uniqueTutors.length;
+
+    if (filteredStudents.length === 0) {
+        if (searchTerm) {
+            listContainer.innerHTML = `
+                <div class="text-center py-10">
+                    <i class="fas fa-search text-gray-400 text-4xl mb-4"></i>
+                    <p class="text-gray-600">No students found matching "${searchTerm}"</p>
+                    <p class="text-sm text-gray-400 mt-2">Try a different search term</p>
+                </div>
+            `;
+        } else {
+            listContainer.innerHTML = `
+                <div class="text-center py-10">
+                    <i class="fas fa-umbrella-beach text-green-400 text-4xl mb-4"></i>
+                    <p class="text-gray-600">No active students are currently on summer break</p>
+                    <p class="text-sm text-gray-400 mt-2">All students are active</p>
+                </div>
+            `;
+        }
         return;
     }
     
-    listContainer.innerHTML = breakStudents.map(student => {
-        const endBreakButton = canEndBreak 
-            ? `<button class="end-break-btn bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700 transition-colors" data-student-id="${student.id}">End Break</button>`
-            : '';
-        return `
-            <div class="border p-4 rounded-lg flex justify-between items-center bg-gray-50">
-                <div>
-                    <p><strong>Student:</strong> ${student.studentName}</p>
-                    <p><strong>Tutor:</strong> ${student.tutorEmail}</p>
+    // Group students by tutor for better organization
+    const studentsByTutor = {};
+    filteredStudents.forEach(student => {
+        const tutorKey = student.tutorEmail || 'No Tutor Assigned';
+        if (!studentsByTutor[tutorKey]) {
+            studentsByTutor[tutorKey] = {
+                tutorName: student.tutorName || student.tutorEmail || 'Unknown Tutor',
+                tutorEmail: student.tutorEmail,
+                students: []
+            };
+        }
+        studentsByTutor[tutorKey].students.push(student);
+    });
+    
+    let html = '';
+    
+    Object.values(studentsByTutor).forEach(tutorGroup => {
+        const studentItems = tutorGroup.students.map(student => {
+            // Format break information
+            const breakInfo = student.lastBreakStart ? 
+                `Started: ${new Date(student.lastBreakStart.seconds * 1000).toLocaleDateString()}` : 
+                'No start date recorded';
+            
+            return `
+                <div class="border-l-4 border-l-yellow-500 bg-gray-50 p-4 rounded-r-lg flex justify-between items-center hover:bg-gray-100 transition-colors">
+                    <div class="flex-1">
+                        <div class="flex items-center gap-3">
+                            <h3 class="font-bold text-lg text-gray-800">${student.studentName}</h3>
+                            <span class="text-xs px-2 py-1 bg-yellow-100 text-yellow-800 rounded-full">On Break</span>
+                        </div>
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-2 mt-2 text-sm text-gray-600">
+                            <div>
+                                <p><strong>Grade:</strong> ${student.grade || 'N/A'}</p>
+                                <p><strong>Days/Week:</strong> ${student.days || 'N/A'}</p>
+                            </div>
+                            <div>
+                                <p><strong>Parent:</strong> ${student.parentName || 'N/A'}</p>
+                                <p><strong>Phone:</strong> ${student.parentPhone || 'N/A'}</p>
+                            </div>
+                            <div>
+                                <p><strong>Fee:</strong> ₦${(student.studentFee || 0).toLocaleString()}</p>
+                                <p><strong>${breakInfo}</strong></p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="flex flex-col gap-2 ml-4">
+                        ${canEndBreak ? `
+                            <button class="end-break-btn bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700 transition-colors flex items-center justify-center whitespace-nowrap"
+                                    data-student-id="${student.id}"
+                                    data-student-name="${student.studentName}">
+                                <i class="fas fa-flag mr-2"></i> End Break
+                            </button>
+                        ` : ''}
+                        <button onclick="handleEditStudent('${student.id}')" 
+                                class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition-colors flex items-center justify-center whitespace-nowrap">
+                            <i class="fas fa-edit mr-2"></i> Edit
+                        </button>
+                    </div>
                 </div>
-                <div class="flex items-center space-x-2">
-                    <span class="text-yellow-600 font-semibold px-3 py-1 bg-yellow-100 rounded-full text-sm">On Break</span>
-                     ${endBreakButton}
+            `;
+        }).join('');
+        
+        html += `
+            <div class="border rounded-lg shadow-sm mb-6">
+                <div class="p-4 bg-yellow-50 border-b rounded-t-lg">
+                    <div class="flex justify-between items-center">
+                        <div>
+                            <h3 class="font-bold text-lg text-gray-800">${tutorGroup.tutorName}</h3>
+                            <p class="text-sm text-gray-600">${tutorGroup.tutorEmail || 'No email'}</p>
+                        </div>
+                        <span class="bg-yellow-200 text-yellow-800 px-3 py-1 rounded-full text-sm font-medium">
+                            ${tutorGroup.students.length} student${tutorGroup.students.length !== 1 ? 's' : ''} on break
+                        </span>
+                    </div>
+                </div>
+                <div class="space-y-3 p-4">
+                    ${studentItems}
                 </div>
             </div>
         `;
-    }).join('');
+    });
+    
+    listContainer.innerHTML = html;
+    
+    // Add event listeners for End Break buttons
     if (canEndBreak) {
         document.querySelectorAll('.end-break-btn').forEach(button => {
             button.addEventListener('click', async (e) => {
                 const studentId = e.target.dataset.studentId;
-                if (confirm("Are you sure you want to end the summer break for this student?")) {
+                const studentName = e.target.dataset.studentName;
+                
+                if (confirm(`Are you sure you want to end the summer break for ${studentName}?`)) {
                     try {
-                        await updateDoc(doc(db, "students", studentId), { summerBreak: false, lastBreakEnd: Timestamp.now() });
-                        document.getElementById('break-status-message').textContent = `Break ended successfully.`;
-                        document.getElementById('break-status-message').className = 'text-center font-semibold mb-4 text-green-600';
+                        // Show loading state on the button
+                        const originalText = e.target.innerHTML;
+                        e.target.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> Ending...';
+                        e.target.disabled = true;
+                        
+                        // Update in Firestore
+                        await updateDoc(doc(db, "students", studentId), { 
+                            summerBreak: false, 
+                            lastBreakEnd: Timestamp.now(),
+                            lastUpdated: Timestamp.now()
+                        });
+                        
+                        // Show success message
+                        const statusMessage = document.getElementById('break-status-message');
+                        statusMessage.textContent = `✅ Summer break ended successfully for ${studentName}`;
+                        statusMessage.className = 'text-center font-semibold mb-4 text-green-600 p-3 bg-green-50 rounded-lg';
+                        statusMessage.classList.remove('hidden');
+                        
+                        // Hide message after 3 seconds
+                        setTimeout(() => {
+                            statusMessage.classList.add('hidden');
+                        }, 3000);
+                        
+                        // Update cache and re-render
                         invalidateCache('breakStudents');
-                        fetchAndRenderBreakStudents();
+                        invalidateCache('students');
+                        invalidateCache('tutorAssignments');
+                        
+                        // Re-fetch and render with current search term
+                        const currentSearch = document.getElementById('break-search').value;
+                        await fetchAndRenderBreakStudents(true);
+                        
+                        // Re-apply search filter if there's a search term
+                        if (currentSearch) {
+                            document.getElementById('break-search').value = currentSearch;
+                            renderBreakStudentsFromCache(currentSearch);
+                        }
+                        
                     } catch (error) {
                         console.error("Error ending summer break:", error);
-                        document.getElementById('break-status-message').textContent = "Failed to end summer break.";
-                        document.getElementById('break-status-message').className = 'text-center font-semibold mb-4 text-red-600';
+                        
+                        // Show error message
+                        const statusMessage = document.getElementById('break-status-message');
+                        statusMessage.textContent = `❌ Failed to end summer break: ${error.message}`;
+                        statusMessage.className = 'text-center font-semibold mb-4 text-red-600 p-3 bg-red-50 rounded-lg';
+                        statusMessage.classList.remove('hidden');
+                        
+                        // Hide message after 5 seconds
+                        setTimeout(() => {
+                            statusMessage.classList.add('hidden');
+                        }, 5000);
+                        
+                        // Restore button state
+                        e.target.innerHTML = originalText;
+                        e.target.disabled = false;
                     }
                 }
             });
@@ -4556,3 +4750,4 @@ onAuthStateChanged(auth, async (user) => {
         window.location.href = "management-auth.html";
     }
 });
+
