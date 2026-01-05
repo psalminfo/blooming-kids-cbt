@@ -3,13 +3,12 @@ import { collection, getDocs, doc, getDoc, where, query, orderBy, Timestamp, wri
 import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-auth.js";
 import { onSnapshot } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
 
-// ##################################
-// # SESSION CACHE & STATE (NOW PERSISTENT)
-// ##################################
+// ======================================================
+// SECTION 1: CACHE MANAGEMENT
+// ======================================================
 
 const CACHE_PREFIX = 'management_cache_';
 
-// The in-memory cache that will be populated from localStorage on load.
 const sessionCache = {
     tutors: null,
     students: null,
@@ -24,29 +23,20 @@ const sessionCache = {
     archivedStudents: null
 };
 
-/**
- * Saves a specific piece of data to localStorage.
- * @param {string} key The key for the cache (e.g., 'tutors').
- * @param {any} data The data to store.
- */
 function saveToLocalStorage(key, data) {
-    // Don't cache reports to avoid quota issues
     if (key === 'reports' || key === 'enrollments' || key === 'tutorAssignments') {
-        sessionCache[key] = data; // Keep in memory only
+        sessionCache[key] = data;
         return;
     }
     
     try {
         localStorage.setItem(CACHE_PREFIX + key, JSON.stringify(data));
-        sessionCache[key] = data; // Also update the in-memory cache
+        sessionCache[key] = data;
     } catch (error) {
         console.error("Could not save to localStorage:", error);
     }
 }
 
-/**
- * Loads all cached data from localStorage into the sessionCache object.
- */
 function loadFromLocalStorage() {
     for (const key in sessionCache) {
         try {
@@ -56,1544 +46,565 @@ function loadFromLocalStorage() {
             }
         } catch (error) {
             console.error(`Could not load '${key}' from localStorage:`, error);
-            localStorage.removeItem(CACHE_PREFIX + key); // Clear corrupted data
+            localStorage.removeItem(CACHE_PREFIX + key);
         }
     }
 }
 
-/**
- * Invalidates (clears) a specific cache from memory and localStorage.
- * @param {string} key The key of the cache to clear.
- */
 function invalidateCache(key) {
     sessionCache[key] = null;
     localStorage.removeItem(CACHE_PREFIX + key);
 }
 
-// Load any persisted data as soon as the script runs
 loadFromLocalStorage();
 
-// Session-level state for the Pay Advice gift feature.
 let payAdviceGifts = {};
 let currentPayData = [];
-
-// Pagination state for reports
 let reportsLastVisible = null;
 let reportsFirstVisible = null;
 let currentReportsPage = 1;
 
-// Utility function to capitalize strings
 function capitalize(str) {
     if (!str) return '';
     return str.replace(/\b\w/g, l => l.toUpperCase());
 }
 
-// ### UPDATED FUNCTION ###
-// Utility function to convert data to CSV, now includes gift and final pay details
-function convertPayAdviceToCSV(data) {
-    const header = [
-        'Tutor Name', 'Student Count', 'Total Student Fees (₦)', 'Management Fee (₦)', 'Total Pay (₦)',
-        'Gift (₦)', 'Final Pay (₦)', 'Beneficiary Bank', 'Beneficiary Account', 'Beneficiary Name'
-    ];
-    const rows = data.map(item => {
-        const giftAmount = payAdviceGifts[item.tutorEmail] || 0;
-        const finalPay = item.totalPay + giftAmount;
-        return [
-            `"${item.tutorName}"`,
-            item.studentCount,
-            item.totalStudentFees,
-            item.managementFee,
-            item.totalPay,
-            giftAmount,
-            finalPay,
-            `"${item.beneficiaryBank || 'N/A'}"`,
-            `"${item.beneficiaryAccount || 'N/A'}"`,
-            `"${item.beneficiaryName || 'N/A'}"`
-        ];
-    });
-    return [header.join(','), ...rows.map(row => row.join(','))].join('\n');
-}
-
-// ##################################
-// # ACTION HANDLER FUNCTIONS
-// ##################################
-
-async function handleEditStudent(studentId) {
-    try {
-        const studentDoc = await getDoc(doc(db, "students", studentId));
-        if (!studentDoc.exists()) {
-            alert("Student not found!");
-            return;
-        }
-        const studentData = studentDoc.data();
-        showEditStudentModal(studentId, studentData, "students");
-    } catch (error) {
-        console.error("Error fetching student for edit: ", error);
-        alert("Error fetching student data. Check the console for details.");
-    }
-}
-
-async function handleEditPendingStudent(studentId) {
-    try {
-        const studentDoc = await getDoc(doc(db, "pending_students", studentId));
-        if (!studentDoc.exists()) {
-            alert("Pending student not found!");
-            return;
-        }
-        const studentData = studentDoc.data();
-        showEditStudentModal(studentId, studentData, "pending_students");
-    } catch (error) {
-        console.error("Error fetching pending student for edit: ", error);
-        alert("Error fetching student data. Check the console for details.");
-    }
-}
-
-function showEditStudentModal(studentId, studentData, collectionName) {
-    const modalHtml = `
-        <div id="edit-modal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-center justify-center">
-            <div class="relative p-8 bg-white w-96 max-w-lg rounded-lg shadow-xl">
-                <button class="absolute top-2 right-2 text-gray-500 hover:text-gray-800 text-2xl font-bold" onclick="closeManagementModal('edit-modal')">&times;</button>
-                <h3 class="text-xl font-bold mb-4">Edit Student Details</h3>
-                <form id="edit-student-form">
-                    <input type="hidden" id="edit-student-id" value="${studentId}">
-                    <input type="hidden" id="edit-collection-name" value="${collectionName}">
-                    <div class="mb-2"><label class="block text-sm font-medium">Student Name</label><input type="text" id="edit-studentName" value="${studentData.studentName}" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2"></div>
-                    <div class="mb-2"><label class="block text-sm font-medium">Student Grade</label><input type="text" id="edit-grade" value="${studentData.grade}" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2"></div>
-                    <div class="mb-2"><label class="block text-sm font-medium">Days/Week</label><input type="text" id="edit-days" value="${studentData.days || ''}" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2"></div>
-                    <div class="mb-2"><label class="block text-sm font-medium">Subjects (comma-separated)</label><input type="text" id="edit-subjects" value="${studentData.subjects ? studentData.subjects.join(', ') : ''}" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2"></div>
-                    <div class="mb-2"><label class="block text-sm font-medium">Parent Name</label><input type="text" id="edit-parentName" value="${studentData.parentName || ''}" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2"></div>
-                    <div class="mb-2"><label class="block text-sm font-medium">Parent Phone</label><input type="text" id="edit-parentPhone" value="${studentData.parentPhone || ''}" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2"></div>
-                    <div class="mb-2"><label class="block text-sm font-medium">Parent Email</label><input type="email" id="edit-parentEmail" value="${studentData.parentEmail || ''}" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2"></div>
-                    <div class="mb-2"><label class="block text-sm font-medium">Tutor Email</label><input type="email" id="edit-tutorEmail" value="${studentData.tutorEmail || ''}" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2"></div>
-                    <div class="mb-4"><label class="block text-sm font-medium">Student Fee (₦)</label><input type="number" id="edit-studentFee" value="${studentData.studentFee || 0}" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2"></div>
-                    <div class="flex justify-end mt-4">
-                        <button type="button" onclick="closeManagementModal('edit-modal')" class="mr-2 px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300">Cancel</button>
-                        <button type="submit" class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700">Save Changes</button>
-                    </div>
-                </form>
-            </div>
-        </div>
-    `;
-    document.body.insertAdjacentHTML('beforeend', modalHtml);
-
-    document.getElementById('edit-student-form').addEventListener('submit', async (e) => {
-        e.preventDefault();
-
-        const form = e.target;
-        const saveBtn = form.querySelector('button[type="submit"]');
-        saveBtn.disabled = true;
-        saveBtn.textContent = 'Saving...';
-
-        const updatedData = {
-            studentName: form.querySelector('#edit-studentName').value,
-            grade: form.querySelector('#edit-grade').value,
-            days: form.querySelector('#edit-days').value,
-            subjects: form.querySelector('#edit-subjects').value.split(',').map(s => s.trim()).filter(s => s.length > 0),
-            parentName: form.querySelector('#edit-parentName').value,
-            parentPhone: form.querySelector('#edit-parentPhone').value,
-            parentEmail: form.querySelector('#edit-parentEmail').value,
-            tutorEmail: form.querySelector('#edit-tutorEmail').value,
-            studentFee: Number(form.querySelector('#edit-studentFee').value) || 0,
-            lastUpdated: Timestamp.now(),
-        };
-
-        try {
-            const studentRef = doc(db, collectionName, studentId);
-            await updateDoc(studentRef, updatedData);
-            alert("Student data updated successfully!");
-            closeManagementModal('edit-modal');
-            
-            // Invalidate the cache to force a refresh of the main view
-            if (collectionName === 'students') {
-                invalidateCache('students');
-                invalidateCache('tutorAssignments');
-            }
-            if (collectionName === 'pending_students') invalidateCache('pendingStudents');
-            
-            // Re-load the current view to show changes
-            const currentNavId = document.querySelector('.nav-item.active')?.dataset.navId;
-            const mainContent = document.getElementById('main-content');
-            if (currentNavId && allNavItems[currentNavId] && mainContent) {
-                allNavItems[currentNavId].fn(mainContent);
-            }
-
-        } catch (error) {
-            console.error("Error updating document: ", error);
-            alert("Failed to update student data. Check console for details.");
-            saveBtn.disabled = false;
-            saveBtn.textContent = 'Save Changes';
-        }
-    });
-}
-
-function showAssignStudentModal() {
-    // Get only active tutors (not inactive or on leave)
-    const tutors = sessionCache.tutors || [];
-    const activeTutors = tutors.filter(tutor => 
-        !tutor.status || tutor.status === 'active'
-    );
-    
-    if (activeTutors.length === 0) {
-        alert("No active tutors available. Please refresh the directory and try again.");
-        return;
-    }
-
-    const tutorOptions = activeTutors
-        .sort((a, b) => a.name.localeCompare(b.name))
-        .map(tutor => `<option value='${JSON.stringify({email: tutor.email, name: tutor.name})}'>${tutor.name} (${tutor.email})</option>`)
-        .join('');
-
-    const modalHtml = `
-        <div id="assign-modal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-center justify-center">
-            <div class="relative p-8 bg-white w-96 max-w-lg rounded-lg shadow-xl">
-                <button class="absolute top-2 right-2 text-gray-500 hover:text-gray-800 text-2xl font-bold" onclick="closeManagementModal('assign-modal')">&times;</button>
-                <h3 class="text-xl font-bold mb-4">Assign New Student</h3>
-                <form id="assign-student-form">
-                    <div class="mb-2">
-                        <label class="block text-sm font-medium">Assign to Tutor</label>
-                        <select id="assign-tutor" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2">
-                            <option value="" disabled selected>Select a tutor...</option>
-                            ${tutorOptions}
-                        </select>
-                    </div>
-                    <div class="mb-2"><label class="block text-sm font-medium">Student Name</label><input type="text" id="assign-studentName" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2"></div>
-                    <div class="mb-2"><label class="block text-sm font-medium">Student Grade</label><input type="text" id="assign-grade" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2"></div>
-                    <div class="mb-2"><label class="block text-sm font-medium">Days/Week</label><input type="text" id="assign-days" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2"></div>
-                    <div class="mb-2"><label class="block text-sm font-medium">Subjects (comma-separated)</label><input type="text" id="assign-subjects" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2"></div>
-                    <div class="mb-2"><label class="block text-sm font-medium">Parent Name</label><input type="text" id="assign-parentName" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2"></div>
-                    <div class="mb-2"><label class="block text-sm font-medium">Parent Phone</label><input type="text" id="assign-parentPhone" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2"></div>
-                    <div class="mb-2"><label class="block text-sm font-medium">Student Fee (₦)</label><input type="number" id="assign-studentFee" required value="0" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2"></div>
-                    <div class="flex justify-end mt-4">
-                        <button type="button" onclick="closeManagementModal('assign-modal')" class="mr-2 px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300">Cancel</button>
-                        <button type="submit" class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700">Assign Student</button>
-                    </div>
-                </form>
-            </div>
-        </div>
-    `;
-    document.body.insertAdjacentHTML('beforeend', modalHtml);
-    document.getElementById('assign-student-form').addEventListener('submit', async (e) => {
-        e.preventDefault();
-        const form = e.target;
-        const selectedTutorData = JSON.parse(form.elements['assign-tutor'].value);
-
-        const newStudentData = {
-            studentName: form.elements['assign-studentName'].value,
-            grade: form.elements['assign-grade'].value,
-            days: form.elements['assign-days'].value,
-            subjects: form.elements['assign-subjects'].value.split(',').map(s => s.trim()).filter(s => s),
-            parentName: form.elements['assign-parentName'].value,
-            parentPhone: form.elements['assign-parentPhone'].value,
-            studentFee: Number(form.elements['assign-studentFee'].value) || 0,
-            tutorEmail: selectedTutorData.email,
-            tutorName: selectedTutorData.name,
-            status: 'approved',
-            summerBreak: false,
-            createdAt: Timestamp.now(),
-            tutorHistory: [{
-                tutorEmail: selectedTutorData.email,
-                tutorName: selectedTutorData.name,
-                assignedDate: Timestamp.now(),
-                assignedBy: window.userData?.email || 'management',
-                isCurrent: true
-            }],
-            gradeHistory: [{
-                grade: form.elements['assign-grade'].value,
-                changedDate: Timestamp.now(),
-                changedBy: window.userData?.email || 'management'
-            }]
-        };
-
-        try {
-            await addDoc(collection(db, "students"), newStudentData);
-            alert(`Student "${newStudentData.studentName}" assigned successfully to ${newStudentData.tutorName}!`);
-            closeManagementModal('assign-modal');
-            invalidateCache('students');
-            invalidateCache('tutorAssignments');
-            renderManagementTutorView(document.getElementById('main-content'));
-        } catch (error) {
-            console.error("Error assigning student: ", error);
-            alert("Failed to assign student. Check the console for details.");
-        }
-    });
-}
-
-// NEW FUNCTION: Reassign Student Modal
-function showReassignStudentModal() {
-    // Get only active tutors (not inactive or on leave)
-    const tutors = sessionCache.tutors || [];
-    const activeTutors = tutors.filter(tutor => 
-        !tutor.status || tutor.status === 'active'
-    );
-    
-    if (activeTutors.length === 0) {
-        alert("No active tutors available. Please refresh the directory and try again.");
-        return;
-    }
-
-    const tutorOptions = activeTutors
-        .sort((a, b) => a.name.localeCompare(b.name))
-        .map(tutor => `<option value='${JSON.stringify({email: tutor.email, name: tutor.name})}'>${tutor.name} (${tutor.email})</option>`)
-        .join('');
-
-    const modalHtml = `
-        <div id="reassign-modal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-center justify-center">
-            <div class="relative p-8 bg-white w-96 max-w-lg rounded-lg shadow-xl">
-                <button class="absolute top-2 right-2 text-gray-500 hover:text-gray-800 text-2xl font-bold" onclick="closeManagementModal('reassign-modal')">&times;</button>
-                <h3 class="text-xl font-bold mb-4">Reassign Student to Different Tutor</h3>
-                <form id="reassign-student-form">
-                    <div class="mb-2">
-                        <label class="block text-sm font-medium">Search Student Name</label>
-                        <input type="text" id="reassign-student-search" placeholder="Enter student name..." class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2">
-                        <button type="button" id="search-student-btn" class="mt-2 bg-blue-500 text-white px-3 py-1 rounded text-sm">Search Student</button>
-                    </div>
-                    <div id="student-search-results" class="mb-4 max-h-40 overflow-y-auto border rounded-md p-2 hidden">
-                        <p class="text-sm text-gray-500">Search results will appear here...</p>
-                    </div>
-                    <div class="mb-2">
-                        <label class="block text-sm font-medium">Assign to New Tutor</label>
-                        <select id="reassign-tutor" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2">
-                            <option value="" disabled selected>Select new tutor...</option>
-                            ${tutorOptions}
-                        </select>
-                    </div>
-                    <input type="hidden" id="selected-student-id">
-                    <div class="flex justify-end mt-4">
-                        <button type="button" onclick="closeManagementModal('reassign-modal')" class="mr-2 px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300">Cancel</button>
-                        <button type="submit" class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700">Reassign Student</button>
-                    </div>
-                </form>
-            </div>
-        </div>
-    `;
-    document.body.insertAdjacentHTML('beforeend', modalHtml);
-
-    // Search student functionality
-    document.getElementById('search-student-btn').addEventListener('click', async () => {
-        const searchTerm = document.getElementById('reassign-student-search').value.trim();
-        if (!searchTerm) {
-            alert("Please enter a student name to search.");
-            return;
-        }
-
-        try {
-            // Get only active students (not archived, graduated, or transferred)
-            const studentsSnapshot = await getDocs(collection(db, "students"));
-            const allStudents = studentsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-            const activeStudents = allStudents.filter(student => 
-                !student.status || student.status === 'active' || student.status === 'approved'
-            );
-            
-            const searchResults = activeStudents.filter(student => 
-                student.studentName.toLowerCase().includes(searchTerm.toLowerCase())
-            );
-
-            const resultsContainer = document.getElementById('student-search-results');
-            resultsContainer.classList.remove('hidden');
-            
-            if (searchResults.length === 0) {
-                resultsContainer.innerHTML = '<p class="text-sm text-gray-500">No active students found matching your search.</p>';
-                return;
-            }
-
-            resultsContainer.innerHTML = searchResults.map(student => `
-                <div class="p-2 border-b cursor-pointer hover:bg-gray-50 student-result" data-student-id="${student.id}" data-student-name="${student.studentName}" data-current-tutor="${student.tutorEmail}">
-                    <p class="font-medium">${student.studentName}</p>
-                    <p class="text-xs text-gray-500">Current Tutor: ${student.tutorEmail} | Grade: ${student.grade}</p>
-                </div>
-            `).join('');
-
-            // Add click handlers for search results
-            document.querySelectorAll('.student-result').forEach(result => {
-                result.addEventListener('click', () => {
-                    const studentId = result.dataset.studentId;
-                    const studentName = result.dataset.studentName;
-                    const currentTutor = result.dataset.currentTutor;
-                    
-                    document.getElementById('selected-student-id').value = studentId;
-                    document.getElementById('reassign-student-search').value = studentName;
-                    
-                    // Highlight selected result
-                    document.querySelectorAll('.student-result').forEach(r => r.classList.remove('bg-blue-100'));
-                    result.classList.add('bg-blue-100');
-                    
-                    alert(`Selected: ${studentName} (Currently with: ${currentTutor})`);
-                });
-            });
-
-        } catch (error) {
-            console.error("Error searching students:", error);
-            alert("Failed to search students. Check console for details.");
-        }
-    });
-
-    // Reassign form submission
-    document.getElementById('reassign-student-form').addEventListener('submit', async (e) => {
-        e.preventDefault();
-        const form = e.target;
-        const studentId = document.getElementById('selected-student-id').value;
-        const selectedTutorData = JSON.parse(form.elements['reassign-tutor'].value);
-
-        if (!studentId) {
-            alert("Please select a student from the search results.");
-            return;
-        }
-
-        try {
-            const studentRef = doc(db, "students", studentId);
-            const studentDoc = await getDoc(studentRef);
-            
-            if (!studentDoc.exists()) {
-                alert("Student not found!");
-                return;
-            }
-
-            const studentData = studentDoc.data();
-            const oldTutor = studentData.tutorEmail;
-            const newTutor = selectedTutorData.email;
-
-            // Get existing tutor history
-            const existingHistory = studentData.tutorHistory || [];
-            
-            // Mark current tutor as not current
-            const updatedHistory = existingHistory.map(entry => ({
-                ...entry,
-                isCurrent: false
-            }));
-            
-            // Add new tutor assignment to history
-            updatedHistory.push({
-                tutorEmail: newTutor,
-                tutorName: selectedTutorData.name,
-                assignedDate: Timestamp.now(),
-                assignedBy: window.userData?.email || 'management',
-                isCurrent: true,
-                previousTutor: oldTutor
-            });
-
-            await updateDoc(studentRef, {
-                tutorEmail: newTutor,
-                tutorName: selectedTutorData.name,
-                lastUpdated: Timestamp.now(),
-                tutorHistory: updatedHistory
-            });
-
-            alert(`Student "${studentData.studentName}" reassigned from ${oldTutor} to ${selectedTutorData.name} successfully!`);
-            closeManagementModal('reassign-modal');
-            invalidateCache('students');
-            invalidateCache('tutorAssignments');
-            renderManagementTutorView(document.getElementById('main-content'));
-
-        } catch (error) {
-            console.error("Error reassigning student:", error);
-            alert("Failed to reassign student. Check the console for details.");
-        }
-    });
-}
-
-async function handleDeleteStudent(studentId) {
-    if (confirm("Are you sure you want to delete this student? This action cannot be undone.")) {
-        try {
-            await deleteDoc(doc(db, "students", studentId));
-            alert("Student deleted successfully!");
-            invalidateCache('students');
-            invalidateCache('tutorAssignments');
-            renderManagementTutorView(document.getElementById('main-content'));
-        } catch (error) {
-            console.error("Error removing student: ", error);
-            alert("Error deleting student. Check the console for details.");
-        }
-    }
-}
-
-async function handleApproveStudent(studentId) {
-    if (confirm("Are you sure you want to approve this student?")) {
-        try {
-            const studentRef = doc(db, "pending_students", studentId);
-            const studentDoc = await getDoc(studentRef);
-            if (!studentDoc.exists()) {
-                alert("Student not found.");
-                return;
-            }
-            const studentData = studentDoc.data();
-            const batch = writeBatch(db);
-            const newStudentRef = doc(db, "students", studentId);
-            
-            // Prepare student data with tutor history
-            const studentWithHistory = {
-                ...studentData,
-                status: 'approved',
-                tutorHistory: [{
-                    tutorEmail: studentData.tutorEmail,
-                    tutorName: studentData.tutorName || studentData.tutorEmail,
-                    assignedDate: Timestamp.now(),
-                    assignedBy: window.userData?.email || 'management',
-                    isCurrent: true
-                }],
-                gradeHistory: [{
-                    grade: studentData.grade || 'Unknown',
-                    changedDate: Timestamp.now(),
-                    changedBy: window.userData?.email || 'management'
-                }]
-            };
-            
-            batch.set(newStudentRef, studentWithHistory);
-            batch.delete(studentRef);
-            await batch.commit();
-            alert("Student approved successfully!");
-            invalidateCache('pendingStudents');
-            invalidateCache('students');
-            invalidateCache('tutorAssignments');
-            renderPendingApprovalsPanel(document.getElementById('main-content'));
-        } catch (error) {
-            console.error("Error approving student: ", error);
-            alert("Error approving student. Check the console for details.");
-        }
-    }
-}
-
-async function handleRejectStudent(studentId) {
-    if (confirm("Are you sure you want to reject this student? This will delete their entry.")) {
-        try {
-            await deleteDoc(doc(db, "pending_students", studentId));
-            alert("Student rejected successfully!");
-            invalidateCache('pendingStudents');
-            renderPendingApprovalsPanel(document.getElementById('main-content'));
-        } catch (error) {
-            console.error("Error rejecting student: ", error);
-            alert("Error rejecting student. Check the console for details.");
-        }
-    }
-}
-
-// ##################################
-// # REFERRAL MANAGEMENT FUNCTIONS - FIXED
-// ##################################
-
-/**
- * Utility function to format amount to Nigerian Naira.
- */
 function formatNaira(amount) {
     return `₦${(amount || 0).toLocaleString()}`;
 }
 
-/**
- * FIXED: Simple function to get parent name from parent_users collection
- */
-async function getParentNameFromParentUsers(parentUid) {
-    try {
-        if (!parentUid) return 'Unknown Parent';
-        
-        const parentDoc = await getDoc(doc(db, 'parent_users', parentUid));
-        if (parentDoc.exists()) {
-            const parentData = parentDoc.data();
-            // Try parentName first, then name, then fallback to email
-            return capitalize(parentData.parentName || parentData.name || parentData.email || 'Unknown Parent');
-        }
-        return 'Unknown Parent';
-    } catch (error) {
-        console.error("Error fetching parent name:", error);
-        return 'Unknown Parent';
-    }
-}
+// ======================================================
+// SECTION 2: DASHBOARD PANEL
+// ======================================================
 
-/**
- * FIXED: Loads the Referral Tracking dashboard with proper parent names
- */
-async function renderReferralsAdminPanel(container) {
-    container.innerHTML = '<div class="text-center py-8"><div class="loading-spinner mx-auto" style="width: 40px; height: 40px;"></div><p class="text-green-600 font-semibold mt-4">Loading referral tracking data...</p></div>';
-
-    try {
-        // 1. Fetch all parents with referral codes
-        const parentsQuery = query(collection(db, 'parent_users'), where('referralCode', '!=', null));
-        const parentsSnapshot = await getDocs(parentsQuery);
-
-        const referralDataMap = {};
-
-        // 2. Process Parents - use parentName directly from parent_users
-        for (const parentDoc of parentsSnapshot.docs) {
-            const data = parentDoc.data();
-            const parentUid = parentDoc.id;
-            
-            // Get parent name from parent_users collection directly
-            const parentName = capitalize(data.parentName || data.name || data.email || 'Unknown Parent');
-            
-            referralDataMap[parentUid] = {
-                uid: parentUid,
-                name: parentName,
-                email: data.email || 'N/A',
-                referralCode: data.referralCode || 'N/A',
-                referralEarnings: data.referralEarnings || 0,
-                bankName: data.bankName || 'N/A',
-                accountNumber: data.accountNumber || 'N/A',
-                totalReferrals: 0,
-                pendingReferrals: 0,
-                approvedReferrals: 0,
-                paidReferrals: 0,
-                transactions: []
-            };
-        }
-
-        // 3. Fetch transactions to count referrals
-        const transactionsSnapshot = await getDocs(collection(db, 'referral_transactions'));
-        
-        transactionsSnapshot.forEach(doc => {
-            const data = doc.data();
-            const ownerUid = data.ownerUid;
-            if (referralDataMap[ownerUid]) {
-                const parentData = referralDataMap[ownerUid];
-                parentData.totalReferrals++;
-                parentData.transactions.push({
-                    id: doc.id,
-                    ...data,
-                    refereeJoinDate: data.refereeJoinDate ? data.refereeJoinDate.toDate().toLocaleDateString() : 'N/A'
-                });
-
-                const status = data.status || 'pending';
-                if (status === 'pending') parentData.pendingReferrals++;
-                else if (status === 'approved') parentData.approvedReferrals++;
-                else if (status === 'paid') parentData.paidReferrals++;
-            }
-        });
-
-        // Store in cache
-        saveToLocalStorage('referralDataMap', referralDataMap);
-
-        // 4. Render HTML
-        let tableRows = '';
-        const sortedParents = Object.values(referralDataMap).sort((a, b) => b.referralEarnings - a.referralEarnings);
-
-        if (sortedParents.length === 0) {
-            tableRows = `<tr><td colspan="6" class="text-center py-4 text-gray-500">No parents in the referral system yet.</td></tr>`;
-        } else {
-            sortedParents.forEach(parent => {
-                tableRows += `
-                    <tr class="border-b hover:bg-gray-50">
-                        <td class="px-6 py-4 font-medium text-gray-900">${parent.name}</td>
-                        <td class="px-6 py-4">
-                            <span class="font-mono bg-gray-100 px-2 py-1 rounded">${parent.referralCode}</span>
-                        </td>
-                        <td class="px-6 py-4 text-center">${parent.totalReferrals}</td>
-                        <td class="px-6 py-4 text-center text-yellow-600 font-semibold">${parent.pendingReferrals}</td>
-                        <td class="px-6 py-4 font-bold text-green-600">${formatNaira(parent.referralEarnings)}</td>
-                        <td class="px-6 py-4 text-right">
-                            <button onclick="showReferralDetailsModal('${parent.uid}')" class="text-indigo-600 hover:text-indigo-900 font-semibold">View Details</button>
-                        </td>
-                    </tr>
-                `;
-            });
-        }
-
-        container.innerHTML = `
-            <div class="bg-white p-6 rounded-lg shadow-md">
-                <h2 class="text-3xl font-extrabold text-gray-900 mb-6">Parent Referral Management</h2>
-                <p class="text-gray-600 mb-6">Track referral activity and manage payouts for parent-led referrals.</p>
-
-                <div class="bg-white shadow overflow-hidden sm:rounded-lg">
-                    <table class="min-w-full divide-y divide-gray-200">
-                        <thead class="bg-gray-50">
-                            <tr>
-                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Parent Name</th>
-                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Code</th>
-                                <th scope="col" class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Total Referrals</th>
-                                <th scope="col" class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Pending Approvals</th>
-                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total Earnings</th>
-                                <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody class="bg-white divide-y divide-gray-200">
-                            ${tableRows}
-                        </tbody>
-                    </table>
-                </div>
-                <p class="text-sm text-gray-500 mt-4">Note: Earnings reflect rewards for approved (non-paid) and paid transactions.</p>
-            </div>
-        `;
-
-        window.showReferralDetailsModal = showReferralDetailsModal;
-    } catch (error) {
-        console.error("Error loading referral data: ", error);
-        container.innerHTML = `<p class="text-center mt-12 text-red-600">Error loading referral data: ${error.message}</p>`;
-    }
-}
-
-/**
- * Displays a modal with detailed transaction history for a specific parent.
- * @param {string} parentUid The UID of the parent user.
- */
-function showReferralDetailsModal(parentUid) {
-    const parentData = sessionCache.referralDataMap[parentUid];
-    if (!parentData) {
-        alert("Referral details not found in cache.");
-        return;
-    }
-    
-    // Sort transactions: pending first, then approved, then paid
-    const sortedTransactions = parentData.transactions.sort((a, b) => {
-        const statusOrder = { 'pending': 1, 'approved': 2, 'paid': 3 };
-        return statusOrder[a.status] - statusOrder[b.status];
-    });
-
-    let transactionsHtml = sortedTransactions.map(t => {
-        const badgeClass = t.status === 'approved' ? 'bg-green-100 text-green-800' :
-                           t.status === 'paid' ? 'bg-indigo-100 text-indigo-800' :
-                           'bg-yellow-100 text-yellow-800';
-        
-        const actionButton = (t.status === 'pending' || t.status === 'approved') ?
-            `<button onclick="updateReferralStatus('${parentData.uid}', '${t.id}', 'approved')" class="text-green-600 hover:text-green-900 font-semibold mr-2 text-sm">${t.status === 'pending' ? 'Approve' : 'Re-Approve'}</button>` :
-            '';
-
-        return `
-            <tr class="border-b">
-                <td class="px-4 py-3">${capitalize(t.refereeName)} (Grade: ${t.refereeGrade})</td>
-                <td class="px-4 py-3">${formatNaira(t.amount)}</td>
-                <td class="px-4 py-3 text-xs">
-                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full font-medium ${badgeClass}">
-                        ${capitalize(t.status)}
-                    </span>
-                </td>
-                <td class="px-4 py-3 text-sm text-gray-500">${t.refereeJoinDate}</td>
-                <td class="px-4 py-3 text-right">
-                    ${actionButton}
-                </td>
-            </tr>
-        `;
-    }).join('');
-
-    const modalHtml = `
-        <div id="referralDetailsModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-center justify-center">
-            <div class="relative p-8 bg-white w-full max-w-4xl rounded-lg shadow-2xl">
-                <button class="absolute top-2 right-2 text-gray-500 hover:text-gray-800 text-2xl font-bold" onclick="closeManagementModal('referralDetailsModal')">&times;</button>
-                <h3 class="text-2xl font-bold mb-4 text-indigo-600">Referral Details for ${parentData.name}</h3>
-
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6 text-sm">
-                    <div class="bg-gray-50 p-3 rounded-lg"><p class="font-medium text-gray-500">Code:</p><p class="font-bold text-lg text-indigo-800">${parentData.referralCode}</p></div>
-                    <div class="bg-gray-50 p-3 rounded-lg"><p class="font-medium text-gray-500">Total Earnings:</p><p class="font-bold text-lg text-green-700">${formatNaira(parentData.referralEarnings)}</p></div>
-                    <div class="bg-gray-50 p-3 rounded-lg"><p class="font-medium text-gray-500">Unpaid Approved:</p><p class="font-bold text-lg text-yellow-600">${parentData.approvedReferrals - parentData.paidReferrals}</p></div>
-                    <div class="col-span-3">
-                        <p class="font-medium text-gray-500 mb-1">Payout Details:</p>
-                        <p class="text-gray-700">Bank: ${parentData.bankName} | Account: ${parentData.accountNumber}</p>
-                    </div>
-                </div>
-
-                <div class="flex justify-between items-center mb-4">
-                    <h4 class="text-xl font-semibold text-gray-700">Transaction History (${parentData.totalReferrals} Total)</h4>
-                    <button onclick="resetParentBalance('${parentData.uid}', ${parentData.referralEarnings})" 
-                            class="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 text-sm disabled:opacity-50"
-                            ${parentData.referralEarnings === 0 ? 'disabled' : ''}>
-                        Mark All Approved as PAID
-                    </button>
-                </div>
-
-                <div class="overflow-x-auto">
-                    <table class="min-w-full divide-y divide-gray-200">
-                        <thead class="bg-gray-50">
-                            <tr>
-                                <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Referee Details</th>
-                                <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Amount</th>
-                                <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                                <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Joined Date</th>
-                                <th class="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody class="bg-white divide-y divide-gray-100">
-                            ${transactionsHtml}
-                        </tbody>
-                    </table>
-                </div>
-
-            </div>
-        </div>
-    `;
-    document.body.insertAdjacentHTML('beforeend', modalHtml);
-
-    // Attach global functions to the window object
-    window.updateReferralStatus = updateReferralStatus;
-    window.resetParentBalance = resetParentBalance;
-}
-
-/**
- * Updates the status of a specific referral transaction.
- * @param {string} parentUid The UID of the parent.
- * @param {string} transactionId The ID of the referral transaction document.
- * @param {string} newStatus The new status to set ('approved' or 'paid').
- */
-async function updateReferralStatus(parentUid, transactionId, newStatus) {
-    if (!confirm(`Are you sure you want to set this transaction status to '${newStatus}'?`)) {
-        return;
-    }
-
-    try {
-        const batch = writeBatch(db);
-        const transactionRef = doc(db, 'referral_transactions', transactionId);
-        const parentRef = doc(db, 'parent_users', parentUid);
-
-        // Fetch the transaction to check its current state and amount
-        const transactionDoc = await getDoc(transactionRef);
-        if (!transactionDoc.exists()) {
-            alert('Transaction not found!');
-            return;
-        }
-        const oldStatus = transactionDoc.data().status;
-        const amount = transactionDoc.data().amount || 0;
-
-        // 1. Update the transaction status
-        batch.update(transactionRef, {
-            status: newStatus,
-            lastUpdated: Timestamp.now()
-        });
-
-        // 2. Adjust parent's referralEarnings if needed
-        let earningsChange = 0;
-        // If moving from 'pending' to 'approved', increase earnings
-        if (oldStatus === 'pending' && newStatus === 'approved') {
-            earningsChange = amount;
-        }
-        // If re-approving (e.g., approved -> approved), no change to earnings
-        // If paying (approved -> paid), earnings are cleared in the resetParentBalance function, not here.
-
-        if (earningsChange !== 0) {
-            const currentEarnings = sessionCache.referralDataMap[parentUid].referralEarnings;
-            batch.update(parentRef, {
-                referralEarnings: currentEarnings + earningsChange
-            });
-        }
-
-        await batch.commit();
-
-        alert(`Transaction status updated to ${capitalize(newStatus)}. Parent earnings adjusted.`);
-        
-        // Refresh the whole view
-        invalidateCache('referralDataMap');
-        closeManagementModal('referralDetailsModal');
-        await renderReferralsAdminPanel(document.getElementById('main-content'));
-
-    } catch (error) {
-        console.error("Error updating referral status: ", error);
-        alert("Failed to update status. Check console for details.");
-    }
-}
-
-/**
- * Clears the parent's referralEarnings and marks all 'approved' transactions as 'paid'.
- * @param {string} parentUid The UID of the parent.
- * @param {number} currentEarnings The parent's current referral earnings.
- */
-async function resetParentBalance(parentUid, currentEarnings) {
-    if (currentEarnings === 0) {
-        alert("This parent has zero approved earnings to pay out.");
-        return;
-    }
-
-    if (!confirm(`Are you sure you want to mark ALL ${formatNaira(currentEarnings)} approved earnings as PAID? This will reset the parent's available earnings to ₦0.`)) {
-        return;
-    }
-
-    try {
-        const batch = writeBatch(db);
-        const parentRef = doc(db, 'parent_users', parentUid);
-
-        // 1. Mark all 'approved' transactions for this parent as 'paid'
-        const approvedQuery = query(
-            collection(db, 'referral_transactions'),
-            where('ownerUid', '==', parentUid),
-            where('status', '==', 'approved')
-        );
-
-        const approvedSnapshot = await getDocs(approvedQuery);
-
-        approvedSnapshot.forEach(doc => {
-            const transactionRef = doc(db, 'referral_transactions', doc.id);
-            batch.update(transactionRef, {
-                status: 'paid',
-                paidDate: Timestamp.now(),
-                lastUpdated: Timestamp.now()
-            });
-        });
-
-        // 2. Reset the parent's earnings
-        batch.update(parentRef, {
-            referralEarnings: 0
-        });
-
-        await batch.commit();
-
-        alert(`Payout complete. ${approvedSnapshot.size} transactions marked as PAID. Parent earnings reset to ₦0.`);
-        
-        // Refresh the whole view
-        invalidateCache('referralDataMap');
-        closeManagementModal('referralDetailsModal');
-        await renderReferralsAdminPanel(document.getElementById('main-content'));
-
-    } catch (error) {
-        console.error("Error processing payout and reset: ", error);
-        alert("Failed to process payout. Check console for details.");
-    }
-}
-
-// ##################################
-// # ENROLLMENT MANAGEMENT PANEL
-// ##################################
-
-// Function to fetch tutor assignment history for students
-async function fetchTutorAssignmentHistory() {
-    try {
-        // Get only active students
-        const studentsSnapshot = await getDocs(query(collection(db, "students")));
-        const tutorAssignments = {};
-        
-        studentsSnapshot.docs.forEach(doc => {
-            const studentData = doc.data();
-            const studentId = doc.id;
-            
-            // Skip archived, graduated, or transferred students
-            if (studentData.status === 'archived' || studentData.status === 'graduated' || studentData.status === 'transferred') {
-                return;
-            }
-            
-            if (studentData.tutorHistory && Array.isArray(studentData.tutorHistory)) {
-                tutorAssignments[studentId] = {
-                    studentName: studentData.studentName,
-                    currentTutor: studentData.tutorEmail,
-                    currentTutorName: studentData.tutorName,
-                    tutorHistory: studentData.tutorHistory.sort((a, b) => {
-                        const dateA = a.assignedDate?.toDate?.() || new Date(0);
-                        const dateB = b.assignedDate?.toDate?.() || new Date(0);
-                        return dateB - dateA;
-                    }),
-                    gradeHistory: studentData.gradeHistory || []
-                };
-            } else if (studentData.tutorEmail) {
-                // Legacy data: create history from current tutor
-                tutorAssignments[studentId] = {
-                    studentName: studentData.studentName,
-                    currentTutor: studentData.tutorEmail,
-                    currentTutorName: studentData.tutorName,
-                    tutorHistory: [{
-                        tutorEmail: studentData.tutorEmail,
-                        tutorName: studentData.tutorName || studentData.tutorEmail,
-                        assignedDate: studentData.createdAt || Timestamp.now(),
-                        assignedBy: 'system',
-                        isCurrent: true
-                    }],
-                    gradeHistory: studentData.gradeHistory || [{
-                        grade: studentData.grade || 'Unknown',
-                        changedDate: studentData.createdAt || Timestamp.now(),
-                        changedBy: 'system'
-                    }]
-                };
-            }
-        });
-        
-        saveToLocalStorage('tutorAssignments', tutorAssignments);
-        return tutorAssignments;
-    } catch (error) {
-        console.error("Error fetching tutor assignment history:", error);
-        return {};
-    }
-}
-
-// Function to display tutor history for a student
-function showTutorHistoryModal(studentId, studentData, tutorAssignments) {
-    const studentHistory = tutorAssignments[studentId];
-    if (!studentHistory) {
-        alert("No tutor history found for this student.");
-        return;
-    }
-
-    const tutorHistoryHTML = studentHistory.tutorHistory.map((assignment, index) => {
-        const assignedDate = assignment.assignedDate?.toDate?.() || new Date();
-        const isCurrent = assignment.isCurrent ? '<span class="ml-2 bg-green-100 text-green-800 text-xs px-2 py-1 rounded-full">Current</span>' : '';
-        
-        return `
-            <tr class="hover:bg-gray-50">
-                <td class="px-4 py-3">${index + 1}</td>
-                <td class="px-4 py-3 font-medium">${assignment.tutorName || assignment.tutorEmail}</td>
-                <td class="px-4 py-3">${assignment.tutorEmail}</td>
-                <td class="px-4 py-3">${assignedDate.toLocaleDateString()}</td>
-                <td class="px-4 py-3">${assignment.assignedBy || 'System'}</td>
-                <td class="px-4 py-3">${isCurrent}</td>
-            </tr>
-        `;
-    }).join('');
-
-    const gradeHistoryHTML = studentHistory.gradeHistory.map((gradeChange, index) => {
-        const changedDate = gradeChange.changedDate?.toDate?.() || new Date();
-        
-        return `
-            <tr class="hover:bg-gray-50">
-                <td class="px-4 py-3">${index + 1}</td>
-                <td class="px-4 py-3 font-medium">${gradeChange.grade}</td>
-                <td class="px-4 py-3">${changedDate.toLocaleDateString()}</td>
-                <td class="px-4 py-3">${gradeChange.changedBy || 'System'}</td>
-            </tr>
-        `;
-    }).join('');
-
-    const modalHtml = `
-        <div id="tutorHistoryModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-center justify-center">
-            <div class="relative p-8 bg-white w-full max-w-6xl rounded-lg shadow-2xl">
-                <button class="absolute top-2 right-2 text-gray-500 hover:text-gray-800 text-2xl font-bold" onclick="closeManagementModal('tutorHistoryModal')">&times;</button>
-                <h3 class="text-2xl font-bold mb-4 text-blue-700">Tutor & Grade History for ${studentData.studentName}</h3>
-                
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-                    <div class="bg-blue-50 p-4 rounded-lg">
-                        <h4 class="font-bold text-lg mb-2 text-blue-800">Current Information</h4>
-                        <p><strong>Tutor:</strong> ${studentData.tutorName || studentData.tutorEmail}</p>
-                        <p><strong>Grade:</strong> ${studentData.grade || 'N/A'}</p>
-                        <p><strong>Subjects:</strong> ${Array.isArray(studentData.subjects) ? studentData.subjects.join(', ') : studentData.subjects || 'N/A'}</p>
-                        <p><strong>Days/Week:</strong> ${studentData.days || 'N/A'}</p>
-                    </div>
-                    <div class="bg-green-50 p-4 rounded-lg">
-                        <h4 class="font-bold text-lg mb-2 text-green-800">Parent Information</h4>
-                        <p><strong>Parent:</strong> ${studentData.parentName || 'N/A'}</p>
-                        <p><strong>Phone:</strong> ${studentData.parentPhone || 'N/A'}</p>
-                        <p><strong>Email:</strong> ${studentData.parentEmail || 'N/A'}</p>
-                        <p><strong>Fee:</strong> ₦${(studentData.studentFee || 0).toLocaleString()}</p>
-                    </div>
-                </div>
-                
-                <div class="mb-8">
-                    <h4 class="text-xl font-bold mb-4 text-gray-800">Tutor Assignment History</h4>
-                    <div class="overflow-x-auto">
-                        <table class="min-w-full divide-y divide-gray-200">
-                            <thead class="bg-gray-50">
-                                <tr>
-                                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">#</th>
-                                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Tutor Name</th>
-                                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Tutor Email</th>
-                                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Assigned Date</th>
-                                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Assigned By</th>
-                                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-                                </tr>
-                            </thead>
-                            <tbody class="bg-white divide-y divide-gray-200">
-                                ${tutorHistoryHTML}
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-                
-                <div>
-                    <h4 class="text-xl font-bold mb-4 text-gray-800">Grade Progression History</h4>
-                    <div class="overflow-x-auto">
-                        <table class="min-w-full divide-y divide-gray-200">
-                            <thead class="bg-gray-50">
-                                <tr>
-                                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">#</th>
-                                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Grade</th>
-                                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Changed Date</th>
-                                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Changed By</th>
-                                </tr>
-                            </thead>
-                            <tbody class="bg-white divide-y divide-gray-200">
-                                ${gradeHistoryHTML}
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-                
-                <div class="flex justify-end mt-6 pt-6 border-t">
-                    <button onclick="closeManagementModal('tutorHistoryModal')" class="px-4 py-2 bg-gray-300 text-gray-700 rounded hover:bg-gray-400">Close</button>
-                </div>
-            </div>
-        </div>
-    `;
-    
-    document.body.insertAdjacentHTML('beforeend', modalHtml);
-}
-
-// Enrollment panel
-async function renderEnrollmentsPanel(container) {
+async function renderDashboardPanel(container) {
     container.innerHTML = `
         <div class="bg-white p-6 rounded-lg shadow-md">
-            <div class="flex justify-between items-center mb-4">
-                <h2 class="text-2xl font-bold text-green-700">Enrollment Management</h2>
-                <div class="flex items-center gap-4">
-                    <input type="search" id="enrollments-search" placeholder="Search enrollments..." class="p-2 border rounded-md w-64">
-                    <button id="refresh-enrollments-btn" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Refresh</button>
-                </div>
-            </div>
+            <h2 class="text-2xl font-bold text-green-700 mb-6">Management Dashboard</h2>
             
-            <div class="flex space-x-4 mb-6">
-                <div class="bg-green-100 p-3 rounded-lg text-center shadow w-full">
-                    <h4 class="font-bold text-green-800 text-sm">Total Enrollments</h4>
-                    <p id="total-enrollments" class="text-2xl font-extrabold">0</p>
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+                <!-- Active Tutors Card -->
+                <div class="bg-gradient-to-r from-blue-50 to-blue-100 border border-blue-200 rounded-xl p-6 shadow-sm hover:shadow-md transition-shadow duration-300">
+                    <div class="flex items-center mb-4">
+                        <div class="w-12 h-12 bg-blue-500 rounded-lg flex items-center justify-center mr-4">
+                            <i class="fas fa-chalkboard-teacher text-white text-xl"></i>
+                        </div>
+                        <div>
+                            <h3 class="text-lg font-semibold text-blue-800">Active Tutors</h3>
+                            <p class="text-sm text-blue-600">Tutors with 'active' status</p>
+                        </div>
+                    </div>
+                    <div class="text-center">
+                        <p id="dashboard-active-tutors" class="text-4xl font-bold text-blue-700 mb-2">0</p>
+                        <div class="flex justify-center">
+                            <button onclick="refreshDashboardCache('tutors')" class="text-blue-600 hover:text-blue-800 text-sm font-medium">
+                                <i class="fas fa-sync-alt mr-1"></i> Refresh
+                            </button>
+                        </div>
+                    </div>
                 </div>
-                <div class="bg-yellow-100 p-3 rounded-lg text-center shadow w-full">
-                    <h4 class="font-bold text-yellow-800 text-sm">Draft Applications</h4>
-                    <p id="draft-enrollments" class="text-2xl font-extrabold">0</p>
+
+                <!-- Active Students Card -->
+                <div class="bg-gradient-to-r from-green-50 to-green-100 border border-green-200 rounded-xl p-6 shadow-sm hover:shadow-md transition-shadow duration-300">
+                    <div class="flex items-center mb-4">
+                        <div class="w-12 h-12 bg-green-500 rounded-lg flex items-center justify-center mr-4">
+                            <i class="fas fa-user-graduate text-white text-xl"></i>
+                        </div>
+                        <div>
+                            <h3 class="text-lg font-semibold text-green-800">Active Students</h3>
+                            <p class="text-sm text-green-600">Students with 'active' status</p>
+                        </div>
+                    </div>
+                    <div class="text-center">
+                        <p id="dashboard-active-students" class="text-4xl font-bold text-green-700 mb-2">0</p>
+                        <div class="flex justify-center">
+                            <button onclick="refreshDashboardCache('students')" class="text-green-600 hover:text-green-800 text-sm font-medium">
+                                <i class="fas fa-sync-alt mr-1"></i> Refresh
+                            </button>
+                        </div>
+                    </div>
                 </div>
-                <div class="bg-blue-100 p-3 rounded-lg text-center shadow w-full">
-                    <h4 class="font-bold text-blue-800 text-sm">Pending Review</h4>
-                    <p id="pending-enrollments" class="text-2xl font-extrabold">0</p>
+
+                <!-- Pending Approvals Card -->
+                <div class="bg-gradient-to-r from-yellow-50 to-yellow-100 border border-yellow-200 rounded-xl p-6 shadow-sm hover:shadow-md transition-shadow duration-300">
+                    <div class="flex items-center mb-4">
+                        <div class="w-12 h-12 bg-yellow-500 rounded-lg flex items-center justify-center mr-4">
+                            <i class="fas fa-user-clock text-white text-xl"></i>
+                        </div>
+                        <div>
+                            <h3 class="text-lg font-semibold text-yellow-800">Pending Approvals</h3>
+                            <p class="text-sm text-yellow-600">Awaiting student applications</p>
+                        </div>
+                    </div>
+                    <div class="text-center">
+                        <p id="dashboard-pending-approvals" class="text-4xl font-bold text-yellow-700 mb-2">0</p>
+                        <div class="flex justify-center">
+                            <button onclick="refreshDashboardCache('pendingStudents')" class="text-yellow-600 hover:text-yellow-800 text-sm font-medium">
+                                <i class="fas fa-sync-alt mr-1"></i> Refresh
+                            </button>
+                        </div>
+                    </div>
                 </div>
-                <div class="bg-purple-100 p-3 rounded-lg text-center shadow w-full">
-                    <h4 class="font-bold text-purple-800 text-sm">Completed</h4>
-                    <p id="completed-enrollments" class="text-2xl font-extrabold">0</p>
+
+                <!-- Total Enrollments Card -->
+                <div class="bg-gradient-to-r from-purple-50 to-purple-100 border border-purple-200 rounded-xl p-6 shadow-sm hover:shadow-md transition-shadow duration-300">
+                    <div class="flex items-center mb-4">
+                        <div class="w-12 h-12 bg-purple-500 rounded-lg flex items-center justify-center mr-4">
+                            <i class="fas fa-file-signature text-white text-xl"></i>
+                        </div>
+                        <div>
+                            <h3 class="text-lg font-semibold text-purple-800">Total Enrollments</h3>
+                            <p class="text-sm text-purple-600">All enrollment applications</p>
+                        </div>
+                    </div>
+                    <div class="text-center">
+                        <p id="dashboard-total-enrollments" class="text-4xl font-bold text-purple-700 mb-2">0</p>
+                        <div class="flex justify-center">
+                            <button onclick="refreshDashboardCache('enrollments')" class="text-purple-600 hover:text-purple-800 text-sm font-medium">
+                                <i class="fas fa-sync-alt mr-1"></i> Refresh
+                            </button>
+                        </div>
+                    </div>
                 </div>
             </div>
 
-            <div class="bg-gray-50 p-4 rounded-lg mb-6">
-                <div class="flex space-x-4">
-                    <select id="status-filter" class="p-2 border rounded-md">
-                        <option value="">All Statuses</option>
-                        <option value="draft">Draft</option>
-                        <option value="pending">Pending</option>
-                        <option value="completed">Completed</option>
-                        <option value="payment_received">Payment Received</option>
-                    </select>
-                    <input type="date" id="date-from" class="p-2 border rounded-md" placeholder="From Date">
-                    <input type="date" id="date-to" class="p-2 border rounded-md" placeholder="To Date">
+            <!-- Quick Actions Section -->
+            <div class="mt-8 p-6 bg-gray-50 rounded-xl border">
+                <h3 class="text-xl font-bold text-gray-800 mb-4">Quick Actions</h3>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <button onclick="showAssignStudentModal()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-3 rounded-lg flex items-center justify-center">
+                        <i class="fas fa-user-plus mr-2"></i> Assign New Student
+                    </button>
+                    <button onclick="showArchiveStudentModal()" class="bg-yellow-600 hover:bg-yellow-700 text-white px-4 py-3 rounded-lg flex items-center justify-center">
+                        <i class="fas fa-archive mr-2"></i> Archive Student
+                    </button>
+                    <button onclick="showMarkInactiveModal()" class="bg-red-600 hover:bg-red-700 text-white px-4 py-3 rounded-lg flex items-center justify-center">
+                        <i class="fas fa-user-slash mr-2"></i> Mark Tutor Inactive
+                    </button>
                 </div>
             </div>
 
-            <div class="overflow-x-auto">
-                <table class="min-w-full divide-y divide-gray-200">
-                    <thead class="bg-gray-50">
-                        <tr>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Application ID</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Parent Name</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Students</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total Fee</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Referral Code</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Created</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody id="enrollments-list" class="bg-white divide-y divide-gray-200">
-                        <tr>
-                            <td colspan="8" class="px-6 py-4 text-center text-gray-500">Loading enrollments...</td>
-                        </tr>
-                    </tbody>
-                </table>
+            <!-- Last Updated Info -->
+            <div class="mt-6 text-center text-sm text-gray-500">
+                <p>Data loaded from cache. Click individual refresh buttons to update specific metrics.</p>
+                <button onclick="refreshAllDashboardData()" class="mt-2 bg-gray-200 hover:bg-gray-300 text-gray-800 px-4 py-2 rounded-lg text-sm font-medium">
+                    <i class="fas fa-sync-alt mr-1"></i> Refresh All Data
+                </button>
             </div>
         </div>
     `;
 
-    // Event Listeners
-    document.getElementById('refresh-enrollments-btn').addEventListener('click', () => fetchAndRenderEnrollments(true));
-    document.getElementById('enrollments-search').addEventListener('input', (e) => filterEnrollments(e.target.value));
-    document.getElementById('status-filter').addEventListener('change', applyEnrollmentFilters);
-    document.getElementById('date-from').addEventListener('change', applyEnrollmentFilters);
-    document.getElementById('date-to').addEventListener('change', applyEnrollmentFilters);
-
-    // Load initial data
-    fetchAndRenderEnrollments();
+    loadDashboardData();
 }
 
-async function fetchAndRenderEnrollments(forceRefresh = false) {
-    if (forceRefresh) {
-        invalidateCache('enrollments');
-    }
-
-    const enrollmentsList = document.getElementById('enrollments-list');
-    if (!enrollmentsList) return;
-
+async function loadDashboardData() {
     try {
-        if (!sessionCache.enrollments || forceRefresh) {
-            enrollmentsList.innerHTML = `<tr><td colspan="8" class="px-6 py-4 text-center text-gray-500">Fetching enrollments...</td></tr>`;
-            
-            const snapshot = await getDocs(query(collection(db, "enrollments"), orderBy("createdAt", "desc")));
-            const enrollmentsData = snapshot.docs.map(doc => ({ 
-                id: doc.id, 
-                ...doc.data() 
-            }));
-            
+        // Load Active Tutors count
+        if (!sessionCache.tutors) {
+            const tutorsSnapshot = await getDocs(query(collection(db, "tutors")));
+            const allTutors = tutorsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            const activeTutors = allTutors.filter(tutor => 
+                !tutor.status || tutor.status === 'active'
+            );
+            saveToLocalStorage('tutors', activeTutors);
+        }
+        const activeTutorsCount = (sessionCache.tutors || []).length;
+        document.getElementById('dashboard-active-tutors').textContent = activeTutorsCount;
+
+        // Load Active Students count
+        if (!sessionCache.students) {
+            const studentsSnapshot = await getDocs(query(collection(db, "students")));
+            const allStudents = studentsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            const activeStudents = allStudents.filter(student => 
+                !student.status || student.status === 'active' || student.status === 'approved'
+            );
+            saveToLocalStorage('students', activeStudents);
+        }
+        const activeStudentsCount = (sessionCache.students || []).length;
+        document.getElementById('dashboard-active-students').textContent = activeStudentsCount;
+
+        // Load Pending Approvals count
+        if (!sessionCache.pendingStudents) {
+            const pendingSnapshot = await getDocs(query(collection(db, "pending_students")));
+            const pendingStudents = pendingSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            saveToLocalStorage('pendingStudents', pendingStudents);
+        }
+        const pendingApprovalsCount = (sessionCache.pendingStudents || []).length;
+        document.getElementById('dashboard-pending-approvals').textContent = pendingApprovalsCount;
+
+        // Load Total Enrollments count
+        if (!sessionCache.enrollments) {
+            const enrollmentsSnapshot = await getDocs(query(collection(db, "enrollments")));
+            const enrollmentsData = enrollmentsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
             saveToLocalStorage('enrollments', enrollmentsData);
         }
-        
-        renderEnrollmentsFromCache();
+        const totalEnrollmentsCount = (sessionCache.enrollments || []).length;
+        document.getElementById('dashboard-total-enrollments').textContent = totalEnrollmentsCount;
+
     } catch (error) {
-        console.error("Error fetching enrollments:", error);
-        enrollmentsList.innerHTML = `<tr><td colspan="8" class="px-6 py-4 text-center text-red-500">Failed to load enrollments: ${error.message}</td></tr>`;
+        console.error("Error loading dashboard data:", error);
+        
+        document.getElementById('dashboard-active-tutors').textContent = 'Error';
+        document.getElementById('dashboard-active-students').textContent = 'Error';
+        document.getElementById('dashboard-pending-approvals').textContent = 'Error';
+        document.getElementById('dashboard-total-enrollments').textContent = 'Error';
     }
 }
 
-function renderEnrollmentsFromCache(searchTerm = '') {
-    const enrollments = sessionCache.enrollments || [];
-    const enrollmentsList = document.getElementById('enrollments-list');
-    if (!enrollmentsList) return;
-
-    // Apply filters
-    const statusFilter = document.getElementById('status-filter')?.value || '';
-    const dateFrom = document.getElementById('date-from')?.value;
-    const dateTo = document.getElementById('date-to')?.value;
-    
-    const lowerCaseSearchTerm = searchTerm.toLowerCase();
-    
-    let filteredEnrollments = enrollments.filter(enrollment => {
-        // Search filter
-        if (searchTerm) {
-            const matchesSearch = 
-                (enrollment.id && enrollment.id.toLowerCase().includes(lowerCaseSearchTerm)) ||
-                (enrollment.parent?.name && enrollment.parent.name.toLowerCase().includes(lowerCaseSearchTerm)) ||
-                (enrollment.parent?.email && enrollment.parent.email.toLowerCase().includes(lowerCaseSearchTerm)) ||
-                (enrollment.parent?.phone && enrollment.parent.phone.toLowerCase().includes(lowerCaseSearchTerm)) ||
-                enrollment.students?.some(student => 
-                    student.name && student.name.toLowerCase().includes(lowerCaseSearchTerm)
-                );
-            
-            if (!matchesSearch) return false;
-        }
-        
-        // Status filter
-        if (statusFilter && enrollment.status !== statusFilter) return false;
-        
-        // Date filter
-        if (dateFrom) {
-            const createdDate = new Date(enrollment.createdAt || enrollment.timestamp);
-            const fromDate = new Date(dateFrom);
-            if (createdDate < fromDate) return false;
-        }
-        
-        if (dateTo) {
-            const createdDate = new Date(enrollment.createdAt || enrollment.timestamp);
-            const toDate = new Date(dateTo);
-            toDate.setHours(23, 59, 59, 999);
-            if (createdDate > toDate) return false;
-        }
-        
-        return true;
-    });
-
-    // Update statistics
-    const total = enrollments.length;
-    const draft = enrollments.filter(e => e.status === 'draft').length;
-    const pending = enrollments.filter(e => e.status === 'pending').length;
-    const completed = enrollments.filter(e => e.status === 'completed' || e.status === 'payment_received').length;
-    
-    document.getElementById('total-enrollments').textContent = total;
-    document.getElementById('draft-enrollments').textContent = draft;
-    document.getElementById('pending-enrollments').textContent = pending;
-    document.getElementById('completed-enrollments').textContent = completed;
-
-    if (filteredEnrollments.length === 0) {
-        enrollmentsList.innerHTML = `
-            <tr>
-                <td colspan="8" class="px-6 py-4 text-center text-gray-500">
-                    No enrollments found${searchTerm ? ` for "${searchTerm}"` : ''}.
-                </td>
-            </tr>
-        `;
-        return;
-    }
-
-    // Helper function to parse fee values consistently
-    function parseFeeValue(feeValue) {
-        if (!feeValue && feeValue !== 0) return 0;
-        
-        if (typeof feeValue === 'number') {
-            return Math.round(feeValue);
-        }
-        
-        if (typeof feeValue === 'string') {
-            const cleaned = feeValue
-                .replace(/[^0-9.-]/g, '')
-                .trim();
-            
-            const parsed = parseFloat(cleaned);
-            return isNaN(parsed) ? 0 : Math.round(parsed);
-        }
-        
-        return 0;
-    }
-
-    // Render enrollments table
-    const tableRows = filteredEnrollments.map(enrollment => {
-        const createdAt = enrollment.createdAt ? new Date(enrollment.createdAt).toLocaleDateString() : 
-                        enrollment.timestamp ? new Date(enrollment.timestamp).toLocaleDateString() : 'N/A';
-        
-        const studentCount = enrollment.students?.length || 0;
-        const studentNames = enrollment.students?.map(s => s.name).join(', ') || 'No students';
-        
-        // Status badge
-        let statusBadge = '';
-        switch(enrollment.status) {
-            case 'draft':
-                statusBadge = `<span class="px-2 py-1 text-xs rounded-full bg-gray-100 text-gray-800">Draft</span>`;
-                break;
-            case 'pending':
-                statusBadge = `<span class="px-2 py-1 text-xs rounded-full bg-yellow-100 text-yellow-800">Pending</span>`;
-                break;
-            case 'completed':
-            case 'payment_received':
-                statusBadge = `<span class="px-2 py-1 text-xs rounded-full bg-green-100 text-green-800">Completed</span>`;
-                break;
-            default:
-                statusBadge = `<span class="px-2 py-1 text-xs rounded-full bg-gray-100 text-gray-800">${enrollment.status || 'Unknown'}</span>`;
-        }
-        
-        // Total fee
-        const totalFeeAmount = parseFeeValue(enrollment.summary?.totalFee);
-        const formattedFee = totalFeeAmount > 0 ? `₦${totalFeeAmount.toLocaleString()}` : '₦0';
-        
-        // Referral code
-        const referralCode = enrollment.referral?.code || 'None';
-        
-        return `
-            <tr class="hover:bg-gray-50">
-                <td class="px-6 py-4 whitespace-nowrap">
-                    <div class="text-sm font-medium text-gray-900">${enrollment.id.substring(0, 12)}...</div>
-                    <div class="text-xs text-gray-500">${enrollment.id}</div>
-                </td>
-                <td class="px-6 py-4">
-                    <div class="text-sm font-medium text-gray-900">${enrollment.parent?.name || 'N/A'}</div>
-                    <div class="text-xs text-gray-500">${enrollment.parent?.email || ''}</div>
-                    <div class="text-xs text-gray-500">${enrollment.parent?.phone || ''}</div>
-                </td>
-                <td class="px-6 py-4">
-                    <div class="text-sm text-gray-900">${studentCount} student(s)</div>
-                    <div class="text-xs text-gray-500 truncate max-w-xs">${studentNames}</div>
-                </td>
-                <td class="px-6 py-4 text-sm font-semibold text-green-600">${formattedFee}</td>
-                <td class="px-6 py-4 text-sm">
-                    <span class="font-mono bg-gray-100 px-2 py-1 rounded">${referralCode}</span>
-                </td>
-                <td class="px-6 py-4">${statusBadge}</td>
-                <td class="px-6 py-4 text-sm text-gray-500">${createdAt}</td>
-                <td class="px-6 py-4 text-sm font-medium">
-                    <button onclick="showEnrollmentDetails('${enrollment.id}')" 
-                            class="text-indigo-600 hover:text-indigo-900 mr-3">
-                        View
-                    </button>
-                    <button onclick="updateEnrollmentStatus('${enrollment.id}', 'completed')" 
-                            class="text-green-600 hover:text-green-900">
-                        Approve
-                    </button>
-                </td>
-            </tr>
-        `;
-    }).join('');
-
-    enrollmentsList.innerHTML = tableRows;
-}
-
-function filterEnrollments(searchTerm) {
-    renderEnrollmentsFromCache(searchTerm);
-}
-
-function applyEnrollmentFilters() {
-    renderEnrollmentsFromCache(document.getElementById('enrollments-search').value);
-}
-
-// Global function to show enrollment details modal
-window.showEnrollmentDetails = async function(enrollmentId) {
+window.refreshDashboardCache = async function(cacheKey) {
     try {
-        const enrollmentDoc = await getDoc(doc(db, "enrollments", enrollmentId));
-        if (!enrollmentDoc.exists()) {
-            alert("Enrollment not found!");
+        const button = event.target.closest('button');
+        const originalText = button.innerHTML;
+        button.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i>';
+        button.disabled = true;
+
+        invalidateCache(cacheKey);
+        
+        if (cacheKey === 'tutors') {
+            const tutorsSnapshot = await getDocs(query(collection(db, "tutors")));
+            const allTutors = tutorsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            const activeTutors = allTutors.filter(tutor => 
+                !tutor.status || tutor.status === 'active'
+            );
+            saveToLocalStorage('tutors', activeTutors);
+            document.getElementById('dashboard-active-tutors').textContent = activeTutors.length;
+        }
+        else if (cacheKey === 'students') {
+            const studentsSnapshot = await getDocs(query(collection(db, "students")));
+            const allStudents = studentsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            const activeStudents = allStudents.filter(student => 
+                !student.status || student.status === 'active' || student.status === 'approved'
+            );
+            saveToLocalStorage('students', activeStudents);
+            document.getElementById('dashboard-active-students').textContent = activeStudents.length;
+        }
+        else if (cacheKey === 'pendingStudents') {
+            const pendingSnapshot = await getDocs(query(collection(db, "pending_students")));
+            const pendingStudents = pendingSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            saveToLocalStorage('pendingStudents', pendingStudents);
+            document.getElementById('dashboard-pending-approvals').textContent = pendingStudents.length;
+        }
+        else if (cacheKey === 'enrollments') {
+            const enrollmentsSnapshot = await getDocs(query(collection(db, "enrollments")));
+            const enrollmentsData = enrollmentsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            saveToLocalStorage('enrollments', enrollmentsData);
+            document.getElementById('dashboard-total-enrollments').textContent = enrollmentsData.length;
+        }
+
+        button.innerHTML = '<i class="fas fa-check mr-1"></i> Refreshed';
+        setTimeout(() => {
+            button.innerHTML = originalText;
+            button.disabled = false;
+        }, 1500);
+
+    } catch (error) {
+        console.error(`Error refreshing ${cacheKey}:`, error);
+        
+        const button = event.target.closest('button');
+        button.innerHTML = '<i class="fas fa-exclamation-triangle mr-1"></i> Error';
+        setTimeout(() => {
+            button.innerHTML = '<i class="fas fa-sync-alt mr-1"></i> Refresh';
+            button.disabled = false;
+        }, 2000);
+    }
+};
+
+window.refreshAllDashboardData = async function() {
+    try {
+        const button = event.target;
+        const originalText = button.innerHTML;
+        button.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i> Refreshing...';
+        button.disabled = true;
+
+        invalidateCache('tutors');
+        invalidateCache('students');
+        invalidateCache('pendingStudents');
+        invalidateCache('enrollments');
+
+        await loadDashboardData();
+
+        button.innerHTML = '<i class="fas fa-check mr-1"></i> All Data Refreshed';
+        setTimeout(() => {
+            button.innerHTML = originalText;
+            button.disabled = false;
+        }, 2000);
+
+    } catch (error) {
+        console.error("Error refreshing all dashboard data:", error);
+        
+        const button = event.target;
+        button.innerHTML = '<i class="fas fa-exclamation-triangle mr-1"></i> Error';
+        setTimeout(() => {
+            button.innerHTML = '<i class="fas fa-sync-alt mr-1"></i> Refresh All Data';
+            button.disabled = false;
+        }, 2000);
+    }
+};
+
+// ======================================================
+// SECTION 3: TUTOR MANAGEMENT PANELS
+// ======================================================
+
+// ======================================================
+// SUBSECTION 3.1: Tutor Directory Panel
+// ======================================================
+
+async function renderManagementTutorView(container) {
+    container.innerHTML = `
+        <div class="bg-white p-6 rounded-lg shadow-md">
+            <div class="flex justify-between items-center mb-4 flex-wrap gap-4">
+                <h2 class="text-2xl font-bold text-green-700">Tutor & Student Directory</h2>
+                <div class="flex items-center gap-4 flex-wrap">
+                    <input type="search" id="directory-search" placeholder="Search Tutors, Students, Parents..." class="p-2 border rounded-md w-64">
+                    <button id="assign-student-btn" class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700">Assign New Student</button>
+                    <button id="reassign-student-btn" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Reassign Student</button>
+                    <button id="view-tutor-history-directory-btn" class="bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700">View Tutor History</button>
+                    <button id="refresh-directory-btn" class="bg-gray-600 text-white px-4 py-2 rounded hover:bg-gray-700">Refresh</button>
+                </div>
+            </div>
+            <div class="flex space-x-4 mb-4">
+                <div class="bg-green-100 p-3 rounded-lg text-center shadow w-full">
+                    <h4 class="font-bold text-green-800 text-sm">Active Tutors</h4>
+                    <p id="tutor-count-badge" class="text-2xl font-extrabold">0</p>
+                </div>
+                <div class="bg-yellow-100 p-3 rounded-lg text-center shadow w-full">
+                    <h4 class="font-bold text-yellow-800 text-sm">Active Students</h4>
+                    <p id="student-count-badge" class="text-2xl font-extrabold">0</p>
+                </div>
+                <div class="bg-purple-100 p-3 rounded-lg text-center shadow w-full">
+                    <h4 class="font-bold text-purple-800 text-sm">Students with History</h4>
+                    <p id="history-count-badge" class="text-2xl font-extrabold">0</p>
+                </div>
+            </div>
+            <div id="directory-list" class="space-y-4">
+                <p class="text-center text-gray-500 py-10">Loading directory...</p>
+            </div>
+        </div>
+    `;
+    document.getElementById('assign-student-btn').addEventListener('click', showAssignStudentModal);
+    document.getElementById('reassign-student-btn').addEventListener('click', showReassignStudentModal);
+    document.getElementById('refresh-directory-btn').addEventListener('click', () => fetchAndRenderDirectory(true));
+    document.getElementById('directory-search').addEventListener('input', (e) => renderDirectoryFromCache(e.target.value));
+    
+    document.getElementById('view-tutor-history-directory-btn').addEventListener('click', async () => {
+        if (!sessionCache.tutorAssignments || Object.keys(sessionCache.tutorAssignments).length === 0) {
+            alert("No tutor history available. Please refresh the directory first.");
             return;
         }
-
-        const enrollment = { id: enrollmentDoc.id, ...enrollmentDoc.data() };
         
-        // Format date
-        const createdAt = enrollment.createdAt ? new Date(enrollment.createdAt).toLocaleString() : 
-                         enrollment.timestamp ? new Date(enrollment.timestamp).toLocaleString() : 'N/A';
+        const students = sessionCache.students || [];
+        const activeStudents = students.filter(student => 
+            !student.status || student.status === 'active' || student.status === 'approved'
+        );
         
-        // Build students details HTML
-        let studentsHTML = '';
-        if (enrollment.students && enrollment.students.length > 0) {
-            studentsHTML = enrollment.students.map(student => {
-                let subjectsHTML = '';
-                if (student.selectedSubjects && student.selectedSubjects.length > 0) {
-                    subjectsHTML = `<p class="text-sm"><strong>Subjects:</strong> ${student.selectedSubjects.join(', ')}</p>`;
-                }
-                
-                let extracurricularHTML = '';
-                if (student.extracurriculars && student.extracurriculars.length > 0) {
-                    extracurricularHTML = `<p class="text-sm"><strong>Extracurricular:</strong> ${student.extracurriculars.map(e => `${e.name} (${e.frequency})`).join(', ')}</p>`;
-                }
-                
-                let testPrepHTML = '';
-                if (student.testPrep && student.testPrep.length > 0) {
-                    testPrepHTML = `<p class="text-sm"><strong>Test Prep:</strong> ${student.testPrep.map(t => `${t.name} (${t.hours} hrs)`).join(', ')}</p>`;
-                }
-                
-                return `
-                    <div class="border rounded-lg p-4 mb-3 bg-gray-50">
-                        <h4 class="font-bold text-lg mb-2">${student.name || 'Unnamed Student'}</h4>
-                        <div class="grid grid-cols-2 gap-2 text-sm">
-                            <p><strong>Grade:</strong> ${student.grade || 'N/A'}</p>
-                            <p><strong>DOB:</strong> ${student.dob || 'N/A'}</p>
-                            <p><strong>Start Date:</strong> ${student.startDate || 'N/A'}</p>
-                        </div>
-                        ${subjectsHTML}
-                        ${extracurricularHTML}
-                        ${testPrepHTML}
-                    </div>
-                `;
-            }).join('');
+        if (activeStudents.length === 0) {
+            alert("No active students found.");
+            return;
         }
-
-        // Helper function to parse fee values consistently
-        function parseFeeValue(feeValue) {
-            if (!feeValue && feeValue !== 0) return 0;
-            
-            if (typeof feeValue === 'number') {
-                return Math.round(feeValue);
-            }
-            
-            if (typeof feeValue === 'string') {
-                const cleaned = feeValue
-                    .replace(/[^0-9.-]/g, '')
-                    .trim();
-                
-                const parsed = parseFloat(cleaned);
-                return isNaN(parsed) ? 0 : Math.round(parsed);
-            }
-            
-            return 0;
-        }
-
-        // Build fee breakdown HTML
-        let feeBreakdownHTML = '';
-        if (enrollment.summary) {
-            const summary = enrollment.summary;
-            
-            // Parse all fee values consistently
-            const academicFee = parseFeeValue(summary.academicFee);
-            const extracurricularFee = parseFeeValue(summary.extracurricularFee);
-            const testPrepFee = parseFeeValue(summary.testPrepFee);
-            const discountAmount = parseFeeValue(summary.discountAmount);
-            const totalFee = parseFeeValue(summary.totalFee);
-            
-            feeBreakdownHTML = `
-                <div class="grid grid-cols-2 gap-4">
-                    <div class="bg-green-50 p-3 rounded">
-                        <p class="text-sm"><strong>Academic Fees:</strong></p>
-                        <p class="text-lg font-bold">₦${academicFee.toLocaleString()}</p>
-                    </div>
-                    <div class="bg-blue-50 p-3 rounded">
-                        <p class="text-sm"><strong>Extracurricular:</strong></p>
-                        <p class="text-lg font-bold">₦${extracurricularFee.toLocaleString()}</p>
-                    </div>
-                    <div class="bg-yellow-50 p-3 rounded">
-                        <p class="text-sm"><strong>Test Prep:</strong></p>
-                        <p class="text-lg font-bold">₦${testPrepFee.toLocaleString()}</p>
-                    </div>
-                    <div class="bg-red-50 p-3 rounded">
-                        <p class="text-sm"><strong>Discount:</strong></p>
-                        <p class="text-lg font-bold">-₦${discountAmount.toLocaleString()}</p>
-                    </div>
-                </div>
-                <div class="mt-4 p-4 bg-gray-100 rounded">
-                    <p class="text-xl font-bold text-green-700">Total: ₦${totalFee.toLocaleString()}</p>
-                </div>
-            `;
-        }
-
-        // Build referral info HTML
-        let referralHTML = '';
-        if (enrollment.referral && enrollment.referral.code) {
-            referralHTML = `
-                <div class="border-l-4 border-green-500 pl-4 bg-green-50 p-3 rounded">
-                    <h4 class="font-bold text-green-700">Referral Information</h4>
-                    <p><strong>Code:</strong> <span class="font-mono">${enrollment.referral.code}</span></p>
-                    ${enrollment.referral.bankName ? `<p><strong>Bank:</strong> ${enrollment.referral.bankName}</p>` : ''}
-                    ${enrollment.referral.accountNumber ? `<p><strong>Account:</strong> ${enrollment.referral.accountNumber}</p>` : ''}
-                    ${enrollment.referral.accountName ? `<p><strong>Account Name:</strong> ${enrollment.referral.accountName}</p>` : ''}
-                </div>
-            `;
-        }
-
+        
+        const studentOptions = activeStudents.map(student => 
+            `<option value="${student.id}">${student.studentName} (${student.grade || 'No grade'})</option>`
+        ).join('');
+        
         const modalHtml = `
-            <div id="enrollmentDetailsModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-center justify-center">
-                <div class="relative p-8 bg-white w-full max-w-4xl rounded-lg shadow-2xl">
-                    <button class="absolute top-2 right-2 text-gray-500 hover:text-gray-800 text-2xl font-bold" onclick="closeManagementModal('enrollmentDetailsModal')">&times;</button>
-                    <h3 class="text-2xl font-bold mb-4 text-green-700">Enrollment Details</h3>
-                    
-                    <div class="grid grid-cols-2 gap-6 mb-6">
-                        <div>
-                            <h4 class="font-bold text-lg mb-2">Application Information</h4>
-                            <p><strong>ID:</strong> ${enrollment.id}</p>
-                            <p><strong>Status:</strong> <span class="px-2 py-1 text-xs rounded-full ${enrollment.status === 'completed' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}">${enrollment.status || 'Unknown'}</span></p>
-                            <p><strong>Created:</strong> ${createdAt}</p>
-                            ${enrollment.lastSaved ? `<p><strong>Last Saved:</strong> ${new Date(enrollment.lastSaved).toLocaleString()}</p>` : ''}
+            <div id="select-student-modal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-center justify-center">
+                <div class="relative p-8 bg-white w-96 max-w-lg rounded-lg shadow-xl">
+                    <button class="absolute top-2 right-2 text-gray-500 hover:text-gray-800 text-2xl font-bold" onclick="closeManagementModal('select-student-modal')">&times;</button>
+                    <h3 class="text-xl font-bold mb-4">Select Student to View Tutor History</h3>
+                    <form id="select-student-form">
+                        <div class="mb-4">
+                            <label class="block text-sm font-medium mb-2">Select Student</label>
+                            <select id="select-student" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2">
+                                <option value="" disabled selected>Select a student...</option>
+                                ${studentOptions}
+                            </select>
                         </div>
-                        
-                        <div>
-                            <h4 class="font-bold text-lg mb-2">Parent Information</h4>
-                            <p><strong>Name:</strong> ${enrollment.parent?.name || 'N/A'}</p>
-                            <p><strong>Email:</strong> ${enrollment.parent?.email || 'N/A'}</p>
-                            <p><strong>Phone:</strong> ${enrollment.parent?.phone || 'N/A'}</p>
-                            <p><strong>Address:</strong> ${enrollment.parent?.address || 'N/A'}</p>
+                        <div class="flex justify-end mt-4">
+                            <button type="button" onclick="closeManagementModal('select-student-modal')" class="mr-2 px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300">Cancel</button>
+                            <button type="submit" class="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700">View History</button>
                         </div>
-                    </div>
-                    
-                    ${referralHTML}
-                    
-                    <div class="mt-6">
-                        <h4 class="font-bold text-lg mb-2">Student Information (${enrollment.students?.length || 0} students)</h4>
-                        ${studentsHTML || '<p class="text-gray-500">No student information available.</p>'}
-                    </div>
-                    
-                    <div class="mt-6">
-                        <h4 class="font-bold text-lg mb-2">Fee Breakdown</h4>
-                        ${feeBreakdownHTML || '<p class="text-gray-500">No fee breakdown available.</p>'}
-                    </div>
-                    
-                    <div class="flex justify-end space-x-3 mt-6 pt-6 border-t">
-                        <button onclick="closeManagementModal('enrollmentDetailsModal')" class="px-4 py-2 bg-gray-300 text-gray-700 rounded hover:bg-gray-400">Close</button>
-                        <button onclick="updateEnrollmentStatus('${enrollment.id}', 'completed')" class="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700">Mark as Completed</button>
-                        <button onclick="updateEnrollmentStatus('${enrollment.id}', 'payment_received')" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">Mark Payment Received</button>
-                    </div>
+                    </form>
                 </div>
             </div>
         `;
         
         document.body.insertAdjacentHTML('beforeend', modalHtml);
         
-    } catch (error) {
-        console.error("Error showing enrollment details:", error);
-        alert("Failed to load enrollment details. Please try again.");
-    }
-};
+        document.getElementById('select-student-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const studentId = document.getElementById('select-student').value;
+            closeManagementModal('select-student-modal');
+            window.viewStudentTutorHistory(studentId);
+        });
+    });
+    
+    fetchAndRenderDirectory();
+}
 
-// Global function to update enrollment status
-window.updateEnrollmentStatus = async function(enrollmentId, newStatus) {
-    if (!confirm(`Are you sure you want to update this enrollment status to '${newStatus}'?`)) {
-        return;
+async function fetchAndRenderDirectory(forceRefresh = false) {
+    if (forceRefresh) {
+        invalidateCache('tutors');
+        invalidateCache('students');
+        invalidateCache('tutorAssignments');
     }
 
     try {
-        await updateDoc(doc(db, "enrollments", enrollmentId), {
-            status: newStatus,
-            lastUpdated: Timestamp.now()
-        });
-
-        alert(`Enrollment status updated to ${newStatus}.`);
+        if (!sessionCache.tutors || !sessionCache.students) {
+            document.getElementById('directory-list').innerHTML = `<p class="text-center text-gray-500 py-10">Fetching data from server...</p>`;
+            const [tutorsSnapshot, studentsSnapshot] = await Promise.all([
+                getDocs(query(collection(db, "tutors"), orderBy("name"))),
+                getDocs(collection(db, "students"))
+            ]);
+            
+            const allTutors = tutorsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            const activeTutors = allTutors.filter(tutor => 
+                !tutor.status || tutor.status === 'active'
+            );
+            
+            const allStudents = studentsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            const activeStudents = allStudents.filter(student => 
+                !student.status || student.status === 'active' || student.status === 'approved'
+            );
+            
+            saveToLocalStorage('tutors', activeTutors);
+            saveToLocalStorage('students', activeStudents);
+        }
         
-        // Refresh the enrollments list
-        invalidateCache('enrollments');
-        closeManagementModal('enrollmentDetailsModal');
-        await fetchAndRenderEnrollments();
+        if (!sessionCache.tutorAssignments || forceRefresh) {
+            await fetchTutorAssignmentHistory();
+        }
         
+        renderDirectoryFromCache();
     } catch (error) {
-        console.error("Error updating enrollment status:", error);
-        alert("Failed to update enrollment status. Please try again.");
+        console.error("Error fetching directory data:", error);
+        document.getElementById('directory-list').innerHTML = `<p class="text-center text-red-500 py-10">Failed to load data.</p>`;
     }
-};
+}
 
-// Global function to view tutor history for a specific student
-window.viewStudentTutorHistory = function(studentId) {
-    const tutorAssignments = sessionCache.tutorAssignments || {};
+function renderDirectoryFromCache(searchTerm = '') {
+    const tutors = sessionCache.tutors || [];
     const students = sessionCache.students || [];
-    
-    const student = students.find(s => s.id === studentId);
-    if (!student) {
-        alert("Student not found!");
+    const tutorAssignments = sessionCache.tutorAssignments || {};
+    const directoryList = document.getElementById('directory-list');
+    if (!directoryList) return;
+
+    if (tutors.length === 0 && students.length === 0) {
+        directoryList.innerHTML = `<p class="text-center text-gray-500 py-10">No directory data found. Click Refresh to fetch from the server.</p>`;
         return;
     }
-    
-    showTutorHistoryModal(studentId, student, tutorAssignments);
-};
 
-// ##################################
-// # NEW: INACTIVE TUTORS PANEL
-// ##################################
+    const lowerCaseSearchTerm = searchTerm.toLowerCase();
+    const studentsByTutor = {};
+    
+    students.forEach(student => {
+        if (!studentsByTutor[student.tutorEmail]) {
+            studentsByTutor[student.tutorEmail] = [];
+        }
+        studentsByTutor[student.tutorEmail].push(student);
+    });
+
+    const filteredTutors = tutors.filter(tutor => {
+        const assignedStudents = studentsByTutor[tutor.email] || [];
+        const tutorMatch = tutor.name.toLowerCase().includes(lowerCaseSearchTerm);
+        const studentMatch = assignedStudents.some(s =>
+            s.studentName.toLowerCase().includes(lowerCaseSearchTerm) ||
+            (s.parentName && s.parentName.toLowerCase().includes(lowerCaseSearchTerm)) ||
+            (s.parentPhone && String(s.parentPhone).toLowerCase().includes(lowerCaseSearchTerm))
+        );
+        return tutorMatch || studentMatch;
+    });
+
+    if (filteredTutors.length === 0) {
+        directoryList.innerHTML = `<p class="text-center text-gray-500 py-10">No results found for "${searchTerm}".</p>`;
+        return;
+    }
+
+    document.getElementById('tutor-count-badge').textContent = tutors.length;
+    document.getElementById('student-count-badge').textContent = students.length;
+    
+    const studentsWithHistory = Object.keys(tutorAssignments).length;
+    document.getElementById('history-count-badge').textContent = studentsWithHistory;
+
+    const canEditStudents = window.userData?.permissions?.actions?.canEditStudents === true;
+    const canDeleteStudents = window.userData?.permissions?.actions?.canDeleteStudents === true;
+    const showActionsColumn = canEditStudents || canDeleteStudents;
+
+    directoryList.innerHTML = filteredTutors.map(tutor => {
+        const assignedStudents = (studentsByTutor[tutor.email] || [])
+            .filter(s =>
+                searchTerm === '' ||
+                tutor.name.toLowerCase().includes(lowerCaseSearchTerm) ||
+                s.studentName.toLowerCase().includes(lowerCaseSearchTerm) ||
+                (s.parentName && s.parentName.toLowerCase().includes(lowerCaseSearchTerm)) ||
+                (s.parentPhone && String(s.parentPhone).toLowerCase().includes(lowerCaseSearchTerm))
+            );
+
+        const studentsTableRows = assignedStudents
+            .sort((a, b) => a.studentName.localeCompare(b.studentName))
+            .map(student => {
+                const subjects = student.subjects && Array.isArray(student.subjects) ? student.subjects.join(', ') : 'N/A';
+                const studentHistory = tutorAssignments[student.id];
+                const historyButton = studentHistory ? 
+                    `<button class="view-history-btn bg-purple-500 text-white px-3 py-1 rounded-full text-xs ml-1" data-student-id="${student.id}">History</button>` : '';
+                
+                const actionButtons = `
+                    ${canEditStudents ? `<button class="edit-student-btn bg-blue-500 text-white px-3 py-1 rounded-full text-xs" data-student-id="${student.id}">Edit</button>` : ''}
+                    ${canDeleteStudents ? `<button class="delete-student-btn bg-red-500 text-white px-3 py-1 rounded-full text-xs" data-student-id="${student.id}">Delete</button>` : ''}
+                    ${historyButton}
+                `;
+                return `
+                    <tr class="hover:bg-gray-50">
+                        <td class="px-4 py-2 font-medium">${student.studentName}</td>
+                        <td class="px-4 py-2">₦${(student.studentFee || 0).toFixed(2)}</td>
+                        <td class="px-4 py-2">${student.grade}</td>
+                        <td class="px-4 py-2">${student.days}</td>
+                        <td class="px-4 py-2">${subjects}</td>
+                        <td class="px-4 py-2">${student.parentName || 'N/A'}</td>
+                        <td class="px-4 py-2">${student.parentPhone || 'N/A'}</td>
+                        ${showActionsColumn || historyButton ? `<td class="px-4 py-2">${actionButtons}</td>` : ''}
+                    </tr>
+                `;
+            }).join('');
+
+        return `
+            <div class="border rounded-lg shadow-sm">
+                <details open>
+                    <summary class="p-4 cursor-pointer flex justify-between items-center font-semibold text-lg">
+                        ${tutor.name}
+                        <span class="ml-2 text-sm font-normal text-gray-500">(${assignedStudents.length} students shown)</span>
+                    </summary>
+                    <div class="border-t p-2">
+                        <table class="min-w-full text-sm">
+                            <thead class="bg-gray-50 text-left"><tr>
+                                <th class="px-4 py-2 font-medium">Student Name</th><th class="px-4 py-2 font-medium">Fee</th>
+                                <th class="px-4 py-2 font-medium">Grade</th><th class="px-4 py-2 font-medium">Days/Week</th>
+                                <th class="px-4 py-2 font-medium">Subject</th><th class="px-4 py-2 font-medium">Parent's Name</th>
+                                <th class="px-4 py-2 font-medium">Parent's Phone</th>
+                                ${showActionsColumn ? `<th class="px-4 py-2 font-medium">Actions</th>` : ''}
+                            </tr></thead>
+                            <tbody class="bg-white divide-y divide-gray-200">${studentsTableRows}</tbody>
+                        </table>
+                    </div>
+                </details>
+            </div>
+        `;
+    }).join('');
+
+    if (canEditStudents) {
+        document.querySelectorAll('.edit-student-btn').forEach(button => button.addEventListener('click', () => handleEditStudent(button.dataset.studentId)));
+    }
+    if (canDeleteStudents) {
+        document.querySelectorAll('.delete-student-btn').forEach(button => button.addEventListener('click', () => handleDeleteStudent(button.dataset.studentId)));
+    }
+    
+    document.querySelectorAll('.view-history-btn').forEach(button => {
+        button.addEventListener('click', () => window.viewStudentTutorHistory(button.dataset.studentId));
+    });
+}
+
+// ======================================================
+// SUBSECTION 3.2: Inactive Tutors Panel
+// ======================================================
 
 async function renderInactiveTutorsPanel(container) {
     container.innerHTML = `
@@ -1645,17 +656,14 @@ async function fetchAndRenderInactiveTutors(forceRefresh = false) {
         if (!sessionCache.inactiveTutors) {
             listContainer.innerHTML = `<p class="text-center text-gray-500 py-10">Fetching tutor data...</p>`;
             
-            // Fetch all tutors
             const tutorsSnapshot = await getDocs(collection(db, "tutors"));
             const allTutors = tutorsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
             
-            // Categorize tutors by status
             const inactiveTutors = allTutors.filter(tutor => tutor.status === 'inactive' || tutor.status === 'on_leave');
             const activeTutors = allTutors.filter(tutor => !tutor.status || tutor.status === 'active');
             
             saveToLocalStorage('inactiveTutors', inactiveTutors);
             
-            // Update counts
             document.getElementById('inactive-count-badge').textContent = inactiveTutors.filter(t => t.status === 'inactive').length;
             document.getElementById('active-count-badge').textContent = activeTutors.length;
             document.getElementById('leave-count-badge').textContent = inactiveTutors.filter(t => t.status === 'on_leave').length;
@@ -1710,7 +718,6 @@ function renderInactiveTutorsFromCache(searchTerm = '') {
         `;
     }).join('');
     
-    // Add event listeners
     document.querySelectorAll('.reactivate-btn').forEach(button => {
         button.addEventListener('click', (e) => handleReactivateTutor(e.target.dataset.tutorId));
     });
@@ -1724,7 +731,6 @@ function showMarkInactiveModal() {
     const allTutors = sessionCache.tutors || [];
     const inactiveTutors = sessionCache.inactiveTutors || [];
     
-    // Get only active tutors (not already inactive or on leave)
     const activeTutorsFiltered = allTutors.filter(tutor => 
         !tutor.status || tutor.status === 'active'
     );
@@ -1830,11 +836,9 @@ async function handleReactivateTutor(tutorId) {
 
 async function showTutorHistory(tutorId) {
     try {
-        // Fetch tutor's students (including archived ones for history)
         const studentsSnapshot = await getDocs(query(collection(db, "students"), where("tutorEmail", "==", tutorId)));
         const students = studentsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         
-        // Fetch tutor's reports
         const reportsSnapshot = await getDocs(query(collection(db, "tutor_submissions"), where("tutorEmail", "==", tutorId)));
         const reports = reportsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         
@@ -1911,9 +915,9 @@ async function showTutorHistory(tutorId) {
     }
 }
 
-// ##################################
-// # NEW: ARCHIVED STUDENTS PANEL
-// ##################################
+// ======================================================
+// SUBSECTION 3.3: Archived Students Panel
+// ======================================================
 
 async function renderArchivedStudentsPanel(container) {
     container.innerHTML = `
@@ -1969,17 +973,14 @@ async function fetchAndRenderArchivedStudents(forceRefresh = false) {
         if (!sessionCache.archivedStudents) {
             listContainer.innerHTML = `<p class="text-center text-gray-500 py-10">Fetching student data...</p>`;
             
-            // Fetch all students
             const studentsSnapshot = await getDocs(collection(db, "students"));
             const allStudents = studentsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
             
-            // Categorize students by status
             const archivedStudents = allStudents.filter(student => student.status === 'archived' || student.status === 'graduated' || student.status === 'transferred');
             const activeStudents = allStudents.filter(student => !student.status || student.status === 'active' || student.status === 'approved');
             
             saveToLocalStorage('archivedStudents', archivedStudents);
             
-            // Update counts
             const archivedCount = archivedStudents.filter(s => s.status === 'archived').length;
             const graduatedCount = archivedStudents.filter(s => s.status === 'graduated').length;
             const transferredCount = archivedStudents.filter(s => s.status === 'transferred').length;
@@ -2067,7 +1068,6 @@ function renderArchivedStudentsFromCache(searchTerm = '') {
         `;
     }).join('');
     
-    // Add event listeners
     document.querySelectorAll('.restore-student-btn').forEach(button => {
         button.addEventListener('click', (e) => handleRestoreStudent(e.target.dataset.studentId));
     });
@@ -2081,7 +1081,6 @@ function showArchiveStudentModal() {
     const allStudents = sessionCache.students || [];
     const archivedStudents = sessionCache.archivedStudents || [];
     
-    // Get only active students (not archived, graduated, or transferred)
     const activeStudentsFiltered = allStudents.filter(student => 
         !student.status || student.status === 'active' || student.status === 'approved'
     );
@@ -2190,274 +1189,14 @@ async function handleRestoreStudent(studentId) {
     }
 }
 
-// ##################################
-// # PANEL RENDERING FUNCTIONS
-// ##################################
+// ======================================================
+// SECTION 4: FINANCIAL PANELS
+// ======================================================
 
-// --- Tutor & Student Directory Panel ---
-async function renderManagementTutorView(container) {
-    container.innerHTML = `
-        <div class="bg-white p-6 rounded-lg shadow-md">
-            <div class="flex justify-between items-center mb-4 flex-wrap gap-4">
-                <h2 class="text-2xl font-bold text-green-700">Tutor & Student Directory</h2>
-                <div class="flex items-center gap-4 flex-wrap">
-                    <input type="search" id="directory-search" placeholder="Search Tutors, Students, Parents..." class="p-2 border rounded-md w-64">
-                    <button id="assign-student-btn" class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700">Assign New Student</button>
-                    <button id="reassign-student-btn" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Reassign Student</button>
-                    <button id="view-tutor-history-directory-btn" class="bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700">View Tutor History</button>
-                    <button id="refresh-directory-btn" class="bg-gray-600 text-white px-4 py-2 rounded hover:bg-gray-700">Refresh</button>
-                </div>
-            </div>
-            <div class="flex space-x-4 mb-4">
-                <div class="bg-green-100 p-3 rounded-lg text-center shadow w-full">
-                    <h4 class="font-bold text-green-800 text-sm">Active Tutors</h4>
-                    <p id="tutor-count-badge" class="text-2xl font-extrabold">0</p>
-                </div>
-                <div class="bg-yellow-100 p-3 rounded-lg text-center shadow w-full">
-                    <h4 class="font-bold text-yellow-800 text-sm">Active Students</h4>
-                    <p id="student-count-badge" class="text-2xl font-extrabold">0</p>
-                </div>
-                <div class="bg-purple-100 p-3 rounded-lg text-center shadow w-full">
-                    <h4 class="font-bold text-purple-800 text-sm">Students with History</h4>
-                    <p id="history-count-badge" class="text-2xl font-extrabold">0</p>
-                </div>
-            </div>
-            <div id="directory-list" class="space-y-4">
-                <p class="text-center text-gray-500 py-10">Loading directory...</p>
-            </div>
-        </div>
-    `;
-    document.getElementById('assign-student-btn').addEventListener('click', showAssignStudentModal);
-    document.getElementById('reassign-student-btn').addEventListener('click', showReassignStudentModal);
-    document.getElementById('refresh-directory-btn').addEventListener('click', () => fetchAndRenderDirectory(true));
-    document.getElementById('directory-search').addEventListener('input', (e) => renderDirectoryFromCache(e.target.value));
-    
-    // View tutor history button
-    document.getElementById('view-tutor-history-directory-btn').addEventListener('click', async () => {
-        if (!sessionCache.tutorAssignments || Object.keys(sessionCache.tutorAssignments).length === 0) {
-            alert("No tutor history available. Please refresh the directory first.");
-            return;
-        }
-        
-        // Create a modal to select a student
-        const students = sessionCache.students || [];
-        const activeStudents = students.filter(student => 
-            !student.status || student.status === 'active' || student.status === 'approved'
-        );
-        
-        if (activeStudents.length === 0) {
-            alert("No active students found.");
-            return;
-        }
-        
-        const studentOptions = activeStudents.map(student => 
-            `<option value="${student.id}">${student.studentName} (${student.grade || 'No grade'})</option>`
-        ).join('');
-        
-        const modalHtml = `
-            <div id="select-student-modal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-center justify-center">
-                <div class="relative p-8 bg-white w-96 max-w-lg rounded-lg shadow-xl">
-                    <button class="absolute top-2 right-2 text-gray-500 hover:text-gray-800 text-2xl font-bold" onclick="closeManagementModal('select-student-modal')">&times;</button>
-                    <h3 class="text-xl font-bold mb-4">Select Student to View Tutor History</h3>
-                    <form id="select-student-form">
-                        <div class="mb-4">
-                            <label class="block text-sm font-medium mb-2">Select Student</label>
-                            <select id="select-student" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2">
-                                <option value="" disabled selected>Select a student...</option>
-                                ${studentOptions}
-                            </select>
-                        </div>
-                        <div class="flex justify-end mt-4">
-                            <button type="button" onclick="closeManagementModal('select-student-modal')" class="mr-2 px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300">Cancel</button>
-                            <button type="submit" class="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700">View History</button>
-                        </div>
-                    </form>
-                </div>
-            </div>
-        `;
-        
-        document.body.insertAdjacentHTML('beforeend', modalHtml);
-        
-        document.getElementById('select-student-form').addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const studentId = document.getElementById('select-student').value;
-            closeManagementModal('select-student-modal');
-            window.viewStudentTutorHistory(studentId);
-        });
-    });
-    
-    fetchAndRenderDirectory();
-}
+// ======================================================
+// SUBSECTION 4.1: Pay Advice Panel
+// ======================================================
 
-async function fetchAndRenderDirectory(forceRefresh = false) {
-    if (forceRefresh) {
-        invalidateCache('tutors');
-        invalidateCache('students');
-        invalidateCache('tutorAssignments');
-    }
-
-    try {
-        // If cache is empty, fetch from server.
-        if (!sessionCache.tutors || !sessionCache.students) {
-            document.getElementById('directory-list').innerHTML = `<p class="text-center text-gray-500 py-10">Fetching data from server...</p>`;
-            const [tutorsSnapshot, studentsSnapshot] = await Promise.all([
-                getDocs(query(collection(db, "tutors"), orderBy("name"))),
-                getDocs(collection(db, "students"))
-            ]);
-            
-            // Filter out inactive tutors and archived students
-            const allTutors = tutorsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-            const activeTutors = allTutors.filter(tutor => 
-                !tutor.status || tutor.status === 'active'
-            );
-            
-            const allStudents = studentsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-            const activeStudents = allStudents.filter(student => 
-                !student.status || student.status === 'active' || student.status === 'approved'
-            );
-            
-            saveToLocalStorage('tutors', activeTutors); // Only store active tutors
-            saveToLocalStorage('students', activeStudents); // Only store active students
-        }
-        
-        // Fetch tutor assignment history if needed (only for active students)
-        if (!sessionCache.tutorAssignments || forceRefresh) {
-            await fetchTutorAssignmentHistory();
-        }
-        
-        renderDirectoryFromCache();
-    } catch (error) {
-        console.error("Error fetching directory data:", error);
-        document.getElementById('directory-list').innerHTML = `<p class="text-center text-red-500 py-10">Failed to load data.</p>`;
-    }
-}
-
-function renderDirectoryFromCache(searchTerm = '') {
-    const tutors = sessionCache.tutors || [];
-    const students = sessionCache.students || [];
-    const tutorAssignments = sessionCache.tutorAssignments || {};
-    const directoryList = document.getElementById('directory-list');
-    if (!directoryList) return;
-
-    if (tutors.length === 0 && students.length === 0) {
-        directoryList.innerHTML = `<p class="text-center text-gray-500 py-10">No directory data found. Click Refresh to fetch from the server.</p>`;
-        return;
-    }
-
-    const lowerCaseSearchTerm = searchTerm.toLowerCase();
-    const studentsByTutor = {};
-    
-    // Group active students by their tutor
-    students.forEach(student => {
-        if (!studentsByTutor[student.tutorEmail]) {
-            studentsByTutor[student.tutorEmail] = [];
-        }
-        studentsByTutor[student.tutorEmail].push(student);
-    });
-
-    // Filter active tutors
-    const filteredTutors = tutors.filter(tutor => {
-        const assignedStudents = studentsByTutor[tutor.email] || [];
-        const tutorMatch = tutor.name.toLowerCase().includes(lowerCaseSearchTerm);
-        const studentMatch = assignedStudents.some(s =>
-            s.studentName.toLowerCase().includes(lowerCaseSearchTerm) ||
-            (s.parentName && s.parentName.toLowerCase().includes(lowerCaseSearchTerm)) ||
-            (s.parentPhone && String(s.parentPhone).toLowerCase().includes(lowerCaseSearchTerm))
-        );
-        return tutorMatch || studentMatch;
-    });
-
-    if (filteredTutors.length === 0) {
-        directoryList.innerHTML = `<p class="text-center text-gray-500 py-10">No results found for "${searchTerm}".</p>`;
-        return;
-    }
-
-    document.getElementById('tutor-count-badge').textContent = tutors.length;
-    document.getElementById('student-count-badge').textContent = students.length;
-    
-    // Count students with tutor history
-    const studentsWithHistory = Object.keys(tutorAssignments).length;
-    document.getElementById('history-count-badge').textContent = studentsWithHistory;
-
-    const canEditStudents = window.userData?.permissions?.actions?.canEditStudents === true;
-    const canDeleteStudents = window.userData?.permissions?.actions?.canDeleteStudents === true;
-    const showActionsColumn = canEditStudents || canDeleteStudents;
-
-    directoryList.innerHTML = filteredTutors.map(tutor => {
-        const assignedStudents = (studentsByTutor[tutor.email] || [])
-            .filter(s =>
-                searchTerm === '' ||
-                tutor.name.toLowerCase().includes(lowerCaseSearchTerm) ||
-                s.studentName.toLowerCase().includes(lowerCaseSearchTerm) ||
-                (s.parentName && s.parentName.toLowerCase().includes(lowerCaseSearchTerm)) ||
-                (s.parentPhone && String(s.parentPhone).toLowerCase().includes(lowerCaseSearchTerm))
-            );
-
-        const studentsTableRows = assignedStudents
-            .sort((a, b) => a.studentName.localeCompare(b.studentName))
-            .map(student => {
-                const subjects = student.subjects && Array.isArray(student.subjects) ? student.subjects.join(', ') : 'N/A';
-                const studentHistory = tutorAssignments[student.id];
-                const historyButton = studentHistory ? 
-                    `<button class="view-history-btn bg-purple-500 text-white px-3 py-1 rounded-full text-xs ml-1" data-student-id="${student.id}">History</button>` : '';
-                
-                const actionButtons = `
-                    ${canEditStudents ? `<button class="edit-student-btn bg-blue-500 text-white px-3 py-1 rounded-full text-xs" data-student-id="${student.id}">Edit</button>` : ''}
-                    ${canDeleteStudents ? `<button class="delete-student-btn bg-red-500 text-white px-3 py-1 rounded-full text-xs" data-student-id="${student.id}">Delete</button>` : ''}
-                    ${historyButton}
-                `;
-                return `
-                    <tr class="hover:bg-gray-50">
-                        <td class="px-4 py-2 font-medium">${student.studentName}</td>
-                        <td class="px-4 py-2">₦${(student.studentFee || 0).toFixed(2)}</td>
-                        <td class="px-4 py-2">${student.grade}</td>
-                        <td class="px-4 py-2">${student.days}</td>
-                        <td class="px-4 py-2">${subjects}</td>
-                        <td class="px-4 py-2">${student.parentName || 'N/A'}</td>
-                        <td class="px-4 py-2">${student.parentPhone || 'N/A'}</td>
-                        ${showActionsColumn || historyButton ? `<td class="px-4 py-2">${actionButtons}</td>` : ''}
-                    </tr>
-                `;
-            }).join('');
-
-        return `
-            <div class="border rounded-lg shadow-sm">
-                <details open>
-                    <summary class="p-4 cursor-pointer flex justify-between items-center font-semibold text-lg">
-                        ${tutor.name}
-                        <span class="ml-2 text-sm font-normal text-gray-500">(${assignedStudents.length} students shown)</span>
-                    </summary>
-                    <div class="border-t p-2">
-                        <table class="min-w-full text-sm">
-                            <thead class="bg-gray-50 text-left"><tr>
-                                <th class="px-4 py-2 font-medium">Student Name</th><th class="px-4 py-2 font-medium">Fee</th>
-                                <th class="px-4 py-2 font-medium">Grade</th><th class="px-4 py-2 font-medium">Days/Week</th>
-                                <th class="px-4 py-2 font-medium">Subject</th><th class="px-4 py-2 font-medium">Parent's Name</th>
-                                <th class="px-4 py-2 font-medium">Parent's Phone</th>
-                                ${showActionsColumn ? `<th class="px-4 py-2 font-medium">Actions</th>` : ''}
-                            </tr></thead>
-                            <tbody class="bg-white divide-y divide-gray-200">${studentsTableRows}</tbody>
-                        </table>
-                    </div>
-                </details>
-            </div>
-        `;
-    }).join('');
-
-    if (canEditStudents) {
-        document.querySelectorAll('.edit-student-btn').forEach(button => button.addEventListener('click', () => handleEditStudent(button.dataset.studentId)));
-    }
-    if (canDeleteStudents) {
-        document.querySelectorAll('.delete-student-btn').forEach(button => button.addEventListener('click', () => handleDeleteStudent(button.dataset.studentId)));
-    }
-    
-    // Add event listeners for history buttons
-    document.querySelectorAll('.view-history-btn').forEach(button => {
-        button.addEventListener('click', () => window.viewStudentTutorHistory(button.dataset.studentId));
-    });
-}
-
-// --- Updated Pay Advice Panel ---
 async function renderPayAdvicePanel(container) {
     const canExport = window.userData?.permissions?.actions?.canExportPayAdvice === true;
     container.innerHTML = `
@@ -2607,7 +1346,6 @@ async function loadPayAdviceData(startDate, endDate) {
             const tutor = doc.data();
             const tutorEmail = tutor.email;
             
-            // Skip inactive tutors in pay calculations
             if (tutor.status === 'inactive' || tutor.status === 'on_leave') {
                 return;
             }
@@ -2618,7 +1356,6 @@ async function loadPayAdviceData(startDate, endDate) {
                 s.tutorEmail === tutorEmail && 
                 reportedStudentNames.has(s.studentName) &&
                 s.summerBreak !== true &&
-                // Skip archived, graduated, or transferred students
                 s.status !== 'archived' &&
                 s.status !== 'graduated' &&
                 s.status !== 'transferred'
@@ -2679,7 +1416,6 @@ function renderPayAdviceTable() {
         `;
     }).join('');
     
-    // Show grand total
     const totalElement = document.getElementById('pay-advice-total');
     const totalAmountElement = document.getElementById('grand-total-amount');
     totalAmountElement.textContent = grandTotal.toLocaleString();
@@ -2703,7 +1439,30 @@ function renderPayAdviceTable() {
     });
 }
 
-// Export Pay Advice as 4 XLS Files
+function convertPayAdviceToCSV(data) {
+    const header = [
+        'Tutor Name', 'Student Count', 'Total Student Fees (₦)', 'Management Fee (₦)', 'Total Pay (₦)',
+        'Gift (₦)', 'Final Pay (₦)', 'Beneficiary Bank', 'Beneficiary Account', 'Beneficiary Name'
+    ];
+    const rows = data.map(item => {
+        const giftAmount = payAdviceGifts[item.tutorEmail] || 0;
+        const finalPay = item.totalPay + giftAmount;
+        return [
+            `"${item.tutorName}"`,
+            item.studentCount,
+            item.totalStudentFees,
+            item.managementFee,
+            item.totalPay,
+            giftAmount,
+            finalPay,
+            `"${item.beneficiaryBank || 'N/A'}"`,
+            `"${item.beneficiaryAccount || 'N/A'}"`,
+            `"${item.beneficiaryName || 'N/A'}"`
+        ];
+    });
+    return [header.join(','), ...rows.map(row => row.join(','))].join('\n');
+}
+
 async function exportPayAdviceAsXLS() {
     try {
         const currentDate = new Date();
@@ -2729,7 +1488,6 @@ async function exportPayAdviceAsXLS() {
             };
         });
 
-        // FILE 1: Main Payment
         const mainPaymentData = processedData.map(tutor => [
             tutor.tutorName,
             tutor.beneficiaryBank,
@@ -2742,7 +1500,6 @@ async function exportPayAdviceAsXLS() {
             `${monthYear} Tutor Payment`
         ]);
 
-        // FILE 2: DataZoom Allocation
         const dataZoomData = processedData.map(tutor => [
             tutor.tutorName,
             tutor.beneficiaryBank,
@@ -2755,7 +1512,6 @@ async function exportPayAdviceAsXLS() {
             'DATAZOOMALLOCT'
         ]);
 
-        // FILE 3: TIN Remittance
         const tinRemittanceData = processedData.map(tutor => [
             tutor.tutorName,
             tutor.tinNumber || '',
@@ -2764,7 +1520,6 @@ async function exportPayAdviceAsXLS() {
             monthYear
         ]);
 
-        // FILE 4: Full Pay Advice Report
         const fullPayAdviceData = processedData.map(tutor => [
             tutor.tutorName,
             tutor.studentCount,
@@ -2778,7 +1533,6 @@ async function exportPayAdviceAsXLS() {
             tutor.tutorName
         ]);
 
-        // Create and download all 4 files
         await downloadMultipleXLSFiles([
             {
                 filename: `Main_Payment_${monthYear.replace(' ', '_')}.xls`,
@@ -2810,7 +1564,6 @@ async function exportPayAdviceAsXLS() {
     }
 }
 
-// Function to download multiple XLS files
 async function downloadMultipleXLSFiles(files) {
     for (const file of files) {
         await downloadAsXLS(file.data, file.headers, file.filename);
@@ -2818,20 +1571,17 @@ async function downloadMultipleXLSFiles(files) {
     }
 }
 
-// Function to convert data to XLS format
 function downloadAsXLS(data, headers, filename) {
     return new Promise((resolve) => {
         let html = '<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40"><head><meta charset="UTF-8"><!--[if gte mso 9]><xml><x:ExcelWorkbook><x:ExcelWorksheets><x:ExcelWorksheet><x:Name>Sheet1</x:Name><x:WorksheetOptions><x:DisplayGridlines/></x:WorksheetOptions></x:ExcelWorksheet></x:ExcelWorksheets></x:ExcelWorkbook></xml><![endif]--></head><body>';
         html += '<table border="1">';
         
-        // Add headers
         html += '<tr>';
         headers.forEach(header => {
             html += `<th>${header}</th>`;
         });
         html += '</tr>';
         
-        // Add data rows
         data.forEach(row => {
             html += '<tr>';
             row.forEach(cell => {
@@ -2842,7 +1592,6 @@ function downloadAsXLS(data, headers, filename) {
         
         html += '</table></body></html>';
         
-        // Create and trigger download
         const blob = new Blob([html], { type: 'application/vnd.ms-excel' });
         const link = document.createElement('a');
         link.href = URL.createObjectURL(blob);
@@ -2855,7 +1604,332 @@ function downloadAsXLS(data, headers, filename) {
     });
 }
 
-// --- Tutor Reports Panel ---
+// ======================================================
+// SUBSECTION 4.2: Referral Management Panel
+// ======================================================
+
+async function getParentNameFromParentUsers(parentUid) {
+    try {
+        if (!parentUid) return 'Unknown Parent';
+        
+        const parentDoc = await getDoc(doc(db, 'parent_users', parentUid));
+        if (parentDoc.exists()) {
+            const parentData = parentDoc.data();
+            return capitalize(parentData.parentName || parentData.name || parentData.email || 'Unknown Parent');
+        }
+        return 'Unknown Parent';
+    } catch (error) {
+        console.error("Error fetching parent name:", error);
+        return 'Unknown Parent';
+    }
+}
+
+async function renderReferralsAdminPanel(container) {
+    container.innerHTML = '<div class="text-center py-8"><div class="loading-spinner mx-auto" style="width: 40px; height: 40px;"></div><p class="text-green-600 font-semibold mt-4">Loading referral tracking data...</p></div>';
+
+    try {
+        const parentsQuery = query(collection(db, 'parent_users'), where('referralCode', '!=', null));
+        const parentsSnapshot = await getDocs(parentsQuery);
+
+        const referralDataMap = {};
+
+        for (const parentDoc of parentsSnapshot.docs) {
+            const data = parentDoc.data();
+            const parentUid = parentDoc.id;
+            
+            const parentName = capitalize(data.parentName || data.name || data.email || 'Unknown Parent');
+            
+            referralDataMap[parentUid] = {
+                uid: parentUid,
+                name: parentName,
+                email: data.email || 'N/A',
+                referralCode: data.referralCode || 'N/A',
+                referralEarnings: data.referralEarnings || 0,
+                bankName: data.bankName || 'N/A',
+                accountNumber: data.accountNumber || 'N/A',
+                totalReferrals: 0,
+                pendingReferrals: 0,
+                approvedReferrals: 0,
+                paidReferrals: 0,
+                transactions: []
+            };
+        }
+
+        const transactionsSnapshot = await getDocs(collection(db, 'referral_transactions'));
+        
+        transactionsSnapshot.forEach(doc => {
+            const data = doc.data();
+            const ownerUid = data.ownerUid;
+            if (referralDataMap[ownerUid]) {
+                const parentData = referralDataMap[ownerUid];
+                parentData.totalReferrals++;
+                parentData.transactions.push({
+                    id: doc.id,
+                    ...data,
+                    refereeJoinDate: data.refereeJoinDate ? data.refereeJoinDate.toDate().toLocaleDateString() : 'N/A'
+                });
+
+                const status = data.status || 'pending';
+                if (status === 'pending') parentData.pendingReferrals++;
+                else if (status === 'approved') parentData.approvedReferrals++;
+                else if (status === 'paid') parentData.paidReferrals++;
+            }
+        });
+
+        saveToLocalStorage('referralDataMap', referralDataMap);
+
+        let tableRows = '';
+        const sortedParents = Object.values(referralDataMap).sort((a, b) => b.referralEarnings - a.referralEarnings);
+
+        if (sortedParents.length === 0) {
+            tableRows = `<tr><td colspan="6" class="text-center py-4 text-gray-500">No parents in the referral system yet.</td></tr>`;
+        } else {
+            sortedParents.forEach(parent => {
+                tableRows += `
+                    <tr class="border-b hover:bg-gray-50">
+                        <td class="px-6 py-4 font-medium text-gray-900">${parent.name}</td>
+                        <td class="px-6 py-4">
+                            <span class="font-mono bg-gray-100 px-2 py-1 rounded">${parent.referralCode}</span>
+                        </td>
+                        <td class="px-6 py-4 text-center">${parent.totalReferrals}</td>
+                        <td class="px-6 py-4 text-center text-yellow-600 font-semibold">${parent.pendingReferrals}</td>
+                        <td class="px-6 py-4 font-bold text-green-600">${formatNaira(parent.referralEarnings)}</td>
+                        <td class="px-6 py-4 text-right">
+                            <button onclick="showReferralDetailsModal('${parent.uid}')" class="text-indigo-600 hover:text-indigo-900 font-semibold">View Details</button>
+                        </td>
+                    </tr>
+                `;
+            });
+        }
+
+        container.innerHTML = `
+            <div class="bg-white p-6 rounded-lg shadow-md">
+                <h2 class="text-3xl font-extrabold text-gray-900 mb-6">Parent Referral Management</h2>
+                <p class="text-gray-600 mb-6">Track referral activity and manage payouts for parent-led referrals.</p>
+
+                <div class="bg-white shadow overflow-hidden sm:rounded-lg">
+                    <table class="min-w-full divide-y divide-gray-200">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Parent Name</th>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Code</th>
+                                <th scope="col" class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Total Referrals</th>
+                                <th scope="col" class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Pending Approvals</th>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total Earnings</th>
+                                <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody class="bg-white divide-y divide-gray-200">
+                            ${tableRows}
+                        </tbody>
+                    </table>
+                </div>
+                <p class="text-sm text-gray-500 mt-4">Note: Earnings reflect rewards for approved (non-paid) and paid transactions.</p>
+            </div>
+        `;
+
+        window.showReferralDetailsModal = showReferralDetailsModal;
+    } catch (error) {
+        console.error("Error loading referral data: ", error);
+        container.innerHTML = `<p class="text-center mt-12 text-red-600">Error loading referral data: ${error.message}</p>`;
+    }
+}
+
+function showReferralDetailsModal(parentUid) {
+    const parentData = sessionCache.referralDataMap[parentUid];
+    if (!parentData) {
+        alert("Referral details not found in cache.");
+        return;
+    }
+    
+    const sortedTransactions = parentData.transactions.sort((a, b) => {
+        const statusOrder = { 'pending': 1, 'approved': 2, 'paid': 3 };
+        return statusOrder[a.status] - statusOrder[b.status];
+    });
+
+    let transactionsHtml = sortedTransactions.map(t => {
+        const badgeClass = t.status === 'approved' ? 'bg-green-100 text-green-800' :
+                           t.status === 'paid' ? 'bg-indigo-100 text-indigo-800' :
+                           'bg-yellow-100 text-yellow-800';
+        
+        const actionButton = (t.status === 'pending' || t.status === 'approved') ?
+            `<button onclick="updateReferralStatus('${parentData.uid}', '${t.id}', 'approved')" class="text-green-600 hover:text-green-900 font-semibold mr-2 text-sm">${t.status === 'pending' ? 'Approve' : 'Re-Approve'}</button>` :
+            '';
+
+        return `
+            <tr class="border-b">
+                <td class="px-4 py-3">${capitalize(t.refereeName)} (Grade: ${t.refereeGrade})</td>
+                <td class="px-4 py-3">${formatNaira(t.amount)}</td>
+                <td class="px-4 py-3 text-xs">
+                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full font-medium ${badgeClass}">
+                        ${capitalize(t.status)}
+                    </span>
+                </td>
+                <td class="px-4 py-3 text-sm text-gray-500">${t.refereeJoinDate}</td>
+                <td class="px-4 py-3 text-right">
+                    ${actionButton}
+                </td>
+            </tr>
+        `;
+    }).join('');
+
+    const modalHtml = `
+        <div id="referralDetailsModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-center justify-center">
+            <div class="relative p-8 bg-white w-full max-w-4xl rounded-lg shadow-2xl">
+                <button class="absolute top-2 right-2 text-gray-500 hover:text-gray-800 text-2xl font-bold" onclick="closeManagementModal('referralDetailsModal')">&times;</button>
+                <h3 class="text-2xl font-bold mb-4 text-indigo-600">Referral Details for ${parentData.name}</h3>
+
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6 text-sm">
+                    <div class="bg-gray-50 p-3 rounded-lg"><p class="font-medium text-gray-500">Code:</p><p class="font-bold text-lg text-indigo-800">${parentData.referralCode}</p></div>
+                    <div class="bg-gray-50 p-3 rounded-lg"><p class="font-medium text-gray-500">Total Earnings:</p><p class="font-bold text-lg text-green-700">${formatNaira(parentData.referralEarnings)}</p></div>
+                    <div class="bg-gray-50 p-3 rounded-lg"><p class="font-medium text-gray-500">Unpaid Approved:</p><p class="font-bold text-lg text-yellow-600">${parentData.approvedReferrals - parentData.paidReferrals}</p></div>
+                    <div class="col-span-3">
+                        <p class="font-medium text-gray-500 mb-1">Payout Details:</p>
+                        <p class="text-gray-700">Bank: ${parentData.bankName} | Account: ${parentData.accountNumber}</p>
+                    </div>
+                </div>
+
+                <div class="flex justify-between items-center mb-4">
+                    <h4 class="text-xl font-semibold text-gray-700">Transaction History (${parentData.totalReferrals} Total)</h4>
+                    <button onclick="resetParentBalance('${parentData.uid}', ${parentData.referralEarnings})" 
+                            class="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 text-sm disabled:opacity-50"
+                            ${parentData.referralEarnings === 0 ? 'disabled' : ''}>
+                        Mark All Approved as PAID
+                    </button>
+                </div>
+
+                <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-gray-200">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Referee Details</th>
+                                <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Amount</th>
+                                <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                                <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Joined Date</th>
+                                <th class="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody class="bg-white divide-y divide-gray-100">
+                            ${transactionsHtml}
+                        </tbody>
+                    </table>
+                </div>
+
+            </div>
+        </div>
+    `;
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+
+    window.updateReferralStatus = updateReferralStatus;
+    window.resetParentBalance = resetParentBalance;
+}
+
+async function updateReferralStatus(parentUid, transactionId, newStatus) {
+    if (!confirm(`Are you sure you want to set this transaction status to '${newStatus}'?`)) {
+        return;
+    }
+
+    try {
+        const batch = writeBatch(db);
+        const transactionRef = doc(db, 'referral_transactions', transactionId);
+        const parentRef = doc(db, 'parent_users', parentUid);
+
+        const transactionDoc = await getDoc(transactionRef);
+        if (!transactionDoc.exists()) {
+            alert('Transaction not found!');
+            return;
+        }
+        const oldStatus = transactionDoc.data().status;
+        const amount = transactionDoc.data().amount || 0;
+
+        batch.update(transactionRef, {
+            status: newStatus,
+            lastUpdated: Timestamp.now()
+        });
+
+        let earningsChange = 0;
+        if (oldStatus === 'pending' && newStatus === 'approved') {
+            earningsChange = amount;
+        }
+
+        if (earningsChange !== 0) {
+            const currentEarnings = sessionCache.referralDataMap[parentUid].referralEarnings;
+            batch.update(parentRef, {
+                referralEarnings: currentEarnings + earningsChange
+            });
+        }
+
+        await batch.commit();
+
+        alert(`Transaction status updated to ${capitalize(newStatus)}. Parent earnings adjusted.`);
+        
+        invalidateCache('referralDataMap');
+        closeManagementModal('referralDetailsModal');
+        await renderReferralsAdminPanel(document.getElementById('main-content'));
+
+    } catch (error) {
+        console.error("Error updating referral status: ", error);
+        alert("Failed to update status. Check console for details.");
+    }
+}
+
+async function resetParentBalance(parentUid, currentEarnings) {
+    if (currentEarnings === 0) {
+        alert("This parent has zero approved earnings to pay out.");
+        return;
+    }
+
+    if (!confirm(`Are you sure you want to mark ALL ${formatNaira(currentEarnings)} approved earnings as PAID? This will reset the parent's available earnings to ₦0.`)) {
+        return;
+    }
+
+    try {
+        const batch = writeBatch(db);
+        const parentRef = doc(db, 'parent_users', parentUid);
+
+        const approvedQuery = query(
+            collection(db, 'referral_transactions'),
+            where('ownerUid', '==', parentUid),
+            where('status', '==', 'approved')
+        );
+
+        const approvedSnapshot = await getDocs(approvedQuery);
+
+        approvedSnapshot.forEach(doc => {
+            const transactionRef = doc(db, 'referral_transactions', doc.id);
+            batch.update(transactionRef, {
+                status: 'paid',
+                paidDate: Timestamp.now(),
+                lastUpdated: Timestamp.now()
+            });
+        });
+
+        batch.update(parentRef, {
+            referralEarnings: 0
+        });
+
+        await batch.commit();
+
+        alert(`Payout complete. ${approvedSnapshot.size} transactions marked as PAID. Parent earnings reset to ₦0.`);
+        
+        invalidateCache('referralDataMap');
+        closeManagementModal('referralDetailsModal');
+        await renderReferralsAdminPanel(document.getElementById('main-content'));
+
+    } catch (error) {
+        console.error("Error processing payout and reset: ", error);
+        alert("Failed to process payout. Check console for details.");
+    }
+}
+
+// ======================================================
+// SECTION 5: ACADEMICS PANELS
+// ======================================================
+
+// ======================================================
+// SUBSECTION 5.1: Tutor Reports Panel
+// ======================================================
+
 async function renderTutorReportsPanel(container) {
     const canDownload = window.userData?.permissions?.actions?.canDownloadReports === true;
     const canExport = window.userData?.permissions?.actions?.canExportPayAdvice === true;
@@ -2864,7 +1938,6 @@ async function renderTutorReportsPanel(container) {
         <div class="bg-white p-6 rounded-lg shadow-md">
             <h2 class="text-2xl font-bold text-green-700 mb-4">Tutor Reports</h2>
             
-            <!-- Filters and Controls -->
             <div class="bg-green-50 p-4 rounded-lg mb-6">
                 <div class="grid grid-cols-1 md:grid-cols-4 gap-4 items-end mb-4">
                     <div>
@@ -2918,13 +1991,11 @@ async function renderTutorReportsPanel(container) {
                 </div>
             </div>
 
-            <!-- Search Box -->
             <div class="mb-6">
                 <input type="search" id="reports-search" placeholder="Search reports by student, tutor, or content..." 
                        class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent">
             </div>
 
-            <!-- Progress Modal -->
             <div id="pdf-progress-modal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-center justify-center hidden">
                 <div class="relative p-8 bg-white w-96 rounded-lg shadow-xl">
                     <h3 class="text-xl font-bold mb-4">Generating PDF</h3>
@@ -2936,7 +2007,6 @@ async function renderTutorReportsPanel(container) {
                 </div>
             </div>
 
-            <!-- Reports List -->
             <div id="tutor-reports-list" class="space-y-4">
                 <div class="text-center py-10">
                     <div class="loading-spinner mx-auto" style="width: 40px; height: 40px;"></div>
@@ -2946,7 +2016,6 @@ async function renderTutorReportsPanel(container) {
         </div>
     `;
 
-    // Set default dates (current month)
     const now = new Date();
     const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
     const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0);
@@ -2957,22 +2026,18 @@ async function renderTutorReportsPanel(container) {
     let allReports = [];
     let filteredReports = [];
 
-    // Date change handler
     const handleDateChange = () => {
         fetchAndRenderTutorReports();
     };
 
-    // Event listeners
     document.getElementById('reports-start-date').addEventListener('change', handleDateChange);
     document.getElementById('reports-end-date').addEventListener('change', handleDateChange);
     document.getElementById('refresh-reports-btn').addEventListener('click', handleDateChange);
     
-    // Search functionality
     document.getElementById('reports-search').addEventListener('input', (e) => {
         filterReports(e.target.value);
     });
 
-    // Filter functionality
     document.getElementById('reports-tutor-filter').addEventListener('change', () => {
         applyFilters();
     });
@@ -2981,16 +2046,13 @@ async function renderTutorReportsPanel(container) {
         applyFilters();
     });
 
-    // Export CSV
     const exportBtn = document.getElementById('export-reports-csv-btn');
     if (exportBtn) {
         exportBtn.addEventListener('click', exportReportsToCSV);
     }
 
-    // Load initial data
     handleDateChange();
 
-    // Helper functions for the reports panel
     function filterReports(searchTerm) {
         const lowerCaseTerm = searchTerm.toLowerCase();
         filteredReports = allReports.filter(report => 
@@ -3061,7 +2123,6 @@ async function renderTutorReportsPanel(container) {
         return [headers.join(','), ...rows.map(row => row.join(','))].join('\n');
     }
 
-    // Fixed function to fetch and render reports
     async function fetchAndRenderTutorReports() {
         const reportsListContainer = document.getElementById('tutor-reports-list');
         if (!reportsListContainer) return;
@@ -3086,11 +2147,9 @@ async function renderTutorReportsPanel(container) {
 
             endDate.setHours(23, 59, 59, 999);
 
-            // Convert dates to Firestore timestamps
             const startTimestamp = Timestamp.fromDate(startDate);
             const endTimestamp = Timestamp.fromDate(endDate);
 
-            // Query reports within date range
             const reportsQuery = query(
                 collection(db, "tutor_submissions"), 
                 where("submittedAt", ">=", startTimestamp),
@@ -3114,10 +2173,8 @@ async function renderTutorReportsPanel(container) {
 
             filteredReports = [...allReports];
 
-            // Update filter dropdowns
             updateFilterDropdowns();
 
-            // Save to cache and render
             saveToLocalStorage('reports', allReports);
             renderTutorReportsFromCache();
 
@@ -3139,15 +2196,12 @@ async function renderTutorReportsPanel(container) {
         const tutorFilter = document.getElementById('reports-tutor-filter');
         const studentFilter = document.getElementById('reports-student-filter');
         
-        // Get unique tutors and students
         const tutors = [...new Set(allReports.map(r => r.tutorEmail))].filter(Boolean);
         const students = [...new Set(allReports.map(r => r.studentName))].filter(Boolean);
         
-        // Update tutor filter
         tutorFilter.innerHTML = '<option value="">All Tutors</option>' + 
             tutors.map(tutor => `<option value="${tutor}">${tutor}</option>`).join('');
         
-        // Update student filter
         studentFilter.innerHTML = '<option value="">All Students</option>' + 
             students.map(student => `<option value="${student}">${student}</option>`).join('');
     }
@@ -3168,7 +2222,6 @@ async function renderTutorReportsPanel(container) {
             return;
         }
 
-        // Group reports by tutor
         const reportsByTutor = {};
         filteredReports.forEach(report => {
             if (!reportsByTutor[report.tutorEmail]) {
@@ -3180,18 +2233,15 @@ async function renderTutorReportsPanel(container) {
             reportsByTutor[report.tutorEmail].reports.push(report);
         });
 
-        // Update statistics
         const uniqueTutors = Object.keys(reportsByTutor).length;
         document.getElementById('report-tutor-count').textContent = uniqueTutors;
         document.getElementById('report-total-count').textContent = filteredReports.length;
 
         const canDownload = window.userData?.permissions?.actions?.canDownloadReports === true;
         
-        // Render the reports in tutor → student hierarchy
         let html = '';
         
         Object.values(reportsByTutor).forEach(tutorData => {
-            // Group reports by student for this tutor
             const reportsByStudent = {};
             tutorData.reports.forEach(report => {
                 if (!reportsByStudent[report.studentName]) {
@@ -3274,275 +2324,466 @@ async function renderTutorReportsPanel(container) {
     }
 }
 
-// FIXED: Date handling functions for parent feedback - UPDATED VERSION
-function formatFeedbackDate(timestamp) {
-    if (!timestamp) return 'Unknown date';
-    
+// ======================================================
+// SUBSECTION 5.2: Enrollments Panel
+// ======================================================
+
+async function renderEnrollmentsPanel(container) {
+    container.innerHTML = `
+        <div class="bg-white p-6 rounded-lg shadow-md">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-2xl font-bold text-green-700">Enrollment Management</h2>
+                <div class="flex items-center gap-4">
+                    <input type="search" id="enrollments-search" placeholder="Search enrollments..." class="p-2 border rounded-md w-64">
+                    <button id="refresh-enrollments-btn" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Refresh</button>
+                </div>
+            </div>
+            
+            <div class="flex space-x-4 mb-6">
+                <div class="bg-green-100 p-3 rounded-lg text-center shadow w-full">
+                    <h4 class="font-bold text-green-800 text-sm">Total Enrollments</h4>
+                    <p id="total-enrollments" class="text-2xl font-extrabold">0</p>
+                </div>
+                <div class="bg-yellow-100 p-3 rounded-lg text-center shadow w-full">
+                    <h4 class="font-bold text-yellow-800 text-sm">Draft Applications</h4>
+                    <p id="draft-enrollments" class="text-2xl font-extrabold">0</p>
+                </div>
+                <div class="bg-blue-100 p-3 rounded-lg text-center shadow w-full">
+                    <h4 class="font-bold text-blue-800 text-sm">Pending Review</h4>
+                    <p id="pending-enrollments" class="text-2xl font-extrabold">0</p>
+                </div>
+                <div class="bg-purple-100 p-3 rounded-lg text-center shadow w-full">
+                    <h4 class="font-bold text-purple-800 text-sm">Completed</h4>
+                    <p id="completed-enrollments" class="text-2xl font-extrabold">0</p>
+                </div>
+            </div>
+
+            <div class="bg-gray-50 p-4 rounded-lg mb-6">
+                <div class="flex space-x-4">
+                    <select id="status-filter" class="p-2 border rounded-md">
+                        <option value="">All Statuses</option>
+                        <option value="draft">Draft</option>
+                        <option value="pending">Pending</option>
+                        <option value="completed">Completed</option>
+                        <option value="payment_received">Payment Received</option>
+                    </select>
+                    <input type="date" id="date-from" class="p-2 border rounded-md" placeholder="From Date">
+                    <input type="date" id="date-to" class="p-2 border rounded-md" placeholder="To Date">
+                </div>
+            </div>
+
+            <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Application ID</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Parent Name</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Students</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total Fee</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Referral Code</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Created</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="enrollments-list" class="bg-white divide-y divide-gray-200">
+                        <tr>
+                            <td colspan="8" class="px-6 py-4 text-center text-gray-500">Loading enrollments...</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    `;
+
+    document.getElementById('refresh-enrollments-btn').addEventListener('click', () => fetchAndRenderEnrollments(true));
+    document.getElementById('enrollments-search').addEventListener('input', (e) => filterEnrollments(e.target.value));
+    document.getElementById('status-filter').addEventListener('change', applyEnrollmentFilters);
+    document.getElementById('date-from').addEventListener('change', applyEnrollmentFilters);
+    document.getElementById('date-to').addEventListener('change', applyEnrollmentFilters);
+
+    fetchAndRenderEnrollments();
+}
+
+async function fetchAndRenderEnrollments(forceRefresh = false) {
+    if (forceRefresh) {
+        invalidateCache('enrollments');
+    }
+
+    const enrollmentsList = document.getElementById('enrollments-list');
+    if (!enrollmentsList) return;
+
     try {
-        let date = null;
-        
-        // Case 1: Firebase Timestamp with toDate() method
-        if (timestamp && typeof timestamp.toDate === 'function') {
-            date = timestamp.toDate();
-        }
-        // Case 2: Object with seconds/nanoseconds (Firestore format)
-        else if (timestamp && typeof timestamp === 'object' && timestamp.seconds) {
-            date = new Date(timestamp.seconds * 1000 + (timestamp.nanoseconds || 0) / 1000000);
-        }
-        // Case 3: ISO string
-        else if (typeof timestamp === 'string') {
-            date = new Date(timestamp);
-        }
-        // Case 4: Number (milliseconds since epoch)
-        else if (typeof timestamp === 'number') {
-            date = new Date(timestamp);
-        }
-        // Case 5: Already a Date object
-        else if (timestamp instanceof Date) {
-            date = timestamp;
+        if (!sessionCache.enrollments || forceRefresh) {
+            enrollmentsList.innerHTML = `<tr><td colspan="8" class="px-6 py-4 text-center text-gray-500">Fetching enrollments...</td></tr>`;
+            
+            const snapshot = await getDocs(query(collection(db, "enrollments"), orderBy("createdAt", "desc")));
+            const enrollmentsData = snapshot.docs.map(doc => ({ 
+                id: doc.id, 
+                ...doc.data() 
+            }));
+            
+            saveToLocalStorage('enrollments', enrollmentsData);
         }
         
-        // Check if we got a valid date
-        if (date && !isNaN(date.getTime())) {
-            return date.toLocaleDateString('en-US', {
-                year: 'numeric',
-                month: 'short',
-                day: 'numeric',
-                hour: '2-digit',
-                minute: '2-digit'
-            });
-        }
-        
-        return 'Unknown date';
+        renderEnrollmentsFromCache();
     } catch (error) {
-        console.error("Error formatting date:", error, timestamp);
-        return 'Invalid date';
+        console.error("Error fetching enrollments:", error);
+        enrollmentsList.innerHTML = `<tr><td colspan="8" class="px-6 py-4 text-center text-red-500">Failed to load enrollments: ${error.message}</td></tr>`;
     }
 }
 
-// FIXED Global functions for event handlers
-window.previewReport = async function(reportId) {
-    try {
-        const { html } = await generateReportHTML(reportId);
-        const newWindow = window.open();
-        newWindow.document.write(html);
-        newWindow.document.close();
-    } catch (error) {
-        console.error("Error previewing report:", error);
-        alert(`Error: ${error.message}`);
-    }
-};
+function renderEnrollmentsFromCache(searchTerm = '') {
+    const enrollments = sessionCache.enrollments || [];
+    const enrollmentsList = document.getElementById('enrollments-list');
+    if (!enrollmentsList) return;
 
-// Download using the same HTML as preview
-window.downloadSingleReport = async function(reportId, event) {
-    const button = event.target;
-    const originalText = button.innerHTML;
+    const statusFilter = document.getElementById('status-filter')?.value || '';
+    const dateFrom = document.getElementById('date-from')?.value;
+    const dateTo = document.getElementById('date-to')?.value;
     
-    try {
-        // Show loading state
-        button.innerHTML = '<div class="loading-spinner mx-auto" style="width: 16px; height: 16px;"></div>';
-        button.disabled = true;
-        
-        // Show progress modal
-        const progressModal = document.getElementById('pdf-progress-modal');
-        const progressBar = document.getElementById('pdf-progress-bar');
-        const progressText = document.getElementById('pdf-progress-text');
-        const progressMessage = document.getElementById('pdf-progress-message');
-        
-        progressModal.classList.remove('hidden');
-        progressMessage.textContent = 'Generating PDF...';
-        progressBar.style.width = '0%';
-        progressText.textContent = '0%';
-
-        // Use the SAME HTML generation as preview
-        const { html, reportData } = await generateReportHTML(reportId);
-        
-        // Update progress
-        progressBar.style.width = '50%';
-        progressText.textContent = '50%';
-        progressMessage.textContent = 'Converting to PDF...';
-
-        // Simple PDF conversion with optimized settings
-        const options = {
-            margin: 0.5,
-            filename: `${reportData.studentName}_Report_${new Date().getTime()}.pdf`,
-            image: { 
-                type: 'jpeg', 
-                quality: 0.98 
-            },
-            html2canvas: { 
-                scale: 2,
-                useCORS: true,
-                logging: false,
-                backgroundColor: '#FFFFFF'
-            },
-            jsPDF: { 
-                unit: 'in', 
-                format: 'a4', 
-                orientation: 'portrait'
-            }
-        };
-
-        // Generate and download PDF
-        await html2pdf().set(options).from(html).save();
-        
-        // Update progress
-        progressBar.style.width = '100%';
-        progressText.textContent = '100%';
-        progressMessage.textContent = 'Download complete!';
-        
-        // Close modal after delay
-        setTimeout(() => {
-            progressModal.classList.add('hidden');
-        }, 1000);
-        
-    } catch (error) {
-        console.error("Error downloading report:", error);
-        alert(`Error downloading report: ${error.message}`);
-        document.getElementById('pdf-progress-modal').classList.add('hidden');
-    } finally {
-        // Restore button
-        button.innerHTML = originalText;
-        button.disabled = false;
-    }
-};
-
-// Bulk download using same reliable method
-window.zipAndDownloadTutorReports = async function(reports, tutorName, button) {
-    const originalButtonText = button.innerHTML;
+    const lowerCaseSearchTerm = searchTerm.toLowerCase();
     
-    try {
-        // Show progress modal
-        const progressModal = document.getElementById('pdf-progress-modal');
-        const progressBar = document.getElementById('pdf-progress-bar');
-        const progressText = document.getElementById('pdf-progress-text');
-        const progressMessage = document.getElementById('pdf-progress-message');
+    let filteredEnrollments = enrollments.filter(enrollment => {
+        if (searchTerm) {
+            const matchesSearch = 
+                (enrollment.id && enrollment.id.toLowerCase().includes(lowerCaseSearchTerm)) ||
+                (enrollment.parent?.name && enrollment.parent.name.toLowerCase().includes(lowerCaseSearchTerm)) ||
+                (enrollment.parent?.email && enrollment.parent.email.toLowerCase().includes(lowerCaseSearchTerm)) ||
+                (enrollment.parent?.phone && enrollment.parent.phone.toLowerCase().includes(lowerCaseSearchTerm)) ||
+                enrollment.students?.some(student => 
+                    student.name && student.name.toLowerCase().includes(lowerCaseSearchTerm)
+                );
+            
+            if (!matchesSearch) return false;
+        }
         
-        progressModal.classList.remove('hidden');
-        progressMessage.textContent = `Preparing ${reports.length} reports for ${tutorName}...`;
-        progressBar.style.width = '0%';
-        progressText.textContent = '0%';
+        if (statusFilter && enrollment.status !== statusFilter) return false;
+        
+        if (dateFrom) {
+            const createdDate = new Date(enrollment.createdAt || enrollment.timestamp);
+            const fromDate = new Date(dateFrom);
+            if (createdDate < fromDate) return false;
+        }
+        
+        if (dateTo) {
+            const createdDate = new Date(enrollment.createdAt || enrollment.timestamp);
+            const toDate = new Date(dateTo);
+            toDate.setHours(23, 59, 59, 999);
+            if (createdDate > toDate) return false;
+        }
+        
+        return true;
+    });
 
-        const zip = new JSZip();
-        let processedCount = 0;
+    const total = enrollments.length;
+    const draft = enrollments.filter(e => e.status === 'draft').length;
+    const pending = enrollments.filter(e => e.status === 'pending').length;
+    const completed = enrollments.filter(e => e.status === 'completed' || e.status === 'payment_received').length;
+    
+    document.getElementById('total-enrollments').textContent = total;
+    document.getElementById('draft-enrollments').textContent = draft;
+    document.getElementById('pending-enrollments').textContent = pending;
+    document.getElementById('completed-enrollments').textContent = completed;
 
-        // Process reports one at a time for reliability
-        for (const report of reports) {
-            try {
-                // Update progress
-                const progress = Math.round((processedCount / reports.length) * 100);
-                progressBar.style.width = `${progress}%`;
-                progressText.textContent = `${progress}%`;
-                progressMessage.textContent = `Processing report ${processedCount + 1} of ${reports.length}...`;
-                button.innerHTML = `📦 Processing ${processedCount + 1}/${reports.length}`;
+    if (filteredEnrollments.length === 0) {
+        enrollmentsList.innerHTML = `
+            <tr>
+                <td colspan="8" class="px-6 py-4 text-center text-gray-500">
+                    No enrollments found${searchTerm ? ` for "${searchTerm}"` : ''}.
+                </td>
+            </tr>
+        `;
+        return;
+    }
 
-                // Use the SAME reliable HTML generation as preview
-                const { html, reportData } = await generateReportHTML(report.id);
-                
-                // Convert to PDF blob
-                const options = {
-                    margin: 0.5,
-                    image: { 
-                        type: 'jpeg', 
-                        quality: 0.98 
-                    },
-                    html2canvas: { 
-                        scale: 2,
-                        useCORS: true,
-                        logging: false,
-                        backgroundColor: '#FFFFFF'
-                    },
-                    jsPDF: { 
-                        unit: 'in', 
-                        format: 'a4', 
-                        orientation: 'portrait'
-                    }
-                };
-
-                const pdfBlob = await html2pdf().set(options).from(html).output('blob');
-                
-                // Create safe filename
-                const safeStudentName = (reportData.studentName || 'Unknown_Student').replace(/[^a-z0-9]/gi, '_');
-                const reportDate = reportData.submittedAt ? 
-                    new Date(reportData.submittedAt.seconds * 1000).toISOString().split('T')[0] : 
-                    'unknown_date';
-                const filename = `${safeStudentName}_${reportDate}.pdf`;
-                
-                zip.file(filename, pdfBlob);
-                
-            } catch (error) {
-                console.error(`Error processing report ${report.id}:`, error);
-                // Continue with next report even if one fails
-            }
+    function parseFeeValue(feeValue) {
+        if (!feeValue && feeValue !== 0) return 0;
+        
+        if (typeof feeValue === 'number') {
+            return Math.round(feeValue);
+        }
+        
+        if (typeof feeValue === 'string') {
+            const cleaned = feeValue
+                .replace(/[^0-9.-]/g, '')
+                .trim();
             
-            processedCount++;
-            
-            // Small delay to prevent overwhelming the browser
-            await new Promise(resolve => setTimeout(resolve, 500));
+            const parsed = parseFloat(cleaned);
+            return isNaN(parsed) ? 0 : Math.round(parsed);
+        }
+        
+        return 0;
+    }
+
+    const tableRows = filteredEnrollments.map(enrollment => {
+        const createdAt = enrollment.createdAt ? new Date(enrollment.createdAt).toLocaleDateString() : 
+                        enrollment.timestamp ? new Date(enrollment.timestamp).toLocaleDateString() : 'N/A';
+        
+        const studentCount = enrollment.students?.length || 0;
+        const studentNames = enrollment.students?.map(s => s.name).join(', ') || 'No students';
+        
+        let statusBadge = '';
+        switch(enrollment.status) {
+            case 'draft':
+                statusBadge = `<span class="px-2 py-1 text-xs rounded-full bg-gray-100 text-gray-800">Draft</span>`;
+                break;
+            case 'pending':
+                statusBadge = `<span class="px-2 py-1 text-xs rounded-full bg-yellow-100 text-yellow-800">Pending</span>`;
+                break;
+            case 'completed':
+            case 'payment_received':
+                statusBadge = `<span class="px-2 py-1 text-xs rounded-full bg-green-100 text-green-800">Completed</span>`;
+                break;
+            default:
+                statusBadge = `<span class="px-2 py-1 text-xs rounded-full bg-gray-100 text-gray-800">${enrollment.status || 'Unknown'}</span>`;
+        }
+        
+        const totalFeeAmount = parseFeeValue(enrollment.summary?.totalFee);
+        const formattedFee = totalFeeAmount > 0 ? `₦${totalFeeAmount.toLocaleString()}` : '₦0';
+        
+        const referralCode = enrollment.referral?.code || 'None';
+        
+        return `
+            <tr class="hover:bg-gray-50">
+                <td class="px-6 py-4 whitespace-nowrap">
+                    <div class="text-sm font-medium text-gray-900">${enrollment.id.substring(0, 12)}...</div>
+                    <div class="text-xs text-gray-500">${enrollment.id}</div>
+                </td>
+                <td class="px-6 py-4">
+                    <div class="text-sm font-medium text-gray-900">${enrollment.parent?.name || 'N/A'}</div>
+                    <div class="text-xs text-gray-500">${enrollment.parent?.email || ''}</div>
+                    <div class="text-xs text-gray-500">${enrollment.parent?.phone || ''}</div>
+                </td>
+                <td class="px-6 py-4">
+                    <div class="text-sm text-gray-900">${studentCount} student(s)</div>
+                    <div class="text-xs text-gray-500 truncate max-w-xs">${studentNames}</div>
+                </td>
+                <td class="px-6 py-4 text-sm font-semibold text-green-600">${formattedFee}</td>
+                <td class="px-6 py-4 text-sm">
+                    <span class="font-mono bg-gray-100 px-2 py-1 rounded">${referralCode}</span>
+                </td>
+                <td class="px-6 py-4">${statusBadge}</td>
+                <td class="px-6 py-4 text-sm text-gray-500">${createdAt}</td>
+                <td class="px-6 py-4 text-sm font-medium">
+                    <button onclick="showEnrollmentDetails('${enrollment.id}')" 
+                            class="text-indigo-600 hover:text-indigo-900 mr-3">
+                        View
+                    </button>
+                    <button onclick="updateEnrollmentStatus('${enrollment.id}', 'completed')" 
+                            class="text-green-600 hover:text-green-900">
+                        Approve
+                    </button>
+                </td>
+            </tr>
+        `;
+    }).join('');
+
+    enrollmentsList.innerHTML = tableRows;
+}
+
+function filterEnrollments(searchTerm) {
+    renderEnrollmentsFromCache(searchTerm);
+}
+
+function applyEnrollmentFilters() {
+    renderEnrollmentsFromCache(document.getElementById('enrollments-search').value);
+}
+
+window.showEnrollmentDetails = async function(enrollmentId) {
+    try {
+        const enrollmentDoc = await getDoc(doc(db, "enrollments", enrollmentId));
+        if (!enrollmentDoc.exists()) {
+            alert("Enrollment not found!");
+            return;
         }
 
-        // Generate zip file
-        progressMessage.textContent = 'Creating ZIP file...';
-        progressBar.style.width = '95%';
-        progressText.textContent = '95%';
+        const enrollment = { id: enrollmentDoc.id, ...enrollmentDoc.data() };
         
-        const zipBlob = await zip.generateAsync({ 
-            type: "blob",
-            compression: "DEFLATE"
+        const createdAt = enrollment.createdAt ? new Date(enrollment.createdAt).toLocaleString() : 
+                         enrollment.timestamp ? new Date(enrollment.timestamp).toLocaleString() : 'N/A';
+        
+        let studentsHTML = '';
+        if (enrollment.students && enrollment.students.length > 0) {
+            studentsHTML = enrollment.students.map(student => {
+                let subjectsHTML = '';
+                if (student.selectedSubjects && student.selectedSubjects.length > 0) {
+                    subjectsHTML = `<p class="text-sm"><strong>Subjects:</strong> ${student.selectedSubjects.join(', ')}</p>`;
+                }
+                
+                let extracurricularHTML = '';
+                if (student.extracurriculars && student.extracurriculars.length > 0) {
+                    extracurricularHTML = `<p class="text-sm"><strong>Extracurricular:</strong> ${student.extracurriculars.map(e => `${e.name} (${e.frequency})`).join(', ')}</p>`;
+                }
+                
+                let testPrepHTML = '';
+                if (student.testPrep && student.testPrep.length > 0) {
+                    testPrepHTML = `<p class="text-sm"><strong>Test Prep:</strong> ${student.testPrep.map(t => `${t.name} (${t.hours} hrs)`).join(', ')}</p>`;
+                }
+                
+                return `
+                    <div class="border rounded-lg p-4 mb-3 bg-gray-50">
+                        <h4 class="font-bold text-lg mb-2">${student.name || 'Unnamed Student'}</h4>
+                        <div class="grid grid-cols-2 gap-2 text-sm">
+                            <p><strong>Grade:</strong> ${student.grade || 'N/A'}</p>
+                            <p><strong>DOB:</strong> ${student.dob || 'N/A'}</p>
+                            <p><strong>Start Date:</strong> ${student.startDate || 'N/A'}</p>
+                        </div>
+                        ${subjectsHTML}
+                        ${extracurricularHTML}
+                        ${testPrepHTML}
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function parseFeeValue(feeValue) {
+            if (!feeValue && feeValue !== 0) return 0;
+            
+            if (typeof feeValue === 'number') {
+                return Math.round(feeValue);
+            }
+            
+            if (typeof feeValue === 'string') {
+                const cleaned = feeValue
+                    .replace(/[^0-9.-]/g, '')
+                    .trim();
+                
+                const parsed = parseFloat(cleaned);
+                return isNaN(parsed) ? 0 : Math.round(parsed);
+            }
+            
+            return 0;
+        }
+
+        let feeBreakdownHTML = '';
+        if (enrollment.summary) {
+            const summary = enrollment.summary;
+            
+            const academicFee = parseFeeValue(summary.academicFee);
+            const extracurricularFee = parseFeeValue(summary.extracurricularFee);
+            const testPrepFee = parseFeeValue(summary.testPrepFee);
+            const discountAmount = parseFeeValue(summary.discountAmount);
+            const totalFee = parseFeeValue(summary.totalFee);
+            
+            feeBreakdownHTML = `
+                <div class="grid grid-cols-2 gap-4">
+                    <div class="bg-green-50 p-3 rounded">
+                        <p class="text-sm"><strong>Academic Fees:</strong></p>
+                        <p class="text-lg font-bold">₦${academicFee.toLocaleString()}</p>
+                    </div>
+                    <div class="bg-blue-50 p-3 rounded">
+                        <p class="text-sm"><strong>Extracurricular:</strong></p>
+                        <p class="text-lg font-bold">₦${extracurricularFee.toLocaleString()}</p>
+                    </div>
+                    <div class="bg-yellow-50 p-3 rounded">
+                        <p class="text-sm"><strong>Test Prep:</strong></p>
+                        <p class="text-lg font-bold">₦${testPrepFee.toLocaleString()}</p>
+                    </div>
+                    <div class="bg-red-50 p-3 rounded">
+                        <p class="text-sm"><strong>Discount:</strong></p>
+                        <p class="text-lg font-bold">-₦${discountAmount.toLocaleString()}</p>
+                    </div>
+                </div>
+                <div class="mt-4 p-4 bg-gray-100 rounded">
+                    <p class="text-xl font-bold text-green-700">Total: ₦${totalFee.toLocaleString()}</p>
+                </div>
+            `;
+        }
+
+        let referralHTML = '';
+        if (enrollment.referral && enrollment.referral.code) {
+            referralHTML = `
+                <div class="border-l-4 border-green-500 pl-4 bg-green-50 p-3 rounded">
+                    <h4 class="font-bold text-green-700">Referral Information</h4>
+                    <p><strong>Code:</strong> <span class="font-mono">${enrollment.referral.code}</span></p>
+                    ${enrollment.referral.bankName ? `<p><strong>Bank:</strong> ${enrollment.referral.bankName}</p>` : ''}
+                    ${enrollment.referral.accountNumber ? `<p><strong>Account:</strong> ${enrollment.referral.accountNumber}</p>` : ''}
+                    ${enrollment.referral.accountName ? `<p><strong>Account Name:</strong> ${enrollment.referral.accountName}</p>` : ''}
+                </div>
+            `;
+        }
+
+        const modalHtml = `
+            <div id="enrollmentDetailsModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-center justify-center">
+                <div class="relative p-8 bg-white w-full max-w-4xl rounded-lg shadow-2xl">
+                    <button class="absolute top-2 right-2 text-gray-500 hover:text-gray-800 text-2xl font-bold" onclick="closeManagementModal('enrollmentDetailsModal')">&times;</button>
+                    <h3 class="text-2xl font-bold mb-4 text-green-700">Enrollment Details</h3>
+                    
+                    <div class="grid grid-cols-2 gap-6 mb-6">
+                        <div>
+                            <h4 class="font-bold text-lg mb-2">Application Information</h4>
+                            <p><strong>ID:</strong> ${enrollment.id}</p>
+                            <p><strong>Status:</strong> <span class="px-2 py-1 text-xs rounded-full ${enrollment.status === 'completed' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}">${enrollment.status || 'Unknown'}</span></p>
+                            <p><strong>Created:</strong> ${createdAt}</p>
+                            ${enrollment.lastSaved ? `<p><strong>Last Saved:</strong> ${new Date(enrollment.lastSaved).toLocaleString()}</p>` : ''}
+                        </div>
+                        
+                        <div>
+                            <h4 class="font-bold text-lg mb-2">Parent Information</h4>
+                            <p><strong>Name:</strong> ${enrollment.parent?.name || 'N/A'}</p>
+                            <p><strong>Email:</strong> ${enrollment.parent?.email || 'N/A'}</p>
+                            <p><strong>Phone:</strong> ${enrollment.parent?.phone || 'N/A'}</p>
+                            <p><strong>Address:</strong> ${enrollment.parent?.address || 'N/A'}</p>
+                        </div>
+                    </div>
+                    
+                    ${referralHTML}
+                    
+                    <div class="mt-6">
+                        <h4 class="font-bold text-lg mb-2">Student Information (${enrollment.students?.length || 0} students)</h4>
+                        ${studentsHTML || '<p class="text-gray-500">No student information available.</p>'}
+                    </div>
+                    
+                    <div class="mt-6">
+                        <h4 class="font-bold text-lg mb-2">Fee Breakdown</h4>
+                        ${feeBreakdownHTML || '<p class="text-gray-500">No fee breakdown available.</p>'}
+                    </div>
+                    
+                    <div class="flex justify-end space-x-3 mt-6 pt-6 border-t">
+                        <button onclick="closeManagementModal('enrollmentDetailsModal')" class="px-4 py-2 bg-gray-300 text-gray-700 rounded hover:bg-gray-400">Close</button>
+                        <button onclick="updateEnrollmentStatus('${enrollment.id}', 'completed')" class="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700">Mark as Completed</button>
+                        <button onclick="updateEnrollmentStatus('${enrollment.id}', 'payment_received')" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">Mark Payment Received</button>
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        document.body.insertAdjacentHTML('beforeend', modalHtml);
+        
+    } catch (error) {
+        console.error("Error showing enrollment details:", error);
+        alert("Failed to load enrollment details. Please try again.");
+    }
+};
+
+window.updateEnrollmentStatus = async function(enrollmentId, newStatus) {
+    if (!confirm(`Are you sure you want to update this enrollment status to '${newStatus}'?`)) {
+        return;
+    }
+
+    try {
+        await updateDoc(doc(db, "enrollments", enrollmentId), {
+            status: newStatus,
+            lastUpdated: Timestamp.now()
         });
 
-        // Download zip
-        progressMessage.textContent = 'Download starting...';
-        progressBar.style.width = '100%';
-        progressText.textContent = '100%';
+        alert(`Enrollment status updated to ${newStatus}.`);
         
-        saveAs(zipBlob, `${tutorName}_Reports_${new Date().toISOString().split('T')[0]}.zip`);
-        
-        // Close modal after short delay
-        setTimeout(() => {
-            progressModal.classList.add('hidden');
-        }, 2000);
+        invalidateCache('enrollments');
+        closeManagementModal('enrollmentDetailsModal');
+        await fetchAndRenderEnrollments();
         
     } catch (error) {
-        console.error("Error creating zip file:", error);
-        alert("Failed to create zip file. Please try again.");
-        document.getElementById('pdf-progress-modal').classList.add('hidden');
-    } finally {
-        // Restore button
-        button.innerHTML = originalButtonText;
-        button.disabled = false;
+        console.error("Error updating enrollment status:", error);
+        alert("Failed to update enrollment status. Please try again.");
     }
 };
 
-// Add CSS for loading spinner
-const additionalStyles = `
-<style>
-.loading-spinner {
-    border: 3px solid #f3f3f3;
-    border-top: 3px solid #3498db;
-    border-radius: 50%;
-    width: 40px;
-    height: 40px;
-    animation: spin 1s linear infinite;
-}
-@keyframes spin {
-    0% { transform: rotate(0deg); }
-    100% { transform: rotate(360deg); }
-}
-#pdf-progress-modal {
-    backdrop-filter: blur(5px);
-}
-</style>
-`;
-// Only add styles if not already added
-if (!document.querySelector('style[data-reports-panel]')) {
-    const styleEl = document.createElement('style');
-    styleEl.setAttribute('data-reports-panel', 'true');
-    styleEl.innerHTML = additionalStyles;
-    document.head.appendChild(styleEl);
-}
+// ======================================================
+// SUBSECTION 5.3: Pending Approvals Panel
+// ======================================================
 
-// --- Pending Approvals Panel ---
 async function renderPendingApprovalsPanel(container) {
     container.innerHTML = `
         <div class="bg-white p-6 rounded-lg shadow-md">
@@ -3605,7 +2846,10 @@ function renderPendingApprovalsFromCache() {
     document.querySelectorAll('.reject-btn').forEach(button => button.addEventListener('click', () => handleRejectStudent(button.dataset.studentId)));
 }
 
-// --- Summer Break Panel ---
+// ======================================================
+// SUBSECTION 5.4: Summer Break Panel
+// ======================================================
+
 async function renderSummerBreakPanel(container) {
     container.innerHTML = `
         <div class="bg-white p-6 rounded-lg shadow-md">
@@ -3659,11 +2903,9 @@ async function fetchAndRenderBreakStudents(forceRefresh = false) {
                 <p class="text-green-600 font-semibold mt-4">Fetching student break status...</p>
             </div>`;
             
-            // Get all students on summer break
             const snapshot = await getDocs(query(collection(db, "students"), where("summerBreak", "==", true)));
             const allBreakStudents = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
             
-            // Filter out archived, graduated, or transferred students from summer break list
             const activeBreakStudents = allBreakStudents.filter(student => 
                 !student.status || student.status === 'active' || student.status === 'approved'
             );
@@ -3693,7 +2935,6 @@ function renderBreakStudentsFromCache(searchTerm = '') {
     const listContainer = document.getElementById('break-students-list');
     if (!listContainer) return;
     
-    // Apply search filter
     const lowerCaseSearchTerm = searchTerm.toLowerCase();
     let filteredStudents = breakStudents;
     
@@ -3707,10 +2948,8 @@ function renderBreakStudentsFromCache(searchTerm = '') {
         );
     }
     
-    // Count unique tutors
     const uniqueTutors = [...new Set(breakStudents.map(s => s.tutorEmail))].filter(Boolean);
     
-    // Update counters
     document.getElementById('break-count-badge').textContent = breakStudents.length;
     document.getElementById('break-tutor-count').textContent = uniqueTutors.length;
 
@@ -3735,7 +2974,6 @@ function renderBreakStudentsFromCache(searchTerm = '') {
         return;
     }
     
-    // Group students by tutor for better organization
     const studentsByTutor = {};
     filteredStudents.forEach(student => {
         const tutorKey = student.tutorEmail || 'No Tutor Assigned';
@@ -3753,7 +2991,6 @@ function renderBreakStudentsFromCache(searchTerm = '') {
     
     Object.values(studentsByTutor).forEach(tutorGroup => {
         const studentItems = tutorGroup.students.map(student => {
-            // Format break information
             const breakInfo = student.lastBreakStart ? 
                 `Break started: ${new Date(student.lastBreakStart.seconds * 1000).toLocaleDateString()}` : 
                 'No break start date recorded';
@@ -3817,54 +3054,45 @@ function renderBreakStudentsFromCache(searchTerm = '') {
     
     listContainer.innerHTML = html;
     
-    // Add event listeners for End Break buttons
     document.querySelectorAll('.end-break-btn').forEach(button => {
         button.addEventListener('click', async (e) => {
             const studentId = e.target.dataset.studentId;
             const studentName = e.target.dataset.studentName;
             const tutorName = e.target.dataset.tutorName;
             
-            // Confirm with the user
             const confirmation = confirm(`Are you sure you want to take ${studentName} off summer break and return them to ${tutorName}?`);
             
             if (!confirmation) {
-                return; // User cancelled
+                return;
             }
             
             try {
-                // Show loading state on the button
                 const originalText = e.target.innerHTML;
                 e.target.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> Ending Break...';
                 e.target.disabled = true;
                 
-                // Update in Firestore - remove summer break flag
                 await updateDoc(doc(db, "students", studentId), { 
                     summerBreak: false, 
                     lastBreakEnd: Timestamp.now(),
                     lastUpdated: Timestamp.now()
                 });
                 
-                // Show success message
                 const statusMessage = document.getElementById('break-status-message');
                 statusMessage.textContent = `✅ Summer break ended for ${studentName}. Student is now active with ${tutorName}.`;
                 statusMessage.className = 'text-center font-semibold mb-4 text-green-600 p-3 bg-green-50 rounded-lg';
                 statusMessage.classList.remove('hidden');
                 
-                // Hide message after 4 seconds
                 setTimeout(() => {
                     statusMessage.classList.add('hidden');
                 }, 4000);
                 
-                // Update all relevant caches
                 invalidateCache('breakStudents');
                 invalidateCache('students');
                 invalidateCache('tutorAssignments');
                 
-                // Re-fetch and render with current search term
                 const currentSearch = document.getElementById('break-search').value;
                 await fetchAndRenderBreakStudents(true);
                 
-                // Re-apply search filter if there's a search term
                 if (currentSearch) {
                     document.getElementById('break-search').value = currentSearch;
                     renderBreakStudentsFromCache(currentSearch);
@@ -3873,18 +3101,15 @@ function renderBreakStudentsFromCache(searchTerm = '') {
             } catch (error) {
                 console.error("Error ending summer break:", error);
                 
-                // Show error message
                 const statusMessage = document.getElementById('break-status-message');
                 statusMessage.textContent = `❌ Failed to End Break for ${studentName}. Error: ${error.message}`;
                 statusMessage.className = 'text-center font-semibold mb-4 text-red-600 p-3 bg-red-50 rounded-lg';
                 statusMessage.classList.remove('hidden');
                 
-                // Hide message after 5 seconds
                 setTimeout(() => {
                     statusMessage.classList.add('hidden');
                 }, 5000);
                 
-                // Restore button state
                 e.target.innerHTML = originalText;
                 e.target.disabled = false;
             }
@@ -3892,7 +3117,53 @@ function renderBreakStudentsFromCache(searchTerm = '') {
     });
 }
 
-// --- Parent Feedback Panel - FIXED DATE ISSUE ---
+// ======================================================
+// SECTION 6: COMMUNICATION PANELS
+// ======================================================
+
+// ======================================================
+// SUBSECTION 6.1: Parent Feedback Panel
+// ======================================================
+
+function formatFeedbackDate(timestamp) {
+    if (!timestamp) return 'Unknown date';
+    
+    try {
+        let date = null;
+        
+        if (timestamp && typeof timestamp.toDate === 'function') {
+            date = timestamp.toDate();
+        }
+        else if (timestamp && typeof timestamp === 'object' && timestamp.seconds) {
+            date = new Date(timestamp.seconds * 1000 + (timestamp.nanoseconds || 0) / 1000000);
+        }
+        else if (typeof timestamp === 'string') {
+            date = new Date(timestamp);
+        }
+        else if (typeof timestamp === 'number') {
+            date = new Date(timestamp);
+        }
+        else if (timestamp instanceof Date) {
+            date = timestamp;
+        }
+        
+        if (date && !isNaN(date.getTime())) {
+            return date.toLocaleDateString('en-US', {
+                year: 'numeric',
+                month: 'short',
+                day: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+        }
+        
+        return 'Unknown date';
+    } catch (error) {
+        console.error("Error formatting date:", error, timestamp);
+        return 'Invalid date';
+    }
+}
+
 async function renderParentFeedbackPanel(container) {
     container.innerHTML = `
         <div class="bg-white p-6 rounded-lg shadow-md">
@@ -3928,27 +3199,21 @@ async function fetchAndRenderParentFeedback(forceRefresh = false) {
         if (!sessionCache.parentFeedback) {
             listContainer.innerHTML = `<p class="text-center text-gray-500 py-10">Fetching feedback messages...</p>`;
             
-            // Get all feedback messages
             const feedbackSnapshot = await getDocs(query(collection(db, "parent_feedback"), orderBy("timestamp", "desc")));
             const feedbackData = feedbackSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
             
-            // Enhance feedback data with proper timestamps - FIXED VERSION
             const enhancedFeedbackData = feedbackData.map(feedback => {
                 let submittedDate = null;
                 
-                // Handle different timestamp formats
                 if (feedback.timestamp) {
-                    // If it's a Firebase Timestamp object with toDate method
                     if (typeof feedback.timestamp.toDate === 'function') {
                         submittedDate = feedback.timestamp;
                     }
-                    // If it's a Timestamp object with seconds property
                     else if (feedback.timestamp.seconds) {
                         submittedDate = {
                             toDate: () => new Date(feedback.timestamp.seconds * 1000)
                         };
                     }
-                    // If it's an ISO string
                     else if (typeof feedback.timestamp === 'string') {
                         const date = new Date(feedback.timestamp);
                         if (!isNaN(date.getTime())) {
@@ -3959,7 +3224,6 @@ async function fetchAndRenderParentFeedback(forceRefresh = false) {
                     }
                 }
                 
-                // If no valid timestamp found, use current time
                 if (!submittedDate) {
                     submittedDate = {
                         toDate: () => new Date()
@@ -4005,13 +3269,11 @@ function renderParentFeedbackFromCache() {
     document.getElementById('feedback-unread-count').textContent = unreadCount;
 
     listContainer.innerHTML = feedbackMessages.map(message => {
-        // FIXED: Use the new formatFeedbackDate function
         const submittedDate = formatFeedbackDate(message.submittedAt || message.timestamp);
         
         const readStatus = message.read ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800';
         const readText = message.read ? 'Read' : 'Unread';
 
-        // Display existing responses
         const responsesHTML = message.responses && message.responses.length > 0 ? `
             <div class="mt-4 border-t pt-4">
                 <h4 class="font-semibold text-gray-700 mb-2">Responses:</h4>
@@ -4022,7 +3284,7 @@ function renderParentFeedbackFromCache() {
                             <span class="text-xs text-gray-500">${formatFeedbackDate(response.responseDate)}</span>
                         </div>
                         <p class="text-gray-700 text-sm">${response.responseText}</p>
-                    </div>
+                        </div>
                 `).join('')}
             </div>
         ` : '';
@@ -4069,7 +3331,6 @@ function renderParentFeedbackFromCache() {
         `;
     }).join('');
 
-    // Add event listeners for the buttons
     document.querySelectorAll('.mark-read-btn').forEach(button => {
         button.addEventListener('click', (e) => {
             e.stopPropagation();
@@ -4092,7 +3353,6 @@ function renderParentFeedbackFromCache() {
     });
 }
 
-// New function to show response modal
 function showResponseModal(messageId) {
     const message = sessionCache.parentFeedback?.find(msg => msg.id === messageId);
     if (!message) {
@@ -4133,7 +3393,6 @@ function showResponseModal(messageId) {
     });
 }
 
-// New function to handle sending responses
 async function handleSendResponse(messageId) {
     const responseText = document.getElementById('response-text').value.trim();
     const modal = document.getElementById('response-modal');
@@ -4162,14 +3421,12 @@ async function handleSendResponse(messageId) {
             responseDate: Timestamp.now()
         };
 
-        // Update the message with the new response
         await updateDoc(messageRef, {
             responses: [...currentResponses, newResponse],
             read: true,
             readAt: Timestamp.now()
         });
 
-        // Update cache
         if (sessionCache.parentFeedback) {
             const messageIndex = sessionCache.parentFeedback.findIndex(msg => msg.id === messageId);
             if (messageIndex !== -1) {
@@ -4196,7 +3453,6 @@ async function handleMarkAsRead(messageId) {
             readAt: Timestamp.now()
         });
         
-        // Update cache and re-render
         if (sessionCache.parentFeedback) {
             const messageIndex = sessionCache.parentFeedback.findIndex(msg => msg.id === messageId);
             if (messageIndex !== -1) {
@@ -4217,7 +3473,6 @@ async function handleDeleteFeedback(messageId) {
         try {
             await deleteDoc(doc(db, "parent_feedback", messageId));
             
-            // Update cache and re-render
             if (sessionCache.parentFeedback) {
                 sessionCache.parentFeedback = sessionCache.parentFeedback.filter(msg => msg.id !== messageId);
                 saveToLocalStorage('parentFeedback', sessionCache.parentFeedback);
@@ -4231,17 +3486,629 @@ async function handleDeleteFeedback(messageId) {
     }
 }
 
-// ##################################
-// # REPORT GENERATION & ZIPPING
-// ##################################
+// ======================================================
+// SECTION 7: ACTION HANDLERS & MODALS
+// ======================================================
 
-// CORRECTED AND FINALIZED FUNCTION
+async function handleEditStudent(studentId) {
+    try {
+        const studentDoc = await getDoc(doc(db, "students", studentId));
+        if (!studentDoc.exists()) {
+            alert("Student not found!");
+            return;
+        }
+        const studentData = studentDoc.data();
+        showEditStudentModal(studentId, studentData, "students");
+    } catch (error) {
+        console.error("Error fetching student for edit: ", error);
+        alert("Error fetching student data. Check the console for details.");
+    }
+}
+
+async function handleEditPendingStudent(studentId) {
+    try {
+        const studentDoc = await getDoc(doc(db, "pending_students", studentId));
+        if (!studentDoc.exists()) {
+            alert("Pending student not found!");
+            return;
+        }
+        const studentData = studentDoc.data();
+        showEditStudentModal(studentId, studentData, "pending_students");
+    } catch (error) {
+        console.error("Error fetching pending student for edit: ", error);
+        alert("Error fetching student data. Check the console for details.");
+    }
+}
+
+function showEditStudentModal(studentId, studentData, collectionName) {
+    const modalHtml = `
+        <div id="edit-modal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-center justify-center">
+            <div class="relative p-8 bg-white w-96 max-w-lg rounded-lg shadow-xl">
+                <button class="absolute top-2 right-2 text-gray-500 hover:text-gray-800 text-2xl font-bold" onclick="closeManagementModal('edit-modal')">&times;</button>
+                <h3 class="text-xl font-bold mb-4">Edit Student Details</h3>
+                <form id="edit-student-form">
+                    <input type="hidden" id="edit-student-id" value="${studentId}">
+                    <input type="hidden" id="edit-collection-name" value="${collectionName}">
+                    <div class="mb-2"><label class="block text-sm font-medium">Student Name</label><input type="text" id="edit-studentName" value="${studentData.studentName}" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2"></div>
+                    <div class="mb-2"><label class="block text-sm font-medium">Student Grade</label><input type="text" id="edit-grade" value="${studentData.grade}" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2"></div>
+                    <div class="mb-2"><label class="block text-sm font-medium">Days/Week</label><input type="text" id="edit-days" value="${studentData.days || ''}" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2"></div>
+                    <div class="mb-2"><label class="block text-sm font-medium">Subjects (comma-separated)</label><input type="text" id="edit-subjects" value="${studentData.subjects ? studentData.subjects.join(', ') : ''}" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2"></div>
+                    <div class="mb-2"><label class="block text-sm font-medium">Parent Name</label><input type="text" id="edit-parentName" value="${studentData.parentName || ''}" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2"></div>
+                    <div class="mb-2"><label class="block text-sm font-medium">Parent Phone</label><input type="text" id="edit-parentPhone" value="${studentData.parentPhone || ''}" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2"></div>
+                    <div class="mb-2"><label class="block text-sm font-medium">Parent Email</label><input type="email" id="edit-parentEmail" value="${studentData.parentEmail || ''}" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2"></div>
+                    <div class="mb-2"><label class="block text-sm font-medium">Tutor Email</label><input type="email" id="edit-tutorEmail" value="${studentData.tutorEmail || ''}" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2"></div>
+                    <div class="mb-4"><label class="block text-sm font-medium">Student Fee (₦)</label><input type="number" id="edit-studentFee" value="${studentData.studentFee || 0}" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2"></div>
+                    <div class="flex justify-end mt-4">
+                        <button type="button" onclick="closeManagementModal('edit-modal')" class="mr-2 px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300">Cancel</button>
+                        <button type="submit" class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700">Save Changes</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    `;
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+
+    document.getElementById('edit-student-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+
+        const form = e.target;
+        const saveBtn = form.querySelector('button[type="submit"]');
+        saveBtn.disabled = true;
+        saveBtn.textContent = 'Saving...';
+
+        const updatedData = {
+            studentName: form.querySelector('#edit-studentName').value,
+            grade: form.querySelector('#edit-grade').value,
+            days: form.querySelector('#edit-days').value,
+            subjects: form.querySelector('#edit-subjects').value.split(',').map(s => s.trim()).filter(s => s.length > 0),
+            parentName: form.querySelector('#edit-parentName').value,
+            parentPhone: form.querySelector('#edit-parentPhone').value,
+            parentEmail: form.querySelector('#edit-parentEmail').value,
+            tutorEmail: form.querySelector('#edit-tutorEmail').value,
+            studentFee: Number(form.querySelector('#edit-studentFee').value) || 0,
+            lastUpdated: Timestamp.now(),
+        };
+
+        try {
+            const studentRef = doc(db, collectionName, studentId);
+            await updateDoc(studentRef, updatedData);
+            alert("Student data updated successfully!");
+            closeManagementModal('edit-modal');
+            
+            if (collectionName === 'students') {
+                invalidateCache('students');
+                invalidateCache('tutorAssignments');
+            }
+            if (collectionName === 'pending_students') invalidateCache('pendingStudents');
+            
+            const currentNavId = document.querySelector('.nav-item.active')?.dataset.navId;
+            const mainContent = document.getElementById('main-content');
+            if (currentNavId && allNavItems[currentNavId] && mainContent) {
+                allNavItems[currentNavId].fn(mainContent);
+            }
+
+        } catch (error) {
+            console.error("Error updating document: ", error);
+            alert("Failed to update student data. Check console for details.");
+            saveBtn.disabled = false;
+            saveBtn.textContent = 'Save Changes';
+        }
+    });
+}
+
+function showAssignStudentModal() {
+    const tutors = sessionCache.tutors || [];
+    const activeTutors = tutors.filter(tutor => 
+        !tutor.status || tutor.status === 'active'
+    );
+    
+    if (activeTutors.length === 0) {
+        alert("No active tutors available. Please refresh the directory and try again.");
+        return;
+    }
+
+    const tutorOptions = activeTutors
+        .sort((a, b) => a.name.localeCompare(b.name))
+        .map(tutor => `<option value='${JSON.stringify({email: tutor.email, name: tutor.name})}'>${tutor.name} (${tutor.email})</option>`)
+        .join('');
+
+    const modalHtml = `
+        <div id="assign-modal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-center justify-center">
+            <div class="relative p-8 bg-white w-96 max-w-lg rounded-lg shadow-xl">
+                <button class="absolute top-2 right-2 text-gray-500 hover:text-gray-800 text-2xl font-bold" onclick="closeManagementModal('assign-modal')">&times;</button>
+                <h3 class="text-xl font-bold mb-4">Assign New Student</h3>
+                <form id="assign-student-form">
+                    <div class="mb-2">
+                        <label class="block text-sm font-medium">Assign to Tutor</label>
+                        <select id="assign-tutor" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2">
+                            <option value="" disabled selected>Select a tutor...</option>
+                            ${tutorOptions}
+                        </select>
+                    </div>
+                    <div class="mb-2"><label class="block text-sm font-medium">Student Name</label><input type="text" id="assign-studentName" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2"></div>
+                    <div class="mb-2"><label class="block text-sm font-medium">Student Grade</label><input type="text" id="assign-grade" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2"></div>
+                    <div class="mb-2"><label class="block text-sm font-medium">Days/Week</label><input type="text" id="assign-days" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2"></div>
+                    <div class="mb-2"><label class="block text-sm font-medium">Subjects (comma-separated)</label><input type="text" id="assign-subjects" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2"></div>
+                    <div class="mb-2"><label class="block text-sm font-medium">Parent Name</label><input type="text" id="assign-parentName" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2"></div>
+                    <div class="mb-2"><label class="block text-sm font-medium">Parent Phone</label><input type="text" id="assign-parentPhone" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2"></div>
+                    <div class="mb-2"><label class="block text-sm font-medium">Student Fee (₦)</label><input type="number" id="assign-studentFee" required value="0" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2"></div>
+                    <div class="flex justify-end mt-4">
+                        <button type="button" onclick="closeManagementModal('assign-modal')" class="mr-2 px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300">Cancel</button>
+                        <button type="submit" class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700">Assign Student</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    `;
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+    document.getElementById('assign-student-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const form = e.target;
+        const selectedTutorData = JSON.parse(form.elements['assign-tutor'].value);
+
+        const newStudentData = {
+            studentName: form.elements['assign-studentName'].value,
+            grade: form.elements['assign-grade'].value,
+            days: form.elements['assign-days'].value,
+            subjects: form.elements['assign-subjects'].value.split(',').map(s => s.trim()).filter(s => s),
+            parentName: form.elements['assign-parentName'].value,
+            parentPhone: form.elements['assign-parentPhone'].value,
+            studentFee: Number(form.elements['assign-studentFee'].value) || 0,
+            tutorEmail: selectedTutorData.email,
+            tutorName: selectedTutorData.name,
+            status: 'approved',
+            summerBreak: false,
+            createdAt: Timestamp.now(),
+            tutorHistory: [{
+                tutorEmail: selectedTutorData.email,
+                tutorName: selectedTutorData.name,
+                assignedDate: Timestamp.now(),
+                assignedBy: window.userData?.email || 'management',
+                isCurrent: true
+            }],
+            gradeHistory: [{
+                grade: form.elements['assign-grade'].value,
+                changedDate: Timestamp.now(),
+                changedBy: window.userData?.email || 'management'
+            }]
+        };
+
+        try {
+            await addDoc(collection(db, "students"), newStudentData);
+            alert(`Student "${newStudentData.studentName}" assigned successfully to ${newStudentData.tutorName}!`);
+            closeManagementModal('assign-modal');
+            invalidateCache('students');
+            invalidateCache('tutorAssignments');
+            renderManagementTutorView(document.getElementById('main-content'));
+        } catch (error) {
+            console.error("Error assigning student: ", error);
+            alert("Failed to assign student. Check the console for details.");
+        }
+    });
+}
+
+function showReassignStudentModal() {
+    const tutors = sessionCache.tutors || [];
+    const activeTutors = tutors.filter(tutor => 
+        !tutor.status || tutor.status === 'active'
+    );
+    
+    if (activeTutors.length === 0) {
+        alert("No active tutors available. Please refresh the directory and try again.");
+        return;
+    }
+
+    const tutorOptions = activeTutors
+        .sort((a, b) => a.name.localeCompare(b.name))
+        .map(tutor => `<option value='${JSON.stringify({email: tutor.email, name: tutor.name})}'>${tutor.name} (${tutor.email})</option>`)
+        .join('');
+
+    const modalHtml = `
+        <div id="reassign-modal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-center justify-center">
+            <div class="relative p-8 bg-white w-96 max-w-lg rounded-lg shadow-xl">
+                <button class="absolute top-2 right-2 text-gray-500 hover:text-gray-800 text-2xl font-bold" onclick="closeManagementModal('reassign-modal')">&times;</button>
+                <h3 class="text-xl font-bold mb-4">Reassign Student to Different Tutor</h3>
+                <form id="reassign-student-form">
+                    <div class="mb-2">
+                        <label class="block text-sm font-medium">Search Student Name</label>
+                        <input type="text" id="reassign-student-search" placeholder="Enter student name..." class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2">
+                        <button type="button" id="search-student-btn" class="mt-2 bg-blue-500 text-white px-3 py-1 rounded text-sm">Search Student</button>
+                    </div>
+                    <div id="student-search-results" class="mb-4 max-h-40 overflow-y-auto border rounded-md p-2 hidden">
+                        <p class="text-sm text-gray-500">Search results will appear here...</p>
+                    </div>
+                    <div class="mb-2">
+                        <label class="block text-sm font-medium">Assign to New Tutor</label>
+                        <select id="reassign-tutor" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2">
+                            <option value="" disabled selected>Select new tutor...</option>
+                            ${tutorOptions}
+                        </select>
+                    </div>
+                    <input type="hidden" id="selected-student-id">
+                    <div class="flex justify-end mt-4">
+                        <button type="button" onclick="closeManagementModal('reassign-modal')" class="mr-2 px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300">Cancel</button>
+                        <button type="submit" class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700">Reassign Student</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    `;
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+
+    document.getElementById('search-student-btn').addEventListener('click', async () => {
+        const searchTerm = document.getElementById('reassign-student-search').value.trim();
+        if (!searchTerm) {
+            alert("Please enter a student name to search.");
+            return;
+        }
+
+        try {
+            const studentsSnapshot = await getDocs(collection(db, "students"));
+            const allStudents = studentsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            const activeStudents = allStudents.filter(student => 
+                !student.status || student.status === 'active' || student.status === 'approved'
+            );
+            
+            const searchResults = activeStudents.filter(student => 
+                student.studentName.toLowerCase().includes(searchTerm.toLowerCase())
+            );
+
+            const resultsContainer = document.getElementById('student-search-results');
+            resultsContainer.classList.remove('hidden');
+            
+            if (searchResults.length === 0) {
+                resultsContainer.innerHTML = '<p class="text-sm text-gray-500">No active students found matching your search.</p>';
+                return;
+            }
+
+            resultsContainer.innerHTML = searchResults.map(student => `
+                <div class="p-2 border-b cursor-pointer hover:bg-gray-50 student-result" data-student-id="${student.id}" data-student-name="${student.studentName}" data-current-tutor="${student.tutorEmail}">
+                    <p class="font-medium">${student.studentName}</p>
+                    <p class="text-xs text-gray-500">Current Tutor: ${student.tutorEmail} | Grade: ${student.grade}</p>
+                </div>
+            `).join('');
+
+            document.querySelectorAll('.student-result').forEach(result => {
+                result.addEventListener('click', () => {
+                    const studentId = result.dataset.studentId;
+                    const studentName = result.dataset.studentName;
+                    const currentTutor = result.dataset.currentTutor;
+                    
+                    document.getElementById('selected-student-id').value = studentId;
+                    document.getElementById('reassign-student-search').value = studentName;
+                    
+                    document.querySelectorAll('.student-result').forEach(r => r.classList.remove('bg-blue-100'));
+                    result.classList.add('bg-blue-100');
+                    
+                    alert(`Selected: ${studentName} (Currently with: ${currentTutor})`);
+                });
+            });
+
+        } catch (error) {
+            console.error("Error searching students:", error);
+            alert("Failed to search students. Check console for details.");
+        }
+    });
+
+    document.getElementById('reassign-student-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const form = e.target;
+        const studentId = document.getElementById('selected-student-id').value;
+        const selectedTutorData = JSON.parse(form.elements['reassign-tutor'].value);
+
+        if (!studentId) {
+            alert("Please select a student from the search results.");
+            return;
+        }
+
+        try {
+            const studentRef = doc(db, "students", studentId);
+            const studentDoc = await getDoc(studentRef);
+            
+            if (!studentDoc.exists()) {
+                alert("Student not found!");
+                return;
+            }
+
+            const studentData = studentDoc.data();
+            const oldTutor = studentData.tutorEmail;
+            const newTutor = selectedTutorData.email;
+
+            const existingHistory = studentData.tutorHistory || [];
+            
+            const updatedHistory = existingHistory.map(entry => ({
+                ...entry,
+                isCurrent: false
+            }));
+            
+            updatedHistory.push({
+                tutorEmail: newTutor,
+                tutorName: selectedTutorData.name,
+                assignedDate: Timestamp.now(),
+                assignedBy: window.userData?.email || 'management',
+                isCurrent: true,
+                previousTutor: oldTutor
+            });
+
+            await updateDoc(studentRef, {
+                tutorEmail: newTutor,
+                tutorName: selectedTutorData.name,
+                lastUpdated: Timestamp.now(),
+                tutorHistory: updatedHistory
+            });
+
+            alert(`Student "${studentData.studentName}" reassigned from ${oldTutor} to ${selectedTutorData.name} successfully!`);
+            closeManagementModal('reassign-modal');
+            invalidateCache('students');
+            invalidateCache('tutorAssignments');
+            renderManagementTutorView(document.getElementById('main-content'));
+
+        } catch (error) {
+            console.error("Error reassigning student:", error);
+            alert("Failed to reassign student. Check the console for details.");
+        }
+    });
+}
+
+async function handleDeleteStudent(studentId) {
+    if (confirm("Are you sure you want to delete this student? This action cannot be undone.")) {
+        try {
+            await deleteDoc(doc(db, "students", studentId));
+            alert("Student deleted successfully!");
+            invalidateCache('students');
+            invalidateCache('tutorAssignments');
+            renderManagementTutorView(document.getElementById('main-content'));
+        } catch (error) {
+            console.error("Error removing student: ", error);
+            alert("Error deleting student. Check the console for details.");
+        }
+    }
+}
+
+async function handleApproveStudent(studentId) {
+    if (confirm("Are you sure you want to approve this student?")) {
+        try {
+            const studentRef = doc(db, "pending_students", studentId);
+            const studentDoc = await getDoc(studentRef);
+            if (!studentDoc.exists()) {
+                alert("Student not found.");
+                return;
+            }
+            const studentData = studentDoc.data();
+            const batch = writeBatch(db);
+            const newStudentRef = doc(db, "students", studentId);
+            
+            const studentWithHistory = {
+                ...studentData,
+                status: 'approved',
+                tutorHistory: [{
+                    tutorEmail: studentData.tutorEmail,
+                    tutorName: studentData.tutorName || studentData.tutorEmail,
+                    assignedDate: Timestamp.now(),
+                    assignedBy: window.userData?.email || 'management',
+                    isCurrent: true
+                }],
+                gradeHistory: [{
+                    grade: studentData.grade || 'Unknown',
+                    changedDate: Timestamp.now(),
+                    changedBy: window.userData?.email || 'management'
+                }]
+            };
+            
+            batch.set(newStudentRef, studentWithHistory);
+            batch.delete(studentRef);
+            await batch.commit();
+            alert("Student approved successfully!");
+            invalidateCache('pendingStudents');
+            invalidateCache('students');
+            invalidateCache('tutorAssignments');
+            renderPendingApprovalsPanel(document.getElementById('main-content'));
+        } catch (error) {
+            console.error("Error approving student: ", error);
+            alert("Error approving student. Check the console for details.");
+        }
+    }
+}
+
+async function handleRejectStudent(studentId) {
+    if (confirm("Are you sure you want to reject this student? This will delete their entry.")) {
+        try {
+            await deleteDoc(doc(db, "pending_students", studentId));
+            alert("Student rejected successfully!");
+            invalidateCache('pendingStudents');
+            renderPendingApprovalsPanel(document.getElementById('main-content'));
+        } catch (error) {
+            console.error("Error rejecting student: ", error);
+            alert("Error rejecting student. Check the console for details.");
+        }
+    }
+}
+
+// ======================================================
+// SECTION 8: UTILITY FUNCTIONS
+// ======================================================
+
+async function fetchTutorAssignmentHistory() {
+    try {
+        const studentsSnapshot = await getDocs(query(collection(db, "students")));
+        const tutorAssignments = {};
+        
+        studentsSnapshot.docs.forEach(doc => {
+            const studentData = doc.data();
+            const studentId = doc.id;
+            
+            if (studentData.status === 'archived' || studentData.status === 'graduated' || studentData.status === 'transferred') {
+                return;
+            }
+            
+            if (studentData.tutorHistory && Array.isArray(studentData.tutorHistory)) {
+                tutorAssignments[studentId] = {
+                    studentName: studentData.studentName,
+                    currentTutor: studentData.tutorEmail,
+                    currentTutorName: studentData.tutorName,
+                    tutorHistory: studentData.tutorHistory.sort((a, b) => {
+                        const dateA = a.assignedDate?.toDate?.() || new Date(0);
+                        const dateB = b.assignedDate?.toDate?.() || new Date(0);
+                        return dateB - dateA;
+                    }),
+                    gradeHistory: studentData.gradeHistory || []
+                };
+            } else if (studentData.tutorEmail) {
+                tutorAssignments[studentId] = {
+                    studentName: studentData.studentName,
+                    currentTutor: studentData.tutorEmail,
+                    currentTutorName: studentData.tutorName,
+                    tutorHistory: [{
+                        tutorEmail: studentData.tutorEmail,
+                        tutorName: studentData.tutorName || studentData.tutorEmail,
+                        assignedDate: studentData.createdAt || Timestamp.now(),
+                        assignedBy: 'system',
+                        isCurrent: true
+                    }],
+                    gradeHistory: studentData.gradeHistory || [{
+                        grade: studentData.grade || 'Unknown',
+                        changedDate: studentData.createdAt || Timestamp.now(),
+                        changedBy: 'system'
+                    }]
+                };
+            }
+        });
+        
+        saveToLocalStorage('tutorAssignments', tutorAssignments);
+        return tutorAssignments;
+    } catch (error) {
+        console.error("Error fetching tutor assignment history:", error);
+        return {};
+    }
+}
+
+function showTutorHistoryModal(studentId, studentData, tutorAssignments) {
+    const studentHistory = tutorAssignments[studentId];
+    if (!studentHistory) {
+        alert("No tutor history found for this student.");
+        return;
+    }
+
+    const tutorHistoryHTML = studentHistory.tutorHistory.map((assignment, index) => {
+        const assignedDate = assignment.assignedDate?.toDate?.() || new Date();
+        const isCurrent = assignment.isCurrent ? '<span class="ml-2 bg-green-100 text-green-800 text-xs px-2 py-1 rounded-full">Current</span>' : '';
+        
+        return `
+            <tr class="hover:bg-gray-50">
+                <td class="px-4 py-3">${index + 1}</td>
+                <td class="px-4 py-3 font-medium">${assignment.tutorName || assignment.tutorEmail}</td>
+                <td class="px-4 py-3">${assignment.tutorEmail}</td>
+                <td class="px-4 py-3">${assignedDate.toLocaleDateString()}</td>
+                <td class="px-4 py-3">${assignment.assignedBy || 'System'}</td>
+                <td class="px-4 py-3">${isCurrent}</td>
+            </tr>
+        `;
+    }).join('');
+
+    const gradeHistoryHTML = studentHistory.gradeHistory.map((gradeChange, index) => {
+        const changedDate = gradeChange.changedDate?.toDate?.() || new Date();
+        
+        return `
+            <tr class="hover:bg-gray-50">
+                <td class="px-4 py-3">${index + 1}</td>
+                <td class="px-4 py-3 font-medium">${gradeChange.grade}</td>
+                <td class="px-4 py-3">${changedDate.toLocaleDateString()}</td>
+                <td class="px-4 py-3">${gradeChange.changedBy || 'System'}</td>
+            </tr>
+        `;
+    }).join('');
+
+    const modalHtml = `
+        <div id="tutorHistoryModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-center justify-center">
+            <div class="relative p-8 bg-white w-full max-w-6xl rounded-lg shadow-2xl">
+                <button class="absolute top-2 right-2 text-gray-500 hover:text-gray-800 text-2xl font-bold" onclick="closeManagementModal('tutorHistoryModal')">&times;</button>
+                <h3 class="text-2xl font-bold mb-4 text-blue-700">Tutor & Grade History for ${studentData.studentName}</h3>
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                    <div class="bg-blue-50 p-4 rounded-lg">
+                        <h4 class="font-bold text-lg mb-2 text-blue-800">Current Information</h4>
+                        <p><strong>Tutor:</strong> ${studentData.tutorName || studentData.tutorEmail}</p>
+                        <p><strong>Grade:</strong> ${studentData.grade || 'N/A'}</p>
+                        <p><strong>Subjects:</strong> ${Array.isArray(studentData.subjects) ? studentData.subjects.join(', ') : studentData.subjects || 'N/A'}</p>
+                        <p><strong>Days/Week:</strong> ${studentData.days || 'N/A'}</p>
+                    </div>
+                    <div class="bg-green-50 p-4 rounded-lg">
+                        <h4 class="font-bold text-lg mb-2 text-green-800">Parent Information</h4>
+                        <p><strong>Parent:</strong> ${studentData.parentName || 'N/A'}</p>
+                        <p><strong>Phone:</strong> ${studentData.parentPhone || 'N/A'}</p>
+                        <p><strong>Email:</strong> ${studentData.parentEmail || 'N/A'}</p>
+                        <p><strong>Fee:</strong> ₦${(studentData.studentFee || 0).toLocaleString()}</p>
+                    </div>
+                </div>
+                
+                <div class="mb-8">
+                    <h4 class="text-xl font-bold mb-4 text-gray-800">Tutor Assignment History</h4>
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full divide-y divide-gray-200">
+                            <thead class="bg-gray-50">
+                                <tr>
+                                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">#</th>
+                                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Tutor Name</th>
+                                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Tutor Email</th>
+                                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Assigned Date</th>
+                                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Assigned By</th>
+                                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                                </tr>
+                            </thead>
+                            <tbody class="bg-white divide-y divide-gray-200">
+                                ${tutorHistoryHTML}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                
+                <div>
+                    <h4 class="text-xl font-bold mb-4 text-gray-800">Grade Progression History</h4>
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full divide-y divide-gray-200">
+                            <thead class="bg-gray-50">
+                                <tr>
+                                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">#</th>
+                                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Grade</th>
+                                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Changed Date</th>
+                                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Changed By</th>
+                                </tr>
+                            </thead>
+                            <tbody class="bg-white divide-y divide-gray-200">
+                                ${gradeHistoryHTML}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                
+                <div class="flex justify-end mt-6 pt-6 border-t">
+                    <button onclick="closeManagementModal('tutorHistoryModal')" class="px-4 py-2 bg-gray-300 text-gray-700 rounded hover:bg-gray-400">Close</button>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+}
+
+window.viewStudentTutorHistory = function(studentId) {
+    const tutorAssignments = sessionCache.tutorAssignments || {};
+    const students = sessionCache.students || [];
+    
+    const student = students.find(s => s.id === studentId);
+    if (!student) {
+        alert("Student not found!");
+        return;
+    }
+    
+    showTutorHistoryModal(studentId, student, tutorAssignments);
+};
+
 async function generateReportHTML(reportId) {
     const reportDoc = await getDoc(doc(db, "tutor_submissions", reportId));
     if (!reportDoc.exists()) throw new Error("Report not found!");
     const reportData = reportDoc.data();
 
-    // Define the sections to be displayed in the report
     const reportSections = {
         "INTRODUCTION": reportData.introduction,
         "TOPICS & REMARKS": reportData.topics,
@@ -4251,9 +4118,7 @@ async function generateReportHTML(reportId) {
         "GENERAL TUTOR'S COMMENTS": reportData.generalComments
     };
 
-    // Generate the HTML for each section, ensuring "N/A" for empty content
     const sectionsHTML = Object.entries(reportSections).map(([title, content]) => {
-        // Sanitize content to prevent HTML injection and format newlines
         const sanitizedContent = content ? String(content).replace(/</g, "&lt;").replace(/>/g, "&gt;") : '';
         const displayContent = (sanitizedContent && sanitizedContent.trim() !== '') ? sanitizedContent.replace(/\n/g, '<br>') : 'N/A';
         return `
@@ -4333,73 +4198,211 @@ async function generateReportHTML(reportId) {
     return { html: reportTemplate, reportData: reportData };
 }
 
-async function viewReportInNewTab(reportId, shouldDownload = false) {
+window.previewReport = async function(reportId) {
     try {
-        const { html, reportData } = await generateReportHTML(reportId);
-
-        if (shouldDownload) {
-             const options = {
-                margin:       0.5,
-                filename:     `${reportData.studentName}_report.pdf`,
-                image:        { type: 'jpeg', quality: 0.98 },
-                html2canvas:  { scale: 2, useCORS: true },
-                jsPDF:        { unit: 'in', format: 'letter', orientation: 'portrait' }
-            };
-            html2pdf().from(html).set(options).save();
-        } else {
-            const newWindow = window.open();
-            newWindow.document.write(html);
-            newWindow.document.close();
-        }
+        const { html } = await generateReportHTML(reportId);
+        const newWindow = window.open();
+        newWindow.document.write(html);
+        newWindow.document.close();
     } catch (error) {
-        console.error("Error viewing/downloading report:", error);
+        console.error("Error previewing report:", error);
         alert(`Error: ${error.message}`);
     }
-}
+};
 
-async function zipAndDownloadTutorReports(reports, tutorName, buttonElement) {
-    const originalButtonText = buttonElement.textContent;
-    buttonElement.textContent = 'Zipping... (0%)';
-    buttonElement.disabled = true;
-
+window.downloadSingleReport = async function(reportId, event) {
+    const button = event.target;
+    const originalText = button.innerHTML;
+    
     try {
+        button.innerHTML = '<div class="loading-spinner mx-auto" style="width: 16px; height: 16px;"></div>';
+        button.disabled = true;
+        
+        const progressModal = document.getElementById('pdf-progress-modal');
+        const progressBar = document.getElementById('pdf-progress-bar');
+        const progressText = document.getElementById('pdf-progress-text');
+        const progressMessage = document.getElementById('pdf-progress-message');
+        
+        progressModal.classList.remove('hidden');
+        progressMessage.textContent = 'Generating PDF...';
+        progressBar.style.width = '0%';
+        progressText.textContent = '0%';
+
+        const { html, reportData } = await generateReportHTML(reportId);
+        
+        progressBar.style.width = '50%';
+        progressText.textContent = '50%';
+        progressMessage.textContent = 'Converting to PDF...';
+
+        const options = {
+            margin: 0.5,
+            filename: `${reportData.studentName}_Report_${new Date().getTime()}.pdf`,
+            image: { 
+                type: 'jpeg', 
+                quality: 0.98 
+            },
+            html2canvas: { 
+                scale: 2,
+                useCORS: true,
+                logging: false,
+                backgroundColor: '#FFFFFF'
+            },
+            jsPDF: { 
+                unit: 'in', 
+                format: 'a4', 
+                orientation: 'portrait'
+            }
+        };
+
+        await html2pdf().set(options).from(html).save();
+        
+        progressBar.style.width = '100%';
+        progressText.textContent = '100%';
+        progressMessage.textContent = 'Download complete!';
+        
+        setTimeout(() => {
+            progressModal.classList.add('hidden');
+        }, 1000);
+        
+    } catch (error) {
+        console.error("Error downloading report:", error);
+        alert(`Error downloading report: ${error.message}`);
+        document.getElementById('pdf-progress-modal').classList.add('hidden');
+    } finally {
+        button.innerHTML = originalText;
+        button.disabled = false;
+    }
+};
+
+window.zipAndDownloadTutorReports = async function(reports, tutorName, button) {
+    const originalButtonText = button.innerHTML;
+    
+    try {
+        const progressModal = document.getElementById('pdf-progress-modal');
+        const progressBar = document.getElementById('pdf-progress-bar');
+        const progressText = document.getElementById('pdf-progress-text');
+        const progressMessage = document.getElementById('pdf-progress-message');
+        
+        progressModal.classList.remove('hidden');
+        progressMessage.textContent = `Preparing ${reports.length} reports for ${tutorName}...`;
+        progressBar.style.width = '0%';
+        progressText.textContent = '0%';
+
         const zip = new JSZip();
-        let filesGenerated = 0;
-        const reportGenerationPromises = reports.map(async (report) => {
-            const { html, reportData } = await generateReportHTML(report.id);
-            const options = {
-                image:        { type: 'jpeg', quality: 0.98 },
-                html2canvas:  { scale: 2, useCORS: true },
-                jsPDF:        { unit: 'in', format: 'letter', orientation: 'portrait' }
-            };
-            const pdfBlob = await html2pdf().from(html).set(options).output('blob');
-            filesGenerated++;
-            buttonElement.textContent = `Zipping... (${Math.round((filesGenerated / reports.length) * 100)}%)`;
-            return { name: `${reportData.studentName}_Report_${report.id.substring(0,5)}.pdf`, blob: pdfBlob };
+        let processedCount = 0;
+
+        for (const report of reports) {
+            try {
+                const progress = Math.round((processedCount / reports.length) * 100);
+                progressBar.style.width = `${progress}%`;
+                progressText.textContent = `${progress}%`;
+                progressMessage.textContent = `Processing report ${processedCount + 1} of ${reports.length}...`;
+                button.innerHTML = `📦 Processing ${processedCount + 1}/${reports.length}`;
+
+                const { html, reportData } = await generateReportHTML(report.id);
+                
+                const options = {
+                    margin: 0.5,
+                    image: { 
+                        type: 'jpeg', 
+                        quality: 0.98 
+                    },
+                    html2canvas: { 
+                        scale: 2,
+                        useCORS: true,
+                        logging: false,
+                        backgroundColor: '#FFFFFF'
+                    },
+                    jsPDF: { 
+                        unit: 'in', 
+                        format: 'a4', 
+                        orientation: 'portrait'
+                    }
+                };
+
+                const pdfBlob = await html2pdf().set(options).from(html).output('blob');
+                
+                const safeStudentName = (reportData.studentName || 'Unknown_Student').replace(/[^a-z0-9]/gi, '_');
+                const reportDate = reportData.submittedAt ? 
+                    new Date(reportData.submittedAt.seconds * 1000).toISOString().split('T')[0] : 
+                    'unknown_date';
+                const filename = `${safeStudentName}_${reportDate}.pdf`;
+                
+                zip.file(filename, pdfBlob);
+                
+            } catch (error) {
+                console.error(`Error processing report ${report.id}:`, error);
+            }
+            
+            processedCount++;
+            
+            await new Promise(resolve => setTimeout(resolve, 500));
+        }
+
+        progressMessage.textContent = 'Creating ZIP file...';
+        progressBar.style.width = '95%';
+        progressText.textContent = '95%';
+        
+        const zipBlob = await zip.generateAsync({ 
+            type: "blob",
+            compression: "DEFLATE"
         });
-        const generatedPdfs = await Promise.all(reportGenerationPromises);
-        generatedPdfs.forEach(pdf => zip.file(pdf.name, pdf.blob));
-        const zipBlob = await zip.generateAsync({ type: "blob" });
-        saveAs(zipBlob, `${tutorName}_All_Reports.zip`);
+
+        progressMessage.textContent = 'Download starting...';
+        progressBar.style.width = '100%';
+        progressText.textContent = '100%';
+        
+        saveAs(zipBlob, `${tutorName}_Reports_${new Date().toISOString().split('T')[0]}.zip`);
+        
+        setTimeout(() => {
+            progressModal.classList.add('hidden');
+        }, 2000);
+        
     } catch (error) {
         console.error("Error creating zip file:", error);
-        alert("Failed to create zip file. See console for details.");
+        alert("Failed to create zip file. Please try again.");
+        document.getElementById('pdf-progress-modal').classList.add('hidden');
     } finally {
-        buttonElement.textContent = originalButtonText;
-        buttonElement.disabled = false;
+        button.innerHTML = originalButtonText;
+        button.disabled = false;
     }
+};
+
+const additionalStyles = `
+<style>
+.loading-spinner {
+    border: 3px solid #f3f3f3;
+    border-top: 3px solid #3498db;
+    border-radius: 50%;
+    width: 40px;
+    height: 40px;
+    animation: spin 1s linear infinite;
+}
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+#pdf-progress-modal {
+    backdrop-filter: blur(5px);
+}
+</style>
+`;
+if (!document.querySelector('style[data-reports-panel]')) {
+    const styleEl = document.createElement('style');
+    styleEl.setAttribute('data-reports-panel', 'true');
+    styleEl.innerHTML = additionalStyles;
+    document.head.appendChild(styleEl);
 }
 
-// ##################################
-// # SIDEBAR NAVIGATION SETUP
-// ##################################
+// ======================================================
+// SECTION 9: NAVIGATION & AUTHENTICATION
+// ======================================================
 
-// Define navigation groups for the sidebar
 const navigationGroups = {
     "dashboard": {
         icon: "fas fa-tachometer-alt",
         label: "Dashboard",
-        defaultNavId: "navTutorManagement"
+        fn: renderDashboardPanel
     },
     "tutorManagement": {
         icon: "fas fa-user-friends",
@@ -4437,24 +4440,19 @@ const navigationGroups = {
     }
 };
 
-// Initialize sidebar navigation
 function initializeSidebarNavigation(staffData) {
     const navContainer = document.getElementById('navContainer');
     const searchInput = document.getElementById('navSearch');
     
     if (!navContainer) return;
     
-    // Clear existing content
     navContainer.innerHTML = '';
     
     let allNavItems = {};
     let hasVisibleItems = false;
     
-    // Build navigation groups
     Object.entries(navigationGroups).forEach(([groupKey, group]) => {
-        // Filter items based on permissions
         const visibleItems = group.items ? group.items.filter(item => {
-            // Check if user has permission for this item
             const hasPermission = item.id === 'navReferralsAdmin' || 
                                 !staffData.permissions || 
                                 !staffData.permissions.tabs || 
@@ -4464,12 +4462,10 @@ function initializeSidebarNavigation(staffData) {
         
         if (visibleItems.length === 0 && groupKey !== 'dashboard') return;
         
-        // Create navigation group
         const groupElement = document.createElement('div');
         groupElement.className = 'nav-group';
         
         if (groupKey === 'dashboard') {
-            // Dashboard is always visible and not collapsible
             const dashboardItem = document.createElement('div');
             dashboardItem.className = 'nav-item';
             dashboardItem.innerHTML = `
@@ -4477,25 +4473,20 @@ function initializeSidebarNavigation(staffData) {
                 <span class="nav-text">${group.label}</span>
             `;
             dashboardItem.addEventListener('click', () => {
-                // Clear all active states
                 document.querySelectorAll('.nav-item').forEach(item => item.classList.remove('active'));
                 dashboardItem.classList.add('active');
                 
-                // Set page title
                 document.getElementById('pageTitle').textContent = group.label;
                 
-                // Load the default panel
-                if (group.defaultNavId && allNavItems[group.defaultNavId]) {
-                    allNavItems[group.defaultNavId].fn(document.getElementById('main-content'));
+                if (group.fn) {
+                    group.fn(document.getElementById('main-content'));
                 }
             });
             navContainer.appendChild(dashboardItem);
             
-            // Set the first visible nav item as active
             setTimeout(() => dashboardItem.click(), 100);
             
         } else {
-            // Regular collapsible group
             groupElement.innerHTML = `
                 <div class="nav-group-header">
                     <div class="group-title">
@@ -4517,7 +4508,6 @@ function initializeSidebarNavigation(staffData) {
                 </div>
             `;
             
-            // Add click handler for group header
             const header = groupElement.querySelector('.nav-group-header');
             header.addEventListener('click', () => {
                 groupElement.classList.toggle('collapsed');
@@ -4526,22 +4516,17 @@ function initializeSidebarNavigation(staffData) {
             navContainer.appendChild(groupElement);
             hasVisibleItems = true;
             
-            // Add click handlers for nav items
             groupElement.querySelectorAll('.nav-item').forEach(item => {
                 item.addEventListener('click', () => {
                     const navId = item.dataset.navId;
                     
-                    // Clear all active states
                     document.querySelectorAll('.nav-item').forEach(navItem => navItem.classList.remove('active'));
                     
-                    // Set active state for clicked item
                     item.classList.add('active');
                     
-                    // Set page title
                     const itemLabel = item.querySelector('.nav-text').textContent;
                     document.getElementById('pageTitle').textContent = itemLabel;
                     
-                    // Load the panel
                     if (navId && allNavItems[navId]) {
                         allNavItems[navId].fn(document.getElementById('main-content'));
                     }
@@ -4550,7 +4535,6 @@ function initializeSidebarNavigation(staffData) {
         }
     });
     
-    // If no visible items, show message
     if (!hasVisibleItems && !document.querySelector('.nav-item[data-nav-id]')) {
         navContainer.innerHTML = `
             <div class="text-center py-8">
@@ -4560,7 +4544,6 @@ function initializeSidebarNavigation(staffData) {
         `;
     }
     
-    // Setup search functionality
     if (searchInput) {
         searchInput.addEventListener('input', (e) => {
             const searchTerm = e.target.value.toLowerCase();
@@ -4570,7 +4553,6 @@ function initializeSidebarNavigation(staffData) {
                 const text = item.querySelector('.nav-text').textContent.toLowerCase();
                 if (text.includes(searchTerm)) {
                     item.style.display = 'flex';
-                    // Show parent group if it's hidden
                     let parentGroup = item.closest('.nav-group');
                     if (parentGroup) {
                         parentGroup.style.display = 'block';
@@ -4586,13 +4568,10 @@ function initializeSidebarNavigation(staffData) {
     return allNavItems;
 }
 
-// Helper function to get permission key from nav ID
 function getPermissionKey(navId) {
-    // Convert navId like "navTutorManagement" to "viewTutorManagement"
     return 'view' + navId.replace('nav', '').replace(/([A-Z])/g, (match, p1) => p1.charAt(0).toUpperCase() + p1.slice(1));
 }
 
-// Update page title
 function updatePageTitle(title) {
     const pageTitle = document.getElementById('pageTitle');
     if (pageTitle) {
@@ -4600,12 +4579,8 @@ function updatePageTitle(title) {
     }
 }
 
-// ##################################
-// # AUTHENTICATION & INITIALIZATION
-// ##################################
-
-// Define all navigation items (for backward compatibility)
 const allNavItems = {
+    navDashboard: { fn: renderDashboardPanel, perm: 'viewDashboard', label: 'Dashboard' },
     navTutorManagement: { fn: renderManagementTutorView, perm: 'viewTutorManagement', label: 'Tutor Directory' },
     navPayAdvice: { fn: renderPayAdvicePanel, perm: 'viewPayAdvice', label: 'Pay Advice' },
     navTutorReports: { fn: renderTutorReportsPanel, perm: 'viewTutorReports', label: 'Tutor Reports' },
@@ -4618,7 +4593,6 @@ const allNavItems = {
     navArchivedStudents: { fn: renderArchivedStudentsPanel, perm: 'viewArchivedStudents', label: 'Archived Students' }
 };
 
-// Global modal close function
 window.closeManagementModal = function(modalId) {
     const modal = document.getElementById(modalId);
     if (modal) {
@@ -4626,7 +4600,6 @@ window.closeManagementModal = function(modalId) {
     }
 };
 
-// Sidebar toggle functionality
 function setupSidebarToggle() {
     const toggleBtn = document.getElementById('toggleSidebar');
     const mobileMenuBtn = document.getElementById('mobileMenuBtn');
@@ -4635,7 +4608,6 @@ function setupSidebarToggle() {
     if (toggleBtn) {
         toggleBtn.addEventListener('click', () => {
             body.classList.toggle('sidebar-collapsed');
-            // Update chevron icon
             const icon = toggleBtn.querySelector('i');
             if (body.classList.contains('sidebar-collapsed')) {
                 icon.className = 'fas fa-chevron-right';
@@ -4652,7 +4624,6 @@ function setupSidebarToggle() {
         });
     }
     
-    // Close mobile sidebar when clicking outside on mobile
     document.addEventListener('click', (e) => {
         const sidebar = document.getElementById('sidebar');
         const mobileMenuBtn = document.getElementById('mobileMenuBtn');
@@ -4671,7 +4642,6 @@ onAuthStateChanged(auth, async (user) => {
     const sidebarLogoutBtn = document.getElementById('sidebarLogoutBtn');
     const mobileMenuBtn = document.getElementById('mobileMenuBtn');
     
-    // Show mobile menu button
     if (mobileMenuBtn) {
         mobileMenuBtn.classList.remove('hidden');
     }
@@ -4687,17 +4657,13 @@ onAuthStateChanged(auth, async (user) => {
                 const staffData = staffDocSnap.data();
                 window.userData = staffData;
                 
-                // Update user info in sidebar
                 document.getElementById('welcome-message').textContent = `Welcome, ${staffData.name}`;
                 document.getElementById('user-role').textContent = `Role: ${capitalize(staffData.role)}`;
                 
-                // Setup sidebar navigation
                 const navItems = initializeSidebarNavigation(staffData);
                 
-                // Setup sidebar toggle
                 setupSidebarToggle();
                 
-                // Setup logout button
                 if (sidebarLogoutBtn) {
                     sidebarLogoutBtn.addEventListener('click', () => {
                         signOut(auth).then(() => {
@@ -4706,15 +4672,13 @@ onAuthStateChanged(auth, async (user) => {
                     });
                 }
                 
-                // Load initial dashboard content
-                const defaultNavId = navigationGroups.dashboard.defaultNavId;
+                const defaultNavId = 'navDashboard';
                 if (defaultNavId && navItems[defaultNavId]) {
-                    updatePageTitle(navigationGroups.dashboard.label);
+                    updatePageTitle('Dashboard');
                     navItems[defaultNavId].fn(mainContent);
                 }
                 
             } else {
-                // User not approved or doesn't exist in staff collection
                 if (mainContent) {
                     mainContent.innerHTML = `
                         <div class="bg-white p-8 rounded-lg shadow-md text-center">
@@ -4746,11 +4710,6 @@ onAuthStateChanged(auth, async (user) => {
             }
         }
     } else {
-        // No user signed in
         window.location.href = "management-auth.html";
     }
 });
-
-
-
-
