@@ -3692,8 +3692,6 @@ function renderBreakStudentsFromCache(searchTerm = '') {
     const breakStudents = sessionCache.breakStudents || [];
     const listContainer = document.getElementById('break-students-list');
     if (!listContainer) return;
-
-    const canEndBreak = window.userData?.permissions?.actions?.canEndBreak === true;
     
     // Apply search filter
     const lowerCaseSearchTerm = searchTerm.toLowerCase();
@@ -3786,14 +3784,12 @@ function renderBreakStudentsFromCache(searchTerm = '') {
                         </div>
                     </div>
                     <div class="ml-4">
-                        ${canEndBreak ? `
-                            <button class="end-break-btn bg-red-600 text-white px-4 py-3 rounded-lg hover:bg-red-700 transition-colors flex items-center justify-center whitespace-nowrap font-medium"
-                                    data-student-id="${student.id}"
-                                    data-student-name="${student.studentName}"
-                                    data-tutor-name="${student.tutorName || student.tutorEmail || 'Unknown Tutor'}">
-                                <i class="fas fa-flag mr-2"></i> End Summer Break
-                            </button>
-                        ` : ''}
+                        <button class="end-break-btn bg-red-600 text-white px-4 py-3 rounded-lg hover:bg-red-700 transition-colors flex items-center justify-center whitespace-nowrap font-medium"
+                                data-student-id="${student.id}"
+                                data-student-name="${student.studentName}"
+                                data-tutor-name="${student.tutorName || student.tutorEmail || 'Unknown Tutor'}">
+                            <i class="fas fa-flag mr-2"></i> End Summer Break
+                        </button>
                     </div>
                 </div>
             `;
@@ -3822,80 +3818,78 @@ function renderBreakStudentsFromCache(searchTerm = '') {
     listContainer.innerHTML = html;
     
     // Add event listeners for End Break buttons
-    if (canEndBreak) {
-        document.querySelectorAll('.end-break-btn').forEach(button => {
-            button.addEventListener('click', async (e) => {
-                const studentId = e.target.dataset.studentId;
-                const studentName = e.target.dataset.studentName;
-                const tutorName = e.target.dataset.tutorName;
+    document.querySelectorAll('.end-break-btn').forEach(button => {
+        button.addEventListener('click', async (e) => {
+            const studentId = e.target.dataset.studentId;
+            const studentName = e.target.dataset.studentName;
+            const tutorName = e.target.dataset.tutorName;
+            
+            // Confirm with the user
+            const confirmation = confirm(`Are you sure you want to take ${studentName} off summer break and return them to ${tutorName}?`);
+            
+            if (!confirmation) {
+                return; // User cancelled
+            }
+            
+            try {
+                // Show loading state on the button
+                const originalText = e.target.innerHTML;
+                e.target.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> Ending Break...';
+                e.target.disabled = true;
                 
-                // Confirm with the user
-                const confirmation = confirm(`Are you sure you want to take ${studentName} off summer break and return them to ${tutorName}?`);
+                // Update in Firestore - remove summer break flag
+                await updateDoc(doc(db, "students", studentId), { 
+                    summerBreak: false, 
+                    lastBreakEnd: Timestamp.now(),
+                    lastUpdated: Timestamp.now()
+                });
                 
-                if (!confirmation) {
-                    return; // User cancelled
+                // Show success message
+                const statusMessage = document.getElementById('break-status-message');
+                statusMessage.textContent = `✅ Summer break ended for ${studentName}. Student is now active with ${tutorName}.`;
+                statusMessage.className = 'text-center font-semibold mb-4 text-green-600 p-3 bg-green-50 rounded-lg';
+                statusMessage.classList.remove('hidden');
+                
+                // Hide message after 4 seconds
+                setTimeout(() => {
+                    statusMessage.classList.add('hidden');
+                }, 4000);
+                
+                // Update all relevant caches
+                invalidateCache('breakStudents');
+                invalidateCache('students');
+                invalidateCache('tutorAssignments');
+                
+                // Re-fetch and render with current search term
+                const currentSearch = document.getElementById('break-search').value;
+                await fetchAndRenderBreakStudents(true);
+                
+                // Re-apply search filter if there's a search term
+                if (currentSearch) {
+                    document.getElementById('break-search').value = currentSearch;
+                    renderBreakStudentsFromCache(currentSearch);
                 }
                 
-                try {
-                    // Show loading state on the button
-                    const originalText = e.target.innerHTML;
-                    e.target.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> Ending Break...';
-                    e.target.disabled = true;
-                    
-                    // Update in Firestore - remove summer break flag
-                    await updateDoc(doc(db, "students", studentId), { 
-                        summerBreak: false, 
-                        lastBreakEnd: Timestamp.now(),
-                        lastUpdated: Timestamp.now()
-                    });
-                    
-                    // Show success message
-                    const statusMessage = document.getElementById('break-status-message');
-                    statusMessage.textContent = `✅ Summer break ended for ${studentName}. Student is now active with ${tutorName}.`;
-                    statusMessage.className = 'text-center font-semibold mb-4 text-green-600 p-3 bg-green-50 rounded-lg';
-                    statusMessage.classList.remove('hidden');
-                    
-                    // Hide message after 4 seconds
-                    setTimeout(() => {
-                        statusMessage.classList.add('hidden');
-                    }, 4000);
-                    
-                    // Update all relevant caches
-                    invalidateCache('breakStudents');
-                    invalidateCache('students');
-                    invalidateCache('tutorAssignments');
-                    
-                    // Re-fetch and render with current search term
-                    const currentSearch = document.getElementById('break-search').value;
-                    await fetchAndRenderBreakStudents(true);
-                    
-                    // Re-apply search filter if there's a search term
-                    if (currentSearch) {
-                        document.getElementById('break-search').value = currentSearch;
-                        renderBreakStudentsFromCache(currentSearch);
-                    }
-                    
-                } catch (error) {
-                    console.error("Error ending summer break:", error);
-                    
-                    // Show error message
-                    const statusMessage = document.getElementById('break-status-message');
-                    statusMessage.textContent = `❌ Failed to end summer break for ${studentName}. Error: ${error.message}`;
-                    statusMessage.className = 'text-center font-semibold mb-4 text-red-600 p-3 bg-red-50 rounded-lg';
-                    statusMessage.classList.remove('hidden');
-                    
-                    // Hide message after 5 seconds
-                    setTimeout(() => {
-                        statusMessage.classList.add('hidden');
-                    }, 5000);
-                    
-                    // Restore button state
-                    e.target.innerHTML = originalText;
-                    e.target.disabled = false;
-                }
-            });
+            } catch (error) {
+                console.error("Error ending summer break:", error);
+                
+                // Show error message
+                const statusMessage = document.getElementById('break-status-message');
+                statusMessage.textContent = `❌ Failed to end summer break for ${studentName}. Error: ${error.message}`;
+                statusMessage.className = 'text-center font-semibold mb-4 text-red-600 p-3 bg-red-50 rounded-lg';
+                statusMessage.classList.remove('hidden');
+                
+                // Hide message after 5 seconds
+                setTimeout(() => {
+                    statusMessage.classList.add('hidden');
+                }, 5000);
+                
+                // Restore button state
+                e.target.innerHTML = originalText;
+                e.target.disabled = false;
+            }
         });
-    }
+    });
 }
 
 // --- Parent Feedback Panel - FIXED DATE ISSUE ---
@@ -4756,5 +4750,6 @@ onAuthStateChanged(auth, async (user) => {
         window.location.href = "management-auth.html";
     }
 });
+
 
 
