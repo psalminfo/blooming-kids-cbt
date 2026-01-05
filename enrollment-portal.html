@@ -197,6 +197,20 @@
             padding-right: 50px;
         }
 
+        /* Phone number input - Single line */
+        .phone-single-line {
+            display: flex;
+            gap: 10px;
+        }
+
+        .phone-single-line input:first-child {
+            flex: 0 0 100px;
+        }
+
+        .phone-single-line input:last-child {
+            flex: 1;
+        }
+
         /* Form Validation */
         .form-control.error {
             border-color: var(--danger);
@@ -449,6 +463,12 @@
             font-size: 15px;
         }
 
+        .extracurricular-details {
+            margin-top: 10px;
+            padding-top: 10px;
+            border-top: 1px solid #eee;
+        }
+
         .frequency-selection {
             display: flex;
             gap: 10px;
@@ -540,6 +560,78 @@
             outline: none;
             border-color: var(--primary);
             box-shadow: 0 0 0 3px rgba(46, 139, 87, 0.1);
+        }
+
+        /* Days & Time Selection */
+        .days-time-section {
+            margin-top: 15px;
+            padding-top: 15px;
+            border-top: 1px solid #eee;
+        }
+
+        .days-time-section h5 {
+            font-size: 13px;
+            color: #666;
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .available-days {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-bottom: 10px;
+        }
+
+        .day-btn {
+            padding: 6px 12px;
+            border: 2px solid #E1E5EB;
+            border-radius: 6px;
+            background: white;
+            cursor: pointer;
+            font-size: 12px;
+            transition: var(--transition);
+            user-select: none;
+        }
+
+        .day-btn:hover {
+            border-color: var(--primary);
+            background: rgba(46, 139, 87, 0.05);
+        }
+
+        .day-btn.selected {
+            background: var(--primary);
+            color: white;
+            border-color: var(--primary);
+        }
+
+        .time-selection {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 10px;
+        }
+
+        .time-input-group {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .time-input-group label {
+            font-size: 13px;
+            color: #666;
+            min-width: 60px;
+        }
+
+        .time-input-group select {
+            flex: 1;
+            padding: 8px;
+            border: 2px solid #E1E5EB;
+            border-radius: 6px;
+            background: white;
+            font-size: 13px;
         }
 
         /* Buttons */
@@ -969,6 +1061,14 @@
                 grid-template-columns: 1fr;
             }
             
+            .phone-single-line {
+                flex-direction: column;
+            }
+            
+            .phone-single-line input:first-child {
+                flex: 1;
+            }
+            
             .logo-text h1 {
                 font-size: 26px;
             }
@@ -1263,12 +1363,18 @@
                     <div class="form-row">
                         <div class="form-group">
                             <label>Phone Number <span class="required">*</span></label>
-                            <input type="tel" class="form-control" id="parentPhone" placeholder="+23480123456789" data-validate="required,phone">
+                            <div class="phone-single-line">
+                                <input type="text" class="form-control" id="countryCode" placeholder="+234" value="+234" data-validate="required">
+                                <input type="tel" class="form-control" id="parentPhone" placeholder="80123456789" data-validate="required,phone">
+                            </div>
                             <div class="error-message" id="parentPhone-error"></div>
                         </div>
                         <div class="form-group">
-                            <label>Address <span class="required">*</span></label>
-                            <input type="text" class="form-control" id="parentAddress" placeholder="State/Province" data-validate="required">
+                            <label>City & Country <span class="required">*</span></label>
+                            <div class="phone-single-line">
+                                <input type="text" class="form-control" id="city" placeholder="Lagos" data-validate="required">
+                                <input type="text" class="form-control" id="country" placeholder="Nigeria" data-validate="required">
+                            </div>
                             <div class="error-message" id="parentAddress-error"></div>
                         </div>
                     </div>
@@ -1523,9 +1629,13 @@
                 ADDITIONAL_SUBJECT_FEE: 40000,
                 SIBLING_DISCOUNT: 10000,
                 BASE_SUBJECTS_INCLUDED: 2,
-                REFERRAL_BONUS: 5000,
-                FULL_FEE_THRESHOLD_DAY: 6
-            }
+                REFERRAL_BONUS: 5000
+            },
+            
+            // Days and Time Options
+            DAYS: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'],
+            HOURS: Array.from({length: 24}, (_, i) => i), // 0-23 hours
+            MINUTES: ['00', '15', '30', '45']
         };
 
         // ==============================================
@@ -1626,7 +1736,7 @@
                 }
                 
                 // Form validation for parent fields
-                const parentInputs = ['#parentName', '#parentEmail', '#parentPhone', '#parentAddress'];
+                const parentInputs = ['#parentName', '#parentEmail', '#countryCode', '#parentPhone', '#city', '#country'];
                 parentInputs.forEach(selector => {
                     const input = document.querySelector(selector);
                     if (input) {
@@ -1642,7 +1752,7 @@
                 // Auto-save when form changes
                 let saveTimer;
                 const setupAutoSave = () => {
-                    const formElements = document.querySelectorAll('.form-control, .subject-option, .extracurricular-card, .frequency-btn, .test-prep-hours');
+                    const formElements = document.querySelectorAll('.form-control, .subject-option, .extracurricular-card, .frequency-btn, .test-prep-hours, .day-btn, select');
                     formElements.forEach(element => {
                         element.addEventListener('change', () => {
                             if (this.isLoadingSavedData || this.isSaving) return;
@@ -1764,6 +1874,22 @@
                     });
                 }
                 
+                // Pre-select academic days and time
+                if (data.academicDays && data.academicDays.length > 0) {
+                    data.academicDays.forEach(day => {
+                        const dayBtn = studentDiv.querySelector(`.academic-day-btn[data-day="${day}"]`);
+                        if (dayBtn) dayBtn.classList.add('selected');
+                    });
+                }
+                
+                if (data.academicTime) {
+                    const [startHour, startMinute, endHour, endMinute] = data.academicTime.split(':');
+                    studentDiv.querySelector('#academic-start-hour').value = startHour;
+                    studentDiv.querySelector('#academic-start-minute').value = startMinute;
+                    studentDiv.querySelector('#academic-end-hour').value = endHour;
+                    studentDiv.querySelector('#academic-end-minute').value = endMinute;
+                }
+                
                 // Pre-select extracurricular activities
                 if (data.extracurriculars && data.extracurriculars.length > 0) {
                     data.extracurriculars.forEach(activity => {
@@ -1779,6 +1905,21 @@
                                 const onceBtn = card.querySelector('[data-frequency="once"]');
                                 if (onceBtn) onceBtn.classList.add('selected');
                             }
+                            // Set days
+                            if (activity.days && activity.days.length > 0) {
+                                activity.days.forEach(day => {
+                                    const dayBtn = card.querySelector(`.extracurricular-day-btn[data-day="${day}"]`);
+                                    if (dayBtn) dayBtn.classList.add('selected');
+                                });
+                            }
+                            // Set time
+                            if (activity.time) {
+                                const [startHour, startMinute, endHour, endMinute] = activity.time.split(':');
+                                card.querySelector('#extracurricular-start-hour').value = startHour;
+                                card.querySelector('#extracurricular-start-minute').value = startMinute;
+                                card.querySelector('#extracurricular-end-hour').value = endHour;
+                                card.querySelector('#extracurricular-end-minute').value = endMinute;
+                            }
                         }
                     });
                 }
@@ -1793,21 +1934,87 @@
                                 input.value = test.hours;
                                 card.classList.add('active');
                             }
+                            // Set days
+                            if (test.days && test.days.length > 0) {
+                                test.days.forEach(day => {
+                                    const dayBtn = card.querySelector(`.test-prep-day-btn[data-day="${day}"]`);
+                                    if (dayBtn) dayBtn.classList.add('selected');
+                                });
+                            }
+                            // Set time
+                            if (test.time) {
+                                const [startHour, startMinute, endHour, endMinute] = test.time.split(':');
+                                card.querySelector('#test-prep-start-hour').value = startHour;
+                                card.querySelector('#test-prep-start-minute').value = startMinute;
+                                card.querySelector('#test-prep-end-hour').value = endHour;
+                                card.querySelector('#test-prep-end-minute').value = endMinute;
+                            }
                         }
                     });
                 }
             }
 
             generateCourseSelectionHTML(id) {
-                // 1. Academic HTML
-                const academicSubjects = CONFIG.ACADEMIC_SUBJECTS.map(subject => `
-                    <div class="subject-option" data-subject="${subject}">
-                        <div class="subject-checkbox"></div>
-                        <span>${subject}</span>
-                    </div>
+                // Generate hour options for select dropdowns
+                const hourOptions = CONFIG.HOURS.map(hour => {
+                    const hour12 = hour % 12 || 12;
+                    const ampm = hour < 12 ? 'AM' : 'PM';
+                    return `<option value="${hour.toString().padStart(2, '0')}">${hour12} ${ampm}</option>`;
+                }).join('');
+                
+                const minuteOptions = CONFIG.MINUTES.map(minute => `<option value="${minute}">${minute}</option>`).join('');
+
+                // 1. Academic HTML with Days & Time
+                const academicDaysHTML = CONFIG.DAYS.map(day => `
+                    <button class="day-btn academic-day-btn" data-day="${day}">${day.substring(0, 3)}</button>
                 `).join('');
 
-                // 2. Extracurricular HTML
+                const academicHTML = `
+                    <div id="academic-${id}" class="tab-content active">
+                        <div class="course-selection">
+                            <p class="course-note">First 2 subjects included. Additional: <strong>+₦40,000</strong></p>
+                            <div class="subjects-grid">
+                                ${CONFIG.ACADEMIC_SUBJECTS.map(subject => `
+                                    <div class="subject-option" data-subject="${subject}">
+                                        <div class="subject-checkbox"></div>
+                                        <span>${subject}</span>
+                                    </div>
+                                `).join('')}
+                            </div>
+                            
+                            <div class="days-time-section">
+                                <h5><i class="far fa-calendar-alt"></i> Available Days</h5>
+                                <div class="available-days">
+                                    ${academicDaysHTML}
+                                </div>
+                                
+                                <h5><i class="far fa-clock"></i> Preferred Time (12AM - 11PM)</h5>
+                                <div class="time-selection">
+                                    <div class="time-input-group">
+                                        <label>From:</label>
+                                        <select id="academic-start-hour" class="time-hour">
+                                            ${hourOptions}
+                                        </select>
+                                        <select id="academic-start-minute" class="time-minute">
+                                            ${minuteOptions}
+                                        </select>
+                                    </div>
+                                    <div class="time-input-group">
+                                        <label>To:</label>
+                                        <select id="academic-end-hour" class="time-hour">
+                                            ${hourOptions}
+                                        </select>
+                                        <select id="academic-end-minute" class="time-minute">
+                                            ${minuteOptions}
+                                        </select>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+
+                // 2. Extracurricular HTML with Days & Time
                 const extracurriculars = CONFIG.EXTRACURRICULAR_FEES.map(activity => {
                     const isGlobalDiscovery = activity.id === 'global_discovery';
                     
@@ -1828,6 +2035,10 @@
                         `;
                     }
 
+                    const extracurricularDaysHTML = CONFIG.DAYS.map(day => `
+                        <button class="day-btn extracurricular-day-btn" data-day="${day}">${day.substring(0, 3)}</button>
+                    `).join('');
+
                     return `
                     <div class="extracurricular-card" data-activity-id="${activity.id}">
                         <div class="extracurricular-header">
@@ -1835,12 +2046,54 @@
                             <div class="extracurricular-price">₦${activity.fee.toLocaleString()}</div>
                         </div>
                         ${buttonsHTML}
+                        <div class="extracurricular-details">
+                            <h5><i class="far fa-calendar-alt"></i> Available Days</h5>
+                            <div class="available-days">
+                                ${extracurricularDaysHTML}
+                            </div>
+                            
+                            <h5><i class="far fa-clock"></i> Preferred Time (12AM - 11PM)</h5>
+                            <div class="time-selection">
+                                <div class="time-input-group">
+                                    <label>From:</label>
+                                    <select id="extracurricular-start-hour" class="time-hour">
+                                        ${hourOptions}
+                                    </select>
+                                    <select id="extracurricular-start-minute" class="time-minute">
+                                        ${minuteOptions}
+                                    </select>
+                                </div>
+                                <div class="time-input-group">
+                                    <label>To:</label>
+                                    <select id="extracurricular-end-hour" class="time-hour">
+                                        ${hourOptions}
+                                    </select>
+                                    <select id="extracurricular-end-minute" class="time-minute">
+                                        ${minuteOptions}
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                     `;
                 }).join('');
 
-                // 3. Test Prep HTML
-                const testPreps = CONFIG.TEST_PREP_FEES.map(test => `
+                const extracurricularHTML = `
+                    <div id="extracurricular-${id}" class="tab-content">
+                        <div class="course-selection">
+                            <p class="course-note">Weekly activities.</p>
+                            <div class="extracurricular-grid">${extracurriculars}</div>
+                        </div>
+                    </div>
+                `;
+
+                // 3. Test Prep HTML with Days & Time
+                const testPreps = CONFIG.TEST_PREP_FEES.map(test => {
+                    const testPrepDaysHTML = CONFIG.DAYS.map(day => `
+                        <button class="day-btn test-prep-day-btn" data-day="${day}">${day.substring(0, 3)}</button>
+                    `).join('');
+
+                    return `
                     <div class="test-prep-card" data-test-id="${test.id}">
                         <div class="test-prep-header">
                             <div class="test-prep-name">${test.name}</div>
@@ -1851,22 +2104,39 @@
                             <input type="number" min="0" step="0.5" value="0" class="test-prep-hours" placeholder="0.5">
                             <span>hrs</span>
                         </div>
+                        <div class="days-time-section">
+                            <h5><i class="far fa-calendar-alt"></i> Available Days</h5>
+                            <div class="available-days">
+                                ${testPrepDaysHTML}
+                            </div>
+                            
+                            <h5><i class="far fa-clock"></i> Preferred Time (12AM - 11PM)</h5>
+                            <div class="time-selection">
+                                <div class="time-input-group">
+                                    <label>From:</label>
+                                    <select id="test-prep-start-hour" class="time-hour">
+                                        ${hourOptions}
+                                    </select>
+                                    <select id="test-prep-start-minute" class="time-minute">
+                                        ${minuteOptions}
+                                    </select>
+                                </div>
+                                <div class="time-input-group">
+                                    <label>To:</label>
+                                    <select id="test-prep-end-hour" class="time-hour">
+                                        ${hourOptions}
+                                    </select>
+                                    <select id="test-prep-end-minute" class="time-minute">
+                                        ${minuteOptions}
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
                     </div>
-                `).join('');
+                    `;
+                }).join('');
 
-                return `
-                    <div id="academic-${id}" class="tab-content active">
-                        <div class="course-selection">
-                            <p class="course-note">First 2 subjects included. Additional: <strong>+₦40,000</strong></p>
-                            <div class="subjects-grid">${academicSubjects}</div>
-                        </div>
-                    </div>
-                    <div id="extracurricular-${id}" class="tab-content">
-                        <div class="course-selection">
-                            <p class="course-note">Weekly activities.</p>
-                            <div class="extracurricular-grid">${extracurriculars}</div>
-                        </div>
-                    </div>
+                const testPrepHTML = `
                     <div id="test-prep-${id}" class="tab-content">
                         <div class="course-selection">
                             <p class="course-note">Starts from 0.5 hours.</p>
@@ -1874,6 +2144,8 @@
                         </div>
                     </div>
                 `;
+
+                return academicHTML + extracurricularHTML + testPrepHTML;
             }
 
             attachStudentEventListeners(studentDiv, id) {
@@ -1900,10 +2172,28 @@
                     });
                 });
 
-                // 3. Extracurricular Selection
+                // 3. Academic Days & Time Selection
+                studentDiv.querySelectorAll('.academic-day-btn').forEach(btn => {
+                    btn.addEventListener('click', () => {
+                        btn.classList.toggle('selected');
+                        this.updateSummary();
+                    });
+                });
+
+                // Time selection changes
+                studentDiv.querySelectorAll('#academic-start-hour, #academic-start-minute, #academic-end-hour, #academic-end-minute').forEach(select => {
+                    select.addEventListener('change', () => {
+                        this.updateSummary();
+                    });
+                });
+
+                // 4. Extracurricular Selection
                 studentDiv.querySelectorAll('.extracurricular-card').forEach(card => {
                     card.addEventListener('click', (e) => {
-                        if (!e.target.classList.contains('frequency-btn')) {
+                        if (!e.target.classList.contains('frequency-btn') && 
+                            !e.target.classList.contains('day-btn') && 
+                            !e.target.classList.contains('time-hour') &&
+                            !e.target.classList.contains('time-minute')) {
                             card.classList.toggle('selected');
                             // Default to once weekly if selected
                             if(card.classList.contains('selected') && !card.querySelector('.frequency-btn.selected')) {
@@ -1913,6 +2203,7 @@
                              // Clear buttons if deselected
                             if (!card.classList.contains('selected')) {
                                 card.querySelectorAll('.frequency-btn').forEach(b => b.classList.remove('selected'));
+                                card.querySelectorAll('.day-btn').forEach(b => b.classList.remove('selected'));
                             }
                             this.updateSummary();
                         }
@@ -1929,9 +2220,28 @@
                             this.updateSummary();
                         });
                     });
+
+                    // Extracurricular Days Selection
+                    card.querySelectorAll('.extracurricular-day-btn').forEach(btn => {
+                        btn.addEventListener('click', (e) => {
+                            e.stopPropagation();
+                            if(!card.classList.contains('selected')) card.classList.add('selected');
+                            btn.classList.toggle('selected');
+                            this.updateSummary();
+                        });
+                    });
+
+                    // Extracurricular Time Selection
+                    card.querySelectorAll('#extracurricular-start-hour, #extracurricular-start-minute, #extracurricular-end-hour, #extracurricular-end-minute').forEach(select => {
+                        select.addEventListener('change', (e) => {
+                            e.stopPropagation();
+                            if(!card.classList.contains('selected')) card.classList.add('selected');
+                            this.updateSummary();
+                        });
+                    });
                 });
 
-                // 4. Test Prep
+                // 5. Test Prep
                 studentDiv.querySelectorAll('.test-prep-hours').forEach(input => {
                     input.addEventListener('input', (e) => {
                         const card = input.closest('.test-prep-card');
@@ -1942,7 +2252,34 @@
                     });
                 });
 
-                // 5. Basic Input Validation
+                // Test Prep Days Selection
+                studentDiv.querySelectorAll('.test-prep-day-btn').forEach(btn => {
+                    btn.addEventListener('click', () => {
+                        const card = btn.closest('.test-prep-card');
+                        if(!card.classList.contains('active')) {
+                            const input = card.querySelector('.test-prep-hours');
+                            if(input) input.value = 1;
+                            card.classList.add('active');
+                        }
+                        btn.classList.toggle('selected');
+                        this.updateSummary();
+                    });
+                });
+
+                // Test Prep Time Selection
+                studentDiv.querySelectorAll('#test-prep-start-hour, #test-prep-start-minute, #test-prep-end-hour, #test-prep-end-minute').forEach(select => {
+                    select.addEventListener('change', () => {
+                        const card = select.closest('.test-prep-card');
+                        if(!card.classList.contains('active')) {
+                            const input = card.querySelector('.test-prep-hours');
+                            if(input) input.value = 1;
+                            card.classList.add('active');
+                        }
+                        this.updateSummary();
+                    });
+                });
+
+                // 6. Basic Input Validation
                 studentDiv.querySelectorAll('[data-validate]').forEach(input => {
                     input.addEventListener('blur', () => this.validateField(input));
                     input.addEventListener('change', () => {
@@ -1952,7 +2289,7 @@
                     });
                 });
 
-                // 6. Remove Button
+                // 7. Remove Button
                 const removeBtn = studentDiv.querySelector('.remove-student');
                 if(removeBtn) {
                     removeBtn.addEventListener('click', () => {
@@ -1978,13 +2315,13 @@
             // FEE CALCULATION
             // ==============================================
             
-            calculateProratedAmount(totalAcademicFee, startDate) {
-                if (!startDate || totalAcademicFee === 0) {
+            calculateProratedAmount(actualMonthlyFee, startDate, selectedDays = []) {
+                if (!startDate || actualMonthlyFee === 0 || selectedDays.length === 0) {
                     return {
-                        toPay: totalAcademicFee,
+                        toPay: actualMonthlyFee,
                         deduction: 0,
-                        daysRemaining: 0,
                         daysInMonth: 0,
+                        daysRemaining: 0,
                         dayOfMonth: 0
                     };
                 }
@@ -1993,45 +2330,70 @@
                     const start = new Date(startDate);
                     const dayOfMonth = start.getDate();
                     
-                    // If starting on or before the 6th, no proration - pay full fee
-                    if (dayOfMonth <= CONFIG.CONSTANTS.FULL_FEE_THRESHOLD_DAY) {
-                        return {
-                            toPay: totalAcademicFee,
-                            deduction: 0,
-                            daysRemaining: 0,
-                            daysInMonth: 0,
-                            dayOfMonth: dayOfMonth
-                        };
-                    }
-                    
                     // Calculate days in the starting month
                     const year = start.getFullYear();
                     const month = start.getMonth();
                     const daysInMonth = new Date(year, month + 1, 0).getDate();
                     
-                    // Days remaining from start date to end of month (inclusive)
-                    const daysRemaining = daysInMonth - dayOfMonth + 1;
+                    // Check if starting at the beginning of the month (1st day)
+                    const isStartOfMonth = dayOfMonth === 1;
                     
-                    // Calculate prorated amount: (days remaining / total days) * fee
-                    const proratedAmountToPay = Math.round((daysRemaining / daysInMonth) * totalAcademicFee);
+                    // If starting on the 1st of the month, no proration - pay full fee
+                    if (isStartOfMonth) {
+                        return {
+                            toPay: actualMonthlyFee,
+                            deduction: 0,
+                            daysInMonth: daysInMonth,
+                            daysRemaining: daysInMonth,
+                            dayOfMonth: dayOfMonth,
+                            explanation: "Full month (starting on 1st)"
+                        };
+                    }
                     
-                    // Calculate deduction for display
-                    const deductionAmount = totalAcademicFee - proratedAmountToPay;
+                    // Calculate days remaining from start date to end of month (inclusive)
+                    const daysRemainingInMonth = daysInMonth - dayOfMonth + 1;
+                    
+                    // Calculate actual class days remaining based on selected days per week
+                    // For example: If student selected Monday, Wednesday, Friday (3 days/week)
+                    // and there are 4 weeks remaining in the month, then:
+                    // actual class days = days per week × weeks remaining
+                    
+                    const daysPerWeek = selectedDays.length;
+                    const weeksRemaining = Math.ceil(daysRemainingInMonth / 7);
+                    const actualClassDaysRemaining = daysPerWeek * weeksRemaining;
+                    
+                    // Calculate total class days in full month (if started on 1st)
+                    const totalWeeksInMonth = Math.ceil(daysInMonth / 7);
+                    const totalClassDaysInMonth = daysPerWeek * totalWeeksInMonth;
+                    
+                    // Calculate daily rate: actual fee ÷ total class days in full month
+                    const dailyRate = actualMonthlyFee / totalClassDaysInMonth;
+                    
+                    // Calculate amount to pay for remaining class days
+                    const proratedAmountToPay = Math.round(dailyRate * actualClassDaysRemaining);
+                    
+                    // Calculate deduction (what they won't pay)
+                    const deductionAmount = actualMonthlyFee - proratedAmountToPay;
+                    
+                    // Generate explanation
+                    let explanation = `Starting on ${dayOfMonth}/${daysInMonth}. ${daysPerWeek} days/week × ${weeksRemaining} weeks = ${actualClassDaysRemaining} class days.`;
                     
                     return {
                         toPay: proratedAmountToPay,
                         deduction: deductionAmount,
-                        daysRemaining: daysRemaining,
                         daysInMonth: daysInMonth,
-                        dayOfMonth: dayOfMonth
+                        daysRemaining: actualClassDaysRemaining,
+                        dayOfMonth: dayOfMonth,
+                        explanation: explanation
                     };
                 } catch (error) {
                     return {
-                        toPay: totalAcademicFee,
+                        toPay: actualMonthlyFee,
                         deduction: 0,
-                        daysRemaining: 0,
                         daysInMonth: 0,
-                        dayOfMonth: 0
+                        daysRemaining: 0,
+                        dayOfMonth: 0,
+                        explanation: "Error in calculation"
                     };
                 }
             }
@@ -2045,7 +2407,8 @@
                 let testPrepTotal = 0;
                 let hasAcademicSelection = false;
                 let earliestStartDate = null;
-                let totalAcademicFeeAllStudents = 0;
+                let totalActualAcademicFee = 0; // The full monthly fee before proration
+                let selectedDaysPerWeek = 0;
                 
                 const studentEntries = document.querySelectorAll('.student-entry');
                 
@@ -2061,16 +2424,20 @@
 
                 studentEntries.forEach((entry, index) => {
                     let studentSubtotal = 0;
-                    let studentAcademicFee = 0;
+                    let studentActualAcademicFee = 0; // Full monthly fee for this student
                     
                     const grade = entry.querySelector('.student-grade').value;
                     const startDate = entry.querySelector('.student-start-date').value;
                     const name = entry.querySelector('.student-name').value || `Student ${index + 1}`;
                     
+                    // Get selected academic days for this student
+                    const selectedDays = Array.from(entry.querySelectorAll('.academic-day-btn.selected')).map(btn => btn.dataset.day);
+                    
                     // Track earliest start date for proration
                     if (startDate) {
                         if (!earliestStartDate || new Date(startDate) < new Date(earliestStartDate)) {
                             earliestStartDate = startDate;
+                            selectedDaysPerWeek = selectedDays.length;
                         }
                     }
                     
@@ -2082,15 +2449,15 @@
                         const baseFee = CONFIG.ACADEMIC_FEES[grade];
                         academicBaseTotal += baseFee;
                         studentSubtotal += baseFee;
-                        studentAcademicFee += baseFee;
+                        studentActualAcademicFee += baseFee;
                         
                         const extraCount = Math.max(0, selectedSubjects.length - CONFIG.CONSTANTS.BASE_SUBJECTS_INCLUDED);
                         const extraFee = extraCount * CONFIG.CONSTANTS.ADDITIONAL_SUBJECT_FEE;
                         additionalSubjectsTotal += extraFee;
                         studentSubtotal += extraFee;
-                        studentAcademicFee += extraFee;
+                        studentActualAcademicFee += extraFee;
                         
-                        totalAcademicFeeAllStudents += studentAcademicFee;
+                        totalActualAcademicFee += studentActualAcademicFee;
                     }
                     
                     // 2. Extracurricular
@@ -2134,25 +2501,29 @@
                 });
                 
                 // Calculations
-                const totalAcademicFee = academicBaseTotal + additionalSubjectsTotal;
+                const totalAcademicFee = academicBaseTotal + additionalSubjectsTotal; // This is the actual monthly fee
                 
                 let discount = 0;
                 if (studentEntries.length >= 2 && hasAcademicSelection) {
                     discount = CONFIG.CONSTANTS.SIBLING_DISCOUNT;
                 }
                 
-                let proratedAmountToPay = totalAcademicFeeAllStudents;
+                let proratedAmountToPay = totalAcademicFee;
                 let prorationDeduction = 0;
                 let prorationExplanation = '';
                 
-                if (hasAcademicSelection && earliestStartDate) {
-                    const prorationResult = this.calculateProratedAmount(totalAcademicFeeAllStudents, earliestStartDate);
+                if (hasAcademicSelection && earliestStartDate && selectedDaysPerWeek > 0) {
+                    const prorationResult = this.calculateProratedAmount(
+                        totalActualAcademicFee, 
+                        earliestStartDate, 
+                        Array.from({length: selectedDaysPerWeek}, (_, i) => `Day${i+1}`) // Placeholder for actual days
+                    );
                     
                     proratedAmountToPay = prorationResult.toPay || 0;
                     prorationDeduction = prorationResult.deduction || 0;
                     
-                    if (prorationDeduction > 0) {
-                        prorationExplanation = `Starting on day ${prorationResult.dayOfMonth} of month (${prorationResult.daysInMonth} days). Charged for ${prorationResult.daysRemaining} days.`;
+                    if (prorationResult.explanation) {
+                        prorationExplanation = prorationResult.explanation;
                     }
                 }
                 
@@ -2241,7 +2612,7 @@
                         }
                     }
                     if (rule === 'phone') {
-                        const phoneRegex = /^[\+]?[0-9\s\-\(\)]{10,}$/;
+                        const phoneRegex = /^[0-9\s\-\(\)]{7,}$/;
                         if (!phoneRegex.test(value)) {
                             isValid = false;
                             errorMessage = 'Invalid phone number';
@@ -2442,6 +2813,16 @@
             }
             
             collectFormData() {
+                // Get normalized phone number (country code - phone number)
+                const countryCode = document.getElementById('countryCode').value.trim();
+                const phoneNumber = document.getElementById('parentPhone').value.trim().replace(/\D/g, '');
+                const normalizedPhoneNumber = `${countryCode}-${phoneNumber}`;
+                
+                // Get city and country
+                const city = document.getElementById('city').value.trim();
+                const country = document.getElementById('country').value.trim();
+                const cityCountry = `${city}, ${country}`;
+                
                 // Get the total fee
                 const totalFeeText = document.getElementById('total-fee').textContent;
                 const totalFeeValue = parseInt(totalFeeText.replace(/[^0-9]/g, '')) || 0;
@@ -2470,8 +2851,12 @@
                     parent: {
                         name: document.getElementById('parentName').value,
                         email: document.getElementById('parentEmail').value,
-                        phone: document.getElementById('parentPhone').value,
-                        address: document.getElementById('parentAddress').value
+                        phone: normalizedPhoneNumber,
+                        countryCode: countryCode,
+                        phoneNumber: phoneNumber,
+                        city: city,
+                        country: country,
+                        address: cityCountry
                     },
                     referral: {
                         code: document.getElementById('referralCode').value,
@@ -2500,6 +2885,8 @@
                         grade: entry.querySelector('.student-grade').value,
                         startDate: entry.querySelector('.student-start-date').value,
                         selectedSubjects: [],
+                        academicDays: [],
+                        academicTime: '',
                         extracurriculars: [],
                         testPrep: []
                     };
@@ -2509,25 +2896,74 @@
                         studentData.selectedSubjects.push(subject.dataset.subject);
                     });
                     
+                    // Collect academic days
+                    entry.querySelectorAll('.academic-day-btn.selected').forEach(btn => {
+                        studentData.academicDays.push(btn.dataset.day);
+                    });
+                    
+                    // Collect academic time
+                    const startHour = entry.querySelector('#academic-start-hour').value;
+                    const startMinute = entry.querySelector('#academic-start-minute').value;
+                    const endHour = entry.querySelector('#academic-end-hour').value;
+                    const endMinute = entry.querySelector('#academic-end-minute').value;
+                    if (startHour && startMinute && endHour && endMinute) {
+                        studentData.academicTime = `${startHour}:${startMinute}:${endHour}:${endMinute}`;
+                    }
+                    
                     // Collect extracurricular activities
                     entry.querySelectorAll('.extracurricular-card.selected').forEach(card => {
-                        const freqBtn = card.querySelector('.frequency-btn.selected');
-                        studentData.extracurriculars.push({
+                        const activityData = {
                             id: card.dataset.activityId,
-                            frequency: freqBtn ? freqBtn.dataset.frequency : 'once',
                             name: card.querySelector('.extracurricular-name').textContent
+                        };
+                        
+                        const freqBtn = card.querySelector('.frequency-btn.selected');
+                        if (freqBtn) activityData.frequency = freqBtn.dataset.frequency;
+                        
+                        // Collect extracurricular days
+                        activityData.days = [];
+                        card.querySelectorAll('.extracurricular-day-btn.selected').forEach(btn => {
+                            activityData.days.push(btn.dataset.day);
                         });
+                        
+                        // Collect extracurricular time
+                        const startHour = card.querySelector('#extracurricular-start-hour').value;
+                        const startMinute = card.querySelector('#extracurricular-start-minute').value;
+                        const endHour = card.querySelector('#extracurricular-end-hour').value;
+                        const endMinute = card.querySelector('#extracurricular-end-minute').value;
+                        if (startHour && startMinute && endHour && endMinute) {
+                            activityData.time = `${startHour}:${startMinute}:${endHour}:${endMinute}`;
+                        }
+                        
+                        studentData.extracurriculars.push(activityData);
                     });
                     
                     // Collect test prep
                     entry.querySelectorAll('.test-prep-card.active').forEach(card => {
                         const hours = parseFloat(card.querySelector('.test-prep-hours').value) || 0;
                         if (hours > 0) {
-                            studentData.testPrep.push({
+                            const testData = {
                                 id: card.dataset.testId,
                                 hours: hours,
                                 name: card.querySelector('.test-prep-name').textContent
+                            };
+                            
+                            // Collect test prep days
+                            testData.days = [];
+                            card.querySelectorAll('.test-prep-day-btn.selected').forEach(btn => {
+                                testData.days.push(btn.dataset.day);
                             });
+                            
+                            // Collect test prep time
+                            const startHour = card.querySelector('#test-prep-start-hour').value;
+                            const startMinute = card.querySelector('#test-prep-start-minute').value;
+                            const endHour = card.querySelector('#test-prep-end-hour').value;
+                            const endMinute = card.querySelector('#test-prep-end-minute').value;
+                            if (startHour && startMinute && endHour && endMinute) {
+                                testData.time = `${startHour}:${startMinute}:${endHour}:${endMinute}`;
+                            }
+                            
+                            studentData.testPrep.push(testData);
                         }
                     });
                     
@@ -2599,8 +3035,44 @@
                 if (data.parent) {
                     document.getElementById('parentName').value = data.parent.name || '';
                     document.getElementById('parentEmail').value = data.parent.email || '';
-                    document.getElementById('parentPhone').value = data.parent.phone || '';
-                    document.getElementById('parentAddress').value = data.parent.address || '';
+                    
+                    // Load phone number
+                    if (data.parent.phone) {
+                        if (data.parent.phone.includes('-')) {
+                            const [countryCode, phoneNumber] = data.parent.phone.split('-');
+                            document.getElementById('countryCode').value = countryCode || '+234';
+                            document.getElementById('parentPhone').value = phoneNumber || '';
+                        } else if (data.parent.countryCode && data.parent.phoneNumber) {
+                            document.getElementById('countryCode').value = data.parent.countryCode || '+234';
+                            document.getElementById('parentPhone').value = data.parent.phoneNumber || '';
+                        } else {
+                            // Handle old format
+                            const phone = data.parent.phone;
+                            if (phone.startsWith('+')) {
+                                document.getElementById('countryCode').value = '+234';
+                                document.getElementById('parentPhone').value = phone.replace('+', '');
+                            } else {
+                                document.getElementById('countryCode').value = '+234';
+                                document.getElementById('parentPhone').value = phone;
+                            }
+                        }
+                    }
+                    
+                    // Load city and country
+                    if (data.parent.city && data.parent.country) {
+                        document.getElementById('city').value = data.parent.city || '';
+                        document.getElementById('country').value = data.parent.country || '';
+                    } else if (data.parent.address) {
+                        // Handle old format
+                        const addressParts = data.parent.address.split(',');
+                        if (addressParts.length >= 2) {
+                            document.getElementById('city').value = addressParts[0].trim() || '';
+                            document.getElementById('country').value = addressParts[1].trim() || '';
+                        } else {
+                            document.getElementById('city').value = data.parent.address || '';
+                            document.getElementById('country').value = 'Nigeria';
+                        }
+                    }
                 }
                 
                 // Load referral information
@@ -2674,12 +3146,16 @@
                 
                 // Populate Bill To
                 const pName = document.getElementById('parentName').value || 'N/A';
-                const pAddress = document.getElementById('parentAddress').value || '';
+                const city = document.getElementById('city').value || '';
+                const country = document.getElementById('country').value || '';
+                const cityCountry = `${city}, ${country}`;
+                const normalizedPhone = `${document.getElementById('countryCode').value}-${document.getElementById('parentPhone').value}`;
+                
                 document.getElementById('invoice-bill-to').innerHTML = `
                     <p><strong>${pName}</strong></p>
-                    <p>${pAddress}</p>
+                    <p>${cityCountry}</p>
                     <p>${document.getElementById('parentEmail').value || ''}</p>
-                    <p>${document.getElementById('parentPhone').value || ''}</p>
+                    <p>${normalizedPhone}</p>
                 `;
                 
                 // Generate invoice number
@@ -2692,7 +3168,7 @@
                 // Academic fees
                 const academicFee = parseInt(document.getElementById('total-academic-fee').textContent.replace(/\D/g,'')) || 0;
                 if (academicFee > 0) {
-                    tbody.innerHTML += `<tr><td>Academic Program Fees</td><td>${document.querySelectorAll('.student-entry').length}</td><td>-</td><td>₦${academicFee.toLocaleString()}</td></tr>`;
+                    tbody.innerHTML += `<tr><td>Academic Program Fees (Monthly)</td><td>${document.querySelectorAll('.student-entry').length}</td><td>-</td><td>₦${academicFee.toLocaleString()}</td></tr>`;
                 }
                 
                 // Extracurricular
@@ -2716,7 +3192,7 @@
                 // Prorated adjustment
                 const prorated = parseInt(document.getElementById('prorated-amount').textContent.replace(/\D/g,'')) || 0;
                 if (prorated > 0) {
-                    tbody.innerHTML += `<tr><td>Prorated Adjustment (Starting mid-month)</td><td>1</td><td>-</td><td>-₦${prorated.toLocaleString()}</td></tr>`;
+                    tbody.innerHTML += `<tr><td>Prorated Adjustment (Mid-month Start)</td><td>1</td><td>-</td><td>-₦${prorated.toLocaleString()}</td></tr>`;
                 }
 
                 modal.classList.add('active');
