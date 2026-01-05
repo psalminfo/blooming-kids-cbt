@@ -211,7 +211,7 @@ function showEditStudentModal(studentId, studentData, collectionName) {
             if (collectionName === 'pending_students') invalidateCache('pendingStudents');
             
             // Re-load the current view to show changes
-            const currentNavId = document.querySelector('.nav-btn.active')?.id;
+            const currentNavId = document.querySelector('.nav-item.active')?.dataset.navId;
             const mainContent = document.getElementById('main-content');
             if (currentNavId && allNavItems[currentNavId] && mainContent) {
                 allNavItems[currentNavId].fn(mainContent);
@@ -4110,10 +4110,220 @@ async function zipAndDownloadTutorReports(reports, tutorName, buttonElement) {
 }
 
 // ##################################
+// # SIDEBAR NAVIGATION SETUP
+// ##################################
+
+// Define navigation groups for the sidebar
+const navigationGroups = {
+    "dashboard": {
+        icon: "fas fa-tachometer-alt",
+        label: "Dashboard",
+        defaultNavId: "navTutorManagement"
+    },
+    "tutorManagement": {
+        icon: "fas fa-user-friends",
+        label: "Tutor Management",
+        items: [
+            { id: "navTutorManagement", label: "Tutor Directory", icon: "fas fa-users", fn: renderManagementTutorView },
+            { id: "navInactiveTutors", label: "Inactive Tutors", icon: "fas fa-user-slash", fn: renderInactiveTutorsPanel },
+            { id: "navArchivedStudents", label: "Archived Students", icon: "fas fa-archive", fn: renderArchivedStudentsPanel }
+        ]
+    },
+    "financial": {
+        icon: "fas fa-money-bill-wave",
+        label: "Financial",
+        items: [
+            { id: "navPayAdvice", label: "Pay Advice", icon: "fas fa-file-invoice-dollar", fn: renderPayAdvicePanel },
+            { id: "navReferralsAdmin", label: "Referral Management", icon: "fas fa-handshake", fn: renderReferralsAdminPanel }
+        ]
+    },
+    "academics": {
+        icon: "fas fa-graduation-cap",
+        label: "Academics",
+        items: [
+            { id: "navTutorReports", label: "Tutor Reports", icon: "fas fa-file-alt", fn: renderTutorReportsPanel },
+            { id: "navEnrollments", label: "Enrollments", icon: "fas fa-user-plus", fn: renderEnrollmentsPanel },
+            { id: "navPendingApprovals", label: "Pending Approvals", icon: "fas fa-user-check", fn: renderPendingApprovalsPanel },
+            { id: "navSummerBreak", label: "Summer Break", icon: "fas fa-umbrella-beach", fn: renderSummerBreakPanel }
+        ]
+    },
+    "communication": {
+        icon: "fas fa-comments",
+        label: "Communication",
+        items: [
+            { id: "navParentFeedback", label: "Parent Feedback", icon: "fas fa-comment-dots", fn: renderParentFeedbackPanel }
+        ]
+    }
+};
+
+// Initialize sidebar navigation
+function initializeSidebarNavigation(staffData) {
+    const navContainer = document.getElementById('navContainer');
+    const searchInput = document.getElementById('navSearch');
+    
+    if (!navContainer) return;
+    
+    // Clear existing content
+    navContainer.innerHTML = '';
+    
+    let allNavItems = {};
+    let hasVisibleItems = false;
+    
+    // Build navigation groups
+    Object.entries(navigationGroups).forEach(([groupKey, group]) => {
+        // Filter items based on permissions
+        const visibleItems = group.items ? group.items.filter(item => {
+            // Check if user has permission for this item
+            const hasPermission = item.id === 'navReferralsAdmin' || 
+                                !staffData.permissions || 
+                                !staffData.permissions.tabs || 
+                                staffData.permissions.tabs[getPermissionKey(item.id)] === true;
+            return hasPermission;
+        }) : [];
+        
+        if (visibleItems.length === 0 && groupKey !== 'dashboard') return;
+        
+        // Create navigation group
+        const groupElement = document.createElement('div');
+        groupElement.className = 'nav-group';
+        
+        if (groupKey === 'dashboard') {
+            // Dashboard is always visible and not collapsible
+            const dashboardItem = document.createElement('div');
+            dashboardItem.className = 'nav-item';
+            dashboardItem.innerHTML = `
+                <div class="nav-icon"><i class="${group.icon}"></i></div>
+                <span class="nav-text">${group.label}</span>
+            `;
+            dashboardItem.addEventListener('click', () => {
+                // Clear all active states
+                document.querySelectorAll('.nav-item').forEach(item => item.classList.remove('active'));
+                dashboardItem.classList.add('active');
+                
+                // Set page title
+                document.getElementById('pageTitle').textContent = group.label;
+                
+                // Load the default panel
+                if (group.defaultNavId && allNavItems[group.defaultNavId]) {
+                    allNavItems[group.defaultNavId].fn(document.getElementById('main-content'));
+                }
+            });
+            navContainer.appendChild(dashboardItem);
+            
+            // Set the first visible nav item as active
+            setTimeout(() => dashboardItem.click(), 100);
+            
+        } else {
+            // Regular collapsible group
+            groupElement.innerHTML = `
+                <div class="nav-group-header">
+                    <div class="group-title">
+                        <i class="${group.icon}"></i>
+                        <span>${group.label}</span>
+                    </div>
+                    <i class="fas fa-chevron-down group-arrow"></i>
+                </div>
+                <div class="nav-items" style="max-height: ${visibleItems.length * 48}px">
+                    ${visibleItems.map(item => {
+                        allNavItems[item.id] = { fn: item.fn, perm: getPermissionKey(item.id) };
+                        return `
+                            <div class="nav-item" data-nav-id="${item.id}">
+                                <div class="nav-icon"><i class="${item.icon}"></i></div>
+                                <span class="nav-text">${item.label}</span>
+                            </div>
+                        `;
+                    }).join('')}
+                </div>
+            `;
+            
+            // Add click handler for group header
+            const header = groupElement.querySelector('.nav-group-header');
+            header.addEventListener('click', () => {
+                groupElement.classList.toggle('collapsed');
+            });
+            
+            navContainer.appendChild(groupElement);
+            hasVisibleItems = true;
+            
+            // Add click handlers for nav items
+            groupElement.querySelectorAll('.nav-item').forEach(item => {
+                item.addEventListener('click', () => {
+                    const navId = item.dataset.navId;
+                    
+                    // Clear all active states
+                    document.querySelectorAll('.nav-item').forEach(navItem => navItem.classList.remove('active'));
+                    
+                    // Set active state for clicked item
+                    item.classList.add('active');
+                    
+                    // Set page title
+                    const itemLabel = item.querySelector('.nav-text').textContent;
+                    document.getElementById('pageTitle').textContent = itemLabel;
+                    
+                    // Load the panel
+                    if (navId && allNavItems[navId]) {
+                        allNavItems[navId].fn(document.getElementById('main-content'));
+                    }
+                });
+            });
+        }
+    });
+    
+    // If no visible items, show message
+    if (!hasVisibleItems && !document.querySelector('.nav-item[data-nav-id]')) {
+        navContainer.innerHTML = `
+            <div class="text-center py-8">
+                <i class="fas fa-lock text-gray-400 text-4xl mb-4"></i>
+                <p class="text-gray-600">No accessible panels available for your role.</p>
+            </div>
+        `;
+    }
+    
+    // Setup search functionality
+    if (searchInput) {
+        searchInput.addEventListener('input', (e) => {
+            const searchTerm = e.target.value.toLowerCase();
+            const navItems = document.querySelectorAll('.nav-item');
+            
+            navItems.forEach(item => {
+                const text = item.querySelector('.nav-text').textContent.toLowerCase();
+                if (text.includes(searchTerm)) {
+                    item.style.display = 'flex';
+                    // Show parent group if it's hidden
+                    let parentGroup = item.closest('.nav-group');
+                    if (parentGroup) {
+                        parentGroup.style.display = 'block';
+                        parentGroup.classList.remove('collapsed');
+                    }
+                } else {
+                    item.style.display = 'none';
+                }
+            });
+        });
+    }
+    
+    return allNavItems;
+}
+
+// Helper function to get permission key from nav ID
+function getPermissionKey(navId) {
+    // Convert navId like "navTutorManagement" to "viewTutorManagement"
+    return 'view' + navId.replace('nav', '').replace(/([A-Z])/g, (match, p1) => p1.charAt(0).toUpperCase() + p1.slice(1));
+}
+
+// Update page title
+function updatePageTitle(title) {
+    const pageTitle = document.getElementById('pageTitle');
+    if (pageTitle) {
+        pageTitle.textContent = title;
+    }
+}
+
+// ##################################
 // # AUTHENTICATION & INITIALIZATION
 // ##################################
 
-// Define all navigation items
+// Define all navigation items (for backward compatibility)
 const allNavItems = {
     navTutorManagement: { fn: renderManagementTutorView, perm: 'viewTutorManagement', label: 'Tutor Directory' },
     navPayAdvice: { fn: renderPayAdvicePanel, perm: 'viewPayAdvice', label: 'Pay Advice' },
@@ -4135,9 +4345,55 @@ window.closeManagementModal = function(modalId) {
     }
 };
 
+// Sidebar toggle functionality
+function setupSidebarToggle() {
+    const toggleBtn = document.getElementById('toggleSidebar');
+    const mobileMenuBtn = document.getElementById('mobileMenuBtn');
+    const body = document.body;
+    
+    if (toggleBtn) {
+        toggleBtn.addEventListener('click', () => {
+            body.classList.toggle('sidebar-collapsed');
+            // Update chevron icon
+            const icon = toggleBtn.querySelector('i');
+            if (body.classList.contains('sidebar-collapsed')) {
+                icon.className = 'fas fa-chevron-right';
+            } else {
+                icon.className = 'fas fa-chevron-left';
+            }
+        });
+    }
+    
+    if (mobileMenuBtn) {
+        mobileMenuBtn.addEventListener('click', () => {
+            const sidebar = document.getElementById('sidebar');
+            sidebar.classList.toggle('mobile-open');
+        });
+    }
+    
+    // Close mobile sidebar when clicking outside on mobile
+    document.addEventListener('click', (e) => {
+        const sidebar = document.getElementById('sidebar');
+        const mobileMenuBtn = document.getElementById('mobileMenuBtn');
+        
+        if (window.innerWidth <= 768 && 
+            sidebar.classList.contains('mobile-open') &&
+            !sidebar.contains(e.target) && 
+            !mobileMenuBtn.contains(e.target)) {
+            sidebar.classList.remove('mobile-open');
+        }
+    });
+}
+
 onAuthStateChanged(auth, async (user) => {
     const mainContent = document.getElementById('main-content');
-    const logoutBtn = document.getElementById('logoutBtn');
+    const sidebarLogoutBtn = document.getElementById('sidebarLogoutBtn');
+    const mobileMenuBtn = document.getElementById('mobileMenuBtn');
+    
+    // Show mobile menu button
+    if (mobileMenuBtn) {
+        mobileMenuBtn.classList.remove('hidden');
+    }
     
     if (user) {
         console.log("User authenticated:", user.email);
@@ -4150,75 +4406,62 @@ onAuthStateChanged(auth, async (user) => {
                 const staffData = staffDocSnap.data();
                 window.userData = staffData;
                 
+                // Update user info in sidebar
                 document.getElementById('welcome-message').textContent = `Welcome, ${staffData.name}`;
                 document.getElementById('user-role').textContent = `Role: ${capitalize(staffData.role)}`;
-
-                // Setup navigation based on permissions
-                const navContainer = document.querySelector('nav');
-                if (navContainer) {
-                    navContainer.innerHTML = '';
-                    
-                    let firstVisibleTab = null;
-                    
-                    Object.entries(allNavItems).forEach(([navId, navItem]) => {
-                        const hasPermission = navId === 'navReferralsAdmin' || 
-                                            !staffData.permissions || 
-                                            !staffData.permissions.tabs || 
-                                            staffData.permissions.tabs[navItem.perm] === true;
-                        
-                        if (hasPermission) {
-                            if (!firstVisibleTab) firstVisibleTab = navId;
-                            
-                            const button = document.createElement('button');
-                            button.id = navId;
-                            button.className = 'nav-btn text-lg font-semibold text-gray-500 hover:text-green-700 px-4 py-2 rounded-lg transition-colors';
-                            button.textContent = navItem.label;
-                            navContainer.appendChild(button);
-                            
-                            button.addEventListener('click', () => {
-                                // Update active state
-                                document.querySelectorAll('.nav-btn').forEach(btn => {
-                                    btn.classList.remove('active', 'bg-green-100', 'text-green-700');
-                                });
-                                button.classList.add('active', 'bg-green-100', 'text-green-700');
-                                
-                                // Load the panel
-                                navItem.fn(mainContent);
-                            });
-                        }
-                    });
-
-                    // Activate and load the first visible tab
-                    if (firstVisibleTab) {
-                        const firstButton = document.getElementById(firstVisibleTab);
-                        if (firstButton) {
-                            firstButton.classList.add('active', 'bg-green-100', 'text-green-700');
-                            allNavItems[firstVisibleTab].fn(mainContent);
-                        }
-                    } else {
-                        mainContent.innerHTML = `<p class="text-center mt-12 text-yellow-600">No accessible panels available for your role.</p>`;
-                    }
-                }
-
+                
+                // Setup sidebar navigation
+                const navItems = initializeSidebarNavigation(staffData);
+                
+                // Setup sidebar toggle
+                setupSidebarToggle();
+                
                 // Setup logout button
-                if (logoutBtn) {
-                    logoutBtn.addEventListener('click', () => {
+                if (sidebarLogoutBtn) {
+                    sidebarLogoutBtn.addEventListener('click', () => {
                         signOut(auth).then(() => {
                             window.location.href = "management-auth.html";
                         });
                     });
                 }
+                
+                // Load initial dashboard content
+                const defaultNavId = navigationGroups.dashboard.defaultNavId;
+                if (defaultNavId && navItems[defaultNavId]) {
+                    updatePageTitle(navigationGroups.dashboard.label);
+                    navItems[defaultNavId].fn(mainContent);
+                }
+                
             } else {
                 // User not approved or doesn't exist in staff collection
                 if (mainContent) {
-                    mainContent.innerHTML = `<p class="text-center mt-12 text-yellow-600 font-semibold">Your account is awaiting approval or not registered in staff directory.</p>`;
+                    mainContent.innerHTML = `
+                        <div class="bg-white p-8 rounded-lg shadow-md text-center">
+                            <i class="fas fa-user-clock text-yellow-500 text-5xl mb-4"></i>
+                            <h2 class="text-2xl font-bold text-yellow-600 mb-2">Account Pending Approval</h2>
+                            <p class="text-gray-600 mb-6">Your account is awaiting approval from an administrator.</p>
+                            <button onclick="window.location.href='management-auth.html'" class="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700">
+                                Return to Login
+                            </button>
+                        </div>
+                    `;
                 }
-                if (logoutBtn) logoutBtn.classList.remove('hidden');
+                if (sidebarLogoutBtn) sidebarLogoutBtn.classList.remove('hidden');
             }
         } catch (error) {
             console.error("Error checking staff permissions:", error);
             if (mainContent) {
-                mainContent.innerHTML = `<p class="text-center mt-12 text-red-600">Error loading dashboard. Please try again.</p>`;
+                mainContent.innerHTML = `
+                    <div class="bg-white p-8 rounded-lg shadow-md text-center">
+                        <i class="fas fa-exclamation-triangle text-red-500 text-5xl mb-4"></i>
+                        <h2 class="text-2xl font-bold text-red-600 mb-2">Error Loading Dashboard</h2>
+                        <p class="text-gray-600 mb-4">There was an error loading your dashboard. Please try again.</p>
+                        <p class="text-sm text-gray-500 mb-6">Error: ${error.message}</p>
+                        <button onclick="window.location.reload()" class="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700">
+                            Refresh Page
+                        </button>
+                    </div>
+                `;
             }
         }
     } else {
