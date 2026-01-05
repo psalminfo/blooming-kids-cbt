@@ -3788,7 +3788,7 @@ function renderBreakStudentsFromCache(searchTerm = '') {
                                 data-student-id="${student.id}"
                                 data-student-name="${student.studentName}"
                                 data-tutor-name="${student.tutorName || student.tutorEmail || 'Unknown Tutor'}">
-                            <i class="fas fa-flag mr-2"></i> End Summer Break
+                            <i class="fas fa-flag mr-2"></i> End Break
                         </button>
                     </div>
                 </div>
@@ -3875,7 +3875,7 @@ function renderBreakStudentsFromCache(searchTerm = '') {
                 
                 // Show error message
                 const statusMessage = document.getElementById('break-status-message');
-                statusMessage.textContent = `❌ Failed to end summer break for ${studentName}. Error: ${error.message}`;
+                statusMessage.textContent = `❌ Failed to End Break for ${studentName}. Error: ${error.message}`;
                 statusMessage.className = 'text-center font-semibold mb-4 text-red-600 p-3 bg-red-50 rounded-lg';
                 statusMessage.classList.remove('hidden');
                 
@@ -4750,6 +4750,7 @@ onAuthStateChanged(auth, async (user) => {
         window.location.href = "management-auth.html";
     }
 });
+
 
 
 
