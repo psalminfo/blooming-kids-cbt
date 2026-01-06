@@ -1537,7 +1537,7 @@ async function setupContentManager() {
 }
 
 // ##################################################################
-// # SECTION 3: TUTOR MANAGEMENT (OPTIMIZED)
+// # SECTION 3: TUTOR MANAGEMENT (UPDATED WITH NEW TOGGLES)
 // ##################################################################
 
 let globalSettings = {};
@@ -1549,43 +1549,66 @@ async function renderTutorManagementPanel(container) {
              <div class="flex justify-between items-center mb-4">
                 <h2 class="text-2xl font-bold text-green-700">Global Settings</h2>
                 <button id="refresh-tutor-data-btn" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Refresh Data</button>
-           
              </div>
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-6">
                 <label class="flex items-center"><span class="text-gray-700 font-semibold mr-4">Report Submission:</span><label class="relative inline-flex items-center cursor-pointer"><input type="checkbox" id="report-toggle" class="sr-only peer"><div class="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div><span id="report-status-label" class="ml-3 text-sm font-medium"></span></label></label>
                 <label class="flex items-center"><span class="text-gray-700 font-semibold mr-4">Tutors Can Add Students:</span><label class="relative inline-flex items-center cursor-pointer"><input type="checkbox" id="tutor-add-toggle" class="sr-only peer"><div class="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div><span id="tutor-add-status-label" class="ml-3 text-sm font-medium"></span></label></label>
-                <label class="flex items-center"><span class="text-gray-700 font-semibold mr-4">Enable Summer Break:</span><label class="relative inline-flex items-center cursor-pointer"><input type="checkbox" id="summer-break-toggle" class="sr-only peer"><div class="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div><span id="summer-break-status-label" class="ml-3 text-sm font-medium"></span></label></label>
+                <label class="flex items-center"><span class="text-gray-700 font-semibold mr-4">Enable Summer Break:</span><label class="relative inline-flex items-center cursor-pointer"><input type="checkbox" id="summer-break-toggle" class="sr-only peer"><div class="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:after:translate-x-full peer peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div><span id="summer-break-status-label" class="ml-3 text-sm font-medium"></span></label></label>
                 <label class="flex items-center"><span class="text-gray-700 font-semibold mr-4">Show Student Fees (Tutors):</span><label class="relative inline-flex items-center cursor-pointer"><input type="checkbox" id="show-fees-toggle" class="sr-only peer"><div class="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div><span id="show-fees-status-label" class="ml-3 text-sm font-medium"></span></label></label>
                 <label class="flex items-center"><span class="text-gray-700 font-semibold mr-4">Edit/Delete (Tutors):</span><label class="relative inline-flex items-center cursor-pointer"><input type="checkbox" id="edit-delete-toggle" class="sr-only peer"><div class="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div><span id="edit-delete-status-label" class="ml-3 text-sm font-medium"></span></label></label>
+                <label class="flex items-center"><span class="text-gray-700 font-semibold mr-4">Direct Student Add (Tutors):</span><label class="relative inline-flex items-center cursor-pointer"><input type="checkbox" id="bypass-approval-toggle" class="sr-only peer"><div class="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div><span id="bypass-approval-status-label" class="ml-3 text-sm font-medium"></span></label></label>
                 
-                 <label class="flex items-center"><span class="text-gray-700 font-semibold mr-4">Direct Student Add (Tutors):</span><label class="relative inline-flex items-center cursor-pointer"><input type="checkbox" id="bypass-approval-toggle" class="sr-only peer"><div class="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div><span id="bypass-approval-status-label" class="ml-3 text-sm font-medium"></span></label></label>
+                <!-- New Toggle for Preschool-Grade 2 Only -->
+                <label class="flex items-center"><span class="text-gray-700 font-semibold mr-4">Preschool-Grade 2 Only Mode:</span><label class="relative inline-flex items-center cursor-pointer"><input type="checkbox" id="preschool-grade2-toggle" class="sr-only peer"><div class="w-11 h-6 bg-purple-200 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-purple-600"></div><span id="preschool-grade2-status-label" class="ml-3 text-sm font-medium"></span></label></label>
             </div>
         </div>
         
         <div class="bg-white p-6 rounded-lg shadow-md">
             <div class="flex justify-between items-start mb-4">
-      
-                 <h3 class="text-2xl font-bold text-green-700">Manage Tutors</h3>
+                <h3 class="text-2xl font-bold text-green-700">Manage Tutors</h3>
                 <div class="flex space-x-4">
                     <div class="bg-blue-100 p-3 rounded-lg text-center shadow"><h4 class="font-bold text-blue-800 text-sm">Total Tutors</h4><p id="tutor-count-badge" class="text-2xl text-blue-600 font-extrabold">0</p></div>
                     <div class="bg-green-100 p-3 rounded-lg text-center shadow"><h4 class="font-bold text-green-800 text-sm">Total Students</h4><p id="student-count-badge" class="text-2xl text-green-600 font-extrabold">0</p></div>
-  
-                 </div>
+                </div>
+            </div>
+
+            <!-- Quick Action Buttons -->
+            <div class="mb-6 p-4 bg-gray-50 rounded-lg border">
+                <h4 class="font-semibold text-gray-700 mb-2">Quick Actions for Selected Tutor:</h4>
+                <div class="flex flex-wrap gap-3">
+                    <button id="enable-tutor-add-btn" class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 flex items-center">
+                        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
+                        </svg>
+                        Enable Student Adding
+                    </button>
+                    <button id="disable-tutor-add-btn" class="bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700 flex items-center">
+                        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                        </svg>
+                        Disable Student Adding
+                    </button>
+                    <button id="enable-preschool-mode-btn" class="bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700 flex items-center">
+                        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                        </svg>
+                        Preschool-Grade 2 Mode
+                    </button>
+                    <div class="text-xs text-gray-500 mt-1">These buttons control global settings for all tutors</div>
+                </div>
             </div>
 
             <div class="mb-4">
                 <label for="global-search-bar" class="block font-semibold">Search Student, Parent, or Tutor:</label>
                 <input type="search" id="global-search-bar" class="w-full p-2 border rounded mt-1" placeholder="Start typing a name...">
-           
-             </div>
+            </div>
             <div id="global-search-results" class="mb-4"></div>
 
             <div id="tutor-management-area">
                 <div class="mb-4">
                     <label for="tutor-select" class="block font-semibold">Select Tutor Manually:</label>
                     <select id="tutor-select" class="w-full p-2 border rounded mt-1"></select>
-    
-                 </div>
+                </div>
                 <div id="selected-tutor-details" class="mt-4"><p class="text-gray-500">Please select a tutor to view details.</p></div>
             </div>
         </div>
@@ -1595,23 +1618,30 @@ async function renderTutorManagementPanel(container) {
 
 function setupTutorManagementListeners() {
     const settingsDocRef = doc(db, "settings", "global_settings");
+    
     // EFFICIENT: This single-doc listener is kept for real-time settings updates.
     onSnapshot(settingsDocRef, (docSnap) => {
         if (docSnap.exists()) {
             const data = docSnap.data();
             globalSettings = data;
 
-            const toggleMap = { 'isReportEnabled': 'report', 'isTutorAddEnabled': 'tutor-add', 'isSummerBreakEnabled': 'summer-break', 'showStudentFees': 'show-fees', 'showEditDeleteButtons': 'edit-delete', 'bypassPendingApproval': 'bypass-approval' };
+            const toggleMap = { 
+                'isReportEnabled': 'report', 
+                'isTutorAddEnabled': 'tutor-add', 
+                'isSummerBreakEnabled': 'summer-break', 
+                'showStudentFees': 'show-fees', 
+                'showEditDeleteButtons': 'edit-delete', 
+                'bypassPendingApproval': 'bypass-approval',
+                'preschoolGrade2Only': 'preschool-grade2'  // New field
+            };
 
             for (const key in toggleMap) {
-             
-                 const type = toggleMap[key];
+                const type = toggleMap[key];
                 const toggle = document.getElementById(`${type}-toggle`);
                 const label = document.getElementById(`${type}-status-label`);
                 if (toggle && label) {
                     toggle.checked = !!data[key];
-              
-                     label.textContent = data[key] ? 'Enabled' : 'Disabled';
+                    label.textContent = data[key] ? 'Enabled' : 'Disabled';
                 }
             }
             if (activeTutorId) {
@@ -1619,6 +1649,7 @@ function setupTutorManagementListeners() {
             }
         }
     });
+    
     // Attach listeners to toggles to update Firestore
     document.getElementById('report-toggle').addEventListener('change', e => updateDoc(settingsDocRef, { isReportEnabled: e.target.checked }));
     document.getElementById('tutor-add-toggle').addEventListener('change', e => updateDoc(settingsDocRef, { isTutorAddEnabled: e.target.checked }));
@@ -1626,6 +1657,36 @@ function setupTutorManagementListeners() {
     document.getElementById('show-fees-toggle').addEventListener('change', e => updateDoc(settingsDocRef, { showStudentFees: e.target.checked }));
     document.getElementById('edit-delete-toggle').addEventListener('change', e => updateDoc(settingsDocRef, { showEditDeleteButtons: e.target.checked }));
     document.getElementById('bypass-approval-toggle').addEventListener('change', e => updateDoc(settingsDocRef, { bypassPendingApproval: e.target.checked }));
+    document.getElementById('preschool-grade2-toggle').addEventListener('change', e => {
+        const isEnabled = e.target.checked;
+        updateDoc(settingsDocRef, { preschoolGrade2Only: isEnabled });
+        
+        // When enabling preschool-grade2 mode, also enable tutor adding
+        if (isEnabled) {
+            updateDoc(settingsDocRef, { isTutorAddEnabled: true });
+        }
+    });
+    
+    // Quick action buttons
+    document.getElementById('enable-tutor-add-btn').addEventListener('click', () => {
+        updateDoc(settingsDocRef, { isTutorAddEnabled: true });
+        alert('Tutor student adding has been enabled globally.');
+    });
+    
+    document.getElementById('disable-tutor-add-btn').addEventListener('click', () => {
+        updateDoc(settingsDocRef, { isTutorAddEnabled: false });
+        alert('Tutor student adding has been disabled globally.');
+    });
+    
+    document.getElementById('enable-preschool-mode-btn').addEventListener('click', () => {
+        if (confirm('Enable Preschool-Grade 2 Only Mode? This will enable tutor student adding and restrict to grades Pre-K through 2.')) {
+            updateDoc(settingsDocRef, { 
+                preschoolGrade2Only: true,
+                isTutorAddEnabled: true 
+            });
+            alert('Preschool-Grade 2 Only Mode enabled. Tutor student adding is now enabled and restricted to grades Pre-K through 2.');
+        }
+    });
     
     // UI Interaction Listeners
     document.getElementById('tutor-select').addEventListener('change', e => {
@@ -1649,6 +1710,7 @@ async function fetchTutorManagementData(forceRefresh = false) {
         const detailsContainer = document.getElementById('selected-tutor-details');
         if (tutorSelect) tutorSelect.innerHTML = '<option>Loading Data...</option>';
         if (detailsContainer) detailsContainer.innerHTML = '';
+        
         if (!sessionCache.tutors) {
             const tutorsSnapshot = await getDocs(query(collection(db, "tutors"), orderBy("name")));
             const tutorsData = {};
@@ -1657,6 +1719,7 @@ async function fetchTutorManagementData(forceRefresh = false) {
             });
             saveToLocalStorage('tutors', tutorsData);
         }
+        
         if (!sessionCache.students) {
             const studentsSnapshot = await getDocs(collection(db, "students"));
             saveToLocalStorage('students', studentsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
@@ -1675,6 +1738,7 @@ function renderTutorManagementFromCache() {
     const tutorSelect = document.getElementById('tutor-select');
     
     if (!tutorSelect) return;
+    
     tutorSelect.innerHTML = `<option value="">-- Select a Tutor --</option>`;
     Object.values(tutorsData).forEach(tutor => {
         const option = document.createElement('option');
@@ -1682,6 +1746,7 @@ function renderTutorManagementFromCache() {
         option.textContent = `${tutor.name} (${tutor.email})`;
         tutorSelect.appendChild(option);
     });
+    
     document.getElementById('tutor-count-badge').textContent = Object.keys(tutorsData).length;
     document.getElementById('student-count-badge').textContent = studentsData.length;
 
@@ -1689,80 +1754,7 @@ function renderTutorManagementFromCache() {
         tutorSelect.value = activeTutorId;
         renderSelectedTutorDetailsFromCache(activeTutorId);
     } else {
-         document.getElementById('selected-tutor-details').innerHTML = `<p class="text-gray-500">Please select a tutor to view details.</p>`;
-    }
-}
-
-function handleGlobalSearch(e) {
-    const searchTerm = e.target.value.toLowerCase().trim();
-    const searchResultsContainer = document.getElementById('global-search-results');
-    const tutorManagementArea = document.getElementById('tutor-management-area');
-    const tutorSelect = document.getElementById('tutor-select');
-
-    if (searchTerm.length < 2) {
-        searchResultsContainer.innerHTML = '';
-        tutorManagementArea.style.display = 'block';
-        return;
-    }
-    
-    tutorManagementArea.style.display = 'none';
-    const students = sessionCache.students || [];
-    const tutors = sessionCache.tutors || {};
-    const tutorsByEmail = Object.values(tutors).reduce((acc, tutor) => {
-        acc[tutor.email] = tutor;
-        return acc;
-    }, {});
-    const studentResults = students.filter(student => 
-        student.studentName?.toLowerCase().includes(searchTerm) ||
-        student.parentName?.toLowerCase().includes(searchTerm)
-    );
-    const tutorResults = Object.values(tutors).filter(tutor => 
-        tutor.name?.toLowerCase().includes(searchTerm) ||
-        tutor.email?.toLowerCase().includes(searchTerm)
-    );
-    let html = `<h4 class="font-bold mb-2">Search Results:</h4>`;
-    if (tutorResults.length > 0) {
-        html += `<h5 class="font-semibold mt-4 mb-2">${tutorResults.length} matching tutor(s) found:</h5><ul class="space-y-2 border rounded-lg p-2 mb-4">${tutorResults.map(tutor => `<li class="flex justify-between items-center bg-gray-50 p-2 rounded-md"><div><p class="font-semibold">${tutor.name} (${tutor.email})</p></div><div class="flex space-x-2"><button class="manage-tutor-from-search-btn bg-blue-500 text-white px-3 py-1 rounded-md text-sm hover:bg-blue-600" data-tutor-id="${tutor.id}">Manage</button></div></li>`).join('')}</ul>`;
-    }
-    if (studentResults.length > 0) {
-        html += `<h5 class="font-semibold mt-4 mb-2">${studentResults.length} matching student(s) found:</h5><ul class="space-y-2 border rounded-lg p-2">${studentResults.map(student => { const tutor = tutorsByEmail[student.tutorEmail] || { id: '', name: 'Unassigned' }; return `<li class="flex justify-between items-center bg-gray-50 p-2 rounded-md"><div><p class="font-semibold">${student.studentName} (Parent: ${student.parentName || 'N/A'})</p><p class="text-sm text-gray-600">Assigned to: ${tutor.name}</p></div><button class="manage-tutor-from-search-btn bg-blue-500 text-white px-3 py-1 rounded-md text-sm hover:bg-blue-600" data-tutor-id="${tutor.id}">Manage Tutor</button></li>` }).join('')}</ul>`;
-    }
-    searchResultsContainer.innerHTML = (studentResults.length || tutorResults.length) ? html : `<p class="text-gray-500">No matches found.</p>`;
-    searchResultsContainer.querySelectorAll('.manage-tutor-from-search-btn').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-            const tutorId = e.currentTarget.dataset.tutorId;
-            if (tutorId) {
-                activeTutorId = tutorId;
-                tutorSelect.value = tutorId;
-                renderSelectedTutorDetailsFromCache(tutorId);
-      
-                 document.getElementById('global-search-bar').value = '';
-                searchResultsContainer.innerHTML = '';
-                tutorManagementArea.style.display = 'block';
-            }
-        });
-    });
-}
-
-function resetStudentForm() {
-    const form = document.querySelector('.add-student-form');
-    if (!form) return;
-    form.querySelector('#new-parent-name').value = '';
-    form.querySelector('#new-parent-phone').value = '';
-    form.querySelector('#new-student-name').value = '';
-    form.querySelector('#new-student-grade').value = '';
-    form.querySelector('#new-student-subjects').value = '';
-    form.querySelector('#new-student-days').value = '';
-    form.querySelector('#new-student-fee').value = '';
-
-    const actionButton = form.querySelector('#add-student-btn');
-    if (actionButton) {
-        actionButton.textContent = 'Add Student';
-        delete actionButton.dataset.editingId;
-    }
-    const cancelButton = form.querySelector('#cancel-edit-btn');
-    if (cancelButton) {
-        cancelButton.remove();
+        document.getElementById('selected-tutor-details').innerHTML = `<p class="text-gray-500">Please select a tutor to view details.</p>`;
     }
 }
 
@@ -1772,50 +1764,120 @@ function renderSelectedTutorDetailsFromCache(tutorId) {
         container.innerHTML = `<p class="text-gray-500">Please select a tutor to view details.</p>`;
         return;
     }
+    
     const tutor = sessionCache.tutors[tutorId];
     const assignedStudents = (sessionCache.students || []).filter(s => s.tutorEmail === tutor.email);
+    
+    // Check if we're in preschool-grade2 mode
+    const isPreschoolMode = globalSettings.preschoolGrade2Only || false;
+    
+    // Generate grade options based on mode
+    let gradeOptions = '';
+    if (isPreschoolMode) {
+        // Preschool to Grade 2 only
+        const preschoolGrades = ['Pre-K', 'K', '1', '2'];
+        gradeOptions = preschoolGrades.map(grade => `<option value="${grade}">${grade}</option>`).join('');
+    } else {
+        // All grades
+        gradeOptions = Array.from({ length: 12 }, (_, i) => `<option value="${i + 1}">${i + 1}</option>`).join('');
+    }
+    
+    const dayOptions = Array.from({ length: 7 }, (_, i) => `<option value="${i + 1}">${i + 1}</option>`).join('');
+    
     const studentsListHTML = assignedStudents.map(student => {
         const feeDisplay = globalSettings.showStudentFees ? ` - Fee: ₦${(student.studentFee || 0).toLocaleString()}` : '';
-        const editDeleteButtons = `
+        const editDeleteButtons = globalSettings.showEditDeleteButtons ? `
             <button class="edit-student-btn text-blue-500 hover:text-blue-700 font-semibold" data-student-id="${student.id}" data-parent-name="${student.parentName || ''}" data-parent-phone="${student.parentPhone || ''}" data-student-name="${student.studentName}" data-grade="${student.grade}" data-subjects="${(student.subjects || []).join(', ')}" data-days="${student.days}" data-fee="${student.studentFee}">Edit</button>
             <button class="delete-student-btn text-red-500 hover:text-red-700 font-semibold" data-student-id="${student.id}">Delete</button>
-        `;
-        return `<li class="flex justify-between items-center bg-gray-50 p-2 rounded-md" data-student-name="${student.studentName.toLowerCase()}"><span>${student.studentName} (${student.grade || 'N/A'})${feeDisplay}</span><div class="flex items-center space-x-2">${editDeleteButtons}</div></li>`;
+        ` : '';
+        
+        return `<li class="flex justify-between items-center bg-gray-50 p-2 rounded-md" data-student-name="${student.studentName.toLowerCase()}">
+            <span>${student.studentName} (${student.grade || 'N/A'})${feeDisplay}</span>
+            <div class="flex items-center space-x-2">${editDeleteButtons}</div>
+        </li>`;
     }).join('');
-    const gradeOptions = Array.from({ length: 12 }, (_, i) => `<option value="${i + 1}">${i + 1}</option>`).join('');
-    const dayOptions = Array.from({ length: 7 }, (_, i) => `<option value="${i + 1}">${i + 1}</option>`).join('');
+    
     container.innerHTML = `
         <div class="p-4 border rounded-lg shadow-sm bg-blue-50">
             <div class="flex items-center justify-between mb-4">
-                <div><h4 class="font-bold text-xl">${tutor.name} (${assignedStudents.length} students)</h4><p class="text-gray-600">${tutor.email}</p></div>
-                <div class="flex items-center space-x-4"><label class="flex items-center space-x-2"><span class="font-semibold">Management Staff:</span><input type="checkbox" id="management-staff-toggle" class="h-5 w-5" ${tutor.isManagementStaff ? 'checked' : ''}></label><button id="delete-tutor-btn" class="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600">Delete Tutor</button></div>
-            </div>
-            <div class="mb-4"><p><strong>Students Assigned to ${tutor.name}:</strong></p><input type="search" id="student-filter-bar" placeholder="Filter this list..." class="w-full p-2 border rounded mt-2 mb-2"><ul id="students-list-ul" class="space-y-2 mt-2">${studentsListHTML || '<p class="text-gray-500">No students assigned.</p>'}</ul></div>
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 border-t pt-4">
-                <div class="add-student-form space-y-2">
-                    <h5 class="font-semibold text-gray-700">Add/Edit Student Details:</h5>
-                    <input type="text" id="new-parent-name" class="w-full p-2 border rounded" placeholder="Parent Name">
-                    <input type="text" id="new-parent-phone" class="w-full p-2 border rounded" placeholder="Parent Phone Number">
-                    <input type="text" id="new-student-name" class="w-full p-2 border rounded" placeholder="Student Name">
-                    <select id="new-student-grade" class="w-full p-2 border rounded"><option value="">Select Grade</option>${gradeOptions}</select>
-                    <input type="text" id="new-student-subjects" class="w-full p-2 border rounded" placeholder="Subject(s) (e.g., Math, English)">
-                    <select id="new-student-days" class="w-full p-2 border rounded"><option value="">Select Days per Week</option>${dayOptions}</select>
-                    <input type="number" id="new-student-fee" class="w-full p-2 border rounded" placeholder="Student Fee (₦)">
-                    <button id="add-student-btn" class="bg-green-600 text-white w-full px-4 py-2 rounded hover:bg-green-700">Add Student</button>
+                <div>
+                    <h4 class="font-bold text-xl">${tutor.name} (${assignedStudents.length} students)</h4>
+                    <p class="text-gray-600">${tutor.email}</p>
                 </div>
- 
-                 <div class="import-students-form">
-                    <h5 class="font-semibold text-gray-700">Import Students for ${tutor.name}:</h5>
-                    <p class="text-xs text-gray-500 mb-2">Upload a .csv or .xlsx file with columns: <strong>parentName, parentPhone, studentName, grade, subjects, days, studentFee</strong></p>
-                    <input type="file" id="student-import-file" class="w-full text-sm border rounded p-1" accept=".csv, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/vnd.ms-excel">
-           
-                  <button id="import-students-btn" class="bg-blue-600 text-white w-full px-4 py-2 rounded mt-2 hover:bg-blue-700">Import Students</button>
-                  <p id="import-status" class="text-sm mt-2"></p>
+                <div class="flex items-center space-x-4">
+                    <label class="flex items-center space-x-2">
+                        <span class="font-semibold">Management Staff:</span>
+                        <input type="checkbox" id="management-staff-toggle" class="h-5 w-5" ${tutor.isManagementStaff ? 'checked' : ''}>
+                    </label>
+                    <button id="delete-tutor-btn" class="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600">Delete Tutor</button>
                 </div>
             </div>
+            
+            ${isPreschoolMode ? `
+                <div class="mb-4 p-3 bg-purple-100 border border-purple-300 rounded-lg">
+                    <div class="flex items-center">
+                        <svg class="w-5 h-5 text-purple-600 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clip-rule="evenodd"/>
+                        </svg>
+                        <span class="font-semibold text-purple-700">Preschool-Grade 2 Mode Active</span>
+                    </div>
+                    <p class="text-sm text-purple-600 mt-1">Only grades Pre-K through 2 are available for student adding.</p>
+                </div>
+            ` : ''}
+            
+            <div class="mb-4">
+                <p><strong>Students Assigned to ${tutor.name}:</strong></p>
+                <input type="search" id="student-filter-bar" placeholder="Filter this list..." class="w-full p-2 border rounded mt-2 mb-2">
+                <ul id="students-list-ul" class="space-y-2 mt-2">
+                    ${studentsListHTML || '<p class="text-gray-500">No students assigned.</p>'}
+                </ul>
+            </div>
+            
+            ${globalSettings.isTutorAddEnabled ? `
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 border-t pt-4">
+                    <div class="add-student-form space-y-2">
+                        <h5 class="font-semibold text-gray-700">Add/Edit Student Details:</h5>
+                        <input type="text" id="new-parent-name" class="w-full p-2 border rounded" placeholder="Parent Name">
+                        <input type="text" id="new-parent-phone" class="w-full p-2 border rounded" placeholder="Parent Phone Number">
+                        <input type="text" id="new-student-name" class="w-full p-2 border rounded" placeholder="Student Name">
+                        <select id="new-student-grade" class="w-full p-2 border rounded">
+                            <option value="">Select Grade</option>
+                            ${gradeOptions}
+                        </select>
+                        <input type="text" id="new-student-subjects" class="w-full p-2 border rounded" placeholder="Subject(s) (e.g., Math, English)">
+                        <select id="new-student-days" class="w-full p-2 border rounded">
+                            <option value="">Select Days per Week</option>
+                            ${dayOptions}
+                        </select>
+                        <input type="number" id="new-student-fee" class="w-full p-2 border rounded" placeholder="Student Fee (₦)">
+                        <button id="add-student-btn" class="bg-green-600 text-white w-full px-4 py-2 rounded hover:bg-green-700">Add Student</button>
+                    </div>
+                    
+                    <div class="import-students-form">
+                        <h5 class="font-semibold text-gray-700">Import Students for ${tutor.name}:</h5>
+                        <p class="text-xs text-gray-500 mb-2">Upload a .csv or .xlsx file with columns: <strong>parentName, parentPhone, studentName, grade, subjects, days, studentFee</strong></p>
+                        <input type="file" id="student-import-file" class="w-full text-sm border rounded p-1" accept=".csv, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/vnd.ms-excel">
+                        <button id="import-students-btn" class="bg-blue-600 text-white w-full px-4 py-2 rounded mt-2 hover:bg-blue-700">Import Students</button>
+                        <p id="import-status" class="text-sm mt-2"></p>
+                    </div>
+                </div>
+            ` : `
+                <div class="mt-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+                    <div class="flex items-center">
+                        <svg class="w-5 h-5 text-yellow-600 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                            <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/>
+                        </svg>
+                        <span class="font-semibold text-yellow-700">Student Adding Disabled</span>
+                    </div>
+                    <p class="text-sm text-yellow-600 mt-1">Tutor student adding is currently disabled in global settings. Enable it to add new students.</p>
+                </div>
+            `}
         </div>`;
+    
     // --- Attach Listeners for the newly created elements ---
-    document.getElementById('management-staff-toggle').addEventListener('change', (e) => updateDoc(doc(db, "tutors", tutorId), { isManagementStaff: e.target.checked }));
+    document.getElementById('management-staff-toggle').addEventListener('change', (e) => 
+        updateDoc(doc(db, "tutors", tutorId), { isManagementStaff: e.target.checked }));
+    
     document.getElementById('delete-tutor-btn').addEventListener('click', async () => {
         if (assignedStudents.length > 0) {
             alert(`Cannot delete tutor "${tutor.name}" because they have ${assignedStudents.length} student(s) assigned. Please reassign or delete these students first.`);
@@ -1825,130 +1887,101 @@ function renderSelectedTutorDetailsFromCache(tutorId) {
             try {
                 await deleteDoc(doc(db, "tutors", tutorId));
                 alert(`Tutor "${tutor.name}" has been successfully deleted.`);
-                invalidateCache('tutors'); // Invalidate
+                invalidateCache('tutors');
                 activeTutorId = null;
                 fetchTutorManagementData();
-      
-             } catch (error) { console.error("Error deleting tutor:", error); alert(`Error deleting tutor: ${error.message}`); }
+            } catch (error) { 
+                console.error("Error deleting tutor:", error); 
+                alert(`Error deleting tutor: ${error.message}`); 
+            }
         }
     });
-    document.getElementById('student-filter-bar').addEventListener('input', (e) => {
-        const searchTerm = e.target.value.toLowerCase();
-        document.querySelectorAll('#students-list-ul li').forEach(li => {
-            li.style.display = (li.dataset.studentName || '').includes(searchTerm) ? 'flex' : 'none';
+    
+    // Only add student-related event listeners if student adding is enabled
+    if (globalSettings.isTutorAddEnabled) {
+        document.getElementById('student-filter-bar').addEventListener('input', (e) => {
+            const searchTerm = e.target.value.toLowerCase();
+            document.querySelectorAll('#students-list-ul li').forEach(li => {
+                li.style.display = (li.dataset.studentName || '').includes(searchTerm) ? 'flex' : 'none';
+            });
         });
-    });
-    document.getElementById('add-student-btn').addEventListener('click', async (e) => {
-        const btn = e.currentTarget;
-        const editingId = btn.dataset.editingId;
-        const studentData = {
-            parentName: document.getElementById('new-parent-name').value,
-            parentPhone: document.getElementById('new-parent-phone').value,
-            studentName: document.getElementById('new-student-name').value,
-            grade: document.getElementById('new-student-grade').value,
-            subjects: document.getElementById('new-student-subjects').value.split(',').map(s => s.trim()),
-            days: document.getElementById('new-student-days').value,
-            studentFee: parseFloat(document.getElementById('new-student-fee').value),
-            tutorEmail: tutor.email,
-        };
-      
-         if (studentData.studentName && studentData.grade && !isNaN(studentData.studentFee)) {
-            if (editingId) {
-                await updateDoc(doc(db, "students", editingId), studentData);
+        
+        document.getElementById('add-student-btn').addEventListener('click', async (e) => {
+            const btn = e.currentTarget;
+            const editingId = btn.dataset.editingId;
+            
+            // Check if we're in preschool mode and validate grade
+            const selectedGrade = document.getElementById('new-student-grade').value;
+            if (globalSettings.preschoolGrade2Only) {
+                const allowedGrades = ['Pre-K', 'K', '1', '2'];
+                if (!allowedGrades.includes(selectedGrade)) {
+                    alert('In Preschool-Grade 2 Mode, only grades Pre-K, K, 1, and 2 are allowed.');
+                    return;
+                }
+            }
+            
+            const studentData = {
+                parentName: document.getElementById('new-parent-name').value,
+                parentPhone: document.getElementById('new-parent-phone').value,
+                studentName: document.getElementById('new-student-name').value,
+                grade: selectedGrade,
+                subjects: document.getElementById('new-student-subjects').value.split(',').map(s => s.trim()),
+                days: document.getElementById('new-student-days').value,
+                studentFee: parseFloat(document.getElementById('new-student-fee').value) || 0,
+                tutorEmail: tutor.email,
+            };
+            
+            if (studentData.studentName && studentData.grade) {
+                if (editingId) {
+                    await updateDoc(doc(db, "students", editingId), studentData);
+                } else {
+                    studentData.summerBreak = false;
+                    await addDoc(collection(db, "students"), studentData);
+                }
+                invalidateCache('students');
+                fetchTutorManagementData();
+                resetStudentForm();
             } else {
-                studentData.summerBreak = false;
-                await addDoc(collection(db, "students"), studentData);
-            }
-            invalidateCache('students'); // Invalidate
-            fetchTutorManagementData(); // Refetch and re-render
-            resetStudentForm();
-        } else {
-            alert('Please fill in Student Name, Grade, and Fee correctly.');
-        }
-    });
-
-    document.getElementById('import-students-btn').addEventListener('click', () => handleStudentImport(tutor));
-
-    container.querySelectorAll('.edit-student-btn').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-            const data = e.currentTarget.dataset;
-            document.getElementById('new-parent-name').value = data.parentName;
-            document.getElementById('new-parent-phone').value = data.parentPhone || '';
-            document.getElementById('new-student-name').value = data.studentName;
-            document.getElementById('new-student-grade').value = data.grade;
-            document.getElementById('new-student-subjects').value = data.subjects;
-       
-             document.getElementById('new-student-days').value = data.days;
-            document.getElementById('new-student-fee').value = data.fee;
-
-            const actionButton = document.getElementById('add-student-btn');
-            actionButton.textContent = 'Update Student';
-            actionButton.dataset.editingId = data.studentId;
-
-            if (!document.getElementById('cancel-edit-btn')) {
-                const cancelButton = document.createElement('button');
-  
-                 cancelButton.id = 'cancel-edit-btn';
-                cancelButton.textContent = 'Cancel Edit';
-                cancelButton.className = 'bg-gray-500 text-white w-full px-4 py-2 rounded hover:bg-gray-600 mt-2';
-                actionButton.insertAdjacentElement('afterend', cancelButton);
-                cancelButton.addEventListener('click', resetStudentForm);
+                alert('Please fill in Student Name and Grade correctly.');
             }
         });
-    });
+
+        document.getElementById('import-students-btn').addEventListener('click', () => handleStudentImport(tutor));
+        
+        container.querySelectorAll('.edit-student-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const data = e.currentTarget.dataset;
+                document.getElementById('new-parent-name').value = data.parentName;
+                document.getElementById('new-parent-phone').value = data.parentPhone || '';
+                document.getElementById('new-student-name').value = data.studentName;
+                document.getElementById('new-student-grade').value = data.grade;
+                document.getElementById('new-student-subjects').value = data.subjects;
+                document.getElementById('new-student-days').value = data.days;
+                document.getElementById('new-student-fee').value = data.fee;
+
+                const actionButton = document.getElementById('add-student-btn');
+                actionButton.textContent = 'Update Student';
+                actionButton.dataset.editingId = data.studentId;
+
+                if (!document.getElementById('cancel-edit-btn')) {
+                    const cancelButton = document.createElement('button');
+                    cancelButton.id = 'cancel-edit-btn';
+                    cancelButton.textContent = 'Cancel Edit';
+                    cancelButton.className = 'bg-gray-500 text-white w-full px-4 py-2 rounded hover:bg-gray-600 mt-2';
+                    actionButton.insertAdjacentElement('afterend', cancelButton);
+                    cancelButton.addEventListener('click', resetStudentForm);
+                }
+            });
+        });
+    }
+    
     container.querySelectorAll('.delete-student-btn').forEach(btn => btn.addEventListener('click', async (e) => {
         if (confirm('Are you sure you want to delete this student?')) {
             await deleteDoc(doc(db, "students", e.target.dataset.studentId));
-            invalidateCache('students'); // Invalidate
-            fetchTutorManagementData(); // Refetch and re-render
+            invalidateCache('students');
+            fetchTutorManagementData();
         }
     }));
-}
-
-async function handleStudentImport(tutor) {
-    const fileInput = document.getElementById('student-import-file');
-    const statusEl = document.getElementById('import-status');
-    if (!fileInput.files[0]) return statusEl.textContent = "Please select a file first.";
-    if (!tutor) return statusEl.textContent = "Error: No tutor selected.";
-    statusEl.textContent = "Reading file...";
-    const reader = new FileReader();
-    reader.onload = async (e) => {
-        try {
-            const data = new Uint8Array(e.target.result);
-            const workbook = XLSX.read(data, { type: 'array' });
-            const sheetName = workbook.SheetNames[0];
-            const worksheet = workbook.Sheets[sheetName];
-            const json = XLSX.utils.sheet_to_json(worksheet);
-            if (json.length === 0) throw new Error("Sheet is empty or format is incorrect.");
-            statusEl.textContent = `Importing ${json.length} students...`;
-            const batch = writeBatch(db);
-            json.forEach(row => {
-                const studentDocRef = doc(collection(db, "students"));
-                const studentData = {
-                    parentName: row['parentName'] || '',
-    parentPhone: row['parentPhone'] || '',
-    studentName: row['studentName'],
-    grade: row['grade'],
-    subjects: (row['subjects'] || '').toString().split(',').map(s => s.trim()), 
-    days: row['days'],
-    studentFee: parseFloat(row['studentFee']),
-    tutorEmail: tutor.email,
-    summerBreak: false
-                };
-                if (!studentData.studentName || isNaN(studentData.studentFee)) return;
-                batch.set(studentDocRef, studentData);
-            });
-            await batch.commit();
-            statusEl.textContent = `✅ Successfully imported ${json.length} students for ${tutor.name}.`;
-            fileInput.value = '';
-            invalidateCache('students'); // Invalidate
-            fetchTutorManagementData();
-        } catch (error) {
-            statusEl.textContent = `❌ Error: ${error.message}`;
-            console.error(error);
-        }
-    };
-    reader.readAsArrayBuffer(fileInput.files[0]);
 }
 
 // ##################################################################
@@ -2656,5 +2689,6 @@ onAuthStateChanged(auth, async (user) => {
 });
 
 // [End Fully Updated admin.js File]
+
 
 
