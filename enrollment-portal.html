@@ -1563,7 +1563,7 @@
     <!-- Main Application Script -->
     <script>
         // ==============================================
-        // ENROLLMENT PORTAL - CLEAN VERSION
+        // ENROLLMENT PORTAL - UPDATED VERSION
         // ==============================================
 
         // CONFIGURATION
@@ -1590,26 +1590,26 @@
                 "Microbiology"
             ],
             
-            // Extracurricular Activities
+            // Extracurricular Activities - Updated with ratePerSession
             EXTRACURRICULAR_FEES: [
-                { id: 'comic', name: 'COMIC BOOK DESIGN', fee: 35000 },
-                { id: 'graphics', name: 'GRAPHICS DESIGNING', fee: 35000 },
-                { id: 'ai', name: 'GENERATIVE AI', fee: 40000 },
-                { id: 'youtube', name: 'YOUTUBE FOR KIDS', fee: 40000 },
-                { id: 'animation', name: 'STOP MOTION ANIMATION', fee: 35000 },
-                { id: 'videography', name: 'VIDEOGRAPHY', fee: 40000 },
-                { id: 'music', name: 'KIDS MUSIC LESSON', fee: 45000 },
-                { id: 'coding', name: 'CODING CLASSES FOR KIDS', fee: 45000 },
-                { id: 'sketch', name: 'SMART SKETCH', fee: 45000 },
-                { id: 'foreign', name: 'FOREIGN LANGUAGE', fee: 55000 },
-                { id: 'global_discovery', name: 'GLOBAL DISCOVERY CLUB', fee: 50000 },
-                { id: 'native', name: 'NATIVE LANGUAGE', fee: 30000 },
-                { id: 'speaking', name: 'PUBLIC SPEAKING', fee: 35000 },
-                { id: 'bible', name: 'BIBLE STUDY', fee: 35000 },
-                { id: 'chess', name: 'CHESS CLASS', fee: 40000 }
+                { id: 'comic', name: 'COMIC BOOK DESIGN', fee: 35000, ratePerSession: 35000 },
+                { id: 'graphics', name: 'GRAPHICS DESIGNING', fee: 35000, ratePerSession: 35000 },
+                { id: 'ai', name: 'GENERATIVE AI', fee: 40000, ratePerSession: 40000 },
+                { id: 'youtube', name: 'YOUTUBE FOR KIDS', fee: 40000, ratePerSession: 40000 },
+                { id: 'animation', name: 'STOP MOTION ANIMATION', fee: 35000, ratePerSession: 35000 },
+                { id: 'videography', name: 'VIDEOGRAPHY', fee: 40000, ratePerSession: 40000 },
+                { id: 'music', name: 'KIDS MUSIC LESSON', fee: 45000, ratePerSession: 45000 },
+                { id: 'coding', name: 'CODING CLASSES FOR KIDS', fee: 45000, ratePerSession: 45000 },
+                { id: 'sketch', name: 'SMART SKETCH', fee: 45000, ratePerSession: 45000 },
+                { id: 'foreign', name: 'FOREIGN LANGUAGE', fee: 55000, ratePerSession: 55000 },
+                { id: 'global_discovery', name: 'GLOBAL DISCOVERY CLUB', fee: 50000, ratePerSession: 50000 },
+                { id: 'native', name: 'NATIVE LANGUAGE', fee: 30000, ratePerSession: 30000 },
+                { id: 'speaking', name: 'PUBLIC SPEAKING', fee: 35000, ratePerSession: 35000 },
+                { id: 'bible', name: 'BIBLE STUDY', fee: 35000, ratePerSession: 35000 },
+                { id: 'chess', name: 'CHESS CLASS', fee: 40000, ratePerSession: 40000 }
             ],
             
-            // Test Preparation
+            // Test Preparation - Per hour rate
             TEST_PREP_FEES: [
                 { id: 'sat', name: 'SAT', rate: 17000 },
                 { id: 'igcse', name: 'IGCSE & GCSE', rate: 20000 },
@@ -1629,12 +1629,13 @@
                 ADDITIONAL_SUBJECT_FEE: 40000,
                 SIBLING_DISCOUNT: 10000,
                 BASE_SUBJECTS_INCLUDED: 2,
-                REFERRAL_BONUS: 5000
+                REFERRAL_BONUS: 5000,
+                WEEKS_PER_MONTH: 4
             },
             
             // Days and Time Options
             DAYS: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'],
-            HOURS: Array.from({length: 24}, (_, i) => i), // 0-23 hours
+            HOURS: Array.from({length: 24}, (_, i) => i),
             MINUTES: ['00', '15', '30', '45']
         };
 
@@ -2047,7 +2048,7 @@
                         </div>
                         ${buttonsHTML}
                         <div class="extracurricular-details">
-                            <h5><i class="far fa-calendar-alt"></i> Available Days</h5>
+                            <h5><i class="far fa-calendar-alt"></i> Select Days (Max 2)</h5>
                             <div class="available-days">
                                 ${extracurricularDaysHTML}
                             </div>
@@ -2081,7 +2082,7 @@
                 const extracurricularHTML = `
                     <div id="extracurricular-${id}" class="tab-content">
                         <div class="course-selection">
-                            <p class="course-note">Weekly activities.</p>
+                            <p class="course-note">Select 1-2 days per week for each activity. Global Discovery is Saturdays only.</p>
                             <div class="extracurricular-grid">${extracurriculars}</div>
                         </div>
                     </div>
@@ -2100,12 +2101,12 @@
                             <div class="test-prep-rate">₦${test.rate.toLocaleString()}/hour</div>
                         </div>
                         <div class="hours-input">
-                            <label>Hours:</label>
-                            <input type="number" min="0" step="0.5" value="0" class="test-prep-hours" placeholder="0.5">
+                            <label>Hours per session:</label>
+                            <input type="number" min="0" step="0.5" value="0" class="test-prep-hours" placeholder="1">
                             <span>hrs</span>
                         </div>
                         <div class="days-time-section">
-                            <h5><i class="far fa-calendar-alt"></i> Available Days</h5>
+                            <h5><i class="far fa-calendar-alt"></i> Select Days</h5>
                             <div class="available-days">
                                 ${testPrepDaysHTML}
                             </div>
@@ -2139,7 +2140,7 @@
                 const testPrepHTML = `
                     <div id="test-prep-${id}" class="tab-content">
                         <div class="course-selection">
-                            <p class="course-note">Starts from 0.5 hours.</p>
+                            <p class="course-note">Fee = (Hours per session × Rate per hour × Days per week × 4 weeks)</p>
                             <div class="test-prep-options">${testPreps}</div>
                         </div>
                     </div>
@@ -2217,16 +2218,47 @@
                             
                             card.querySelectorAll('.frequency-btn').forEach(b => b.classList.remove('selected'));
                             btn.classList.add('selected');
+                            
+                            // Handle day visibility based on frequency
+                            this.handleExtracurricularFrequency(card, btn.dataset.frequency);
+                            
                             this.updateSummary();
                         });
                     });
 
-                    // Extracurricular Days Selection
+                    // Extracurricular Days Selection - UPDATED WITH 2-DAY LIMIT
                     card.querySelectorAll('.extracurricular-day-btn').forEach(btn => {
                         btn.addEventListener('click', (e) => {
                             e.stopPropagation();
+                            
+                            const isGlobalDiscovery = card.dataset.activityId === 'global_discovery';
+                            const selectedDays = card.querySelectorAll('.extracurricular-day-btn.selected');
+                            
+                            if (isGlobalDiscovery) {
+                                // For Global Discovery, only allow Saturday
+                                if (btn.dataset.day === 'Saturday') {
+                                    // Deselect all other days first
+                                    card.querySelectorAll('.extracurricular-day-btn.selected').forEach(otherBtn => {
+                                        otherBtn.classList.remove('selected');
+                                    });
+                                    btn.classList.add('selected');
+                                }
+                            } else {
+                                // For regular activities: limit to 2 days maximum
+                                if (btn.classList.contains('selected')) {
+                                    // Deselect if already selected
+                                    btn.classList.remove('selected');
+                                } else if (selectedDays.length < 2) {
+                                    // Select if less than 2 days already selected
+                                    btn.classList.add('selected');
+                                } else {
+                                    // Show message when trying to select more than 2 days
+                                    this.showAlert("Maximum 2 days per week for extracurricular activities", "warning");
+                                    return;
+                                }
+                            }
+                            
                             if(!card.classList.contains('selected')) card.classList.add('selected');
-                            btn.classList.toggle('selected');
                             this.updateSummary();
                         });
                     });
@@ -2252,7 +2284,7 @@
                     });
                 });
 
-                // Test Prep Days Selection
+                // Test Prep Days Selection - NO LIMIT ON DAYS
                 studentDiv.querySelectorAll('.test-prep-day-btn').forEach(btn => {
                     btn.addEventListener('click', () => {
                         const card = btn.closest('.test-prep-card');
@@ -2262,6 +2294,17 @@
                             card.classList.add('active');
                         }
                         btn.classList.toggle('selected');
+                        
+                        // Recalculate hours based on days selected
+                        const selectedDays = card.querySelectorAll('.test-prep-day-btn.selected').length;
+                        const hoursInput = card.querySelector('.test-prep-hours');
+                        const currentHours = parseFloat(hoursInput.value) || 0;
+                        
+                        // If days are selected but no hours set, default to 1 hour per day
+                        if (selectedDays > 0 && currentHours === 0) {
+                            hoursInput.value = 1;
+                        }
+                        
                         this.updateSummary();
                     });
                 });
@@ -2303,6 +2346,38 @@
                 }
             }
             
+            handleExtracurricularFrequency(card, frequency) {
+                const isGlobalDiscovery = card.dataset.activityId === 'global_discovery';
+                
+                if (isGlobalDiscovery) {
+                    // Global Discovery: Show only Saturday option
+                    card.querySelectorAll('.extracurricular-day-btn').forEach(btn => {
+                        if (btn.dataset.day === 'Saturday') {
+                            btn.style.display = 'flex';
+                        } else {
+                            btn.style.display = 'none';
+                        }
+                    });
+                } else {
+                    // Show all days for regular activities
+                    card.querySelectorAll('.extracurricular-day-btn').forEach(btn => {
+                        btn.style.display = 'flex';
+                    });
+                    
+                    // Clear day selections when changing frequency
+                    if (frequency === 'once') {
+                        // For once weekly, clear any second day selection
+                        const selectedDays = card.querySelectorAll('.extracurricular-day-btn.selected');
+                        if (selectedDays.length > 1) {
+                            // Keep only the first selected day
+                            selectedDays.forEach((btn, index) => {
+                                if (index > 0) btn.classList.remove('selected');
+                            });
+                        }
+                    }
+                }
+            }
+            
             updateRemoveButtons() {
                 const buttons = document.querySelectorAll('.remove-student');
                 buttons.forEach(btn => {
@@ -2312,7 +2387,7 @@
             }
 
             // ==============================================
-            // FEE CALCULATION
+            // UPDATED FEE CALCULATION LOGIC
             // ==============================================
             
             calculateProratedAmount(actualMonthlyFee, startDate, selectedDays = []) {
@@ -2354,10 +2429,6 @@
                     const daysRemainingInMonth = daysInMonth - dayOfMonth + 1;
                     
                     // Calculate actual class days remaining based on selected days per week
-                    // For example: If student selected Monday, Wednesday, Friday (3 days/week)
-                    // and there are 4 weeks remaining in the month, then:
-                    // actual class days = days per week × weeks remaining
-                    
                     const daysPerWeek = selectedDays.length;
                     const weeksRemaining = Math.ceil(daysRemainingInMonth / 7);
                     const actualClassDaysRemaining = daysPerWeek * weeksRemaining;
@@ -2407,12 +2478,10 @@
                 let testPrepTotal = 0;
                 let hasAcademicSelection = false;
                 let earliestStartDate = null;
-                let totalActualAcademicFee = 0; // The full monthly fee before proration
+                let totalActualAcademicFee = 0;
                 let selectedDaysPerWeek = 0;
                 
                 const studentEntries = document.querySelectorAll('.student-entry');
-                
-                // Fee breakdown preparation
                 const breakdownContainer = document.getElementById('fee-details');
                 breakdownContainer.innerHTML = '';
                 
@@ -2424,7 +2493,7 @@
 
                 studentEntries.forEach((entry, index) => {
                     let studentSubtotal = 0;
-                    let studentActualAcademicFee = 0; // Full monthly fee for this student
+                    let studentActualAcademicFee = 0;
                     
                     const grade = entry.querySelector('.student-grade').value;
                     const startDate = entry.querySelector('.student-start-date').value;
@@ -2460,27 +2529,56 @@
                         totalActualAcademicFee += studentActualAcademicFee;
                     }
                     
-                    // 2. Extracurricular
+                    // 2. Extracurricular - UPDATED LOGIC (1-2 days per week)
                     entry.querySelectorAll('.extracurricular-card.selected').forEach(card => {
                         const activity = CONFIG.EXTRACURRICULAR_FEES.find(a => a.id === card.dataset.activityId);
                         if (activity) {
-                            let fee = activity.fee;
-                            const freqBtn = card.querySelector('.frequency-btn.selected');
-                            if (freqBtn && freqBtn.dataset.frequency === 'twice') fee *= 2;
+                            // Count selected days for this activity
+                            const selectedDays = Array.from(card.querySelectorAll('.extracurricular-day-btn.selected'));
+                            const numberOfDays = selectedDays.length;
+                            
+                            let fee = 0;
+                            
+                            if (activity.id === 'global_discovery') {
+                                // Global Discovery is once per week (Saturday only) - flat monthly fee
+                                fee = activity.ratePerSession;
+                            } else {
+                                // Regular activities: 1 day = weekly rate, 2 days = weekly rate × 2
+                                // Cap at 2 days maximum
+                                fee = activity.ratePerSession * Math.min(numberOfDays, 2);
+                                
+                                // If frequency is "twice", double the fee for the selected days
+                                const freqBtn = card.querySelector('.frequency-btn.selected');
+                                if (freqBtn && freqBtn.dataset.frequency === 'twice') {
+                                    fee *= 2;
+                                }
+                            }
                             
                             extracurricularTotal += fee;
                             studentSubtotal += fee;
                         }
                     });
                     
-                    // 3. Test Prep
+                    // 3. Test Prep - UPDATED LOGIC (hours × days × weeks)
                     entry.querySelectorAll('.test-prep-card.active').forEach(card => {
                         const test = CONFIG.TEST_PREP_FEES.find(t => t.id === card.dataset.testId);
                         const hours = parseFloat(card.querySelector('.test-prep-hours').value) || 0;
+                        
                         if (test && hours > 0) {
-                            const fee = hours * test.rate;
-                            testPrepTotal += fee;
-                            studentSubtotal += fee;
+                            // Count selected days for this test prep
+                            const selectedDays = Array.from(card.querySelectorAll('.test-prep-day-btn.selected'));
+                            const numberOfDays = selectedDays.length;
+                            
+                            if (numberOfDays > 0) {
+                                // Calculate fee: (hours per session) × (rate per hour) × (days per week) × (4 weeks per month)
+                                // Example: 2 hours/day × ₦17,000/hour × 3 days/week × 4 weeks = ₦408,000/month
+                                const weeklyHours = hours * numberOfDays;
+                                const monthlyHours = weeklyHours * CONFIG.CONSTANTS.WEEKS_PER_MONTH;
+                                const fee = monthlyHours * test.rate;
+                                
+                                testPrepTotal += fee;
+                                studentSubtotal += fee;
+                            }
                         }
                     });
 
@@ -2501,7 +2599,7 @@
                 });
                 
                 // Calculations
-                const totalAcademicFee = academicBaseTotal + additionalSubjectsTotal; // This is the actual monthly fee
+                const totalAcademicFee = academicBaseTotal + additionalSubjectsTotal;
                 
                 let discount = 0;
                 if (studentEntries.length >= 2 && hasAcademicSelection) {
@@ -2516,7 +2614,7 @@
                     const prorationResult = this.calculateProratedAmount(
                         totalActualAcademicFee, 
                         earliestStartDate, 
-                        Array.from({length: selectedDaysPerWeek}, (_, i) => `Day${i+1}`) // Placeholder for actual days
+                        Array.from({length: selectedDaysPerWeek}, (_, i) => `Day${i+1}`)
                     );
                     
                     proratedAmountToPay = prorationResult.toPay || 0;
