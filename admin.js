@@ -95,8 +95,8 @@ async function updateStaffPermissions(staffEmail, newRole) {
             viewStaffManagement: false, 
             viewParentFeedback: false, 
             viewEnrollments: false,
-            viewInactiveTutors: false,  // ← Add this
-            viewArchivedStudents: false // ← Add this
+            viewInactiveTutors: false,
+            viewArchivedStudents: false
         }, 
         actions: { 
             canDownloadReports: false, 
@@ -116,8 +116,8 @@ async function updateStaffPermissions(staffEmail, newRole) {
             viewStaffManagement: false, 
             viewParentFeedback: false, 
             viewEnrollments: false,
-            viewInactiveTutors: false,  // ← Add this
-            viewArchivedStudents: false // ← Add this
+            viewInactiveTutors: false,
+            viewArchivedStudents: false
         }, 
         actions: { 
             canDownloadReports: false, 
@@ -137,8 +137,8 @@ async function updateStaffPermissions(staffEmail, newRole) {
             viewStaffManagement: false, 
             viewParentFeedback: true, 
             viewEnrollments: true,
-            viewInactiveTutors: true,   // ← Add this (managers can view inactive tutors)
-            viewArchivedStudents: true  // ← Add this (managers can view archived students)
+            viewInactiveTutors: true,
+            viewArchivedStudents: true
         }, 
         actions: { 
             canDownloadReports: false, 
@@ -158,8 +158,8 @@ async function updateStaffPermissions(staffEmail, newRole) {
             viewStaffManagement: true, 
             viewParentFeedback: true, 
             viewEnrollments: true,
-            viewInactiveTutors: true,   // ← Add this
-            viewArchivedStudents: true  // ← Add this
+            viewInactiveTutors: true,
+            viewArchivedStudents: true
         }, 
         actions: { 
             canDownloadReports: true, 
@@ -1537,11 +1537,10 @@ async function setupContentManager() {
 }
 
 // ##################################################################
-// # SECTION 3: TUTOR MANAGEMENT (OPTIMIZED)
+// # SECTION 3: TUTOR MANAGEMENT (OPTIMIZED WITH ADDITIONAL CONTROLS)
 // ##################################################################
 
 let globalSettings = {};
-// Populated by the single onSnapshot listener
 
 async function renderTutorManagementPanel(container) {
     container.innerHTML = `
@@ -1559,6 +1558,8 @@ async function renderTutorManagementPanel(container) {
                 <label class="flex items-center"><span class="text-gray-700 font-semibold mr-4">Edit/Delete (Tutors):</span><label class="relative inline-flex items-center cursor-pointer"><input type="checkbox" id="edit-delete-toggle" class="sr-only peer"><div class="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div><span id="edit-delete-status-label" class="ml-3 text-sm font-medium"></span></label></label>
                 
                  <label class="flex items-center"><span class="text-gray-700 font-semibold mr-4">Direct Student Add (Tutors):</span><label class="relative inline-flex items-center cursor-pointer"><input type="checkbox" id="bypass-approval-toggle" class="sr-only peer"><div class="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div><span id="bypass-approval-status-label" class="ml-3 text-sm font-medium"></span></label></label>
+                <label class="flex items-center"><span class="text-gray-700 font-semibold mr-4">Show Transition Button:</span><label class="relative inline-flex items-center cursor-pointer"><input type="checkbox" id="show-transition-toggle" class="sr-only peer"><div class="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div><span id="show-transition-status-label" class="ml-3 text-sm font-medium"></span></label></label>
+                <label class="flex items-center"><span class="text-gray-700 font-semibold mr-4">Preschool-2 Add/Transition:</span><label class="relative inline-flex items-center cursor-pointer"><input type="checkbox" id="preschool-add-toggle" class="sr-only peer"><div class="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div><span id="preschool-add-status-label" class="ml-3 text-sm font-medium"></span></label></label>
             </div>
         </div>
         
@@ -1601,17 +1602,24 @@ function setupTutorManagementListeners() {
             const data = docSnap.data();
             globalSettings = data;
 
-            const toggleMap = { 'isReportEnabled': 'report', 'isTutorAddEnabled': 'tutor-add', 'isSummerBreakEnabled': 'summer-break', 'showStudentFees': 'show-fees', 'showEditDeleteButtons': 'edit-delete', 'bypassPendingApproval': 'bypass-approval' };
+            const toggleMap = { 
+                'isReportEnabled': 'report', 
+                'isTutorAddEnabled': 'tutor-add', 
+                'isSummerBreakEnabled': 'summer-break', 
+                'showStudentFees': 'show-fees', 
+                'showEditDeleteButtons': 'edit-delete', 
+                'bypassPendingApproval': 'bypass-approval',
+                'showTransitionButton': 'show-transition',
+                'preschoolAddTransition': 'preschool-add'
+            };
 
             for (const key in toggleMap) {
-             
-                 const type = toggleMap[key];
+                const type = toggleMap[key];
                 const toggle = document.getElementById(`${type}-toggle`);
                 const label = document.getElementById(`${type}-status-label`);
                 if (toggle && label) {
                     toggle.checked = !!data[key];
-              
-                     label.textContent = data[key] ? 'Enabled' : 'Disabled';
+                    label.textContent = data[key] ? 'Enabled' : 'Disabled';
                 }
             }
             if (activeTutorId) {
@@ -1626,6 +1634,8 @@ function setupTutorManagementListeners() {
     document.getElementById('show-fees-toggle').addEventListener('change', e => updateDoc(settingsDocRef, { showStudentFees: e.target.checked }));
     document.getElementById('edit-delete-toggle').addEventListener('change', e => updateDoc(settingsDocRef, { showEditDeleteButtons: e.target.checked }));
     document.getElementById('bypass-approval-toggle').addEventListener('change', e => updateDoc(settingsDocRef, { bypassPendingApproval: e.target.checked }));
+    document.getElementById('show-transition-toggle').addEventListener('change', e => updateDoc(settingsDocRef, { showTransitionButton: e.target.checked }));
+    document.getElementById('preschool-add-toggle').addEventListener('change', e => updateDoc(settingsDocRef, { preschoolAddTransition: e.target.checked }));
     
     // UI Interaction Listeners
     document.getElementById('tutor-select').addEventListener('change', e => {
@@ -1735,8 +1745,7 @@ function handleGlobalSearch(e) {
                 activeTutorId = tutorId;
                 tutorSelect.value = tutorId;
                 renderSelectedTutorDetailsFromCache(tutorId);
-      
-                 document.getElementById('global-search-bar').value = '';
+                document.getElementById('global-search-bar').value = '';
                 searchResultsContainer.innerHTML = '';
                 tutorManagementArea.style.display = 'block';
             }
@@ -1877,8 +1886,7 @@ function renderSelectedTutorDetailsFromCache(tutorId) {
             document.getElementById('new-student-name').value = data.studentName;
             document.getElementById('new-student-grade').value = data.grade;
             document.getElementById('new-student-subjects').value = data.subjects;
-       
-             document.getElementById('new-student-days').value = data.days;
+            document.getElementById('new-student-days').value = data.days;
             document.getElementById('new-student-fee').value = data.fee;
 
             const actionButton = document.getElementById('add-student-btn');
@@ -1887,8 +1895,7 @@ function renderSelectedTutorDetailsFromCache(tutorId) {
 
             if (!document.getElementById('cancel-edit-btn')) {
                 const cancelButton = document.createElement('button');
-  
-                 cancelButton.id = 'cancel-edit-btn';
+                cancelButton.id = 'cancel-edit-btn';
                 cancelButton.textContent = 'Cancel Edit';
                 cancelButton.className = 'bg-gray-500 text-white w-full px-4 py-2 rounded hover:bg-gray-600 mt-2';
                 actionButton.insertAdjacentElement('afterend', cancelButton);
@@ -1926,14 +1933,14 @@ async function handleStudentImport(tutor) {
                 const studentDocRef = doc(collection(db, "students"));
                 const studentData = {
                     parentName: row['parentName'] || '',
-    parentPhone: row['parentPhone'] || '',
-    studentName: row['studentName'],
-    grade: row['grade'],
-    subjects: (row['subjects'] || '').toString().split(',').map(s => s.trim()), 
-    days: row['days'],
-    studentFee: parseFloat(row['studentFee']),
-    tutorEmail: tutor.email,
-    summerBreak: false
+                    parentPhone: row['parentPhone'] || '',
+                    studentName: row['studentName'],
+                    grade: row['grade'],
+                    subjects: (row['subjects'] || '').toString().split(',').map(s => s.trim()), 
+                    days: row['days'],
+                    studentFee: parseFloat(row['studentFee']),
+                    tutorEmail: tutor.email,
+                    summerBreak: false
                 };
                 if (!studentData.studentName || isNaN(studentData.studentFee)) return;
                 batch.set(studentDocRef, studentData);
@@ -1960,12 +1967,10 @@ async function renderTutorReportsPanel(container) {
             <div class="flex justify-between items-start mb-4">
                  <h2 class="text-2xl font-bold text-green-700">Tutor Reports</h2>
                  <div class="flex items-center space-x-4">
-     
                      <div class="bg-blue-100 p-3 rounded-lg text-center shadow"><h4 class="font-bold text-blue-800 text-sm">Tutors Submitted</h4><p id="report-tutor-count" class="text-2xl text-blue-600 font-extrabold">0</p></div>
                     <div class="bg-green-100 p-3 rounded-lg text-center shadow"><h4 class="font-bold text-green-800 text-sm">Total Reports</h4><p id="report-count" class="text-2xl text-green-600 font-extrabold">0</p></div>
                     <button id="refresh-reports-btn" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Refresh</button>
-            
-             </div>
+                </div>
             </div>
             <div id="tutor-reports-list" class="space-y-4"><p class="text-gray-500 text-center">Loading reports...</p></div>
         </div>
@@ -2017,8 +2022,7 @@ function renderTutorReportsFromCache() {
             <li class="flex justify-between items-center p-2 bg-gray-50 rounded-md">
                 <span>${report.studentName} - ${new Date(report.submittedAt.seconds * 1000).toLocaleDateString()}</span>
                 <button class="download-single-report-btn bg-blue-500 text-white px-3 py-1 text-sm rounded hover:bg-blue-600" data-report-id="${report.id}">Download PDF</button>
-            
-             </li>
+            </li>
         `).join('');
         return `
             <div class="border rounded-lg shadow-sm">
@@ -2030,8 +2034,7 @@ function renderTutorReportsFromCache() {
                     </summary>
                     <div class="p-4 border-t"><ul class="space-y-2">${reportLinks}</ul></div>
                 </details>
- 
-             </div>
+            </div>
         `;
     }).join('');
 
@@ -2046,20 +2049,22 @@ function renderTutorReportsFromCache() {
             button.textContent = 'Zipping...';
             button.disabled = true;
             try {
-   
-                 const zip = new JSZip();
+                const zip = new JSZip();
                 for (const report of reportsToDownload) {
                     const pdfBlob = await downloadAdminReport(report.id, true); 
                     if (pdfBlob) {
-              
-                         const fileName = `${report.studentName}_${new Date(report.submittedAt.seconds * 1000).toLocaleDateString().replace(/\//g, '-')}.pdf`;
+                        const fileName = `${report.studentName}_${new Date(report.submittedAt.seconds * 1000).toLocaleDateString().replace(/\//g, '-')}.pdf`;
                         zip.file(fileName, pdfBlob);
                     }
                 }
                 const content = await zip.generateAsync({ type: "blob" });
                 saveAs(content, `${reportsByTutor[tutorEmail].name}_Reports.zip`);
-            } catch (error) { console.error("Error creating ZIP file:", error); alert("An error occurred while creating the ZIP file.");
-            } finally { button.textContent = 'Download All as ZIP'; button.disabled = false;
+            } catch (error) { 
+                console.error("Error creating ZIP file:", error); 
+                alert("An error occurred while creating the ZIP file.");
+            } finally { 
+                button.textContent = 'Download All as ZIP'; 
+                button.disabled = false;
             }
         });
     });
@@ -2092,7 +2097,6 @@ async function downloadAdminReport(reportId, returnBlob = false) {
         return null; 
     }
 }
-
 
 // ##################################################################
 // # SECTION 5: PAY ADVICE PANEL (CORRECTED)
@@ -2144,8 +2148,7 @@ async function loadPayAdviceData(startDate, endDate) {
             return;
         }
 
-        // ### FIXED SECTION ###
-        // Firestore 'in' queries are limited to 30 values. This function fetches tutors by chunking the email list.
+        // Fetch tutors by chunking the email list
         const fetchTutorsInChunks = async (emails) => {
             if (emails.length === 0) return [];
             const chunks = [];
@@ -2156,7 +2159,7 @@ async function loadPayAdviceData(startDate, endDate) {
                 getDocs(query(collection(db, "tutors"), where("email", "in", chunk)))
             );
             const querySnapshots = await Promise.all(queryPromises);
-            return querySnapshots.flatMap(snapshot => snapshot.docs); // Combine docs from all snapshots
+            return querySnapshots.flatMap(snapshot => snapshot.docs);
         };
 
         // Fetch both tutors (in chunks) and all students concurrently.
@@ -2164,18 +2167,23 @@ async function loadPayAdviceData(startDate, endDate) {
             fetchTutorsInChunks(activeTutorEmails),
             getDocs(collection(db, "students"))
         ]);
-        // ### END FIXED SECTION ###
 
         const allStudents = studentsSnapshot.docs.map(doc => doc.data());
         let totalStudentCount = 0;
         const payData = [];
-        tutorDocs.forEach(doc => { // Iterate over the combined array of tutor documents
+        tutorDocs.forEach(doc => {
             const tutor = doc.data();
             const assignedStudents = allStudents.filter(s => s.tutorEmail === tutor.email);
             const totalStudentFees = assignedStudents.reduce((sum, s) => sum + (s.studentFee || 0), 0);
             const managementFee = (tutor.isManagementStaff && tutor.managementFee) ? tutor.managementFee : 0;
             totalStudentCount += assignedStudents.length;
-            payData.push({ tutorName: tutor.name, studentCount: assignedStudents.length, totalStudentFees: totalStudentFees, managementFee: managementFee, totalPay: totalStudentFees + managementFee });
+            payData.push({ 
+                tutorName: tutor.name, 
+                studentCount: assignedStudents.length, 
+                totalStudentFees: totalStudentFees, 
+                managementFee: managementFee, 
+                totalPay: totalStudentFees + managementFee 
+            });
         });
 
         document.getElementById('pay-tutor-count').textContent = payData.length;
@@ -2195,7 +2203,6 @@ async function loadPayAdviceData(startDate, endDate) {
         tableBody.innerHTML = `<tr><td colspan="5" class="text-center py-4 text-red-500">Failed to load pay data. Check console.</td></tr>`;
     }
 }
-
 
 // ##################################################################
 // # SECTION 6: SUMMER BREAK PANEL (OPTIMIZED WITH SEARCH & SORT)
@@ -2499,8 +2506,7 @@ function renderStaffFromCache() {
             } else {
                 e.target.value = e.target.dataset.originalRole;
             }
-  
-             });
+        });
     });
     document.querySelectorAll('.manage-permissions-btn').forEach(button => {
         button.addEventListener('click', (e) => openPermissionsModal(e.target.dataset.id));
@@ -2575,15 +2581,14 @@ async function openPermissionsModal(staffId) {
         };
         await updateDoc(doc(db, "staff", staffId), { permissions: newPermissions });
         alert("Custom permissions saved successfully!");
-        invalidateCache('staff'); // Invalidate
+        invalidateCache('staff');
         fetchAndRenderStaff();
         closeModal();
     });
 }
 
-
 // ##################################################################
-// # SECTION 8: PENDING APPROVALS (No changes needed)
+// # SECTION 8: PENDING APPROVALS
 // ##################################################################
 async function renderPendingApprovalsPanel(container) {
     container.innerHTML = `<h2 class="text-2xl font-bold text-green-700 mb-4">Pending Approvals</h2><div id="pending-list" class="space-y-4"></div>`;
@@ -2617,7 +2622,7 @@ async function handleApproval(id, type, status) {
 }
 
 // ##################################################################
-// # MAIN APP INITIALIZATION (Unchanged)
+// # MAIN APP INITIALIZATION
 // ##################################################################
 onAuthStateChanged(auth, async (user) => {
     const mainContent = document.getElementById('main-content');
@@ -2655,6 +2660,134 @@ onAuthStateChanged(auth, async (user) => {
     }
 });
 
-// [End Fully Updated admin.js File]
+// Helper functions for dashboard
+async function ensureDashboardData() {
+    if (!sessionCache.tutors || !sessionCache.students) {
+        try {
+            if (!sessionCache.tutors) {
+                const tutorsSnapshot = await getDocs(collection(db, "tutors"));
+                const tutorsData = {};
+                tutorsSnapshot.forEach(doc => {
+                    tutorsData[doc.id] = { id: doc.id, ...doc.data() };
+                });
+                saveToLocalStorage('tutors', tutorsData);
+            }
+            if (!sessionCache.students) {
+                const studentsSnapshot = await getDocs(collection(db, "students"));
+                saveToLocalStorage('students', studentsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+            }
+        } catch (error) {
+            console.error("Error loading dashboard data:", error);
+        }
+    }
+}
 
+function loadCountersFromCache() {
+    document.getElementById('totalStudentsCount').textContent = sessionCache.students ? sessionCache.students.length : 0;
+    document.getElementById('totalTutorsCount').textContent = sessionCache.tutors ? Object.keys(sessionCache.tutors).length : 0;
+    
+    // Populate students per tutor dropdown
+    const select = document.getElementById('studentsPerTutorSelect');
+    if (select) {
+        select.innerHTML = '<option value="">All Tutors</option>';
+        if (sessionCache.tutors) {
+            Object.values(sessionCache.tutors).forEach(tutor => {
+                const studentCount = sessionCache.students ? 
+                    sessionCache.students.filter(s => s.tutorEmail === tutor.email).length : 0;
+                const option = document.createElement('option');
+                option.value = tutor.id;
+                option.textContent = `${tutor.name} (${studentCount} students)`;
+                select.appendChild(option);
+            });
+        }
+    }
+}
 
+function loadStudentDropdown() {
+    const select = document.getElementById('studentDropdown');
+    if (select) {
+        select.innerHTML = '<option value="">Select a student</option>';
+        if (sessionCache.students) {
+            sessionCache.students.forEach(student => {
+                const option = document.createElement('option');
+                option.value = student.id;
+                option.textContent = `${student.studentName} (Grade ${student.grade})`;
+                select.appendChild(option);
+            });
+        }
+    }
+}
+
+async function loadAndRenderReport(studentId) {
+    const reportContent = document.getElementById('reportContent');
+    if (!studentId) {
+        reportContent.innerHTML = '<p class="text-gray-500">Please select a student to view their report.</p>';
+        return;
+    }
+    
+    reportContent.innerHTML = '<p class="text-gray-500">Loading report...</p>';
+    
+    try {
+        // Fetch reports for this student
+        const reportsQuery = query(
+            collection(db, "tutor_submissions"),
+            where("studentId", "==", studentId),
+            orderBy("submittedAt", "desc")
+        );
+        const reportsSnapshot = await getDocs(reportsQuery);
+        
+        if (reportsSnapshot.empty) {
+            reportContent.innerHTML = '<p class="text-gray-500">No reports found for this student.</p>';
+            return;
+        }
+        
+        const reports = reportsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        
+        // Get student info
+        const student = sessionCache.students?.find(s => s.id === studentId);
+        const studentName = student ? student.studentName : 'Unknown Student';
+        
+        reportContent.innerHTML = `
+            <div class="bg-white p-4 rounded-lg shadow-sm">
+                <h3 class="text-lg font-semibold mb-2">Reports for ${studentName}</h3>
+                <div class="space-y-3">
+                    ${reports.map(report => `
+                        <div class="border rounded p-3">
+                            <div class="flex justify-between items-center mb-2">
+                                <h4 class="font-medium">${report.tutorName || 'Tutor'}</h4>
+                                <span class="text-sm text-gray-500">
+                                    ${new Date(report.submittedAt.seconds * 1000).toLocaleDateString()}
+                                </span>
+                            </div>
+                            <p class="text-sm text-gray-600 mb-2">${report.introduction?.substring(0, 100)}...</p>
+                            <button onclick="viewFullReport('${report.id}')" class="text-blue-600 hover:text-blue-800 text-sm">
+                                View Full Report
+                            </button>
+                        </div>
+                    `).join('')}
+                </div>
+            </div>
+        `;
+    } catch (error) {
+        console.error("Error loading report:", error);
+        reportContent.innerHTML = '<p class="text-red-500">Error loading report.</p>';
+    }
+}
+
+// Add missing function
+async function viewFullReport(reportId) {
+    // This would open a modal or new page with the full report
+    alert(`Would open full report ${reportId}`);
+}
+
+// Fix: Add missing function declaration for saveAs if not already defined
+if (typeof window.saveAs === 'undefined') {
+    window.saveAs = function(blob, filename) {
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = filename;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    };
+}
