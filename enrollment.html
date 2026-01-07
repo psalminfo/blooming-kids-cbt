@@ -3,52 +3,159 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Blooming Kids House - Quality Education for Your Child</title>
+    <title>Blooming Kids House - Personalized Education & Tutoring</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&family=Open+Sans:wght@400;500;600&display=swap" rel="stylesheet">
     <style>
         :root {
             --primary: #2E8B57;      /* Sea Green - Professional */
+            --primary-light: #3CB371;
             --primary-dark: #1E6B47;
             --secondary: #FFD700;    /* Gold accent */
+            --accent: #FF6B6B;       /* Coral accent */
             --light: #F8F9FA;
-            --dark: #343A40;
-            --success: #28A745;
-            --border-radius: 16px;
-            --shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
-            --transition: all 0.3s ease;
+            --light-gray: #F5F7FA;
+            --gray: #6C757D;
+            --dark: #212529;
+            --border-radius: 8px;
+            --shadow: 0 5px 15px rgba(0, 0, 0, 0.08);
+            --shadow-lg: 0 10px 30px rgba(0, 0, 0, 0.12);
+            --transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
         }
 
         * {
             margin: 0;
             padding: 0;
             box-sizing: border-box;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
         }
 
         body {
-            background: linear-gradient(135deg, #f5f7fa 0%, #e4edf5 100%);
+            font-family: 'Open Sans', sans-serif;
             color: var(--dark);
-            min-height: 100vh;
+            background-color: white;
+            line-height: 1.6;
             overflow-x: hidden;
+        }
+
+        h1, h2, h3, h4, h5, h6 {
+            font-family: 'Poppins', sans-serif;
+            font-weight: 600;
+            line-height: 1.3;
+            margin-bottom: 1rem;
+        }
+
+        a {
+            text-decoration: none;
+            color: inherit;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 20px;
+        }
+
+        .section-padding {
+            padding: 100px 0;
+        }
+
+        .section-title {
+            text-align: center;
+            margin-bottom: 60px;
+        }
+
+        .section-title h2 {
+            font-size: 2.5rem;
+            color: var(--primary-dark);
+            margin-bottom: 15px;
+            position: relative;
+            display: inline-block;
+        }
+
+        .section-title h2:after {
+            content: '';
+            position: absolute;
+            bottom: -10px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 60px;
+            height: 3px;
+            background: var(--primary);
+        }
+
+        .section-title p {
+            font-size: 1.1rem;
+            color: var(--gray);
+            max-width: 700px;
+            margin: 0 auto;
+        }
+
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 14px 32px;
+            border-radius: var(--border-radius);
+            font-weight: 600;
+            font-size: 16px;
+            transition: var(--transition);
+            cursor: pointer;
+            border: none;
+            gap: 10px;
+        }
+
+        .btn-primary {
+            background: var(--primary);
+            color: white;
+            box-shadow: 0 4px 12px rgba(46, 139, 87, 0.25);
+        }
+
+        .btn-primary:hover {
+            background: var(--primary-dark);
+            transform: translateY(-3px);
+            box-shadow: 0 6px 20px rgba(46, 139, 87, 0.3);
+        }
+
+        .btn-secondary {
+            background: white;
+            color: var(--primary);
+            border: 2px solid var(--primary);
+        }
+
+        .btn-secondary:hover {
+            background: var(--primary);
+            color: white;
+            transform: translateY(-3px);
         }
 
         /* Header & Navigation */
         .header {
-            background: rgba(255, 255, 255, 0.95);
-            backdrop-filter: blur(10px);
-            padding: 20px 40px;
             position: fixed;
             top: 0;
             left: 0;
-            right: 0;
+            width: 100%;
             z-index: 1000;
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            transition: var(--transition);
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+        }
+
+        .header.scrolled {
+            background: rgba(255, 255, 255, 0.98);
+            box-shadow: 0 5px 20px rgba(0, 0, 0, 0.1);
+            padding: 10px 0;
+        }
+
+        .header-container {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            box-shadow: 0 2px 20px rgba(0, 0, 0, 0.08);
+            padding: 20px 0;
         }
 
-        .logo-container {
+        .logo {
             display: flex;
             align-items: center;
             gap: 15px;
@@ -60,281 +167,424 @@
         }
 
         .logo-text h1 {
+            font-size: 1.5rem;
+            margin-bottom: 0;
             color: var(--primary-dark);
-            font-size: 24px;
-            margin-bottom: 3px;
         }
 
         .logo-text p {
-            color: #666;
-            font-size: 13px;
+            font-size: 0.8rem;
+            color: var(--gray);
         }
 
-        .nav-links {
+        .nav-menu {
             display: flex;
-            gap: 30px;
             align-items: center;
+            gap: 25px;
         }
 
-        .nav-links a {
-            color: var(--dark);
-            text-decoration: none;
+        .nav-link {
             font-weight: 500;
-            font-size: 16px;
+            font-size: 15px;
+            color: var(--dark);
             transition: var(--transition);
-            padding: 8px 16px;
-            border-radius: 8px;
+            position: relative;
+            padding: 8px 0;
+            white-space: nowrap;
         }
 
-        .nav-links a:hover {
+        .nav-link:hover {
             color: var(--primary);
-            background: rgba(46, 139, 87, 0.05);
         }
 
-        .contact-btn {
+        .nav-link:after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 0;
+            height: 2px;
             background: var(--primary);
-            color: white !important;
-            padding: 10px 25px !important;
+            transition: var(--transition);
         }
 
-        .contact-btn:hover {
-            background: var(--primary-dark) !important;
+        .nav-link:hover:after {
+            width: 100%;
+        }
+
+        .nav-actions {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .phone-numbers {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+            gap: 2px;
+        }
+
+        .phone-number {
+            font-weight: 600;
+            font-size: 14px;
+            color: var(--primary-dark);
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            white-space: nowrap;
+        }
+
+        .phone-number i {
+            color: var(--primary);
+            font-size: 12px;
+        }
+
+        .mobile-menu-btn {
+            display: none;
+            background: none;
+            border: none;
+            font-size: 1.5rem;
+            color: var(--dark);
+            cursor: pointer;
+        }
+
+        /* Auth Gateway Modal - SIMPLIFIED */
+        .auth-modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            z-index: 2000;
+            align-items: center;
+            justify-content: center;
+            animation: fadeIn 0.3s ease;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        .auth-content {
+            background: white;
+            border-radius: var(--border-radius);
+            padding: 40px;
+            max-width: 500px;
+            width: 90%;
+            max-height: 90vh;
+            overflow-y: auto;
+            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.3);
+            animation: slideUp 0.4s ease;
+            position: relative;
+        }
+
+        @keyframes slideUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .close-auth {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: none;
+            border: none;
+            font-size: 28px;
+            color: #666;
+            cursor: pointer;
+            transition: var(--transition);
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .close-auth:hover {
+            background: #f8f9fa;
+            color: var(--dark);
+        }
+
+        .auth-header {
+            text-align: center;
+            margin-bottom: 40px;
+        }
+
+        .auth-header h2 {
+            color: var(--primary-dark);
+            font-size: 2rem;
+            margin-bottom: 10px;
+        }
+
+        .auth-header p {
+            color: #666;
+            font-size: 1.1rem;
+        }
+
+        /* Simple Portal Selection */
+        .portal-selection {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .portal-card {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+            padding: 25px;
+            background: #f8f9fa;
+            border-radius: var(--border-radius);
+            cursor: pointer;
+            transition: var(--transition);
+            border: 2px solid transparent;
+        }
+
+        .portal-card:hover {
+            background: white;
+            border-color: var(--primary);
+            transform: translateY(-3px);
+            box-shadow: var(--shadow);
+        }
+
+        .portal-icon {
+            font-size: 2.5rem;
+            color: var(--primary);
+            min-width: 60px;
+            text-align: center;
+        }
+
+        .portal-info h3 {
+            margin-bottom: 5px;
+            color: var(--dark);
+            font-size: 1.3rem;
+        }
+
+        .portal-info p {
+            color: var(--gray);
+            font-size: 0.95rem;
+            margin-bottom: 0;
         }
 
         /* Hero Section */
         .hero {
             position: relative;
-            height: 100vh;
+            min-height: 100vh;
             display: flex;
             align-items: center;
-            justify-content: center;
-            overflow: hidden;
-            margin-top: 80px;
-        }
-
-        .hero-background {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: linear-gradient(rgba(0, 0, 0, 0.4), rgba(0, 0, 0, 0.3)), 
+            background: linear-gradient(rgba(0, 0, 0, 0.7), rgba(0, 0, 0, 0.5)), 
                         url('https://res.cloudinary.com/dy2hxcyaf/image/upload/v1765918491/premium_photo-1661661139398-9f360bea5b48_cbnekz.avif');
             background-size: cover;
             background-position: center;
-            z-index: 1;
+            background-attachment: fixed;
+            color: white;
+            margin-top: 0;
+            padding-top: 80px;
         }
 
         .hero-content {
-            position: relative;
-            z-index: 2;
-            text-align: center;
-            color: white;
             max-width: 800px;
-            padding: 40px;
-            background: rgba(255, 255, 255, 0.1);
-            backdrop-filter: blur(10px);
-            border-radius: var(--border-radius);
-            border: 1px solid rgba(255, 255, 255, 0.2);
-            margin: 0 20px;
+            padding: 60px 0;
         }
 
-        .hero h2 {
+        .hero h1 {
             font-size: 3.5rem;
+            font-weight: 700;
             margin-bottom: 20px;
-            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+            line-height: 1.2;
         }
 
         .hero p {
-            font-size: 1.3rem;
-            margin-bottom: 30px;
-            text-shadow: 1px 1px 3px rgba(0, 0, 0, 0.3);
-            line-height: 1.6;
+            font-size: 1.25rem;
+            margin-bottom: 40px;
+            opacity: 0.9;
+            max-width: 600px;
         }
 
-        /* Cards Container */
-        .cards-container {
-            position: relative;
-            z-index: 3;
-            margin-top: -100px;
-            padding: 0 20px;
+        .hero-buttons {
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
         }
 
-        .cards-grid {
+        /* Stats Section */
+        .stats-section {
+            background: var(--light-gray);
+            padding: 80px 0;
+        }
+
+        .stats-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
-            gap: 40px;
-            max-width: 1200px;
-            margin: 0 auto;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 30px;
         }
 
-        /* Card Styles */
-        .card {
+        .stat-card {
+            text-align: center;
+            padding: 40px 20px;
             background: white;
             border-radius: var(--border-radius);
             box-shadow: var(--shadow);
-            overflow: hidden;
             transition: var(--transition);
-            height: 500px;
-            display: flex;
-            flex-direction: column;
         }
 
-        .card:hover {
+        .stat-card:hover {
             transform: translateY(-10px);
-            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15);
+            box-shadow: var(--shadow-lg);
         }
 
-        .card-header {
-            padding: 30px;
-            background: var(--primary);
-            color: white;
-            text-align: center;
-        }
-
-        .card-header h3 {
-            font-size: 28px;
-            margin-bottom: 10px;
-        }
-
-        .card-header i {
-            font-size: 40px;
-            margin-bottom: 15px;
-            color: var(--secondary);
-        }
-
-        .card-content {
-            padding: 30px;
-            flex-grow: 1;
-            overflow-y: auto;
-        }
-
-        /* FAQ Card Specific */
-        .faq-item {
-            margin-bottom: 20px;
-            border-bottom: 1px solid #EEE;
-            padding-bottom: 15px;
-        }
-
-        .faq-question {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            cursor: pointer;
-            padding: 10px 0;
-        }
-
-        .faq-question h4 {
-            font-size: 18px;
-            color: var(--dark);
-            margin: 0;
-            flex-grow: 1;
-        }
-
-        .faq-toggle {
+        .stat-icon {
+            font-size: 3rem;
             color: var(--primary);
-            font-size: 20px;
-            transition: var(--transition);
+            margin-bottom: 20px;
         }
 
-        .faq-answer {
-            padding: 10px 0;
-            color: #666;
-            line-height: 1.6;
-            font-size: 15px;
-            display: none;
-        }
-
-        .faq-item.active .faq-answer {
+        .stat-number {
+            font-size: 3rem;
+            font-weight: 700;
+            color: var(--primary-dark);
+            margin-bottom: 10px;
             display: block;
         }
 
-        .faq-item.active .faq-toggle {
-            transform: rotate(45deg);
+        .stat-label {
+            font-size: 1.1rem;
+            color: var(--gray);
+            font-weight: 500;
         }
 
-        /* Enroll Card Specific */
-        .enroll-card .card-content {
-            display: flex;
-            flex-direction: column;
-            justify-content: flex-start;
-            align-items: center;
+        /* Features Section */
+        .features-section {
+            padding: 100px 0;
+        }
+
+        .features-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 40px;
+        }
+
+        .feature-card {
             text-align: center;
-            padding: 40px 30px;
-        }
-
-        .enroll-icon {
-            font-size: 80px;
-            color: var(--primary);
-            margin-bottom: 30px;
-        }
-
-        .enroll-features {
-            text-align: left;
-            margin: 30px 0;
-            width: 100%;
-        }
-
-        .feature {
-            display: flex;
-            align-items: center;
-            gap: 15px;
-            margin-bottom: 15px;
-            padding: 12px;
-            background: #F8F9FA;
-            border-radius: 8px;
-        }
-
-        .feature i {
-            color: var(--success);
-            font-size: 20px;
-        }
-
-        /* Buttons */
-        .btn {
-            padding: 16px 40px;
-            border: none;
-            border-radius: 50px;
-            font-size: 18px;
-            font-weight: 600;
-            cursor: pointer;
+            padding: 50px 30px;
+            border-radius: var(--border-radius);
+            background: white;
+            box-shadow: var(--shadow);
             transition: var(--transition);
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            gap: 12px;
-            text-decoration: none;
+            border-top: 4px solid transparent;
         }
 
-        .btn-primary {
+        .feature-card:hover {
+            transform: translateY(-10px);
+            border-top-color: var(--primary);
+            box-shadow: var(--shadow-lg);
+        }
+
+        .feature-icon {
+            font-size: 3.5rem;
+            color: var(--primary);
+            margin-bottom: 25px;
+            display: inline-block;
+        }
+
+        .feature-card h3 {
+            font-size: 1.5rem;
+            margin-bottom: 15px;
+            color: var(--dark);
+        }
+
+        .feature-card p {
+            color: var(--gray);
+            font-size: 1rem;
+        }
+
+        /* Programs Section */
+        .programs-section {
+            background: var(--light-gray);
+            padding: 100px 0;
+        }
+
+        .programs-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 30px;
+        }
+
+        .program-card {
+            background: white;
+            border-radius: var(--border-radius);
+            overflow: hidden;
+            box-shadow: var(--shadow);
+            transition: var(--transition);
+        }
+
+        .program-card:hover {
+            transform: translateY(-10px);
+            box-shadow: var(--shadow-lg);
+        }
+
+        .program-header {
             background: var(--primary);
             color: white;
-            box-shadow: 0 4px 15px rgba(46, 139, 87, 0.3);
+            padding: 25px;
+            text-align: center;
         }
 
-        .btn-primary:hover {
-            background: var(--primary-dark);
-            transform: translateY(-3px);
-            box-shadow: 0 6px 20px rgba(46, 139, 87, 0.4);
+        .program-header i {
+            font-size: 2.5rem;
+            margin-bottom: 15px;
+            display: block;
         }
 
-        .btn-large {
-            padding: 20px 50px;
-            font-size: 20px;
-            margin-top: 20px;
-            width: 100%;
-            max-width: 300px;
+        .program-header h3 {
+            font-size: 1.5rem;
+            margin-bottom: 0;
+        }
+
+        .program-body {
+            padding: 30px;
+        }
+
+        .program-body p {
+            color: var(--gray);
+            margin-bottom: 20px;
+        }
+
+        .program-features {
+            list-style: none;
+            margin-bottom: 25px;
+        }
+
+        .program-features li {
+            padding: 8px 0;
+            color: var(--dark);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .program-features li i {
+            color: var(--primary);
         }
 
         /* About Section */
         .about-section {
-            padding: 100px 40px;
+            padding: 100px 0;
             background: white;
         }
 
         .about-content {
-            max-width: 1200px;
-            margin: 0 auto;
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
             gap: 60px;
@@ -348,60 +598,51 @@
         }
 
         .about-text p {
-            font-size: 1.1rem;
-            line-height: 1.8;
-            color: #666;
             margin-bottom: 20px;
+            color: var(--gray);
+            font-size: 1.1rem;
         }
 
-        .stats {
+        .about-stats {
             display: grid;
             grid-template-columns: repeat(3, 1fr);
             gap: 20px;
             margin-top: 40px;
         }
 
-        .stat-item {
+        .about-stat {
             text-align: center;
             padding: 20px;
-            background: #F8F9FA;
-            border-radius: 12px;
+            background: var(--light-gray);
+            border-radius: var(--border-radius);
         }
 
-        .stat-number {
+        .about-stat .number {
             font-size: 2.5rem;
             font-weight: 700;
             color: var(--primary);
+            display: block;
             margin-bottom: 5px;
         }
 
-        .stat-label {
-            color: #666;
+        .about-stat .label {
+            color: var(--gray);
             font-size: 0.9rem;
         }
 
-        /* Programs Section */
-        .programs-section {
-            padding: 100px 40px;
-            background: linear-gradient(135deg, #f0f7ff 0%, #e6f2ff 100%);
+        /* All Programs Section */
+        .all-programs-section {
+            padding: 100px 0;
+            background: white;
         }
 
-        .programs-section h2 {
-            text-align: center;
-            font-size: 2.8rem;
-            color: var(--primary-dark);
-            margin-bottom: 50px;
-        }
-
-        .programs-grid {
+        .all-programs-grid {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
             gap: 30px;
-            max-width: 1200px;
-            margin: 0 auto;
         }
 
-        .program-card {
+        .all-program-card {
             background: white;
             border-radius: var(--border-radius);
             padding: 40px 30px;
@@ -411,43 +652,34 @@
             border: 2px solid transparent;
         }
 
-        .program-card:hover {
+        .all-program-card:hover {
             transform: translateY(-10px);
             border-color: var(--primary);
-            box-shadow: 0 20px 40px rgba(46, 139, 87, 0.15);
+            box-shadow: var(--shadow-lg);
         }
 
-        .program-card i {
+        .all-program-card i {
             font-size: 50px;
             color: var(--primary);
             margin-bottom: 20px;
         }
 
-        .program-card h3 {
+        .all-program-card h3 {
             font-size: 1.5rem;
             color: var(--dark);
             margin-bottom: 15px;
         }
 
-        .program-card p {
-            color: #666;
+        .all-program-card p {
+            color: var(--gray);
             line-height: 1.6;
             font-size: 1rem;
         }
 
         /* Testimonials Section */
         .testimonials-section {
-            padding: 100px 40px;
-            background: white;
-            position: relative;
-            overflow: hidden;
-        }
-
-        .testimonials-section h2 {
-            text-align: center;
-            font-size: 2.8rem;
-            color: var(--primary-dark);
-            margin-bottom: 50px;
+            padding: 100px 0;
+            background: var(--light-gray);
         }
 
         .testimonials-container {
@@ -470,10 +702,11 @@
 
         .testimonial-card {
             min-width: 350px;
-            background: #F8F9FA;
+            background: white;
             border-radius: var(--border-radius);
             padding: 30px;
             box-shadow: var(--shadow);
+            transition: var(--transition);
             border-left: 5px solid var(--primary);
         }
 
@@ -514,59 +747,186 @@
             font-size: 0.9rem;
         }
 
-        /* Footer */
-        .footer {
-            background: var(--primary-dark);
-            color: white;
-            padding: 60px 40px 30px;
+        /* FAQ Section */
+        .faq-section {
+            padding: 100px 0;
+            background: white;
         }
 
-        .footer-content {
-            max-width: 1200px;
-            margin: 0 auto;
+        .faq-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
             gap: 40px;
         }
 
-        .footer-section h3 {
-            font-size: 20px;
-            margin-bottom: 25px;
-            color: var(--secondary);
+        .faq-accordion {
+            flex: 1;
         }
 
-        .footer-section p, .footer-section a {
-            color: rgba(255, 255, 255, 0.8);
+        .faq-item {
+            background: var(--light-gray);
+            border-radius: var(--border-radius);
             margin-bottom: 15px;
-            display: block;
-            text-decoration: none;
+            overflow: hidden;
+        }
+
+        .faq-question {
+            padding: 20px 25px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            cursor: pointer;
+            font-weight: 600;
+            color: var(--dark);
+            background: white;
+            border-left: 4px solid transparent;
             transition: var(--transition);
         }
 
-        .footer-section a:hover {
-            color: white;
-            padding-left: 5px;
+        .faq-question:hover {
+            border-left-color: var(--primary);
         }
 
-        .contact-info {
+        .faq-question.active {
+            border-left-color: var(--primary);
+            background: var(--light);
+        }
+
+        .faq-toggle {
+            font-size: 1.2rem;
+            color: var(--primary);
+            transition: var(--transition);
+        }
+
+        .faq-answer {
+            padding: 0 25px;
+            max-height: 0;
+            overflow: hidden;
+            transition: var(--transition);
+        }
+
+        .faq-answer.active {
+            padding: 20px 25px;
+            max-height: 500px;
+        }
+
+        .enroll-card {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+            color: white;
+            padding: 40px;
+            border-radius: var(--border-radius);
+            box-shadow: var(--shadow-lg);
+        }
+
+        .enroll-card h3 {
+            color: white;
+            margin-bottom: 20px;
+            font-size: 1.8rem;
+        }
+
+        .enroll-card p {
+            margin-bottom: 30px;
+            opacity: 0.9;
+        }
+
+        .enroll-features {
+            margin-bottom: 30px;
+        }
+
+        .enroll-feature {
             display: flex;
             align-items: center;
             gap: 15px;
             margin-bottom: 15px;
         }
 
-        .contact-info i {
+        .enroll-feature i {
             color: var(--secondary);
-            font-size: 18px;
+        }
+
+        /* Footer */
+        .footer {
+            background: var(--dark);
+            color: white;
+            padding: 80px 0 30px;
+        }
+
+        .footer-content {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 40px;
+            margin-bottom: 50px;
+        }
+
+        .footer-column h3 {
+            color: white;
+            margin-bottom: 25px;
+            font-size: 1.3rem;
+            position: relative;
+            padding-bottom: 10px;
+        }
+
+        .footer-column h3:after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 40px;
+            height: 2px;
+            background: var(--primary);
+        }
+
+        .footer-column p, .footer-column a {
+            color: rgba(255, 255, 255, 0.7);
+            margin-bottom: 15px;
+            display: block;
+            transition: var(--transition);
+        }
+
+        .footer-column a:hover {
+            color: white;
+            padding-left: 5px;
+        }
+
+        .footer-contact-info {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            margin-bottom: 15px;
+        }
+
+        .footer-contact-info i {
+            color: var(--primary);
+        }
+
+        .social-links {
+            display: flex;
+            gap: 15px;
+            margin-top: 20px;
+        }
+
+        .social-link {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.1);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: var(--transition);
+        }
+
+        .social-link:hover {
+            background: var(--primary);
+            transform: translateY(-3px);
         }
 
         .copyright {
             text-align: center;
             padding-top: 30px;
-            margin-top: 30px;
             border-top: 1px solid rgba(255, 255, 255, 0.1);
-            color: rgba(255, 255, 255, 0.6);
-            font-size: 14px;
+            color: rgba(255, 255, 255, 0.5);
+            font-size: 0.9rem;
         }
 
         /* Floating WhatsApp Button */
@@ -574,48 +934,28 @@
             position: fixed;
             bottom: 30px;
             right: 30px;
-            background: #25D366;
-            color: white;
             width: 60px;
             height: 60px;
+            background: #25D366;
+            color: white;
             border-radius: 50%;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 30px;
-            box-shadow: 0 4px 20px rgba(37, 211, 102, 0.3);
-            z-index: 1000;
+            font-size: 1.8rem;
+            box-shadow: 0 4px 15px rgba(37, 211, 102, 0.3);
+            z-index: 999;
             transition: var(--transition);
-            text-decoration: none;
         }
 
         .whatsapp-float:hover {
             transform: scale(1.1);
-            box-shadow: 0 6px 25px rgba(37, 211, 102, 0.4);
-        }
-
-        .whatsapp-float .tooltip {
-            position: absolute;
-            right: 70px;
-            background: var(--dark);
-            color: white;
-            padding: 8px 15px;
-            border-radius: 20px;
-            font-size: 14px;
-            opacity: 0;
-            pointer-events: none;
-            transition: var(--transition);
-            white-space: nowrap;
-        }
-
-        .whatsapp-float:hover .tooltip {
-            opacity: 1;
-            right: 75px;
+            box-shadow: 0 6px 20px rgba(37, 211, 102, 0.4);
         }
 
         /* Responsive Design */
         @media (max-width: 992px) {
-            .hero h2 {
+            .hero h1 {
                 font-size: 2.8rem;
             }
             
@@ -623,77 +963,84 @@
                 font-size: 1.1rem;
             }
             
-            .cards-grid {
-                grid-template-columns: 1fr;
-                max-width: 500px;
+            .nav-menu {
+                display: none;
+                position: fixed;
+                top: 80px;
+                left: 0;
+                width: 100%;
+                background: white;
+                flex-direction: column;
+                padding: 20px;
+                box-shadow: 0 10px 30px rgba(0,0,0,0.1);
             }
             
-            .nav-links {
-                display: none;
+            .nav-menu.active {
+                display: flex;
             }
             
             .mobile-menu-btn {
                 display: block;
             }
-
-            .testimonials-track {
-                animation: scrollTestimonials 40s linear infinite;
+            
+            .hero-buttons {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+            
+            .section-padding {
+                padding: 70px 0;
+            }
+            
+            .section-title h2 {
+                font-size: 2rem;
             }
 
-            .programs-grid {
-                grid-template-columns: repeat(2, 1fr);
+            .phone-numbers {
+                display: none;
+            }
+
+            .portal-selection {
+                gap: 10px;
+            }
+
+            .portal-card {
+                padding: 20px;
             }
         }
 
         @media (max-width: 768px) {
-            .hero h2 {
+            .hero h1 {
                 font-size: 2.2rem;
             }
             
-            .hero-content {
-                padding: 30px 20px;
+            .hero p {
+                font-size: 1rem;
             }
             
-            .card {
-                height: auto;
-                min-height: 450px;
-            }
-            
-            .about-section,
-            .programs-section,
-            .testimonials-section {
-                padding: 60px 20px;
-            }
-            
-            .stats,
-            .programs-grid {
+            .about-stats {
                 grid-template-columns: 1fr;
             }
-
-            .testimonial-card {
-                min-width: 300px;
+            
+            .features-grid,
+            .programs-grid,
+            .all-programs-grid {
+                grid-template-columns: 1fr;
             }
-
-            .whatsapp-float {
-                width: 50px;
-                height: 50px;
-                font-size: 25px;
-                bottom: 20px;
-                right: 20px;
+            
+            .faq-grid {
+                grid-template-columns: 1fr;
             }
         }
 
-        /* Mobile Menu Button */
-        .mobile-menu-btn {
-            display: none;
-            background: none;
-            border: none;
-            color: var(--dark);
-            font-size: 24px;
-            cursor: pointer;
+        @media (min-width: 993px) {
+            .nav-actions {
+                min-width: 180px;
+                justify-content: flex-end;
+            }
         }
 
-        /* Animation */
+        /* Animations */
         @keyframes fadeInUp {
             from {
                 opacity: 0;
@@ -709,267 +1056,202 @@
             animation: fadeInUp 0.6s ease forwards;
         }
 
-        .delay-1 { animation-delay: 0.2s; opacity: 0; }
-        .delay-2 { animation-delay: 0.4s; opacity: 0; }
+        .delay-1 { animation-delay: 0.2s; }
+        .delay-2 { animation-delay: 0.4s; }
+        .delay-3 { animation-delay: 0.6s; }
+
+        /* Smooth scrolling */
+        html {
+            scroll-behavior: smooth;
+        }
     </style>
 </head>
 <body>
+    <!-- Auth Gateway Modal -->
+    <div class="auth-modal" id="authModal">
+        <div class="auth-content">
+            <button class="close-auth" id="closeAuth">&times;</button>
+            
+            <div class="auth-header">
+                <h2>Portal Access</h2>
+                <p>Select your portal to continue</p>
+            </div>
+
+            <!-- Simple Portal Selection -->
+            <div class="portal-selection">
+                <div class="portal-card" onclick="window.open('https://bkh.netlify.app/parent.html#', '_blank')">
+                    <div class="portal-icon">
+                        <i class="fas fa-user-friends"></i>
+                    </div>
+                    <div class="portal-info">
+                        <h3>Parent Portal</h3>
+                        <p>Access your child's progress, schedules, and reports</p>
+                    </div>
+                </div>
+                
+                <div class="portal-card" onclick="window.open('https://bkh.netlify.app/tutor-auth.html', '_blank')">
+                    <div class="portal-icon">
+                        <i class="fas fa-chalkboard-teacher"></i>
+                    </div>
+                    <div class="portal-info">
+                        <h3>Tutor Portal</h3>
+                        <p>Teaching materials, student progress, and schedules</p>
+                    </div>
+                </div>
+                
+                <div class="portal-card" onclick="window.open('https://bkh.netlify.app/management-auth.html#', '_blank')">
+                    <div class="portal-icon">
+                        <i class="fas fa-cogs"></i>
+                    </div>
+                    <div class="portal-info">
+                        <h3>Management Portal</h3>
+                        <p>Administrative access and system management</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Floating WhatsApp Button -->
     <a href="https://wa.me/2347078961070" class="whatsapp-float" target="_blank">
         <i class="fab fa-whatsapp"></i>
-        <span class="tooltip">Chat with us</span>
     </a>
 
-    <!-- Header & Navigation -->
-    <header class="header">
-        <div class="logo-container">
-            <img src="https://res.cloudinary.com/dy2hxcyaf/image/upload/v1757700806/newbhlogo_umwqzy.svg" 
-                 alt="Blooming Kids House Logo" 
-                 class="logo-img">
-            <div class="logo-text">
-                <h1>Blooming Kids House</h1>
-                <p>Nurturing Young Minds for Excellence</p>
+    <!-- Header -->
+    <header class="header" id="header">
+        <div class="container header-container">
+            <div class="logo">
+                <img src="https://res.cloudinary.com/dy2hxcyaf/image/upload/v1757700806/newbhlogo_umwqzy.svg" 
+                     alt="Blooming Kids House" 
+                     class="logo-img">
+                <div class="logo-text">
+                    <h1>Blooming Kids House</h1>
+                    <p>Nurturing Young Minds for Excellence</p>
+                </div>
             </div>
+            
+            <nav class="nav-menu">
+                <a href="#home" class="nav-link">Home</a>
+                <a href="#about" class="nav-link">About Us</a>
+                <a href="#programs" class="nav-link">Programs</a>
+                <a href="#all-programs" class="nav-link">All Courses</a>
+                <a href="#testimonials" class="nav-link">Testimonials</a>
+                <a href="#faq" class="nav-link">FAQ</a>
+                <div class="nav-actions">
+                    <div class="phone-numbers">
+                        <div class="phone-number">
+                            <i class="fas fa-phone"></i> 0707 896 1070
+                        </div>
+                        <div class="phone-number">
+                            <i class="fas fa-phone"></i> 0902 914 7024
+                        </div>
+                    </div>
+                    <a href="#" class="btn btn-secondary" id="openAuth">
+                        <i class="fas fa-sign-in-alt"></i> Sign In
+                    </a>
+                </div>
+            </nav>
+            
+            <button class="mobile-menu-btn" id="mobileMenuBtn">
+                <i class="fas fa-bars"></i>
+            </button>
         </div>
-        
-        <nav class="nav-links">
-            <a href="#home">Home</a>
-            <a href="#about">About Us</a>
-            <a href="#programs">Programs</a>
-            <a href="#testimonials">Testimonials</a>
-            <a href="tel:07078961070" class="contact-btn">
-                <i class="fas fa-phone"></i> 0707 896 1070, 0902 914 7024
-            </a>
-        </nav>
-        
-        <button class="mobile-menu-btn">
-            <i class="fas fa-bars"></i>
-        </button>
     </header>
 
     <!-- Hero Section -->
     <section class="hero" id="home">
-        <div class="hero-background"></div>
-        <div class="hero-content animate-up">
-            <h2>Unlock Your Child's Full Potential</h2>
-            <p>At Blooming Kids House, we provide personalized tutoring that nurtures academic excellence and builds confidence for students from Preschool to Grade 12.</p>
+        <div class="container">
+            <div class="hero-content">
+                <h1 class="animate-up">Unlock Your Child's Full Potential</h1>
+                <p class="animate-up delay-1">At Blooming Kids House, we provide personalized tutoring that nurtures academic excellence and builds confidence for students from Preschool to Grade 12.</p>
+                <div class="hero-buttons animate-up delay-2">
+                    <a href="https://bkh.netlify.app/enrollment-portal.html" class="btn btn-primary btn-large" target="_blank">
+                        <i class="fas fa-user-plus"></i> Enroll Now
+                    </a>
+                </div>
+            </div>
         </div>
     </section>
 
-    <!-- Cards Section -->
-    <div class="cards-container">
-        <div class="cards-grid">
-            <!-- FAQ Card -->
-            <div class="card faq-card animate-up delay-1">
-                <div class="card-header">
-                    <i class="fas fa-question-circle"></i>
-                    <h3>Frequently Asked Questions</h3>
-                    <p>Find answers to common questions</p>
+    <!-- Stats Section -->
+    <section class="stats-section">
+        <div class="container">
+            <div class="stats-grid">
+                <div class="stat-card animate-up">
+                    <div class="stat-icon">
+                        <i class="fas fa-graduation-cap"></i>
+                    </div>
+                    <span class="stat-number" data-count="1700">0</span>
+                    <span class="stat-label">Students Transformed</span>
                 </div>
-                <div class="card-content">
-                    <div class="faq-item active">
-                        <div class="faq-question">
-                            <h4>What grades do you tutor?</h4>
-                            <span class="faq-toggle">+</span>
-                        </div>
-                        <div class="faq-answer">
-                            We tutor students from Preschool all the way through Grade 12, covering all major subjects in the curriculum.
-                        </div>
+                <div class="stat-card animate-up delay-1">
+                    <div class="stat-icon">
+                        <i class="fas fa-chalkboard-teacher"></i>
                     </div>
-                    
-                    <div class="faq-item">
-                        <div class="faq-question">
-                            <h4>How are sessions scheduled?</h4>
-                            <span class="faq-toggle">+</span>
-                        </div>
-                        <div class="faq-answer">
-                            You can choose from three schedules: Twice weekly (2 sessions), Thrice weekly (3 sessions), or Daily (5 sessions). Sessions are 1 hour each.
-                        </div>
-                    </div>
-                    
-                    <div class="faq-item">
-                        <div class="faq-question">
-                            <h4>What is included in the tuition fee?</h4>
-                            <span class="faq-toggle">+</span>
-                        </div>
-                        <div class="faq-answer">
-                            The base fee includes 2 subjects. Additional subjects can be added at ₦40,000 each per month. All learning materials are provided.
-                        </div>
-                    </div>
-
-                    <div class="faq-item">
-    <div class="faq-question">
-        <h4>Are the classes one-to-one?</h4>
-        <span class="faq-toggle">+</span>
-    </div>
-    <div class="faq-answer">
-        Yes. All our classes are 100% one-to-one, tailored to your child's learning needs.
-    </div>
-</div>
-
-<div class="faq-item">
-    <div class="faq-question">
-        <h4>Which platform do you use for lessons?</h4>
-        <span class="faq-toggle">+</span>
-    </div>
-    <div class="faq-answer">
-        Live classes are held on Zoom. Homework and class activities are managed via Google Classroom.
-    </div>
-</div>
-
-<div class="faq-item">
-    <div class="faq-question">
-        <h4>How do parents track progress?</h4>
-        <span class="faq-toggle">+</span>
-    </div>
-    <div class="faq-answer">
-        Parents have access to a Parent Portal, where you receive monthly feedback and detailed learning reports.
-    </div>
-</div>
-
-<div class="faq-item">
-    <div class="faq-question">
-        <h4>How is payment done?</h4>
-        <span class="faq-toggle">+</span>
-    </div>
-    <div class="faq-answer">
-        Payments are made in Naira. Fees depend on your child's grade level and number of classes per week.
-    </div>
-</div>
-
-<div class="faq-item">
-    <div class="faq-question">
-        <h4>Are your tutors experienced and professional?</h4>
-        <span class="faq-toggle">+</span>
-    </div>
-    <div class="faq-answer">
-        Yes. All our tutors are experienced, trained, and professional educators, carefully vetted to deliver quality learning.
-    </div>
-</div>
-                    
-                    <div class="faq-item">
-                        <div class="faq-question">
-                            <h4>Do you offer sibling discounts?</h4>
-                            <span class="faq-toggle">+</span>
-                        </div>
-                        <div class="faq-answer">
-                            Yes. We offer a flat discount of ₦10,000 for families enrolling more than one student. This discount is applied once per family, making our programs more affordable for siblings.
-                        </div>
-                    </div>
-                    
-                    <div class="faq-item">
-                        <div class="faq-question">
-                            <h4>Can my child start mid-month?</h4>
-                            <span class="faq-toggle">+</span>
-                        </div>
-                        <div class="faq-answer">
-                            Absolutely! We prorate fees based on the start date, so you only pay for the sessions your child will attend.
-                        </div>
-                    </div>
+                    <span class="stat-number" data-count="189">0</span>
+                    <span class="stat-label">Expert Tutors</span>
                 </div>
-            </div>
-
-            <!-- Enroll Now Card - UPDATED -->
-            <div class="card enroll-card animate-up delay-2">
-                <div class="card-header">
-                    <i class="fas fa-graduation-cap"></i>
-                    <h3>Enroll Your Child Today</h3>
-                    <p>Secure their spot for academic success</p>
-                </div>
-                <div class="card-content">
-                    <!-- Enroll Now Button at the top -->
-                    <a href="https://bkh.netlify.app/enrollment-portal.html" class="btn btn-primary btn-large" target="_blank" rel="noopener noreferrer" style="margin-bottom: 30px;">
-                        <i class="fas fa-user-plus"></i> Enroll Now
-                    </a>
-                    
-                    <p style="font-size: 18px; margin-bottom: 30px; color: #555;">
-                        Join over 1500+ students who have transformed their academic journey with our personalized tutoring approach.
-                    </p>
-                    
-                    <div class="enroll-features">
-                        <div class="feature">
-                            <i class="fas fa-check-circle"></i>
-                            <span>Personalized learning plans</span>
-                        </div>
-                        <div class="feature">
-                            <i class="fas fa-check-circle"></i>
-                            <span>Qualified & experienced tutors</span>
-                        </div>
-                        <div class="feature">
-                            <i class="fas fa-check-circle"></i>
-                            <span>Monthly progress reports</span>
-                        </div>
-                        <div class="feature">
-                            <i class="fas fa-check-circle"></i>
-                            <span>Flexible scheduling</span>
-                        </div>
-                        <div class="feature">
-                            <i class="fas fa-check-circle"></i>
-                            <span>Parent portal access</span>
-                        </div>
+                <div class="stat-card animate-up delay-2">
+                    <div class="stat-icon">
+                        <i class="fas fa-star"></i>
                     </div>
-                    
-                    <p style="margin-top: 20px; font-size: 14px; color: #777;">
-                        <i class="fas fa-lock"></i> Secure enrollment process
-                    </p>
+                    <span class="stat-number" data-count="98">0</span>
+                    <span class="stat-label">Satisfaction Rate</span>
                 </div>
             </div>
         </div>
-    </div>
+    </section>
 
-    <!-- About Section -->
-    <section class="about-section" id="about">
-        <div class="about-content">
-            <div class="about-text">
+    <!-- Features Section -->
+    <section class="features-section">
+        <div class="container">
+            <div class="section-title">
                 <h2>Why Choose Blooming Kids House?</h2>
-                <p>For over 5 years, we've been dedicated to providing exceptional tutoring that goes beyond just improving grades. We build confident learners who excel academically and develop a lifelong love for learning.</p>
-                <p>Our tailored approach ensures each student receives individual attention based on their unique learning style and pace.</p>
-                
-                <div class="stats">
-                    <div class="stat-item">
-                        <div class="stat-number">98%</div>
-                        <div class="stat-label">Student Satisfaction</div>
-                    </div>
-                    <div class="stat-item">
-                        <div class="stat-number">1700+</div>
-                        <div class="stat-label">Students Transformed</div>
-                    </div>
-                    <div class="stat-item">
-                        <div class="stat-number">189+</div>
-                        <div class="stat-label">Expert Tutors</div>
-                    </div>
-                </div>
+                <p>We combine personalized attention with proven teaching methods to ensure every student reaches their full potential.</p>
             </div>
             
-            <div class="about-image">
-                <div style="background: #F8F9FA; border-radius: var(--border-radius); padding: 40px; height: 100%; display: flex; flex-direction: column; justify-content: center;">
-                    <h3 style="color: var(--primary-dark); margin-bottom: 20px; font-size: 24px;">Our Commitment</h3>
-                    <div style="margin-bottom: 25px;">
-                        <div style="display: flex; align-items: center; gap: 15px; margin-bottom: 15px;">
-                            <div style="background: var(--primary); color: white; width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center;">
-                                <i class="fas fa-star"></i>
-                            </div>
-                            <span style="font-weight: 500;">Quality Education for Every Child</span>
-                        </div>
-                        <div style="display: flex; align-items: center; gap: 15px; margin-bottom: 15px;">
-                            <div style="background: var(--primary); color: white; width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center;">
-                                <i class="fas fa-chart-line"></i>
-                            </div>
-                            <span style="font-weight: 500;">Proven Academic Results</span>
-                        </div>
-                        <div style="display: flex; align-items: center; gap: 15px; margin-bottom: 15px;">
-                            <div style="background: var(--primary); color: white; width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center;">
-                                <i class="fas fa-users"></i>
-                            </div>
-                            <span style="font-weight: 500;">Personalized Attention</span>
-                        </div>
-                        <div style="display: flex; align-items: center; gap: 15px;">
-                            <div style="background: var(--primary); color: white; width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center;">
-                                <i class="fas fa-handshake"></i>
-                            </div>
-                            <span style="font-weight: 500;">Strong Parent Partnership</span>
-                        </div>
+            <div class="features-grid">
+                <div class="feature-card animate-up">
+                    <div class="feature-icon">
+                        <i class="fas fa-user-graduate"></i>
                     </div>
+                    <h3>100% One-to-One Tutoring</h3>
+                    <p>Every session is personalized to your child's unique learning style, pace, and academic goals.</p>
+                </div>
+                <div class="feature-card animate-up delay-1">
+                    <div class="feature-icon">
+                        <i class="fas fa-chart-line"></i>
+                    </div>
+                    <h3>Proven Academic Results</h3>
+                    <p>98% of our students show significant academic improvement within the first three months.</p>
+                </div>
+                <div class="feature-card animate-up delay-2">
+                    <div class="feature-icon">
+                        <i class="fas fa-users"></i>
+                    </div>
+                    <h3>Expert Vetted Tutors</h3>
+                    <p>All tutors are experienced, trained educators carefully selected for quality teaching.</p>
+                </div>
+                <div class="feature-card animate-up">
+                    <div class="feature-icon">
+                        <i class="fas fa-laptop-house"></i>
+                    </div>
+                    <h3>Flexible Online Platform</h3>
+                    <p>Live classes on Zoom with homework managed via Google Classroom for seamless learning.</p>
+                </div>
+                <div class="feature-card animate-up delay-1">
+                    <div class="feature-icon">
+                        <i class="fas fa-file-alt"></i>
+                    </div>
+                    <h3>Monthly Progress Reports</h3>
+                    <p>Parents receive detailed feedback and learning reports through our Parent Portal.</p>
+                </div>
+                <div class="feature-card animate-up delay-2">
+                    <div class="feature-icon">
+                        <i class="fas fa-handshake"></i>
+                    </div>
+                    <h3>Sibling Discounts</h3>
+                    <p>₦10,000 flat discount for families enrolling more than one student.</p>
                 </div>
             </div>
         </div>
@@ -977,195 +1259,451 @@
 
     <!-- Programs Section -->
     <section class="programs-section" id="programs">
-        <h2>Our Academic Programs</h2>
-        <div class="programs-grid">
-            <div class="program-card">
-                <i class="fas fa-baby"></i>
-                <h3>Preschool to Grade 1</h3>
-                <p>Building strong foundations in reading, writing, and basic math skills through interactive learning.</p>
+        <div class="container">
+            <div class="section-title">
+                <h2>Our Core Academic Programs</h2>
+                <p>Structured tutoring programs designed for every educational stage and learning need.</p>
             </div>
             
-            <div class="program-card">
-                <i class="fas fa-child"></i>
-                <h3>Grade 2 to 4</h3>
-                <p>Developing core academic skills and confidence in all major subjects with personalized attention.</p>
+            <div class="programs-grid">
+                <!-- Preschool to Grade 1 -->
+                <div class="program-card animate-up">
+                    <div class="program-header">
+                        <i class="fas fa-baby"></i>
+                        <h3>Preschool to Grade 1</h3>
+                    </div>
+                    <div class="program-body">
+                        <p>Building strong foundations in reading, writing, and basic math skills through interactive learning.</p>
+                        <ul class="program-features">
+                            <li><i class="fas fa-check"></i> Phonics & Reading Development</li>
+                            <li><i class="fas fa-check"></i> Basic Math & Counting Skills</li>
+                            <li><i class="fas fa-check"></i> Writing & Motor Skills</li>
+                            <li><i class="fas fa-check"></i> Creative & Interactive Learning</li>
+                        </ul>
+                        <a href="https://bkh.netlify.app/enrollment-portal.html" class="btn btn-primary" target="_blank">
+                            <i class="fas fa-info-circle"></i> Learn More
+                        </a>
+                    </div>
+                </div>
+                
+                <!-- Grade 2 to 4 -->
+                <div class="program-card animate-up delay-1">
+                    <div class="program-header">
+                        <i class="fas fa-child"></i>
+                        <h3>Grade 2 to 4</h3>
+                    </div>
+                    <div class="program-body">
+                        <p>Developing core academic skills and confidence in all major subjects with personalized attention.</p>
+                        <ul class="program-features">
+                            <li><i class="fas fa-check"></i> Core Subject Mastery</li>
+                            <li><i class="fas fa-check"></i> Study Skills Development</li>
+                            <li><i class="fas fa-check"></i> Homework & Assignment Support</li>
+                            <li><i class="fas fa-check"></i> Confidence & Motivation Building</li>
+                        </ul>
+                        <a href="https://bkh.netlify.app/enrollment-portal.html" class="btn btn-primary" target="_blank">
+                            <i class="fas fa-info-circle"></i> Learn More
+                        </a>
+                    </div>
+                </div>
+                
+                <!-- Grade 5 to 8 -->
+                <div class="program-card animate-up delay-2">
+                    <div class="program-header">
+                        <i class="fas fa-user-graduate"></i>
+                        <h3>Grade 5 to 8</h3>
+                    </div>
+                    <div class="program-body">
+                        <p>Preparing for higher grades with comprehensive subject coverage and exam preparation techniques.</p>
+                        <ul class="program-features">
+                            <li><i class="fas fa-check"></i> Advanced Subject Tutoring</li>
+                            <li><i class="fas fa-check"></i> Exam Preparation Strategies</li>
+                            <li><i class="fas fa-check"></i> Time Management Skills</li>
+                            <li><i class="fas fa-check"></i> Critical Thinking Development</li>
+                        </ul>
+                        <a href="https://bkh.netlify.app/enrollment-portal.html" class="btn btn-primary" target="_blank">
+                            <i class="fas fa-info-circle"></i> Learn More
+                        </a>
+                    </div>
+                </div>
+                
+                <!-- Grade 9 to 12 -->
+                <div class="program-card animate-up">
+                    <div class="program-header">
+                        <i class="fas fa-graduation-cap"></i>
+                        <h3>Grade 9 to 12</h3>
+                    </div>
+                    <div class="program-body">
+                        <p>Advanced tutoring for O'Level and A'Level preparation with focus on university entrance requirements.</p>
+                        <ul class="program-features">
+                            <li><i class="fas fa-check"></i> O/A Level Exam Preparation</li>
+                            <li><i class="fas fa-check"></i> University Entrance Guidance</li>
+                            <li><i class="fas fa-check"></i> Advanced Problem Solving</li>
+                            <li><i class="fas fa-check"></i> Career Pathway Counseling</li>
+                        </ul>
+                        <a href="https://bkh.netlify.app/enrollment-portal.html" class="btn btn-primary" target="_blank">
+                            <i class="fas fa-info-circle"></i> Learn More
+                        </a>
+                    </div>
+                </div>
             </div>
-            
-            <div class="program-card">
-                <i class="fas fa-user-graduate"></i>
-                <h3>Grade 5 to 8</h3>
-                <p>Preparing for higher grades with comprehensive subject coverage and exam preparation techniques.</p>
-            </div>
-            
-            <div class="program-card">
-                <i class="fas fa-graduation-cap"></i>
-                <h3>Grade 9 to 12</h3>
-                <p>Advanced tutoring for O'Level and A'Level preparation with focus on university entrance requirements.</p>
-            </div>
-            
-            <div class="program-card">
-                <i class="fas fa-sun"></i>
-                <h3>Holiday Programs</h3>
-                <p>Special intensive courses during school breaks to catch up or get ahead in challenging subjects.</p>
-            </div>
-            
-            <div class="program-card">
-                <i class="fas fa-users"></i>
-                <h3>Group Sessions</h3>
-                <p>Small group tutoring for collaborative learning and peer support at discounted rates.</p>
-            </div>
+        </div>
+    </section>
 
-            <div class="program-card">
-                <i class="fas fa-users"></i>
-                <h3>Comic Book Design, Graphic Designing, Tech Courses</h3>
-                <p>Build creative and technical skills in a hands-on environment. Learn digital art, design principles, and tech fundamentals through guided projects and collaborative workshops.</p>
+    <!-- About Section -->
+    <section class="about-section" id="about">
+        <div class="container">
+            <div class="about-content">
+                <div class="about-text animate-up">
+                    <h2>Improving Lives Through Personalized Education</h2>
+                    <p>For over 5 years, Blooming Kids House has been dedicated to providing exceptional tutoring that goes beyond just improving grades. We build confident learners who excel academically and develop a lifelong love for learning.</p>
+                    <p>Our tailored approach ensures each student receives individual attention based on their unique learning style and pace. We believe every child has the potential to succeed when given the right support and guidance.</p>
+                    
+                    <div class="about-stats">
+                        <div class="about-stat">
+                            <span class="number">5+</span>
+                            <span class="label">Years Experience</span>
+                        </div>
+                        <div class="about-stat">
+                            <span class="number">24/7</span>
+                            <span class="label">Parent Support</span>
+                        </div>
+                        <div class="about-stat">
+                            <span class="number">100%</span>
+                            <span class="label">Personalized Sessions</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="about-image animate-up delay-1">
+                    <div class="enroll-card">
+                        <h3>Start Your Child's Success Journey Today</h3>
+                        <p>Join over 1700+ students who have transformed their academic journey with our personalized tutoring approach.</p>
+                        
+                        <div class="enroll-features">
+                            <div class="enroll-feature">
+                                <i class="fas fa-check-circle"></i>
+                                <span>Personalized learning plans for each student</span>
+                            </div>
+                            <div class="enroll-feature">
+                                <i class="fas fa-check-circle"></i>
+                                <span>Qualified & experienced tutors</span>
+                            </div>
+                            <div class="enroll-feature">
+                                <i class="fas fa-check-circle"></i>
+                                <span>Monthly progress reports and feedback</span>
+                            </div>
+                            <div class="enroll-feature">
+                                <i class="fas fa-check-circle"></i>
+                                <span>Flexible scheduling options</span>
+                            </div>
+                            <div class="enroll-feature">
+                                <i class="fas fa-check-circle"></i>
+                                <span>Parent portal access</span>
+                            </div>
+                        </div>
+                        
+                        <div style="display: flex; gap: 15px; margin-top: 30px;">
+                            <a href="https://bkh.netlify.app/enrollment-portal.html" class="btn btn-secondary" target="_blank" style="background: white; color: var(--primary);">
+                                <i class="fas fa-user-plus"></i> Enroll Now
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- All Programs Section -->
+    <section class="all-programs-section" id="all-programs">
+        <div class="container">
+            <div class="section-title">
+                <h2>Specialty & Enrichment Courses</h2>
+                <p>Explore diverse interests and develop new skills with our specialty programs</p>
             </div>
             
-            <div class="program-card">
-                <i class="fas fa-users"></i>
-                <h3>Kids Music Lessons, Foreign Language, Native Language, Bible Study, Chess Class</h3>
-                <p>Explore diverse interests in a supportive group setting. From music and languages to strategy and faith, each class encourages curiosity, confidence, and community connection.</p>
+            <div class="all-programs-grid">
+                <div class="all-program-card animate-up">
+                    <i class="fas fa-sun"></i>
+                    <h3>Holiday Programs</h3>
+                    <p>Special intensive courses during school breaks to catch up or get ahead in challenging subjects.</p>
+                </div>
+                
+                <div class="all-program-card animate-up delay-1">
+                    <i class="fas fa-users"></i>
+                    <h3>Group Sessions</h3>
+                    <p>Small group tutoring for collaborative learning and peer support at discounted rates.</p>
+                </div>
+                
+                <div class="all-program-card animate-up delay-2">
+                    <i class="fas fa-paint-brush"></i>
+                    <h3>Creative Arts</h3>
+                    <p>Comic Book Design, Graphic Designing, and Digital Art courses for creative minds.</p>
+                </div>
+                
+                <div class="all-program-card animate-up">
+                    <i class="fas fa-laptop-code"></i>
+                    <h3>Tech Courses</h3>
+                    <p>Introduction to coding, web design, and technology fundamentals for young learners.</p>
+                </div>
+                
+                <div class="all-program-card animate-up delay-1">
+                    <i class="fas fa-music"></i>
+                    <h3>Music Lessons</h3>
+                    <p>Kids music lessons to develop musical skills and appreciation from an early age.</p>
+                </div>
+                
+                <div class="all-program-card animate-up delay-2">
+                    <i class="fas fa-language"></i>
+                    <h3>Language Courses</h3>
+                    <p>Foreign language, native language, and communication skills development.</p>
+                </div>
+                
+                <div class="all-program-card animate-up">
+                    <i class="fas fa-book-bible"></i>
+                    <h3>Bible Study</h3>
+                    <p>Religious education and moral development classes for spiritual growth.</p>
+                </div>
+                
+                <div class="all-program-card animate-up delay-1">
+                    <i class="fas fa-chess"></i>
+                    <h3>Chess Class</h3>
+                    <p>Strategic thinking and problem-solving development through chess.</p>
+                </div>
             </div>
         </div>
     </section>
 
     <!-- Testimonials Section -->
     <section class="testimonials-section" id="testimonials">
-        <h2>What Parents & Students Say</h2>
-        <div class="testimonials-container">
-            <div class="testimonials-track">
-                <!-- Testimonial 1 -->
-                <div class="testimonial-card">
-                    <div class="testimonial-text">
-                        "My daughter's grades improved from C's to A's in just 3 months! The personalized attention made all the difference."
+        <div class="container">
+            <div class="section-title">
+                <h2>What Parents & Students Say</h2>
+                <p>Hear from families who have experienced the Blooming Kids House difference.</p>
+            </div>
+            
+            <div class="testimonials-container">
+                <div class="testimonials-track">
+                    <!-- Testimonial 1 -->
+                    <div class="testimonial-card">
+                        <div class="testimonial-text">
+                            "My daughter's grades improved from C's to A's in just 3 months! The personalized attention made all the difference. The tutors are exceptional and truly care about student success."
+                        </div>
+                        <div class="testimonial-author">
+                            <div class="author-avatar">M</div>
+                            <div class="author-info">
+                                <h4>Mrs. Adeola Johnson</h4>
+                                <p>Parent of Grade 5 Student</p>
+                            </div>
+                        </div>
                     </div>
-                    <div class="testimonial-author">
-                        <div class="author-avatar">M</div>
-                        <div class="author-info">
-                            <h4>Mrs. Adeola Johnson</h4>
-                            <p>Parent of Grade 5 Student</p>
+                    
+                    <!-- Testimonial 2 -->
+                    <div class="testimonial-card">
+                        <div class="testimonial-text">
+                            "The tutors are exceptional! They not only teach the subjects but also build my son's confidence. Worth every kobo! After trying 3 different tutors, we finally found Blooming Kids House."
+                        </div>
+                        <div class="testimonial-author">
+                            <div class="author-avatar">D</div>
+                            <div class="author-info">
+                                <h4>Mr. David Okon</h4>
+                                <p>Parent of Grade 8 Student</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Testimonial 3 -->
+                    <div class="testimonial-card">
+                        <div class="testimonial-text">
+                            "Their structured approach and monthly reports keep us informed. The sibling discount made it affordable for both my children. Now they study together and motivate each other!"
+                        </div>
+                        <div class="testimonial-author">
+                            <div class="author-avatar">F</div>
+                            <div class="author-info">
+                                <h4>Mr. Femi Adeyemi</h4>
+                                <p>Parent of Grade 6 & 9 Students</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Testimonial 4 -->
+                    <div class="testimonial-card">
+                        <div class="testimonial-text">
+                            "My child was struggling with math, but after joining Blooming Kids House, he now loves it and helps his classmates! The one-to-one sessions made all the difference."
+                        </div>
+                        <div class="testimonial-author">
+                            <div class="author-avatar">B</div>
+                            <div class="author-info">
+                                <h4>Mrs. Bola Ahmed</h4>
+                                <p>Parent of Grade 4 Student</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Testimonial 5 -->
+                    <div class="testimonial-card">
+                        <div class="testimonial-text">
+                            "The Parent Portal is fantastic! I can track my child's progress anytime. The monthly reports are detailed and help me understand exactly where my child needs support."
+                        </div>
+                        <div class="testimonial-author">
+                            <div class="author-avatar">C</div>
+                            <div class="author-info">
+                                <h4>Mrs. Chidinma Eze</h4>
+                                <p>Parent of Grade 3 Student</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Duplicate testimonials for seamless scrolling -->
+                    <div class="testimonial-card">
+                        <div class="testimonial-text">
+                            "My daughter's grades improved from C's to A's in just 3 months! The personalized attention made all the difference. The tutors are exceptional and truly care about student success."
+                        </div>
+                        <div class="testimonial-author">
+                            <div class="author-avatar">M</div>
+                            <div class="author-info">
+                                <h4>Mrs. Adeola Johnson</h4>
+                                <p>Parent of Grade 5 Student</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- FAQ Section -->
+    <section class="faq-section" id="faq">
+        <div class="container">
+            <div class="section-title">
+                <h2>Frequently Asked Questions</h2>
+                <p>Find answers to common questions about our tutoring programs and services.</p>
+            </div>
+            
+            <div class="faq-grid">
+                <div class="faq-accordion">
+                    <div class="faq-item animate-up">
+                        <div class="faq-question">
+                            <span>What grades do you tutor?</span>
+                            <span class="faq-toggle">+</span>
+                        </div>
+                        <div class="faq-answer">
+                            We tutor students from Preschool all the way through Grade 12, covering all major subjects in the curriculum including Math, English, Sciences, and more.
+                        </div>
+                    </div>
+                    
+                    <div class="faq-item animate-up delay-1">
+                        <div class="faq-question">
+                            <span>How are sessions scheduled?</span>
+                            <span class="faq-toggle">+</span>
+                        </div>
+                        <div class="faq-answer">
+                            You can choose from three schedules: Twice weekly (2 sessions), Thrice weekly (3 sessions), or Daily (5 sessions). Sessions are 1 hour each and scheduled at times convenient for you.
+                        </div>
+                    </div>
+                    
+                    <div class="faq-item animate-up delay-2">
+                        <div class="faq-question">
+                            <span>What is included in the tuition fee?</span>
+                            <span class="faq-toggle">+</span>
+                        </div>
+                        <div class="faq-answer">
+                            The base fee includes 2 subjects. Additional subjects can be added at ₦40,000 each per month. All learning materials are provided. Fees are prorated based on start date.
+                        </div>
+                    </div>
+                    
+                    <div class="faq-item animate-up">
+                        <div class="faq-question">
+                            <span>Are the classes one-to-one?</span>
+                            <span class="faq-toggle">+</span>
+                        </div>
+                        <div class="faq-answer">
+                            Yes. All our classes are 100% one-to-one, tailored to your child's learning needs. Each student receives personalized attention from their dedicated tutor.
+                        </div>
+                    </div>
+                    
+                    <div class="faq-item animate-up delay-1">
+                        <div class="faq-question">
+                            <span>Which platform do you use for lessons?</span>
+                            <span class="faq-toggle">+</span>
+                        </div>
+                        <div class="faq-answer">
+                            Live classes are held on Zoom. Homework and class activities are managed via Google Classroom. Both platforms are easy to use and accessible on any device.
+                        </div>
+                    </div>
+                    
+                    <div class="faq-item animate-up delay-2">
+                        <div class="faq-question">
+                            <span>How do parents track progress?</span>
+                            <span class="faq-toggle">+</span>
+                        </div>
+                        <div class="faq-answer">
+                            Parents have access to a Parent Portal, where you receive monthly feedback and detailed learning reports. You can also communicate directly with your child's tutor.
+                        </div>
+                    </div>
+                    
+                    <div class="faq-item animate-up">
+                        <div class="faq-question">
+                            <span>How is payment done?</span>
+                            <span class="faq-toggle">+</span>
+                        </div>
+                        <div class="faq-answer">
+                            Payments are made in Naira. Fees depend on your child's grade level and number of classes per week. We accept bank transfers and provide payment receipts.
+                        </div>
+                    </div>
+                    
+                    <div class="faq-item animate-up delay-1">
+                        <div class="faq-question">
+                            <span>Are your tutors experienced and professional?</span>
+                            <span class="faq-toggle">+</span>
+                        </div>
+                        <div class="faq-answer">
+                            Yes. All our tutors are experienced, trained, and professional educators, carefully vetted to deliver quality learning. They undergo continuous training and assessment.
+                        </div>
+                    </div>
+                    
+                    <div class="faq-item animate-up delay-2">
+                        <div class="faq-question">
+                            <span>Do you offer sibling discounts?</span>
+                            <span class="faq-toggle">+</span>
+                        </div>
+                        <div class="faq-answer">
+                            Yes. We offer a flat discount of ₦10,000 for families enrolling more than one student. This discount is applied once per family, making our programs more affordable for siblings.
+                        </div>
+                    </div>
+                    
+                    <div class="faq-item animate-up">
+                        <div class="faq-question">
+                            <span>Can my child start mid-month?</span>
+                            <span class="faq-toggle">+</span>
+                        </div>
+                        <div class="faq-answer">
+                            Absolutely! We prorate fees based on the start date, so you only pay for the sessions your child will attend. You can start anytime that works for you.
                         </div>
                     </div>
                 </div>
                 
-                <!-- Testimonial 2 -->
-                <div class="testimonial-card">
-                    <div class="testimonial-text">
-                        "The tutors are exceptional! They not only teach the subjects but also build my son's confidence. Worth every kobo!"
-                    </div>
-                    <div class="testimonial-author">
-                        <div class="author-avatar">D</div>
-                        <div class="author-info">
-                            <h4>Mr. David Okon</h4>
-                            <p>Parent of Grade 8 Student</p>
+                <div class="faq-sidebar animate-up delay-1">
+                    <div class="enroll-card" style="background: var(--primary-dark);">
+                        <h3>Need Immediate Assistance?</h3>
+                        <p>Contact us today for a free consultation and assessment for your child.</p>
+                        
+                        <div class="footer-contact-info" style="color: white; margin-bottom: 15px;">
+                            <i class="fas fa-phone"></i>
+                            <span>0707 896 1070</span>
                         </div>
-                    </div>
-                </div>
-                
-                <!-- Testimonial 3 -->
-                <div class="testimonial-card">
-                    <div class="testimonial-text">
-                        "After trying 3 different tutors, we finally found Blooming Kids House. Their structured approach and monthly reports keep us informed."
-                    </div>
-                    <div class="testimonial-author">
-                        <div class="author-avatar">C</div>
-                        <div class="author-info">
-                            <h4>Mrs. Chidinma Eze</h4>
-                            <p>Parent of Grade 3 Student</p>
+                        <div class="footer-contact-info" style="color: white; margin-bottom: 15px;">
+                            <i class="fas fa-phone"></i>
+                            <span>0902 914 7024</span>
                         </div>
-                    </div>
-                </div>
-                
-                <!-- Testimonial 4 -->
-                <div class="testimonial-card">
-                    <div class="testimonial-text">
-                        "The sibling discount made it affordable for both my children. Now they study together and motivate each other!"
-                    </div>
-                    <div class="testimonial-author">
-                        <div class="author-avatar">F</div>
-                        <div class="author-info">
-                            <h4>Mr. Femi Adeyemi</h4>
-                            <p>Parent of Grade 6 & 9 Students</p>
+                        <div class="footer-contact-info" style="color: white; margin-bottom: 25px;">
+                            <i class="fas fa-envelope"></i>
+                            <span>bloomingkidshouse.learning@gmail.com</span>
                         </div>
-                    </div>
-                </div>
-                
-                <!-- Testimonial 5 -->
-                <div class="testimonial-card">
-                    <div class="testimonial-text">
-                        "My child was struggling with math, but after joining Blooming Kids House, he now loves it and helps his classmates!"
-                    </div>
-                    <div class="testimonial-author">
-                        <div class="author-avatar">B</div>
-                        <div class="author-info">
-                            <h4>Mrs. Bola Ahmed</h4>
-                            <p>Parent of Grade 4 Student</p>
-                        </div>
-                    </div>
-                </div>
-                
-                <!-- Duplicate testimonials for seamless scrolling -->
-                <div class="testimonial-card">
-                    <div class="testimonial-text">
-                        "My daughter's grades improved from C's to A's in just 3 months! The personalized attention made all the difference."
-                    </div>
-                    <div class="testimonial-author">
-                        <div class="author-avatar">M</div>
-                        <div class="author-info">
-                            <h4>Mrs. Adeola Johnson</h4>
-                            <p>Parent of Grade 5 Student</p>
-                        </div>
-                    </div>
-                </div>
-                
-                <div class="testimonial-card">
-                    <div class="testimonial-text">
-                        "The tutors are exceptional! They not only teach the subjects but also build my son's confidence. Worth every kobo!"
-                    </div>
-                    <div class="testimonial-author">
-                        <div class="author-avatar">D</div>
-                        <div class="author-info">
-                            <h4>Mr. David Okon</h4>
-                            <p>Parent of Grade 8 Student</p>
-                        </div>
-                    </div>
-                </div>
-                
-                <div class="testimonial-card">
-                    <div class="testimonial-text">
-                        "After trying 3 different tutors, we finally found Blooming Kids House. Their structured approach and monthly reports keep us informed."
-                    </div>
-                    <div class="testimonial-author">
-                        <div class="author-avatar">C</div>
-                        <div class="author-info">
-                            <h4>Mrs. Chidinma Eze</h4>
-                            <p>Parent of Grade 3 Student</p>
-                        </div>
-                    </div>
-                </div>
-                
-                <div class="testimonial-card">
-                    <div class="testimonial-text">
-                        "The sibling discount made it affordable for both my children. Now they study together and motivate each other!"
-                    </div>
-                    <div class="testimonial-author">
-                        <div class="author-avatar">F</div>
-                        <div class="author-info">
-                            <h4>Mr. Femi Adeyemi</h4>
-                            <p>Parent of Grade 6 & 9 Students</p>
-                        </div>
-                    </div>
-                </div>
-                
-                <div class="testimonial-card">
-                    <div class="testimonial-text">
-                        "My child was struggling with math, but after joining Blooming Kids House, he now loves it and helps his classmates!"
-                    </div>
-                    <div class="testimonial-author">
-                        <div class="author-avatar">B</div>
-                        <div class="author-info">
-                            <h4>Mrs. Bola Ahmed</h4>
-                            <p>Parent of Grade 4 Student</p>
+                        
+                        <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                            <a href="https://wa.me/2347078961070" class="btn btn-primary" target="_blank">
+                                <i class="fab fa-whatsapp"></i> WhatsApp
+                            </a>
                         </div>
                     </div>
                 </div>
@@ -1175,79 +1713,204 @@
 
     <!-- Footer -->
     <footer class="footer">
-        <div class="footer-content">
-            <div class="footer-section">
-                <h3>Blooming Kids House</h3>
-                <p>Nurturing young minds to bloom into confident, successful learners through personalized education and care.</p>
-                <div class="contact-info">
-                    <i class="fas fa-map-marker-alt"></i>
-                    <span>Lagos, Nigeria</span>
+        <div class="container">
+            <div class="footer-content">
+                <div class="footer-column">
+                    <h3>Blooming Kids House</h3>
+                    <p>Nurturing young minds to bloom into confident, successful learners through personalized education and care.</p>
+                    <div class="footer-contact-info">
+                        <i class="fas fa-map-marker-alt"></i>
+                        <span>Lagos, Nigeria</span>
+                    </div>
+                    <div class="footer-contact-info">
+                        <i class="fas fa-phone"></i>
+                        <span>0707 896 1070</span>
+                    </div>
+                    <div class="footer-contact-info">
+                        <i class="fas fa-phone"></i>
+                        <span>0902 914 7024</span>
+                    </div>
+                    <div class="footer-contact-info">
+                        <i class="fas fa-envelope"></i>
+                        <span>bloomingkidshouse.learning@gmail.com</span>
+                    </div>
                 </div>
-                <div class="contact-info">
-                    <i class="fas fa-phone"></i>
-                    <span>0707 896 1070, 0902 914 7024</span>
+                
+                <div class="footer-column">
+                    <h3>Quick Links</h3>
+                    <a href="#home">Home</a>
+                    <a href="#about">About Us</a>
+                    <a href="#programs">Core Programs</a>
+                    <a href="#all-programs">Specialty Courses</a>
+                    <a href="#testimonials">Testimonials</a>
+                    <a href="#faq">FAQ</a>
+                    <a href="#" id="footerAuth">Sign In Portal</a>
+                    <a href="https://bkh.netlify.app/enrollment-portal.html" target="_blank">Enrollment Portal</a>
                 </div>
-                <div class="contact-info">
-                    <i class="fas fa-envelope"></i>
-                    <span>bloomingkidshouse.learning@gmail.com</span>
+                
+                <div class="footer-column">
+                    <h3>Core Programs</h3>
+                    <a href="#programs">Preschool to Grade 1</a>
+                    <a href="#programs">Grade 2 to 4</a>
+                    <a href="#programs">Grade 5 to 8</a>
+                    <a href="#programs">Grade 9 to 12</a>
+                    <a href="#all-programs">Holiday Programs</a>
+                    <a href="#all-programs">Group Sessions</a>
+                </div>
+                
+                <div class="footer-column">
+                    <h3>Connect With Us</h3>
+                    <p>Follow us on social media for updates and educational tips.</p>
+                    <div class="social-links">
+                        <a href="https://web.facebook.com/p/Blooming-Kids-House-100064221635202/?_rdc=1&_rdr#" class="social-link" target="_blank">
+                            <i class="fab fa-facebook-f"></i>
+                        </a>
+                        <a href="https://www.instagram.com/bloomingkidshouse/?hl=en" class="social-link" target="_blank">
+                            <i class="fab fa-instagram"></i>
+                        </a>
+                        <a href="https://twitter.com/YOUR_PAGE" class="social-link" target="_blank">
+                            <i class="fab fa-twitter"></i>
+                        </a>
+                        <a href="https://wa.me/2347078961070" class="social-link" target="_blank">
+                            <i class="fab fa-whatsapp"></i>
+                        </a>
+                    </div>
                 </div>
             </div>
             
-            <div class="footer-section">
-                <h3>Quick Links</h3>
-                <a href="#home">Home</a>
-                <a href="#about">About Us</a>
-                <a href="#programs">Programs</a>
-                <a href="#testimonials">Testimonials</a>
-                <a href="https://bkh.netlify.app/enrollment-portal.html" target="_blank" rel="noopener noreferrer">Enrollment Portal</a>
+            <div class="copyright">
+                <p>© <span id="current-year">2024</span> Blooming Kids House Ltd. All rights reserved.</p>
+                <p style="margin-top: 5px;">Designed with ❤️ for the future of education</p>
             </div>
-            
-            <div class="footer-section">
-                <h3>Programs</h3>
-                <a href="#programs">Preschool to Grade 1</a>
-                <a href="#programs">Grade 2 to 4</a>
-                <a href="#programs">Grade 5 to 8</a>
-                <a href="#programs">Grade 9 to 12</a>
-                <a href="#programs">Holiday Programs</a>
-            </div>
-            
-            <div class="footer-section">
-                <h3>Connect With Us</h3>
-                <p>Follow us on social media for updates and educational tips.</p>
-                <div style="display: flex; gap: 15px; margin-top: 20px;">
-                    <!-- Replace # with your actual social media links -->
-                    <a href="https://web.facebook.com/p/Blooming-Kids-House-100064221635202/?_rdc=1&_rdr#" target="_blank" style="background: rgba(255,255,255,0.1); width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center;">
-                        <i class="fab fa-facebook-f"></i>
-                    </a>
-                    <a href="https://www.instagram.com/bloomingkidshouse/?hl=en" target="_blank" style="background: rgba(255,255,255,0.1); width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center;">
-                        <i class="fab fa-instagram"></i>
-                    </a>
-                    <a href="https://twitter.com/YOUR_PAGE" target="_blank" style="background: rgba(255,255,255,0.1); width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center;">
-                        <i class="fab fa-twitter"></i>
-                    </a>
-                    <a href="https://wa.me/2347078961070" target="_blank" style="background: rgba(255,255,255,0.1); width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center;">
-                        <i class="fab fa-whatsapp"></i>
-                    </a>
-                </div>
-            </div>
-        </div>
-        
-        <div class="copyright">
-            <p>© <span id="current-year">2024</span> Blooming Kids House Ltd. All rights reserved.</p>
-            <p style="margin-top: 5px;">Designed with ❤️ for the future of education</p>
         </div>
     </footer>
 
     <script>
-        // FAQ Toggle Functionality
+        // Mobile Menu Toggle
+        const mobileMenuBtn = document.getElementById('mobileMenuBtn');
+        const navMenu = document.querySelector('.nav-menu');
+        const header = document.getElementById('header');
+        
+        mobileMenuBtn.addEventListener('click', function() {
+            navMenu.classList.toggle('active');
+            this.innerHTML = navMenu.classList.contains('active') ? 
+                '<i class="fas fa-times"></i>' : '<i class="fas fa-bars"></i>';
+        });
+        
+        // Close mobile menu when clicking a link
+        document.querySelectorAll('.nav-link').forEach(link => {
+            link.addEventListener('click', () => {
+                navMenu.classList.remove('active');
+                mobileMenuBtn.innerHTML = '<i class="fas fa-bars"></i>';
+            });
+        });
+        
+        // Header scroll effect
+        window.addEventListener('scroll', function() {
+            if (window.scrollY > 100) {
+                header.classList.add('scrolled');
+            } else {
+                header.classList.remove('scrolled');
+            }
+        });
+        
+        // Simple Auth Modal Functionality
+        const authModal = document.getElementById('authModal');
+        const openAuthBtn = document.getElementById('openAuth');
+        const closeAuthBtn = document.getElementById('closeAuth');
+        const footerAuthLink = document.getElementById('footerAuth');
+
+        // Open modal
+        function openAuthModal() {
+            authModal.style.display = 'flex';
+            document.body.style.overflow = 'hidden';
+        }
+
+        // Close modal
+        function closeAuthModal() {
+            authModal.style.display = 'none';
+            document.body.style.overflow = 'auto';
+        }
+
+        // Event listeners for auth modal
+        openAuthBtn.addEventListener('click', function(e) {
+            e.preventDefault();
+            openAuthModal();
+        });
+
+        footerAuthLink.addEventListener('click', function(e) {
+            e.preventDefault();
+            openAuthModal();
+        });
+
+        closeAuthBtn.addEventListener('click', closeAuthModal);
+
+        // Close modal when clicking outside
+        authModal.addEventListener('click', function(e) {
+            if (e.target === authModal) {
+                closeAuthModal();
+            }
+        });
+
+        // Close modal with Escape key
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape' && authModal.style.display === 'flex') {
+                closeAuthModal();
+            }
+        });
+        
+        // FAQ Accordion
         document.querySelectorAll('.faq-question').forEach(question => {
             question.addEventListener('click', function() {
                 const faqItem = this.parentElement;
-                faqItem.classList.toggle('active');
+                const answer = this.nextElementSibling;
+                
+                // Close other open items
+                document.querySelectorAll('.faq-item').forEach(item => {
+                    if (item !== faqItem) {
+                        item.querySelector('.faq-question').classList.remove('active');
+                        item.querySelector('.faq-answer').classList.remove('active');
+                    }
+                });
+                
+                // Toggle current item
+                this.classList.toggle('active');
+                answer.classList.toggle('active');
             });
         });
-
-        // Smooth Scrolling for Navigation Links
+        
+        // Animated counters
+        const counters = document.querySelectorAll('.stat-number');
+        const speed = 200;
+        
+        const animateCounter = (counter) => {
+            const target = +counter.getAttribute('data-count');
+            const count = +counter.innerText;
+            const increment = target / speed;
+            
+            if (count < target) {
+                counter.innerText = Math.ceil(count + increment);
+                setTimeout(() => animateCounter(counter), 10);
+            } else {
+                counter.innerText = target + (counter.getAttribute('data-count') === '98' ? '%' : '+');
+            }
+        };
+        
+        // Intersection Observer for counters
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    counters.forEach(counter => animateCounter(counter));
+                }
+            });
+        }, { threshold: 0.5 });
+        
+        observer.observe(document.querySelector('.stats-section'));
+        
+        // Set current year
+        document.getElementById('current-year').textContent = new Date().getFullYear();
+        
+        // Smooth scrolling for anchor links
         document.querySelectorAll('a[href^="#"]').forEach(anchor => {
             anchor.addEventListener('click', function (e) {
                 e.preventDefault();
@@ -1257,70 +1920,13 @@
                 const targetElement = document.querySelector(targetId);
                 if (targetElement) {
                     window.scrollTo({
-                        top: targetElement.offsetTop - 80,
+                        top: targetElement.offsetTop - 100,
                         behavior: 'smooth'
                     });
                 }
             });
         });
-
-        // Mobile Menu Toggle
-        const mobileMenuBtn = document.querySelector('.mobile-menu-btn');
-        const navLinks = document.querySelector('.nav-links');
         
-        mobileMenuBtn.addEventListener('click', function() {
-            navLinks.style.display = navLinks.style.display === 'flex' ? 'none' : 'flex';
-            if (navLinks.style.display === 'flex') {
-                navLinks.style.flexDirection = 'column';
-                navLinks.style.position = 'absolute';
-                navLinks.style.top = '100%';
-                navLinks.style.left = '0';
-                navLinks.style.right = '0';
-                navLinks.style.background = 'white';
-                navLinks.style.padding = '20px';
-                navLinks.style.boxShadow = '0 10px 30px rgba(0,0,0,0.1)';
-            }
-        });
-
-        // Update mobile menu on resize
-        window.addEventListener('resize', function() {
-            if (window.innerWidth > 992) {
-                navLinks.style.display = 'flex';
-                navLinks.style.flexDirection = 'row';
-                navLinks.style.position = 'static';
-                navLinks.style.background = 'transparent';
-                navLinks.style.padding = '0';
-                navLinks.style.boxShadow = 'none';
-            } else {
-                navLinks.style.display = 'none';
-            }
-        });
-
-        // Animation on scroll
-        const observerOptions = {
-            threshold: 0.1,
-            rootMargin: '0px 0px -50px 0px'
-        };
-
-        const observer = new IntersectionObserver((entries) => {
-            entries.forEach(entry => {
-                if (entry.isIntersecting) {
-                    entry.target.classList.add('animate-up');
-                }
-            });
-        }, observerOptions);
-
-        // Observe elements for animation
-        document.querySelectorAll('.about-section, .programs-section, .testimonials-section').forEach(el => {
-            observer.observe(el);
-        });
-
-        // FIXED: Removed the problematic JavaScript that was interfering with the Enroll Now button
-        // The button will now work normally with target="_blank"
-
-        // Set current year in footer
-        document.getElementById('current-year').textContent = new Date().getFullYear();
-
         // Pause testimonials on hover
         const testimonialsTrack = document.querySelector('.testimonials-track');
         if (testimonialsTrack) {
@@ -1332,6 +1938,20 @@
                 testimonialsTrack.style.animationPlayState = 'running';
             });
         }
+        
+        // Animation on scroll
+        const animateOnScroll = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    entry.target.classList.add('animate-up');
+                }
+            });
+        }, { threshold: 0.1 });
+        
+        // Observe elements for animation
+        document.querySelectorAll('.feature-card, .program-card, .about-text, .about-image, .all-program-card, .faq-item').forEach(el => {
+            animateOnScroll.observe(el);
+        });
     </script>
 </body>
 </html>
