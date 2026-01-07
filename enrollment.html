@@ -129,6 +129,18 @@
             transform: translateY(-3px);
         }
 
+        .btn-accent {
+            background: var(--accent);
+            color: white;
+            box-shadow: 0 4px 12px rgba(255, 107, 107, 0.25);
+        }
+
+        .btn-accent:hover {
+            background: #ff5252;
+            transform: translateY(-3px);
+            box-shadow: 0 6px 20px rgba(255, 107, 107, 0.3);
+        }
+
         /* Header & Navigation */
         .header {
             position: fixed;
@@ -1167,6 +1179,9 @@
                 <div class="hero-buttons animate-up delay-2">
                     <a href="https://bkh.netlify.app/enrollment-portal.html" class="btn btn-primary btn-large" target="_blank">
                         <i class="fas fa-user-plus"></i> Enroll Now
+                    </a>
+                    <a href="https://bkh.netlify.app/index.html" class="btn btn-accent btn-large" target="_blank">
+                        <i class="fas fa-clipboard-check"></i> Free Assessment Test
                     </a>
                 </div>
             </div>
