@@ -190,13 +190,13 @@ async function renderDashboardPanel(container) {
             <div class="mt-8 p-6 bg-gray-50 rounded-xl border">
                 <h3 class="text-xl font-bold text-gray-800 mb-4">Quick Actions</h3>
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <button onclick="showAssignStudentModal()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-3 rounded-lg flex items-center justify-center">
+                    <button id="quick-action-assign" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-3 rounded-lg flex items-center justify-center">
                         <i class="fas fa-user-plus mr-2"></i> Assign New Student
                     </button>
-                    <button onclick="showArchiveStudentModal()" class="bg-yellow-600 hover:bg-yellow-700 text-white px-4 py-3 rounded-lg flex items-center justify-center">
+                    <button id="quick-action-archive" class="bg-yellow-600 hover:bg-yellow-700 text-white px-4 py-3 rounded-lg flex items-center justify-center">
                         <i class="fas fa-archive mr-2"></i> Archive Student
                     </button>
-                    <button onclick="showMarkInactiveModal()" class="bg-red-600 hover:bg-red-700 text-white px-4 py-3 rounded-lg flex items-center justify-center">
+                    <button id="quick-action-inactive" class="bg-red-600 hover:bg-red-700 text-white px-4 py-3 rounded-lg flex items-center justify-center">
                         <i class="fas fa-user-slash mr-2"></i> Mark Tutor Inactive
                     </button>
                 </div>
@@ -214,6 +214,13 @@ async function renderDashboardPanel(container) {
             ` : ''}
         </div>
     `;
+
+    // Add event listeners for quick actions
+    if (showTutorsCard) {
+        document.getElementById('quick-action-assign')?.addEventListener('click', showAssignStudentModal);
+        document.getElementById('quick-action-archive')?.addEventListener('click', showArchiveStudentModal);
+        document.getElementById('quick-action-inactive')?.addEventListener('click', showMarkInactiveModal);
+    }
 
     loadDashboardData();
 }
@@ -291,6 +298,573 @@ async function loadDashboardData() {
         if (enrollmentsElement) enrollmentsElement.textContent = 'Error';
     }
 }
+
+// ======================================================
+// QUICK ACTION MODAL FUNCTIONS
+// ======================================================
+
+window.showAssignStudentModal = async function() {
+    try {
+        // Load tutors and students data
+        if (!sessionCache.tutors) {
+            const tutorsSnapshot = await getDocs(query(collection(db, "tutors")));
+            const activeTutors = tutorsSnapshot.docs
+                .map(doc => ({ id: doc.id, ...doc.data() }))
+                .filter(tutor => !tutor.status || tutor.status === 'active');
+            sessionCache.tutors = activeTutors;
+        }
+
+        if (!sessionCache.students) {
+            const studentsSnapshot = await getDocs(query(collection(db, "students")));
+            const activeStudents = studentsSnapshot.docs
+                .map(doc => ({ id: doc.id, ...doc.data() }))
+                .filter(student => !student.status || student.status === 'active' || student.status === 'approved');
+            sessionCache.students = activeStudents;
+        }
+
+        const tutors = sessionCache.tutors || [];
+        const students = sessionCache.students || [];
+
+        // Create modal HTML
+        const modalHTML = `
+            <div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+                <div class="bg-white rounded-lg shadow-xl w-full max-w-2xl">
+                    <div class="flex justify-between items-center p-6 border-b">
+                        <h3 class="text-xl font-bold text-blue-700">Assign Student to Tutor</h3>
+                        <button onclick="closeModal()" class="text-gray-400 hover:text-gray-600">
+                            <i class="fas fa-times text-xl"></i>
+                        </button>
+                    </div>
+                    
+                    <div class="p-6">
+                        <div class="mb-6">
+                            <label class="block text-sm font-medium text-gray-700 mb-2">
+                                Select Tutor <span class="text-red-500">*</span>
+                            </label>
+                            <select id="assign-tutor-select" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                                <option value="">-- Select a Tutor --</option>
+                                ${tutors.map(tutor => `
+                                    <option value="${tutor.id}">
+                                        ${tutor.name || tutor.email || tutor.id} ${tutor.assignedStudentsCount ? `(${tutor.assignedStudentsCount} students)` : ''}
+                                    </option>
+                                `).join('')}
+                            </select>
+                        </div>
+                        
+                        <div class="mb-6">
+                            <label class="block text-sm font-medium text-gray-700 mb-2">
+                                Select Student <span class="text-red-500">*</span>
+                            </label>
+                            <select id="assign-student-select" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                                <option value="">-- Select a Student --</option>
+                                ${students.map(student => `
+                                    <option value="${student.id}">
+                                        ${student.name || student.email || student.id}
+                                    </option>
+                                `).join('')}
+                            </select>
+                        </div>
+                        
+                        <div class="mb-6">
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Assignment Notes (Optional)</label>
+                            <textarea id="assignment-notes" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500" rows="3" placeholder="Add any notes about this assignment..."></textarea>
+                        </div>
+                    </div>
+                    
+                    <div class="flex justify-end gap-3 p-6 border-t bg-gray-50 rounded-b-lg">
+                        <button onclick="closeModal()" class="px-5 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50">
+                            Cancel
+                        </button>
+                        <button onclick="submitAssignment()" class="px-5 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+                            <i class="fas fa-user-plus mr-2"></i> Assign Student
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        // Add modal to DOM
+        const modalContainer = document.createElement('div');
+        modalContainer.id = 'assign-student-modal';
+        modalContainer.innerHTML = modalHTML;
+        document.body.appendChild(modalContainer);
+        
+        // Focus on first select
+        setTimeout(() => {
+            document.getElementById('assign-tutor-select')?.focus();
+        }, 100);
+        
+    } catch (error) {
+        console.error('Error showing assign student modal:', error);
+        alert('Failed to load assignment data. Please try again.');
+    }
+};
+
+window.showArchiveStudentModal = async function() {
+    try {
+        // Load active students
+        if (!sessionCache.students) {
+            const studentsSnapshot = await getDocs(query(collection(db, "students")));
+            const activeStudents = studentsSnapshot.docs
+                .map(doc => ({ id: doc.id, ...doc.data() }))
+                .filter(student => !student.status || student.status === 'active' || student.status === 'approved');
+            sessionCache.students = activeStudents;
+        }
+
+        const students = sessionCache.students || [];
+
+        // Create modal HTML
+        const modalHTML = `
+            <div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+                <div class="bg-white rounded-lg shadow-xl w-full max-w-2xl">
+                    <div class="flex justify-between items-center p-6 border-b">
+                        <h3 class="text-xl font-bold text-yellow-700">Archive Student</h3>
+                        <button onclick="closeModal()" class="text-gray-400 hover:text-gray-600">
+                            <i class="fas fa-times text-xl"></i>
+                        </button>
+                    </div>
+                    
+                    <div class="p-6">
+                        <div class="mb-6">
+                            <label class="block text-sm font-medium text-gray-700 mb-2">
+                                Select Student to Archive <span class="text-red-500">*</span>
+                            </label>
+                            <select id="archive-student-select" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500">
+                                <option value="">-- Select a Student --</option>
+                                ${students.map(student => `
+                                    <option value="${student.id}">
+                                        ${student.name || student.email || student.id}
+                                    </option>
+                                `).join('')}
+                            </select>
+                        </div>
+                        
+                        <div class="mb-6">
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Archive Reason <span class="text-red-500">*</span></label>
+                            <select id="archive-reason" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500">
+                                <option value="">-- Select Reason --</option>
+                                <option value="graduated">Graduated/Completed</option>
+                                <option value="withdrawn">Withdrawn from Program</option>
+                                <option value="transferred">Transferred to Another Tutor</option>
+                                <option value="inactive">Became Inactive</option>
+                                <option value="other">Other</option>
+                            </select>
+                        </div>
+                        
+                        <div class="mb-6">
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Additional Notes (Optional)</label>
+                            <textarea id="archive-notes" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500" rows="3" placeholder="Add any notes about this archiving..."></textarea>
+                        </div>
+                        
+                        <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6">
+                            <div class="flex items-start">
+                                <i class="fas fa-exclamation-triangle text-yellow-500 mt-1 mr-3"></i>
+                                <div>
+                                    <p class="text-yellow-800 font-medium mb-1">Important Note:</p>
+                                    <p class="text-yellow-700 text-sm">Archiving a student will:</p>
+                                    <ul class="text-yellow-700 text-sm list-disc pl-5 mt-1">
+                                        <li>Change their status to "archived"</li>
+                                        <li>Remove them from active student lists</li>
+                                        <li>Preserve all their data for records</li>
+                                        <li>Notify their assigned tutor (if any)</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="flex justify-end gap-3 p-6 border-t bg-gray-50 rounded-b-lg">
+                        <button onclick="closeModal()" class="px-5 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50">
+                            Cancel
+                        </button>
+                        <button onclick="submitArchiveStudent()" class="px-5 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700">
+                            <i class="fas fa-archive mr-2"></i> Archive Student
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        // Add modal to DOM
+        const modalContainer = document.createElement('div');
+        modalContainer.id = 'archive-student-modal';
+        modalContainer.innerHTML = modalHTML;
+        document.body.appendChild(modalContainer);
+        
+    } catch (error) {
+        console.error('Error showing archive student modal:', error);
+        alert('Failed to load student data. Please try again.');
+    }
+};
+
+window.showMarkInactiveModal = async function() {
+    try {
+        // Load active tutors
+        if (!sessionCache.tutors) {
+            const tutorsSnapshot = await getDocs(query(collection(db, "tutors")));
+            const activeTutors = tutorsSnapshot.docs
+                .map(doc => ({ id: doc.id, ...doc.data() }))
+                .filter(tutor => !tutor.status || tutor.status === 'active');
+            sessionCache.tutors = activeTutors;
+        }
+
+        const tutors = sessionCache.tutors || [];
+
+        // Create modal HTML
+        const modalHTML = `
+            <div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+                <div class="bg-white rounded-lg shadow-xl w-full max-w-2xl">
+                    <div class="flex justify-between items-center p-6 border-b">
+                        <h3 class="text-xl font-bold text-red-700">Mark Tutor as Inactive</h3>
+                        <button onclick="closeModal()" class="text-gray-400 hover:text-gray-600">
+                            <i class="fas fa-times text-xl"></i>
+                        </button>
+                    </div>
+                    
+                    <div class="p-6">
+                        <div class="mb-6">
+                            <label class="block text-sm font-medium text-gray-700 mb-2">
+                                Select Tutor to Mark Inactive <span class="text-red-500">*</span>
+                            </label>
+                            <select id="inactive-tutor-select" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500">
+                                <option value="">-- Select a Tutor --</option>
+                                ${tutors.map(tutor => `
+                                    <option value="${tutor.id}">
+                                        ${tutor.name || tutor.email || tutor.id} 
+                                        ${tutor.assignedStudentsCount ? `(${tutor.assignedStudentsCount} students)` : ''}
+                                    </option>
+                                `).join('')}
+                            </select>
+                        </div>
+                        
+                        <div class="mb-6">
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Inactive Reason <span class="text-red-500">*</span></label>
+                            <select id="inactive-reason" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500">
+                                <option value="">-- Select Reason --</option>
+                                <option value="left">Left the Organization</option>
+                                <option value="temporary">Temporary Leave</option>
+                                <option value="performance">Performance Issues</option>
+                                <option value="capacity">At Capacity</option>
+                                <option value="other">Other</option>
+                            </select>
+                        </div>
+                        
+                        <div class="mb-6">
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Additional Notes (Optional)</label>
+                            <textarea id="inactive-notes" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500" rows="3" placeholder="Add any notes about marking this tutor inactive..."></textarea>
+                        </div>
+                        
+                        <div class="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
+                            <div class="flex items-start">
+                                <i class="fas fa-exclamation-circle text-red-500 mt-1 mr-3"></i>
+                                <div>
+                                    <p class="text-red-800 font-medium mb-1">Important Note:</p>
+                                    <p class="text-red-700 text-sm">Marking a tutor as inactive will:</p>
+                                    <ul class="text-red-700 text-sm list-disc pl-5 mt-1">
+                                        <li>Change their status to "inactive"</li>
+                                        <li>Remove them from active tutor lists</li>
+                                        <li>Prevent new student assignments</li>
+                                        <li>Notify their assigned students (if any)</li>
+                                        <li>Allow reassignment of their students</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="flex justify-end gap-3 p-6 border-t bg-gray-50 rounded-b-lg">
+                        <button onclick="closeModal()" class="px-5 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50">
+                            Cancel
+                        </button>
+                        <button onclick="submitMarkInactive()" class="px-5 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700">
+                            <i class="fas fa-user-slash mr-2"></i> Mark Tutor Inactive
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        // Add modal to DOM
+        const modalContainer = document.createElement('div');
+        modalContainer.id = 'mark-inactive-modal';
+        modalContainer.innerHTML = modalHTML;
+        document.body.appendChild(modalContainer);
+        
+    } catch (error) {
+        console.error('Error showing mark inactive modal:', error);
+        alert('Failed to load tutor data. Please try again.');
+    }
+};
+
+// ======================================================
+// MODAL SUBMISSION FUNCTIONS
+// ======================================================
+
+async function submitAssignment() {
+    const tutorId = document.getElementById('assign-tutor-select').value;
+    const studentId = document.getElementById('assign-student-select').value;
+    const notes = document.getElementById('assignment-notes').value;
+    
+    if (!tutorId || !studentId) {
+        alert('Please select both a tutor and a student.');
+        return;
+    }
+    
+    try {
+        // Show loading state
+        const submitBtn = document.querySelector('#assign-student-modal button[onclick="submitAssignment()"]');
+        const originalText = submitBtn.innerHTML;
+        submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> Assigning...';
+        submitBtn.disabled = true;
+        
+        // Create assignment data
+        const assignmentData = {
+            tutorId: tutorId,
+            studentId: studentId,
+            assignedBy: window.userData?.uid || 'system',
+            assignedByEmail: window.userData?.email || 'system',
+            assignedDate: new Date().toISOString(),
+            status: 'active',
+            notes: notes || '',
+            lastModified: new Date().toISOString()
+        };
+        
+        // Add assignment to Firestore
+        const assignmentRef = await addDoc(collection(db, "tutorAssignments"), assignmentData);
+        
+        // Update tutor's assignedStudentsCount
+        const tutorRef = doc(db, "tutors", tutorId);
+        const tutorDoc = await getDoc(tutorRef);
+        if (tutorDoc.exists()) {
+            const currentCount = tutorDoc.data().assignedStudentsCount || 0;
+            await updateDoc(tutorRef, {
+                assignedStudentsCount: currentCount + 1,
+                lastModified: new Date().toISOString()
+            });
+        }
+        
+        // Update student's tutorId
+        const studentRef = doc(db, "students", studentId);
+        await updateDoc(studentRef, {
+            tutorId: tutorId,
+            lastModified: new Date().toISOString()
+        });
+        
+        // Invalidate cache
+        invalidateCache('tutorAssignments');
+        invalidateCache('tutors');
+        invalidateCache('students');
+        
+        // Close modal
+        closeModal();
+        
+        // Show success message
+        alert('Student assigned successfully!');
+        
+        // Refresh dashboard data
+        await refreshAllDashboardData();
+        
+    } catch (error) {
+        console.error('Error assigning student:', error);
+        alert('Failed to assign student. Please try again.');
+        
+        // Reset button
+        const submitBtn = document.querySelector('#assign-student-modal button[onclick="submitAssignment()"]');
+        submitBtn.innerHTML = originalText;
+        submitBtn.disabled = false;
+    }
+}
+
+async function submitArchiveStudent() {
+    const studentId = document.getElementById('archive-student-select').value;
+    const reason = document.getElementById('archive-reason').value;
+    const notes = document.getElementById('archive-notes').value;
+    
+    if (!studentId || !reason) {
+        alert('Please select a student and provide a reason.');
+        return;
+    }
+    
+    try {
+        // Show loading state
+        const submitBtn = document.querySelector('#archive-student-modal button[onclick="submitArchiveStudent()"]');
+        const originalText = submitBtn.innerHTML;
+        submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> Archiving...';
+        submitBtn.disabled = true;
+        
+        // Update student status
+        const studentRef = doc(db, "students", studentId);
+        await updateDoc(studentRef, {
+            status: 'archived',
+            archiveReason: reason,
+            archiveNotes: notes || '',
+            archivedDate: new Date().toISOString(),
+            archivedBy: window.userData?.uid || 'system',
+            archivedByEmail: window.userData?.email || 'system',
+            lastModified: new Date().toISOString()
+        });
+        
+        // Find and update any active assignment
+        const assignmentsQuery = query(
+            collection(db, "tutorAssignments"),
+            where("studentId", "==", studentId),
+            where("status", "==", "active")
+        );
+        const assignmentsSnapshot = await getDocs(assignmentsQuery);
+        
+        if (!assignmentsSnapshot.empty) {
+            const assignmentDoc = assignmentsSnapshot.docs[0];
+            await updateDoc(doc(db, "tutorAssignments", assignmentDoc.id), {
+                status: 'archived',
+                endDate: new Date().toISOString(),
+                lastModified: new Date().toISOString()
+            });
+            
+            // Update tutor's assignedStudentsCount
+            const assignmentData = assignmentDoc.data();
+            const tutorRef = doc(db, "tutors", assignmentData.tutorId);
+            const tutorDoc = await getDoc(tutorRef);
+            if (tutorDoc.exists()) {
+                const currentCount = tutorDoc.data().assignedStudentsCount || 0;
+                if (currentCount > 0) {
+                    await updateDoc(tutorRef, {
+                        assignedStudentsCount: currentCount - 1,
+                        lastModified: new Date().toISOString()
+                    });
+                }
+            }
+        }
+        
+        // Invalidate cache
+        invalidateCache('students');
+        invalidateCache('tutorAssignments');
+        invalidateCache('tutors');
+        
+        // Close modal
+        closeModal();
+        
+        // Show success message
+        alert('Student archived successfully!');
+        
+        // Refresh dashboard data
+        await refreshAllDashboardData();
+        
+    } catch (error) {
+        console.error('Error archiving student:', error);
+        alert('Failed to archive student. Please try again.');
+        
+        // Reset button
+        const submitBtn = document.querySelector('#archive-student-modal button[onclick="submitArchiveStudent()"]');
+        submitBtn.innerHTML = originalText;
+        submitBtn.disabled = false;
+    }
+}
+
+async function submitMarkInactive() {
+    const tutorId = document.getElementById('inactive-tutor-select').value;
+    const reason = document.getElementById('inactive-reason').value;
+    const notes = document.getElementById('inactive-notes').value;
+    
+    if (!tutorId || !reason) {
+        alert('Please select a tutor and provide a reason.');
+        return;
+    }
+    
+    try {
+        // Show loading state
+        const submitBtn = document.querySelector('#mark-inactive-modal button[onclick="submitMarkInactive()"]');
+        const originalText = submitBtn.innerHTML;
+        submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> Processing...';
+        submitBtn.disabled = true;
+        
+        // Update tutor status
+        const tutorRef = doc(db, "tutors", tutorId);
+        await updateDoc(tutorRef, {
+            status: 'inactive',
+            inactiveReason: reason,
+            inactiveNotes: notes || '',
+            inactiveDate: new Date().toISOString(),
+            markedInactiveBy: window.userData?.uid || 'system',
+            markedInactiveByEmail: window.userData?.email || 'system',
+            lastModified: new Date().toISOString()
+        });
+        
+        // Find and update active assignments
+        const assignmentsQuery = query(
+            collection(db, "tutorAssignments"),
+            where("tutorId", "==", tutorId),
+            where("status", "==", "active")
+        );
+        const assignmentsSnapshot = await getDocs(assignmentsQuery);
+        
+        if (!assignmentsSnapshot.empty) {
+            const batch = writeBatch(db);
+            assignmentsSnapshot.docs.forEach(doc => {
+                batch.update(doc.ref, {
+                    status: 'pending_reassignment',
+                    endDate: new Date().toISOString(),
+                    lastModified: new Date().toISOString()
+                });
+            });
+            await batch.commit();
+        }
+        
+        // Invalidate cache
+        invalidateCache('tutors');
+        invalidateCache('tutorAssignments');
+        invalidateCache('students');
+        
+        // Close modal
+        closeModal();
+        
+        // Show success message
+        alert('Tutor marked as inactive successfully! Their students now need reassignment.');
+        
+        // Refresh dashboard data
+        await refreshAllDashboardData();
+        
+    } catch (error) {
+        console.error('Error marking tutor inactive:', error);
+        alert('Failed to mark tutor as inactive. Please try again.');
+        
+        // Reset button
+        const submitBtn = document.querySelector('#mark-inactive-modal button[onclick="submitMarkInactive()"]');
+        submitBtn.innerHTML = originalText;
+        submitBtn.disabled = false;
+    }
+}
+
+// ======================================================
+// UTILITY FUNCTIONS
+// ======================================================
+
+window.closeModal = function() {
+    const modals = ['assign-student-modal', 'archive-student-modal', 'mark-inactive-modal'];
+    modals.forEach(modalId => {
+        const modal = document.getElementById(modalId);
+        if (modal) {
+            modal.remove();
+        }
+    });
+};
+
+// Close modal when clicking outside
+document.addEventListener('click', function(event) {
+    const modals = ['assign-student-modal', 'archive-student-modal', 'mark-inactive-modal'];
+    modals.forEach(modalId => {
+        const modal = document.getElementById(modalId);
+        if (modal && event.target === modal) {
+            closeModal();
+        }
+    });
+});
+
+// Close modal with Escape key
+document.addEventListener('keydown', function(event) {
+    if (event.key === 'Escape') {
+        closeModal();
+    }
+});
 
 // Refresh All Dashboard Data function
 window.refreshAllDashboardData = async function() {
@@ -5377,6 +5951,7 @@ onAuthStateChanged(auth, async (user) => {
         window.location.href = "management-auth.html";
     }
 });
+
 
 
 
