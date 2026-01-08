@@ -2819,8 +2819,6 @@ window.showEnrollmentDetails = async function(enrollmentId) {
                             <p><strong>Email:</strong> ${enrollment.parent?.email || 'N/A'}</p>
                             <p><strong>Phone:</strong> ${enrollment.parent?.phone || 'N/A'}</p>
                             <p><strong>Address:</strong> ${enrollment.parent?.address || 'N/A'}</p>
-                            <p><strong>Occupation:</strong> ${enrollment.parent?.occupation || 'N/A'}</p>
-                            <p><strong>Preferred Contact:</strong> ${enrollment.parent?.preferredContact || 'N/A'}</p>
                         </div>
                     </div>
                     
@@ -5266,4 +5264,5 @@ onAuthStateChanged(auth, async (user) => {
         window.location.href = "management-auth.html";
     }
 });
+
 
