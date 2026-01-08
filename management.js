@@ -2380,9 +2380,8 @@ async function renderEnrollmentsPanel(container) {
                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Application ID</th>
                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Parent Name</th>
                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Parent Email</th>
-                            <th class="px6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Parent Phone</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Parent Phone</th>
                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Students</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Days/Time</th>
                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total Fee</th>
                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Referral Code</th>
                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
@@ -2392,7 +2391,7 @@ async function renderEnrollmentsPanel(container) {
                     </thead>
                     <tbody id="enrollments-list" class="bg-white divide-y divide-gray-200">
                         <tr>
-                            <td colspan="11" class="px-6 py-4 text-center text-gray-500">Loading enrollments...</td>
+                            <td colspan="10" class="px-6 py-4 text-center text-gray-500">Loading enrollments...</td>
                         </tr>
                     </tbody>
                 </table>
@@ -2419,7 +2418,7 @@ async function fetchAndRenderEnrollments(forceRefresh = false) {
 
     try {
         if (!sessionCache.enrollments || forceRefresh) {
-            enrollmentsList.innerHTML = `<tr><td colspan="11" class="px-6 py-4 text-center text-gray-500">Fetching enrollments...</td></tr>`;
+            enrollmentsList.innerHTML = `<tr><td colspan="10" class="px-6 py-4 text-center text-gray-500">Fetching enrollments...</td></tr>`;
             
             const snapshot = await getDocs(query(collection(db, "enrollments"), orderBy("createdAt", "desc")));
             const enrollmentsData = snapshot.docs.map(doc => ({ 
@@ -2433,7 +2432,7 @@ async function fetchAndRenderEnrollments(forceRefresh = false) {
         renderEnrollmentsFromCache();
     } catch (error) {
         console.error("Error fetching enrollments:", error);
-        enrollmentsList.innerHTML = `<tr><td colspan="11" class="px-6 py-4 text-center text-red-500">Failed to load enrollments: ${error.message}</td></tr>`;
+        enrollmentsList.innerHTML = `<tr><td colspan="10" class="px-6 py-4 text-center text-red-500">Failed to load enrollments: ${error.message}</td></tr>`;
     }
 }
 
@@ -2543,7 +2542,7 @@ function renderEnrollmentsFromCache(searchTerm = '') {
     if (filteredEnrollments.length === 0) {
         enrollmentsList.innerHTML = `
             <tr>
-                <td colspan="11" class="px-6 py-4 text-center text-gray-500">
+                <td colspan="10" class="px-6 py-4 text-center text-gray-500">
                     No enrollments found${searchTerm ? ` for "${searchTerm}"` : ''}.
                 </td>
             </tr>
@@ -2577,12 +2576,6 @@ function renderEnrollmentsFromCache(searchTerm = '') {
         const studentCount = enrollment.students?.length || 0;
         const studentNames = enrollment.students?.map(s => s.name).join(', ') || 'No students';
         
-        // Extract academicDays and academicTime from the first student or enrollment
-        const firstStudent = enrollment.students && enrollment.students.length > 0 ? enrollment.students[0] : {};
-        const academicDays = firstStudent.academicDays || enrollment.academicDays || 'Not specified';
-        const academicTime = firstStudent.academicTime || enrollment.academicTime || 'Not specified';
-        const daysTimeDisplay = `${academicDays} • ${academicTime}`;
-        
         let statusBadge = '';
         switch(enrollment.status) {
             case 'draft':
@@ -2592,8 +2585,10 @@ function renderEnrollmentsFromCache(searchTerm = '') {
                 statusBadge = `<span class="px-2 py-1 text-xs rounded-full bg-yellow-100 text-yellow-800">Pending</span>`;
                 break;
             case 'completed':
-            case 'payment_received':
                 statusBadge = `<span class="px-2 py-1 text-xs rounded-full bg-green-100 text-green-800">Completed</span>`;
+                break;
+            case 'payment_received':
+                statusBadge = `<span class="px-2 py-1 text-xs rounded-full bg-blue-100 text-blue-800">Payment Received</span>`;
                 break;
             default:
                 statusBadge = `<span class="px-2 py-1 text-xs rounded-full bg-gray-100 text-gray-800">${enrollment.status || 'Unknown'}</span>`;
@@ -2616,9 +2611,6 @@ function renderEnrollmentsFromCache(searchTerm = '') {
                 <td class="px-6 py-4">
                     <div class="text-sm text-gray-900">${studentCount} student(s)</div>
                     <div class="text-xs text-gray-500 truncate max-w-xs">${studentNames}</div>
-                </td>
-                <td class="px-6 py-4 text-sm text-gray-600">
-                    <div class="text-xs">${daysTimeDisplay}</div>
                 </td>
                 <td class="px-6 py-4 text-sm font-semibold text-green-600">${formattedFee}</td>
                 <td class="px-6 py-4 text-sm">
@@ -2692,10 +2684,6 @@ window.showEnrollmentDetails = async function(enrollmentId) {
                     testPrepHTML = `<p class="text-sm"><strong>Test Prep:</strong> ${student.testPrep.map(t => `${t.name} (${t.hours} hrs)`).join(', ')}</p>`;
                 }
                 
-                // Academic days and time for this student
-                const academicDays = student.academicDays || enrollment.academicDays || 'Not specified';
-                const academicTime = student.academicTime || enrollment.academicTime || 'Not specified';
-                
                 return `
                     <div class="border rounded-lg p-4 mb-3 bg-gray-50">
                         <h4 class="font-bold text-lg mb-2">${student.name || 'Unnamed Student'}</h4>
@@ -2704,10 +2692,8 @@ window.showEnrollmentDetails = async function(enrollmentId) {
                             <p><strong>DOB:</strong> ${student.dob || 'N/A'}</p>
                             <p><strong>Start Date:</strong> ${student.startDate || 'N/A'}</p>
                             <p><strong>Gender:</strong> ${student.gender || 'N/A'}</p>
-                            <p><strong>Preferred Tutor:</strong> ${student.preferredTutor || 'N/A'}</p>
+                            <p><strong>Learning Style:</strong> ${student.learningStyle || 'N/A'}</p>
                             <p><strong>School:</strong> ${student.school || 'N/A'}</p>
-                            <p><strong>Academic Days:</strong> ${academicDays}</p>
-                            <p><strong>Academic Time:</strong> ${academicTime}</p>
                         </div>
                         ${subjectsHTML}
                         ${extracurricularHTML}
@@ -2808,7 +2794,7 @@ window.showEnrollmentDetails = async function(enrollmentId) {
                         <div>
                             <h4 class="font-bold text-lg mb-2">Application Information</h4>
                             <p><strong>ID:</strong> ${enrollment.id}</p>
-                            <p><strong>Status:</strong> <span class="px-2 py-1 text-xs rounded-full ${enrollment.status === 'completed' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}">${enrollment.status || 'Unknown'}</span></p>
+                            <p><strong>Status:</strong> <span class="px-2 py-1 text-xs rounded-full ${enrollment.status === 'completed' || enrollment.status === 'payment_received' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}">${enrollment.status || 'Unknown'}</span></p>
                             <p><strong>Created:</strong> ${createdAt}</p>
                             ${enrollment.lastSaved ? `<p><strong>Last Saved:</strong> ${new Date(enrollment.lastSaved).toLocaleString()}</p>` : ''}
                         </div>
@@ -2819,6 +2805,8 @@ window.showEnrollmentDetails = async function(enrollmentId) {
                             <p><strong>Email:</strong> ${enrollment.parent?.email || 'N/A'}</p>
                             <p><strong>Phone:</strong> ${enrollment.parent?.phone || 'N/A'}</p>
                             <p><strong>Address:</strong> ${enrollment.parent?.address || 'N/A'}</p>
+                            <p><strong>Occupation:</strong> ${enrollment.parent?.occupation || 'N/A'}</p>
+                            <p><strong>Preferred Contact:</strong> ${enrollment.parent?.preferredContact || 'N/A'}</p>
                         </div>
                     </div>
                     
@@ -2862,9 +2850,20 @@ window.approveEnrollmentModal = async function(enrollmentId) {
 
         const enrollment = enrollmentDoc.data();
         
-        // Get tutors for assignment
-        const tutorsSnapshot = await getDocs(query(collection(db, "tutors"), where("status", "==", "active")));
-        const activeTutors = tutorsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        // Get tutors from the tutor directory (cache first, then fetch if needed)
+        let activeTutors = [];
+        if (sessionCache.tutors && sessionCache.tutors.length > 0) {
+            activeTutors = sessionCache.tutors.filter(tutor => 
+                !tutor.status || tutor.status === 'active'
+            );
+        }
+        
+        // If no tutors in cache, fetch them
+        if (activeTutors.length === 0) {
+            const tutorsSnapshot = await getDocs(query(collection(db, "tutors"), where("status", "==", "active")));
+            activeTutors = tutorsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            saveToLocalStorage('tutors', activeTutors);
+        }
         
         if (activeTutors.length === 0) {
             alert("No active tutors available. Please add tutors first.");
@@ -2875,30 +2874,35 @@ window.approveEnrollmentModal = async function(enrollmentId) {
             `<option value="${tutor.email}">${tutor.name} (${tutor.email})</option>`
         ).join('');
         
-        // Get academic days and time from enrollment
-        const firstStudent = enrollment.students && enrollment.students.length > 0 ? enrollment.students[0] : {};
-        const academicDays = firstStudent.academicDays || enrollment.academicDays || '';
-        const academicTime = firstStudent.academicTime || enrollment.academicTime || '';
-        
         const modalHtml = `
             <div id="approveEnrollmentModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-center justify-center">
-                <div class="relative p-8 bg-white w-96 max-w-lg rounded-lg shadow-xl">
+                <div class="relative p-8 bg-white w-96 max-w-4xl rounded-lg shadow-xl">
                     <button class="absolute top-2 right-2 text-gray-500 hover:text-gray-800 text-2xl font-bold" onclick="closeManagementModal('approveEnrollmentModal')">&times;</button>
                     <h3 class="text-xl font-bold mb-4">Approve Enrollment</h3>
                     <form id="approve-enrollment-form">
                         <input type="hidden" id="approve-enrollment-id" value="${enrollmentId}">
                         
-                        <div class="mb-4">
-                            <label class="block text-sm font-medium mb-2">Payment Method</label>
-                            <select id="payment-method" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2">
-                                <option value="">Select payment method</option>
-                                <option value="bank_transfer">Bank Transfer</option>
-                                <option value="credit_card">Credit Card</option>
-                                <option value="debit_card">Debit Card</option>
-                                <option value="cash">Cash</option>
-                                <option value="online_payment">Online Payment</option>
-                                <option value="pos">POS</option>
-                            </select>
+                        <div class="grid grid-cols-2 gap-4 mb-4">
+                            <div>
+                                <label class="block text-sm font-medium mb-2">Payment Method</label>
+                                <select id="payment-method" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2">
+                                    <option value="">Select payment method</option>
+                                    <option value="bank_transfer">Bank Transfer</option>
+                                    <option value="credit_card">Credit Card</option>
+                                    <option value="debit_card">Debit Card</option>
+                                    <option value="cash">Cash</option>
+                                    <option value="online_payment">Online Payment</option>
+                                    <option value="pos">POS</option>
+                                </select>
+                            </div>
+                            
+                            <div>
+                                <label class="block text-sm font-medium mb-2">Payment Status</label>
+                                <select id="payment-status" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2">
+                                    <option value="completed">Completed (Not Paid)</option>
+                                    <option value="payment_received">Payment Received</option>
+                                </select>
+                            </div>
                         </div>
                         
                         <div class="mb-4">
@@ -2912,25 +2916,25 @@ window.approveEnrollmentModal = async function(enrollmentId) {
                         </div>
                         
                         <div class="mb-4">
-                            <label class="block text-sm font-medium mb-2">Academic Days</label>
-                            <input type="text" id="academic-days" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2" value="${academicDays}" placeholder="e.g., Monday, Wednesday, Friday">
-                        </div>
-                        
-                        <div class="mb-4">
-                            <label class="block text-sm font-medium mb-2">Academic Time</label>
-                            <input type="text" id="academic-time" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2" value="${academicTime}" placeholder="e.g., 3:00 PM - 5:00 PM">
-                        </div>
-                        
-                        <div class="mb-4">
                             <label class="block text-sm font-medium mb-2">Assign Tutor (for each student)</label>
-                            <div id="student-tutor-assignments">
+                            <div class="flex items-center mb-2">
+                                <input type="text" id="tutor-search" placeholder="Search for tutor..." class="flex-1 p-2 border rounded-md mr-2">
+                                <span class="text-sm text-gray-500">${activeTutors.length} tutors available</span>
+                            </div>
+                            <div id="student-tutor-assignments" class="max-h-60 overflow-y-auto border rounded-md p-2">
                                 ${enrollment.students ? enrollment.students.map((student, index) => `
-                                    <div class="mb-3 p-2 border rounded">
-                                        <p class="text-sm font-medium mb-1">${student.name}</p>
-                                        <select name="tutor-assignment-${index}" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-1 text-sm">
-                                            <option value="">Select tutor...</option>
-                                            ${tutorOptions}
-                                        </select>
+                                    <div class="mb-3 p-3 border rounded bg-gray-50">
+                                        <div class="flex items-center justify-between mb-2">
+                                            <p class="text-sm font-medium">${student.name}</p>
+                                            <span class="text-xs text-gray-500">Grade: ${student.grade || 'N/A'}</span>
+                                        </div>
+                                        <div class="relative">
+                                            <select name="tutor-assignment-${index}" required class="tutor-select mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2 text-sm">
+                                                <option value="">Select tutor...</option>
+                                                ${tutorOptions}
+                                            </select>
+                                            <div class="tutor-search-results hidden absolute z-10 w-full mt-1 bg-white border rounded-md shadow-lg max-h-48 overflow-y-auto"></div>
+                                        </div>
                                     </div>
                                 `).join('') : ''}
                             </div>
@@ -2953,6 +2957,100 @@ window.approveEnrollmentModal = async function(enrollmentId) {
         
         document.body.insertAdjacentHTML('beforeend', modalHtml);
         
+        // Setup tutor search functionality
+        const tutorSearchInput = document.getElementById('tutor-search');
+        const tutorSelects = document.querySelectorAll('.tutor-select');
+        
+        tutorSearchInput.addEventListener('input', (e) => {
+            const searchTerm = e.target.value.toLowerCase();
+            
+            tutorSelects.forEach((select, index) => {
+                const options = Array.from(select.options);
+                options.forEach(option => {
+                    const text = option.text.toLowerCase();
+                    option.style.display = text.includes(searchTerm) || option.value === '' ? '' : 'none';
+                });
+            });
+        });
+        
+        // Also setup individual search for each tutor select
+        tutorSelects.forEach(select => {
+            select.addEventListener('focus', () => {
+                const wrapper = select.parentElement;
+                const resultsDiv = wrapper.querySelector('.tutor-search-results');
+                
+                // Clear previous results
+                resultsDiv.innerHTML = '';
+                resultsDiv.classList.add('hidden');
+                
+                // Get all tutors
+                const allTutors = activeTutors.map(tutor => ({
+                    email: tutor.email,
+                    name: tutor.name
+                }));
+                
+                // Create searchable dropdown
+                const searchInput = document.createElement('input');
+                searchInput.type = 'text';
+                searchInput.placeholder = 'Type to search tutors...';
+                searchInput.className = 'w-full p-2 border-b focus:outline-none';
+                resultsDiv.appendChild(searchInput);
+                
+                const listDiv = document.createElement('div');
+                resultsDiv.appendChild(listDiv);
+                
+                function updateResults(searchTerm = '') {
+                    listDiv.innerHTML = '';
+                    
+                    const filteredTutors = allTutors.filter(tutor => 
+                        !searchTerm || 
+                        tutor.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                        tutor.email.toLowerCase().includes(searchTerm.toLowerCase())
+                    );
+                    
+                    if (filteredTutors.length === 0) {
+                        const noResults = document.createElement('div');
+                        noResults.className = 'p-3 text-gray-500 text-center';
+                        noResults.textContent = 'No tutors found';
+                        listDiv.appendChild(noResults);
+                    } else {
+                        filteredTutors.forEach(tutor => {
+                            const optionDiv = document.createElement('div');
+                            optionDiv.className = 'p-3 hover:bg-gray-100 cursor-pointer border-b';
+                            optionDiv.innerHTML = `
+                                <div class="font-medium">${tutor.name}</div>
+                                <div class="text-xs text-gray-500">${tutor.email}</div>
+                            `;
+                            
+                            optionDiv.addEventListener('click', () => {
+                                select.value = tutor.email;
+                                resultsDiv.classList.add('hidden');
+                            });
+                            
+                            listDiv.appendChild(optionDiv);
+                        });
+                    }
+                }
+                
+                updateResults();
+                
+                searchInput.addEventListener('input', (e) => {
+                    updateResults(e.target.value);
+                });
+                
+                resultsDiv.classList.remove('hidden');
+            });
+            
+            select.addEventListener('blur', () => {
+                setTimeout(() => {
+                    const resultsDiv = select.parentElement.querySelector('.tutor-search-results');
+                    if (resultsDiv) {
+                        resultsDiv.classList.add('hidden');
+                    }
+                }, 200);
+            });
+        });
+        
         document.getElementById('approve-enrollment-form').addEventListener('submit', async (e) => {
             e.preventDefault();
             await approveEnrollmentWithDetails(enrollmentId);
@@ -2969,14 +3067,18 @@ async function approveEnrollmentWithDetails(enrollmentId) {
     if (!form) return;
     
     const paymentMethod = form.elements['payment-method'].value;
+    const paymentStatus = form.elements['payment-status'].value;
     const paymentReference = form.elements['payment-reference'].value;
     const paymentDate = form.elements['payment-date'].value;
     const finalFee = parseFloat(form.elements['final-fee'].value);
-    const academicDays = form.elements['academic-days'].value;
-    const academicTime = form.elements['academic-time'].value;
     
     if (!paymentMethod) {
         alert("Please select a payment method.");
+        return;
+    }
+    
+    if (!paymentStatus) {
+        alert("Please select a payment status.");
         return;
     }
     
@@ -2995,15 +3097,18 @@ async function approveEnrollmentWithDetails(enrollmentId) {
         enrollmentData.students.forEach((student, index) => {
             const tutorEmail = form.elements[`tutor-assignment-${index}`].value;
             if (tutorEmail) {
+                // Get tutor name from cache
+                const tutor = sessionCache.tutors?.find(t => t.email === tutorEmail);
+                const tutorName = tutor ? tutor.name : tutorEmail;
+                
                 studentAssignments.push({
                     studentName: student.name,
                     studentId: `pending_${Date.now()}_${index}`,
                     tutorEmail: tutorEmail,
+                    tutorName: tutorName,
                     grade: student.grade,
                     subjects: student.selectedSubjects || [],
-                    academicDays: academicDays,
-                    academicTime: academicTime,
-                    days: academicDays, // For backward compatibility
+                    days: 'To be determined',
                     studentFee: Math.round(finalFee / enrollmentData.students.length)
                 });
             }
@@ -3014,11 +3119,18 @@ async function approveEnrollmentWithDetails(enrollmentId) {
             return;
         }
         
+        // Check if all students have tutors assigned
+        const hasEmptyAssignments = studentAssignments.some(assignment => !assignment.tutorEmail);
+        if (hasEmptyAssignments) {
+            alert("Please assign a tutor to each student.");
+            return;
+        }
+        
         const batch = writeBatch(db);
         
         // Update enrollment status
         batch.update(doc(db, "enrollments", enrollmentId), {
-            status: 'completed',
+            status: paymentStatus,
             payment: {
                 method: paymentMethod,
                 reference: paymentReference || '',
@@ -3028,8 +3140,6 @@ async function approveEnrollmentWithDetails(enrollmentId) {
                 approvedAt: Timestamp.now()
             },
             finalFee: finalFee,
-            academicDays: academicDays,
-            academicTime: academicTime,
             approvedAt: Timestamp.now(),
             approvedBy: window.userData?.email || 'management',
             lastUpdated: Timestamp.now()
@@ -3103,11 +3213,6 @@ window.downloadEnrollmentInvoice = async function(enrollmentId) {
         const invoiceDate = new Date(enrollment.approvedAt || enrollment.createdAt || Date.now());
         const invoiceNumber = `INV-${enrollmentId.substring(0, 8).toUpperCase()}`;
         
-        // Get academic days and time
-        const firstStudent = enrollment.students && enrollment.students.length > 0 ? enrollment.students[0] : {};
-        const academicDays = firstStudent.academicDays || enrollment.academicDays || 'Not specified';
-        const academicTime = firstStudent.academicTime || enrollment.academicTime || 'Not specified';
-        
         const invoiceHTML = `
             <!DOCTYPE html>
             <html>
@@ -3150,8 +3255,7 @@ window.downloadEnrollmentInvoice = async function(enrollmentId) {
                             <strong>Invoice Details:</strong><br>
                             Status: ${enrollment.status || 'Completed'}<br>
                             Approved By: ${enrollment.payment?.approvedBy || window.userData?.name || 'Management'}<br>
-                            Payment Method: ${enrollment.payment?.method || 'Not specified'}<br>
-                            Schedule: ${academicDays} • ${academicTime}
+                            Payment Method: ${enrollment.payment?.method || 'Not specified'}
                         </div>
                     </div>
                     
@@ -3228,25 +3332,21 @@ window.downloadEnrollmentInvoice = async function(enrollmentId) {
             </html>
         `;
         
-        // Convert HTML to image using html2canvas
-        const newWindow = window.open();
-        newWindow.document.write(invoiceHTML);
-        newWindow.document.close();
+        // Create a Blob from the HTML
+        const blob = new Blob([invoiceHTML], { type: 'text/html' });
         
-        // Give time for page to load
-        setTimeout(() => {
-            html2canvas(newWindow.document.body).then(canvas => {
-                const imgData = canvas.toDataURL('image/jpeg');
-                const link = document.createElement('a');
-                link.href = imgData;
-                link.download = `Invoice_${invoiceNumber}.jpg`;
-                link.click();
-                newWindow.close();
-            }).catch(error => {
-                console.error("Error generating invoice image:", error);
-                alert("Failed to generate invoice image. The invoice has been opened in a new window.");
-            });
-        }, 1000);
+        // Create a link element
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = `Invoice_${invoiceNumber}.html`;
+        
+        // Append to the document, trigger click, and remove
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        
+        // Clean up the URL object
+        URL.revokeObjectURL(link.href);
         
     } catch (error) {
         console.error("Error downloading invoice:", error);
@@ -5264,6 +5364,7 @@ onAuthStateChanged(auth, async (user) => {
         window.location.href = "management-auth.html";
     }
 });
+
 
 
 
