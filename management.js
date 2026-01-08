@@ -2382,6 +2382,7 @@ async function renderEnrollmentsPanel(container) {
                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Parent Email</th>
                             <th class="px6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Parent Phone</th>
                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Students</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Days/Time</th>
                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total Fee</th>
                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Referral Code</th>
                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
@@ -2391,7 +2392,7 @@ async function renderEnrollmentsPanel(container) {
                     </thead>
                     <tbody id="enrollments-list" class="bg-white divide-y divide-gray-200">
                         <tr>
-                            <td colspan="10" class="px-6 py-4 text-center text-gray-500">Loading enrollments...</td>
+                            <td colspan="11" class="px-6 py-4 text-center text-gray-500">Loading enrollments...</td>
                         </tr>
                     </tbody>
                 </table>
@@ -2418,7 +2419,7 @@ async function fetchAndRenderEnrollments(forceRefresh = false) {
 
     try {
         if (!sessionCache.enrollments || forceRefresh) {
-            enrollmentsList.innerHTML = `<tr><td colspan="10" class="px-6 py-4 text-center text-gray-500">Fetching enrollments...</td></tr>`;
+            enrollmentsList.innerHTML = `<tr><td colspan="11" class="px-6 py-4 text-center text-gray-500">Fetching enrollments...</td></tr>`;
             
             const snapshot = await getDocs(query(collection(db, "enrollments"), orderBy("createdAt", "desc")));
             const enrollmentsData = snapshot.docs.map(doc => ({ 
@@ -2432,7 +2433,7 @@ async function fetchAndRenderEnrollments(forceRefresh = false) {
         renderEnrollmentsFromCache();
     } catch (error) {
         console.error("Error fetching enrollments:", error);
-        enrollmentsList.innerHTML = `<tr><td colspan="10" class="px-6 py-4 text-center text-red-500">Failed to load enrollments: ${error.message}</td></tr>`;
+        enrollmentsList.innerHTML = `<tr><td colspan="11" class="px-6 py-4 text-center text-red-500">Failed to load enrollments: ${error.message}</td></tr>`;
     }
 }
 
@@ -2542,7 +2543,7 @@ function renderEnrollmentsFromCache(searchTerm = '') {
     if (filteredEnrollments.length === 0) {
         enrollmentsList.innerHTML = `
             <tr>
-                <td colspan="10" class="px-6 py-4 text-center text-gray-500">
+                <td colspan="11" class="px-6 py-4 text-center text-gray-500">
                     No enrollments found${searchTerm ? ` for "${searchTerm}"` : ''}.
                 </td>
             </tr>
@@ -2575,6 +2576,12 @@ function renderEnrollmentsFromCache(searchTerm = '') {
         
         const studentCount = enrollment.students?.length || 0;
         const studentNames = enrollment.students?.map(s => s.name).join(', ') || 'No students';
+        
+        // Extract academicDays and academicTime from the first student or enrollment
+        const firstStudent = enrollment.students && enrollment.students.length > 0 ? enrollment.students[0] : {};
+        const academicDays = firstStudent.academicDays || enrollment.academicDays || 'Not specified';
+        const academicTime = firstStudent.academicTime || enrollment.academicTime || 'Not specified';
+        const daysTimeDisplay = `${academicDays} • ${academicTime}`;
         
         let statusBadge = '';
         switch(enrollment.status) {
@@ -2609,6 +2616,9 @@ function renderEnrollmentsFromCache(searchTerm = '') {
                 <td class="px-6 py-4">
                     <div class="text-sm text-gray-900">${studentCount} student(s)</div>
                     <div class="text-xs text-gray-500 truncate max-w-xs">${studentNames}</div>
+                </td>
+                <td class="px-6 py-4 text-sm text-gray-600">
+                    <div class="text-xs">${daysTimeDisplay}</div>
                 </td>
                 <td class="px-6 py-4 text-sm font-semibold text-green-600">${formattedFee}</td>
                 <td class="px-6 py-4 text-sm">
@@ -2682,6 +2692,10 @@ window.showEnrollmentDetails = async function(enrollmentId) {
                     testPrepHTML = `<p class="text-sm"><strong>Test Prep:</strong> ${student.testPrep.map(t => `${t.name} (${t.hours} hrs)`).join(', ')}</p>`;
                 }
                 
+                // Academic days and time for this student
+                const academicDays = student.academicDays || enrollment.academicDays || 'Not specified';
+                const academicTime = student.academicTime || enrollment.academicTime || 'Not specified';
+                
                 return `
                     <div class="border rounded-lg p-4 mb-3 bg-gray-50">
                         <h4 class="font-bold text-lg mb-2">${student.name || 'Unnamed Student'}</h4>
@@ -2692,6 +2706,8 @@ window.showEnrollmentDetails = async function(enrollmentId) {
                             <p><strong>Gender:</strong> ${student.gender || 'N/A'}</p>
                             <p><strong>Learning Style:</strong> ${student.learningStyle || 'N/A'}</p>
                             <p><strong>School:</strong> ${student.school || 'N/A'}</p>
+                            <p><strong>Academic Days:</strong> ${academicDays}</p>
+                            <p><strong>Academic Time:</strong> ${academicTime}</p>
                         </div>
                         ${subjectsHTML}
                         ${extracurricularHTML}
@@ -2861,6 +2877,11 @@ window.approveEnrollmentModal = async function(enrollmentId) {
             `<option value="${tutor.email}">${tutor.name} (${tutor.email})</option>`
         ).join('');
         
+        // Get academic days and time from enrollment
+        const firstStudent = enrollment.students && enrollment.students.length > 0 ? enrollment.students[0] : {};
+        const academicDays = firstStudent.academicDays || enrollment.academicDays || '';
+        const academicTime = firstStudent.academicTime || enrollment.academicTime || '';
+        
         const modalHtml = `
             <div id="approveEnrollmentModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-center justify-center">
                 <div class="relative p-8 bg-white w-96 max-w-lg rounded-lg shadow-xl">
@@ -2890,6 +2911,16 @@ window.approveEnrollmentModal = async function(enrollmentId) {
                         <div class="mb-4">
                             <label class="block text-sm font-medium mb-2">Payment Date</label>
                             <input type="date" id="payment-date" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2" value="${new Date().toISOString().split('T')[0]}">
+                        </div>
+                        
+                        <div class="mb-4">
+                            <label class="block text-sm font-medium mb-2">Academic Days</label>
+                            <input type="text" id="academic-days" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2" value="${academicDays}" placeholder="e.g., Monday, Wednesday, Friday">
+                        </div>
+                        
+                        <div class="mb-4">
+                            <label class="block text-sm font-medium mb-2">Academic Time</label>
+                            <input type="text" id="academic-time" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2" value="${academicTime}" placeholder="e.g., 3:00 PM - 5:00 PM">
                         </div>
                         
                         <div class="mb-4">
@@ -2943,6 +2974,8 @@ async function approveEnrollmentWithDetails(enrollmentId) {
     const paymentReference = form.elements['payment-reference'].value;
     const paymentDate = form.elements['payment-date'].value;
     const finalFee = parseFloat(form.elements['final-fee'].value);
+    const academicDays = form.elements['academic-days'].value;
+    const academicTime = form.elements['academic-time'].value;
     
     if (!paymentMethod) {
         alert("Please select a payment method.");
@@ -2970,7 +3003,9 @@ async function approveEnrollmentWithDetails(enrollmentId) {
                     tutorEmail: tutorEmail,
                     grade: student.grade,
                     subjects: student.selectedSubjects || [],
-                    days: 'To be determined',
+                    academicDays: academicDays,
+                    academicTime: academicTime,
+                    days: academicDays, // For backward compatibility
                     studentFee: Math.round(finalFee / enrollmentData.students.length)
                 });
             }
@@ -2995,6 +3030,8 @@ async function approveEnrollmentWithDetails(enrollmentId) {
                 approvedAt: Timestamp.now()
             },
             finalFee: finalFee,
+            academicDays: academicDays,
+            academicTime: academicTime,
             approvedAt: Timestamp.now(),
             approvedBy: window.userData?.email || 'management',
             lastUpdated: Timestamp.now()
@@ -3068,6 +3105,11 @@ window.downloadEnrollmentInvoice = async function(enrollmentId) {
         const invoiceDate = new Date(enrollment.approvedAt || enrollment.createdAt || Date.now());
         const invoiceNumber = `INV-${enrollmentId.substring(0, 8).toUpperCase()}`;
         
+        // Get academic days and time
+        const firstStudent = enrollment.students && enrollment.students.length > 0 ? enrollment.students[0] : {};
+        const academicDays = firstStudent.academicDays || enrollment.academicDays || 'Not specified';
+        const academicTime = firstStudent.academicTime || enrollment.academicTime || 'Not specified';
+        
         const invoiceHTML = `
             <!DOCTYPE html>
             <html>
@@ -3110,7 +3152,8 @@ window.downloadEnrollmentInvoice = async function(enrollmentId) {
                             <strong>Invoice Details:</strong><br>
                             Status: ${enrollment.status || 'Completed'}<br>
                             Approved By: ${enrollment.payment?.approvedBy || window.userData?.name || 'Management'}<br>
-                            Payment Method: ${enrollment.payment?.method || 'Not specified'}
+                            Payment Method: ${enrollment.payment?.method || 'Not specified'}<br>
+                            Schedule: ${academicDays} • ${academicTime}
                         </div>
                     </div>
                     
@@ -5223,3 +5266,4 @@ onAuthStateChanged(auth, async (user) => {
         window.location.href = "management-auth.html";
     }
 });
+
