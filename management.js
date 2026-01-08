@@ -2556,6 +2556,7 @@ async function renderTutorReportsPanel(container) {
                         <div id="pdf-progress-bar" class="bg-green-600 h-4 rounded-full transition-all duration-300" style="width: 0%"></div>
                     </div>
                     <p id="pdf-progress-text" class="text-center text-sm text-gray-600">0%</p>
+                    <div id="pdf-error-message" class="mt-4 text-red-600 hidden"></div>
                 </div>
             </div>
 
@@ -2640,7 +2641,10 @@ async function renderTutorReportsPanel(container) {
             const endDate = document.getElementById('reports-end-date').value;
             link.href = URL.createObjectURL(blob);
             link.download = `Tutor_Reports_${startDate}_to_${endDate}.csv`;
+            document.body.appendChild(link);
             link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(link.href);
         } catch (error) {
             console.error('Error exporting CSV:', error);
             alert('Failed to export CSV. Please try again.');
@@ -2820,7 +2824,7 @@ async function renderTutorReportsPanel(container) {
                                     👁️ Preview
                                 </button>
                                 ${canDownload ? `
-                                    <button onclick="downloadSingleReport('${report.id}', event)" 
+                                    <button onclick="downloadSingleReport('${report.id}')" 
                                             class="bg-green-600 text-white px-3 py-1 rounded text-xs hover:bg-green-700">
                                         📥 Download
                                     </button>
@@ -2873,6 +2877,604 @@ async function renderTutorReportsPanel(container) {
         });
 
         reportsListContainer.innerHTML = html;
+    }
+
+    // Add the missing functions that are referenced in the HTML
+    window.downloadSingleReport = async function(reportId) {
+        try {
+            const report = allReports.find(r => r.id === reportId);
+            if (!report) {
+                throw new Error('Report not found');
+            }
+
+            showPdfProgressModal('Generating report PDF...', 0);
+            
+            // Create PDF content
+            const pdfContent = generateReportPdfContent(report);
+            
+            updatePdfProgress('Creating PDF document...', 50);
+            
+            // Use jsPDF to generate PDF
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF();
+            
+            // Set document properties
+            doc.setProperties({
+                title: `Tutor Report - ${report.studentName} - ${report.tutorName}`,
+                subject: 'Tutor Progress Report',
+                author: report.tutorName,
+                keywords: 'tutor, report, progress, student',
+                creator: 'Tutor Management System'
+            });
+
+            // Add content to PDF
+            const pageWidth = doc.internal.pageSize.getWidth();
+            const margin = 20;
+            let yPos = margin;
+            
+            // Title
+            doc.setFontSize(20);
+            doc.setFont('helvetica', 'bold');
+            doc.text('TUTOR PROGRESS REPORT', pageWidth / 2, yPos, { align: 'center' });
+            yPos += 15;
+            
+            // Horizontal line
+            doc.setDrawColor(0);
+            doc.setLineWidth(0.5);
+            doc.line(margin, yPos, pageWidth - margin, yPos);
+            yPos += 10;
+            
+            // Report details table
+            const details = [
+                ['Tutor:', report.tutorName || 'N/A'],
+                ['Tutor Email:', report.tutorEmail || 'N/A'],
+                ['Student:', report.studentName || 'N/A'],
+                ['Parent:', report.parentName || 'N/A'],
+                ['Grade:', report.grade || 'N/A'],
+                ['Submission Date:', report.submittedAt ? 
+                    new Date(report.submittedAt.seconds * 1000).toLocaleDateString() : 'N/A']
+            ];
+            
+            doc.setFontSize(12);
+            doc.setFont('helvetica', 'normal');
+            
+            details.forEach(([label, value]) => {
+                if (yPos > 250) {
+                    doc.addPage();
+                    yPos = margin;
+                }
+                doc.setFont('helvetica', 'bold');
+                doc.text(label, margin, yPos);
+                doc.setFont('helvetica', 'normal');
+                doc.text(value, margin + 40, yPos);
+                yPos += 8;
+            });
+            
+            yPos += 5;
+            
+            // Topics Covered
+            if (yPos > 230) {
+                doc.addPage();
+                yPos = margin;
+            }
+            doc.setFont('helvetica', 'bold');
+            doc.setFontSize(14);
+            doc.text('TOPICS COVERED:', margin, yPos);
+            yPos += 8;
+            doc.setFont('helvetica', 'normal');
+            doc.setFontSize(11);
+            const topicsLines = doc.splitTextToSize(report.topics || 'No topics provided', pageWidth - 2 * margin);
+            topicsLines.forEach(line => {
+                if (yPos > 250) {
+                    doc.addPage();
+                    yPos = margin;
+                }
+                doc.text(line, margin, yPos);
+                yPos += 7;
+            });
+            
+            yPos += 5;
+            
+            // Progress
+            if (yPos > 230) {
+                doc.addPage();
+                yPos = margin;
+            }
+            doc.setFont('helvetica', 'bold');
+            doc.setFontSize(14);
+            doc.text('PROGRESS:', margin, yPos);
+            yPos += 8;
+            doc.setFont('helvetica', 'normal');
+            doc.setFontSize(11);
+            const progressLines = doc.splitTextToSize(report.progress || 'No progress reported', pageWidth - 2 * margin);
+            progressLines.forEach(line => {
+                if (yPos > 250) {
+                    doc.addPage();
+                    yPos = margin;
+                }
+                doc.text(line, margin, yPos);
+                yPos += 7;
+            });
+            
+            yPos += 5;
+            
+            // Strengths & Weaknesses
+            if (report.strengthsWeaknesses) {
+                if (yPos > 230) {
+                    doc.addPage();
+                    yPos = margin;
+                }
+                doc.setFont('helvetica', 'bold');
+                doc.setFontSize(14);
+                doc.text('STRENGTHS & WEAKNESSES:', margin, yPos);
+                yPos += 8;
+                doc.setFont('helvetica', 'normal');
+                doc.setFontSize(11);
+                const strengthsLines = doc.splitTextToSize(report.strengthsWeaknesses, pageWidth - 2 * margin);
+                strengthsLines.forEach(line => {
+                    if (yPos > 250) {
+                        doc.addPage();
+                        yPos = margin;
+                    }
+                    doc.text(line, margin, yPos);
+                    yPos += 7;
+                });
+                yPos += 5;
+            }
+            
+            // Recommendations
+            if (report.recommendations) {
+                if (yPos > 230) {
+                    doc.addPage();
+                    yPos = margin;
+                }
+                doc.setFont('helvetica', 'bold');
+                doc.setFontSize(14);
+                doc.text('RECOMMENDATIONS:', margin, yPos);
+                yPos += 8;
+                doc.setFont('helvetica', 'normal');
+                doc.setFontSize(11);
+                const recommendationsLines = doc.splitTextToSize(report.recommendations, pageWidth - 2 * margin);
+                recommendationsLines.forEach(line => {
+                    if (yPos > 250) {
+                        doc.addPage();
+                        yPos = margin;
+                    }
+                    doc.text(line, margin, yPos);
+                    yPos += 7;
+                });
+            }
+            
+            // Footer
+            const totalPages = doc.getNumberOfPages();
+            for (let i = 1; i <= totalPages; i++) {
+                doc.setPage(i);
+                doc.setFontSize(8);
+                doc.setTextColor(128);
+                doc.text(`Page ${i} of ${totalPages}`, pageWidth - margin, 290, { align: 'right' });
+                doc.text('Generated by Tutor Management System', margin, 290);
+            }
+
+            updatePdfProgress('Finalizing PDF...', 90);
+            
+            // Generate and download
+            const fileName = `Tutor_Report_${report.tutorName.replace(/\s+/g, '_')}_${report.studentName.replace(/\s+/g, '_')}_${Date.now()}.pdf`;
+            doc.save(fileName);
+            
+            updatePdfProgress('Download complete!', 100);
+            
+            // Hide modal after a brief delay
+            setTimeout(() => {
+                hidePdfProgressModal();
+            }, 1000);
+            
+        } catch (error) {
+            console.error('Error generating PDF:', error);
+            showPdfError(`Failed to generate PDF: ${error.message}`);
+        }
+    };
+
+    window.zipAndDownloadTutorReports = async function(reports, tutorName, buttonElement) {
+        try {
+            if (!reports || reports.length === 0) {
+                throw new Error('No reports to download');
+            }
+
+            showPdfProgressModal(`Preparing ${reports.length} reports for download...`, 0);
+            
+            // Disable button during processing
+            if (buttonElement) {
+                buttonElement.disabled = true;
+                buttonElement.innerHTML = '⏳ Processing...';
+            }
+            
+            const zip = new JSZip();
+            let processedCount = 0;
+            
+            for (const report of reports) {
+                try {
+                    updatePdfProgress(`Generating report: ${report.studentName}`, 
+                        Math.round((processedCount / reports.length) * 90));
+                    
+                    const { jsPDF } = window.jspdf;
+                    const doc = new jsPDF();
+                    
+                    // Set document properties
+                    doc.setProperties({
+                        title: `Tutor Report - ${report.studentName} - ${report.tutorName}`,
+                        subject: 'Tutor Progress Report',
+                        author: report.tutorName,
+                        keywords: 'tutor, report, progress, student',
+                        creator: 'Tutor Management System'
+                    });
+
+                    const pageWidth = doc.internal.pageSize.getWidth();
+                    const margin = 20;
+                    let yPos = margin;
+                    
+                    // Title
+                    doc.setFontSize(20);
+                    doc.setFont('helvetica', 'bold');
+                    doc.text('TUTOR PROGRESS REPORT', pageWidth / 2, yPos, { align: 'center' });
+                    yPos += 15;
+                    
+                    // Horizontal line
+                    doc.setDrawColor(0);
+                    doc.setLineWidth(0.5);
+                    doc.line(margin, yPos, pageWidth - margin, yPos);
+                    yPos += 10;
+                    
+                    // Report details
+                    const details = [
+                        ['Tutor:', report.tutorName || 'N/A'],
+                        ['Tutor Email:', report.tutorEmail || 'N/A'],
+                        ['Student:', report.studentName || 'N/A'],
+                        ['Parent:', report.parentName || 'N/A'],
+                        ['Grade:', report.grade || 'N/A'],
+                        ['Submission Date:', report.submittedAt ? 
+                            new Date(report.submittedAt.seconds * 1000).toLocaleDateString() : 'N/A']
+                    ];
+                    
+                    doc.setFontSize(12);
+                    doc.setFont('helvetica', 'normal');
+                    
+                    details.forEach(([label, value]) => {
+                        if (yPos > 250) {
+                            doc.addPage();
+                            yPos = margin;
+                        }
+                        doc.setFont('helvetica', 'bold');
+                        doc.text(label, margin, yPos);
+                        doc.setFont('helvetica', 'normal');
+                        doc.text(value, margin + 40, yPos);
+                        yPos += 8;
+                    });
+                    
+                    yPos += 5;
+                    
+                    // Add all sections
+                    const sections = [
+                        { title: 'TOPICS COVERED:', content: report.topics },
+                        { title: 'PROGRESS:', content: report.progress },
+                        { title: 'STRENGTHS & WEAKNESSES:', content: report.strengthsWeaknesses },
+                        { title: 'RECOMMENDATIONS:', content: report.recommendations }
+                    ];
+                    
+                    for (const section of sections) {
+                        if (!section.content) continue;
+                        
+                        if (yPos > 230) {
+                            doc.addPage();
+                            yPos = margin;
+                        }
+                        doc.setFont('helvetica', 'bold');
+                        doc.setFontSize(14);
+                        doc.text(section.title, margin, yPos);
+                        yPos += 8;
+                        doc.setFont('helvetica', 'normal');
+                        doc.setFontSize(11);
+                        const contentLines = doc.splitTextToSize(section.content, pageWidth - 2 * margin);
+                        contentLines.forEach(line => {
+                            if (yPos > 250) {
+                                doc.addPage();
+                                yPos = margin;
+                            }
+                            doc.text(line, margin, yPos);
+                            yPos += 7;
+                        });
+                        yPos += 5;
+                    }
+                    
+                    // Footer
+                    const totalPages = doc.getNumberOfPages();
+                    for (let i = 1; i <= totalPages; i++) {
+                        doc.setPage(i);
+                        doc.setFontSize(8);
+                        doc.setTextColor(128);
+                        doc.text(`Page ${i} of ${totalPages}`, pageWidth - margin, 290, { align: 'right' });
+                        doc.text('Generated by Tutor Management System', margin, 290);
+                    }
+                    
+                    // Generate PDF blob
+                    const pdfBlob = doc.output('blob');
+                    
+                    // Sanitize filename
+                    const safeStudentName = report.studentName.replace(/[^\w\s]/gi, '_').replace(/\s+/g, '_');
+                    const safeDate = report.submittedAt ? 
+                        new Date(report.submittedAt.seconds * 1000).toISOString().split('T')[0] : 
+                        'unknown_date';
+                    
+                    const fileName = `Report_${safeStudentName}_${safeDate}.pdf`;
+                    zip.file(fileName, pdfBlob);
+                    
+                    processedCount++;
+                    
+                } catch (error) {
+                    console.error(`Error processing report ${report.id}:`, error);
+                    // Continue with other reports
+                }
+            }
+            
+            if (processedCount === 0) {
+                throw new Error('Failed to generate any PDF files');
+            }
+            
+            updatePdfProgress('Creating ZIP archive...', 95);
+            
+            // Generate ZIP file
+            const zipBlob = await zip.generateAsync({ type: 'blob' });
+            
+            // Download ZIP
+            const link = document.createElement('a');
+            const safeTutorName = tutorName.replace(/[^\w\s]/gi, '_').replace(/\s+/g, '_');
+            link.href = URL.createObjectURL(zipBlob);
+            link.download = `Tutor_Reports_${safeTutorName}_${Date.now()}.zip`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(link.href);
+            
+            updatePdfProgress('Download complete!', 100);
+            
+            // Re-enable button
+            if (buttonElement) {
+                setTimeout(() => {
+                    buttonElement.disabled = false;
+                    buttonElement.innerHTML = `
+                        <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10"></path>
+                        </svg>
+                        📦 ZIP & DOWNLOAD ALL REPORTS FOR ${tutorName.toUpperCase()}
+                    `;
+                }, 1000);
+            }
+            
+            // Hide modal after delay
+            setTimeout(() => {
+                hidePdfProgressModal();
+            }, 1500);
+            
+        } catch (error) {
+            console.error('Error creating ZIP file:', error);
+            showPdfError(`Failed to create ZIP file: ${error.message}`);
+            
+            // Re-enable button on error
+            if (buttonElement) {
+                buttonElement.disabled = false;
+                buttonElement.innerHTML = `
+                    <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10"></path>
+                    </svg>
+                    📦 ZIP & DOWNLOAD ALL REPORTS FOR ${tutorName.toUpperCase()}
+                `;
+            }
+        }
+    };
+
+    window.previewReport = function(reportId) {
+        const report = allReports.find(r => r.id === reportId);
+        if (!report) {
+            alert('Report not found');
+            return;
+        }
+        
+        // Create preview modal
+        const modal = document.createElement('div');
+        modal.className = 'fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-center justify-center';
+        modal.innerHTML = `
+            <div class="relative p-8 bg-white w-11/12 max-w-4xl max-h-[90vh] rounded-lg shadow-xl overflow-y-auto">
+                <div class="flex justify-between items-center mb-6">
+                    <h3 class="text-2xl font-bold text-green-700">Report Preview</h3>
+                    <button onclick="this.closest('.fixed').remove()" class="text-gray-500 hover:text-gray-700 text-2xl">&times;</button>
+                </div>
+                
+                <div class="space-y-6">
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <h4 class="font-bold text-gray-700">Tutor:</h4>
+                            <p>${report.tutorName || 'N/A'}</p>
+                        </div>
+                        <div>
+                            <h4 class="font-bold text-gray-700">Student:</h4>
+                            <p>${report.studentName || 'N/A'}</p>
+                        </div>
+                        <div>
+                            <h4 class="font-bold text-gray-700">Grade:</h4>
+                            <p>${report.grade || 'N/A'}</p>
+                        </div>
+                        <div>
+                            <h4 class="font-bold text-gray-700">Date:</h4>
+                            <p>${report.submittedAt ? new Date(report.submittedAt.seconds * 1000).toLocaleDateString() : 'N/A'}</p>
+                        </div>
+                    </div>
+                    
+                    ${report.topics ? `
+                        <div>
+                            <h4 class="font-bold text-gray-700 mb-2">Topics Covered:</h4>
+                            <div class="bg-gray-50 p-4 rounded-lg">${formatReportText(report.topics)}</div>
+                        </div>
+                    ` : ''}
+                    
+                    ${report.progress ? `
+                        <div>
+                            <h4 class="font-bold text-gray-700 mb-2">Progress:</h4>
+                            <div class="bg-gray-50 p-4 rounded-lg">${formatReportText(report.progress)}</div>
+                        </div>
+                    ` : ''}
+                    
+                    ${report.strengthsWeaknesses ? `
+                        <div>
+                            <h4 class="font-bold text-gray-700 mb-2">Strengths & Weaknesses:</h4>
+                            <div class="bg-gray-50 p-4 rounded-lg">${formatReportText(report.strengthsWeaknesses)}</div>
+                        </div>
+                    ` : ''}
+                    
+                    ${report.recommendations ? `
+                        <div>
+                            <h4 class="font-bold text-gray-700 mb-2">Recommendations:</h4>
+                            <div class="bg-gray-50 p-4 rounded-lg">${formatReportText(report.recommendations)}</div>
+                        </div>
+                    ` : ''}
+                </div>
+                
+                <div class="mt-8 flex justify-end space-x-4">
+                    <button onclick="this.closest('.fixed').remove()" class="bg-gray-300 text-gray-700 px-4 py-2 rounded hover:bg-gray-400">
+                        Close
+                    </button>
+                    ${canDownload ? `
+                        <button onclick="downloadSingleReport('${reportId}')" class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700">
+                            Download PDF
+                        </button>
+                    ` : ''}
+                </div>
+            </div>
+        `;
+        
+        document.body.appendChild(modal);
+        
+        function formatReportText(text) {
+            return text.replace(/\n/g, '<br>');
+        }
+    };
+
+    // Helper functions for PDF progress modal
+    function showPdfProgressModal(message, progress) {
+        const modal = document.getElementById('pdf-progress-modal');
+        const messageEl = document.getElementById('pdf-progress-message');
+        const progressBar = document.getElementById('pdf-progress-bar');
+        const progressText = document.getElementById('pdf-progress-text');
+        const errorEl = document.getElementById('pdf-error-message');
+        
+        modal.classList.remove('hidden');
+        messageEl.textContent = message;
+        progressBar.style.width = `${progress}%`;
+        progressText.textContent = `${progress}%`;
+        errorEl.classList.add('hidden');
+    }
+
+    function updatePdfProgress(message, progress) {
+        const messageEl = document.getElementById('pdf-progress-message');
+        const progressBar = document.getElementById('pdf-progress-bar');
+        const progressText = document.getElementById('pdf-progress-text');
+        
+        if (messageEl) messageEl.textContent = message;
+        if (progressBar) progressBar.style.width = `${progress}%`;
+        if (progressText) progressText.textContent = `${progress}%`;
+    }
+
+    function hidePdfProgressModal() {
+        const modal = document.getElementById('pdf-progress-modal');
+        modal.classList.add('hidden');
+    }
+
+    function showPdfError(message) {
+        const errorEl = document.getElementById('pdf-error-message');
+        errorEl.textContent = message;
+        errorEl.classList.remove('hidden');
+        
+        // Auto-hide error after 5 seconds
+        setTimeout(() => {
+            errorEl.classList.add('hidden');
+            hidePdfProgressModal();
+        }, 5000);
+    }
+
+    function generateReportPdfContent(report) {
+        // This function creates the HTML content for PDF generation
+        // It's kept as a fallback if jsPDF has issues
+        return `
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <meta charset="UTF-8">
+                <title>Tutor Report - ${report.studentName}</title>
+                <style>
+                    body { font-family: Arial, sans-serif; line-height: 1.6; margin: 40px; }
+                    .header { text-align: center; border-bottom: 2px solid #333; padding-bottom: 20px; margin-bottom: 30px; }
+                    h1 { color: #2d3748; margin-bottom: 10px; }
+                    .info-table { width: 100%; border-collapse: collapse; margin-bottom: 30px; }
+                    .info-table td { padding: 8px; border-bottom: 1px solid #ddd; }
+                    .info-table tr:last-child td { border-bottom: none; }
+                    .section { margin-bottom: 25px; }
+                    .section-title { color: #2d3748; border-bottom: 1px solid #ccc; padding-bottom: 5px; margin-bottom: 10px; font-weight: bold; }
+                    .content { padding: 10px; background: #f9f9f9; border-radius: 4px; white-space: pre-line; }
+                    .footer { margin-top: 50px; padding-top: 20px; border-top: 1px solid #ccc; font-size: 12px; color: #666; }
+                    @media print {
+                        body { margin: 20px; }
+                        .no-print { display: none; }
+                    }
+                </style>
+            </head>
+            <body>
+                <div class="header">
+                    <h1>TUTOR PROGRESS REPORT</h1>
+                    <p>Generated on ${new Date().toLocaleDateString()}</p>
+                </div>
+                
+                <table class="info-table">
+                    <tr><td><strong>Tutor:</strong></td><td>${report.tutorName || 'N/A'}</td></tr>
+                    <tr><td><strong>Tutor Email:</strong></td><td>${report.tutorEmail || 'N/A'}</td></tr>
+                    <tr><td><strong>Student:</strong></td><td>${report.studentName || 'N/A'}</td></tr>
+                    <tr><td><strong>Parent:</strong></td><td>${report.parentName || 'N/A'}</td></tr>
+                    <tr><td><strong>Grade:</strong></td><td>${report.grade || 'N/A'}</td></tr>
+                    <tr><td><strong>Submission Date:</strong></td><td>${report.submittedAt ? new Date(report.submittedAt.seconds * 1000).toLocaleDateString() : 'N/A'}</td></tr>
+                </table>
+                
+                ${report.topics ? `
+                    <div class="section">
+                        <div class="section-title">TOPICS COVERED</div>
+                        <div class="content">${report.topics}</div>
+                    </div>
+                ` : ''}
+                
+                ${report.progress ? `
+                    <div class="section">
+                        <div class="section-title">PROGRESS</div>
+                        <div class="content">${report.progress}</div>
+                    </div>
+                ` : ''}
+                
+                ${report.strengthsWeaknesses ? `
+                    <div class="section">
+                        <div class="section-title">STRENGTHS & WEAKNESSES</div>
+                        <div class="content">${report.strengthsWeaknesses}</div>
+                    </div>
+                ` : ''}
+                
+                ${report.recommendations ? `
+                    <div class="section">
+                        <div class="section-title">RECOMMENDATIONS</div>
+                        <div class="content">${report.recommendations}</div>
+                    </div>
+                ` : ''}
+                
+                <div class="footer">
+                    <p>Generated by Tutor Management System</p>
+                    <p>Document ID: ${report.id}</p>
+                </div>
+            </body>
+            </html>
+        `;
     }
 }
 
@@ -5951,6 +6553,7 @@ onAuthStateChanged(auth, async (user) => {
         window.location.href = "management-auth.html";
     }
 });
+
 
 
 
