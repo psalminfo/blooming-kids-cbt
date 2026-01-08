@@ -1262,6 +1262,84 @@
             border-radius: 6px;
             border: 1px solid #e1e5eb;
         }
+        
+        /* Preferred Tutor Selection */
+        .tutor-selection {
+            display: flex;
+            gap: 15px;
+            margin-top: 10px;
+        }
+        
+        .tutor-option {
+            flex: 1;
+            padding: 12px 15px;
+            border: 2px solid #E1E5EB;
+            border-radius: 8px;
+            background: white;
+            cursor: pointer;
+            text-align: center;
+            transition: var(--transition);
+            user-select: none;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+        
+        .tutor-option:hover {
+            border-color: var(--primary);
+            background: rgba(46, 139, 87, 0.05);
+        }
+        
+        .tutor-option.selected {
+            border-color: var(--primary);
+            background: rgba(46, 139, 87, 0.1);
+            color: var(--primary-dark);
+            font-weight: 600;
+        }
+        
+        .tutor-option i {
+            font-size: 16px;
+        }
+        
+        /* Academic Sessions Selection */
+        .academic-sessions {
+            display: flex;
+            gap: 10px;
+            margin-top: 15px;
+        }
+        
+        .session-option {
+            flex: 1;
+            padding: 10px;
+            border: 2px solid #E1E5EB;
+            border-radius: 8px;
+            background: white;
+            cursor: pointer;
+            text-align: center;
+            transition: var(--transition);
+            user-select: none;
+        }
+        
+        .session-option:hover {
+            border-color: var(--primary);
+            background: rgba(46, 139, 87, 0.05);
+        }
+        
+        .session-option.selected {
+            border-color: var(--primary);
+            background: rgba(46, 139, 87, 0.1);
+            color: var(--primary-dark);
+            font-weight: 600;
+        }
+        
+        .session-price {
+            display: block;
+            font-weight: 700;
+            color: var(--primary);
+            margin-top: 5px;
+            font-size: 14px;
+        }
     </style>
 </head>
 <body>
@@ -1585,7 +1663,7 @@
         // ENROLLMENT PORTAL - UPDATED VERSION
         // ==============================================
 
-        // CONFIGURATION
+        // CONFIGURATION - UPDATED WITH CORRECT FEES FROM IMAGES
         const CONFIG = {
             // Firebase Configuration
             FIREBASE_CONFIG: {
@@ -1635,12 +1713,32 @@
                 { id: '11plus', name: '11+ Exam Prep', rate: 15000 }
             ],
             
-            // Academic Fee Structure
+            // UPDATED: Academic Fee Structure based on the images you provided
             ACADEMIC_FEES: {
-                'preschool': 80000,
-                'grade2-4': 95000,
-                'grade5-8': 105000,
-                'grade9-12': 110000
+                // Preschool to Grade 1
+                'preschool': {
+                    'twice': 80000,
+                    'three': 95000,
+                    'five': 150000
+                },
+                // Grade 2 to 4
+                'grade2-4': {
+                    'twice': 95000,
+                    'three': 110000,
+                    'five': 170000
+                },
+                // Grade 5 to 8
+                'grade5-8': {
+                    'twice': 105000,
+                    'three': 120000,
+                    'five': 180000
+                },
+                // Grade 9 to 12
+                'grade9-12': {
+                    'twice': 110000,
+                    'three': 135000,
+                    'five': 200000
+                }
             },
             
             // Constants
@@ -1773,7 +1871,7 @@
                 // Auto-save when form changes
                 let saveTimer;
                 const setupAutoSave = () => {
-                    const formElements = document.querySelectorAll('.form-control, .subject-option, .extracurricular-card, .frequency-btn, .test-prep-hours, .day-btn, select');
+                    const formElements = document.querySelectorAll('.form-control, .subject-option, .extracurricular-card, .frequency-btn, .test-prep-hours, .day-btn, select, .tutor-option, .session-option');
                     formElements.forEach(element => {
                         element.addEventListener('change', () => {
                             if (this.isLoadingSavedData || this.isSaving) return;
@@ -1849,6 +1947,23 @@
                             <div class="error-message student-start-date-error"></div>
                         </div>
                     </div>
+                    
+                    <!-- NEW: Preferred Tutor Selection -->
+                    <div class="form-group">
+                        <label>Preferred Tutor <span class="required">*</span></label>
+                        <div class="tutor-selection">
+                            <div class="tutor-option" data-tutor="male">
+                                <i class="fas fa-male"></i> Male Tutor
+                            </div>
+                            <div class="tutor-option" data-tutor="female">
+                                <i class="fas fa-female"></i> Female Tutor
+                            </div>
+                            <div class="tutor-option" data-tutor="no-preference">
+                                <i class="fas fa-user-check"></i> No Preference
+                            </div>
+                        </div>
+                        <div class="error-message student-tutor-error"></div>
+                    </div>
 
                     <div class="course-selection-container">
                         <div class="course-tabs">
@@ -1884,6 +1999,22 @@
             
             preloadStudentSelections(studentDiv, data) {
                 if (!data) return;
+                
+                // Pre-select preferred tutor
+                if (data.preferredTutor) {
+                    const tutorOption = studentDiv.querySelector(`.tutor-option[data-tutor="${data.preferredTutor}"]`);
+                    if (tutorOption) {
+                        tutorOption.classList.add('selected');
+                    }
+                }
+                
+                // Pre-select academic sessions
+                if (data.academicSessions) {
+                    const sessionOption = studentDiv.querySelector(`.session-option[data-sessions="${data.academicSessions}"]`);
+                    if (sessionOption) {
+                        sessionOption.classList.add('selected');
+                    }
+                }
                 
                 // Pre-select academic subjects
                 if (data.selectedSubjects && data.selectedSubjects.length > 0) {
@@ -1985,7 +2116,7 @@
                 
                 const minuteOptions = CONFIG.MINUTES.map(minute => `<option value="${minute}">${minute}</option>`).join('');
 
-                // 1. Academic HTML with Days & Time
+                // 1. Academic HTML with Sessions, Days & Time
                 const academicDaysHTML = CONFIG.DAYS.map(day => `
                     <button class="day-btn academic-day-btn" data-day="${day}">${day.substring(0, 3)}</button>
                 `).join('');
@@ -1993,6 +2124,22 @@
                 const academicHTML = `
                     <div id="academic-${id}" class="tab-content active">
                         <div class="course-selection">
+                            <!-- NEW: Academic Sessions Selection -->
+                            <div class="academic-sessions">
+                                <div class="session-option" data-sessions="twice">
+                                    Twice Weekly
+                                    <span class="session-price" id="twice-price-${id}">₦0</span>
+                                </div>
+                                <div class="session-option" data-sessions="three">
+                                    3 Times Weekly
+                                    <span class="session-price" id="three-price-${id}">₦0</span>
+                                </div>
+                                <div class="session-option" data-sessions="five">
+                                    5 Times Weekly
+                                    <span class="session-price" id="five-price-${id}">₦0</span>
+                                </div>
+                            </div>
+                            
                             <p class="course-note">First 2 subjects included. Additional: <strong>+₦40,000</strong></p>
                             <div class="subjects-grid">
                                 ${CONFIG.ACADEMIC_SUBJECTS.map(subject => `
@@ -2170,7 +2317,16 @@
             }
 
             attachStudentEventListeners(studentDiv, id) {
-                // 1. Tab Switching Logic
+                // 1. Preferred Tutor Selection
+                studentDiv.querySelectorAll('.tutor-option').forEach(option => {
+                    option.addEventListener('click', () => {
+                        studentDiv.querySelectorAll('.tutor-option').forEach(opt => opt.classList.remove('selected'));
+                        option.classList.add('selected');
+                        this.updateSummary();
+                    });
+                });
+
+                // 2. Tab Switching Logic
                 const tabs = studentDiv.querySelectorAll('.course-tab');
                 tabs.forEach(tab => {
                     tab.addEventListener('click', (e) => {
@@ -2185,7 +2341,17 @@
                     });
                 });
 
-                // 2. Subject Selection
+                // 3. Academic Sessions Selection
+                studentDiv.querySelectorAll('.session-option').forEach(option => {
+                    option.addEventListener('click', () => {
+                        studentDiv.querySelectorAll('.session-option').forEach(opt => opt.classList.remove('selected'));
+                        option.classList.add('selected');
+                        this.updateSessionPrices(studentDiv);
+                        this.updateSummary();
+                    });
+                });
+
+                // 4. Subject Selection
                 studentDiv.querySelectorAll('.subject-option').forEach(option => {
                     option.addEventListener('click', () => {
                         option.classList.toggle('selected');
@@ -2193,7 +2359,7 @@
                     });
                 });
 
-                // 3. Academic Days & Time Selection
+                // 5. Academic Days & Time Selection
                 studentDiv.querySelectorAll('.academic-day-btn').forEach(btn => {
                     btn.addEventListener('click', () => {
                         btn.classList.toggle('selected');
@@ -2208,7 +2374,7 @@
                     });
                 });
 
-                // 4. Extracurricular Selection
+                // 6. Extracurricular Selection
                 studentDiv.querySelectorAll('.extracurricular-card').forEach(card => {
                     card.addEventListener('click', (e) => {
                         if (!e.target.classList.contains('frequency-btn') && 
@@ -2293,7 +2459,7 @@
                     });
                 });
 
-                // 5. Test Prep
+                // 7. Test Prep
                 studentDiv.querySelectorAll('.test-prep-hours').forEach(input => {
                     input.addEventListener('input', (e) => {
                         const card = input.closest('.test-prep-card');
@@ -2342,17 +2508,18 @@
                     });
                 });
 
-                // 6. Basic Input Validation
+                // 8. Basic Input Validation
                 studentDiv.querySelectorAll('[data-validate]').forEach(input => {
                     input.addEventListener('blur', () => this.validateField(input));
                     input.addEventListener('change', () => {
                         if (!this.isLoadingSavedData) {
+                            this.updateSessionPrices(studentDiv);
                             this.updateSummary();
                         }
                     });
                 });
 
-                // 7. Remove Button
+                // 9. Remove Button
                 const removeBtn = studentDiv.querySelector('.remove-student');
                 if(removeBtn) {
                     removeBtn.addEventListener('click', () => {
@@ -2361,6 +2528,24 @@
                             this.studentCount--;
                             this.updateRemoveButtons();
                             this.updateSummary();
+                        }
+                    });
+                }
+            }
+            
+            updateSessionPrices(studentDiv) {
+                const grade = studentDiv.querySelector('.student-grade').value;
+                const sessionOptions = studentDiv.querySelectorAll('.session-option');
+                
+                if (grade && CONFIG.ACADEMIC_FEES[grade]) {
+                    const fees = CONFIG.ACADEMIC_FEES[grade];
+                    
+                    sessionOptions.forEach(option => {
+                        const sessions = option.dataset.sessions;
+                        const priceElement = option.querySelector('.session-price');
+                        
+                        if (priceElement && fees[sessions]) {
+                            priceElement.textContent = `₦${fees[sessions].toLocaleString()}`;
                         }
                     });
                 }
@@ -2517,6 +2702,10 @@
                     const startDate = entry.querySelector('.student-start-date').value;
                     const name = entry.querySelector('.student-name').value || `Student ${index + 1}`;
                     
+                    // Get selected academic sessions
+                    const selectedSession = entry.querySelector('.session-option.selected');
+                    const sessions = selectedSession ? selectedSession.dataset.sessions : null;
+                    
                     // Get selected academic days for this student
                     const selectedDays = Array.from(entry.querySelectorAll('.academic-day-btn.selected')).map(btn => btn.dataset.day);
                     
@@ -2528,12 +2717,12 @@
                         }
                     }
                     
-                    // 1. Academic Calculation
+                    // 1. Academic Calculation - UPDATED WITH SESSIONS
                     const selectedSubjects = Array.from(entry.querySelectorAll('.subject-option.selected'));
                     
-                    if (grade && CONFIG.ACADEMIC_FEES[grade] && selectedSubjects.length > 0) {
+                    if (grade && sessions && CONFIG.ACADEMIC_FEES[grade] && CONFIG.ACADEMIC_FEES[grade][sessions] && selectedSubjects.length > 0) {
                         hasAcademicSelection = true;
-                        const baseFee = CONFIG.ACADEMIC_FEES[grade];
+                        const baseFee = CONFIG.ACADEMIC_FEES[grade][sessions];
                         academicBaseTotal += baseFee;
                         studentSubtotal += baseFee;
                         studentActualAcademicFee += baseFee;
@@ -2606,7 +2795,7 @@
                     breakdownItem.innerHTML = `
                         <div>
                             <strong>${name}</strong><br>
-                            <small style="color: #666;">Grade: ${grade || 'None'}</small>
+                            <small style="color: #666;">Grade: ${grade || 'None'} | Sessions: ${sessions || 'None'}</small>
                         </div>
                         <div style="text-align: right;">
                             <div>₦${studentSubtotal.toLocaleString()}</div>
@@ -2996,12 +3185,22 @@
                 
                 // Collect student data
                 document.querySelectorAll('.student-entry').forEach((entry, index) => {
+                    // Get preferred tutor
+                    const selectedTutor = entry.querySelector('.tutor-option.selected');
+                    const preferredTutor = selectedTutor ? selectedTutor.dataset.tutor : null;
+                    
+                    // Get academic sessions
+                    const selectedSession = entry.querySelector('.session-option.selected');
+                    const academicSessions = selectedSession ? selectedSession.dataset.sessions : null;
+                    
                     const studentData = {
                         id: index + 1,
                         name: entry.querySelector('.student-name').value,
                         dob: entry.querySelector('.student-dob').value,
                         grade: entry.querySelector('.student-grade').value,
                         startDate: entry.querySelector('.student-start-date').value,
+                        preferredTutor: preferredTutor,
+                        academicSessions: academicSessions,
                         selectedSubjects: [],
                         academicDays: [],
                         academicTime: '',
@@ -3240,6 +3439,11 @@
                             }
                         });
                         
+                        // Update session prices
+                        document.querySelectorAll('.student-entry').forEach(entry => {
+                            this.updateSessionPrices(entry);
+                        });
+                        
                         // Update summary after everything is loaded
                         setTimeout(() => {
                             this.updateSummary();
@@ -3315,8 +3519,10 @@
                     const studentName = entry.querySelector('.student-name').value || `Student ${index + 1}`;
                     const selectedSubjects = Array.from(entry.querySelectorAll('.subject-option.selected')).map(opt => opt.dataset.subject);
                     const grade = entry.querySelector('.student-grade').value;
+                    const selectedSession = entry.querySelector('.session-option.selected');
+                    const sessions = selectedSession ? selectedSession.dataset.sessions : null;
                     
-                    if (selectedSubjects.length > 0) {
+                    if (selectedSubjects.length > 0 && grade && sessions) {
                         const academicDays = Array.from(entry.querySelectorAll('.academic-day-btn.selected')).map(btn => btn.dataset.day);
                         const startHour = entry.querySelector('#academic-start-hour').value;
                         const startMinute = entry.querySelector('#academic-start-minute').value;
@@ -3326,10 +3532,16 @@
                         const startTime = `${parseInt(startHour) % 12 || 12}:${startMinute} ${startHour < 12 ? 'AM' : 'PM'}`;
                         const endTime = `${parseInt(endHour) % 12 || 12}:${endMinute} ${endHour < 12 ? 'AM' : 'PM'}`;
                         
-                        const description = `${studentName}: ${selectedSubjects.join(', ')} (${academicDays.join(', ')}, ${startTime}-${endTime})`;
+                        // Get tutor preference
+                        const selectedTutor = entry.querySelector('.tutor-option.selected');
+                        const tutorPreference = selectedTutor ? selectedTutor.dataset.tutor : 'No Preference';
+                        const tutorText = tutorPreference === 'male' ? 'Male Tutor' : 
+                                          tutorPreference === 'female' ? 'Female Tutor' : 'No Preference';
+                        
+                        const description = `${studentName}: ${selectedSubjects.join(', ')} (${sessions} weekly, ${academicDays.join(', ')}, ${startTime}-${endTime}, ${tutorText})`;
                         
                         // Calculate student's academic fee
-                        const baseFee = CONFIG.ACADEMIC_FEES[grade] || 0;
+                        const baseFee = CONFIG.ACADEMIC_FEES[grade] ? CONFIG.ACADEMIC_FEES[grade][sessions] : 0;
                         const extraCount = Math.max(0, selectedSubjects.length - CONFIG.CONSTANTS.BASE_SUBJECTS_INCLUDED);
                         const extraFee = extraCount * CONFIG.CONSTANTS.ADDITIONAL_SUBJECT_FEE;
                         const studentAcademicFee = baseFee + extraFee;
@@ -3434,10 +3646,21 @@
                     const grade = entry.querySelector('.student-grade').value;
                     const startDate = entry.querySelector('.student-start-date').value;
                     
+                    // Get tutor preference
+                    const selectedTutor = entry.querySelector('.tutor-option.selected');
+                    const tutorPreference = selectedTutor ? selectedTutor.dataset.tutor : 'No Preference';
+                    const tutorText = tutorPreference === 'male' ? 'Male Tutor' : 
+                                      tutorPreference === 'female' ? 'Female Tutor' : 'No Preference';
+                    
+                    // Get academic sessions
+                    const selectedSession = entry.querySelector('.session-option.selected');
+                    const sessions = selectedSession ? selectedSession.dataset.sessions : null;
+                    const sessionsText = sessions ? `${sessions} weekly` : 'Not selected';
+                    
                     const studentDiv = document.createElement('div');
                     studentDiv.className = 'invoice-student-details';
                     
-                    let detailsHTML = `<h4>${studentName} (${grade}) - Starting: ${startDate}</h4>`;
+                    let detailsHTML = `<h4>${studentName} (${grade}) - ${sessionsText} - ${tutorText} - Starting: ${startDate}</h4>`;
                     
                     // Academic details
                     const selectedSubjects = Array.from(entry.querySelectorAll('.subject-option.selected')).map(opt => opt.dataset.subject);
