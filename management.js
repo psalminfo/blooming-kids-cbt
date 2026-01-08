@@ -2704,7 +2704,7 @@ window.showEnrollmentDetails = async function(enrollmentId) {
                             <p><strong>DOB:</strong> ${student.dob || 'N/A'}</p>
                             <p><strong>Start Date:</strong> ${student.startDate || 'N/A'}</p>
                             <p><strong>Gender:</strong> ${student.gender || 'N/A'}</p>
-                            <p><strong>Learning Style:</strong> ${student.learningStyle || 'N/A'}</p>
+                            <p><strong>Preferred Tutor:</strong> ${student.preferredTutor || 'N/A'}</p>
                             <p><strong>School:</strong> ${student.school || 'N/A'}</p>
                             <p><strong>Academic Days:</strong> ${academicDays}</p>
                             <p><strong>Academic Time:</strong> ${academicTime}</p>
@@ -5264,5 +5264,6 @@ onAuthStateChanged(auth, async (user) => {
         window.location.href = "management-auth.html";
     }
 });
+
 
 
