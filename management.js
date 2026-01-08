@@ -116,11 +116,6 @@ async function renderDashboardPanel(container) {
                     </div>
                     <div class="text-center">
                         <p id="dashboard-active-tutors" class="text-4xl font-bold text-blue-700 mb-2">0</p>
-                        <div class="flex justify-center">
-                            <button onclick="refreshDashboardCache('tutors')" class="text-blue-600 hover:text-blue-800 text-sm font-medium">
-                                <i class="fas fa-sync-alt mr-1"></i> Refresh
-                            </button>
-                        </div>
                     </div>
                 </div>
                 ` : ''}
@@ -139,11 +134,6 @@ async function renderDashboardPanel(container) {
                     </div>
                     <div class="text-center">
                         <p id="dashboard-active-students" class="text-4xl font-bold text-green-700 mb-2">0</p>
-                        <div class="flex justify-center">
-                            <button onclick="refreshDashboardCache('students')" class="text-green-600 hover:text-green-800 text-sm font-medium">
-                                <i class="fas fa-sync-alt mr-1"></i> Refresh
-                            </button>
-                        </div>
                     </div>
                 </div>
                 ` : ''}
@@ -162,11 +152,6 @@ async function renderDashboardPanel(container) {
                     </div>
                     <div class="text-center">
                         <p id="dashboard-pending-approvals" class="text-4xl font-bold text-yellow-700 mb-2">0</p>
-                        <div class="flex justify-center">
-                            <button onclick="refreshDashboardCache('pendingStudents')" class="text-yellow-600 hover:text-yellow-800 text-sm font-medium">
-                                <i class="fas fa-sync-alt mr-1"></i> Refresh
-                            </button>
-                        </div>
                     </div>
                 </div>
                 ` : ''}
@@ -185,11 +170,6 @@ async function renderDashboardPanel(container) {
                     </div>
                     <div class="text-center">
                         <p id="dashboard-total-enrollments" class="text-4xl font-bold text-purple-700 mb-2">0</p>
-                        <div class="flex justify-center">
-                            <button onclick="refreshDashboardCache('enrollments')" class="text-purple-600 hover:text-purple-800 text-sm font-medium">
-                                <i class="fas fa-sync-alt mr-1"></i> Refresh
-                            </button>
-                        </div>
                     </div>
                 </div>
                 ` : ''}
@@ -226,7 +206,7 @@ async function renderDashboardPanel(container) {
             <!-- Last Updated Info (only if at least one card is visible) -->
             ${visibleCardsCount > 0 ? `
             <div class="mt-6 text-center text-sm text-gray-500">
-                <p>Data loaded from cache. Click individual refresh buttons to update specific metrics.</p>
+                <p>Data loaded from cache.</p>
                 <button onclick="refreshAllDashboardData()" class="mt-2 bg-gray-200 hover:bg-gray-300 text-gray-800 px-4 py-2 rounded-lg text-sm font-medium">
                     <i class="fas fa-sync-alt mr-1"></i> Refresh All Data
                 </button>
@@ -311,6 +291,33 @@ async function loadDashboardData() {
         if (enrollmentsElement) enrollmentsElement.textContent = 'Error';
     }
 }
+
+// Refresh All Dashboard Data function
+window.refreshAllDashboardData = async function() {
+    // Invalidate all cache
+    invalidateCache('tutors');
+    invalidateCache('students');
+    invalidateCache('pendingStudents');
+    invalidateCache('enrollments');
+    invalidateCache('tutorAssignments');
+    
+    // Show loading state
+    const tutorsElement = document.getElementById('dashboard-active-tutors');
+    const studentsElement = document.getElementById('dashboard-active-students');
+    const pendingElement = document.getElementById('dashboard-pending-approvals');
+    const enrollmentsElement = document.getElementById('dashboard-total-enrollments');
+    
+    if (tutorsElement) tutorsElement.textContent = '...';
+    if (studentsElement) studentsElement.textContent = '...';
+    if (pendingElement) pendingElement.textContent = '...';
+    if (enrollmentsElement) enrollmentsElement.textContent = '...';
+    
+    // Reload data
+    await loadDashboardData();
+    
+    // Show success message
+    alert('Dashboard data refreshed successfully!');
+};
 
 // ======================================================
 // SECTION 3: TUTOR MANAGEMENT PANELS
@@ -2296,7 +2303,7 @@ async function renderTutorReportsPanel(container) {
 }
 
 // ======================================================
-// SUBSECTION 5.2: Enrollments Panel
+// SUBSECTION 5.2: Enrollments Panel (UPDATED)
 // ======================================================
 
 async function renderEnrollmentsPanel(container) {
@@ -2307,6 +2314,29 @@ async function renderEnrollmentsPanel(container) {
                 <div class="flex items-center gap-4">
                     <input type="search" id="enrollments-search" placeholder="Search enrollments..." class="p-2 border rounded-md w-64">
                     <button id="refresh-enrollments-btn" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Refresh</button>
+                </div>
+            </div>
+            
+            <!-- Revenue Summary -->
+            <div class="mb-6 p-4 bg-gradient-to-r from-blue-50 to-green-50 rounded-lg border">
+                <h3 class="text-lg font-bold text-gray-800 mb-3">Revenue Summary</h3>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div class="bg-white p-4 rounded-lg shadow">
+                        <p class="text-sm text-gray-600">Projected Revenue</p>
+                        <p id="projected-revenue" class="text-2xl font-bold text-blue-600">₦0</p>
+                        <p class="text-xs text-gray-500">Total from all enrollments</p>
+                    </div>
+                    <div class="bg-white p-4 rounded-lg shadow">
+                        <p class="text-sm text-gray-600">Confirmed Revenue</p>
+                        <p id="confirmed-revenue" class="text-2xl font-bold text-green-600">₦0</p>
+                        <p class="text-xs text-gray-500">From approved enrollments</p>
+                    </div>
+                    <div class="bg-white p-4 rounded-lg shadow">
+                        <p class="text-sm text-gray-600">Payment Methods</p>
+                        <div id="payment-methods-chart" class="mt-2">
+                            <p class="text-xs text-gray-500">Loading chart...</p>
+                        </div>
+                    </div>
                 </div>
             </div>
             
@@ -2343,12 +2373,14 @@ async function renderEnrollmentsPanel(container) {
                 </div>
             </div>
 
-            <div class="overflow-x-auto">
+            <div class="overflow-x-auto" style="max-height: 500px; overflow-y: auto;">
                 <table class="min-w-full divide-y divide-gray-200">
-                    <thead class="bg-gray-50">
+                    <thead class="bg-gray-50 sticky top-0">
                         <tr>
                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Application ID</th>
                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Parent Name</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Parent Email</th>
+                            <th class="px6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Parent Phone</th>
                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Students</th>
                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total Fee</th>
                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Referral Code</th>
@@ -2359,7 +2391,7 @@ async function renderEnrollmentsPanel(container) {
                     </thead>
                     <tbody id="enrollments-list" class="bg-white divide-y divide-gray-200">
                         <tr>
-                            <td colspan="8" class="px-6 py-4 text-center text-gray-500">Loading enrollments...</td>
+                            <td colspan="10" class="px-6 py-4 text-center text-gray-500">Loading enrollments...</td>
                         </tr>
                     </tbody>
                 </table>
@@ -2386,7 +2418,7 @@ async function fetchAndRenderEnrollments(forceRefresh = false) {
 
     try {
         if (!sessionCache.enrollments || forceRefresh) {
-            enrollmentsList.innerHTML = `<tr><td colspan="8" class="px-6 py-4 text-center text-gray-500">Fetching enrollments...</td></tr>`;
+            enrollmentsList.innerHTML = `<tr><td colspan="10" class="px-6 py-4 text-center text-gray-500">Fetching enrollments...</td></tr>`;
             
             const snapshot = await getDocs(query(collection(db, "enrollments"), orderBy("createdAt", "desc")));
             const enrollmentsData = snapshot.docs.map(doc => ({ 
@@ -2400,7 +2432,7 @@ async function fetchAndRenderEnrollments(forceRefresh = false) {
         renderEnrollmentsFromCache();
     } catch (error) {
         console.error("Error fetching enrollments:", error);
-        enrollmentsList.innerHTML = `<tr><td colspan="8" class="px-6 py-4 text-center text-red-500">Failed to load enrollments: ${error.message}</td></tr>`;
+        enrollmentsList.innerHTML = `<tr><td colspan="10" class="px-6 py-4 text-center text-red-500">Failed to load enrollments: ${error.message}</td></tr>`;
     }
 }
 
@@ -2447,6 +2479,56 @@ function renderEnrollmentsFromCache(searchTerm = '') {
         return true;
     });
 
+    // Calculate revenue metrics
+    let projectedRevenue = 0;
+    let confirmedRevenue = 0;
+    const paymentMethods = {};
+    
+    enrollments.forEach(enrollment => {
+        const fee = parseFeeValue(enrollment.summary?.totalFee) || 0;
+        projectedRevenue += fee;
+        
+        if (enrollment.status === 'completed' || enrollment.status === 'payment_received') {
+            confirmedRevenue += fee;
+            
+            // Track payment methods
+            const paymentMethod = enrollment.payment?.method || 'Unknown';
+            if (!paymentMethods[paymentMethod]) {
+                paymentMethods[paymentMethod] = 0;
+            }
+            paymentMethods[paymentMethod] += fee;
+        }
+    });
+    
+    // Update revenue display
+    document.getElementById('projected-revenue').textContent = `₦${projectedRevenue.toLocaleString()}`;
+    document.getElementById('confirmed-revenue').textContent = `₦${confirmedRevenue.toLocaleString()}`;
+    
+    // Update payment methods chart
+    const chartContainer = document.getElementById('payment-methods-chart');
+    if (chartContainer) {
+        if (Object.keys(paymentMethods).length === 0) {
+            chartContainer.innerHTML = '<p class="text-xs text-gray-500">No payment data available</p>';
+        } else {
+            let chartHtml = '';
+            Object.entries(paymentMethods).forEach(([method, amount]) => {
+                const percentage = confirmedRevenue > 0 ? Math.round((amount / confirmedRevenue) * 100) : 0;
+                chartHtml += `
+                    <div class="mb-1">
+                        <div class="flex justify-between text-xs">
+                            <span>${method}</span>
+                            <span>₦${amount.toLocaleString()} (${percentage}%)</span>
+                        </div>
+                        <div class="w-full bg-gray-200 rounded-full h-1.5">
+                            <div class="bg-green-600 h-1.5 rounded-full" style="width: ${percentage}%"></div>
+                        </div>
+                    </div>
+                `;
+            });
+            chartContainer.innerHTML = chartHtml;
+        }
+    }
+
     const total = enrollments.length;
     const draft = enrollments.filter(e => e.status === 'draft').length;
     const pending = enrollments.filter(e => e.status === 'pending').length;
@@ -2460,7 +2542,7 @@ function renderEnrollmentsFromCache(searchTerm = '') {
     if (filteredEnrollments.length === 0) {
         enrollmentsList.innerHTML = `
             <tr>
-                <td colspan="8" class="px-6 py-4 text-center text-gray-500">
+                <td colspan="10" class="px-6 py-4 text-center text-gray-500">
                     No enrollments found${searchTerm ? ` for "${searchTerm}"` : ''}.
                 </td>
             </tr>
@@ -2521,11 +2603,9 @@ function renderEnrollmentsFromCache(searchTerm = '') {
                     <div class="text-sm font-medium text-gray-900">${enrollment.id.substring(0, 12)}...</div>
                     <div class="text-xs text-gray-500">${enrollment.id}</div>
                 </td>
-                <td class="px-6 py-4">
-                    <div class="text-sm font-medium text-gray-900">${enrollment.parent?.name || 'N/A'}</div>
-                    <div class="text-xs text-gray-500">${enrollment.parent?.email || ''}</div>
-                    <div class="text-xs text-gray-500">${enrollment.parent?.phone || ''}</div>
-                </td>
+                <td class="px-6 py-4 text-sm text-gray-900">${enrollment.parent?.name || 'N/A'}</td>
+                <td class="px-6 py-4 text-sm text-gray-900">${enrollment.parent?.email || 'N/A'}</td>
+                <td class="px-6 py-4 text-sm text-gray-900">${enrollment.parent?.phone || 'N/A'}</td>
                 <td class="px-6 py-4">
                     <div class="text-sm text-gray-900">${studentCount} student(s)</div>
                     <div class="text-xs text-gray-500 truncate max-w-xs">${studentNames}</div>
@@ -2536,15 +2616,25 @@ function renderEnrollmentsFromCache(searchTerm = '') {
                 </td>
                 <td class="px-6 py-4">${statusBadge}</td>
                 <td class="px-6 py-4 text-sm text-gray-500">${createdAt}</td>
-                <td class="px-6 py-4 text-sm font-medium">
+                <td class="px-6 py-4 text-sm font-medium space-x-2">
                     <button onclick="showEnrollmentDetails('${enrollment.id}')" 
-                            class="text-indigo-600 hover:text-indigo-900 mr-3">
+                            class="text-indigo-600 hover:text-indigo-900">
                         View
                     </button>
-                    <button onclick="updateEnrollmentStatus('${enrollment.id}', 'completed')" 
+                    <button onclick="approveEnrollmentModal('${enrollment.id}')" 
                             class="text-green-600 hover:text-green-900">
                         Approve
                     </button>
+                    <button onclick="deleteEnrollment('${enrollment.id}')" 
+                            class="text-red-600 hover:text-red-900">
+                        Delete
+                    </button>
+                    ${enrollment.status === 'completed' || enrollment.status === 'payment_received' ? `
+                    <button onclick="downloadEnrollmentInvoice('${enrollment.id}')" 
+                            class="text-blue-600 hover:text-blue-900">
+                        Invoice
+                    </button>
+                    ` : ''}
                 </td>
             </tr>
         `;
@@ -2599,10 +2689,14 @@ window.showEnrollmentDetails = async function(enrollmentId) {
                             <p><strong>Grade:</strong> ${student.grade || 'N/A'}</p>
                             <p><strong>DOB:</strong> ${student.dob || 'N/A'}</p>
                             <p><strong>Start Date:</strong> ${student.startDate || 'N/A'}</p>
+                            <p><strong>Gender:</strong> ${student.gender || 'N/A'}</p>
+                            <p><strong>Learning Style:</strong> ${student.learningStyle || 'N/A'}</p>
+                            <p><strong>School:</strong> ${student.school || 'N/A'}</p>
                         </div>
                         ${subjectsHTML}
                         ${extracurricularHTML}
                         ${testPrepHTML}
+                        ${student.additionalNotes ? `<p class="text-sm mt-2"><strong>Notes:</strong> ${student.additionalNotes}</p>` : ''}
                     </div>
                 `;
             }).join('');
@@ -2675,9 +2769,22 @@ window.showEnrollmentDetails = async function(enrollmentId) {
             `;
         }
 
+        let paymentHTML = '';
+        if (enrollment.payment) {
+            paymentHTML = `
+                <div class="border-l-4 border-blue-500 pl-4 bg-blue-50 p-3 rounded">
+                    <h4 class="font-bold text-blue-700">Payment Information</h4>
+                    <p><strong>Method:</strong> ${enrollment.payment.method || 'N/A'}</p>
+                    ${enrollment.payment.reference ? `<p><strong>Reference:</strong> ${enrollment.payment.reference}</p>` : ''}
+                    ${enrollment.payment.date ? `<p><strong>Date:</strong> ${new Date(enrollment.payment.date).toLocaleDateString()}</p>` : ''}
+                    ${enrollment.payment.approvedBy ? `<p><strong>Approved By:</strong> ${enrollment.payment.approvedBy}</p>` : ''}
+                </div>
+            `;
+        }
+
         const modalHtml = `
             <div id="enrollmentDetailsModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-center justify-center">
-                <div class="relative p-8 bg-white w-full max-w-4xl rounded-lg shadow-2xl">
+                <div class="relative p-8 bg-white w-full max-w-4xl rounded-lg shadow-2xl" style="max-height: 90vh; overflow-y: auto;">
                     <button class="absolute top-2 right-2 text-gray-500 hover:text-gray-800 text-2xl font-bold" onclick="closeManagementModal('enrollmentDetailsModal')">&times;</button>
                     <h3 class="text-2xl font-bold mb-4 text-green-700">Enrollment Details</h3>
                     
@@ -2696,10 +2803,13 @@ window.showEnrollmentDetails = async function(enrollmentId) {
                             <p><strong>Email:</strong> ${enrollment.parent?.email || 'N/A'}</p>
                             <p><strong>Phone:</strong> ${enrollment.parent?.phone || 'N/A'}</p>
                             <p><strong>Address:</strong> ${enrollment.parent?.address || 'N/A'}</p>
+                            <p><strong>Occupation:</strong> ${enrollment.parent?.occupation || 'N/A'}</p>
+                            <p><strong>Preferred Contact:</strong> ${enrollment.parent?.preferredContact || 'N/A'}</p>
                         </div>
                     </div>
                     
                     ${referralHTML}
+                    ${paymentHTML}
                     
                     <div class="mt-6">
                         <h4 class="font-bold text-lg mb-2">Student Information (${enrollment.students?.length || 0} students)</h4>
@@ -2713,8 +2823,8 @@ window.showEnrollmentDetails = async function(enrollmentId) {
                     
                     <div class="flex justify-end space-x-3 mt-6 pt-6 border-t">
                         <button onclick="closeManagementModal('enrollmentDetailsModal')" class="px-4 py-2 bg-gray-300 text-gray-700 rounded hover:bg-gray-400">Close</button>
-                        <button onclick="updateEnrollmentStatus('${enrollment.id}', 'completed')" class="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700">Mark as Completed</button>
-                        <button onclick="updateEnrollmentStatus('${enrollment.id}', 'payment_received')" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">Mark Payment Received</button>
+                        <button onclick="approveEnrollmentModal('${enrollment.id}')" class="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700">Approve</button>
+                        <button onclick="downloadEnrollmentInvoice('${enrollment.id}')" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">Download Invoice</button>
                     </div>
                 </div>
             </div>
@@ -2728,31 +2838,383 @@ window.showEnrollmentDetails = async function(enrollmentId) {
     }
 };
 
-window.updateEnrollmentStatus = async function(enrollmentId, newStatus) {
-    if (!confirm(`Are you sure you want to update this enrollment status to '${newStatus}'?`)) {
-        return;
-    }
-
+window.approveEnrollmentModal = async function(enrollmentId) {
     try {
-        await updateDoc(doc(db, "enrollments", enrollmentId), {
-            status: newStatus,
-            lastUpdated: Timestamp.now()
-        });
+        const enrollmentDoc = await getDoc(doc(db, "enrollments", enrollmentId));
+        if (!enrollmentDoc.exists()) {
+            alert("Enrollment not found!");
+            return;
+        }
 
-        alert(`Enrollment status updated to ${newStatus}.`);
+        const enrollment = enrollmentDoc.data();
         
-        invalidateCache('enrollments');
-        closeManagementModal('enrollmentDetailsModal');
-        await fetchAndRenderEnrollments();
+        // Get tutors for assignment
+        const tutorsSnapshot = await getDocs(query(collection(db, "tutors"), where("status", "==", "active")));
+        const activeTutors = tutorsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        
+        if (activeTutors.length === 0) {
+            alert("No active tutors available. Please add tutors first.");
+            return;
+        }
+        
+        const tutorOptions = activeTutors.map(tutor => 
+            `<option value="${tutor.email}">${tutor.name} (${tutor.email})</option>`
+        ).join('');
+        
+        const modalHtml = `
+            <div id="approveEnrollmentModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-center justify-center">
+                <div class="relative p-8 bg-white w-96 max-w-lg rounded-lg shadow-xl">
+                    <button class="absolute top-2 right-2 text-gray-500 hover:text-gray-800 text-2xl font-bold" onclick="closeManagementModal('approveEnrollmentModal')">&times;</button>
+                    <h3 class="text-xl font-bold mb-4">Approve Enrollment</h3>
+                    <form id="approve-enrollment-form">
+                        <input type="hidden" id="approve-enrollment-id" value="${enrollmentId}">
+                        
+                        <div class="mb-4">
+                            <label class="block text-sm font-medium mb-2">Payment Method</label>
+                            <select id="payment-method" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2">
+                                <option value="">Select payment method</option>
+                                <option value="bank_transfer">Bank Transfer</option>
+                                <option value="credit_card">Credit Card</option>
+                                <option value="debit_card">Debit Card</option>
+                                <option value="cash">Cash</option>
+                                <option value="online_payment">Online Payment</option>
+                                <option value="pos">POS</option>
+                            </select>
+                        </div>
+                        
+                        <div class="mb-4">
+                            <label class="block text-sm font-medium mb-2">Payment Reference (Optional)</label>
+                            <input type="text" id="payment-reference" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2" placeholder="e.g., transaction ID">
+                        </div>
+                        
+                        <div class="mb-4">
+                            <label class="block text-sm font-medium mb-2">Payment Date</label>
+                            <input type="date" id="payment-date" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2" value="${new Date().toISOString().split('T')[0]}">
+                        </div>
+                        
+                        <div class="mb-4">
+                            <label class="block text-sm font-medium mb-2">Assign Tutor (for each student)</label>
+                            <div id="student-tutor-assignments">
+                                ${enrollment.students ? enrollment.students.map((student, index) => `
+                                    <div class="mb-3 p-2 border rounded">
+                                        <p class="text-sm font-medium mb-1">${student.name}</p>
+                                        <select name="tutor-assignment-${index}" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-1 text-sm">
+                                            <option value="">Select tutor...</option>
+                                            ${tutorOptions}
+                                        </select>
+                                    </div>
+                                `).join('') : ''}
+                            </div>
+                        </div>
+                        
+                        <div class="mb-4">
+                            <label class="block text-sm font-medium mb-2">Final Fee (₦)</label>
+                            <input type="number" id="final-fee" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2" 
+                                   value="${enrollment.summary?.totalFee || 0}" min="0" step="1000">
+                        </div>
+                        
+                        <div class="flex justify-end mt-4">
+                            <button type="button" onclick="closeManagementModal('approveEnrollmentModal')" class="mr-2 px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300">Cancel</button>
+                            <button type="submit" class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700">Approve Enrollment</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        `;
+        
+        document.body.insertAdjacentHTML('beforeend', modalHtml);
+        
+        document.getElementById('approve-enrollment-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            await approveEnrollmentWithDetails(enrollmentId);
+        });
         
     } catch (error) {
-        console.error("Error updating enrollment status:", error);
-        alert("Failed to update enrollment status. Please try again.");
+        console.error("Error showing approve modal:", error);
+        alert("Failed to load approval form. Please try again.");
+    }
+};
+
+async function approveEnrollmentWithDetails(enrollmentId) {
+    const form = document.getElementById('approve-enrollment-form');
+    if (!form) return;
+    
+    const paymentMethod = form.elements['payment-method'].value;
+    const paymentReference = form.elements['payment-reference'].value;
+    const paymentDate = form.elements['payment-date'].value;
+    const finalFee = parseFloat(form.elements['final-fee'].value);
+    
+    if (!paymentMethod) {
+        alert("Please select a payment method.");
+        return;
+    }
+    
+    if (isNaN(finalFee) || finalFee < 0) {
+        alert("Please enter a valid fee amount.");
+        return;
+    }
+    
+    try {
+        // Get enrollment data
+        const enrollmentDoc = await getDoc(doc(db, "enrollments", enrollmentId));
+        const enrollmentData = enrollmentDoc.data();
+        
+        // Get tutor assignments
+        const studentAssignments = [];
+        enrollmentData.students.forEach((student, index) => {
+            const tutorEmail = form.elements[`tutor-assignment-${index}`].value;
+            if (tutorEmail) {
+                studentAssignments.push({
+                    studentName: student.name,
+                    studentId: `pending_${Date.now()}_${index}`,
+                    tutorEmail: tutorEmail,
+                    grade: student.grade,
+                    subjects: student.selectedSubjects || [],
+                    days: 'To be determined',
+                    studentFee: Math.round(finalFee / enrollmentData.students.length)
+                });
+            }
+        });
+        
+        if (studentAssignments.length === 0) {
+            alert("Please assign tutors to all students.");
+            return;
+        }
+        
+        const batch = writeBatch(db);
+        
+        // Update enrollment status
+        batch.update(doc(db, "enrollments", enrollmentId), {
+            status: 'completed',
+            payment: {
+                method: paymentMethod,
+                reference: paymentReference || '',
+                date: Timestamp.fromDate(new Date(paymentDate)),
+                amount: finalFee,
+                approvedBy: window.userData?.name || window.userData?.email || 'Management',
+                approvedAt: Timestamp.now()
+            },
+            finalFee: finalFee,
+            approvedAt: Timestamp.now(),
+            approvedBy: window.userData?.email || 'management',
+            lastUpdated: Timestamp.now()
+        });
+        
+        // Create pending student entries for each student
+        studentAssignments.forEach(student => {
+            const pendingStudentRef = doc(collection(db, "pending_students"));
+            batch.set(pendingStudentRef, {
+                ...student,
+                parentName: enrollmentData.parent?.name,
+                parentPhone: enrollmentData.parent?.phone,
+                parentEmail: enrollmentData.parent?.email,
+                enrollmentId: enrollmentId,
+                status: 'pending',
+                createdAt: Timestamp.now(),
+                source: 'enrollment_approval'
+            });
+        });
+        
+        await batch.commit();
+        
+        alert("Enrollment approved successfully! Students have been added to pending approvals.");
+        
+        closeManagementModal('approveEnrollmentModal');
+        invalidateCache('enrollments');
+        invalidateCache('pendingStudents');
+        
+        // Refresh the view
+        const currentNavId = document.querySelector('.nav-item.active')?.dataset.navId;
+        const mainContent = document.getElementById('main-content');
+        if (currentNavId && allNavItems[currentNavId] && mainContent) {
+            allNavItems[currentNavId].fn(mainContent);
+        }
+        
+    } catch (error) {
+        console.error("Error approving enrollment:", error);
+        alert("Failed to approve enrollment. Please try again.");
+    }
+}
+
+window.deleteEnrollment = async function(enrollmentId) {
+    if (!confirm("Are you sure you want to delete this enrollment? This action cannot be undone.")) {
+        return;
+    }
+    
+    try {
+        await deleteDoc(doc(db, "enrollments", enrollmentId));
+        alert("Enrollment deleted successfully!");
+        
+        invalidateCache('enrollments');
+        renderEnrollmentsFromCache(document.getElementById('enrollments-search')?.value || '');
+        
+    } catch (error) {
+        console.error("Error deleting enrollment:", error);
+        alert("Failed to delete enrollment. Please try again.");
+    }
+};
+
+window.downloadEnrollmentInvoice = async function(enrollmentId) {
+    try {
+        const enrollmentDoc = await getDoc(doc(db, "enrollments", enrollmentId));
+        if (!enrollmentDoc.exists()) {
+            alert("Enrollment not found!");
+            return;
+        }
+        
+        const enrollment = enrollmentDoc.data();
+        
+        // Create invoice HTML
+        const invoiceDate = new Date(enrollment.approvedAt || enrollment.createdAt || Date.now());
+        const invoiceNumber = `INV-${enrollmentId.substring(0, 8).toUpperCase()}`;
+        
+        const invoiceHTML = `
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <meta charset="UTF-8">
+                <title>Invoice ${invoiceNumber}</title>
+                <style>
+                    body { font-family: Arial, sans-serif; margin: 40px; }
+                    .invoice-container { max-width: 800px; margin: 0 auto; border: 1px solid #ddd; padding: 30px; }
+                    .header { text-align: center; margin-bottom: 30px; border-bottom: 2px solid #4CAF50; padding-bottom: 20px; }
+                    .company-name { font-size: 28px; font-weight: bold; color: #4CAF50; margin-bottom: 5px; }
+                    .invoice-title { font-size: 24px; margin: 10px 0; }
+                    .invoice-info { display: flex; justify-content: space-between; margin: 20px 0; }
+                    .section { margin: 20px 0; }
+                    .section-title { font-weight: bold; border-bottom: 1px solid #ddd; padding-bottom: 5px; margin-bottom: 10px; }
+                    table { width: 100%; border-collapse: collapse; margin: 10px 0; }
+                    th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+                    th { background-color: #f2f2f2; }
+                    .total-row { font-weight: bold; background-color: #f9f9f9; }
+                    .footer { margin-top: 40px; padding-top: 20px; border-top: 1px solid #ddd; text-align: center; color: #666; }
+                </style>
+            </head>
+            <body>
+                <div class="invoice-container">
+                    <div class="header">
+                        <div class="company-name">Blooming Kids House</div>
+                        <div class="invoice-title">INVOICE</div>
+                        <div>Invoice #: ${invoiceNumber}</div>
+                        <div>Date: ${invoiceDate.toLocaleDateString()}</div>
+                    </div>
+                    
+                    <div class="invoice-info">
+                        <div>
+                            <strong>Bill To:</strong><br>
+                            ${enrollment.parent?.name || ''}<br>
+                            ${enrollment.parent?.email || ''}<br>
+                            ${enrollment.parent?.phone || ''}
+                        </div>
+                        <div>
+                            <strong>Invoice Details:</strong><br>
+                            Status: ${enrollment.status || 'Completed'}<br>
+                            Approved By: ${enrollment.payment?.approvedBy || window.userData?.name || 'Management'}<br>
+                            Payment Method: ${enrollment.payment?.method || 'Not specified'}
+                        </div>
+                    </div>
+                    
+                    <div class="section">
+                        <div class="section-title">Student Details</div>
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Student Name</th>
+                                    <th>Grade</th>
+                                    <th>Subjects</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${enrollment.students ? enrollment.students.map(student => `
+                                    <tr>
+                                        <td>${student.name || ''}</td>
+                                        <td>${student.grade || ''}</td>
+                                        <td>${student.selectedSubjects ? student.selectedSubjects.join(', ') : ''}</td>
+                                    </tr>
+                                `).join('') : '<tr><td colspan="3">No student information</td></tr>'}
+                            </tbody>
+                        </table>
+                    </div>
+                    
+                    <div class="section">
+                        <div class="section-title">Fee Breakdown</div>
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Description</th>
+                                    <th>Amount (₦)</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>Academic Fees</td>
+                                    <td>${(enrollment.summary?.academicFee || 0).toLocaleString()}</td>
+                                </tr>
+                                <tr>
+                                    <td>Extracurricular Activities</td>
+                                    <td>${(enrollment.summary?.extracurricularFee || 0).toLocaleString()}</td>
+                                </tr>
+                                <tr>
+                                    <td>Test Preparation</td>
+                                    <td>${(enrollment.summary?.testPrepFee || 0).toLocaleString()}</td>
+                                </tr>
+                                <tr>
+                                    <td>Discount</td>
+                                    <td>-${(enrollment.summary?.discountAmount || 0).toLocaleString()}</td>
+                                </tr>
+                                <tr class="total-row">
+                                    <td><strong>TOTAL</strong></td>
+                                    <td><strong>₦${(enrollment.summary?.totalFee || 0).toLocaleString()}</strong></td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    
+                    <div class="section">
+                        <div class="section-title">Payment Information</div>
+                        <p>Payment Status: <strong>${enrollment.status === 'payment_received' ? 'PAID' : 'PENDING'}</strong></p>
+                        ${enrollment.payment?.reference ? `<p>Reference: ${enrollment.payment.reference}</p>` : ''}
+                        ${enrollment.payment?.date ? `<p>Payment Date: ${new Date(enrollment.payment.date.seconds * 1000).toLocaleDateString()}</p>` : ''}
+                    </div>
+                    
+                    <div class="footer">
+                        <p>Thank you for choosing Blooming Kids House!</p>
+                        <p>For inquiries, contact: info@bloomingkidshouse.com | +234 123 456 7890</p>
+                        <p>This is a computer-generated invoice. No signature required.</p>
+                    </div>
+                </div>
+            </body>
+            </html>
+        `;
+        
+        // Convert HTML to image using html2canvas
+        const newWindow = window.open();
+        newWindow.document.write(invoiceHTML);
+        newWindow.document.close();
+        
+        // Give time for page to load
+        setTimeout(() => {
+            html2canvas(newWindow.document.body).then(canvas => {
+                const imgData = canvas.toDataURL('image/jpeg');
+                const link = document.createElement('a');
+                link.href = imgData;
+                link.download = `Invoice_${invoiceNumber}.jpg`;
+                link.click();
+                newWindow.close();
+            }).catch(error => {
+                console.error("Error generating invoice image:", error);
+                alert("Failed to generate invoice image. The invoice has been opened in a new window.");
+            });
+        }, 1000);
+        
+    } catch (error) {
+        console.error("Error downloading invoice:", error);
+        alert("Failed to download invoice. Please try again.");
     }
 };
 
 // ======================================================
-// SUBSECTION 5.3: Pending Approvals Panel
+// SUBSECTION 5.3: Pending Approvals Panel (UPDATED)
 // ======================================================
 
 async function renderPendingApprovalsPanel(container) {
@@ -2760,7 +3222,10 @@ async function renderPendingApprovalsPanel(container) {
         <div class="bg-white p-6 rounded-lg shadow-md">
             <div class="flex justify-between items-center mb-4">
                 <h2 class="text-2xl font-bold text-green-700">Pending Approvals</h2>
-                <button id="refresh-pending-btn" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Refresh</button>
+                <div class="flex items-center gap-4">
+                    <input type="search" id="pending-search" placeholder="Search by student, parent, or tutor..." class="p-2 border rounded-md w-64">
+                    <button id="refresh-pending-btn" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Refresh</button>
+                </div>
             </div>
             <div id="pending-approvals-list" class="space-y-4">
                 <p class="text-center text-gray-500 py-10">Loading pending students...</p>
@@ -2768,6 +3233,7 @@ async function renderPendingApprovalsPanel(container) {
         </div>
     `;
     document.getElementById('refresh-pending-btn').addEventListener('click', () => fetchAndRenderPendingApprovals(true));
+    document.getElementById('pending-search').addEventListener('input', (e) => filterPendingApprovals(e.target.value));
     fetchAndRenderPendingApprovals();
 }
 
@@ -2779,7 +3245,25 @@ async function fetchAndRenderPendingApprovals(forceRefresh = false) {
         if (!sessionCache.pendingStudents) {
             listContainer.innerHTML = `<p class="text-center text-gray-500 py-10">Fetching pending students...</p>`;
             const snapshot = await getDocs(query(collection(db, "pending_students")));
-            saveToLocalStorage('pendingStudents', snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+            const pendingStudents = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            
+            // Also fetch enrollment data for those pending students that came from enrollments
+            const enrollmentPendingStudents = pendingStudents.filter(student => student.enrollmentId);
+            
+            for (const student of enrollmentPendingStudents) {
+                if (student.enrollmentId) {
+                    try {
+                        const enrollmentDoc = await getDoc(doc(db, "enrollments", student.enrollmentId));
+                        if (enrollmentDoc.exists()) {
+                            student.enrollmentData = enrollmentDoc.data();
+                        }
+                    } catch (error) {
+                        console.error("Error fetching enrollment data:", error);
+                    }
+                }
+            }
+            
+            saveToLocalStorage('pendingStudents', pendingStudents);
         }
         renderPendingApprovalsFromCache();
     } catch(error) {
@@ -2788,8 +3272,28 @@ async function fetchAndRenderPendingApprovals(forceRefresh = false) {
     }
 }
 
-function renderPendingApprovalsFromCache() {
+function filterPendingApprovals(searchTerm = '') {
     const pendingStudents = sessionCache.pendingStudents || [];
+    const listContainer = document.getElementById('pending-approvals-list');
+    if (!listContainer) return;
+
+    if (searchTerm) {
+        const lowerCaseTerm = searchTerm.toLowerCase();
+        const filtered = pendingStudents.filter(student =>
+            student.studentName?.toLowerCase().includes(lowerCaseTerm) ||
+            student.parentName?.toLowerCase().includes(lowerCaseTerm) ||
+            student.tutorEmail?.toLowerCase().includes(lowerCaseTerm) ||
+            student.parentEmail?.toLowerCase().includes(lowerCaseTerm) ||
+            student.parentPhone?.toLowerCase().includes(lowerCaseTerm)
+        );
+        renderPendingApprovalsFromCache(filtered);
+    } else {
+        renderPendingApprovalsFromCache(pendingStudents);
+    }
+}
+
+function renderPendingApprovalsFromCache(studentsToRender = null) {
+    const pendingStudents = studentsToRender || sessionCache.pendingStudents || [];
     const listContainer = document.getElementById('pending-approvals-list');
     if (!listContainer) return;
 
@@ -2798,20 +3302,55 @@ function renderPendingApprovalsFromCache() {
         return;
     }
 
-    listContainer.innerHTML = pendingStudents.map(student => `
-        <div class="border p-4 rounded-lg flex justify-between items-center bg-gray-50">
-            <div>
-                <p><strong>Student:</strong> ${student.studentName}</p>
-                <p><strong>Fee:</strong> ₦${(student.studentFee || 0).toFixed(2)}</p>
-                <p><strong>Submitted by Tutor:</strong> ${student.tutorEmail || 'N/A'}</p>
+    listContainer.innerHTML = pendingStudents.map(student => {
+        // Get tutor name if available from tutors cache
+        let tutorName = student.tutorEmail;
+        if (sessionCache.tutors) {
+            const tutor = sessionCache.tutors.find(t => t.email === student.tutorEmail);
+            if (tutor) {
+                tutorName = tutor.name;
+            }
+        }
+        
+        // Check if this came from an enrollment
+        const fromEnrollment = student.enrollmentId ? ' (From Enrollment)' : '';
+        
+        return `
+            <div class="border p-4 rounded-lg flex justify-between items-center bg-gray-50 hover:bg-gray-100 transition-colors">
+                <div class="flex-1">
+                    <div class="flex items-center justify-between mb-2">
+                        <h3 class="font-bold text-lg text-gray-800">${student.studentName}${fromEnrollment}</h3>
+                        ${student.enrollmentId ? `<span class="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">Enrollment ID: ${student.enrollmentId.substring(0, 8)}</span>` : ''}
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-3 text-sm text-gray-600">
+                        <div>
+                            <p><i class="fas fa-user-friends mr-2"></i>Parent: ${student.parentName || 'N/A'}</p>
+                            <p><i class="fas fa-phone mr-2"></i>Phone: ${student.parentPhone || 'N/A'}</p>
+                            <p><i class="fas fa-envelope mr-2"></i>Email: ${student.parentEmail || 'N/A'}</p>
+                        </div>
+                        <div>
+                            <p><i class="fas fa-chalkboard-teacher mr-2"></i>Tutor: ${tutorName || student.tutorEmail}</p>
+                            <p><i class="fas fa-graduation-cap mr-2"></i>Grade: ${student.grade || 'N/A'}</p>
+                            <p><i class="fas fa-money-bill-wave mr-2"></i>Fee: ₦${(student.studentFee || 0).toLocaleString()}</p>
+                        </div>
+                        <div>
+                            <p><i class="fas fa-book mr-2"></i>Subjects: ${Array.isArray(student.subjects) ? student.subjects.join(', ') : student.subjects || 'N/A'}</p>
+                            <p><i class="fas fa-calendar mr-2"></i>Days/Week: ${student.days || 'To be determined'}</p>
+                            ${student.enrollmentData ? `<p class="text-xs text-blue-600"><i class="fas fa-file-invoice mr-1"></i>Enrollment Fee: ₦${(student.enrollmentData.summary?.totalFee || 0).toLocaleString()}</p>` : ''}
+                        </div>
+                    </div>
+                    ${student.source === 'enrollment_approval' ? `<p class="text-xs text-green-600 mt-2"><i class="fas fa-check-circle mr-1"></i>This student was approved from an enrollment application.</p>` : ''}
+                </div>
+                <div class="flex items-center space-x-2 ml-4">
+                    <button class="edit-pending-btn bg-blue-500 text-white px-3 py-1 text-sm rounded-full hover:bg-blue-600 transition-colors" data-student-id="${student.id}">Edit</button>
+                    <button class="approve-btn bg-green-600 text-white px-3 py-1 text-sm rounded-full hover:bg-green-700 transition-colors" data-student-id="${student.id}">Approve</button>
+                    <button class="reject-btn bg-red-600 text-white px-3 py-1 text-sm rounded-full hover:bg-red-700 transition-colors" data-student-id="${student.id}">Reject</button>
+                </div>
             </div>
-            <div class="flex items-center space-x-2">
-                <button class="edit-pending-btn bg-blue-500 text-white px-3 py-1 text-sm rounded-full" data-student-id="${student.id}">Edit</button>
-                <button class="approve-btn bg-green-600 text-white px-3 py-1 text-sm rounded-full" data-student-id="${student.id}">Approve</button>
-                <button class="reject-btn bg-red-600 text-white px-3 py-1 text-sm rounded-full" data-student-id="${student.id}">Reject</button>
-            </div>
-        </div>
-    `).join('');
+        `;
+    }).join('');
+    
+    // Reattach event listeners
     document.querySelectorAll('.edit-pending-btn').forEach(button => button.addEventListener('click', () => handleEditPendingStudent(button.dataset.studentId)));
     document.querySelectorAll('.approve-btn').forEach(button => button.addEventListener('click', () => handleApproveStudent(button.dataset.studentId)));
     document.querySelectorAll('.reject-btn').forEach(button => button.addEventListener('click', () => handleRejectStudent(button.dataset.studentId)));
@@ -4684,4 +5223,3 @@ onAuthStateChanged(auth, async (user) => {
         window.location.href = "management-auth.html";
     }
 });
-
