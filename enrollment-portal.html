@@ -832,7 +832,7 @@
             border-radius: var(--border-radius);
             box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
             width: 100%;
-            max-width: 800px;
+            max-width: 900px;
             max-height: 90vh;
             overflow-y: auto;
             padding: 30px;
@@ -1246,6 +1246,22 @@
             margin-top: 5px;
             font-style: italic;
         }
+        
+        .invoice-student-details {
+            margin: 20px 0;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            border-left: 4px solid var(--primary);
+        }
+        
+        .student-schedule {
+            margin-top: 10px;
+            padding: 10px;
+            background: white;
+            border-radius: 6px;
+            border: 1px solid #e1e5eb;
+        }
     </style>
 </head>
 <body>
@@ -1294,6 +1310,9 @@
                     <p>Loading parent information...</p>
                 </div>
             </div>
+            
+            <!-- Student Details Section -->
+            <div id="invoice-student-details-container"></div>
             
             <table class="invoice-table">
                 <thead>
@@ -1630,7 +1649,8 @@
                 SIBLING_DISCOUNT: 10000,
                 BASE_SUBJECTS_INCLUDED: 2,
                 REFERRAL_BONUS: 5000,
-                WEEKS_PER_MONTH: 4
+                WEEKS_PER_MONTH: 4,
+                PRORATION_THRESHOLD: 6 // Days 1-6 = full fee, 7+ = prorate
             },
             
             // Days and Time Options
@@ -2397,7 +2417,8 @@
                         deduction: 0,
                         daysInMonth: 0,
                         daysRemaining: 0,
-                        dayOfMonth: 0
+                        dayOfMonth: 0,
+                        explanation: "Full month fee"
                     };
                 }
                 
@@ -2405,25 +2426,22 @@
                     const start = new Date(startDate);
                     const dayOfMonth = start.getDate();
                     
+                    // Check threshold: if starting between 1st-6th, full fee
+                    if (dayOfMonth >= 1 && dayOfMonth <= CONFIG.CONSTANTS.PRORATION_THRESHOLD) {
+                        return {
+                            toPay: actualMonthlyFee,
+                            deduction: 0,
+                            daysInMonth: 0,
+                            daysRemaining: 0,
+                            dayOfMonth: dayOfMonth,
+                            explanation: `Full month fee (Starting on ${dayOfMonth}st)`
+                        };
+                    }
+                    
                     // Calculate days in the starting month
                     const year = start.getFullYear();
                     const month = start.getMonth();
                     const daysInMonth = new Date(year, month + 1, 0).getDate();
-                    
-                    // Check if starting at the beginning of the month (1st day)
-                    const isStartOfMonth = dayOfMonth === 1;
-                    
-                    // If starting on the 1st of the month, no proration - pay full fee
-                    if (isStartOfMonth) {
-                        return {
-                            toPay: actualMonthlyFee,
-                            deduction: 0,
-                            daysInMonth: daysInMonth,
-                            daysRemaining: daysInMonth,
-                            dayOfMonth: dayOfMonth,
-                            explanation: "Full month (starting on 1st)"
-                        };
-                    }
                     
                     // Calculate days remaining from start date to end of month (inclusive)
                     const daysRemainingInMonth = daysInMonth - dayOfMonth + 1;
@@ -2447,7 +2465,7 @@
                     const deductionAmount = actualMonthlyFee - proratedAmountToPay;
                     
                     // Generate explanation
-                    let explanation = `Starting on ${dayOfMonth}/${daysInMonth}. ${daysPerWeek} days/week × ${weeksRemaining} weeks = ${actualClassDaysRemaining} class days.`;
+                    let explanation = `Starting on ${dayOfMonth}/${daysInMonth}. ${daysPerWeek} days/week × ${weeksRemaining} weeks = ${actualClassDaysRemaining} class days. Prorated from ₦${actualMonthlyFee.toLocaleString()}`;
                     
                     return {
                         toPay: proratedAmountToPay,
@@ -2625,8 +2643,9 @@
                     }
                 }
                 
+                // CORRECTED: Total payable calculation
                 const totalPayable = Math.max(0, 
-                    proratedAmountToPay +
+                    proratedAmountToPay + // Use prorated amount for academic
                     extracurricularTotal + 
                     testPrepTotal - 
                     discount
@@ -2969,7 +2988,8 @@
                         extracurricularFee: extracurricularFeeValue,
                         testPrepFee: testPrepFeeValue,
                         proratedAmount: proratedValue,
-                        discountAmount: discountValue
+                        discountAmount: discountValue,
+                        prorationExplanation: document.getElementById('proration-explanation').textContent
                     },
                     timestamp: new Date().toISOString()
                 };
@@ -2985,6 +3005,7 @@
                         selectedSubjects: [],
                         academicDays: [],
                         academicTime: '',
+                        academicSchedule: '',
                         extracurriculars: [],
                         testPrep: []
                     };
@@ -2995,7 +3016,9 @@
                     });
                     
                     // Collect academic days
+                    const academicDays = [];
                     entry.querySelectorAll('.academic-day-btn.selected').forEach(btn => {
+                        academicDays.push(btn.dataset.day);
                         studentData.academicDays.push(btn.dataset.day);
                     });
                     
@@ -3004,8 +3027,12 @@
                     const startMinute = entry.querySelector('#academic-start-minute').value;
                     const endHour = entry.querySelector('#academic-end-hour').value;
                     const endMinute = entry.querySelector('#academic-end-minute').value;
+                    
                     if (startHour && startMinute && endHour && endMinute) {
+                        const startTime = `${parseInt(startHour) % 12 || 12}:${startMinute} ${startHour < 12 ? 'AM' : 'PM'}`;
+                        const endTime = `${parseInt(endHour) % 12 || 12}:${endMinute} ${endHour < 12 ? 'AM' : 'PM'}`;
                         studentData.academicTime = `${startHour}:${startMinute}:${endHour}:${endMinute}`;
+                        studentData.academicSchedule = `${academicDays.join(', ')} from ${startTime} to ${endTime}`;
                     }
                     
                     // Collect extracurricular activities
@@ -3029,8 +3056,12 @@
                         const startMinute = card.querySelector('#extracurricular-start-minute').value;
                         const endHour = card.querySelector('#extracurricular-end-hour').value;
                         const endMinute = card.querySelector('#extracurricular-end-minute').value;
+                        
                         if (startHour && startMinute && endHour && endMinute) {
+                            const startTime = `${parseInt(startHour) % 12 || 12}:${startMinute} ${startHour < 12 ? 'AM' : 'PM'}`;
+                            const endTime = `${parseInt(endHour) % 12 || 12}:${endMinute} ${endHour < 12 ? 'AM' : 'PM'}`;
                             activityData.time = `${startHour}:${startMinute}:${endHour}:${endMinute}`;
+                            activityData.schedule = `${activityData.days.join(', ')} from ${startTime} to ${endTime}`;
                         }
                         
                         studentData.extracurriculars.push(activityData);
@@ -3043,7 +3074,8 @@
                             const testData = {
                                 id: card.dataset.testId,
                                 hours: hours,
-                                name: card.querySelector('.test-prep-name').textContent
+                                name: card.querySelector('.test-prep-name').textContent,
+                                rate: card.querySelector('.test-prep-rate').textContent
                             };
                             
                             // Collect test prep days
@@ -3057,8 +3089,12 @@
                             const startMinute = card.querySelector('#test-prep-start-minute').value;
                             const endHour = card.querySelector('#test-prep-end-hour').value;
                             const endMinute = card.querySelector('#test-prep-end-minute').value;
+                            
                             if (startHour && startMinute && endHour && endMinute) {
+                                const startTime = `${parseInt(startHour) % 12 || 12}:${startMinute} ${startHour < 12 ? 'AM' : 'PM'}`;
+                                const endTime = `${parseInt(endHour) % 12 || 12}:${endMinute} ${endHour < 12 ? 'AM' : 'PM'}`;
                                 testData.time = `${startHour}:${startMinute}:${endHour}:${endMinute}`;
+                                testData.schedule = `${testData.days.join(', ')} from ${startTime} to ${endTime}`;
                             }
                             
                             studentData.testPrep.push(testData);
@@ -3259,41 +3295,218 @@
                 // Generate invoice number
                 document.getElementById('invoice-number').textContent = this.currentApplicationId || 'BKH-' + Date.now();
                 
+                // Populate Student Details Section
+                this.populateStudentDetailsOnInvoice();
+                
                 // Populate Items
                 const tbody = document.getElementById('invoice-items');
                 tbody.innerHTML = '';
                 
-                // Academic fees
+                // Collect all data
                 const academicFee = parseInt(document.getElementById('total-academic-fee').textContent.replace(/\D/g,'')) || 0;
-                if (academicFee > 0) {
-                    tbody.innerHTML += `<tr><td>Academic Program Fees (Monthly)</td><td>${document.querySelectorAll('.student-entry').length}</td><td>-</td><td>₦${academicFee.toLocaleString()}</td></tr>`;
-                }
-                
-                // Extracurricular
                 const extracurricularFee = parseInt(document.getElementById('total-extracurricular-fee').textContent.replace(/\D/g,'')) || 0;
-                if (extracurricularFee > 0) {
-                    tbody.innerHTML += `<tr><td>Extracurricular Activities</td><td>1</td><td>-</td><td>₦${extracurricularFee.toLocaleString()}</td></tr>`;
-                }
-                
-                // Test prep
                 const testPrepFee = parseInt(document.getElementById('total-test-prep-fee').textContent.replace(/\D/g,'')) || 0;
-                if (testPrepFee > 0) {
-                    tbody.innerHTML += `<tr><td>Test Preparation Services</td><td>1</td><td>-</td><td>₦${testPrepFee.toLocaleString()}</td></tr>`;
-                }
+                const discount = parseInt(document.getElementById('discount-amount').textContent.replace(/\D/g,'')) || 0;
+                const prorated = parseInt(document.getElementById('prorated-amount').textContent.replace(/\D/g,'')) || 0;
+                
+                // Academic fees with details
+                const studentEntries = document.querySelectorAll('.student-entry');
+                studentEntries.forEach((entry, index) => {
+                    const studentName = entry.querySelector('.student-name').value || `Student ${index + 1}`;
+                    const selectedSubjects = Array.from(entry.querySelectorAll('.subject-option.selected')).map(opt => opt.dataset.subject);
+                    const grade = entry.querySelector('.student-grade').value;
+                    
+                    if (selectedSubjects.length > 0) {
+                        const academicDays = Array.from(entry.querySelectorAll('.academic-day-btn.selected')).map(btn => btn.dataset.day);
+                        const startHour = entry.querySelector('#academic-start-hour').value;
+                        const startMinute = entry.querySelector('#academic-start-minute').value;
+                        const endHour = entry.querySelector('#academic-end-hour').value;
+                        const endMinute = entry.querySelector('#academic-end-minute').value;
+                        
+                        const startTime = `${parseInt(startHour) % 12 || 12}:${startMinute} ${startHour < 12 ? 'AM' : 'PM'}`;
+                        const endTime = `${parseInt(endHour) % 12 || 12}:${endMinute} ${endHour < 12 ? 'AM' : 'PM'}`;
+                        
+                        const description = `${studentName}: ${selectedSubjects.join(', ')} (${academicDays.join(', ')}, ${startTime}-${endTime})`;
+                        
+                        // Calculate student's academic fee
+                        const baseFee = CONFIG.ACADEMIC_FEES[grade] || 0;
+                        const extraCount = Math.max(0, selectedSubjects.length - CONFIG.CONSTANTS.BASE_SUBJECTS_INCLUDED);
+                        const extraFee = extraCount * CONFIG.CONSTANTS.ADDITIONAL_SUBJECT_FEE;
+                        const studentAcademicFee = baseFee + extraFee;
+                        
+                        tbody.innerHTML += `<tr><td>${description}</td><td>1</td><td>₦${studentAcademicFee.toLocaleString()}</td><td>₦${studentAcademicFee.toLocaleString()}</td></tr>`;
+                    }
+                });
+                
+                // Extracurricular activities with details
+                studentEntries.forEach((entry, index) => {
+                    const studentName = entry.querySelector('.student-name').value || `Student ${index + 1}`;
+                    
+                    entry.querySelectorAll('.extracurricular-card.selected').forEach(card => {
+                        const activityName = card.querySelector('.extracurricular-name').textContent;
+                        const selectedDays = Array.from(card.querySelectorAll('.extracurricular-day-btn.selected')).map(btn => btn.dataset.day);
+                        const startHour = card.querySelector('#extracurricular-start-hour').value;
+                        const startMinute = card.querySelector('#extracurricular-start-minute').value;
+                        const endHour = card.querySelector('#extracurricular-end-hour').value;
+                        const endMinute = card.querySelector('#extracurricular-end-minute').value;
+                        
+                        const startTime = `${parseInt(startHour) % 12 || 12}:${startMinute} ${startHour < 12 ? 'AM' : 'PM'}`;
+                        const endTime = `${parseInt(endHour) % 12 || 12}:${endMinute} ${endHour < 12 ? 'AM' : 'PM'}`;
+                        
+                        const activity = CONFIG.EXTRACURRICULAR_FEES.find(a => a.id === card.dataset.activityId);
+                        const description = `${studentName}: ${activityName} (${selectedDays.join(', ')}, ${startTime}-${endTime})`;
+                        
+                        if (activity) {
+                            const selectedDaysCount = selectedDays.length;
+                            let fee = 0;
+                            
+                            if (activity.id === 'global_discovery') {
+                                fee = activity.ratePerSession;
+                            } else {
+                                fee = activity.ratePerSession * Math.min(selectedDaysCount, 2);
+                                const freqBtn = card.querySelector('.frequency-btn.selected');
+                                if (freqBtn && freqBtn.dataset.frequency === 'twice') {
+                                    fee *= 2;
+                                }
+                            }
+                            
+                            if (fee > 0) {
+                                tbody.innerHTML += `<tr><td>${description}</td><td>1</td><td>₦${fee.toLocaleString()}</td><td>₦${fee.toLocaleString()}</td></tr>`;
+                            }
+                        }
+                    });
+                });
+                
+                // Test prep with details
+                studentEntries.forEach((entry, index) => {
+                    const studentName = entry.querySelector('.student-name').value || `Student ${index + 1}`;
+                    
+                    entry.querySelectorAll('.test-prep-card.active').forEach(card => {
+                        const testName = card.querySelector('.test-prep-name').textContent;
+                        const hours = parseFloat(card.querySelector('.test-prep-hours').value) || 0;
+                        const selectedDays = Array.from(card.querySelectorAll('.test-prep-day-btn.selected')).map(btn => btn.dataset.day);
+                        const startHour = card.querySelector('#test-prep-start-hour').value;
+                        const startMinute = card.querySelector('#test-prep-start-minute').value;
+                        const endHour = card.querySelector('#test-prep-end-hour').value;
+                        const endMinute = card.querySelector('#test-prep-end-minute').value;
+                        
+                        const startTime = `${parseInt(startHour) % 12 || 12}:${startMinute} ${startHour < 12 ? 'AM' : 'PM'}`;
+                        const endTime = `${parseInt(endHour) % 12 || 12}:${endMinute} ${endHour < 12 ? 'AM' : 'PM'}`;
+                        
+                        const test = CONFIG.TEST_PREP_FEES.find(t => t.id === card.dataset.testId);
+                        
+                        if (test && hours > 0 && selectedDays.length > 0) {
+                            const weeklyHours = hours * selectedDays.length;
+                            const monthlyHours = weeklyHours * CONFIG.CONSTANTS.WEEKS_PER_MONTH;
+                            const fee = monthlyHours * test.rate;
+                            
+                            const description = `${studentName}: ${testName} (${selectedDays.join(', ')}, ${startTime}-${endTime}, ${hours}hrs/session)`;
+                            
+                            tbody.innerHTML += `<tr><td>${description}</td><td>1</td><td>₦${fee.toLocaleString()}</td><td>₦${fee.toLocaleString()}</td></tr>`;
+                        }
+                    });
+                });
                 
                 // Discounts
-                const discount = parseInt(document.getElementById('discount-amount').textContent.replace(/\D/g,'')) || 0;
                 if (discount > 0) {
                     tbody.innerHTML += `<tr><td>Sibling Discount</td><td>1</td><td>-</td><td>-₦${discount.toLocaleString()}</td></tr>`;
                 }
                 
                 // Prorated adjustment
-                const prorated = parseInt(document.getElementById('prorated-amount').textContent.replace(/\D/g,'')) || 0;
                 if (prorated > 0) {
-                    tbody.innerHTML += `<tr><td>Prorated Adjustment (Mid-month Start)</td><td>1</td><td>-</td><td>-₦${prorated.toLocaleString()}</td></tr>`;
+                    const explanation = document.getElementById('proration-explanation').textContent;
+                    tbody.innerHTML += `<tr><td>Prorated Adjustment (Mid-month Start)<br><small>${explanation}</small></td><td>1</td><td>-</td><td>-₦${prorated.toLocaleString()}</td></tr>`;
                 }
 
                 modal.classList.add('active');
+            }
+            
+            populateStudentDetailsOnInvoice() {
+                const container = document.getElementById('invoice-student-details-container');
+                container.innerHTML = '';
+                
+                const studentEntries = document.querySelectorAll('.student-entry');
+                
+                if (studentEntries.length === 0) return;
+                
+                studentEntries.forEach((entry, index) => {
+                    const studentName = entry.querySelector('.student-name').value || `Student ${index + 1}`;
+                    const grade = entry.querySelector('.student-grade').value;
+                    const startDate = entry.querySelector('.student-start-date').value;
+                    
+                    const studentDiv = document.createElement('div');
+                    studentDiv.className = 'invoice-student-details';
+                    
+                    let detailsHTML = `<h4>${studentName} (${grade}) - Starting: ${startDate}</h4>`;
+                    
+                    // Academic details
+                    const selectedSubjects = Array.from(entry.querySelectorAll('.subject-option.selected')).map(opt => opt.dataset.subject);
+                    const academicDays = Array.from(entry.querySelectorAll('.academic-day-btn.selected')).map(btn => btn.dataset.day);
+                    const startHour = entry.querySelector('#academic-start-hour').value;
+                    const startMinute = entry.querySelector('#academic-start-minute').value;
+                    const endHour = entry.querySelector('#academic-end-hour').value;
+                    const endMinute = entry.querySelector('#academic-end-minute').value;
+                    
+                    if (selectedSubjects.length > 0) {
+                        const startTime = `${parseInt(startHour) % 12 || 12}:${startMinute} ${startHour < 12 ? 'AM' : 'PM'}`;
+                        const endTime = `${parseInt(endHour) % 12 || 12}:${endMinute} ${endHour < 12 ? 'AM' : 'PM'}`;
+                        
+                        detailsHTML += `
+                            <div class="student-schedule">
+                                <strong>Academic Subjects:</strong> ${selectedSubjects.join(', ')}<br>
+                                <strong>Schedule:</strong> ${academicDays.join(', ')} from ${startTime} to ${endTime}
+                            </div>
+                        `;
+                    }
+                    
+                    // Extracurricular details
+                    const extracurricularCards = entry.querySelectorAll('.extracurricular-card.selected');
+                    if (extracurricularCards.length > 0) {
+                        detailsHTML += '<div class="student-schedule"><strong>Extracurricular Activities:</strong><br>';
+                        
+                        extracurricularCards.forEach(card => {
+                            const activityName = card.querySelector('.extracurricular-name').textContent;
+                            const selectedDays = Array.from(card.querySelectorAll('.extracurricular-day-btn.selected')).map(btn => btn.dataset.day);
+                            const startHour = card.querySelector('#extracurricular-start-hour').value;
+                            const startMinute = card.querySelector('#extracurricular-start-minute').value;
+                            const endHour = card.querySelector('#extracurricular-end-hour').value;
+                            const endMinute = card.querySelector('#extracurricular-end-minute').value;
+                            
+                            const startTime = `${parseInt(startHour) % 12 || 12}:${startMinute} ${startHour < 12 ? 'AM' : 'PM'}`;
+                            const endTime = `${parseInt(endHour) % 12 || 12}:${endMinute} ${endHour < 12 ? 'AM' : 'PM'}`;
+                            
+                            detailsHTML += `${activityName}: ${selectedDays.join(', ')} from ${startTime} to ${endTime}<br>`;
+                        });
+                        
+                        detailsHTML += '</div>';
+                    }
+                    
+                    // Test prep details
+                    const testPrepCards = entry.querySelectorAll('.test-prep-card.active');
+                    if (testPrepCards.length > 0) {
+                        detailsHTML += '<div class="student-schedule"><strong>Test Preparation:</strong><br>';
+                        
+                        testPrepCards.forEach(card => {
+                            const testName = card.querySelector('.test-prep-name').textContent;
+                            const hours = parseFloat(card.querySelector('.test-prep-hours').value) || 0;
+                            const selectedDays = Array.from(card.querySelectorAll('.test-prep-day-btn.selected')).map(btn => btn.dataset.day);
+                            const startHour = card.querySelector('#test-prep-start-hour').value;
+                            const startMinute = card.querySelector('#test-prep-start-minute').value;
+                            const endHour = card.querySelector('#test-prep-end-hour').value;
+                            const endMinute = card.querySelector('#test-prep-end-minute').value;
+                            
+                            const startTime = `${parseInt(startHour) % 12 || 12}:${startMinute} ${startHour < 12 ? 'AM' : 'PM'}`;
+                            const endTime = `${parseInt(endHour) % 12 || 12}:${endMinute} ${endHour < 12 ? 'AM' : 'PM'}`;
+                            
+                            detailsHTML += `${testName}: ${selectedDays.join(', ')} from ${startTime} to ${endTime} (${hours}hrs/session)<br>`;
+                        });
+                        
+                        detailsHTML += '</div>';
+                    }
+                    
+                    studentDiv.innerHTML = detailsHTML;
+                    container.appendChild(studentDiv);
+                });
             }
 
             async downloadInvoicePDF() {
