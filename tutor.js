@@ -924,8 +924,13 @@ async function renderStudentDatabase(container, tutor) {
     // CHANGED: Load reports from Firestore (cross-device) instead of localStorage
     let savedReports = await loadReportsFromFirestore(tutor.email);
 
+    // ====== CHANGED HERE (LINE ~725) ======
     // Fetch students and all of the tutor's historical submissions
-    const studentQuery = query(collection(db, "students"), where("tutorEmail", "==", tutor.email));
+    const studentQuery = query(
+        collection(db, "students"), 
+        where("tutorEmail", "==", tutor.email),
+        where("status", "in", ["active", "approved", null]) // Only show non-archived students
+    );
     const pendingStudentQuery = query(collection(db, "pending_students"), where("tutorEmail", "==", tutor.email));
     
     // --- START: MODIFICATION (NO INDEX REQUIRED) ---
@@ -1696,10 +1701,14 @@ function renderAutoRegisteredStudents(container, tutor) {
 }
 
 async function loadAutoRegisteredStudents(tutorEmail) {
+    // ====== CHANGED HERE (LINE ~1105) ======
     // Query both collections for auto-registered students
-    const studentsQuery = query(collection(db, "students"), 
+    const studentsQuery = query(
+        collection(db, "students"), 
         where("tutorEmail", "==", tutorEmail),
-        where("autoRegistered", "==", true));
+        where("autoRegistered", "==", true),
+        where("status", "in", ["active", "approved", null]) // Only show non-archived students
+    );
     
     const pendingQuery = query(collection(db, "pending_students"), 
         where("tutorEmail", "==", tutorEmail),
@@ -2250,4 +2259,3 @@ validationStyles.textContent = `
 `;
 document.head.appendChild(validationStyles);
 }
-
