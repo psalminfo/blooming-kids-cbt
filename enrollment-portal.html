@@ -634,6 +634,17 @@
             font-size: 13px;
         }
 
+        .time-validation-error {
+            color: var(--danger);
+            font-size: 12px;
+            margin-top: 5px;
+            display: none;
+        }
+
+        .time-validation-error.show {
+            display: block;
+        }
+
         /* Buttons */
         .btn {
             padding: 14px 28px;
@@ -1461,7 +1472,7 @@
                         <div class="form-group">
                             <label>Phone Number <span class="required">*</span></label>
                             <div class="phone-single-line">
-                                <input type="text" class="form-control" id="countryCode" placeholder="Phonecode" value="Country" data-validate="required">
+                                <input type="text" class="form-control" id="countryCode" placeholder="Phonecode" value="+234" data-validate="required">
                                 <input type="tel" class="form-control" id="parentPhone" placeholder="80123456789" data-validate="required,phone">
                             </div>
                             <div class="error-message" id="parentPhone-error"></div>
@@ -1923,26 +1934,24 @@
                             <input type="text" class="form-control student-name" placeholder="Student Name" data-validate="required" value="${prefillData?.name || ''}">
                             <div class="error-message student-name-error"></div>
                         </div>
-                        <div class="form-row">
-    <div class="form-group">
-        <label>Gender <span class="required">*</span></label>
-        <select class="form-control select student-gender" data-validate="required">
-            <option value="">Select Gender</option>
-            <option value="male" ${prefillData?.gender === 'male' ? 'selected' : ''}>Male</option>
-            <option value="female" ${prefillData?.gender === 'female' ? 'selected' : ''}>Female</option>
-            <option value="other" ${prefillData?.gender === 'other' ? 'selected' : ''}>Other</option>
-            <option value="prefer-not-to-say" ${prefillData?.gender === 'prefer-not-to-say' ? 'selected' : ''}>Prefer not to say</option>
-        </select>
-        <div class="error-message student-gender-error"></div>
-    </div>
-</div>
+                        <div class="form-group">
+                            <label>Gender <span class="required">*</span></label>
+                            <select class="form-control select student-gender" data-validate="required">
+                                <option value="">Select Gender</option>
+                                <option value="male" ${prefillData?.gender === 'male' ? 'selected' : ''}>Male</option>
+                                <option value="female" ${prefillData?.gender === 'female' ? 'selected' : ''}>Female</option>
+                                <option value="other" ${prefillData?.gender === 'other' ? 'selected' : ''}>Other</option>
+                                <option value="prefer-not-to-say" ${prefillData?.gender === 'prefer-not-to-say' ? 'selected' : ''}>Prefer not to say</option>
+                            </select>
+                            <div class="error-message student-gender-error"></div>
+                        </div>
+                    </div>
+                    <div class="form-row">
                         <div class="form-group">
                             <label>Date of Birth <span class="required">*</span></label>
                             <input type="date" class="form-control student-dob" data-validate="required" value="${prefillData?.dob || ''}">
                             <div class="error-message student-dob-error"></div>
                         </div>
-                    </div>
-                    <div class="form-row">
                         <div class="form-group">
                             <label>School Grade <span class="required">*</span></label>
                             <select class="form-control select student-grade" data-validate="required">
@@ -1954,29 +1963,29 @@
                             </select>
                             <div class="error-message student-grade-error"></div>
                         </div>
-                        <div class="form-row">
-    <div class="form-group">
-        <label>Actual Grade <span class="required">*</span></label>
-        <select class="form-control select student-grade" data-validate="required">
-            <option value="">Select Grade</option>
-            <option value="preschool" ${prefillData?.grade === 'preschool' ? 'selected' : ''}>Preschool</option>
-            <option value="kindergarten" ${prefillData?.grade === 'kindergarten' ? 'selected' : ''}>Kindergarten</option>
-            <option value="grade1" ${prefillData?.grade === 'grade1' ? 'selected' : ''}>Grade 1</option>
-            <option value="grade2" ${prefillData?.grade === 'grade2' ? 'selected' : ''}>Grade 2</option>
-            <option value="grade3" ${prefillData?.grade === 'grade3' ? 'selected' : ''}>Grade 3</option>
-            <option value="grade4" ${prefillData?.grade === 'grade4' ? 'selected' : ''}>Grade 4</option>
-            <option value="grade5" ${prefillData?.grade === 'grade5' ? 'selected' : ''}>Grade 5</option>
-            <option value="grade6" ${prefillData?.grade === 'grade6' ? 'selected' : ''}>Grade 6</option>
-            <option value="grade7" ${prefillData?.grade === 'grade7' ? 'selected' : ''}>Grade 7</option>
-            <option value="grade8" ${prefillData?.grade === 'grade8' ? 'selected' : ''}>Grade 8</option>
-            <option value="grade9" ${prefillData?.grade === 'grade9' ? 'selected' : ''}>Grade 9</option>
-            <option value="grade10" ${prefillData?.grade === 'grade10' ? 'selected' : ''}>Grade 10</option>
-            <option value="grade11" ${prefillData?.grade === 'grade11' ? 'selected' : ''}>Grade 11</option>
-            <option value="grade12" ${prefillData?.grade === 'grade12' ? 'selected' : ''}>Grade 12</option>
-        </select>
-        <div class="error-message student-grade-error"></div>
-    </div>
-</div>
+                        <div class="form-group">
+                            <label>Actual Grade <span class="required">*</span></label>
+                            <select class="form-control select student-actual-grade" data-validate="required">
+                                <option value="">Select Actual Grade</option>
+                                <option value="preschool" ${prefillData?.actualGrade === 'preschool' ? 'selected' : ''}>Preschool</option>
+                                <option value="kindergarten" ${prefillData?.actualGrade === 'kindergarten' ? 'selected' : ''}>Kindergarten</option>
+                                <option value="grade1" ${prefillData?.actualGrade === 'grade1' ? 'selected' : ''}>Grade 1</option>
+                                <option value="grade2" ${prefillData?.actualGrade === 'grade2' ? 'selected' : ''}>Grade 2</option>
+                                <option value="grade3" ${prefillData?.actualGrade === 'grade3' ? 'selected' : ''}>Grade 3</option>
+                                <option value="grade4" ${prefillData?.actualGrade === 'grade4' ? 'selected' : ''}>Grade 4</option>
+                                <option value="grade5" ${prefillData?.actualGrade === 'grade5' ? 'selected' : ''}>Grade 5</option>
+                                <option value="grade6" ${prefillData?.actualGrade === 'grade6' ? 'selected' : ''}>Grade 6</option>
+                                <option value="grade7" ${prefillData?.actualGrade === 'grade7' ? 'selected' : ''}>Grade 7</option>
+                                <option value="grade8" ${prefillData?.actualGrade === 'grade8' ? 'selected' : ''}>Grade 8</option>
+                                <option value="grade9" ${prefillData?.actualGrade === 'grade9' ? 'selected' : ''}>Grade 9</option>
+                                <option value="grade10" ${prefillData?.actualGrade === 'grade10' ? 'selected' : ''}>Grade 10</option>
+                                <option value="grade11" ${prefillData?.actualGrade === 'grade11' ? 'selected' : ''}>Grade 11</option>
+                                <option value="grade12" ${prefillData?.actualGrade === 'grade12' ? 'selected' : ''}>Grade 12</option>
+                            </select>
+                            <div class="error-message student-actual-grade-error"></div>
+                        </div>
+                    </div>
+                    <div class="form-row">
                         <div class="form-group">
                             <label>Preferred Start Date <span class="required">*</span></label>
                             <input type="date" class="form-control student-start-date" min="${new Date().toISOString().split('T')[0]}" data-validate="required" value="${prefillData?.startDate || defaultStartDate}">
@@ -1984,7 +1993,7 @@
                         </div>
                     </div>
                     
-                    <!-- NEW: Preferred Tutor Selection -->
+                    <!-- Preferred Tutor Selection -->
                     <div class="form-group">
                         <label>Preferred Tutor <span class="required">*</span></label>
                         <div class="tutor-selection">
@@ -2154,13 +2163,13 @@
 
                 // 1. Academic HTML with Sessions, Days & Time
                 const academicDaysHTML = CONFIG.DAYS.map(day => `
-                    <button class="day-btn academic-day-btn" data-day="${day}">${day.substring(0, 3)}</button>
+                    <button class="day-btn academic-day-btn" data-day="${day}" type="button">${day.substring(0, 3)}</button>
                 `).join('');
 
                 const academicHTML = `
                     <div id="academic-${id}" class="tab-content active">
                         <div class="course-selection">
-                            <!-- NEW: Academic Sessions Selection -->
+                            <!-- Academic Sessions Selection -->
                             <div class="academic-sessions">
                                 <div class="session-option" data-sessions="twice">
                                     Twice Weekly
@@ -2186,35 +2195,39 @@
                                 `).join('')}
                             </div>
                             
-                            <div class="days-time-section" data-validate="required">
-    <h5><i class="far fa-calendar-alt"></i> Available Days <span class="required">*</span></h5>
-    <div class="available-days">
-        ${academicDaysHTML}
-    </div>
-    <div class="error-message available-days-error"></div>
-</div>
+                            <div class="days-time-section">
+                                <h5><i class="far fa-calendar-alt"></i> Available Days <span class="required">*</span></h5>
+                                <div class="available-days" data-time-section="academic" data-student-id="${id}">
+                                    ${academicDaysHTML}
+                                </div>
+                                <div class="error-message available-days-error-${id}"></div>
                                 
-                                <h5><i class="far fa-clock"></i> Preferred Time (12AM - 11PM)</h5>
+                                <h5><i class="far fa-clock"></i> Preferred Time (12AM - 11PM) <span class="required">*</span></h5>
                                 <div class="time-selection">
                                     <div class="time-input-group">
                                         <label>From:</label>
-                                        <select id="academic-start-hour" class="time-hour">
+                                        <select id="academic-start-hour-${id}" class="time-hour" data-time-section="academic" data-student-id="${id}">
+                                            <option value="">Hour</option>
                                             ${hourOptions}
                                         </select>
-                                        <select id="academic-start-minute" class="time-minute">
+                                        <select id="academic-start-minute-${id}" class="time-minute" data-time-section="academic" data-student-id="${id}">
+                                            <option value="">Min</option>
                                             ${minuteOptions}
                                         </select>
                                     </div>
                                     <div class="time-input-group">
                                         <label>To:</label>
-                                        <select id="academic-end-hour" class="time-hour">
+                                        <select id="academic-end-hour-${id}" class="time-hour" data-time-section="academic" data-student-id="${id}">
+                                            <option value="">Hour</option>
                                             ${hourOptions}
                                         </select>
-                                        <select id="academic-end-minute" class="time-minute">
+                                        <select id="academic-end-minute-${id}" class="time-minute" data-time-section="academic" data-student-id="${id}">
+                                            <option value="">Min</option>
                                             ${minuteOptions}
                                         </select>
                                     </div>
                                 </div>
+                                <div class="time-validation-error" id="academic-time-error-${id}">Please select a valid time range</div>
                             </div>
                         </div>
                     </div>
@@ -2229,56 +2242,62 @@
                     if (isGlobalDiscovery) {
                         buttonsHTML = `
                             <div class="frequency-selection">
-                                <button class="frequency-btn" data-frequency="once" style="width: 100%;">Every Saturday (Monthly)</button>
+                                <button class="frequency-btn" data-frequency="once" style="width: 100%;" type="button">Every Saturday (Monthly)</button>
                             </div>
                         `;
                     } else {
                         buttonsHTML = `
                             <div class="frequency-selection">
-                                <button class="frequency-btn" data-frequency="once">Once Weekly</button>
-                                <button class="frequency-btn" data-frequency="twice">Twice Weekly</button>
+                                <button class="frequency-btn" data-frequency="once" type="button">Once Weekly</button>
+                                <button class="frequency-btn" data-frequency="twice" type="button">Twice Weekly</button>
                             </div>
                         `;
                     }
 
                     const extracurricularDaysHTML = CONFIG.DAYS.map(day => `
-                        <button class="day-btn extracurricular-day-btn" data-day="${day}">${day.substring(0, 3)}</button>
+                        <button class="day-btn extracurricular-day-btn" data-day="${day}" type="button">${day.substring(0, 3)}</button>
                     `).join('');
 
                     return `
-                    <div class="extracurricular-card" data-activity-id="${activity.id}">
+                    <div class="extracurricular-card" data-activity-id="${activity.id}" data-student-id="${id}">
                         <div class="extracurricular-header">
                             <div class="extracurricular-name">${activity.name}</div>
                             <div class="extracurricular-price">₦${activity.fee.toLocaleString()}</div>
                         </div>
                         ${buttonsHTML}
                         <div class="extracurricular-details">
-                            <h5><i class="far fa-calendar-alt"></i> Select Days (Max 2)</h5>
+                            <h5><i class="far fa-calendar-alt"></i> Select Days (Max 2) <span class="required">*</span></h5>
                             <div class="available-days">
                                 ${extracurricularDaysHTML}
                             </div>
+                            <div class="error-message extracurricular-days-error-${id}-${activity.id}" style="display: none;"></div>
                             
-                            <h5><i class="far fa-clock"></i> Preferred Time (12AM - 11PM)</h5>
+                            <h5><i class="far fa-clock"></i> Your Preferred Time (12AM - 11PM) <span class="required">*</span></h5>
                             <div class="time-selection">
                                 <div class="time-input-group">
                                     <label>From:</label>
-                                    <select id="extracurricular-start-hour" class="time-hour">
+                                    <select id="extracurricular-start-hour-${id}-${activity.id}" class="time-hour" data-time-section="extracurricular" data-activity-id="${activity.id}" data-student-id="${id}">
+                                        <option value="">Hour</option>
                                         ${hourOptions}
                                     </select>
-                                    <select id="extracurricular-start-minute" class="time-minute">
+                                    <select id="extracurricular-start-minute-${id}-${activity.id}" class="time-minute" data-time-section="extracurricular" data-activity-id="${activity.id}" data-student-id="${id}">
+                                        <option value="">Min</option>
                                         ${minuteOptions}
                                     </select>
                                 </div>
                                 <div class="time-input-group">
                                     <label>To:</label>
-                                    <select id="extracurricular-end-hour" class="time-hour">
+                                    <select id="extracurricular-end-hour-${id}-${activity.id}" class="time-hour" data-time-section="extracurricular" data-activity-id="${activity.id}" data-student-id="${id}">
+                                        <option value="">Hour</option>
                                         ${hourOptions}
                                     </select>
-                                    <select id="extracurricular-end-minute" class="time-minute">
+                                    <select id="extracurricular-end-minute-${id}-${activity.id}" class="time-minute" data-time-section="extracurricular" data-activity-id="${activity.id}" data-student-id="${id}">
+                                        <option value="">Min</option>
                                         ${minuteOptions}
                                     </select>
                                 </div>
                             </div>
+                            <div class="time-validation-error" id="extracurricular-time-error-${id}-${activity.id}" style="display: none;">Please select a valid time range</div>
                         </div>
                     </div>
                     `;
@@ -2296,11 +2315,11 @@
                 // 3. Test Prep HTML with Days & Time
                 const testPreps = CONFIG.TEST_PREP_FEES.map(test => {
                     const testPrepDaysHTML = CONFIG.DAYS.map(day => `
-                        <button class="day-btn test-prep-day-btn" data-day="${day}">${day.substring(0, 3)}</button>
+                        <button class="day-btn test-prep-day-btn" data-day="${day}" type="button">${day.substring(0, 3)}</button>
                     `).join('');
 
                     return `
-                    <div class="test-prep-card" data-test-id="${test.id}">
+                    <div class="test-prep-card" data-test-id="${test.id}" data-student-id="${id}">
                         <div class="test-prep-header">
                             <div class="test-prep-name">${test.name}</div>
                             <div class="test-prep-rate">₦${test.rate.toLocaleString()}/hour</div>
@@ -2311,32 +2330,38 @@
                             <span>hrs</span>
                         </div>
                         <div class="days-time-section">
-                            <h5><i class="far fa-calendar-alt"></i> Select Days</h5>
+                            <h5><i class="far fa-calendar-alt"></i> Select Days <span class="required">*</span></h5>
                             <div class="available-days">
                                 ${testPrepDaysHTML}
                             </div>
+                            <div class="error-message test-prep-days-error-${id}-${test.id}" style="display: none;"></div>
                             
-                            <h5><i class="far fa-clock"></i> Preferred Time (12AM - 11PM)</h5>
+                            <h5><i class="far fa-clock"></i> Preferred Time (12AM - 11PM) <span class="required">*</span></h5>
                             <div class="time-selection">
                                 <div class="time-input-group">
                                     <label>From:</label>
-                                    <select id="test-prep-start-hour" class="time-hour">
+                                    <select id="test-prep-start-hour-${id}-${test.id}" class="time-hour" data-time-section="test-prep" data-test-id="${test.id}" data-student-id="${id}">
+                                        <option value="">Hour</option>
                                         ${hourOptions}
                                     </select>
-                                    <select id="test-prep-start-minute" class="time-minute">
+                                    <select id="test-prep-start-minute-${id}-${test.id}" class="time-minute" data-time-section="test-prep" data-test-id="${test.id}" data-student-id="${id}">
+                                        <option value="">Min</option>
                                         ${minuteOptions}
                                     </select>
                                 </div>
                                 <div class="time-input-group">
                                     <label>To:</label>
-                                    <select id="test-prep-end-hour" class="time-hour">
+                                    <select id="test-prep-end-hour-${id}-${test.id}" class="time-hour" data-time-section="test-prep" data-test-id="${test.id}" data-student-id="${id}">
+                                        <option value="">Hour</option>
                                         ${hourOptions}
                                     </select>
-                                    <select id="test-prep-end-minute" class="time-minute">
+                                    <select id="test-prep-end-minute-${id}-${test.id}" class="time-minute" data-time-section="test-prep" data-test-id="${test.id}" data-student-id="${id}">
+                                        <option value="">Min</option>
                                         ${minuteOptions}
                                     </select>
                                 </div>
                             </div>
+                            <div class="time-validation-error" id="test-prep-time-error-${id}-${test.id}" style="display: none;">Please select a valid time range</div>
                         </div>
                     </div>
                     `;
@@ -2405,10 +2430,11 @@
                     });
                 });
 
-                // Time selection changes
-                studentDiv.querySelectorAll('#academic-start-hour, #academic-start-minute, #academic-end-hour, #academic-end-minute').forEach(select => {
+                // Academic Time selection changes
+                studentDiv.querySelectorAll(`#academic-start-hour-${id}, #academic-start-minute-${id}, #academic-end-hour-${id}, #academic-end-minute-${id}`).forEach(select => {
                     select.addEventListener('change', () => {
                         this.updateSummary();
+                        this.validateTimeSelection('academic', id, null);
                     });
                 });
 
@@ -2455,7 +2481,8 @@
                         btn.addEventListener('click', (e) => {
                             e.stopPropagation();
                             
-                            const isGlobalDiscovery = card.dataset.activityId === 'global_discovery';
+                            const activityId = card.dataset.activityId;
+                            const isGlobalDiscovery = activityId === 'global_discovery';
                             const selectedDays = card.querySelectorAll('.extracurricular-day-btn.selected');
                             
                             if (isGlobalDiscovery) {
@@ -2484,15 +2511,20 @@
                             
                             if(!card.classList.contains('selected')) card.classList.add('selected');
                             this.updateSummary();
+                            
+                            // Validate days selection
+                            this.validateExtracurricularDays(card, activityId, id);
                         });
                     });
 
                     // Extracurricular Time Selection
-                    card.querySelectorAll('#extracurricular-start-hour, #extracurricular-start-minute, #extracurricular-end-hour, #extracurricular-end-minute').forEach(select => {
+                    const activityId = card.dataset.activityId;
+                    card.querySelectorAll(`#extracurricular-start-hour-${id}-${activityId}, #extracurricular-start-minute-${id}-${activityId}, #extracurricular-end-hour-${id}-${activityId}, #extracurricular-end-minute-${id}-${activityId}`).forEach(select => {
                         select.addEventListener('change', (e) => {
                             e.stopPropagation();
                             if(!card.classList.contains('selected')) card.classList.add('selected');
                             this.updateSummary();
+                            this.validateTimeSelection('extracurricular', id, activityId);
                         });
                     });
                 });
@@ -2508,7 +2540,7 @@
                     });
                 });
 
-                // Test Prep Days Selection - NO LIMIT ON DAYS
+                // Test Prep Days Selection
                 studentDiv.querySelectorAll('.test-prep-day-btn').forEach(btn => {
                     btn.addEventListener('click', () => {
                         const card = btn.closest('.test-prep-card');
@@ -2534,15 +2566,19 @@
                 });
 
                 // Test Prep Time Selection
-                studentDiv.querySelectorAll('#test-prep-start-hour, #test-prep-start-minute, #test-prep-end-hour, #test-prep-end-minute').forEach(select => {
-                    select.addEventListener('change', () => {
-                        const card = select.closest('.test-prep-card');
-                        if(!card.classList.contains('active')) {
-                            const input = card.querySelector('.test-prep-hours');
-                            if(input) input.value = 1;
-                            card.classList.add('active');
-                        }
-                        this.updateSummary();
+                studentDiv.querySelectorAll('.test-prep-card').forEach(card => {
+                    const testId = card.dataset.testId;
+                    card.querySelectorAll(`#test-prep-start-hour-${id}-${testId}, #test-prep-start-minute-${id}-${testId}, #test-prep-end-hour-${id}-${testId}, #test-prep-end-minute-${id}-${testId}`).forEach(select => {
+                        select.addEventListener('change', () => {
+                            const card = select.closest('.test-prep-card');
+                            if(!card.classList.contains('active')) {
+                                const input = card.querySelector('.test-prep-hours');
+                                if(input) input.value = 1;
+                                card.classList.add('active');
+                            }
+                            this.updateSummary();
+                            this.validateTimeSelection('test-prep', id, testId);
+                        });
                     });
                 });
 
@@ -2929,14 +2965,16 @@
             }
 
             // ==============================================
-            // VALIDATION
+            // VALIDATION - FIXED VERSION
             // ==============================================
             
             validateField(input) {
+                if (!input) return true;
+                
                 const rules = input.getAttribute('data-validate');
                 if (!rules) return true;
                 
-                const value = input.value.trim();
+                const value = input.value ? input.value.trim() : '';
                 const ruleList = rules.split(',');
                 let isValid = true;
                 let errorMessage = '';
@@ -2949,7 +2987,7 @@
                     }
                     if (rule === 'email') {
                         const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-                        if (!emailRegex.test(value)) {
+                        if (value && !emailRegex.test(value)) {
                             isValid = false;
                             errorMessage = 'Invalid email address';
                             break;
@@ -2957,7 +2995,7 @@
                     }
                     if (rule === 'phone') {
                         const phoneRegex = /^[0-9\s\-\(\)]{7,}$/;
-                        if (!phoneRegex.test(value)) {
+                        if (value && !phoneRegex.test(value)) {
                             isValid = false;
                             errorMessage = 'Invalid phone number';
                             break;
@@ -2965,29 +3003,189 @@
                     }
                 }
                 
-                const errorElement = input.parentElement.querySelector('.error-message') || 
+                const errorElement = input.parentElement?.querySelector('.error-message') || 
                                     document.getElementById(`${input.id}-error`);
                 
                 if (errorElement) {
                     if (isValid) {
                         errorElement.classList.remove('show');
-                        input.classList.remove('error');
-                        input.classList.add('valid');
+                        if (input.classList) {
+                            input.classList.remove('error');
+                            input.classList.add('valid');
+                        }
                     } else {
                         errorElement.textContent = errorMessage;
                         errorElement.classList.add('show');
-                        input.classList.add('error');
-                        input.classList.remove('valid');
+                        if (input.classList) {
+                            input.classList.add('error');
+                            input.classList.remove('valid');
+                        }
                     }
                 }
                 return isValid;
             }
             
+            validateTimeSelection(section, studentId, itemId = null) {
+                let isValid = true;
+                
+                if (section === 'academic') {
+                    const startHour = document.getElementById(`academic-start-hour-${studentId}`).value;
+                    const startMinute = document.getElementById(`academic-start-minute-${studentId}`).value;
+                    const endHour = document.getElementById(`academic-end-hour-${studentId}`).value;
+                    const endMinute = document.getElementById(`academic-end-minute-${studentId}`).value;
+                    
+                    const errorElement = document.getElementById(`academic-time-error-${studentId}`);
+                    
+                    if (!startHour || !startMinute || !endHour || !endMinute) {
+                        isValid = false;
+                        if (errorElement) errorElement.classList.add('show');
+                    } else {
+                        // Check if end time is after start time
+                        const startTime = parseInt(startHour) * 60 + parseInt(startMinute);
+                        const endTime = parseInt(endHour) * 60 + parseInt(endMinute);
+                        
+                        if (endTime <= startTime) {
+                            isValid = false;
+                            if (errorElement) {
+                                errorElement.textContent = 'End time must be after start time';
+                                errorElement.classList.add('show');
+                            }
+                        } else {
+                            if (errorElement) errorElement.classList.remove('show');
+                        }
+                    }
+                } 
+                else if (section === 'extracurricular' && itemId) {
+                    const startHour = document.getElementById(`extracurricular-start-hour-${studentId}-${itemId}`).value;
+                    const startMinute = document.getElementById(`extracurricular-start-minute-${studentId}-${itemId}`).value;
+                    const endHour = document.getElementById(`extracurricular-end-hour-${studentId}-${itemId}`).value;
+                    const endMinute = document.getElementById(`extracurricular-end-minute-${studentId}-${itemId}`).value;
+                    
+                    const errorElement = document.getElementById(`extracurricular-time-error-${studentId}-${itemId}`);
+                    const card = document.querySelector(`.extracurricular-card[data-activity-id="${itemId}"][data-student-id="${studentId}"]`);
+                    
+                    if (card && card.classList.contains('selected')) {
+                        if (!startHour || !startMinute || !endHour || !endMinute) {
+                            isValid = false;
+                            if (errorElement) {
+                                errorElement.textContent = 'Please select a valid time range';
+                                errorElement.classList.add('show');
+                            }
+                        } else {
+                            // Check if end time is after start time
+                            const startTime = parseInt(startHour) * 60 + parseInt(startMinute);
+                            const endTime = parseInt(endHour) * 60 + parseInt(endMinute);
+                            
+                            if (endTime <= startTime) {
+                                isValid = false;
+                                if (errorElement) {
+                                    errorElement.textContent = 'End time must be after start time';
+                                    errorElement.classList.add('show');
+                                }
+                            } else {
+                                if (errorElement) errorElement.classList.remove('show');
+                            }
+                        }
+                    } else {
+                        if (errorElement) errorElement.classList.remove('show');
+                    }
+                }
+                else if (section === 'test-prep' && itemId) {
+                    const startHour = document.getElementById(`test-prep-start-hour-${studentId}-${itemId}`).value;
+                    const startMinute = document.getElementById(`test-prep-start-minute-${studentId}-${itemId}`).value;
+                    const endHour = document.getElementById(`test-prep-end-hour-${studentId}-${itemId}`).value;
+                    const endMinute = document.getElementById(`test-prep-end-minute-${studentId}-${itemId}`).value;
+                    
+                    const errorElement = document.getElementById(`test-prep-time-error-${studentId}-${itemId}`);
+                    const card = document.querySelector(`.test-prep-card[data-test-id="${itemId}"][data-student-id="${studentId}"]`);
+                    
+                    if (card && card.classList.contains('active')) {
+                        if (!startHour || !startMinute || !endHour || !endMinute) {
+                            isValid = false;
+                            if (errorElement) {
+                                errorElement.textContent = 'Please select a valid time range';
+                                errorElement.classList.add('show');
+                            }
+                        } else {
+                            // Check if end time is after start time
+                            const startTime = parseInt(startHour) * 60 + parseInt(startMinute);
+                            const endTime = parseInt(endHour) * 60 + parseInt(endMinute);
+                            
+                            if (endTime <= startTime) {
+                                isValid = false;
+                                if (errorElement) {
+                                    errorElement.textContent = 'End time must be after start time';
+                                    errorElement.classList.add('show');
+                                }
+                            } else {
+                                if (errorElement) errorElement.classList.remove('show');
+                            }
+                        }
+                    } else {
+                        if (errorElement) errorElement.classList.remove('show');
+                    }
+                }
+                
+                return isValid;
+            }
+            
+            validateExtracurricularDays(card, activityId, studentId) {
+                const selectedDays = card.querySelectorAll('.extracurricular-day-btn.selected');
+                const errorElement = document.getElementById(`extracurricular-days-error-${studentId}-${activityId}`);
+                
+                if (card.classList.contains('selected') && selectedDays.length === 0) {
+                    if (errorElement) {
+                        errorElement.textContent = 'Please select at least one day';
+                        errorElement.style.display = 'block';
+                    }
+                    return false;
+                } else {
+                    if (errorElement) errorElement.style.display = 'none';
+                    return true;
+                }
+            }
+            
             validateForm() {
                 let allValid = true;
+                
+                // Validate basic form fields
                 document.querySelectorAll('[data-validate]').forEach(input => {
                     if (!this.validateField(input)) allValid = false;
                 });
+                
+                // Validate student selections
+                const studentEntries = document.querySelectorAll('.student-entry');
+                studentEntries.forEach((entry, index) => {
+                    const studentId = index + 1;
+                    
+                    // Validate academic time if academic subjects are selected
+                    const selectedSubjects = entry.querySelectorAll('.subject-option.selected');
+                    if (selectedSubjects.length > 0) {
+                        if (!this.validateTimeSelection('academic', studentId, null)) {
+                            allValid = false;
+                        }
+                    }
+                    
+                    // Validate extracurricular times
+                    entry.querySelectorAll('.extracurricular-card.selected').forEach(card => {
+                        const activityId = card.dataset.activityId;
+                        if (!this.validateTimeSelection('extracurricular', studentId, activityId)) {
+                            allValid = false;
+                        }
+                        if (!this.validateExtracurricularDays(card, activityId, studentId)) {
+                            allValid = false;
+                        }
+                    });
+                    
+                    // Validate test prep times
+                    entry.querySelectorAll('.test-prep-card.active').forEach(card => {
+                        const testId = card.dataset.testId;
+                        if (!this.validateTimeSelection('test-prep', studentId, testId)) {
+                            allValid = false;
+                        }
+                    });
+                });
+                
                 return allValid;
             }
 
@@ -3038,7 +3236,7 @@
                 }
                 
                 if(!this.validateForm()) {
-                    this.showAlert("Please complete all required fields first", "danger");
+                    this.showAlert("Please complete all required fields including time selections", "danger");
                     return;
                 }
                 
@@ -3158,13 +3356,13 @@
             
             collectFormData() {
                 // Get normalized phone number (country code - phone number)
-                const countryCode = document.getElementById('countryCode').value.trim();
-                const phoneNumber = document.getElementById('parentPhone').value.trim().replace(/\D/g, '');
+                const countryCode = document.getElementById('countryCode').value ? document.getElementById('countryCode').value.trim() : '+234';
+                const phoneNumber = document.getElementById('parentPhone').value ? document.getElementById('parentPhone').value.trim().replace(/\D/g, '') : '';
                 const normalizedPhoneNumber = `${countryCode}-${phoneNumber}`;
                 
                 // Get city and country
-                const city = document.getElementById('city').value.trim();
-                const country = document.getElementById('country').value.trim();
+                const city = document.getElementById('city').value ? document.getElementById('city').value.trim() : '';
+                const country = document.getElementById('country').value ? document.getElementById('country').value.trim() : '';
                 const cityCountry = `${city}, ${country}`;
                 
                 // Get the total fee
@@ -3234,8 +3432,10 @@
                     const studentData = {
                         id: index + 1,
                         name: entry.querySelector('.student-name').value,
+                        gender: entry.querySelector('.student-gender').value,
                         dob: entry.querySelector('.student-dob').value,
                         grade: entry.querySelector('.student-grade').value,
+                        actualGrade: entry.querySelector('.student-actual-grade').value,
                         startDate: entry.querySelector('.student-start-date').value,
                         preferredTutor: preferredTutor,
                         academicSessions: academicSessions,
@@ -3260,10 +3460,10 @@
                     });
                     
                     // Collect academic time
-                    const startHour = entry.querySelector('#academic-start-hour').value;
-                    const startMinute = entry.querySelector('#academic-start-minute').value;
-                    const endHour = entry.querySelector('#academic-end-hour').value;
-                    const endMinute = entry.querySelector('#academic-end-minute').value;
+                    const startHour = document.getElementById(`academic-start-hour-${index + 1}`)?.value || '';
+                    const startMinute = document.getElementById(`academic-start-minute-${index + 1}`)?.value || '';
+                    const endHour = document.getElementById(`academic-end-hour-${index + 1}`)?.value || '';
+                    const endMinute = document.getElementById(`academic-end-minute-${index + 1}`)?.value || '';
                     
                     if (startHour && startMinute && endHour && endMinute) {
                         const startTime = `${parseInt(startHour) % 12 || 12}:${startMinute} ${startHour < 12 ? 'AM' : 'PM'}`;
@@ -3289,10 +3489,10 @@
                         });
                         
                         // Collect extracurricular time
-                        const startHour = card.querySelector('#extracurricular-start-hour').value;
-                        const startMinute = card.querySelector('#extracurricular-start-minute').value;
-                        const endHour = card.querySelector('#extracurricular-end-hour').value;
-                        const endMinute = card.querySelector('#extracurricular-end-minute').value;
+                        const startHour = document.getElementById(`extracurricular-start-hour-${index + 1}-${activityData.id}`)?.value || '';
+                        const startMinute = document.getElementById(`extracurricular-start-minute-${index + 1}-${activityData.id}`)?.value || '';
+                        const endHour = document.getElementById(`extracurricular-end-hour-${index + 1}-${activityData.id}`)?.value || '';
+                        const endMinute = document.getElementById(`extracurricular-end-minute-${index + 1}-${activityData.id}`)?.value || '';
                         
                         if (startHour && startMinute && endHour && endMinute) {
                             const startTime = `${parseInt(startHour) % 12 || 12}:${startMinute} ${startHour < 12 ? 'AM' : 'PM'}`;
@@ -3322,10 +3522,10 @@
                             });
                             
                             // Collect test prep time
-                            const startHour = card.querySelector('#test-prep-start-hour').value;
-                            const startMinute = card.querySelector('#test-prep-start-minute').value;
-                            const endHour = card.querySelector('#test-prep-end-hour').value;
-                            const endMinute = card.querySelector('#test-prep-end-minute').value;
+                            const startHour = document.getElementById(`test-prep-start-hour-${index + 1}-${testData.id}`)?.value || '';
+                            const startMinute = document.getElementById(`test-prep-start-minute-${index + 1}-${testData.id}`)?.value || '';
+                            const endHour = document.getElementById(`test-prep-end-hour-${index + 1}-${testData.id}`)?.value || '';
+                            const endMinute = document.getElementById(`test-prep-end-minute-${index + 1}-${testData.id}`)?.value || '';
                             
                             if (startHour && startMinute && endHour && endMinute) {
                                 const startTime = `${parseInt(startHour) % 12 || 12}:${startMinute} ${startHour < 12 ? 'AM' : 'PM'}`;
@@ -3562,13 +3762,13 @@
                     
                     if (selectedSubjects.length > 0 && grade && sessions) {
                         const academicDays = Array.from(entry.querySelectorAll('.academic-day-btn.selected')).map(btn => btn.dataset.day);
-                        const startHour = entry.querySelector('#academic-start-hour').value;
-                        const startMinute = entry.querySelector('#academic-start-minute').value;
-                        const endHour = entry.querySelector('#academic-end-hour').value;
-                        const endMinute = entry.querySelector('#academic-end-minute').value;
+                        const startHour = document.getElementById(`academic-start-hour-${index + 1}`)?.value || '';
+                        const startMinute = document.getElementById(`academic-start-minute-${index + 1}`)?.value || '';
+                        const endHour = document.getElementById(`academic-end-hour-${index + 1}`)?.value || '';
+                        const endMinute = document.getElementById(`academic-end-minute-${index + 1}`)?.value || '';
                         
-                        const startTime = `${parseInt(startHour) % 12 || 12}:${startMinute} ${startHour < 12 ? 'AM' : 'PM'}`;
-                        const endTime = `${parseInt(endHour) % 12 || 12}:${endMinute} ${endHour < 12 ? 'AM' : 'PM'}`;
+                        const startTime = startHour && startMinute ? `${parseInt(startHour) % 12 || 12}:${startMinute} ${startHour < 12 ? 'AM' : 'PM'}` : '';
+                        const endTime = endHour && endMinute ? `${parseInt(endHour) % 12 || 12}:${endMinute} ${endHour < 12 ? 'AM' : 'PM'}` : '';
                         
                         // Get tutor preference
                         const selectedTutor = entry.querySelector('.tutor-option.selected');
@@ -3595,15 +3795,16 @@
                     entry.querySelectorAll('.extracurricular-card.selected').forEach(card => {
                         const activityName = card.querySelector('.extracurricular-name').textContent;
                         const selectedDays = Array.from(card.querySelectorAll('.extracurricular-day-btn.selected')).map(btn => btn.dataset.day);
-                        const startHour = card.querySelector('#extracurricular-start-hour').value;
-                        const startMinute = card.querySelector('#extracurricular-start-minute').value;
-                        const endHour = card.querySelector('#extracurricular-end-hour').value;
-                        const endMinute = card.querySelector('#extracurricular-end-minute').value;
+                        const activityId = card.dataset.activityId;
+                        const startHour = document.getElementById(`extracurricular-start-hour-${index + 1}-${activityId}`)?.value || '';
+                        const startMinute = document.getElementById(`extracurricular-start-minute-${index + 1}-${activityId}`)?.value || '';
+                        const endHour = document.getElementById(`extracurricular-end-hour-${index + 1}-${activityId}`)?.value || '';
+                        const endMinute = document.getElementById(`extracurricular-end-minute-${index + 1}-${activityId}`)?.value || '';
                         
-                        const startTime = `${parseInt(startHour) % 12 || 12}:${startMinute} ${startHour < 12 ? 'AM' : 'PM'}`;
-                        const endTime = `${parseInt(endHour) % 12 || 12}:${endMinute} ${endHour < 12 ? 'AM' : 'PM'}`;
+                        const startTime = startHour && startMinute ? `${parseInt(startHour) % 12 || 12}:${startMinute} ${startHour < 12 ? 'AM' : 'PM'}` : '';
+                        const endTime = endHour && endMinute ? `${parseInt(endHour) % 12 || 12}:${endMinute} ${endHour < 12 ? 'AM' : 'PM'}` : '';
                         
-                        const activity = CONFIG.EXTRACURRICULAR_FEES.find(a => a.id === card.dataset.activityId);
+                        const activity = CONFIG.EXTRACURRICULAR_FEES.find(a => a.id === activityId);
                         const description = `${studentName}: ${activityName} (${selectedDays.join(', ')}, ${startTime}-${endTime})`;
                         
                         if (activity) {
@@ -3635,15 +3836,16 @@
                         const testName = card.querySelector('.test-prep-name').textContent;
                         const hours = parseFloat(card.querySelector('.test-prep-hours').value) || 0;
                         const selectedDays = Array.from(card.querySelectorAll('.test-prep-day-btn.selected')).map(btn => btn.dataset.day);
-                        const startHour = card.querySelector('#test-prep-start-hour').value;
-                        const startMinute = card.querySelector('#test-prep-start-minute').value;
-                        const endHour = card.querySelector('#test-prep-end-hour').value;
-                        const endMinute = card.querySelector('#test-prep-end-minute').value;
+                        const testId = card.dataset.testId;
+                        const startHour = document.getElementById(`test-prep-start-hour-${index + 1}-${testId}`)?.value || '';
+                        const startMinute = document.getElementById(`test-prep-start-minute-${index + 1}-${testId}`)?.value || '';
+                        const endHour = document.getElementById(`test-prep-end-hour-${index + 1}-${testId}`)?.value || '';
+                        const endMinute = document.getElementById(`test-prep-end-minute-${index + 1}-${testId}`)?.value || '';
                         
-                        const startTime = `${parseInt(startHour) % 12 || 12}:${startMinute} ${startHour < 12 ? 'AM' : 'PM'}`;
-                        const endTime = `${parseInt(endHour) % 12 || 12}:${endMinute} ${endHour < 12 ? 'AM' : 'PM'}`;
+                        const startTime = startHour && startMinute ? `${parseInt(startHour) % 12 || 12}:${startMinute} ${startHour < 12 ? 'AM' : 'PM'}` : '';
+                        const endTime = endHour && endMinute ? `${parseInt(endHour) % 12 || 12}:${endMinute} ${endHour < 12 ? 'AM' : 'PM'}` : '';
                         
-                        const test = CONFIG.TEST_PREP_FEES.find(t => t.id === card.dataset.testId);
+                        const test = CONFIG.TEST_PREP_FEES.find(t => t.id === testId);
                         
                         if (test && hours > 0 && selectedDays.length > 0) {
                             const weeklyHours = hours * selectedDays.length;
@@ -3680,7 +3882,8 @@
                 if (studentEntries.length === 0) return;
                 
                 studentEntries.forEach((entry, index) => {
-                    const studentName = entry.querySelector('.student-name').value || `Student ${index + 1}`;
+                    const studentId = index + 1;
+                    const studentName = entry.querySelector('.student-name').value || `Student ${studentId}`;
                     const grade = entry.querySelector('.student-grade').value;
                     const startDate = entry.querySelector('.student-start-date').value;
                     
@@ -3703,14 +3906,14 @@
                     // Academic details
                     const selectedSubjects = Array.from(entry.querySelectorAll('.subject-option.selected')).map(opt => opt.dataset.subject);
                     const academicDays = Array.from(entry.querySelectorAll('.academic-day-btn.selected')).map(btn => btn.dataset.day);
-                    const startHour = entry.querySelector('#academic-start-hour').value;
-                    const startMinute = entry.querySelector('#academic-start-minute').value;
-                    const endHour = entry.querySelector('#academic-end-hour').value;
-                    const endMinute = entry.querySelector('#academic-end-minute').value;
+                    const startHour = document.getElementById(`academic-start-hour-${studentId}`)?.value || '';
+                    const startMinute = document.getElementById(`academic-start-minute-${studentId}`)?.value || '';
+                    const endHour = document.getElementById(`academic-end-hour-${studentId}`)?.value || '';
+                    const endMinute = document.getElementById(`academic-end-minute-${studentId}`)?.value || '';
                     
                     if (selectedSubjects.length > 0) {
-                        const startTime = `${parseInt(startHour) % 12 || 12}:${startMinute} ${startHour < 12 ? 'AM' : 'PM'}`;
-                        const endTime = `${parseInt(endHour) % 12 || 12}:${endMinute} ${endHour < 12 ? 'AM' : 'PM'}`;
+                        const startTime = startHour && startMinute ? `${parseInt(startHour) % 12 || 12}:${startMinute} ${startHour < 12 ? 'AM' : 'PM'}` : '';
+                        const endTime = endHour && endMinute ? `${parseInt(endHour) % 12 || 12}:${endMinute} ${endHour < 12 ? 'AM' : 'PM'}` : '';
                         
                         detailsHTML += `
                             <div class="student-schedule">
@@ -3726,15 +3929,16 @@
                         detailsHTML += '<div class="student-schedule"><strong>Extracurricular Activities:</strong><br>';
                         
                         extracurricularCards.forEach(card => {
+                            const activityId = card.dataset.activityId;
                             const activityName = card.querySelector('.extracurricular-name').textContent;
                             const selectedDays = Array.from(card.querySelectorAll('.extracurricular-day-btn.selected')).map(btn => btn.dataset.day);
-                            const startHour = card.querySelector('#extracurricular-start-hour').value;
-                            const startMinute = card.querySelector('#extracurricular-start-minute').value;
-                            const endHour = card.querySelector('#extracurricular-end-hour').value;
-                            const endMinute = card.querySelector('#extracurricular-end-minute').value;
+                            const startHour = document.getElementById(`extracurricular-start-hour-${studentId}-${activityId}`)?.value || '';
+                            const startMinute = document.getElementById(`extracurricular-start-minute-${studentId}-${activityId}`)?.value || '';
+                            const endHour = document.getElementById(`extracurricular-end-hour-${studentId}-${activityId}`)?.value || '';
+                            const endMinute = document.getElementById(`extracurricular-end-minute-${studentId}-${activityId}`)?.value || '';
                             
-                            const startTime = `${parseInt(startHour) % 12 || 12}:${startMinute} ${startHour < 12 ? 'AM' : 'PM'}`;
-                            const endTime = `${parseInt(endHour) % 12 || 12}:${endMinute} ${endHour < 12 ? 'AM' : 'PM'}`;
+                            const startTime = startHour && startMinute ? `${parseInt(startHour) % 12 || 12}:${startMinute} ${startHour < 12 ? 'AM' : 'PM'}` : '';
+                            const endTime = endHour && endMinute ? `${parseInt(endHour) % 12 || 12}:${endMinute} ${endHour < 12 ? 'AM' : 'PM'}` : '';
                             
                             detailsHTML += `${activityName}: ${selectedDays.join(', ')} from ${startTime} to ${endTime}<br>`;
                         });
@@ -3748,16 +3952,17 @@
                         detailsHTML += '<div class="student-schedule"><strong>Test Preparation:</strong><br>';
                         
                         testPrepCards.forEach(card => {
+                            const testId = card.dataset.testId;
                             const testName = card.querySelector('.test-prep-name').textContent;
                             const hours = parseFloat(card.querySelector('.test-prep-hours').value) || 0;
                             const selectedDays = Array.from(card.querySelectorAll('.test-prep-day-btn.selected')).map(btn => btn.dataset.day);
-                            const startHour = card.querySelector('#test-prep-start-hour').value;
-                            const startMinute = card.querySelector('#test-prep-start-minute').value;
-                            const endHour = card.querySelector('#test-prep-end-hour').value;
-                            const endMinute = card.querySelector('#test-prep-end-minute').value;
+                            const startHour = document.getElementById(`test-prep-start-hour-${studentId}-${testId}`)?.value || '';
+                            const startMinute = document.getElementById(`test-prep-start-minute-${studentId}-${testId}`)?.value || '';
+                            const endHour = document.getElementById(`test-prep-end-hour-${studentId}-${testId}`)?.value || '';
+                            const endMinute = document.getElementById(`test-prep-end-minute-${studentId}-${testId}`)?.value || '';
                             
-                            const startTime = `${parseInt(startHour) % 12 || 12}:${startMinute} ${startHour < 12 ? 'AM' : 'PM'}`;
-                            const endTime = `${parseInt(endHour) % 12 || 12}:${endMinute} ${endHour < 12 ? 'AM' : 'PM'}`;
+                            const startTime = startHour && startMinute ? `${parseInt(startHour) % 12 || 12}:${startMinute} ${startHour < 12 ? 'AM' : 'PM'}` : '';
+                            const endTime = endHour && endMinute ? `${parseInt(endHour) % 12 || 12}:${endMinute} ${endHour < 12 ? 'AM' : 'PM'}` : '';
                             
                             detailsHTML += `${testName}: ${selectedDays.join(', ')} from ${startTime} to ${endTime} (${hours}hrs/session)<br>`;
                         });
@@ -3789,7 +3994,7 @@
 
             submitEnrollment() {
                 if(!this.validateForm()) {
-                    this.showAlert("Please fix all errors before submitting", "danger");
+                    this.showAlert("Please fix all errors before submitting. Make sure all time selections are completed.", "danger");
                     return;
                 }
                 
