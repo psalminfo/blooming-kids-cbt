@@ -4277,7 +4277,7 @@ function renderPendingApprovalsFromCache(studentsToRender = null) {
     document.querySelectorAll('.reject-btn').forEach(button => button.addEventListener('click', () => handleRejectStudent(button.dataset.studentId)));
 }
 
-// ======================================================
+// ===// ======================================================
 // SUBSECTION 5.4: Summer Break Panel
 // ======================================================
 
@@ -4317,9 +4317,16 @@ async function renderSummerBreakPanel(container) {
         </div>
     `;
     
+    // Add event listeners
     document.getElementById('refresh-break-btn').addEventListener('click', () => fetchAndRenderBreakStudents(true));
-    document.getElementById('break-search').addEventListener('input', (e) => renderBreakStudentsFromCache(e.target.value));
     
+    // FIXED: Properly pass the search term to the function
+    document.getElementById('break-search').addEventListener('input', (e) => {
+        const searchTerm = e.target.value;
+        renderBreakStudentsFromCache(searchTerm);
+    });
+    
+    // Fetch initial data
     fetchAndRenderBreakStudents();
 }
 
@@ -4328,12 +4335,13 @@ async function fetchAndRenderBreakStudents(forceRefresh = false) {
     const listContainer = document.getElementById('break-students-list');
 
     try {
-        if (!sessionCache.breakStudents) {
-            listContainer.innerHTML = `<div class="text-center py-10">
-                <div class="loading-spinner mx-auto" style="width: 40px; height: 40px;"></div>
-                <p class="text-green-600 font-semibold mt-4">Fetching student break status...</p>
-            </div>`;
-            
+        // Show loading state
+        listContainer.innerHTML = `<div class="text-center py-10">
+            <div class="loading-spinner mx-auto" style="width: 40px; height: 40px;"></div>
+            <p class="text-green-600 font-semibold mt-4">Fetching student break status...</p>
+        </div>`;
+        
+        if (!sessionCache.breakStudents || forceRefresh) {
             const snapshot = await getDocs(query(collection(db, "students"), where("summerBreak", "==", true)));
             const allBreakStudents = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
             
@@ -4343,7 +4351,14 @@ async function fetchAndRenderBreakStudents(forceRefresh = false) {
             
             saveToLocalStorage('breakStudents', activeBreakStudents);
         }
-        renderBreakStudentsFromCache();
+        
+        // Get current search term to maintain it after refresh
+        const searchInput = document.getElementById('break-search');
+        const currentSearchTerm = searchInput ? searchInput.value : '';
+        
+        // Render with current search term
+        renderBreakStudentsFromCache(currentSearchTerm);
+        
     } catch(error) {
         console.error("Error fetching break students:", error);
         const listContainer = document.getElementById('break-students-list');
@@ -4381,9 +4396,11 @@ function renderBreakStudentsFromCache(searchTerm = '') {
     
     const uniqueTutors = [...new Set(breakStudents.map(s => s.tutorEmail))].filter(Boolean);
     
+    // Update counts
     document.getElementById('break-count-badge').textContent = breakStudents.length;
     document.getElementById('break-tutor-count').textContent = uniqueTutors.length;
-
+    
+    // Show appropriate message based on results
     if (filteredStudents.length === 0) {
         if (searchTerm) {
             listContainer.innerHTML = `
@@ -4405,6 +4422,7 @@ function renderBreakStudentsFromCache(searchTerm = '') {
         return;
     }
     
+    // Group students by tutor
     const studentsByTutor = {};
     filteredStudents.forEach(student => {
         const tutorKey = student.tutorEmail || 'No Tutor Assigned';
@@ -4420,6 +4438,7 @@ function renderBreakStudentsFromCache(searchTerm = '') {
     
     let html = '';
     
+    // Generate HTML for each tutor group
     Object.values(studentsByTutor).forEach(tutorGroup => {
         const studentItems = tutorGroup.students.map(student => {
             const breakInfo = student.lastBreakStart ? 
@@ -4485,6 +4504,7 @@ function renderBreakStudentsFromCache(searchTerm = '') {
     
     listContainer.innerHTML = html;
     
+    // Add event listeners to End Break buttons
     document.querySelectorAll('.end-break-btn').forEach(button => {
         button.addEventListener('click', async (e) => {
             const studentId = e.target.dataset.studentId;
@@ -4508,6 +4528,7 @@ function renderBreakStudentsFromCache(searchTerm = '') {
                     lastUpdated: Timestamp.now()
                 });
                 
+                // Show success message
                 const statusMessage = document.getElementById('break-status-message');
                 statusMessage.textContent = `✅ Summer break ended for ${studentName}. Student is now active with ${tutorName}.`;
                 statusMessage.className = 'text-center font-semibold mb-4 text-green-600 p-3 bg-green-50 rounded-lg';
@@ -4517,13 +4538,16 @@ function renderBreakStudentsFromCache(searchTerm = '') {
                     statusMessage.classList.add('hidden');
                 }, 4000);
                 
+                // Invalidate caches
                 invalidateCache('breakStudents');
                 invalidateCache('students');
                 invalidateCache('tutorAssignments');
                 
+                // Refresh the data
                 const currentSearch = document.getElementById('break-search').value;
                 await fetchAndRenderBreakStudents(true);
                 
+                // Restore search term if any
                 if (currentSearch) {
                     document.getElementById('break-search').value = currentSearch;
                     renderBreakStudentsFromCache(currentSearch);
@@ -4532,6 +4556,7 @@ function renderBreakStudentsFromCache(searchTerm = '') {
             } catch (error) {
                 console.error("Error ending summer break:", error);
                 
+                // Show error message
                 const statusMessage = document.getElementById('break-status-message');
                 statusMessage.textContent = `❌ Failed to End Break for ${studentName}. Error: ${error.message}`;
                 statusMessage.className = 'text-center font-semibold mb-4 text-red-600 p-3 bg-red-50 rounded-lg';
@@ -4541,11 +4566,13 @@ function renderBreakStudentsFromCache(searchTerm = '') {
                     statusMessage.classList.add('hidden');
                 }, 5000);
                 
+                // Restore button state
                 e.target.innerHTML = originalText;
                 e.target.disabled = false;
             }
         });
     });
+}
 }
 
 // ======================================================
@@ -6144,3 +6171,4 @@ onAuthStateChanged(auth, async (user) => {
         window.location.href = "management-auth.html";
     }
 });
+
