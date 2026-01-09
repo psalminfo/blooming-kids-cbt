@@ -2924,7 +2924,7 @@ async function renderEnrollmentsPanel(container) {
                     <p id="pending-enrollments" class="text-2xl font-extrabold">0</p>
                 </div>
                 <div class="bg-purple-100 p-3 rounded-lg text-center shadow w-full">
-                    <h4 class="font-bold text-purple-800 text-sm">Approved</h4>
+                    <h4 class="font-bold text-purple-800 text-sm">Completed</h4>
                     <p id="completed-enrollments" class="text-2xl font-extrabold">0</p>
                 </div>
             </div>
@@ -2935,7 +2935,7 @@ async function renderEnrollmentsPanel(container) {
                         <option value="">All Statuses</option>
                         <option value="draft">Draft</option>
                         <option value="pending">Pending</option>
-                        <option value="approved">Approved</option>
+                        <option value="completed">Completed</option>
                         <option value="payment_received">Payment Received</option>
                     </select>
                     <input type="date" id="date-from" class="p-2 border rounded-md" placeholder="From Date">
@@ -3059,7 +3059,7 @@ function renderEnrollmentsFromCache(searchTerm = '') {
         const fee = parseFeeValue(enrollment.summary?.totalFee) || 0;
         projectedRevenue += fee;
         
-        if (enrollment.status === 'approved' || enrollment.status === 'payment_received') {
+        if (enrollment.status === 'completed' || enrollment.status === 'payment_received') {
             confirmedRevenue += fee;
             
             // Track payment methods
@@ -3103,12 +3103,12 @@ function renderEnrollmentsFromCache(searchTerm = '') {
     const total = enrollments.length;
     const draft = enrollments.filter(e => e.status === 'draft').length;
     const pending = enrollments.filter(e => e.status === 'pending').length;
-    const approved = enrollments.filter(e => e.status === 'approved' || e.status === 'payment_received').length;
+    const completed = enrollments.filter(e => e.status === 'completed' || e.status === 'payment_received').length;
     
     document.getElementById('total-enrollments').textContent = total;
     document.getElementById('draft-enrollments').textContent = draft;
     document.getElementById('pending-enrollments').textContent = pending;
-    document.getElementById('completed-enrollments').textContent = approved;
+    document.getElementById('completed-enrollments').textContent = completed;
 
     if (filteredEnrollments.length === 0) {
         enrollmentsList.innerHTML = `
@@ -3161,8 +3161,8 @@ function renderEnrollmentsFromCache(searchTerm = '') {
             case 'pending':
                 statusBadge = `<span class="px-2 py-1 text-xs rounded-full bg-yellow-100 text-yellow-800">Pending</span>`;
                 break;
-            case 'approved':
-                statusBadge = `<span class="px-2 py-1 text-xs rounded-full bg-green-100 text-green-800">Approved</span>`;
+            case 'completed':
+                statusBadge = `<span class="px-2 py-1 text-xs rounded-full bg-green-100 text-green-800">Completed</span>`;
                 break;
             case 'payment_received':
                 statusBadge = `<span class="px-2 py-1 text-xs rounded-full bg-blue-100 text-blue-800">Payment Received</span>`;
@@ -3176,11 +3176,8 @@ function renderEnrollmentsFromCache(searchTerm = '') {
         
         const referralCode = enrollment.referral?.code || 'None';
         
-        // Check if enrollment can be approved (not already approved)
-        const canApprove = !['approved', 'payment_received'].includes(enrollment.status);
-        const approveButton = canApprove 
-            ? `<button onclick="approveEnrollmentModal('${enrollment.id}')" class="text-green-600 hover:text-green-900">Approve</button>`
-            : `<button class="text-gray-400 cursor-not-allowed" disabled>Already Approved</button>`;
+        // Check if enrollment is already approved
+        const isApproved = enrollment.status === 'completed' || enrollment.status === 'payment_received';
         
         return `
             <tr class="hover:bg-gray-50">
@@ -3209,19 +3206,22 @@ function renderEnrollmentsFromCache(searchTerm = '') {
                             class="text-indigo-600 hover:text-indigo-900">
                         View
                     </button>
-                    ${approveButton}
-                    ${canApprove ? `
+                    ${!isApproved ? `
+                        <button onclick="approveEnrollmentModal('${enrollment.id}')" 
+                                class="text-green-600 hover:text-green-900">
+                            Approve
+                        </button>
+                    ` : `
+                        <button onclick="editEnrollmentApproval('${enrollment.id}')" 
+                                class="text-yellow-600 hover:text-yellow-900">
+                            Edit Approval
+                        </button>
+                    `}
                     <button onclick="deleteEnrollment('${enrollment.id}')" 
                             class="text-red-600 hover:text-red-900">
                         Delete
                     </button>
-                    ` : `
-                    <button onclick="editApprovedEnrollment('${enrollment.id}')" 
-                            class="text-blue-600 hover:text-blue-900">
-                        Edit
-                    </button>
-                    `}
-                    ${!canApprove ? `
+                    ${isApproved ? `
                     <button onclick="downloadEnrollmentInvoice('${enrollment.id}')" 
                             class="text-blue-600 hover:text-blue-900">
                         Invoice
@@ -3374,18 +3374,15 @@ window.showEnrollmentDetails = async function(enrollmentId) {
                     <h4 class="font-bold text-blue-700">Payment Information</h4>
                     <p><strong>Method:</strong> ${enrollment.payment.method || 'N/A'}</p>
                     ${enrollment.payment.reference ? `<p><strong>Reference:</strong> ${enrollment.payment.reference}</p>` : ''}
-                    ${enrollment.payment.date ? `<p><strong>Date:</strong> ${new Date(enrollment.payment.date.seconds * 1000).toLocaleDateString()}</p>` : ''}
+                    ${enrollment.payment.date ? `<p><strong>Date:</strong> ${new Date(enrollment.payment.date).toLocaleDateString()}</p>` : ''}
                     ${enrollment.payment.approvedBy ? `<p><strong>Approved By:</strong> ${enrollment.payment.approvedBy}</p>` : ''}
                 </div>
             `;
         }
 
-        // Check if enrollment can be approved
-        const canApprove = !['approved', 'payment_received'].includes(enrollment.status);
-        const approveButton = canApprove 
-            ? `<button onclick="approveEnrollmentModal('${enrollment.id}')" class="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700">Approve</button>`
-            : `<button onclick="editApprovedEnrollment('${enrollment.id}')" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">Edit</button>`;
-
+        // Check if enrollment is already approved
+        const isApproved = enrollment.status === 'completed' || enrollment.status === 'payment_received';
+        
         const modalHtml = `
             <div id="enrollmentDetailsModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-center justify-center">
                 <div class="relative p-8 bg-white w-full max-w-4xl rounded-lg shadow-2xl" style="max-height: 90vh; overflow-y: auto;">
@@ -3396,7 +3393,7 @@ window.showEnrollmentDetails = async function(enrollmentId) {
                         <div>
                             <h4 class="font-bold text-lg mb-2">Application Information</h4>
                             <p><strong>ID:</strong> ${enrollment.id}</p>
-                            <p><strong>Status:</strong> <span class="px-2 py-1 text-xs rounded-full ${enrollment.status === 'approved' || enrollment.status === 'payment_received' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}">${enrollment.status || 'Unknown'}</span></p>
+                            <p><strong>Status:</strong> <span class="px-2 py-1 text-xs rounded-full ${isApproved ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}">${enrollment.status || 'Unknown'}</span></p>
                             <p><strong>Created:</strong> ${createdAt}</p>
                             ${enrollment.lastSaved ? `<p><strong>Last Saved:</strong> ${new Date(enrollment.lastSaved).toLocaleString()}</p>` : ''}
                         </div>
@@ -3425,10 +3422,12 @@ window.showEnrollmentDetails = async function(enrollmentId) {
                     
                     <div class="flex justify-end space-x-3 mt-6 pt-6 border-t">
                         <button onclick="closeManagementModal('enrollmentDetailsModal')" class="px-4 py-2 bg-gray-300 text-gray-700 rounded hover:bg-gray-400">Close</button>
-                        ${approveButton}
-                        ${!canApprove ? `
-                        <button onclick="downloadEnrollmentInvoice('${enrollment.id}')" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">Download Invoice</button>
-                        ` : ''}
+                        ${!isApproved ? `
+                            <button onclick="approveEnrollmentModal('${enrollment.id}')" class="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700">Approve</button>
+                        ` : `
+                            <button onclick="editEnrollmentApproval('${enrollment.id}')" class="px-4 py-2 bg-yellow-600 text-white rounded hover:bg-yellow-700">Edit Approval</button>
+                        `}
+                        <button onclick="downloadEnrollmentInvoice('${enrollment.id}')" ${!isApproved ? 'disabled class="px-4 py-2 bg-gray-400 text-white rounded cursor-not-allowed"' : 'class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"'}>Download Invoice</button>
                     </div>
                 </div>
             </div>
@@ -3453,12 +3452,12 @@ window.approveEnrollmentModal = async function(enrollmentId) {
         const enrollment = enrollmentDoc.data();
         
         // Check if already approved
-        if (enrollment.status === 'approved' || enrollment.status === 'payment_received') {
-            alert("This enrollment has already been approved.");
+        if (enrollment.status === 'completed' || enrollment.status === 'payment_received') {
+            alert("This enrollment has already been approved. Use 'Edit Approval' to make changes.");
             return;
         }
         
-        // Get tutors for assignment from tutor directory (optional)
+        // Get tutors for assignment from tutor directory (only if needed)
         let tutors = sessionCache.tutors || [];
         if (tutors.length === 0) {
             const tutorsSnapshot = await getDocs(query(collection(db, "tutors"), where("status", "==", "active")));
@@ -3473,27 +3472,25 @@ window.approveEnrollmentModal = async function(enrollmentId) {
         
         const modalHtml = `
             <div id="approveEnrollmentModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-center justify-center">
-                <div class="relative p-8 bg-white w-96 max-w-lg rounded-lg shadow-xl" style="max-height: 90vh; overflow-y: auto;">
+                <div class="relative p-8 bg-white w-96 max-w-lg rounded-lg shadow-xl">
                     <button class="absolute top-2 right-2 text-gray-500 hover:text-gray-800 text-2xl font-bold" onclick="closeManagementModal('approveEnrollmentModal')">&times;</button>
                     <h3 class="text-xl font-bold mb-4">Approve Enrollment</h3>
-                    <p class="text-sm text-gray-600 mb-4">Approval will move students to pending approval list for tutor assignment.</p>
-                    
                     <form id="approve-enrollment-form">
                         <input type="hidden" id="approve-enrollment-id" value="${enrollmentId}">
                         
                         <div class="mb-4">
                             <label class="block text-sm font-medium mb-2">Approval Type</label>
-                            <select id="approval-type" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2" onchange="toggleTutorAssignment(this.value)">
+                            <select id="approval-type" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2">
                                 <option value="">Select approval type</option>
-                                <option value="with_tutors">With Tutor Assignment</option>
-                                <option value="without_tutors">Without Tutor Assignment</option>
+                                <option value="with_tutor">Approve with Tutor Assignment</option>
+                                <option value="without_tutor">Approve without Tutor (Pending Assignment)</option>
                             </select>
                         </div>
                         
-                        <div id="payment-section" class="mb-4">
-                            <label class="block text-sm font-medium mb-2">Payment Method (Optional)</label>
-                            <select id="payment-method" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2">
-                                <option value="">No payment received yet</option>
+                        <div class="mb-4">
+                            <label class="block text-sm font-medium mb-2">Payment Method</label>
+                            <select id="payment-method" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2">
+                                <option value="">Select payment method</option>
                                 <option value="bank_transfer">Bank Transfer</option>
                                 <option value="credit_card">Credit Card</option>
                                 <option value="debit_card">Debit Card</option>
@@ -3503,16 +3500,14 @@ window.approveEnrollmentModal = async function(enrollmentId) {
                             </select>
                         </div>
                         
-                        <div id="payment-details" style="display: none;">
-                            <div class="mb-4">
-                                <label class="block text-sm font-medium mb-2">Payment Reference (Optional)</label>
-                                <input type="text" id="payment-reference" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2" placeholder="e.g., transaction ID">
-                            </div>
-                            
-                            <div class="mb-4">
-                                <label class="block text-sm font-medium mb-2">Payment Date</label>
-                                <input type="date" id="payment-date" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2" value="${new Date().toISOString().split('T')[0]}">
-                            </div>
+                        <div class="mb-4">
+                            <label class="block text-sm font-medium mb-2">Payment Reference (Optional)</label>
+                            <input type="text" id="payment-reference" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2" placeholder="e.g., transaction ID">
+                        </div>
+                        
+                        <div class="mb-4">
+                            <label class="block text-sm font-medium mb-2">Payment Date</label>
+                            <input type="date" id="payment-date" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2" value="${new Date().toISOString().split('T')[0]}">
                         </div>
                         
                         <div class="mb-4">
@@ -3525,8 +3520,8 @@ window.approveEnrollmentModal = async function(enrollmentId) {
                             <input type="text" id="academic-time" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2" value="${academicTime}" placeholder="e.g., 3:00 PM - 5:00 PM">
                         </div>
                         
-                        <div id="tutor-assignment-section" class="mb-4" style="display: none;">
-                            <label class="block text-sm font-medium mb-2">Assign Tutor (Optional - can be assigned later)</label>
+                        <div id="tutor-assignment-section" class="mb-4 hidden">
+                            <label class="block text-sm font-medium mb-2">Assign Tutor (for each student)</label>
                             <div id="student-tutor-assignments">
                                 ${enrollment.students ? enrollment.students.map((student, index) => `
                                     <div class="mb-3 p-2 border rounded">
@@ -3546,9 +3541,15 @@ window.approveEnrollmentModal = async function(enrollmentId) {
                         </div>
                         
                         <div class="mb-4">
+                            <label class="block text-sm font-medium mb-2">Final Fee (₦) - Parent Payment</label>
+                            <input type="number" id="final-fee" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2" 
+                                   value="${enrollment.summary?.totalFee || 0}" min="0" step="1000">
+                        </div>
+                        
+                        <div class="mb-4">
                             <label class="block text-sm font-medium mb-2">Status</label>
                             <select id="enrollment-status" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2">
-                                <option value="approved">Approved (Pending Payment)</option>
+                                <option value="completed">Completed</option>
                                 <option value="payment_received">Payment Received</option>
                             </select>
                         </div>
@@ -3564,62 +3565,44 @@ window.approveEnrollmentModal = async function(enrollmentId) {
         
         document.body.insertAdjacentHTML('beforeend', modalHtml);
         
-        // Show/hide tutor assignment section based on approval type
-        window.toggleTutorAssignment = function(type) {
-            const tutorSection = document.getElementById('tutor-assignment-section');
-            if (tutorSection) {
-                tutorSection.style.display = type === 'with_tutors' ? 'block' : 'none';
-            }
-        };
+        // Handle approval type change
+        const approvalTypeSelect = document.getElementById('approval-type');
+        const tutorAssignmentSection = document.getElementById('tutor-assignment-section');
         
-        // Show/hide payment details based on payment method selection
-        document.getElementById('payment-method').addEventListener('change', function() {
-            const paymentDetails = document.getElementById('payment-details');
-            if (paymentDetails) {
-                paymentDetails.style.display = this.value ? 'block' : 'none';
-            }
-        });
-        
-        // Show/hide payment details based on status selection
-        document.getElementById('enrollment-status').addEventListener('change', function() {
-            const paymentMethod = document.getElementById('payment-method');
-            const paymentSection = document.getElementById('payment-section');
-            if (this.value === 'payment_received') {
-                paymentSection.style.display = 'block';
-                paymentMethod.required = true;
-            } else {
-                paymentSection.style.display = 'block';
-                paymentMethod.required = false;
-            }
-        });
-        
-        // Initialize tutor search for each student
-        if (enrollment.students) {
-            enrollment.students.forEach((student, index) => {
-                const searchInput = document.getElementById(`tutor-search-${index}`);
-                const resultsContainer = document.getElementById(`tutor-results-${index}`);
-                const hiddenInput = document.getElementById(`selected-tutor-${index}`);
-                
-                if (searchInput && resultsContainer && hiddenInput) {
-                    // Add focus event to show all tutors initially
-                    searchInput.addEventListener('focus', function() {
-                        displayTutorResults(this.value, tutors, resultsContainer, hiddenInput, searchInput);
-                    });
-                    
-                    // Add input event for searching
-                    searchInput.addEventListener('input', function() {
-                        displayTutorResults(this.value, tutors, resultsContainer, hiddenInput, searchInput);
-                    });
-                    
-                    // Close results when clicking outside
-                    document.addEventListener('click', function(event) {
-                        if (!searchInput.contains(event.target) && !resultsContainer.contains(event.target)) {
-                            resultsContainer.classList.add('hidden');
+        approvalTypeSelect.addEventListener('change', function() {
+            if (this.value === 'with_tutor' && tutors.length > 0) {
+                tutorAssignmentSection.classList.remove('hidden');
+                // Initialize tutor search for each student
+                if (enrollment.students) {
+                    enrollment.students.forEach((student, index) => {
+                        const searchInput = document.getElementById(`tutor-search-${index}`);
+                        const resultsContainer = document.getElementById(`tutor-results-${index}`);
+                        const hiddenInput = document.getElementById(`selected-tutor-${index}`);
+                        
+                        if (searchInput && resultsContainer && hiddenInput) {
+                            // Add focus event to show all tutors initially
+                            searchInput.addEventListener('focus', function() {
+                                displayTutorResults(this.value, tutors, resultsContainer, hiddenInput, searchInput);
+                            });
+                            
+                            // Add input event for searching
+                            searchInput.addEventListener('input', function() {
+                                displayTutorResults(this.value, tutors, resultsContainer, hiddenInput, searchInput);
+                            });
+                            
+                            // Close results when clicking outside
+                            document.addEventListener('click', function(event) {
+                                if (!searchInput.contains(event.target) && !resultsContainer.contains(event.target)) {
+                                    resultsContainer.classList.add('hidden');
+                                }
+                            });
                         }
                     });
                 }
-            });
-        }
+            } else {
+                tutorAssignmentSection.classList.add('hidden');
+            }
+        });
         
         document.getElementById('approve-enrollment-form').addEventListener('submit', async (e) => {
             e.preventDefault();
@@ -3631,6 +3614,174 @@ window.approveEnrollmentModal = async function(enrollmentId) {
         alert("Failed to load approval form. Please try again.");
     }
 };
+
+window.editEnrollmentApproval = async function(enrollmentId) {
+    try {
+        const enrollmentDoc = await getDoc(doc(db, "enrollments", enrollmentId));
+        if (!enrollmentDoc.exists()) {
+            alert("Enrollment not found!");
+            return;
+        }
+
+        const enrollment = enrollmentDoc.data();
+        
+        // Check if it's actually approved
+        if (!(enrollment.status === 'completed' || enrollment.status === 'payment_received')) {
+            alert("This enrollment is not yet approved. Use 'Approve' instead.");
+            return;
+        }
+        
+        // Get tutors for assignment from tutor directory
+        let tutors = sessionCache.tutors || [];
+        if (tutors.length === 0) {
+            const tutorsSnapshot = await getDocs(query(collection(db, "tutors"), where("status", "==", "active")));
+            tutors = tutorsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            saveToLocalStorage('tutors', tutors);
+        }
+        
+        const modalHtml = `
+            <div id="editEnrollmentApprovalModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-center justify-center">
+                <div class="relative p-8 bg-white w-96 max-w-lg rounded-lg shadow-xl">
+                    <button class="absolute top-2 right-2 text-gray-500 hover:text-gray-800 text-2xl font-bold" onclick="closeManagementModal('editEnrollmentApprovalModal')">&times;</button>
+                    <h3 class="text-xl font-bold mb-4">Edit Enrollment Approval</h3>
+                    <form id="edit-enrollment-approval-form">
+                        <input type="hidden" id="edit-enrollment-id" value="${enrollmentId}">
+                        
+                        <div class="mb-4">
+                            <label class="block text-sm font-medium mb-2">Payment Method</label>
+                            <select id="edit-payment-method" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2">
+                                <option value="bank_transfer" ${enrollment.payment?.method === 'bank_transfer' ? 'selected' : ''}>Bank Transfer</option>
+                                <option value="credit_card" ${enrollment.payment?.method === 'credit_card' ? 'selected' : ''}>Credit Card</option>
+                                <option value="debit_card" ${enrollment.payment?.method === 'debit_card' ? 'selected' : ''}>Debit Card</option>
+                                <option value="cash" ${enrollment.payment?.method === 'cash' ? 'selected' : ''}>Cash</option>
+                                <option value="online_payment" ${enrollment.payment?.method === 'online_payment' ? 'selected' : ''}>Online Payment</option>
+                                <option value="pos" ${enrollment.payment?.method === 'pos' ? 'selected' : ''}>POS</option>
+                            </select>
+                        </div>
+                        
+                        <div class="mb-4">
+                            <label class="block text-sm font-medium mb-2">Payment Reference (Optional)</label>
+                            <input type="text" id="edit-payment-reference" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2" 
+                                   value="${enrollment.payment?.reference || ''}" placeholder="e.g., transaction ID">
+                        </div>
+                        
+                        <div class="mb-4">
+                            <label class="block text-sm font-medium mb-2">Payment Date</label>
+                            <input type="date" id="edit-payment-date" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2" 
+                                   value="${enrollment.payment?.date ? new Date(enrollment.payment.date.seconds * 1000).toISOString().split('T')[0] : new Date().toISOString().split('T')[0]}">
+                        </div>
+                        
+                        <div class="mb-4">
+                            <label class="block text-sm font-medium mb-2">Academic Days</label>
+                            <input type="text" id="edit-academic-days" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2" 
+                                   value="${enrollment.academicDays || ''}" placeholder="e.g., Monday, Wednesday, Friday">
+                        </div>
+                        
+                        <div class="mb-4">
+                            <label class="block text-sm font-medium mb-2">Academic Time</label>
+                            <input type="text" id="edit-academic-time" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2" 
+                                   value="${enrollment.academicTime || ''}" placeholder="e.g., 3:00 PM - 5:00 PM">
+                        </div>
+                        
+                        <div class="mb-4">
+                            <label class="block text-sm font-medium mb-2">Final Fee (₦) - Parent Payment</label>
+                            <input type="number" id="edit-final-fee" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2" 
+                                   value="${enrollment.finalFee || enrollment.summary?.totalFee || 0}" min="0" step="1000">
+                        </div>
+                        
+                        <div class="mb-4">
+                            <label class="block text-sm font-medium mb-2">Status</label>
+                            <select id="edit-enrollment-status" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2">
+                                <option value="completed" ${enrollment.status === 'completed' ? 'selected' : ''}>Completed</option>
+                                <option value="payment_received" ${enrollment.status === 'payment_received' ? 'selected' : ''}>Payment Received</option>
+                            </select>
+                        </div>
+                        
+                        <div class="flex justify-end mt-4">
+                            <button type="button" onclick="closeManagementModal('editEnrollmentApprovalModal')" class="mr-2 px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300">Cancel</button>
+                            <button type="submit" class="px-4 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700">Update Approval</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        `;
+        
+        document.body.insertAdjacentHTML('beforeend', modalHtml);
+        
+        document.getElementById('edit-enrollment-approval-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            await updateEnrollmentApproval(enrollmentId);
+        });
+        
+    } catch (error) {
+        console.error("Error showing edit approval modal:", error);
+        alert("Failed to load edit approval form. Please try again.");
+    }
+};
+
+async function updateEnrollmentApproval(enrollmentId) {
+    const form = document.getElementById('edit-enrollment-approval-form');
+    if (!form) return;
+    
+    const paymentMethod = form.elements['edit-payment-method'].value;
+    const paymentReference = form.elements['edit-payment-reference'].value;
+    const paymentDate = form.elements['edit-payment-date'].value;
+    const finalFee = parseFloat(form.elements['edit-final-fee'].value);
+    const academicDays = form.elements['edit-academic-days'].value;
+    const academicTime = form.elements['edit-academic-time'].value;
+    const enrollmentStatus = form.elements['edit-enrollment-status'].value;
+    
+    if (!paymentMethod) {
+        alert("Please select a payment method.");
+        return;
+    }
+    
+    if (isNaN(finalFee) || finalFee < 0) {
+        alert("Please enter a valid fee amount.");
+        return;
+    }
+    
+    try {
+        // Get the enrollment to preserve existing data
+        const enrollmentDoc = await getDoc(doc(db, "enrollments", enrollmentId));
+        const enrollmentData = enrollmentDoc.data();
+        
+        // Update enrollment with new approval details
+        await updateDoc(doc(db, "enrollments", enrollmentId), {
+            status: enrollmentStatus,
+            payment: {
+                method: paymentMethod,
+                reference: paymentReference || '',
+                date: Timestamp.fromDate(new Date(paymentDate)),
+                amount: finalFee,
+                approvedBy: enrollmentData.payment?.approvedBy || window.userData?.name || window.userData?.email || 'Management',
+                approvedAt: enrollmentData.payment?.approvedAt || Timestamp.now(),
+                updatedBy: window.userData?.email || 'management',
+                updatedAt: Timestamp.now()
+            },
+            finalFee: finalFee,
+            academicDays: academicDays,
+            academicTime: academicTime,
+            lastUpdated: Timestamp.now()
+        });
+        
+        alert("Enrollment approval updated successfully!");
+        
+        closeManagementModal('editEnrollmentApprovalModal');
+        invalidateCache('enrollments');
+        
+        // Refresh the view
+        const currentNavId = document.querySelector('.nav-item.active')?.dataset.navId;
+        const mainContent = document.getElementById('main-content');
+        if (currentNavId && allNavItems[currentNavId] && mainContent) {
+            allNavItems[currentNavId].fn(mainContent);
+        }
+        
+    } catch (error) {
+        console.error("Error updating enrollment approval:", error);
+        alert("Failed to update enrollment approval. Please try again.");
+    }
+}
 
 function displayTutorResults(searchTerm, tutors, resultsContainer, hiddenInput, searchInput) {
     const term = searchTerm.toLowerCase().trim();
@@ -3680,8 +3831,9 @@ async function approveEnrollmentWithDetails(enrollmentId) {
     
     const approvalType = form.elements['approval-type'].value;
     const paymentMethod = form.elements['payment-method'].value;
-    const paymentReference = form.elements['payment-reference']?.value || '';
-    const paymentDate = form.elements['payment-date']?.value || new Date().toISOString().split('T')[0];
+    const paymentReference = form.elements['payment-reference'].value;
+    const paymentDate = form.elements['payment-date'].value;
+    const finalFee = parseFloat(form.elements['final-fee'].value);
     const academicDays = form.elements['academic-days'].value;
     const academicTime = form.elements['academic-time'].value;
     const enrollmentStatus = form.elements['enrollment-status'].value;
@@ -3691,13 +3843,13 @@ async function approveEnrollmentWithDetails(enrollmentId) {
         return;
     }
     
-    if (enrollmentStatus === 'payment_received' && !paymentMethod) {
-        alert("Payment method is required when status is 'Payment Received'.");
+    if (!paymentMethod) {
+        alert("Please select a payment method.");
         return;
     }
     
-    if (!academicDays || !academicTime) {
-        alert("Please enter academic days and time.");
+    if (isNaN(finalFee) || finalFee < 0) {
+        alert("Please enter a valid fee amount.");
         return;
     }
     
@@ -3706,83 +3858,114 @@ async function approveEnrollmentWithDetails(enrollmentId) {
         const enrollmentDoc = await getDoc(doc(db, "enrollments", enrollmentId));
         const enrollmentData = enrollmentDoc.data();
         
-        // Check if already approved
-        if (enrollmentData.status === 'approved' || enrollmentData.status === 'payment_received') {
-            alert("This enrollment has already been approved.");
-            closeManagementModal('approveEnrollmentModal');
-            return;
-        }
-        
         const batch = writeBatch(db);
         
-        // Prepare update data
-        const updateData = {
+        // Update enrollment status
+        batch.update(doc(db, "enrollments", enrollmentId), {
             status: enrollmentStatus,
+            payment: {
+                method: paymentMethod,
+                reference: paymentReference || '',
+                date: Timestamp.fromDate(new Date(paymentDate)),
+                amount: finalFee,
+                approvedBy: window.userData?.name || window.userData?.email || 'Management',
+                approvedAt: Timestamp.now()
+            },
+            finalFee: finalFee,
             academicDays: academicDays,
             academicTime: academicTime,
             approvedAt: Timestamp.now(),
             approvedBy: window.userData?.email || 'management',
             lastUpdated: Timestamp.now()
-        };
+        });
         
-        // Add payment info if provided
-        if (paymentMethod) {
-            updateData.payment = {
-                method: paymentMethod,
-                reference: paymentReference,
-                date: Timestamp.fromDate(new Date(paymentDate)),
-                amount: enrollmentData.summary?.totalFee || 0,
-                approvedBy: window.userData?.name || window.userData?.email || 'Management'
-            };
-        }
-        
-        // Update enrollment status
-        batch.update(doc(db, "enrollments", enrollmentId), updateData);
-        
-        // Create pending student entries for each student (NO FEE ATTACHED)
-        enrollmentData.students.forEach((student, index) => {
-            let tutorEmail = '';
-            let tutorName = '';
+        // Handle tutor assignment based on approval type
+        if (approvalType === 'with_tutor') {
+            // Get tutor assignments
+            const studentAssignments = [];
+            const errors = [];
             
-            // Get tutor assignment if with_tutors option selected
-            if (approvalType === 'with_tutors') {
-                tutorEmail = document.getElementById(`selected-tutor-${index}`)?.value || '';
-                if (tutorEmail) {
-                    // Get tutor name from tutors cache
-                    const tutors = sessionCache.tutors || [];
-                    const tutor = tutors.find(t => t.email === tutorEmail);
-                    tutorName = tutor ? tutor.name : tutorEmail;
+            enrollmentData.students.forEach((student, index) => {
+                const tutorEmail = document.getElementById(`selected-tutor-${index}`)?.value;
+                if (!tutorEmail) {
+                    errors.push(`Please select a tutor for student: ${student.name}`);
+                    return;
                 }
+                
+                // Get tutor name from tutors cache
+                const tutors = sessionCache.tutors || [];
+                const tutor = tutors.find(t => t.email === tutorEmail);
+                const tutorName = tutor ? tutor.name : tutorEmail;
+                
+                // Create pending student entry WITHOUT tutor fee (left blank)
+                studentAssignments.push({
+                    studentName: student.name,
+                    studentId: `pending_${Date.now()}_${index}`,
+                    tutorEmail: tutorEmail,
+                    tutorName: tutorName,
+                    grade: student.grade,
+                    subjects: student.selectedSubjects || [],
+                    academicDays: academicDays,
+                    academicTime: academicTime,
+                    days: academicDays,
+                    startDate: student.startDate || '', // Include start date
+                    // Note: No tutorFee field - left blank as requested
+                    parentFee: finalFee, // Parent payment amount
+                    enrollmentId: enrollmentId,
+                    status: 'pending',
+                    createdAt: Timestamp.now(),
+                    source: 'enrollment_approval'
+                });
+            });
+            
+            if (errors.length > 0) {
+                alert(errors.join('\n'));
+                return;
             }
             
-            const pendingStudentRef = doc(collection(db, "pending_students"));
-            batch.set(pendingStudentRef, {
-                studentName: student.name,
-                studentId: `pending_${enrollmentId}_${index}`,
-                parentName: enrollmentData.parent?.name,
-                parentPhone: enrollmentData.parent?.phone,
-                parentEmail: enrollmentData.parent?.email,
-                enrollmentId: enrollmentId,
-                grade: student.grade,
-                actualGrade: student.actualGrade,
-                startDate: student.startDate,
-                subjects: student.selectedSubjects || [],
-                extracurriculars: student.extracurriculars || [],
-                academicDays: academicDays,
-                academicTime: academicTime,
-                days: academicDays,
-                tutorEmail: tutorEmail,
-                tutorName: tutorName,
-                status: tutorEmail ? 'assigned' : 'pending',
-                createdAt: Timestamp.now(),
-                source: 'enrollment_approval'
-                // NO FEE ATTACHED - fee will be added when tutor is assigned
+            if (studentAssignments.length === 0) {
+                alert("Please assign tutors to all students.");
+                return;
+            }
+            
+            // Create pending student entries for each student
+            studentAssignments.forEach(student => {
+                const pendingStudentRef = doc(collection(db, "pending_students"));
+                batch.set(pendingStudentRef, student);
             });
-        });
+        } else if (approvalType === 'without_tutor') {
+            // Create pending student entries without tutor assignment
+            enrollmentData.students.forEach((student, index) => {
+                const pendingStudentRef = doc(collection(db, "pending_students"));
+                batch.set(pendingStudentRef, {
+                    studentName: student.name,
+                    studentId: `pending_${Date.now()}_${index}`,
+                    tutorEmail: '', // No tutor assigned
+                    tutorName: '', // No tutor assigned
+                    grade: student.grade,
+                    subjects: student.selectedSubjects || [],
+                    academicDays: academicDays,
+                    academicTime: academicTime,
+                    days: academicDays,
+                    startDate: student.startDate || '', // Include start date
+                    // Note: No tutorFee field - left blank as requested
+                    parentFee: finalFee, // Parent payment amount
+                    enrollmentId: enrollmentId,
+                    status: 'pending',
+                    createdAt: Timestamp.now(),
+                    source: 'enrollment_approval_without_tutor',
+                    notes: 'Needs tutor assignment'
+                });
+            });
+        }
         
         await batch.commit();
         
-        alert(`Enrollment approved successfully! Students have been added to pending approvals ${approvalType === 'with_tutors' ? 'with tutor assignments' : 'without tutor assignments'}.`);
+        const message = approvalType === 'with_tutor' 
+            ? "Enrollment approved successfully! Students have been added to pending approvals with tutor assignments."
+            : "Enrollment approved successfully! Students have been added to pending approvals (needs tutor assignment).";
+        
+        alert(message);
         
         closeManagementModal('approveEnrollmentModal');
         invalidateCache('enrollments');
@@ -3798,122 +3981,6 @@ async function approveEnrollmentWithDetails(enrollmentId) {
     } catch (error) {
         console.error("Error approving enrollment:", error);
         alert("Failed to approve enrollment. Please try again.");
-    }
-}
-
-window.editApprovedEnrollment = async function(enrollmentId) {
-    try {
-        const enrollmentDoc = await getDoc(doc(db, "enrollments", enrollmentId));
-        if (!enrollmentDoc.exists()) {
-            alert("Enrollment not found!");
-            return;
-        }
-
-        const enrollment = enrollmentDoc.data();
-        
-        if (!['approved', 'payment_received'].includes(enrollment.status)) {
-            alert("Only approved enrollments can be edited.");
-            return;
-        }
-        
-        const modalHtml = `
-            <div id="editEnrollmentModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-center justify-center">
-                <div class="relative p-8 bg-white w-96 max-w-lg rounded-lg shadow-xl">
-                    <button class="absolute top-2 right-2 text-gray-500 hover:text-gray-800 text-2xl font-bold" onclick="closeManagementModal('editEnrollmentModal')">&times;</button>
-                    <h3 class="text-xl font-bold mb-4">Edit Approved Enrollment</h3>
-                    
-                    <form id="edit-enrollment-form">
-                        <input type="hidden" id="edit-enrollment-id" value="${enrollmentId}">
-                        
-                        <div class="mb-4">
-                            <label class="block text-sm font-medium mb-2">Academic Days</label>
-                            <input type="text" id="edit-academic-days" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2" 
-                                   value="${enrollment.academicDays || ''}" placeholder="e.g., Monday, Wednesday, Friday">
-                        </div>
-                        
-                        <div class="mb-4">
-                            <label class="block text-sm font-medium mb-2">Academic Time</label>
-                            <input type="text" id="edit-academic-time" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2" 
-                                   value="${enrollment.academicTime || ''}" placeholder="e.g., 3:00 PM - 5:00 PM">
-                        </div>
-                        
-                        <div class="mb-4">
-                            <label class="block text-sm font-medium mb-2">Status</label>
-                            <select id="edit-enrollment-status" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2">
-                                <option value="approved" ${enrollment.status === 'approved' ? 'selected' : ''}>Approved (Pending Payment)</option>
-                                <option value="payment_received" ${enrollment.status === 'payment_received' ? 'selected' : ''}>Payment Received</option>
-                            </select>
-                        </div>
-                        
-                        ${enrollment.payment ? `
-                        <div class="mb-4">
-                            <label class="block text-sm font-medium mb-2">Payment Reference</label>
-                            <input type="text" id="edit-payment-reference" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2" 
-                                   value="${enrollment.payment.reference || ''}" placeholder="Transaction reference">
-                        </div>
-                        ` : ''}
-                        
-                        <div class="flex justify-end mt-4">
-                            <button type="button" onclick="closeManagementModal('editEnrollmentModal')" class="mr-2 px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300">Cancel</button>
-                            <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">Save Changes</button>
-                        </div>
-                    </form>
-                </div>
-            </div>
-        `;
-        
-        document.body.insertAdjacentHTML('beforeend', modalHtml);
-        
-        document.getElementById('edit-enrollment-form').addEventListener('submit', async (e) => {
-            e.preventDefault();
-            await updateEnrollmentDetails(enrollmentId);
-        });
-        
-    } catch (error) {
-        console.error("Error showing edit modal:", error);
-        alert("Failed to load edit form. Please try again.");
-    }
-};
-
-async function updateEnrollmentDetails(enrollmentId) {
-    const form = document.getElementById('edit-enrollment-form');
-    if (!form) return;
-    
-    const academicDays = form.elements['edit-academic-days'].value;
-    const academicTime = form.elements['edit-academic-time'].value;
-    const enrollmentStatus = form.elements['edit-enrollment-status'].value;
-    const paymentReference = form.elements['edit-payment-reference']?.value || '';
-    
-    try {
-        const updateData = {
-            academicDays: academicDays,
-            academicTime: academicTime,
-            status: enrollmentStatus,
-            lastUpdated: Timestamp.now()
-        };
-        
-        // Update payment reference if provided
-        if (paymentReference) {
-            updateData['payment.reference'] = paymentReference;
-        }
-        
-        await updateDoc(doc(db, "enrollments", enrollmentId), updateData);
-        
-        alert("Enrollment updated successfully!");
-        
-        closeManagementModal('editEnrollmentModal');
-        invalidateCache('enrollments');
-        
-        // Refresh the view
-        const currentNavId = document.querySelector('.nav-item.active')?.dataset.navId;
-        const mainContent = document.getElementById('main-content');
-        if (currentNavId && allNavItems[currentNavId] && mainContent) {
-            allNavItems[currentNavId].fn(mainContent);
-        }
-        
-    } catch (error) {
-        console.error("Error updating enrollment:", error);
-        alert("Failed to update enrollment. Please try again.");
     }
 }
 
@@ -3945,6 +4012,12 @@ window.downloadEnrollmentInvoice = async function(enrollmentId) {
         
         const enrollment = enrollmentDoc.data();
         
+        // Check if enrollment is approved
+        if (!(enrollment.status === 'completed' || enrollment.status === 'payment_received')) {
+            alert("Cannot generate invoice for unapproved enrollment.");
+            return;
+        }
+        
         // Create invoice HTML
         const invoiceDate = new Date(enrollment.approvedAt || enrollment.createdAt || Date.now());
         const invoiceNumber = `INV-${enrollmentId.substring(0, 8).toUpperCase()}`;
@@ -3954,20 +4027,8 @@ window.downloadEnrollmentInvoice = async function(enrollmentId) {
         const academicDays = firstStudent.academicDays || enrollment.academicDays || 'Not specified';
         const academicTime = firstStudent.academicTime || enrollment.academicTime || 'Not specified';
         
-        // Create students table with start dates
-        let studentsTableHTML = '';
-        if (enrollment.students && enrollment.students.length > 0) {
-            studentsTableHTML = enrollment.students.map(student => `
-                <tr>
-                    <td>${student.name || ''}</td>
-                    <td>${student.actualGrade || student.grade || ''}</td>
-                    <td>${student.startDate || 'Not specified'}</td>
-                    <td>${student.selectedSubjects ? student.selectedSubjects.join(', ') : ''}</td>
-                </tr>
-            `).join('');
-        } else {
-            studentsTableHTML = '<tr><td colspan="4">No student information</td></tr>';
-        }
+        // Get start date from first student
+        const startDate = firstStudent.startDate || enrollment.startDate || 'Not specified';
         
         const invoiceHTML = `
             <!DOCTYPE html>
@@ -3989,7 +4050,7 @@ window.downloadEnrollmentInvoice = async function(enrollmentId) {
                     th { background-color: #f2f2f2; }
                     .total-row { font-weight: bold; background-color: #f9f9f9; }
                     .footer { margin-top: 40px; padding-top: 20px; border-top: 1px solid #ddd; text-align: center; color: #666; }
-                    .schedule { background-color: #f5f5f5; padding: 10px; border-radius: 5px; margin: 10px 0; }
+                    .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 10px 0; }
                 </style>
             </head>
             <body>
@@ -4006,23 +4067,15 @@ window.downloadEnrollmentInvoice = async function(enrollmentId) {
                             <strong>Bill To:</strong><br>
                             ${enrollment.parent?.name || ''}<br>
                             ${enrollment.parent?.email || ''}<br>
-                            ${enrollment.parent?.phone || ''}<br>
-                            ${enrollment.parent?.address || ''}
+                            ${enrollment.parent?.phone || ''}
                         </div>
                         <div>
                             <strong>Invoice Details:</strong><br>
                             Status: ${enrollment.status || 'Completed'}<br>
                             Approved By: ${enrollment.payment?.approvedBy || window.userData?.name || 'Management'}<br>
-                            ${enrollment.payment?.method ? `Payment Method: ${enrollment.payment.method}<br>` : ''}
-                            Approved Date: ${enrollment.approvedAt ? new Date(enrollment.approvedAt.seconds * 1000).toLocaleDateString() : 'N/A'}
-                        </div>
-                    </div>
-                    
-                    <div class="section">
-                        <div class="section-title">Schedule Information</div>
-                        <div class="schedule">
-                            <strong>Days:</strong> ${academicDays}<br>
-                            <strong>Time:</strong> ${academicTime}
+                            Payment Method: ${enrollment.payment?.method || 'Not specified'}<br>
+                            Start Date: ${startDate}<br>
+                            Schedule: ${academicDays} • ${academicTime}
                         </div>
                     </div>
                     
@@ -4038,7 +4091,14 @@ window.downloadEnrollmentInvoice = async function(enrollmentId) {
                                 </tr>
                             </thead>
                             <tbody>
-                                ${studentsTableHTML}
+                                ${enrollment.students ? enrollment.students.map(student => `
+                                    <tr>
+                                        <td>${student.name || ''}</td>
+                                        <td>${student.grade || ''}</td>
+                                        <td>${student.startDate || ''}</td>
+                                        <td>${student.selectedSubjects ? student.selectedSubjects.join(', ') : ''}</td>
+                                    </tr>
+                                `).join('') : '<tr><td colspan="4">No student information</td></tr>'}
                             </tbody>
                         </table>
                     </div>
@@ -4071,21 +4131,25 @@ window.downloadEnrollmentInvoice = async function(enrollmentId) {
                                 </tr>
                                 <tr class="total-row">
                                     <td><strong>TOTAL</strong></td>
-                                    <td><strong>₦${(enrollment.summary?.totalFee || 0).toLocaleString()}</strong></td>
+                                    <td><strong>₦${(enrollment.finalFee || enrollment.summary?.totalFee || 0).toLocaleString()}</strong></td>
                                 </tr>
                             </tbody>
                         </table>
                     </div>
                     
-                    ${enrollment.payment ? `
                     <div class="section">
                         <div class="section-title">Payment Information</div>
-                        <p>Payment Status: <strong>${enrollment.status === 'payment_received' ? 'PAID' : 'PENDING'}</strong></p>
-                        <p>Payment Method: ${enrollment.payment.method || 'N/A'}</p>
-                        ${enrollment.payment.reference ? `<p>Reference: ${enrollment.payment.reference}</p>` : ''}
-                        ${enrollment.payment.date ? `<p>Payment Date: ${new Date(enrollment.payment.date.seconds * 1000).toLocaleDateString()}</p>` : ''}
+                        <div class="info-grid">
+                            <div>
+                                <p><strong>Payment Status:</strong> ${enrollment.status === 'payment_received' ? 'PAID' : 'PENDING'}</p>
+                                <p><strong>Payment Method:</strong> ${enrollment.payment?.method || 'Not specified'}</p>
+                            </div>
+                            <div>
+                                ${enrollment.payment?.reference ? `<p><strong>Reference:</strong> ${enrollment.payment.reference}</p>` : ''}
+                                ${enrollment.payment?.date ? `<p><strong>Payment Date:</strong> ${new Date(enrollment.payment.date.seconds * 1000).toLocaleDateString()}</p>` : ''}
+                            </div>
+                        </div>
                     </div>
-                    ` : ''}
                     
                     <div class="footer">
                         <p>Thank you for choosing Blooming Kids House!</p>
@@ -4277,7 +4341,7 @@ function renderPendingApprovalsFromCache(studentsToRender = null) {
     document.querySelectorAll('.reject-btn').forEach(button => button.addEventListener('click', () => handleRejectStudent(button.dataset.studentId)));
 }
 
-// ===// ======================================================
+// ======================================================
 // SUBSECTION 5.4: Summer Break Panel
 // ======================================================
 
@@ -4320,10 +4384,10 @@ async function renderSummerBreakPanel(container) {
     // Add event listeners
     document.getElementById('refresh-break-btn').addEventListener('click', () => fetchAndRenderBreakStudents(true));
     
-    // FIXED: Properly pass the search term to the function
-    document.getElementById('break-search').addEventListener('input', (e) => {
-        const searchTerm = e.target.value;
-        renderBreakStudentsFromCache(searchTerm);
+    // Add search event listener
+    const searchInput = document.getElementById('break-search');
+    searchInput.addEventListener('input', function(e) {
+        renderBreakStudentsFromCache(e.target.value);
     });
     
     // Fetch initial data
@@ -4572,7 +4636,6 @@ function renderBreakStudentsFromCache(searchTerm = '') {
             }
         });
     });
-}
 }
 
 // ======================================================
@@ -6171,4 +6234,5 @@ onAuthStateChanged(auth, async (user) => {
         window.location.href = "management-auth.html";
     }
 });
+
 
