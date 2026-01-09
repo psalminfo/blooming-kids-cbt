@@ -2475,17 +2475,210 @@ async function resetParentBalance(parentUid, currentEarnings) {
 }
 
 // ======================================================
-// SECTION 5: ACADEMICS PANELS
-// ======================================================
-
-// ======================================================
 // SUBSECTION 5.1: Tutor Reports Panel
 // ======================================================
 
 async function renderTutorReportsPanel(container) {
     const canDownload = window.userData?.permissions?.actions?.canDownloadReports === true;
     const canExport = window.userData?.permissions?.actions?.canExportPayAdvice === true;
-    
+
+    // --- 1. Define Global Helper Functions (Attached to Window for onclick access) ---
+
+    // Helper: Generate a printable HTML template for the PDF
+    const generateReportTemplate = (report) => {
+        const date = report.submittedAt && report.submittedAt.seconds 
+            ? new Date(report.submittedAt.seconds * 1000).toLocaleDateString() 
+            : new Date().toLocaleDateString();
+
+        return `
+            <div style="padding: 40px; font-family: 'Helvetica', sans-serif; color: #333; line-height: 1.6;">
+                <div style="border-bottom: 2px solid #166534; padding-bottom: 20px; margin-bottom: 30px; display: flex; justify-content: space-between; align-items: center;">
+                    <div>
+                        <h1 style="color: #166534; font-size: 24px; margin: 0; font-weight: bold;">TUTOR REPORT</h1>
+                        <p style="margin: 5px 0 0; color: #666; font-size: 14px;">Submission Date: ${date}</p>
+                    </div>
+                    <div style="text-align: right;">
+                        <h3 style="margin: 0; font-size: 18px; font-weight: bold;">${report.studentName || 'Student'}</h3>
+                        <p style="margin: 0; font-size: 14px; color: #555;">${report.grade || 'Grade N/A'}</p>
+                    </div>
+                </div>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 30px;">
+                    <div style="background: #f0fdf4; padding: 15px; border-radius: 8px;">
+                        <span style="display: block; font-size: 12px; color: #166534; font-weight: bold; text-transform: uppercase;">Tutor</span>
+                        <strong style="font-size: 16px;">${report.tutorName || 'N/A'}</strong>
+                        <br><span style="font-size: 13px; color: #555;">${report.tutorEmail || ''}</span>
+                    </div>
+                    <div style="background: #f0fdf4; padding: 15px; border-radius: 8px;">
+                        <span style="display: block; font-size: 12px; color: #166534; font-weight: bold; text-transform: uppercase;">Parent</span>
+                        <strong style="font-size: 16px;">${report.parentName || 'N/A'}</strong>
+                    </div>
+                </div>
+
+                <div style="margin-bottom: 25px;">
+                    <h3 style="color: #166534; border-bottom: 1px solid #ddd; padding-bottom: 8px; font-size: 16px;">Topics Covered</h3>
+                    <p style="white-space: pre-wrap; margin-top: 10px;">${report.topics || 'No details provided.'}</p>
+                </div>
+
+                <div style="margin-bottom: 25px;">
+                    <h3 style="color: #166534; border-bottom: 1px solid #ddd; padding-bottom: 8px; font-size: 16px;">Progress & Observations</h3>
+                    <p style="white-space: pre-wrap; margin-top: 10px;">${report.progress || 'No details provided.'}</p>
+                </div>
+
+                <div style="margin-bottom: 25px;">
+                    <h3 style="color: #166534; border-bottom: 1px solid #ddd; padding-bottom: 8px; font-size: 16px;">Strengths & Weaknesses</h3>
+                    <p style="white-space: pre-wrap; margin-top: 10px;">${report.strengthsWeaknesses || 'No details provided.'}</p>
+                </div>
+
+                <div style="margin-bottom: 25px;">
+                    <h3 style="color: #166534; border-bottom: 1px solid #ddd; padding-bottom: 8px; font-size: 16px;">Recommendations</h3>
+                    <p style="white-space: pre-wrap; margin-top: 10px;">${report.recommendations || 'No details provided.'}</p>
+                </div>
+            </div>
+        `;
+    };
+
+    // 1. Download Single Report
+    window.downloadSingleReport = async (reportId, event) => {
+        if (event) event.stopPropagation(); // Prevent toggling the accordion
+        
+        // Find report in the global cache (we will set this below)
+        const report = window.allReportsCache.find(r => r.id === reportId);
+        if (!report) {
+            alert("Report data not found.");
+            return;
+        }
+
+        const element = document.createElement('div');
+        element.innerHTML = generateReportTemplate(report);
+
+        const opt = {
+            margin: 0.5,
+            filename: `Report_${report.studentName}_${report.tutorName}.pdf`,
+            image: { type: 'jpeg', quality: 0.98 },
+            html2canvas: { scale: 2 },
+            jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' }
+        };
+
+        // Check if library exists
+        if (typeof html2pdf === 'undefined') {
+            alert("PDF library missing. Please check connection or include html2pdf.js.");
+            return;
+        }
+
+        const btn = event ? event.target.closest('button') : null;
+        if(btn) btn.innerText = "⏳";
+
+        try {
+            await html2pdf().set(opt).from(element).save();
+        } catch (err) {
+            console.error(err);
+            alert("Error generating PDF");
+        } finally {
+            if(btn) btn.innerHTML = `📥 Download`;
+        }
+    };
+
+    // 2. Preview Report (Modal)
+    window.previewReport = (reportId) => {
+        const report = window.allReportsCache.find(r => r.id === reportId);
+        if (!report) return;
+
+        // Simple modal implementation on the fly
+        const modalId = 'preview-modal-overlay';
+        let modal = document.getElementById(modalId);
+        
+        if(modal) modal.remove(); // Clean up old if exists
+
+        const modalHtml = `
+            <div id="${modalId}" class="fixed inset-0 bg-black bg-opacity-50 z-[60] flex items-center justify-center p-4">
+                <div class="bg-white rounded-lg w-full max-w-3xl max-h-[90vh] overflow-y-auto shadow-2xl relative">
+                    <button onclick="document.getElementById('${modalId}').remove()" class="absolute top-4 right-4 text-gray-500 hover:text-red-500 text-2xl font-bold">&times;</button>
+                    <div class="p-2">
+                        ${generateReportTemplate(report)}
+                    </div>
+                </div>
+            </div>
+        `;
+        document.body.insertAdjacentHTML('beforeend', modalHtml);
+    };
+
+    // 3. Zip and Download All Reports
+    window.zipAndDownloadTutorReports = async (reports, tutorName, btnElement) => {
+        if (typeof JSZip === 'undefined' || typeof html2pdf === 'undefined') {
+            alert("Required libraries (JSZip or html2pdf) are missing.");
+            return;
+        }
+
+        if(btnElement) btnElement.disabled = true;
+
+        const modal = document.getElementById('pdf-progress-modal');
+        const progressBar = document.getElementById('pdf-progress-bar');
+        const progressText = document.getElementById('pdf-progress-text');
+        const progressMessage = document.getElementById('pdf-progress-message');
+
+        modal.classList.remove('hidden');
+        
+        const zip = new JSZip();
+        const folder = zip.folder(`${tutorName}_Reports`);
+        let count = 0;
+
+        try {
+            for (const report of reports) {
+                count++;
+                const percentage = Math.round((count / reports.length) * 100);
+                
+                // Update UI
+                progressBar.style.width = `${percentage}%`;
+                progressText.innerText = `${percentage}%`;
+                progressMessage.innerText = `Generating PDF ${count} of ${reports.length} for ${report.studentName}...`;
+
+                // Generate PDF Blob
+                const element = document.createElement('div');
+                element.innerHTML = generateReportTemplate(report);
+                
+                const opt = {
+                    margin: 0.5,
+                    filename: `Report_${report.studentName}.pdf`,
+                    image: { type: 'jpeg', quality: 0.98 },
+                    html2canvas: { scale: 2 },
+                    jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' }
+                };
+
+                // Generate PDF as Blob
+                const pdfBlob = await html2pdf().set(opt).from(element).output('blob');
+                
+                // Add to Zip
+                const dateStr = report.submittedAt ? new Date(report.submittedAt.seconds * 1000).toISOString().split('T')[0] : 'date';
+                folder.file(`${report.studentName}_${dateStr}.pdf`, pdfBlob);
+            }
+
+            progressMessage.innerText = "Compressing files...";
+            const zipContent = await zip.generateAsync({ type: "blob" });
+            
+            // Download Zip
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(zipContent);
+            link.download = `${tutorName}_Reports_Bundle.zip`;
+            link.click();
+
+            // Cleanup
+            setTimeout(() => {
+                modal.classList.add('hidden');
+                if(btnElement) btnElement.disabled = false;
+                progressBar.style.width = '0%';
+            }, 1000);
+
+        } catch (error) {
+            console.error("Zip Error:", error);
+            alert("An error occurred while generating the ZIP file.");
+            modal.classList.add('hidden');
+            if(btnElement) btnElement.disabled = false;
+        }
+    };
+
+    // --- 2. Main HTML Structure ---
+
     container.innerHTML = `
         <div class="bg-white p-6 rounded-lg shadow-md">
             <h2 class="text-2xl font-bold text-green-700 mb-4">Tutor Reports</h2>
@@ -2550,8 +2743,8 @@ async function renderTutorReportsPanel(container) {
 
             <div id="pdf-progress-modal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-center justify-center hidden">
                 <div class="relative p-8 bg-white w-96 rounded-lg shadow-xl">
-                    <h3 class="text-xl font-bold mb-4">Generating PDF</h3>
-                    <p id="pdf-progress-message" class="mb-4">Initializing...</p>
+                    <h3 class="text-xl font-bold mb-4">Generating PDF Bundle</h3>
+                    <p id="pdf-progress-message" class="mb-4 text-sm text-gray-700">Initializing...</p>
                     <div class="w-full bg-gray-200 rounded-full h-4 mb-4">
                         <div id="pdf-progress-bar" class="bg-green-600 h-4 rounded-full transition-all duration-300" style="width: 0%"></div>
                     </div>
@@ -2568,6 +2761,8 @@ async function renderTutorReportsPanel(container) {
         </div>
     `;
 
+    // --- 3. Logic & Event Listeners ---
+
     const now = new Date();
     const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
     const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0);
@@ -2575,8 +2770,12 @@ async function renderTutorReportsPanel(container) {
     document.getElementById('reports-start-date').value = firstDay.toISOString().split('T')[0];
     document.getElementById('reports-end-date').value = lastDay.toISOString().split('T')[0];
 
+    // Local state
     let allReports = [];
     let filteredReports = [];
+    
+    // Bind to window for PDF generator access
+    window.allReportsCache = [];
 
     const handleDateChange = () => {
         fetchAndRenderTutorReports();
@@ -2713,6 +2912,7 @@ async function renderTutorReportsPanel(container) {
             
             if (snapshot.empty) {
                 allReports = [];
+                window.allReportsCache = []; // Update global cache
                 filteredReports = [];
                 renderTutorReportsFromCache();
                 return;
@@ -2722,12 +2922,14 @@ async function renderTutorReportsPanel(container) {
                 id: doc.id, 
                 ...doc.data() 
             }));
-
+            
+            window.allReportsCache = allReports; // Update global cache
             filteredReports = [...allReports];
 
             updateFilterDropdowns();
 
-            saveToLocalStorage('reports', allReports);
+            // Optional: Save to local storage for persistence across reloads if needed
+            // saveToLocalStorage('reports', allReports); 
             renderTutorReportsFromCache();
 
         } catch (error) {
@@ -2751,11 +2953,15 @@ async function renderTutorReportsPanel(container) {
         const tutors = [...new Set(allReports.map(r => r.tutorEmail))].filter(Boolean);
         const students = [...new Set(allReports.map(r => r.studentName))].filter(Boolean);
         
+        // Preserve current selection if possible
+        const currentTutor = tutorFilter.value;
+        const currentStudent = studentFilter.value;
+
         tutorFilter.innerHTML = '<option value="">All Tutors</option>' + 
-            tutors.map(tutor => `<option value="${tutor}">${tutor}</option>`).join('');
+            tutors.map(tutor => `<option value="${tutor}" ${tutor === currentTutor ? 'selected' : ''}>${tutor}</option>`).join('');
         
         studentFilter.innerHTML = '<option value="">All Students</option>' + 
-            students.map(student => `<option value="${student}">${student}</option>`).join('');
+            students.map(student => `<option value="${student}" ${student === currentStudent ? 'selected' : ''}>${student}</option>`).join('');
     }
 
     function renderTutorReportsFromCache() {
@@ -2799,11 +3005,11 @@ async function renderTutorReportsPanel(container) {
                 if (!reportsByStudent[report.studentName]) {
                     reportsByStudent[report.studentName] = [];
                 }
-                reportsByStudent[report.studentName].reports.push(report);
+                reportsByStudent[report.studentName].push(report);
             });
 
-            const studentReportsHTML = Object.entries(reportsByStudent).map(([studentName, studentData]) => {
-                const reportLinks = studentData.reports.map(report => {
+            const studentReportsHTML = Object.entries(reportsByStudent).map(([studentName, studentReports]) => {
+                const reportLinks = studentReports.map(report => {
                     const reportDate = report.submittedAt ? 
                         new Date(report.submittedAt.seconds * 1000).toLocaleDateString() : 
                         'Unknown date';
@@ -2816,12 +3022,12 @@ async function renderTutorReportsPanel(container) {
                             </div>
                             <div class="flex gap-2">
                                 <button onclick="previewReport('${report.id}')" 
-                                        class="bg-blue-500 text-white px-3 py-1 rounded text-xs hover:bg-blue-600">
+                                        class="bg-blue-500 text-white px-3 py-1 rounded text-xs hover:bg-blue-600 transition-colors">
                                     👁️ Preview
                                 </button>
                                 ${canDownload ? `
-                                    <button onclick="downloadSingleReport('${report.id}')" 
-                                            class="bg-green-600 text-white px-3 py-1 rounded text-xs hover:bg-green-700">
+                                    <button onclick="downloadSingleReport('${report.id}', event)" 
+                                            class="bg-green-600 text-white px-3 py-1 rounded text-xs hover:bg-green-700 transition-colors">
                                         📥 Download
                                     </button>
                                 ` : ''}
@@ -2840,9 +3046,35 @@ async function renderTutorReportsPanel(container) {
                 `;
             }).join('');
 
+            // Using encodeURIComponent to safely pass the JSON string in onclick
+            const safeReportsData = encodeURIComponent(JSON.stringify(tutorData.reports));
+            const safeTutorName = tutorData.name.replace(/'/g, "\\'");
+
+            // Note: We parse the data back in the onclick handler by calling JSON.parse(decodeURIComponent(...))
+            // But to keep it simpler with the global function we defined:
+            // We pass the data object directly if we were using addEventListener, but with inline onclick strings it is messy.
+            // Better approach: Attach the data to window temporarily or use the global cache logic in the zip function.
+            // However, to fix your existing structure, I will pass the objects via a safer method: 
+            // We will filter the global cache in the zip function based on the Tutor Email, 
+            // BUT your code passed the object. 
+            // Let's use the method I wrote: window.zipAndDownloadTutorReports takes (reports, name, btn).
+            // To make this work safely in HTML string:
+            // We will lookup the reports dynamically in the function or just use the filtered list.
+            
+            // SIMPLIFICATION for stability:
+            // Since passing complex objects in onclick is prone to breakage with quotes,
+            // I will store the reports for this tutor in a temporary global map or just rely on the fact 
+            // that we have 'filteredReports'. 
+            
+            // ACTUALLY, the cleanest way in this specific HTML string context without rewriting everything:
+            // Pass the tutor email and filter from 'allReportsCache' inside the zip function.
+            
             const zipButtonHTML = canDownload ? `
                 <div class="p-4 border-t bg-blue-50">
-                    <button onclick="zipAndDownloadTutorReports('${tutorData.name.replace(/'/g, "\\'")}', '${tutorData.reports.map(r => r.id).join(',')}')" 
+                    <button onclick="
+                        const reports = window.allReportsCache.filter(r => r.tutorEmail === '${tutorData.reports[0].tutorEmail}');
+                        window.zipAndDownloadTutorReports(reports, '${safeTutorName}', this);
+                    " 
                             class="w-full bg-blue-600 text-white px-4 py-3 rounded-lg hover:bg-blue-700 transition-colors font-semibold flex items-center justify-center">
                         <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10"></path>
@@ -2873,312 +3105,6 @@ async function renderTutorReportsPanel(container) {
         });
 
         reportsListContainer.innerHTML = html;
-    }
-
-    // ======================================================
-    // PDF DOWNLOAD FUNCTIONS
-    // ======================================================
-
-    window.downloadSingleReport = async function(reportId) {
-        try {
-            updateProgress('Fetching report data...', 10);
-            
-            // Find the report in our cached data
-            const report = allReports.find(r => r.id === reportId);
-            if (!report) {
-                throw new Error('Report not found');
-            }
-
-            updateProgress('Generating PDF...', 30);
-            
-            // Generate PDF using jsPDF
-            const { jsPDF } = window.jspdf;
-            const pdf = new jsPDF();
-            
-            // Add title
-            pdf.setFontSize(20);
-            pdf.text('Tutor Progress Report', 20, 20);
-            
-            // Add report details
-            pdf.setFontSize(12);
-            let yPosition = 40;
-            
-            const details = [
-                `Tutor: ${report.tutorName || 'N/A'}`,
-                `Email: ${report.tutorEmail || 'N/A'}`,
-                `Student: ${report.studentName || 'N/A'}`,
-                `Parent: ${report.parentName || 'N/A'}`,
-                `Grade: ${report.grade || 'N/A'}`,
-                `Date: ${report.submittedAt ? new Date(report.submittedAt.seconds * 1000).toLocaleDateString() : 'N/A'}`,
-                '',
-                'Topics Covered:',
-                report.topics || 'N/A',
-                '',
-                'Progress:',
-                report.progress || 'N/A',
-                '',
-                'Strengths & Weaknesses:',
-                report.strengthsWeaknesses || 'N/A',
-                '',
-                'Recommendations:',
-                report.recommendations || 'N/A'
-            ];
-
-            updateProgress('Adding content to PDF...', 60);
-            
-            // Add content with line wrapping
-            details.forEach(detail => {
-                if (yPosition > 270) {
-                    pdf.addPage();
-                    yPosition = 20;
-                }
-                
-                if (detail.startsWith('Tutor:') || detail.startsWith('Student:') || 
-                    detail.startsWith('Topics') || detail.startsWith('Progress') || 
-                    detail.startsWith('Strengths') || detail.startsWith('Recommendations')) {
-                    pdf.setFont(undefined, 'bold');
-                } else {
-                    pdf.setFont(undefined, 'normal');
-                }
-                
-                const lines = pdf.splitTextToSize(detail, 170);
-                pdf.text(lines, 20, yPosition);
-                yPosition += (lines.length * 7) + 5;
-            });
-
-            updateProgress('Finalizing PDF...', 90);
-            
-            // Generate filename
-            const date = report.submittedAt ? 
-                new Date(report.submittedAt.seconds * 1000).toISOString().split('T')[0] : 
-                new Date().toISOString().split('T')[0];
-            const filename = `Tutor_Report_${report.studentName || 'Unknown'}_${date}.pdf`;
-            
-            // Save PDF
-            pdf.save(filename);
-            
-            updateProgress('Download complete!', 100);
-            
-            // Hide modal after a brief delay
-            setTimeout(() => {
-                const modal = document.getElementById('pdf-progress-modal');
-                modal.classList.add('hidden');
-            }, 1000);
-            
-        } catch (error) {
-            console.error('Error generating PDF:', error);
-            alert('Failed to generate PDF. Please try again.');
-            
-            const modal = document.getElementById('pdf-progress-modal');
-            modal.classList.add('hidden');
-        }
-    };
-
-    window.previewReport = async function(reportId) {
-        try {
-            const report = allReports.find(r => r.id === reportId);
-            if (!report) {
-                throw new Error('Report not found');
-            }
-
-            // Generate PDF similar to download but open in new tab
-            const { jsPDF } = window.jspdf;
-            const pdf = new jsPDF();
-            
-            pdf.setFontSize(20);
-            pdf.text('Tutor Progress Report', 20, 20);
-            
-            pdf.setFontSize(12);
-            let yPosition = 40;
-            
-            const details = [
-                `Tutor: ${report.tutorName || 'N/A'}`,
-                `Email: ${report.tutorEmail || 'N/A'}`,
-                `Student: ${report.studentName || 'N/A'}`,
-                `Parent: ${report.parentName || 'N/A'}`,
-                `Grade: ${report.grade || 'N/A'}`,
-                `Date: ${report.submittedAt ? new Date(report.submittedAt.seconds * 1000).toLocaleDateString() : 'N/A'}`,
-                '',
-                'Topics Covered:',
-                report.topics || 'N/A',
-                '',
-                'Progress:',
-                report.progress || 'N/A',
-                '',
-                'Strengths & Weaknesses:',
-                report.strengthsWeaknesses || 'N/A',
-                '',
-                'Recommendations:',
-                report.recommendations || 'N/A'
-            ];
-
-            details.forEach(detail => {
-                if (yPosition > 270) {
-                    pdf.addPage();
-                    yPosition = 20;
-                }
-                
-                if (detail.startsWith('Tutor:') || detail.startsWith('Student:') || 
-                    detail.startsWith('Topics') || detail.startsWith('Progress') || 
-                    detail.startsWith('Strengths') || detail.startsWith('Recommendations')) {
-                    pdf.setFont(undefined, 'bold');
-                } else {
-                    pdf.setFont(undefined, 'normal');
-                }
-                
-                const lines = pdf.splitTextToSize(detail, 170);
-                pdf.text(lines, 20, yPosition);
-                yPosition += (lines.length * 7) + 5;
-            });
-
-            // Open PDF in new tab
-            const pdfBlob = pdf.output('blob');
-            const pdfUrl = URL.createObjectURL(pdfBlob);
-            window.open(pdfUrl, '_blank');
-            
-            // Clean up URL object
-            setTimeout(() => URL.revokeObjectURL(pdfUrl), 1000);
-            
-        } catch (error) {
-            console.error('Error previewing report:', error);
-            alert('Failed to preview report. Please try again.');
-        }
-    };
-
-    window.zipAndDownloadTutorReports = async function(tutorName, reportIds) {
-        try {
-            const ids = reportIds.split(',');
-            const reports = allReports.filter(r => ids.includes(r.id));
-            
-            if (reports.length === 0) {
-                throw new Error('No reports found');
-            }
-
-            updateProgress(`Preparing to download ${reports.length} reports...`, 10);
-            
-            // Check if JSZip is available
-            if (!window.JSZip) {
-                throw new Error('ZIP library not loaded. Please refresh the page and try again.');
-            }
-
-            const zip = new JSZip();
-            let processed = 0;
-
-            updateProgress('Generating PDF files...', 20);
-            
-            for (const report of reports) {
-                updateProgress(`Generating PDF for ${report.studentName || 'Unknown'}...`, 
-                    20 + Math.floor((processed / reports.length) * 70));
-                
-                const { jsPDF } = window.jspdf;
-                const pdf = new jsPDF();
-                
-                pdf.setFontSize(20);
-                pdf.text('Tutor Progress Report', 20, 20);
-                
-                pdf.setFontSize(12);
-                let yPosition = 40;
-                
-                const details = [
-                    `Tutor: ${report.tutorName || 'N/A'}`,
-                    `Email: ${report.tutorEmail || 'N/A'}`,
-                    `Student: ${report.studentName || 'N/A'}`,
-                    `Parent: ${report.parentName || 'N/A'}`,
-                    `Grade: ${report.grade || 'N/A'}`,
-                    `Date: ${report.submittedAt ? new Date(report.submittedAt.seconds * 1000).toLocaleDateString() : 'N/A'}`,
-                    '',
-                    'Topics Covered:',
-                    report.topics || 'N/A',
-                    '',
-                    'Progress:',
-                    report.progress || 'N/A',
-                    '',
-                    'Strengths & Weaknesses:',
-                    report.strengthsWeaknesses || 'N/A',
-                    '',
-                    'Recommendations:',
-                    report.recommendations || 'N/A'
-                ];
-
-                details.forEach(detail => {
-                    if (yPosition > 270) {
-                        pdf.addPage();
-                        yPosition = 20;
-                    }
-                    
-                    if (detail.startsWith('Tutor:') || detail.startsWith('Student:') || 
-                        detail.startsWith('Topics') || detail.startsWith('Progress') || 
-                        detail.startsWith('Strengths') || detail.startsWith('Recommendations')) {
-                        pdf.setFont(undefined, 'bold');
-                    } else {
-                        pdf.setFont(undefined, 'normal');
-                    }
-                    
-                    const lines = pdf.splitTextToSize(detail, 170);
-                    pdf.text(lines, 20, yPosition);
-                    yPosition += (lines.length * 7) + 5;
-                });
-
-                const date = report.submittedAt ? 
-                    new Date(report.submittedAt.seconds * 1000).toISOString().split('T')[0] : 
-                    new Date().toISOString().split('T')[0];
-                const filename = `${report.studentName || 'Unknown'}_${date}.pdf`;
-                
-                // Convert PDF to array buffer
-                const pdfOutput = pdf.output('arraybuffer');
-                zip.file(filename, pdfOutput);
-                
-                processed++;
-            }
-
-            updateProgress('Creating ZIP file...', 95);
-            
-            // Generate ZIP file
-            const zipBlob = await zip.generateAsync({ type: 'blob' });
-            const zipUrl = URL.createObjectURL(zipBlob);
-            
-            // Create download link
-            const link = document.createElement('a');
-            link.href = zipUrl;
-            link.download = `${tutorName.replace(/[^a-z0-9]/gi, '_')}_Reports_${new Date().toISOString().split('T')[0]}.zip`;
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-            
-            // Clean up
-            URL.revokeObjectURL(zipUrl);
-            
-            updateProgress('Download complete!', 100);
-            
-            // Hide modal after a brief delay
-            setTimeout(() => {
-                const modal = document.getElementById('pdf-progress-modal');
-                modal.classList.add('hidden');
-            }, 1000);
-            
-        } catch (error) {
-            console.error('Error creating ZIP file:', error);
-            alert('Failed to create ZIP file. Please try again.');
-            
-            const modal = document.getElementById('pdf-progress-modal');
-            modal.classList.add('hidden');
-        }
-    };
-
-    function updateProgress(message, percentage) {
-        const modal = document.getElementById('pdf-progress-modal');
-        const messageEl = document.getElementById('pdf-progress-message');
-        const progressBar = document.getElementById('pdf-progress-bar');
-        const progressText = document.getElementById('pdf-progress-text');
-        
-        // Show modal if not already shown
-        if (modal.classList.contains('hidden')) {
-            modal.classList.remove('hidden');
-        }
-        
-        if (messageEl) messageEl.textContent = message;
-        if (progressBar) progressBar.style.width = `${percentage}%`;
-        if (progressText) progressText.textContent = `${percentage}%`;
     }
 }
 
@@ -6257,6 +6183,7 @@ onAuthStateChanged(auth, async (user) => {
         window.location.href = "management-auth.html";
     }
 });
+
 
 
 
