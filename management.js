@@ -2799,11 +2799,11 @@ async function renderTutorReportsPanel(container) {
                 if (!reportsByStudent[report.studentName]) {
                     reportsByStudent[report.studentName] = [];
                 }
-                reportsByStudent[report.studentName].push(report);
+                reportsByStudent[report.studentName].reports.push(report);
             });
 
-            const studentReportsHTML = Object.entries(reportsByStudent).map(([studentName, studentReports]) => {
-                const reportLinks = studentReports.map(report => {
+            const studentReportsHTML = Object.entries(reportsByStudent).map(([studentName, studentData]) => {
+                const reportLinks = studentData.reports.map(report => {
                     const reportDate = report.submittedAt ? 
                         new Date(report.submittedAt.seconds * 1000).toLocaleDateString() : 
                         'Unknown date';
@@ -2820,7 +2820,7 @@ async function renderTutorReportsPanel(container) {
                                     👁️ Preview
                                 </button>
                                 ${canDownload ? `
-                                    <button onclick="downloadSingleReport('${report.id}', event)" 
+                                    <button onclick="downloadSingleReport('${report.id}')" 
                                             class="bg-green-600 text-white px-3 py-1 rounded text-xs hover:bg-green-700">
                                         📥 Download
                                     </button>
@@ -2842,7 +2842,7 @@ async function renderTutorReportsPanel(container) {
 
             const zipButtonHTML = canDownload ? `
                 <div class="p-4 border-t bg-blue-50">
-                    <button onclick="zipAndDownloadTutorReports(${JSON.stringify(tutorData.reports).replace(/"/g, '&quot;')}, '${tutorData.name.replace(/'/g, "\\'")}', this)" 
+                    <button onclick="zipAndDownloadTutorReports('${tutorData.name.replace(/'/g, "\\'")}', '${tutorData.reports.map(r => r.id).join(',')}')" 
                             class="w-full bg-blue-600 text-white px-4 py-3 rounded-lg hover:bg-blue-700 transition-colors font-semibold flex items-center justify-center">
                         <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10"></path>
@@ -2874,7 +2874,313 @@ async function renderTutorReportsPanel(container) {
 
         reportsListContainer.innerHTML = html;
     }
-} 
+
+    // ======================================================
+    // PDF DOWNLOAD FUNCTIONS
+    // ======================================================
+
+    window.downloadSingleReport = async function(reportId) {
+        try {
+            updateProgress('Fetching report data...', 10);
+            
+            // Find the report in our cached data
+            const report = allReports.find(r => r.id === reportId);
+            if (!report) {
+                throw new Error('Report not found');
+            }
+
+            updateProgress('Generating PDF...', 30);
+            
+            // Generate PDF using jsPDF
+            const { jsPDF } = window.jspdf;
+            const pdf = new jsPDF();
+            
+            // Add title
+            pdf.setFontSize(20);
+            pdf.text('Tutor Progress Report', 20, 20);
+            
+            // Add report details
+            pdf.setFontSize(12);
+            let yPosition = 40;
+            
+            const details = [
+                `Tutor: ${report.tutorName || 'N/A'}`,
+                `Email: ${report.tutorEmail || 'N/A'}`,
+                `Student: ${report.studentName || 'N/A'}`,
+                `Parent: ${report.parentName || 'N/A'}`,
+                `Grade: ${report.grade || 'N/A'}`,
+                `Date: ${report.submittedAt ? new Date(report.submittedAt.seconds * 1000).toLocaleDateString() : 'N/A'}`,
+                '',
+                'Topics Covered:',
+                report.topics || 'N/A',
+                '',
+                'Progress:',
+                report.progress || 'N/A',
+                '',
+                'Strengths & Weaknesses:',
+                report.strengthsWeaknesses || 'N/A',
+                '',
+                'Recommendations:',
+                report.recommendations || 'N/A'
+            ];
+
+            updateProgress('Adding content to PDF...', 60);
+            
+            // Add content with line wrapping
+            details.forEach(detail => {
+                if (yPosition > 270) {
+                    pdf.addPage();
+                    yPosition = 20;
+                }
+                
+                if (detail.startsWith('Tutor:') || detail.startsWith('Student:') || 
+                    detail.startsWith('Topics') || detail.startsWith('Progress') || 
+                    detail.startsWith('Strengths') || detail.startsWith('Recommendations')) {
+                    pdf.setFont(undefined, 'bold');
+                } else {
+                    pdf.setFont(undefined, 'normal');
+                }
+                
+                const lines = pdf.splitTextToSize(detail, 170);
+                pdf.text(lines, 20, yPosition);
+                yPosition += (lines.length * 7) + 5;
+            });
+
+            updateProgress('Finalizing PDF...', 90);
+            
+            // Generate filename
+            const date = report.submittedAt ? 
+                new Date(report.submittedAt.seconds * 1000).toISOString().split('T')[0] : 
+                new Date().toISOString().split('T')[0];
+            const filename = `Tutor_Report_${report.studentName || 'Unknown'}_${date}.pdf`;
+            
+            // Save PDF
+            pdf.save(filename);
+            
+            updateProgress('Download complete!', 100);
+            
+            // Hide modal after a brief delay
+            setTimeout(() => {
+                const modal = document.getElementById('pdf-progress-modal');
+                modal.classList.add('hidden');
+            }, 1000);
+            
+        } catch (error) {
+            console.error('Error generating PDF:', error);
+            alert('Failed to generate PDF. Please try again.');
+            
+            const modal = document.getElementById('pdf-progress-modal');
+            modal.classList.add('hidden');
+        }
+    };
+
+    window.previewReport = async function(reportId) {
+        try {
+            const report = allReports.find(r => r.id === reportId);
+            if (!report) {
+                throw new Error('Report not found');
+            }
+
+            // Generate PDF similar to download but open in new tab
+            const { jsPDF } = window.jspdf;
+            const pdf = new jsPDF();
+            
+            pdf.setFontSize(20);
+            pdf.text('Tutor Progress Report', 20, 20);
+            
+            pdf.setFontSize(12);
+            let yPosition = 40;
+            
+            const details = [
+                `Tutor: ${report.tutorName || 'N/A'}`,
+                `Email: ${report.tutorEmail || 'N/A'}`,
+                `Student: ${report.studentName || 'N/A'}`,
+                `Parent: ${report.parentName || 'N/A'}`,
+                `Grade: ${report.grade || 'N/A'}`,
+                `Date: ${report.submittedAt ? new Date(report.submittedAt.seconds * 1000).toLocaleDateString() : 'N/A'}`,
+                '',
+                'Topics Covered:',
+                report.topics || 'N/A',
+                '',
+                'Progress:',
+                report.progress || 'N/A',
+                '',
+                'Strengths & Weaknesses:',
+                report.strengthsWeaknesses || 'N/A',
+                '',
+                'Recommendations:',
+                report.recommendations || 'N/A'
+            ];
+
+            details.forEach(detail => {
+                if (yPosition > 270) {
+                    pdf.addPage();
+                    yPosition = 20;
+                }
+                
+                if (detail.startsWith('Tutor:') || detail.startsWith('Student:') || 
+                    detail.startsWith('Topics') || detail.startsWith('Progress') || 
+                    detail.startsWith('Strengths') || detail.startsWith('Recommendations')) {
+                    pdf.setFont(undefined, 'bold');
+                } else {
+                    pdf.setFont(undefined, 'normal');
+                }
+                
+                const lines = pdf.splitTextToSize(detail, 170);
+                pdf.text(lines, 20, yPosition);
+                yPosition += (lines.length * 7) + 5;
+            });
+
+            // Open PDF in new tab
+            const pdfBlob = pdf.output('blob');
+            const pdfUrl = URL.createObjectURL(pdfBlob);
+            window.open(pdfUrl, '_blank');
+            
+            // Clean up URL object
+            setTimeout(() => URL.revokeObjectURL(pdfUrl), 1000);
+            
+        } catch (error) {
+            console.error('Error previewing report:', error);
+            alert('Failed to preview report. Please try again.');
+        }
+    };
+
+    window.zipAndDownloadTutorReports = async function(tutorName, reportIds) {
+        try {
+            const ids = reportIds.split(',');
+            const reports = allReports.filter(r => ids.includes(r.id));
+            
+            if (reports.length === 0) {
+                throw new Error('No reports found');
+            }
+
+            updateProgress(`Preparing to download ${reports.length} reports...`, 10);
+            
+            // Check if JSZip is available
+            if (!window.JSZip) {
+                throw new Error('ZIP library not loaded. Please refresh the page and try again.');
+            }
+
+            const zip = new JSZip();
+            let processed = 0;
+
+            updateProgress('Generating PDF files...', 20);
+            
+            for (const report of reports) {
+                updateProgress(`Generating PDF for ${report.studentName || 'Unknown'}...`, 
+                    20 + Math.floor((processed / reports.length) * 70));
+                
+                const { jsPDF } = window.jspdf;
+                const pdf = new jsPDF();
+                
+                pdf.setFontSize(20);
+                pdf.text('Tutor Progress Report', 20, 20);
+                
+                pdf.setFontSize(12);
+                let yPosition = 40;
+                
+                const details = [
+                    `Tutor: ${report.tutorName || 'N/A'}`,
+                    `Email: ${report.tutorEmail || 'N/A'}`,
+                    `Student: ${report.studentName || 'N/A'}`,
+                    `Parent: ${report.parentName || 'N/A'}`,
+                    `Grade: ${report.grade || 'N/A'}`,
+                    `Date: ${report.submittedAt ? new Date(report.submittedAt.seconds * 1000).toLocaleDateString() : 'N/A'}`,
+                    '',
+                    'Topics Covered:',
+                    report.topics || 'N/A',
+                    '',
+                    'Progress:',
+                    report.progress || 'N/A',
+                    '',
+                    'Strengths & Weaknesses:',
+                    report.strengthsWeaknesses || 'N/A',
+                    '',
+                    'Recommendations:',
+                    report.recommendations || 'N/A'
+                ];
+
+                details.forEach(detail => {
+                    if (yPosition > 270) {
+                        pdf.addPage();
+                        yPosition = 20;
+                    }
+                    
+                    if (detail.startsWith('Tutor:') || detail.startsWith('Student:') || 
+                        detail.startsWith('Topics') || detail.startsWith('Progress') || 
+                        detail.startsWith('Strengths') || detail.startsWith('Recommendations')) {
+                        pdf.setFont(undefined, 'bold');
+                    } else {
+                        pdf.setFont(undefined, 'normal');
+                    }
+                    
+                    const lines = pdf.splitTextToSize(detail, 170);
+                    pdf.text(lines, 20, yPosition);
+                    yPosition += (lines.length * 7) + 5;
+                });
+
+                const date = report.submittedAt ? 
+                    new Date(report.submittedAt.seconds * 1000).toISOString().split('T')[0] : 
+                    new Date().toISOString().split('T')[0];
+                const filename = `${report.studentName || 'Unknown'}_${date}.pdf`;
+                
+                // Convert PDF to array buffer
+                const pdfOutput = pdf.output('arraybuffer');
+                zip.file(filename, pdfOutput);
+                
+                processed++;
+            }
+
+            updateProgress('Creating ZIP file...', 95);
+            
+            // Generate ZIP file
+            const zipBlob = await zip.generateAsync({ type: 'blob' });
+            const zipUrl = URL.createObjectURL(zipBlob);
+            
+            // Create download link
+            const link = document.createElement('a');
+            link.href = zipUrl;
+            link.download = `${tutorName.replace(/[^a-z0-9]/gi, '_')}_Reports_${new Date().toISOString().split('T')[0]}.zip`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            
+            // Clean up
+            URL.revokeObjectURL(zipUrl);
+            
+            updateProgress('Download complete!', 100);
+            
+            // Hide modal after a brief delay
+            setTimeout(() => {
+                const modal = document.getElementById('pdf-progress-modal');
+                modal.classList.add('hidden');
+            }, 1000);
+            
+        } catch (error) {
+            console.error('Error creating ZIP file:', error);
+            alert('Failed to create ZIP file. Please try again.');
+            
+            const modal = document.getElementById('pdf-progress-modal');
+            modal.classList.add('hidden');
+        }
+    };
+
+    function updateProgress(message, percentage) {
+        const modal = document.getElementById('pdf-progress-modal');
+        const messageEl = document.getElementById('pdf-progress-message');
+        const progressBar = document.getElementById('pdf-progress-bar');
+        const progressText = document.getElementById('pdf-progress-text');
+        
+        // Show modal if not already shown
+        if (modal.classList.contains('hidden')) {
+            modal.classList.remove('hidden');
+        }
+        
+        if (messageEl) messageEl.textContent = message;
+        if (progressBar) progressBar.style.width = `${percentage}%`;
+        if (progressText) progressText.textContent = `${percentage}%`;
+    }
+}
 
 // ======================================================
 // SUBSECTION 5.2: Enrollments Panel (UPDATED)
@@ -5951,6 +6257,7 @@ onAuthStateChanged(auth, async (user) => {
         window.location.href = "management-auth.html";
     }
 });
+
 
 
 
