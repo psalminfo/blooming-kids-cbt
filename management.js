@@ -2482,6 +2482,530 @@ async function resetParentBalance(parentUid, currentEarnings) {
 // SUBSECTION 5.1: Tutor Reports Panel
 // ======================================================
 
+// Add these global helper functions at the top of your file
+async function downloadSingleReport(reportId, event = null) {
+    if (event) event.stopPropagation();
+    
+    try {
+        showPDFProgressModal('Preparing report for download...', 10);
+        
+        // Fetch the specific report
+        const reportDoc = await getDoc(doc(db, "tutor_submissions", reportId));
+        if (!reportDoc.exists()) {
+            throw new Error('Report not found');
+        }
+        
+        const report = { id: reportDoc.id, ...reportDoc.data() };
+        
+        updatePDFProgress('Creating PDF layout...', 30);
+        
+        // Create a container for the PDF content
+        const pdfContainer = document.createElement('div');
+        pdfContainer.style.padding = '20px';
+        pdfContainer.style.fontFamily = 'Arial, sans-serif';
+        pdfContainer.style.maxWidth = '800px';
+        pdfContainer.style.margin = '0 auto';
+        pdfContainer.style.backgroundColor = 'white';
+        
+        // Format date
+        const submissionDate = report.submittedAt ? 
+            new Date(report.submittedAt.seconds * 1000).toLocaleDateString('en-US', {
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric'
+            }) : 'Not specified';
+        
+        // Build the PDF content
+        pdfContainer.innerHTML = `
+            <div style="text-align: center; margin-bottom: 30px; border-bottom: 2px solid #4CAF50; padding-bottom: 20px;">
+                <h1 style="color: #4CAF50; margin: 0; font-size: 28px;">Tutor Report</h1>
+                <p style="color: #666; margin: 10px 0 0 0;">Generated on ${new Date().toLocaleDateString()}</p>
+            </div>
+            
+            <div style="margin-bottom: 30px;">
+                <h2 style="color: #333; border-bottom: 1px solid #eee; padding-bottom: 10px; font-size: 20px;">Report Information</h2>
+                <table style="width: 100%; border-collapse: collapse; margin-top: 10px;">
+                    <tr>
+                        <td style="padding: 8px; border: 1px solid #ddd; width: 30%; font-weight: bold; background-color: #f9f9f9;">Submission Date:</td>
+                        <td style="padding: 8px; border: 1px solid #ddd;">${submissionDate}</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold; background-color: #f9f9f9;">Tutor Name:</td>
+                        <td style="padding: 8px; border: 1px solid #ddd;">${report.tutorName || 'Not specified'}</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold; background-color: #f9f9f9;">Tutor Email:</td>
+                        <td style="padding: 8px; border: 1px solid #ddd;">${report.tutorEmail || 'Not specified'}</td>
+                    </tr>
+                </table>
+            </div>
+            
+            <div style="margin-bottom: 30px;">
+                <h2 style="color: #333; border-bottom: 1px solid #eee; padding-bottom: 10px; font-size: 20px;">Student Information</h2>
+                <table style="width: 100%; border-collapse: collapse; margin-top: 10px;">
+                    <tr>
+                        <td style="padding: 8px; border: 1px solid #ddd; width: 30%; font-weight: bold; background-color: #f9f9f9;">Student Name:</td>
+                        <td style="padding: 8px; border: 1px solid #ddd;">${report.studentName || 'Not specified'}</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold; background-color: #f9f9f9;">Parent Name:</td>
+                        <td style="padding: 8px; border: 1px solid #ddd;">${report.parentName || 'Not specified'}</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold; background-color: #f9f9f9;">Grade:</td>
+                        <td style="padding: 8px; border: 1px solid #ddd;">${report.grade || 'Not specified'}</td>
+                    </tr>
+                </table>
+            </div>
+            
+            <div style="margin-bottom: 30px;">
+                <h2 style="color: #333; border-bottom: 1px solid #eee; padding-bottom: 10px; font-size: 20px;">Session Details</h2>
+                <div style="margin-top: 10px;">
+                    <h3 style="color: #555; font-size: 16px; margin-bottom: 5px;">Introduction:</h3>
+                    <div style="padding: 15px; background-color: #f5f5f5; border-radius: 5px; border-left: 4px solid #4CAF50; margin-bottom: 20px;">
+                        ${formatTextForPDF(report.introduction || 'Not specified')}
+                    </div>
+                    
+                    <h3 style="color: #555; font-size: 16px; margin-bottom: 5px;">Topics Covered:</h3>
+                    <div style="padding: 15px; background-color: #f5f5f5; border-radius: 5px; border-left: 4px solid #2196F3; margin-bottom: 20px;">
+                        ${formatTextForPDF(report.topics || 'Not specified')}
+                    </div>
+                    
+                    <h3 style="color: #555; font-size: 16px; margin-bottom: 5px;">Progress Made:</h3>
+                    <div style="padding: 15px; background-color: #f5f5f5; border-radius: 5px; border-left: 4px solid #FF9800; margin-bottom: 20px;">
+                        ${formatTextForPDF(report.progress || 'Not specified')}
+                    </div>
+                    
+                    <h3 style="color: #555; font-size: 16px; margin-bottom: 5px;">Strengths & Weaknesses:</h3>
+                    <div style="padding: 15px; background-color: #f5f5f5; border-radius: 5px; border-left: 4px solid #9C27B0; margin-bottom: 20px;">
+                        ${formatTextForPDF(report.strengthsWeaknesses || 'Not specified')}
+                    </div>
+                    
+                    <h3 style="color: #555; font-size: 16px; margin-bottom: 5px;">Recommendations:</h3>
+                    <div style="padding: 15px; background-color: #f5f5f5; border-radius: 5px; border-left: 4px solid #F44336;">
+                        ${formatTextForPDF(report.recommendations || 'Not specified')}
+                    </div>
+                </div>
+            </div>
+            
+            <div style="margin-top: 40px; padding-top: 20px; border-top: 1px solid #ddd; text-align: center; color: #777; font-size: 12px;">
+                <p>Report ID: ${report.id}</p>
+                <p>Generated by Tutoring Management System</p>
+            </div>
+        `;
+        
+        // Add to document body temporarily
+        document.body.appendChild(pdfContainer);
+        
+        updatePDFProgress('Generating PDF file...', 60);
+        
+        try {
+            // Generate PDF using html2pdf
+            const options = {
+                margin: [15, 15, 15, 15],
+                filename: `Tutor_Report_${report.studentName || 'Unknown'}_${report.tutorName || 'Unknown'}_${Date.now()}.pdf`,
+                image: { type: 'jpeg', quality: 0.98 },
+                html2canvas: { 
+                    scale: 2,
+                    useCORS: true,
+                    logging: false,
+                    letterRendering: true,
+                    backgroundColor: '#FFFFFF'
+                },
+                jsPDF: { 
+                    unit: 'mm', 
+                    format: 'a4', 
+                    orientation: 'portrait',
+                    compress: true
+                },
+                pagebreak: { 
+                    mode: ['avoid-all', 'css', 'legacy'] 
+                }
+            };
+            
+            await html2pdf().set(options).from(pdfContainer).save();
+            
+            updatePDFProgress('Download complete!', 100);
+            
+            // Clean up
+            setTimeout(() => {
+                document.body.removeChild(pdfContainer);
+                hidePDFProgressModal();
+            }, 1000);
+            
+        } catch (pdfError) {
+            console.error('PDF generation error:', pdfError);
+            
+            // Fallback: Try a simpler approach
+            updatePDFProgress('Trying alternative method...', 70);
+            
+            // Create a printable version as fallback
+            const printWindow = window.open('', '_blank');
+            printWindow.document.write(`
+                <!DOCTYPE html>
+                <html>
+                <head>
+                    <title>Tutor Report</title>
+                    <style>
+                        body { font-family: Arial, sans-serif; padding: 20px; max-width: 800px; margin: 0 auto; }
+                        h1 { color: #4CAF50; }
+                        table { width: 100%; border-collapse: collapse; margin: 10px 0; }
+                        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+                        th { background-color: #f9f9f9; }
+                        .section { margin-bottom: 30px; }
+                        .content-box { padding: 15px; background-color: #f5f5f5; border-radius: 5px; margin: 10px 0; }
+                        @media print {
+                            body { font-size: 12pt; }
+                            .no-print { display: none; }
+                        }
+                    </style>
+                </head>
+                <body>
+                    ${pdfContainer.innerHTML}
+                    <div class="no-print" style="text-align: center; margin-top: 20px;">
+                        <button onclick="window.print()" style="padding: 10px 20px; background-color: #4CAF50; color: white; border: none; border-radius: 4px; cursor: pointer;">
+                            Print or Save as PDF
+                        </button>
+                    </div>
+                </body>
+                </html>
+            `);
+            printWindow.document.close();
+            
+            updatePDFProgress('Opening print dialog...', 90);
+            
+            setTimeout(() => {
+                hidePDFProgressModal();
+            }, 2000);
+        }
+        
+    } catch (error) {
+        console.error('Error downloading report:', error);
+        hidePDFProgressModal();
+        alert('Failed to download report. Error: ' + error.message);
+    }
+}
+
+function formatTextForPDF(text) {
+    if (!text) return 'Not specified';
+    return text
+        .replace(/\n/g, '<br>')
+        .replace(/\t/g, '&nbsp;&nbsp;&nbsp;&nbsp;')
+        .replace(/  /g, '&nbsp;&nbsp;');
+}
+
+function showPDFProgressModal(message, progress) {
+    const modal = document.getElementById('pdf-progress-modal');
+    const messageEl = document.getElementById('pdf-progress-message');
+    const progressBar = document.getElementById('pdf-progress-bar');
+    const progressText = document.getElementById('pdf-progress-text');
+    
+    if (modal && messageEl && progressBar && progressText) {
+        modal.classList.remove('hidden');
+        messageEl.textContent = message;
+        progressBar.style.width = `${progress}%`;
+        progressText.textContent = `${progress}%`;
+    }
+}
+
+function updatePDFProgress(message, progress) {
+    const messageEl = document.getElementById('pdf-progress-message');
+    const progressBar = document.getElementById('pdf-progress-bar');
+    const progressText = document.getElementById('pdf-progress-text');
+    
+    if (messageEl && progressBar && progressText) {
+        messageEl.textContent = message;
+        progressBar.style.width = `${progress}%`;
+        progressText.textContent = `${progress}%`;
+    }
+}
+
+function hidePDFProgressModal() {
+    const modal = document.getElementById('pdf-progress-modal');
+    if (modal) {
+        modal.classList.add('hidden');
+    }
+}
+
+async function zipAndDownloadTutorReports(reports, tutorName, button) {
+    if (!reports || reports.length === 0) {
+        alert('No reports to download');
+        return;
+    }
+    
+    try {
+        const originalText = button.textContent;
+        button.innerHTML = '<div class="loading-spinner" style="width: 20px; height: 20px;"></div> Creating ZIP...';
+        button.disabled = true;
+        
+        showPDFProgressModal(`Preparing ${reports.length} reports for ${tutorName}...`, 5);
+        
+        const zip = new JSZip();
+        let processedCount = 0;
+        
+        for (const report of reports) {
+            processedCount++;
+            const progress = Math.floor((processedCount / reports.length) * 90) + 5;
+            updatePDFProgress(`Processing report ${processedCount} of ${reports.length}...`, progress);
+            
+            try {
+                // Generate PDF content for each report
+                const submissionDate = report.submittedAt ? 
+                    new Date(report.submittedAt.seconds * 1000).toLocaleDateString('en-US') : 'Unknown';
+                
+                const pdfContent = await generatePDFContent(report);
+                
+                // Create a Blob for the PDF
+                const options = {
+                    margin: [15, 15, 15, 15],
+                    image: { type: 'jpeg', quality: 0.98 },
+                    html2canvas: { 
+                        scale: 2,
+                        useCORS: true,
+                        logging: false,
+                        backgroundColor: '#FFFFFF'
+                    },
+                    jsPDF: { 
+                        unit: 'mm', 
+                        format: 'a4', 
+                        orientation: 'portrait'
+                    }
+                };
+                
+                // Generate PDF blob
+                const pdfBlob = await html2pdf()
+                    .set(options)
+                    .from(pdfContent)
+                    .output('blob');
+                
+                // Add to zip
+                const fileName = `Report_${report.studentName || 'Unknown'}_${submissionDate.replace(/[\/]/g, '-')}.pdf`;
+                zip.file(fileName, pdfBlob);
+                
+                await new Promise(resolve => setTimeout(resolve, 100)); // Small delay to prevent UI freeze
+                
+            } catch (error) {
+                console.error(`Error processing report ${report.id}:`, error);
+                // Continue with next report
+            }
+        }
+        
+        updatePDFProgress('Creating ZIP archive...', 95);
+        
+        // Generate zip file
+        const zipBlob = await zip.generateAsync({ type: 'blob' });
+        
+        // Create download link
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(zipBlob);
+        link.download = `Tutor_Reports_${tutorName.replace(/[^a-z0-9]/gi, '_')}_${Date.now()}.zip`;
+        link.click();
+        
+        updatePDFProgress('Download complete!', 100);
+        
+        // Clean up
+        setTimeout(() => {
+            URL.revokeObjectURL(link.href);
+            button.innerHTML = originalText;
+            button.disabled = false;
+            hidePDFProgressModal();
+        }, 1000);
+        
+    } catch (error) {
+        console.error('Error creating ZIP:', error);
+        hidePDFProgressModal();
+        
+        if (button) {
+            button.innerHTML = '📦 ZIP & DOWNLOAD ALL REPORTS';
+            button.disabled = false;
+        }
+        
+        alert('Failed to create ZIP file. Error: ' + error.message);
+    }
+}
+
+async function generatePDFContent(report) {
+    const submissionDate = report.submittedAt ? 
+        new Date(report.submittedAt.seconds * 1000).toLocaleDateString('en-US', {
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric'
+        }) : 'Not specified';
+    
+    return `
+        <div style="padding: 20px; font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; background-color: white;">
+            <div style="text-align: center; margin-bottom: 30px; border-bottom: 2px solid #4CAF50; padding-bottom: 20px;">
+                <h1 style="color: #4CAF50; margin: 0; font-size: 28px;">Tutor Report</h1>
+                <p style="color: #666; margin: 10px 0 0 0;">Generated on ${new Date().toLocaleDateString()}</p>
+            </div>
+            
+            <div style="margin-bottom: 30px;">
+                <h2 style="color: #333; border-bottom: 1px solid #eee; padding-bottom: 10px; font-size: 20px;">Report Information</h2>
+                <table style="width: 100%; border-collapse: collapse; margin-top: 10px;">
+                    <tr>
+                        <td style="padding: 8px; border: 1px solid #ddd; width: 30%; font-weight: bold; background-color: #f9f9f9;">Submission Date:</td>
+                        <td style="padding: 8px; border: 1px solid #ddd;">${submissionDate}</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold; background-color: #f9f9f9;">Tutor Name:</td>
+                        <td style="padding: 8px; border: 1px solid #ddd;">${report.tutorName || 'Not specified'}</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold; background-color: #f9f9f9;">Tutor Email:</td>
+                        <td style="padding: 8px; border: 1px solid #ddd;">${report.tutorEmail || 'Not specified'}</td>
+                    </tr>
+                </table>
+            </div>
+            
+            <div style="margin-bottom: 30px;">
+                <h2 style="color: #333; border-bottom: 1px solid #eee; padding-bottom: 10px; font-size: 20px;">Student Information</h2>
+                <table style="width: 100%; border-collapse: collapse; margin-top: 10px;">
+                    <tr>
+                        <td style="padding: 8px; border: 1px solid #ddd; width: 30%; font-weight: bold; background-color: #f9f9f9;">Student Name:</td>
+                        <td style="padding: 8px; border: 1px solid #ddd;">${report.studentName || 'Not specified'}</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold; background-color: #f9f9f9;">Parent Name:</td>
+                        <td style="padding: 8px; border: 1px solid #ddd;">${report.parentName || 'Not specified'}</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold; background-color: #f9f9f9;">Grade:</td>
+                        <td style="padding: 8px; border: 1px solid #ddd;">${report.grade || 'Not specified'}</td>
+                    </tr>
+                </table>
+            </div>
+            
+            <div style="margin-bottom: 30px;">
+                <h2 style="color: #333; border-bottom: 1px solid #eee; padding-bottom: 10px; font-size: 20px;">Session Details</h2>
+                <div style="margin-top: 10px;">
+                    <h3 style="color: #555; font-size: 16px; margin-bottom: 5px;">Introduction:</h3>
+                    <div style="padding: 15px; background-color: #f5f5f5; border-radius: 5px; border-left: 4px solid #4CAF50; margin-bottom: 20px; white-space: pre-line;">
+                        ${report.introduction || 'Not specified'}
+                    </div>
+                    
+                    <h3 style="color: #555; font-size: 16px; margin-bottom: 5px;">Topics Covered:</h3>
+                    <div style="padding: 15px; background-color: #f5f5f5; border-radius: 5px; border-left: 4px solid #2196F3; margin-bottom: 20px; white-space: pre-line;">
+                        ${report.topics || 'Not specified'}
+                    </div>
+                    
+                    <h3 style="color: #555; font-size: 16px; margin-bottom: 5px;">Progress Made:</h3>
+                    <div style="padding: 15px; background-color: #f5f5f5; border-radius: 5px; border-left: 4px solid #FF9800; margin-bottom: 20px; white-space: pre-line;">
+                        ${report.progress || 'Not specified'}
+                    </div>
+                    
+                    <h3 style="color: #555; font-size: 16px; margin-bottom: 5px;">Strengths & Weaknesses:</h3>
+                    <div style="padding: 15px; background-color: #f5f5f5; border-radius: 5px; border-left: 4px solid #9C27B0; margin-bottom: 20px; white-space: pre-line;">
+                        ${report.strengthsWeaknesses || 'Not specified'}
+                    </div>
+                    
+                    <h3 style="color: #555; font-size: 16px; margin-bottom: 5px;">Recommendations:</h3>
+                    <div style="padding: 15px; background-color: #f5f5f5; border-radius: 5px; border-left: 4px solid #F44336; white-space: pre-line;">
+                        ${report.recommendations || 'Not specified'}
+                    </div>
+                </div>
+            </div>
+            
+            <div style="margin-top: 40px; padding-top: 20px; border-top: 1px solid #ddd; text-align: center; color: #777; font-size: 12px;">
+                <p>Report ID: ${report.id}</p>
+                <p>Generated by Tutoring Management System</p>
+            </div>
+        </div>
+    `;
+}
+
+async function previewReport(reportId) {
+    try {
+        const reportDoc = await getDoc(doc(db, "tutor_submissions", reportId));
+        if (!reportDoc.exists()) {
+            alert('Report not found');
+            return;
+        }
+        
+        const report = { id: reportDoc.id, ...reportDoc.data() };
+        
+        const previewWindow = window.open('', '_blank');
+        previewWindow.document.write(`
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <title>Preview Report - ${report.studentName || 'Unknown Student'}</title>
+                <style>
+                    body { 
+                        font-family: Arial, sans-serif; 
+                        padding: 20px; 
+                        max-width: 1000px; 
+                        margin: 0 auto; 
+                        background-color: #f5f5f5;
+                    }
+                    .report-container {
+                        background-color: white;
+                        padding: 30px;
+                        border-radius: 8px;
+                        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+                    }
+                    h1 { color: #4CAF50; border-bottom: 2px solid #4CAF50; padding-bottom: 10px; }
+                    h2 { color: #333; border-bottom: 1px solid #eee; padding-bottom: 10px; }
+                    h3 { color: #555; margin-top: 20px; }
+                    table { width: 100%; border-collapse: collapse; margin: 15px 0; }
+                    th, td { border: 1px solid #ddd; padding: 12px; text-align: left; }
+                    th { background-color: #f9f9f9; font-weight: bold; }
+                    .content-box { 
+                        padding: 15px; 
+                        background-color: #f9f9f9; 
+                        border-radius: 5px; 
+                        margin: 10px 0; 
+                        border-left: 4px solid #4CAF50;
+                        white-space: pre-line;
+                    }
+                    .info-box { 
+                        background-color: #e8f5e8; 
+                        padding: 15px; 
+                        border-radius: 5px; 
+                        margin: 20px 0; 
+                        border-left: 4px solid #4CAF50;
+                    }
+                    .print-btn { 
+                        padding: 10px 20px; 
+                        background-color: #4CAF50; 
+                        color: white; 
+                        border: none; 
+                        border-radius: 4px; 
+                        cursor: pointer; 
+                        margin-top: 20px;
+                        font-size: 16px;
+                    }
+                    .print-btn:hover { background-color: #45a049; }
+                </style>
+            </head>
+            <body>
+                <div class="report-container">
+                    ${await generatePDFContent(report)}
+                    <div style="text-align: center; margin-top: 30px;">
+                        <button onclick="window.print()" class="print-btn">
+                            📄 Print or Save as PDF
+                        </button>
+                        <button onclick="window.close()" style="margin-left: 10px; padding: 10px 20px; background-color: #666; color: white; border: none; border-radius: 4px; cursor: pointer;">
+                            Close
+                        </button>
+                    </div>
+                </div>
+            </body>
+            </html>
+        `);
+        previewWindow.document.close();
+        
+    } catch (error) {
+        console.error('Error previewing report:', error);
+        alert('Failed to preview report: ' + error.message);
+    }
+}
+
+// Make sure to include these script tags in your HTML if not already included:
+// <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+// <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+// <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+// <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+
 async function renderTutorReportsPanel(container) {
     const canDownload = window.userData?.permissions?.actions?.canDownloadReports === true;
     const canExport = window.userData?.permissions?.actions?.canExportPayAdvice === true;
@@ -2556,7 +3080,6 @@ async function renderTutorReportsPanel(container) {
                         <div id="pdf-progress-bar" class="bg-green-600 h-4 rounded-full transition-all duration-300" style="width: 0%"></div>
                     </div>
                     <p id="pdf-progress-text" class="text-center text-sm text-gray-600">0%</p>
-                    <div id="pdf-error-message" class="mt-4 text-red-600 hidden"></div>
                 </div>
             </div>
 
@@ -2641,10 +3164,7 @@ async function renderTutorReportsPanel(container) {
             const endDate = document.getElementById('reports-end-date').value;
             link.href = URL.createObjectURL(blob);
             link.download = `Tutor_Reports_${startDate}_to_${endDate}.csv`;
-            document.body.appendChild(link);
             link.click();
-            document.body.removeChild(link);
-            URL.revokeObjectURL(link.href);
         } catch (error) {
             console.error('Error exporting CSV:', error);
             alert('Failed to export CSV. Please try again.');
@@ -2824,7 +3344,7 @@ async function renderTutorReportsPanel(container) {
                                     👁️ Preview
                                 </button>
                                 ${canDownload ? `
-                                    <button onclick="downloadSingleReport('${report.id}')" 
+                                    <button onclick="downloadSingleReport('${report.id}', event)" 
                                             class="bg-green-600 text-white px-3 py-1 rounded text-xs hover:bg-green-700">
                                         📥 Download
                                     </button>
@@ -2877,604 +3397,6 @@ async function renderTutorReportsPanel(container) {
         });
 
         reportsListContainer.innerHTML = html;
-    }
-
-    // Add the missing functions that are referenced in the HTML
-    window.downloadSingleReport = async function(reportId) {
-        try {
-            const report = allReports.find(r => r.id === reportId);
-            if (!report) {
-                throw new Error('Report not found');
-            }
-
-            showPdfProgressModal('Generating report PDF...', 0);
-            
-            // Create PDF content
-            const pdfContent = generateReportPdfContent(report);
-            
-            updatePdfProgress('Creating PDF document...', 50);
-            
-            // Use jsPDF to generate PDF
-            const { jsPDF } = window.jspdf;
-            const doc = new jsPDF();
-            
-            // Set document properties
-            doc.setProperties({
-                title: `Tutor Report - ${report.studentName} - ${report.tutorName}`,
-                subject: 'Tutor Progress Report',
-                author: report.tutorName,
-                keywords: 'tutor, report, progress, student',
-                creator: 'Tutor Management System'
-            });
-
-            // Add content to PDF
-            const pageWidth = doc.internal.pageSize.getWidth();
-            const margin = 20;
-            let yPos = margin;
-            
-            // Title
-            doc.setFontSize(20);
-            doc.setFont('helvetica', 'bold');
-            doc.text('TUTOR PROGRESS REPORT', pageWidth / 2, yPos, { align: 'center' });
-            yPos += 15;
-            
-            // Horizontal line
-            doc.setDrawColor(0);
-            doc.setLineWidth(0.5);
-            doc.line(margin, yPos, pageWidth - margin, yPos);
-            yPos += 10;
-            
-            // Report details table
-            const details = [
-                ['Tutor:', report.tutorName || 'N/A'],
-                ['Tutor Email:', report.tutorEmail || 'N/A'],
-                ['Student:', report.studentName || 'N/A'],
-                ['Parent:', report.parentName || 'N/A'],
-                ['Grade:', report.grade || 'N/A'],
-                ['Submission Date:', report.submittedAt ? 
-                    new Date(report.submittedAt.seconds * 1000).toLocaleDateString() : 'N/A']
-            ];
-            
-            doc.setFontSize(12);
-            doc.setFont('helvetica', 'normal');
-            
-            details.forEach(([label, value]) => {
-                if (yPos > 250) {
-                    doc.addPage();
-                    yPos = margin;
-                }
-                doc.setFont('helvetica', 'bold');
-                doc.text(label, margin, yPos);
-                doc.setFont('helvetica', 'normal');
-                doc.text(value, margin + 40, yPos);
-                yPos += 8;
-            });
-            
-            yPos += 5;
-            
-            // Topics Covered
-            if (yPos > 230) {
-                doc.addPage();
-                yPos = margin;
-            }
-            doc.setFont('helvetica', 'bold');
-            doc.setFontSize(14);
-            doc.text('TOPICS COVERED:', margin, yPos);
-            yPos += 8;
-            doc.setFont('helvetica', 'normal');
-            doc.setFontSize(11);
-            const topicsLines = doc.splitTextToSize(report.topics || 'No topics provided', pageWidth - 2 * margin);
-            topicsLines.forEach(line => {
-                if (yPos > 250) {
-                    doc.addPage();
-                    yPos = margin;
-                }
-                doc.text(line, margin, yPos);
-                yPos += 7;
-            });
-            
-            yPos += 5;
-            
-            // Progress
-            if (yPos > 230) {
-                doc.addPage();
-                yPos = margin;
-            }
-            doc.setFont('helvetica', 'bold');
-            doc.setFontSize(14);
-            doc.text('PROGRESS:', margin, yPos);
-            yPos += 8;
-            doc.setFont('helvetica', 'normal');
-            doc.setFontSize(11);
-            const progressLines = doc.splitTextToSize(report.progress || 'No progress reported', pageWidth - 2 * margin);
-            progressLines.forEach(line => {
-                if (yPos > 250) {
-                    doc.addPage();
-                    yPos = margin;
-                }
-                doc.text(line, margin, yPos);
-                yPos += 7;
-            });
-            
-            yPos += 5;
-            
-            // Strengths & Weaknesses
-            if (report.strengthsWeaknesses) {
-                if (yPos > 230) {
-                    doc.addPage();
-                    yPos = margin;
-                }
-                doc.setFont('helvetica', 'bold');
-                doc.setFontSize(14);
-                doc.text('STRENGTHS & WEAKNESSES:', margin, yPos);
-                yPos += 8;
-                doc.setFont('helvetica', 'normal');
-                doc.setFontSize(11);
-                const strengthsLines = doc.splitTextToSize(report.strengthsWeaknesses, pageWidth - 2 * margin);
-                strengthsLines.forEach(line => {
-                    if (yPos > 250) {
-                        doc.addPage();
-                        yPos = margin;
-                    }
-                    doc.text(line, margin, yPos);
-                    yPos += 7;
-                });
-                yPos += 5;
-            }
-            
-            // Recommendations
-            if (report.recommendations) {
-                if (yPos > 230) {
-                    doc.addPage();
-                    yPos = margin;
-                }
-                doc.setFont('helvetica', 'bold');
-                doc.setFontSize(14);
-                doc.text('RECOMMENDATIONS:', margin, yPos);
-                yPos += 8;
-                doc.setFont('helvetica', 'normal');
-                doc.setFontSize(11);
-                const recommendationsLines = doc.splitTextToSize(report.recommendations, pageWidth - 2 * margin);
-                recommendationsLines.forEach(line => {
-                    if (yPos > 250) {
-                        doc.addPage();
-                        yPos = margin;
-                    }
-                    doc.text(line, margin, yPos);
-                    yPos += 7;
-                });
-            }
-            
-            // Footer
-            const totalPages = doc.getNumberOfPages();
-            for (let i = 1; i <= totalPages; i++) {
-                doc.setPage(i);
-                doc.setFontSize(8);
-                doc.setTextColor(128);
-                doc.text(`Page ${i} of ${totalPages}`, pageWidth - margin, 290, { align: 'right' });
-                doc.text('Generated by Tutor Management System', margin, 290);
-            }
-
-            updatePdfProgress('Finalizing PDF...', 90);
-            
-            // Generate and download
-            const fileName = `Tutor_Report_${report.tutorName.replace(/\s+/g, '_')}_${report.studentName.replace(/\s+/g, '_')}_${Date.now()}.pdf`;
-            doc.save(fileName);
-            
-            updatePdfProgress('Download complete!', 100);
-            
-            // Hide modal after a brief delay
-            setTimeout(() => {
-                hidePdfProgressModal();
-            }, 1000);
-            
-        } catch (error) {
-            console.error('Error generating PDF:', error);
-            showPdfError(`Failed to generate PDF: ${error.message}`);
-        }
-    };
-
-    window.zipAndDownloadTutorReports = async function(reports, tutorName, buttonElement) {
-        try {
-            if (!reports || reports.length === 0) {
-                throw new Error('No reports to download');
-            }
-
-            showPdfProgressModal(`Preparing ${reports.length} reports for download...`, 0);
-            
-            // Disable button during processing
-            if (buttonElement) {
-                buttonElement.disabled = true;
-                buttonElement.innerHTML = '⏳ Processing...';
-            }
-            
-            const zip = new JSZip();
-            let processedCount = 0;
-            
-            for (const report of reports) {
-                try {
-                    updatePdfProgress(`Generating report: ${report.studentName}`, 
-                        Math.round((processedCount / reports.length) * 90));
-                    
-                    const { jsPDF } = window.jspdf;
-                    const doc = new jsPDF();
-                    
-                    // Set document properties
-                    doc.setProperties({
-                        title: `Tutor Report - ${report.studentName} - ${report.tutorName}`,
-                        subject: 'Tutor Progress Report',
-                        author: report.tutorName,
-                        keywords: 'tutor, report, progress, student',
-                        creator: 'Tutor Management System'
-                    });
-
-                    const pageWidth = doc.internal.pageSize.getWidth();
-                    const margin = 20;
-                    let yPos = margin;
-                    
-                    // Title
-                    doc.setFontSize(20);
-                    doc.setFont('helvetica', 'bold');
-                    doc.text('TUTOR PROGRESS REPORT', pageWidth / 2, yPos, { align: 'center' });
-                    yPos += 15;
-                    
-                    // Horizontal line
-                    doc.setDrawColor(0);
-                    doc.setLineWidth(0.5);
-                    doc.line(margin, yPos, pageWidth - margin, yPos);
-                    yPos += 10;
-                    
-                    // Report details
-                    const details = [
-                        ['Tutor:', report.tutorName || 'N/A'],
-                        ['Tutor Email:', report.tutorEmail || 'N/A'],
-                        ['Student:', report.studentName || 'N/A'],
-                        ['Parent:', report.parentName || 'N/A'],
-                        ['Grade:', report.grade || 'N/A'],
-                        ['Submission Date:', report.submittedAt ? 
-                            new Date(report.submittedAt.seconds * 1000).toLocaleDateString() : 'N/A']
-                    ];
-                    
-                    doc.setFontSize(12);
-                    doc.setFont('helvetica', 'normal');
-                    
-                    details.forEach(([label, value]) => {
-                        if (yPos > 250) {
-                            doc.addPage();
-                            yPos = margin;
-                        }
-                        doc.setFont('helvetica', 'bold');
-                        doc.text(label, margin, yPos);
-                        doc.setFont('helvetica', 'normal');
-                        doc.text(value, margin + 40, yPos);
-                        yPos += 8;
-                    });
-                    
-                    yPos += 5;
-                    
-                    // Add all sections
-                    const sections = [
-                        { title: 'TOPICS COVERED:', content: report.topics },
-                        { title: 'PROGRESS:', content: report.progress },
-                        { title: 'STRENGTHS & WEAKNESSES:', content: report.strengthsWeaknesses },
-                        { title: 'RECOMMENDATIONS:', content: report.recommendations }
-                    ];
-                    
-                    for (const section of sections) {
-                        if (!section.content) continue;
-                        
-                        if (yPos > 230) {
-                            doc.addPage();
-                            yPos = margin;
-                        }
-                        doc.setFont('helvetica', 'bold');
-                        doc.setFontSize(14);
-                        doc.text(section.title, margin, yPos);
-                        yPos += 8;
-                        doc.setFont('helvetica', 'normal');
-                        doc.setFontSize(11);
-                        const contentLines = doc.splitTextToSize(section.content, pageWidth - 2 * margin);
-                        contentLines.forEach(line => {
-                            if (yPos > 250) {
-                                doc.addPage();
-                                yPos = margin;
-                            }
-                            doc.text(line, margin, yPos);
-                            yPos += 7;
-                        });
-                        yPos += 5;
-                    }
-                    
-                    // Footer
-                    const totalPages = doc.getNumberOfPages();
-                    for (let i = 1; i <= totalPages; i++) {
-                        doc.setPage(i);
-                        doc.setFontSize(8);
-                        doc.setTextColor(128);
-                        doc.text(`Page ${i} of ${totalPages}`, pageWidth - margin, 290, { align: 'right' });
-                        doc.text('Generated by Tutor Management System', margin, 290);
-                    }
-                    
-                    // Generate PDF blob
-                    const pdfBlob = doc.output('blob');
-                    
-                    // Sanitize filename
-                    const safeStudentName = report.studentName.replace(/[^\w\s]/gi, '_').replace(/\s+/g, '_');
-                    const safeDate = report.submittedAt ? 
-                        new Date(report.submittedAt.seconds * 1000).toISOString().split('T')[0] : 
-                        'unknown_date';
-                    
-                    const fileName = `Report_${safeStudentName}_${safeDate}.pdf`;
-                    zip.file(fileName, pdfBlob);
-                    
-                    processedCount++;
-                    
-                } catch (error) {
-                    console.error(`Error processing report ${report.id}:`, error);
-                    // Continue with other reports
-                }
-            }
-            
-            if (processedCount === 0) {
-                throw new Error('Failed to generate any PDF files');
-            }
-            
-            updatePdfProgress('Creating ZIP archive...', 95);
-            
-            // Generate ZIP file
-            const zipBlob = await zip.generateAsync({ type: 'blob' });
-            
-            // Download ZIP
-            const link = document.createElement('a');
-            const safeTutorName = tutorName.replace(/[^\w\s]/gi, '_').replace(/\s+/g, '_');
-            link.href = URL.createObjectURL(zipBlob);
-            link.download = `Tutor_Reports_${safeTutorName}_${Date.now()}.zip`;
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-            URL.revokeObjectURL(link.href);
-            
-            updatePdfProgress('Download complete!', 100);
-            
-            // Re-enable button
-            if (buttonElement) {
-                setTimeout(() => {
-                    buttonElement.disabled = false;
-                    buttonElement.innerHTML = `
-                        <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10"></path>
-                        </svg>
-                        📦 ZIP & DOWNLOAD ALL REPORTS FOR ${tutorName.toUpperCase()}
-                    `;
-                }, 1000);
-            }
-            
-            // Hide modal after delay
-            setTimeout(() => {
-                hidePdfProgressModal();
-            }, 1500);
-            
-        } catch (error) {
-            console.error('Error creating ZIP file:', error);
-            showPdfError(`Failed to create ZIP file: ${error.message}`);
-            
-            // Re-enable button on error
-            if (buttonElement) {
-                buttonElement.disabled = false;
-                buttonElement.innerHTML = `
-                    <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10"></path>
-                    </svg>
-                    📦 ZIP & DOWNLOAD ALL REPORTS FOR ${tutorName.toUpperCase()}
-                `;
-            }
-        }
-    };
-
-    window.previewReport = function(reportId) {
-        const report = allReports.find(r => r.id === reportId);
-        if (!report) {
-            alert('Report not found');
-            return;
-        }
-        
-        // Create preview modal
-        const modal = document.createElement('div');
-        modal.className = 'fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-center justify-center';
-        modal.innerHTML = `
-            <div class="relative p-8 bg-white w-11/12 max-w-4xl max-h-[90vh] rounded-lg shadow-xl overflow-y-auto">
-                <div class="flex justify-between items-center mb-6">
-                    <h3 class="text-2xl font-bold text-green-700">Report Preview</h3>
-                    <button onclick="this.closest('.fixed').remove()" class="text-gray-500 hover:text-gray-700 text-2xl">&times;</button>
-                </div>
-                
-                <div class="space-y-6">
-                    <div class="grid grid-cols-2 gap-4">
-                        <div>
-                            <h4 class="font-bold text-gray-700">Tutor:</h4>
-                            <p>${report.tutorName || 'N/A'}</p>
-                        </div>
-                        <div>
-                            <h4 class="font-bold text-gray-700">Student:</h4>
-                            <p>${report.studentName || 'N/A'}</p>
-                        </div>
-                        <div>
-                            <h4 class="font-bold text-gray-700">Grade:</h4>
-                            <p>${report.grade || 'N/A'}</p>
-                        </div>
-                        <div>
-                            <h4 class="font-bold text-gray-700">Date:</h4>
-                            <p>${report.submittedAt ? new Date(report.submittedAt.seconds * 1000).toLocaleDateString() : 'N/A'}</p>
-                        </div>
-                    </div>
-                    
-                    ${report.topics ? `
-                        <div>
-                            <h4 class="font-bold text-gray-700 mb-2">Topics Covered:</h4>
-                            <div class="bg-gray-50 p-4 rounded-lg">${formatReportText(report.topics)}</div>
-                        </div>
-                    ` : ''}
-                    
-                    ${report.progress ? `
-                        <div>
-                            <h4 class="font-bold text-gray-700 mb-2">Progress:</h4>
-                            <div class="bg-gray-50 p-4 rounded-lg">${formatReportText(report.progress)}</div>
-                        </div>
-                    ` : ''}
-                    
-                    ${report.strengthsWeaknesses ? `
-                        <div>
-                            <h4 class="font-bold text-gray-700 mb-2">Strengths & Weaknesses:</h4>
-                            <div class="bg-gray-50 p-4 rounded-lg">${formatReportText(report.strengthsWeaknesses)}</div>
-                        </div>
-                    ` : ''}
-                    
-                    ${report.recommendations ? `
-                        <div>
-                            <h4 class="font-bold text-gray-700 mb-2">Recommendations:</h4>
-                            <div class="bg-gray-50 p-4 rounded-lg">${formatReportText(report.recommendations)}</div>
-                        </div>
-                    ` : ''}
-                </div>
-                
-                <div class="mt-8 flex justify-end space-x-4">
-                    <button onclick="this.closest('.fixed').remove()" class="bg-gray-300 text-gray-700 px-4 py-2 rounded hover:bg-gray-400">
-                        Close
-                    </button>
-                    ${canDownload ? `
-                        <button onclick="downloadSingleReport('${reportId}')" class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700">
-                            Download PDF
-                        </button>
-                    ` : ''}
-                </div>
-            </div>
-        `;
-        
-        document.body.appendChild(modal);
-        
-        function formatReportText(text) {
-            return text.replace(/\n/g, '<br>');
-        }
-    };
-
-    // Helper functions for PDF progress modal
-    function showPdfProgressModal(message, progress) {
-        const modal = document.getElementById('pdf-progress-modal');
-        const messageEl = document.getElementById('pdf-progress-message');
-        const progressBar = document.getElementById('pdf-progress-bar');
-        const progressText = document.getElementById('pdf-progress-text');
-        const errorEl = document.getElementById('pdf-error-message');
-        
-        modal.classList.remove('hidden');
-        messageEl.textContent = message;
-        progressBar.style.width = `${progress}%`;
-        progressText.textContent = `${progress}%`;
-        errorEl.classList.add('hidden');
-    }
-
-    function updatePdfProgress(message, progress) {
-        const messageEl = document.getElementById('pdf-progress-message');
-        const progressBar = document.getElementById('pdf-progress-bar');
-        const progressText = document.getElementById('pdf-progress-text');
-        
-        if (messageEl) messageEl.textContent = message;
-        if (progressBar) progressBar.style.width = `${progress}%`;
-        if (progressText) progressText.textContent = `${progress}%`;
-    }
-
-    function hidePdfProgressModal() {
-        const modal = document.getElementById('pdf-progress-modal');
-        modal.classList.add('hidden');
-    }
-
-    function showPdfError(message) {
-        const errorEl = document.getElementById('pdf-error-message');
-        errorEl.textContent = message;
-        errorEl.classList.remove('hidden');
-        
-        // Auto-hide error after 5 seconds
-        setTimeout(() => {
-            errorEl.classList.add('hidden');
-            hidePdfProgressModal();
-        }, 5000);
-    }
-
-    function generateReportPdfContent(report) {
-        // This function creates the HTML content for PDF generation
-        // It's kept as a fallback if jsPDF has issues
-        return `
-            <!DOCTYPE html>
-            <html>
-            <head>
-                <meta charset="UTF-8">
-                <title>Tutor Report - ${report.studentName}</title>
-                <style>
-                    body { font-family: Arial, sans-serif; line-height: 1.6; margin: 40px; }
-                    .header { text-align: center; border-bottom: 2px solid #333; padding-bottom: 20px; margin-bottom: 30px; }
-                    h1 { color: #2d3748; margin-bottom: 10px; }
-                    .info-table { width: 100%; border-collapse: collapse; margin-bottom: 30px; }
-                    .info-table td { padding: 8px; border-bottom: 1px solid #ddd; }
-                    .info-table tr:last-child td { border-bottom: none; }
-                    .section { margin-bottom: 25px; }
-                    .section-title { color: #2d3748; border-bottom: 1px solid #ccc; padding-bottom: 5px; margin-bottom: 10px; font-weight: bold; }
-                    .content { padding: 10px; background: #f9f9f9; border-radius: 4px; white-space: pre-line; }
-                    .footer { margin-top: 50px; padding-top: 20px; border-top: 1px solid #ccc; font-size: 12px; color: #666; }
-                    @media print {
-                        body { margin: 20px; }
-                        .no-print { display: none; }
-                    }
-                </style>
-            </head>
-            <body>
-                <div class="header">
-                    <h1>TUTOR PROGRESS REPORT</h1>
-                    <p>Generated on ${new Date().toLocaleDateString()}</p>
-                </div>
-                
-                <table class="info-table">
-                    <tr><td><strong>Tutor:</strong></td><td>${report.tutorName || 'N/A'}</td></tr>
-                    <tr><td><strong>Tutor Email:</strong></td><td>${report.tutorEmail || 'N/A'}</td></tr>
-                    <tr><td><strong>Student:</strong></td><td>${report.studentName || 'N/A'}</td></tr>
-                    <tr><td><strong>Parent:</strong></td><td>${report.parentName || 'N/A'}</td></tr>
-                    <tr><td><strong>Grade:</strong></td><td>${report.grade || 'N/A'}</td></tr>
-                    <tr><td><strong>Submission Date:</strong></td><td>${report.submittedAt ? new Date(report.submittedAt.seconds * 1000).toLocaleDateString() : 'N/A'}</td></tr>
-                </table>
-                
-                ${report.topics ? `
-                    <div class="section">
-                        <div class="section-title">TOPICS COVERED</div>
-                        <div class="content">${report.topics}</div>
-                    </div>
-                ` : ''}
-                
-                ${report.progress ? `
-                    <div class="section">
-                        <div class="section-title">PROGRESS</div>
-                        <div class="content">${report.progress}</div>
-                    </div>
-                ` : ''}
-                
-                ${report.strengthsWeaknesses ? `
-                    <div class="section">
-                        <div class="section-title">STRENGTHS & WEAKNESSES</div>
-                        <div class="content">${report.strengthsWeaknesses}</div>
-                    </div>
-                ` : ''}
-                
-                ${report.recommendations ? `
-                    <div class="section">
-                        <div class="section-title">RECOMMENDATIONS</div>
-                        <div class="content">${report.recommendations}</div>
-                    </div>
-                ` : ''}
-                
-                <div class="footer">
-                    <p>Generated by Tutor Management System</p>
-                    <p>Document ID: ${report.id}</p>
-                </div>
-            </body>
-            </html>
-        `;
     }
 }
 
@@ -6553,6 +6475,7 @@ onAuthStateChanged(auth, async (user) => {
         window.location.href = "management-auth.html";
     }
 });
+
 
 
 
