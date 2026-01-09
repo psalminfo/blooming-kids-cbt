@@ -1764,8 +1764,7 @@
             
             // Days and Time Options
             DAYS: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'],
-            HOURS: Array.from({length: 24}, (_, i) => i),
-            MINUTES: ['00', '15', '30', '45']
+            HOURS: Array.from({length: 24}, (_, i) => i)
         };
 
         // ==============================================
@@ -2080,7 +2079,7 @@
                 }
                 
                 if (data.academicTime) {
-                    const [startHour, startMinute, endHour, endMinute] = data.academicTime.split(':');
+                    const [startHour, endHour] = data.academicTime.split(':');
                     studentDiv.querySelector('#academic-start-hour').value = startHour;
                     studentDiv.querySelector('#academic-end-hour').value = endHour;
                 }
@@ -2109,11 +2108,9 @@
                             }
                             // Set time
                             if (activity.time) {
-                                const [startHour, startMinute, endHour, endMinute] = activity.time.split(':');
+                                const [startHour, endHour] = activity.time.split(':');
                                 card.querySelector('#extracurricular-start-hour').value = startHour;
-                                card.querySelector('#extracurricular-start-minute').value = startMinute;
                                 card.querySelector('#extracurricular-end-hour').value = endHour;
-                                card.querySelector('#extracurricular-end-minute').value = endMinute;
                             }
                         }
                     });
@@ -2138,11 +2135,9 @@
                             }
                             // Set time
                             if (test.time) {
-                                const [startHour, startMinute, endHour, endMinute] = test.time.split(':');
+                                const [startHour, endHour] = test.time.split(':');
                                 card.querySelector('#test-prep-start-hour').value = startHour;
-                                card.querySelector('#test-prep-start-minute').value = startMinute;
                                 card.querySelector('#test-prep-end-hour').value = endHour;
-                                card.querySelector('#test-prep-end-minute').value = endMinute;
                             }
                         }
                     });
@@ -2150,14 +2145,12 @@
             }
 
             generateCourseSelectionHTML(id) {
-                // Generate hour options for select dropdowns
+                // Generate hour options for select dropdowns (hour only, no minutes)
                 const hourOptions = CONFIG.HOURS.map(hour => {
                     const hour12 = hour % 12 || 12;
                     const ampm = hour < 12 ? 'AM' : 'PM';
                     return `<option value="${hour.toString().padStart(2, '0')}">${hour12} ${ampm}</option>`;
                 }).join('');
-                
-                const minuteOptions = CONFIG.MINUTES.map(minute => `<option value="${minute}">${minute}</option>`).join('');
 
                 // 1. Academic HTML with Sessions, Days & Time
                 const academicDaysHTML = CONFIG.DAYS.map(day => `
@@ -2208,20 +2201,12 @@
                                             <option value="">Hour</option>
                                             ${hourOptions}
                                         </select>
-                                        <select id="academic-start-minute-${id}" class="time-minute" data-time-section="academic" data-student-id="${id}">
-                                            <option value="">Min</option>
-                                            ${minuteOptions}
-                                        </select>
                                     </div>
                                     <div class="time-input-group">
                                         <label>To:</label>
                                         <select id="academic-end-hour-${id}" class="time-hour" data-time-section="academic" data-student-id="${id}">
                                             <option value="">Hour</option>
                                             ${hourOptions}
-                                        </select>
-                                        <select id="academic-end-minute-${id}" class="time-minute" data-time-section="academic" data-student-id="${id}">
-                                            <option value="">Min</option>
-                                            ${minuteOptions}
                                         </select>
                                     </div>
                                 </div>
@@ -2270,7 +2255,7 @@
                             </div>
                             <div class="error-message extracurricular-days-error-${id}-${activity.id}" style="display: none;"></div>
                             
-                            <h5><i class="far fa-clock"></i> Your Your Country Preferred Time (12AM - 11PM) <span class="required">*</span></h5>
+                            <h5><i class="far fa-clock"></i> Your Country Preferred Time (12AM - 11PM) <span class="required">*</span></h5>
                             <div class="time-selection">
                                 <div class="time-input-group">
                                     <label>From:</label>
@@ -2278,20 +2263,12 @@
                                         <option value="">Hour</option>
                                         ${hourOptions}
                                     </select>
-                                    <select id="extracurricular-start-minute-${id}-${activity.id}" class="time-minute" data-time-section="extracurricular" data-activity-id="${activity.id}" data-student-id="${id}">
-                                        <option value="">Min</option>
-                                        ${minuteOptions}
-                                    </select>
                                 </div>
                                 <div class="time-input-group">
                                     <label>To:</label>
                                     <select id="extracurricular-end-hour-${id}-${activity.id}" class="time-hour" data-time-section="extracurricular" data-activity-id="${activity.id}" data-student-id="${id}">
                                         <option value="">Hour</option>
                                         ${hourOptions}
-                                    </select>
-                                    <select id="extracurricular-end-minute-${id}-${activity.id}" class="time-minute" data-time-section="extracurricular" data-activity-id="${activity.id}" data-student-id="${id}">
-                                        <option value="">Min</option>
-                                        ${minuteOptions}
                                     </select>
                                 </div>
                             </div>
@@ -2342,20 +2319,12 @@
                                         <option value="">Hour</option>
                                         ${hourOptions}
                                     </select>
-                                    <select id="test-prep-start-minute-${id}-${test.id}" class="time-minute" data-time-section="test-prep" data-test-id="${test.id}" data-student-id="${id}">
-                                        <option value="">Min</option>
-                                        ${minuteOptions}
-                                    </select>
                                 </div>
                                 <div class="time-input-group">
                                     <label>To:</label>
                                     <select id="test-prep-end-hour-${id}-${test.id}" class="time-hour" data-time-section="test-prep" data-test-id="${test.id}" data-student-id="${id}">
                                         <option value="">Hour</option>
                                         ${hourOptions}
-                                    </select>
-                                    <select id="test-prep-end-minute-${id}-${test.id}" class="time-minute" data-time-section="test-prep" data-test-id="${test.id}" data-student-id="${id}">
-                                        <option value="">Min</option>
-                                        ${minuteOptions}
                                     </select>
                                 </div>
                             </div>
@@ -2429,7 +2398,7 @@
                 });
 
                 // Academic Time selection changes
-                studentDiv.querySelectorAll(`#academic-start-hour-${id}, #academic-start-minute-${id}, #academic-end-hour-${id}, #academic-end-minute-${id}`).forEach(select => {
+                studentDiv.querySelectorAll(`#academic-start-hour-${id}, #academic-end-hour-${id}`).forEach(select => {
                     select.addEventListener('change', () => {
                         this.updateSummary();
                         this.validateTimeSelection('academic', id, null);
@@ -2441,8 +2410,7 @@
                     card.addEventListener('click', (e) => {
                         if (!e.target.classList.contains('frequency-btn') && 
                             !e.target.classList.contains('day-btn') && 
-                            !e.target.classList.contains('time-hour') &&
-                            !e.target.classList.contains('time-minute')) {
+                            !e.target.classList.contains('time-hour')) {
                             card.classList.toggle('selected');
                             // Default to once weekly if selected
                             if(card.classList.contains('selected') && !card.querySelector('.frequency-btn.selected')) {
@@ -2517,7 +2485,7 @@
 
                     // Extracurricular Time Selection
                     const activityId = card.dataset.activityId;
-                    card.querySelectorAll(`#extracurricular-start-hour-${id}-${activityId}, #extracurricular-start-minute-${id}-${activityId}, #extracurricular-end-hour-${id}-${activityId}, #extracurricular-end-minute-${id}-${activityId}`).forEach(select => {
+                    card.querySelectorAll(`#extracurricular-start-hour-${id}-${activityId}, #extracurricular-end-hour-${id}-${activityId}`).forEach(select => {
                         select.addEventListener('change', (e) => {
                             e.stopPropagation();
                             if(!card.classList.contains('selected')) card.classList.add('selected');
@@ -2566,7 +2534,7 @@
                 // Test Prep Time Selection
                 studentDiv.querySelectorAll('.test-prep-card').forEach(card => {
                     const testId = card.dataset.testId;
-                    card.querySelectorAll(`#test-prep-start-hour-${id}-${testId}, #test-prep-start-minute-${id}-${testId}, #test-prep-end-hour-${id}-${testId}, #test-prep-end-minute-${id}-${testId}`).forEach(select => {
+                    card.querySelectorAll(`#test-prep-start-hour-${id}-${testId}, #test-prep-end-hour-${id}-${testId}`).forEach(select => {
                         select.addEventListener('change', () => {
                             const card = select.closest('.test-prep-card');
                             if(!card.classList.contains('active')) {
@@ -3028,19 +2996,17 @@
                 
                 if (section === 'academic') {
                     const startHour = document.getElementById(`academic-start-hour-${studentId}`).value;
-                    const startMinute = document.getElementById(`academic-start-minute-${studentId}`).value;
                     const endHour = document.getElementById(`academic-end-hour-${studentId}`).value;
-                    const endMinute = document.getElementById(`academic-end-minute-${studentId}`).value;
                     
                     const errorElement = document.getElementById(`academic-time-error-${studentId}`);
                     
-                    if (!startHour || !startMinute || !endHour || !endMinute) {
+                    if (!startHour || !endHour) {
                         isValid = false;
                         if (errorElement) errorElement.classList.add('show');
                     } else {
                         // Check if end time is after start time
-                        const startTime = parseInt(startHour) * 60 + parseInt(startMinute);
-                        const endTime = parseInt(endHour) * 60 + parseInt(endMinute);
+                        const startTime = parseInt(startHour);
+                        const endTime = parseInt(endHour);
                         
                         if (endTime <= startTime) {
                             isValid = false;
@@ -3055,15 +3021,13 @@
                 } 
                 else if (section === 'extracurricular' && itemId) {
                     const startHour = document.getElementById(`extracurricular-start-hour-${studentId}-${itemId}`).value;
-                    const startMinute = document.getElementById(`extracurricular-start-minute-${studentId}-${itemId}`).value;
                     const endHour = document.getElementById(`extracurricular-end-hour-${studentId}-${itemId}`).value;
-                    const endMinute = document.getElementById(`extracurricular-end-minute-${studentId}-${itemId}`).value;
                     
                     const errorElement = document.getElementById(`extracurricular-time-error-${studentId}-${itemId}`);
                     const card = document.querySelector(`.extracurricular-card[data-activity-id="${itemId}"][data-student-id="${studentId}"]`);
                     
                     if (card && card.classList.contains('selected')) {
-                        if (!startHour || !startMinute || !endHour || !endMinute) {
+                        if (!startHour || !endHour) {
                             isValid = false;
                             if (errorElement) {
                                 errorElement.textContent = 'Please select a valid time range';
@@ -3071,8 +3035,8 @@
                             }
                         } else {
                             // Check if end time is after start time
-                            const startTime = parseInt(startHour) * 60 + parseInt(startMinute);
-                            const endTime = parseInt(endHour) * 60 + parseInt(endMinute);
+                            const startTime = parseInt(startHour);
+                            const endTime = parseInt(endHour);
                             
                             if (endTime <= startTime) {
                                 isValid = false;
@@ -3090,15 +3054,13 @@
                 }
                 else if (section === 'test-prep' && itemId) {
                     const startHour = document.getElementById(`test-prep-start-hour-${studentId}-${itemId}`).value;
-                    const startMinute = document.getElementById(`test-prep-start-minute-${studentId}-${itemId}`).value;
                     const endHour = document.getElementById(`test-prep-end-hour-${studentId}-${itemId}`).value;
-                    const endMinute = document.getElementById(`test-prep-end-minute-${studentId}-${itemId}`).value;
                     
                     const errorElement = document.getElementById(`test-prep-time-error-${studentId}-${itemId}`);
                     const card = document.querySelector(`.test-prep-card[data-test-id="${itemId}"][data-student-id="${studentId}"]`);
                     
                     if (card && card.classList.contains('active')) {
-                        if (!startHour || !startMinute || !endHour || !endMinute) {
+                        if (!startHour || !endHour) {
                             isValid = false;
                             if (errorElement) {
                                 errorElement.textContent = 'Please select a valid time range';
@@ -3106,8 +3068,8 @@
                             }
                         } else {
                             // Check if end time is after start time
-                            const startTime = parseInt(startHour) * 60 + parseInt(startMinute);
-                            const endTime = parseInt(endHour) * 60 + parseInt(endMinute);
+                            const startTime = parseInt(startHour);
+                            const endTime = parseInt(endHour);
                             
                             if (endTime <= startTime) {
                                 isValid = false;
@@ -3459,14 +3421,12 @@
                     
                     // Collect academic time
                     const startHour = document.getElementById(`academic-start-hour-${index + 1}`)?.value || '';
-                    const startMinute = document.getElementById(`academic-start-minute-${index + 1}`)?.value || '';
                     const endHour = document.getElementById(`academic-end-hour-${index + 1}`)?.value || '';
-                    const endMinute = document.getElementById(`academic-end-minute-${index + 1}`)?.value || '';
                     
-                    if (startHour && startMinute && endHour && endMinute) {
-                        const startTime = `${parseInt(startHour) % 12 || 12}:${startMinute} ${startHour < 12 ? 'AM' : 'PM'}`;
-                        const endTime = `${parseInt(endHour) % 12 || 12}:${endMinute} ${endHour < 12 ? 'AM' : 'PM'}`;
-                        studentData.academicTime = `${startHour}:${startMinute}:${endHour}:${endMinute}`;
+                    if (startHour && endHour) {
+                        const startTime = `${parseInt(startHour) % 12 || 12} ${startHour < 12 ? 'AM' : 'PM'}`;
+                        const endTime = `${parseInt(endHour) % 12 || 12} ${endHour < 12 ? 'AM' : 'PM'}`;
+                        studentData.academicTime = `${startHour}:${endHour}`;
                         studentData.academicSchedule = `${academicDays.join(', ')} from ${startTime} to ${endTime}`;
                     }
                     
@@ -3488,14 +3448,12 @@
                         
                         // Collect extracurricular time
                         const startHour = document.getElementById(`extracurricular-start-hour-${index + 1}-${activityData.id}`)?.value || '';
-                        const startMinute = document.getElementById(`extracurricular-start-minute-${index + 1}-${activityData.id}`)?.value || '';
                         const endHour = document.getElementById(`extracurricular-end-hour-${index + 1}-${activityData.id}`)?.value || '';
-                        const endMinute = document.getElementById(`extracurricular-end-minute-${index + 1}-${activityData.id}`)?.value || '';
                         
-                        if (startHour && startMinute && endHour && endMinute) {
-                            const startTime = `${parseInt(startHour) % 12 || 12}:${startMinute} ${startHour < 12 ? 'AM' : 'PM'}`;
-                            const endTime = `${parseInt(endHour) % 12 || 12}:${endMinute} ${endHour < 12 ? 'AM' : 'PM'}`;
-                            activityData.time = `${startHour}:${startMinute}:${endHour}:${endMinute}`;
+                        if (startHour && endHour) {
+                            const startTime = `${parseInt(startHour) % 12 || 12} ${startHour < 12 ? 'AM' : 'PM'}`;
+                            const endTime = `${parseInt(endHour) % 12 || 12} ${endHour < 12 ? 'AM' : 'PM'}`;
+                            activityData.time = `${startHour}:${endHour}`;
                             activityData.schedule = `${activityData.days.join(', ')} from ${startTime} to ${endTime}`;
                         }
                         
@@ -3521,14 +3479,12 @@
                             
                             // Collect test prep time
                             const startHour = document.getElementById(`test-prep-start-hour-${index + 1}-${testData.id}`)?.value || '';
-                            const startMinute = document.getElementById(`test-prep-start-minute-${index + 1}-${testData.id}`)?.value || '';
                             const endHour = document.getElementById(`test-prep-end-hour-${index + 1}-${testData.id}`)?.value || '';
-                            const endMinute = document.getElementById(`test-prep-end-minute-${index + 1}-${testData.id}`)?.value || '';
                             
-                            if (startHour && startMinute && endHour && endMinute) {
-                                const startTime = `${parseInt(startHour) % 12 || 12}:${startMinute} ${startHour < 12 ? 'AM' : 'PM'}`;
-                                const endTime = `${parseInt(endHour) % 12 || 12}:${endMinute} ${endHour < 12 ? 'AM' : 'PM'}`;
-                                testData.time = `${startHour}:${startMinute}:${endHour}:${endMinute}`;
+                            if (startHour && endHour) {
+                                const startTime = `${parseInt(startHour) % 12 || 12} ${startHour < 12 ? 'AM' : 'PM'}`;
+                                const endTime = `${parseInt(endHour) % 12 || 12} ${endHour < 12 ? 'AM' : 'PM'}`;
+                                testData.time = `${startHour}:${endHour}`;
                                 testData.schedule = `${testData.days.join(', ')} from ${startTime} to ${endTime}`;
                             }
                             
@@ -3761,12 +3717,10 @@
                     if (selectedSubjects.length > 0 && grade && sessions) {
                         const academicDays = Array.from(entry.querySelectorAll('.academic-day-btn.selected')).map(btn => btn.dataset.day);
                         const startHour = document.getElementById(`academic-start-hour-${index + 1}`)?.value || '';
-                        const startMinute = document.getElementById(`academic-start-minute-${index + 1}`)?.value || '';
                         const endHour = document.getElementById(`academic-end-hour-${index + 1}`)?.value || '';
-                        const endMinute = document.getElementById(`academic-end-minute-${index + 1}`)?.value || '';
                         
-                        const startTime = startHour && startMinute ? `${parseInt(startHour) % 12 || 12}:${startMinute} ${startHour < 12 ? 'AM' : 'PM'}` : '';
-                        const endTime = endHour && endMinute ? `${parseInt(endHour) % 12 || 12}:${endMinute} ${endHour < 12 ? 'AM' : 'PM'}` : '';
+                        const startTime = startHour ? `${parseInt(startHour) % 12 || 12} ${startHour < 12 ? 'AM' : 'PM'}` : '';
+                        const endTime = endHour ? `${parseInt(endHour) % 12 || 12} ${endHour < 12 ? 'AM' : 'PM'}` : '';
                         
                         // Get tutor preference
                         const selectedTutor = entry.querySelector('.tutor-option.selected');
@@ -3795,12 +3749,10 @@
                         const selectedDays = Array.from(card.querySelectorAll('.extracurricular-day-btn.selected')).map(btn => btn.dataset.day);
                         const activityId = card.dataset.activityId;
                         const startHour = document.getElementById(`extracurricular-start-hour-${index + 1}-${activityId}`)?.value || '';
-                        const startMinute = document.getElementById(`extracurricular-start-minute-${index + 1}-${activityId}`)?.value || '';
                         const endHour = document.getElementById(`extracurricular-end-hour-${index + 1}-${activityId}`)?.value || '';
-                        const endMinute = document.getElementById(`extracurricular-end-minute-${index + 1}-${activityId}`)?.value || '';
                         
-                        const startTime = startHour && startMinute ? `${parseInt(startHour) % 12 || 12}:${startMinute} ${startHour < 12 ? 'AM' : 'PM'}` : '';
-                        const endTime = endHour && endMinute ? `${parseInt(endHour) % 12 || 12}:${endMinute} ${endHour < 12 ? 'AM' : 'PM'}` : '';
+                        const startTime = startHour ? `${parseInt(startHour) % 12 || 12} ${startHour < 12 ? 'AM' : 'PM'}` : '';
+                        const endTime = endHour ? `${parseInt(endHour) % 12 || 12} ${endHour < 12 ? 'AM' : 'PM'}` : '';
                         
                         const activity = CONFIG.EXTRACURRICULAR_FEES.find(a => a.id === activityId);
                         const description = `${studentName}: ${activityName} (${selectedDays.join(', ')}, ${startTime}-${endTime})`;
@@ -3836,12 +3788,10 @@
                         const selectedDays = Array.from(card.querySelectorAll('.test-prep-day-btn.selected')).map(btn => btn.dataset.day);
                         const testId = card.dataset.testId;
                         const startHour = document.getElementById(`test-prep-start-hour-${index + 1}-${testId}`)?.value || '';
-                        const startMinute = document.getElementById(`test-prep-start-minute-${index + 1}-${testId}`)?.value || '';
                         const endHour = document.getElementById(`test-prep-end-hour-${index + 1}-${testId}`)?.value || '';
-                        const endMinute = document.getElementById(`test-prep-end-minute-${index + 1}-${testId}`)?.value || '';
                         
-                        const startTime = startHour && startMinute ? `${parseInt(startHour) % 12 || 12}:${startMinute} ${startHour < 12 ? 'AM' : 'PM'}` : '';
-                        const endTime = endHour && endMinute ? `${parseInt(endHour) % 12 || 12}:${endMinute} ${endHour < 12 ? 'AM' : 'PM'}` : '';
+                        const startTime = startHour ? `${parseInt(startHour) % 12 || 12} ${startHour < 12 ? 'AM' : 'PM'}` : '';
+                        const endTime = endHour ? `${parseInt(endHour) % 12 || 12} ${endHour < 12 ? 'AM' : 'PM'}` : '';
                         
                         const test = CONFIG.TEST_PREP_FEES.find(t => t.id === testId);
                         
@@ -3905,13 +3855,11 @@
                     const selectedSubjects = Array.from(entry.querySelectorAll('.subject-option.selected')).map(opt => opt.dataset.subject);
                     const academicDays = Array.from(entry.querySelectorAll('.academic-day-btn.selected')).map(btn => btn.dataset.day);
                     const startHour = document.getElementById(`academic-start-hour-${studentId}`)?.value || '';
-                    const startMinute = document.getElementById(`academic-start-minute-${studentId}`)?.value || '';
                     const endHour = document.getElementById(`academic-end-hour-${studentId}`)?.value || '';
-                    const endMinute = document.getElementById(`academic-end-minute-${studentId}`)?.value || '';
                     
                     if (selectedSubjects.length > 0) {
-                        const startTime = startHour && startMinute ? `${parseInt(startHour) % 12 || 12}:${startMinute} ${startHour < 12 ? 'AM' : 'PM'}` : '';
-                        const endTime = endHour && endMinute ? `${parseInt(endHour) % 12 || 12}:${endMinute} ${endHour < 12 ? 'AM' : 'PM'}` : '';
+                        const startTime = startHour ? `${parseInt(startHour) % 12 || 12} ${startHour < 12 ? 'AM' : 'PM'}` : '';
+                        const endTime = endHour ? `${parseInt(endHour) % 12 || 12} ${endHour < 12 ? 'AM' : 'PM'}` : '';
                         
                         detailsHTML += `
                             <div class="student-schedule">
@@ -3931,12 +3879,10 @@
                             const activityName = card.querySelector('.extracurricular-name').textContent;
                             const selectedDays = Array.from(card.querySelectorAll('.extracurricular-day-btn.selected')).map(btn => btn.dataset.day);
                             const startHour = document.getElementById(`extracurricular-start-hour-${studentId}-${activityId}`)?.value || '';
-                            const startMinute = document.getElementById(`extracurricular-start-minute-${studentId}-${activityId}`)?.value || '';
                             const endHour = document.getElementById(`extracurricular-end-hour-${studentId}-${activityId}`)?.value || '';
-                            const endMinute = document.getElementById(`extracurricular-end-minute-${studentId}-${activityId}`)?.value || '';
                             
-                            const startTime = startHour && startMinute ? `${parseInt(startHour) % 12 || 12}:${startMinute} ${startHour < 12 ? 'AM' : 'PM'}` : '';
-                            const endTime = endHour && endMinute ? `${parseInt(endHour) % 12 || 12}:${endMinute} ${endHour < 12 ? 'AM' : 'PM'}` : '';
+                            const startTime = startHour ? `${parseInt(startHour) % 12 || 12} ${startHour < 12 ? 'AM' : 'PM'}` : '';
+                            const endTime = endHour ? `${parseInt(endHour) % 12 || 12} ${endHour < 12 ? 'AM' : 'PM'}` : '';
                             
                             detailsHTML += `${activityName}: ${selectedDays.join(', ')} from ${startTime} to ${endTime}<br>`;
                         });
@@ -3955,12 +3901,10 @@
                             const hours = parseFloat(card.querySelector('.test-prep-hours').value) || 0;
                             const selectedDays = Array.from(card.querySelectorAll('.test-prep-day-btn.selected')).map(btn => btn.dataset.day);
                             const startHour = document.getElementById(`test-prep-start-hour-${studentId}-${testId}`)?.value || '';
-                            const startMinute = document.getElementById(`test-prep-start-minute-${studentId}-${testId}`)?.value || '';
                             const endHour = document.getElementById(`test-prep-end-hour-${studentId}-${testId}`)?.value || '';
-                            const endMinute = document.getElementById(`test-prep-end-minute-${studentId}-${testId}`)?.value || '';
                             
-                            const startTime = startHour && startMinute ? `${parseInt(startHour) % 12 || 12}:${startMinute} ${startHour < 12 ? 'AM' : 'PM'}` : '';
-                            const endTime = endHour && endMinute ? `${parseInt(endHour) % 12 || 12}:${endMinute} ${endHour < 12 ? 'AM' : 'PM'}` : '';
+                            const startTime = startHour ? `${parseInt(startHour) % 12 || 12} ${startHour < 12 ? 'AM' : 'PM'}` : '';
+                            const endTime = endHour ? `${parseInt(endHour) % 12 || 12} ${endHour < 12 ? 'AM' : 'PM'}` : '';
                             
                             detailsHTML += `${testName}: ${selectedDays.join(', ')} from ${startTime} to ${endTime} (${hours}hrs/session)<br>`;
                         });
