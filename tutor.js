@@ -1,6 +1,5 @@
-
 import { auth, db } from './firebaseConfig.js';
-import { collection, getDocs, doc, updateDoc, getDoc, where, query, addDoc, writeBatch, deleteDoc, setDoc } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
+import { collection, getDocs, doc, updateDoc, getDoc, where, query, addDoc, writeBatch, deleteDoc, setDoc, Timestamp } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
 import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-auth.js";
 import { onSnapshot } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
 
@@ -679,7 +678,7 @@ async function loadTutorReports(tutorEmail, parentName = null) {
 
 // [The rest of your existing code remains exactly the same - no changes needed below this line]
 // ##################################################################
-// # SECTION 2: STUDENT DATABASE (MERGED FUNCTIONALITY) - UNCHANGED
+// # SECTION 2: STUDENT DATABASE (MERGED FUNCTIONALITY) - UPDATED TO EXCLUDE ARCHIVED STUDENTS
 // ##################################################################
 
 // Helper function to generate the new student form fields
@@ -926,11 +925,11 @@ async function renderStudentDatabase(container, tutor) {
     let savedReports = await loadReportsFromFirestore(tutor.email);
 
     // Fetch students and all of the tutor's historical submissions
+    // CHANGED: Filter out archived, graduated, and transferred students
     const studentQuery = query(collection(db, "students"), where("tutorEmail", "==", tutor.email));
     const pendingStudentQuery = query(collection(db, "pending_students"), where("tutorEmail", "==", tutor.email));
     
     // --- START: MODIFICATION (NO INDEX REQUIRED) ---
-    // This simple query only filters by one field and does NOT require a custom index.
     const allSubmissionsQuery = query(collection(db, "tutor_submissions"), where("tutorEmail", "==", tutor.email));
 
     const [studentsSnapshot, pendingStudentsSnapshot, allSubmissionsSnapshot] = await Promise.all([
@@ -938,6 +937,17 @@ async function renderStudentDatabase(container, tutor) {
         getDocs(pendingStudentQuery),
         getDocs(allSubmissionsQuery)
     ]);
+
+    // CHANGED: Filter out archived, graduated, and transferred students on client side
+    let approvedStudents = studentsSnapshot.docs
+        .map(doc => ({ id: doc.id, ...doc.data(), isPending: false, collection: "students" }))
+        .filter(student => {
+            // Only show active or approved students, exclude archived/graduated/transferred
+            return !student.status || 
+                   student.status === 'active' || 
+                   student.status === 'approved' || 
+                   !['archived', 'graduated', 'transferred'].includes(student.status);
+        });
 
     // Now, filter the submissions for the current month here in the code
     const now = new Date();
@@ -952,9 +962,7 @@ async function renderStudentDatabase(container, tutor) {
             submittedStudentIds.add(submissionData.studentId);
         }
     });
-    // --- END: MODIFICATION (NO INDEX REQUIRED) ---
 
-    const approvedStudents = studentsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data(), isPending: false, collection: "students" }));
     const pendingStudents = pendingStudentsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data(), isPending: true, collection: "pending_students" }));
 
     let students = [...approvedStudents, ...pendingStudents];
@@ -1698,6 +1706,7 @@ function renderAutoRegisteredStudents(container, tutor) {
 
 async function loadAutoRegisteredStudents(tutorEmail) {
     // Query both collections for auto-registered students
+    // CHANGED: Filter out archived students
     const studentsQuery = query(collection(db, "students"), 
         where("tutorEmail", "==", tutorEmail),
         where("autoRegistered", "==", true));
@@ -1712,8 +1721,16 @@ async function loadAutoRegisteredStudents(tutorEmail) {
             getDocs(pendingQuery)
         ]);
 
-        const autoStudents = [
-            ...studentsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data(), collection: "students" })),
+        // Filter out archived, graduated, and transferred students
+        let autoStudents = [
+            ...studentsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data(), collection: "students" }))
+                .filter(student => {
+                    // Exclude archived, graduated, or transferred students
+                    return !student.status || 
+                           (student.status !== "archived" && 
+                            student.status !== "graduated" && 
+                            student.status !== "transferred");
+                }),
             ...pendingSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data(), collection: "pending_students" }))
         ];
 
@@ -1794,8 +1811,9 @@ function renderAutoStudentsList(students) {
             }
         });
     });
+}
 
-    // ##################################################################
+// ##################################################################
 // # SECTION 6: SUBMISSION ERROR HANDLING WITH IMMEDIATE FEEDBACK
 // ##################################################################
 
@@ -2250,5 +2268,3 @@ validationStyles.textContent = `
     }
 `;
 document.head.appendChild(validationStyles);
-}
-
