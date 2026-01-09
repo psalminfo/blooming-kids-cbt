@@ -3277,7 +3277,7 @@ window.showEnrollmentDetails = async function(enrollmentId) {
                             <p><strong>Start Date:</strong> ${student.startDate || 'N/A'}</p>
                             <p><strong>Gender:</strong> ${student.gender || 'N/A'}</p>
                             <p><strong>Preferred Tutor:</strong> ${student.preferredTutor || 'N/A'}</p>
-                            <p><strong>Actual Grade:</strong> ${actualGrade || 'N/A'}</p>
+                            <p><strong>Actual Grade:</strong> ${student.actualGrade || 'N/A'}</p>
                             <p><strong>Academic Days:</strong> ${academicDays}</p>
                             <p><strong>Academic Time:</strong> ${academicTime}</p>
                         </div>
@@ -5947,6 +5947,7 @@ onAuthStateChanged(auth, async (user) => {
         window.location.href = "management-auth.html";
     }
 });
+
 
 
 
