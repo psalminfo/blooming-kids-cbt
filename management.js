@@ -2481,204 +2481,7 @@ async function resetParentBalance(parentUid, currentEarnings) {
 async function renderTutorReportsPanel(container) {
     const canDownload = window.userData?.permissions?.actions?.canDownloadReports === true;
     const canExport = window.userData?.permissions?.actions?.canExportPayAdvice === true;
-
-    // --- 1. Define Global Helper Functions (Attached to Window for onclick access) ---
-
-    // Helper: Generate a printable HTML template for the PDF
-    const generateReportTemplate = (report) => {
-        const date = report.submittedAt && report.submittedAt.seconds 
-            ? new Date(report.submittedAt.seconds * 1000).toLocaleDateString() 
-            : new Date().toLocaleDateString();
-
-        return `
-            <div style="padding: 40px; font-family: 'Helvetica', sans-serif; color: #333; line-height: 1.6;">
-                <div style="border-bottom: 2px solid #166534; padding-bottom: 20px; margin-bottom: 30px; display: flex; justify-content: space-between; align-items: center;">
-                    <div>
-                        <h1 style="color: #166534; font-size: 24px; margin: 0; font-weight: bold;">TUTOR REPORT</h1>
-                        <p style="margin: 5px 0 0; color: #666; font-size: 14px;">Submission Date: ${date}</p>
-                    </div>
-                    <div style="text-align: right;">
-                        <h3 style="margin: 0; font-size: 18px; font-weight: bold;">${report.studentName || 'Student'}</h3>
-                        <p style="margin: 0; font-size: 14px; color: #555;">${report.grade || 'Grade N/A'}</p>
-                    </div>
-                </div>
-
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 30px;">
-                    <div style="background: #f0fdf4; padding: 15px; border-radius: 8px;">
-                        <span style="display: block; font-size: 12px; color: #166534; font-weight: bold; text-transform: uppercase;">Tutor</span>
-                        <strong style="font-size: 16px;">${report.tutorName || 'N/A'}</strong>
-                        <br><span style="font-size: 13px; color: #555;">${report.tutorEmail || ''}</span>
-                    </div>
-                    <div style="background: #f0fdf4; padding: 15px; border-radius: 8px;">
-                        <span style="display: block; font-size: 12px; color: #166534; font-weight: bold; text-transform: uppercase;">Parent</span>
-                        <strong style="font-size: 16px;">${report.parentName || 'N/A'}</strong>
-                    </div>
-                </div>
-
-                <div style="margin-bottom: 25px;">
-                    <h3 style="color: #166534; border-bottom: 1px solid #ddd; padding-bottom: 8px; font-size: 16px;">Topics Covered</h3>
-                    <p style="white-space: pre-wrap; margin-top: 10px;">${report.topics || 'No details provided.'}</p>
-                </div>
-
-                <div style="margin-bottom: 25px;">
-                    <h3 style="color: #166534; border-bottom: 1px solid #ddd; padding-bottom: 8px; font-size: 16px;">Progress & Observations</h3>
-                    <p style="white-space: pre-wrap; margin-top: 10px;">${report.progress || 'No details provided.'}</p>
-                </div>
-
-                <div style="margin-bottom: 25px;">
-                    <h3 style="color: #166534; border-bottom: 1px solid #ddd; padding-bottom: 8px; font-size: 16px;">Strengths & Weaknesses</h3>
-                    <p style="white-space: pre-wrap; margin-top: 10px;">${report.strengthsWeaknesses || 'No details provided.'}</p>
-                </div>
-
-                <div style="margin-bottom: 25px;">
-                    <h3 style="color: #166534; border-bottom: 1px solid #ddd; padding-bottom: 8px; font-size: 16px;">Recommendations</h3>
-                    <p style="white-space: pre-wrap; margin-top: 10px;">${report.recommendations || 'No details provided.'}</p>
-                </div>
-            </div>
-        `;
-    };
-
-    // 1. Download Single Report
-    window.downloadSingleReport = async (reportId, event) => {
-        if (event) event.stopPropagation(); // Prevent toggling the accordion
-        
-        // Find report in the global cache (we will set this below)
-        const report = window.allReportsCache.find(r => r.id === reportId);
-        if (!report) {
-            alert("Report data not found.");
-            return;
-        }
-
-        const element = document.createElement('div');
-        element.innerHTML = generateReportTemplate(report);
-
-        const opt = {
-            margin: 0.5,
-            filename: `Report_${report.studentName}_${report.tutorName}.pdf`,
-            image: { type: 'jpeg', quality: 0.98 },
-            html2canvas: { scale: 2 },
-            jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' }
-        };
-
-        // Check if library exists
-        if (typeof html2pdf === 'undefined') {
-            alert("PDF library missing. Please check connection or include html2pdf.js.");
-            return;
-        }
-
-        const btn = event ? event.target.closest('button') : null;
-        if(btn) btn.innerText = "⏳";
-
-        try {
-            await html2pdf().set(opt).from(element).save();
-        } catch (err) {
-            console.error(err);
-            alert("Error generating PDF");
-        } finally {
-            if(btn) btn.innerHTML = `📥 Download`;
-        }
-    };
-
-    // 2. Preview Report (Modal)
-    window.previewReport = (reportId) => {
-        const report = window.allReportsCache.find(r => r.id === reportId);
-        if (!report) return;
-
-        // Simple modal implementation on the fly
-        const modalId = 'preview-modal-overlay';
-        let modal = document.getElementById(modalId);
-        
-        if(modal) modal.remove(); // Clean up old if exists
-
-        const modalHtml = `
-            <div id="${modalId}" class="fixed inset-0 bg-black bg-opacity-50 z-[60] flex items-center justify-center p-4">
-                <div class="bg-white rounded-lg w-full max-w-3xl max-h-[90vh] overflow-y-auto shadow-2xl relative">
-                    <button onclick="document.getElementById('${modalId}').remove()" class="absolute top-4 right-4 text-gray-500 hover:text-red-500 text-2xl font-bold">&times;</button>
-                    <div class="p-2">
-                        ${generateReportTemplate(report)}
-                    </div>
-                </div>
-            </div>
-        `;
-        document.body.insertAdjacentHTML('beforeend', modalHtml);
-    };
-
-    // 3. Zip and Download All Reports
-    window.zipAndDownloadTutorReports = async (reports, tutorName, btnElement) => {
-        if (typeof JSZip === 'undefined' || typeof html2pdf === 'undefined') {
-            alert("Required libraries (JSZip or html2pdf) are missing.");
-            return;
-        }
-
-        if(btnElement) btnElement.disabled = true;
-
-        const modal = document.getElementById('pdf-progress-modal');
-        const progressBar = document.getElementById('pdf-progress-bar');
-        const progressText = document.getElementById('pdf-progress-text');
-        const progressMessage = document.getElementById('pdf-progress-message');
-
-        modal.classList.remove('hidden');
-        
-        const zip = new JSZip();
-        const folder = zip.folder(`${tutorName}_Reports`);
-        let count = 0;
-
-        try {
-            for (const report of reports) {
-                count++;
-                const percentage = Math.round((count / reports.length) * 100);
-                
-                // Update UI
-                progressBar.style.width = `${percentage}%`;
-                progressText.innerText = `${percentage}%`;
-                progressMessage.innerText = `Generating PDF ${count} of ${reports.length} for ${report.studentName}...`;
-
-                // Generate PDF Blob
-                const element = document.createElement('div');
-                element.innerHTML = generateReportTemplate(report);
-                
-                const opt = {
-                    margin: 0.5,
-                    filename: `Report_${report.studentName}.pdf`,
-                    image: { type: 'jpeg', quality: 0.98 },
-                    html2canvas: { scale: 2 },
-                    jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' }
-                };
-
-                // Generate PDF as Blob
-                const pdfBlob = await html2pdf().set(opt).from(element).output('blob');
-                
-                // Add to Zip
-                const dateStr = report.submittedAt ? new Date(report.submittedAt.seconds * 1000).toISOString().split('T')[0] : 'date';
-                folder.file(`${report.studentName}_${dateStr}.pdf`, pdfBlob);
-            }
-
-            progressMessage.innerText = "Compressing files...";
-            const zipContent = await zip.generateAsync({ type: "blob" });
-            
-            // Download Zip
-            const link = document.createElement('a');
-            link.href = URL.createObjectURL(zipContent);
-            link.download = `${tutorName}_Reports_Bundle.zip`;
-            link.click();
-
-            // Cleanup
-            setTimeout(() => {
-                modal.classList.add('hidden');
-                if(btnElement) btnElement.disabled = false;
-                progressBar.style.width = '0%';
-            }, 1000);
-
-        } catch (error) {
-            console.error("Zip Error:", error);
-            alert("An error occurred while generating the ZIP file.");
-            modal.classList.add('hidden');
-            if(btnElement) btnElement.disabled = false;
-        }
-    };
-
-    // --- 2. Main HTML Structure ---
-
+    
     container.innerHTML = `
         <div class="bg-white p-6 rounded-lg shadow-md">
             <h2 class="text-2xl font-bold text-green-700 mb-4">Tutor Reports</h2>
@@ -2743,8 +2546,8 @@ async function renderTutorReportsPanel(container) {
 
             <div id="pdf-progress-modal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-center justify-center hidden">
                 <div class="relative p-8 bg-white w-96 rounded-lg shadow-xl">
-                    <h3 class="text-xl font-bold mb-4">Generating PDF Bundle</h3>
-                    <p id="pdf-progress-message" class="mb-4 text-sm text-gray-700">Initializing...</p>
+                    <h3 class="text-xl font-bold mb-4">Generating PDF</h3>
+                    <p id="pdf-progress-message" class="mb-4">Initializing...</p>
                     <div class="w-full bg-gray-200 rounded-full h-4 mb-4">
                         <div id="pdf-progress-bar" class="bg-green-600 h-4 rounded-full transition-all duration-300" style="width: 0%"></div>
                     </div>
@@ -2761,8 +2564,6 @@ async function renderTutorReportsPanel(container) {
         </div>
     `;
 
-    // --- 3. Logic & Event Listeners ---
-
     const now = new Date();
     const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
     const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0);
@@ -2770,12 +2571,8 @@ async function renderTutorReportsPanel(container) {
     document.getElementById('reports-start-date').value = firstDay.toISOString().split('T')[0];
     document.getElementById('reports-end-date').value = lastDay.toISOString().split('T')[0];
 
-    // Local state
     let allReports = [];
     let filteredReports = [];
-    
-    // Bind to window for PDF generator access
-    window.allReportsCache = [];
 
     const handleDateChange = () => {
         fetchAndRenderTutorReports();
@@ -2801,6 +2598,11 @@ async function renderTutorReportsPanel(container) {
     if (exportBtn) {
         exportBtn.addEventListener('click', exportReportsToCSV);
     }
+
+    // Define the PDF download functions
+    window.previewReport = previewReport;
+    window.downloadSingleReport = downloadSingleReport;
+    window.zipAndDownloadTutorReports = zipAndDownloadTutorReports;
 
     handleDateChange();
 
@@ -2912,7 +2714,6 @@ async function renderTutorReportsPanel(container) {
             
             if (snapshot.empty) {
                 allReports = [];
-                window.allReportsCache = []; // Update global cache
                 filteredReports = [];
                 renderTutorReportsFromCache();
                 return;
@@ -2922,14 +2723,12 @@ async function renderTutorReportsPanel(container) {
                 id: doc.id, 
                 ...doc.data() 
             }));
-            
-            window.allReportsCache = allReports; // Update global cache
+
             filteredReports = [...allReports];
 
             updateFilterDropdowns();
 
-            // Optional: Save to local storage for persistence across reloads if needed
-            // saveToLocalStorage('reports', allReports); 
+            saveToLocalStorage('reports', allReports);
             renderTutorReportsFromCache();
 
         } catch (error) {
@@ -2953,15 +2752,11 @@ async function renderTutorReportsPanel(container) {
         const tutors = [...new Set(allReports.map(r => r.tutorEmail))].filter(Boolean);
         const students = [...new Set(allReports.map(r => r.studentName))].filter(Boolean);
         
-        // Preserve current selection if possible
-        const currentTutor = tutorFilter.value;
-        const currentStudent = studentFilter.value;
-
         tutorFilter.innerHTML = '<option value="">All Tutors</option>' + 
-            tutors.map(tutor => `<option value="${tutor}" ${tutor === currentTutor ? 'selected' : ''}>${tutor}</option>`).join('');
+            tutors.map(tutor => `<option value="${tutor}">${tutor}</option>`).join('');
         
         studentFilter.innerHTML = '<option value="">All Students</option>' + 
-            students.map(student => `<option value="${student}" ${student === currentStudent ? 'selected' : ''}>${student}</option>`).join('');
+            students.map(student => `<option value="${student}">${student}</option>`).join('');
     }
 
     function renderTutorReportsFromCache() {
@@ -3022,12 +2817,12 @@ async function renderTutorReportsPanel(container) {
                             </div>
                             <div class="flex gap-2">
                                 <button onclick="previewReport('${report.id}')" 
-                                        class="bg-blue-500 text-white px-3 py-1 rounded text-xs hover:bg-blue-600 transition-colors">
+                                        class="bg-blue-500 text-white px-3 py-1 rounded text-xs hover:bg-blue-600">
                                     👁️ Preview
                                 </button>
                                 ${canDownload ? `
                                     <button onclick="downloadSingleReport('${report.id}', event)" 
-                                            class="bg-green-600 text-white px-3 py-1 rounded text-xs hover:bg-green-700 transition-colors">
+                                            class="bg-green-600 text-white px-3 py-1 rounded text-xs hover:bg-green-700">
                                         📥 Download
                                     </button>
                                 ` : ''}
@@ -3046,35 +2841,9 @@ async function renderTutorReportsPanel(container) {
                 `;
             }).join('');
 
-            // Using encodeURIComponent to safely pass the JSON string in onclick
-            const safeReportsData = encodeURIComponent(JSON.stringify(tutorData.reports));
-            const safeTutorName = tutorData.name.replace(/'/g, "\\'");
-
-            // Note: We parse the data back in the onclick handler by calling JSON.parse(decodeURIComponent(...))
-            // But to keep it simpler with the global function we defined:
-            // We pass the data object directly if we were using addEventListener, but with inline onclick strings it is messy.
-            // Better approach: Attach the data to window temporarily or use the global cache logic in the zip function.
-            // However, to fix your existing structure, I will pass the objects via a safer method: 
-            // We will filter the global cache in the zip function based on the Tutor Email, 
-            // BUT your code passed the object. 
-            // Let's use the method I wrote: window.zipAndDownloadTutorReports takes (reports, name, btn).
-            // To make this work safely in HTML string:
-            // We will lookup the reports dynamically in the function or just use the filtered list.
-            
-            // SIMPLIFICATION for stability:
-            // Since passing complex objects in onclick is prone to breakage with quotes,
-            // I will store the reports for this tutor in a temporary global map or just rely on the fact 
-            // that we have 'filteredReports'. 
-            
-            // ACTUALLY, the cleanest way in this specific HTML string context without rewriting everything:
-            // Pass the tutor email and filter from 'allReportsCache' inside the zip function.
-            
             const zipButtonHTML = canDownload ? `
                 <div class="p-4 border-t bg-blue-50">
-                    <button onclick="
-                        const reports = window.allReportsCache.filter(r => r.tutorEmail === '${tutorData.reports[0].tutorEmail}');
-                        window.zipAndDownloadTutorReports(reports, '${safeTutorName}', this);
-                    " 
+                    <button onclick="zipAndDownloadTutorReports(${JSON.stringify(tutorData.reports).replace(/"/g, '&quot;')}, '${tutorData.name.replace(/'/g, "\\'")}', this)" 
                             class="w-full bg-blue-600 text-white px-4 py-3 rounded-lg hover:bg-blue-700 transition-colors font-semibold flex items-center justify-center">
                         <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10"></path>
@@ -3105,6 +2874,408 @@ async function renderTutorReportsPanel(container) {
         });
 
         reportsListContainer.innerHTML = html;
+    }
+
+    // PDF Download Functions Implementation
+    async function previewReport(reportId) {
+        try {
+            const report = allReports.find(r => r.id === reportId);
+            if (!report) {
+                alert('Report not found');
+                return;
+            }
+
+            // Show preview in a modal or new tab
+            const previewContent = `
+                <html>
+                <head>
+                    <title>Preview: ${report.studentName} - ${report.tutorName}</title>
+                    <style>
+                        body { font-family: Arial, sans-serif; padding: 20px; }
+                        .header { background: #f0f9ff; padding: 20px; border-radius: 8px; margin-bottom: 20px; }
+                        .section { margin-bottom: 20px; padding: 15px; border: 1px solid #ddd; border-radius: 5px; }
+                        .section-title { font-weight: bold; color: #2d3748; margin-bottom: 10px; }
+                    </style>
+                </head>
+                <body>
+                    <div class="header">
+                        <h1>Tutor Report</h1>
+                        <p><strong>Tutor:</strong> ${report.tutorName} (${report.tutorEmail})</p>
+                        <p><strong>Student:</strong> ${report.studentName}</p>
+                        <p><strong>Date:</strong> ${report.submittedAt ? new Date(report.submittedAt.seconds * 1000).toLocaleDateString() : 'N/A'}</p>
+                    </div>
+                    
+                    <div class="section">
+                        <div class="section-title">Topics Covered</div>
+                        <p>${report.topics || 'No topics provided'}</p>
+                    </div>
+                    
+                    <div class="section">
+                        <div class="section-title">Progress Summary</div>
+                        <p>${report.progress || 'No progress summary provided'}</p>
+                    </div>
+                    
+                    <div class="section">
+                        <div class="section-title">Strengths & Weaknesses</div>
+                        <p>${report.strengthsWeaknesses || 'No strengths/weaknesses provided'}</p>
+                    </div>
+                    
+                    <div class="section">
+                        <div class="section-title">Recommendations</div>
+                        <p>${report.recommendations || 'No recommendations provided'}</p>
+                    </div>
+                </body>
+                </html>
+            `;
+
+            const previewWindow = window.open('', '_blank');
+            previewWindow.document.write(previewContent);
+            previewWindow.document.close();
+        } catch (error) {
+            console.error('Error previewing report:', error);
+            alert('Failed to preview report');
+        }
+    }
+
+    async function downloadSingleReport(reportId, event) {
+        if (event) {
+            event.preventDefault();
+            event.stopPropagation();
+        }
+
+        const report = allReports.find(r => r.id === reportId);
+        if (!report) {
+            alert('Report not found');
+            return;
+        }
+
+        try {
+            // Show progress modal
+            const progressModal = document.getElementById('pdf-progress-modal');
+            const progressBar = document.getElementById('pdf-progress-bar');
+            const progressText = document.getElementById('pdf-progress-text');
+            const progressMessage = document.getElementById('pdf-progress-message');
+            
+            progressMessage.textContent = `Generating PDF for ${report.studentName}...`;
+            progressModal.classList.remove('hidden');
+            progressBar.style.width = '30%';
+            progressText.textContent = '30%';
+
+            // Generate PDF content
+            const pdfContent = generatePDFContent(report);
+            
+            progressBar.style.width = '70%';
+            progressText.textContent = '70%';
+            progressMessage.textContent = 'Creating PDF document...';
+
+            // Use jsPDF to create PDF
+            const { jsPDF } = window.jspdf;
+            const pdf = new jsPDF();
+            
+            // Set margins and starting position
+            const marginLeft = 15;
+            let currentY = 20;
+            
+            // Add title
+            pdf.setFontSize(16);
+            pdf.setFont(undefined, 'bold');
+            pdf.text("TUTOR REPORT", marginLeft, currentY);
+            currentY += 10;
+            
+            // Add report details
+            pdf.setFontSize(10);
+            pdf.setFont(undefined, 'normal');
+            
+            const details = [
+                `Tutor: ${report.tutorName || 'N/A'} (${report.tutorEmail || 'N/A'})`,
+                `Student: ${report.studentName || 'N/A'}`,
+                `Parent: ${report.parentName || 'N/A'}`,
+                `Grade: ${report.grade || 'N/A'}`,
+                `Date: ${report.submittedAt ? new Date(report.submittedAt.seconds * 1000).toLocaleDateString() : 'N/A'}`
+            ];
+            
+            details.forEach(detail => {
+                pdf.text(detail, marginLeft, currentY);
+                currentY += 7;
+            });
+            
+            currentY += 5;
+            
+            // Function to add section with proper text wrapping
+            const addSection = (title, content) => {
+                if (currentY > 250) {
+                    pdf.addPage();
+                    currentY = 20;
+                }
+                
+                pdf.setFont(undefined, 'bold');
+                pdf.text(title, marginLeft, currentY);
+                currentY += 7;
+                
+                pdf.setFont(undefined, 'normal');
+                const lines = pdf.splitTextToSize(content || 'No content provided', 180);
+                lines.forEach(line => {
+                    if (currentY > 280) {
+                        pdf.addPage();
+                        currentY = 20;
+                    }
+                    pdf.text(line, marginLeft, currentY);
+                    currentY += 7;
+                });
+                currentY += 5;
+            };
+            
+            // Add all sections
+            addSection("TOPICS COVERED:", report.topics);
+            addSection("PROGRESS SUMMARY:", report.progress);
+            addSection("STRENGTHS & WEAKNESSES:", report.strengthsWeaknesses);
+            addSection("RECOMMENDATIONS:", report.recommendations);
+            
+            // Add footer
+            pdf.setFontSize(8);
+            pdf.text(`Generated on ${new Date().toLocaleDateString()}`, marginLeft, 290);
+
+            progressBar.style.width = '100%';
+            progressText.textContent = '100%';
+            progressMessage.textContent = 'Downloading PDF...';
+
+            // Save the PDF
+            const fileName = `TutorReport_${report.studentName}_${report.submittedAt ? new Date(report.submittedAt.seconds * 1000).toISOString().split('T')[0] : new Date().toISOString().split('T')[0]}.pdf`;
+            pdf.save(fileName);
+            
+            // Hide progress modal after a short delay
+            setTimeout(() => {
+                progressModal.classList.add('hidden');
+                progressBar.style.width = '0%';
+                progressText.textContent = '0%';
+            }, 1000);
+
+        } catch (error) {
+            console.error('Error downloading report:', error);
+            alert('Failed to generate PDF. Please try again.');
+            document.getElementById('pdf-progress-modal').classList.add('hidden');
+        }
+    }
+
+    function generatePDFContent(report) {
+        // This is a simple HTML representation for PDF generation
+        // In a real app, you might use a more sophisticated PDF library
+        return `
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <title>Tutor Report - ${report.studentName}</title>
+                <style>
+                    body { font-family: Arial, sans-serif; padding: 20px; }
+                    .header { border-bottom: 2px solid #4CAF50; padding-bottom: 10px; margin-bottom: 20px; }
+                    .section { margin-bottom: 15px; }
+                    .section-title { font-weight: bold; color: #2c3e50; margin-bottom: 5px; }
+                </style>
+            </head>
+            <body>
+                <div class="header">
+                    <h1>Tutor Report</h1>
+                    <p><strong>Tutor:</strong> ${report.tutorName} (${report.tutorEmail})</p>
+                    <p><strong>Student:</strong> ${report.studentName}</p>
+                    <p><strong>Date:</strong> ${report.submittedAt ? new Date(report.submittedAt.seconds * 1000).toLocaleDateString() : 'N/A'}</p>
+                </div>
+                
+                <div class="section">
+                    <div class="section-title">Topics Covered:</div>
+                    <p>${report.topics || 'No topics provided'}</p>
+                </div>
+                
+                <div class="section">
+                    <div class="section-title">Progress Summary:</div>
+                    <p>${report.progress || 'No progress summary provided'}</p>
+                </div>
+                
+                <div class="section">
+                    <div class="section-title">Strengths & Weaknesses:</div>
+                    <p>${report.strengthsWeaknesses || 'No strengths/weaknesses provided'}</p>
+                </div>
+                
+                <div class="section">
+                    <div class="section-title">Recommendations:</div>
+                    <p>${report.recommendations || 'No recommendations provided'}</p>
+                </div>
+            </body>
+            </html>
+        `;
+    }
+
+    async function zipAndDownloadTutorReports(reports, tutorName, buttonElement) {
+        if (!reports || reports.length === 0) {
+            alert('No reports to download');
+            return;
+        }
+
+        try {
+            // Disable button and show loading state
+            if (buttonElement) {
+                buttonElement.disabled = true;
+                buttonElement.innerHTML = '<span class="loading-spinner" style="width: 20px; height: 20px; margin-right: 8px;"></span> Generating ZIP...';
+            }
+
+            // Show progress modal
+            const progressModal = document.getElementById('pdf-progress-modal');
+            const progressBar = document.getElementById('pdf-progress-bar');
+            const progressText = document.getElementById('pdf-progress-text');
+            const progressMessage = document.getElementById('pdf-progress-message');
+            
+            progressModal.classList.remove('hidden');
+            progressMessage.textContent = `Preparing to generate ${reports.length} PDFs...`;
+
+            // Initialize JSZip
+            const zip = new JSZip();
+            let completed = 0;
+
+            for (const report of reports) {
+                try {
+                    progressMessage.textContent = `Generating PDF for ${report.studentName}...`;
+                    const progress = Math.round((completed / reports.length) * 100);
+                    progressBar.style.width = `${progress}%`;
+                    progressText.textContent = `${progress}%`;
+
+                    // Generate individual PDF
+                    const { jsPDF } = window.jspdf;
+                    const pdf = new jsPDF();
+                    
+                    const marginLeft = 15;
+                    let currentY = 20;
+                    
+                    // Add title
+                    pdf.setFontSize(16);
+                    pdf.setFont(undefined, 'bold');
+                    pdf.text("TUTOR REPORT", marginLeft, currentY);
+                    currentY += 10;
+                    
+                    // Add report details
+                    pdf.setFontSize(10);
+                    pdf.setFont(undefined, 'normal');
+                    
+                    const details = [
+                        `Tutor: ${report.tutorName || 'N/A'} (${report.tutorEmail || 'N/A'})`,
+                        `Student: ${report.studentName || 'N/A'}`,
+                        `Parent: ${report.parentName || 'N/A'}`,
+                        `Grade: ${report.grade || 'N/A'}`,
+                        `Date: ${report.submittedAt ? new Date(report.submittedAt.seconds * 1000).toLocaleDateString() : 'N/A'}`
+                    ];
+                    
+                    details.forEach(detail => {
+                        pdf.text(detail, marginLeft, currentY);
+                        currentY += 7;
+                    });
+                    
+                    currentY += 5;
+                    
+                    // Function to add section with proper text wrapping
+                    const addSection = (title, content) => {
+                        if (currentY > 250) {
+                            pdf.addPage();
+                            currentY = 20;
+                        }
+                        
+                        pdf.setFont(undefined, 'bold');
+                        pdf.text(title, marginLeft, currentY);
+                        currentY += 7;
+                        
+                        pdf.setFont(undefined, 'normal');
+                        const lines = pdf.splitTextToSize(content || 'No content provided', 180);
+                        lines.forEach(line => {
+                            if (currentY > 280) {
+                                pdf.addPage();
+                                currentY = 20;
+                            }
+                            pdf.text(line, marginLeft, currentY);
+                            currentY += 7;
+                        });
+                        currentY += 5;
+                    };
+                    
+                    // Add all sections
+                    addSection("TOPICS COVERED:", report.topics);
+                    addSection("PROGRESS SUMMARY:", report.progress);
+                    addSection("STRENGTHS & WEAKNESSES:", report.strengthsWeaknesses);
+                    addSection("RECOMMENDATIONS:", report.recommendations);
+                    
+                    // Add footer
+                    pdf.setFontSize(8);
+                    pdf.text(`Generated on ${new Date().toLocaleDateString()}`, marginLeft, 290);
+
+                    // Get PDF as blob
+                    const pdfBlob = pdf.output('blob');
+                    
+                    // Add to zip with sanitized filename
+                    const fileName = `Report_${report.studentName.replace(/[^a-z0-9]/gi, '_')}_${report.submittedAt ? new Date(report.submittedAt.seconds * 1000).toISOString().split('T')[0] : new Date().toISOString().split('T')[0]}.pdf`;
+                    zip.file(fileName, pdfBlob);
+                    
+                    completed++;
+                    
+                } catch (error) {
+                    console.error(`Error generating PDF for ${report.studentName}:`, error);
+                }
+            }
+
+            progressMessage.textContent = 'Creating ZIP file...';
+            progressBar.style.width = '95%';
+            progressText.textContent = '95%';
+
+            // Generate the zip file
+            const zipBlob = await zip.generateAsync({ type: 'blob' });
+            
+            progressBar.style.width = '100%';
+            progressText.textContent = '100%';
+            progressMessage.textContent = 'Downloading ZIP file...';
+
+            // Create download link
+            const link = document.createElement('a');
+            const sanitizedTutorName = tutorName.replace(/[^a-z0-9]/gi, '_');
+            const currentDate = new Date().toISOString().split('T')[0];
+            link.href = URL.createObjectURL(zipBlob);
+            link.download = `TutorReports_${sanitizedTutorName}_${currentDate}.zip`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            
+            // Reset button state
+            if (buttonElement) {
+                setTimeout(() => {
+                    buttonElement.disabled = false;
+                    buttonElement.innerHTML = `
+                        <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10"></path>
+                        </svg>
+                        📦 ZIP & DOWNLOAD ALL REPORTS FOR ${tutorName.toUpperCase()}
+                    `;
+                }, 1000);
+            }
+
+            // Hide progress modal after delay
+            setTimeout(() => {
+                progressModal.classList.add('hidden');
+                progressBar.style.width = '0%';
+                progressText.textContent = '0%';
+                progressMessage.textContent = 'Initializing...';
+            }, 1500);
+
+        } catch (error) {
+            console.error('Error creating ZIP file:', error);
+            alert('Failed to create ZIP file. Please try again.');
+            
+            // Reset button state on error
+            if (buttonElement) {
+                buttonElement.disabled = false;
+                buttonElement.innerHTML = `
+                    <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10"></path>
+                    </svg>
+                    📦 ZIP & DOWNLOAD ALL REPORTS FOR ${tutorName.toUpperCase()}
+                `;
+            }
+            
+            document.getElementById('pdf-progress-modal').classList.add('hidden');
+        }
     }
 }
 
@@ -6183,6 +6354,7 @@ onAuthStateChanged(auth, async (user) => {
         window.location.href = "management-auth.html";
     }
 });
+
 
 
 
