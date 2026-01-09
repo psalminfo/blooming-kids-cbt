@@ -1461,7 +1461,7 @@
                         <div class="form-group">
                             <label>Phone Number <span class="required">*</span></label>
                             <div class="phone-single-line">
-                                <input type="text" class="form-control" id="countryCode" placeholder="Country code" value="Country" data-validate="required">
+                                <input type="text" class="form-control" id="countryCode" placeholder="Phonecode" value="Country" data-validate="required">
                                 <input type="tel" class="form-control" id="parentPhone" placeholder="80123456789" data-validate="required,phone">
                             </div>
                             <div class="error-message" id="parentPhone-error"></div>
@@ -1956,7 +1956,7 @@
                         </div>
                         <div class="form-row">
     <div class="form-group">
-        <label>School Grade <span class="required">*</span></label>
+        <label>Actual Grade <span class="required">*</span></label>
         <select class="form-control select student-grade" data-validate="required">
             <option value="">Select Grade</option>
             <option value="preschool" ${prefillData?.grade === 'preschool' ? 'selected' : ''}>Preschool</option>
@@ -2186,11 +2186,13 @@
                                 `).join('')}
                             </div>
                             
-                            <div class="days-time-section">
-                                <h5><i class="far fa-calendar-alt"></i> Available Days</h5>
-                                <div class="available-days">
-                                    ${academicDaysHTML}
-                                </div>
+                            <div class="days-time-section" data-validate="required">
+    <h5><i class="far fa-calendar-alt"></i> Available Days <span class="required">*</span></h5>
+    <div class="available-days">
+        ${academicDaysHTML}
+    </div>
+    <div class="error-message available-days-error"></div>
+</div>
                                 
                                 <h5><i class="far fa-clock"></i> Preferred Time (12AM - 11PM)</h5>
                                 <div class="time-selection">
