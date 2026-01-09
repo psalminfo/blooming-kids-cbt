@@ -2556,7 +2556,6 @@ async function renderTutorReportsPanel(container) {
                         <div id="pdf-progress-bar" class="bg-green-600 h-4 rounded-full transition-all duration-300" style="width: 0%"></div>
                     </div>
                     <p id="pdf-progress-text" class="text-center text-sm text-gray-600">0%</p>
-                    <div id="pdf-error-message" class="mt-4 text-red-600 hidden"></div>
                 </div>
             </div>
 
@@ -2641,10 +2640,7 @@ async function renderTutorReportsPanel(container) {
             const endDate = document.getElementById('reports-end-date').value;
             link.href = URL.createObjectURL(blob);
             link.download = `Tutor_Reports_${startDate}_to_${endDate}.csv`;
-            document.body.appendChild(link);
             link.click();
-            document.body.removeChild(link);
-            URL.revokeObjectURL(link.href);
         } catch (error) {
             console.error('Error exporting CSV:', error);
             alert('Failed to export CSV. Please try again.');
@@ -2880,276 +2876,190 @@ async function renderTutorReportsPanel(container) {
     }
 
     // ======================================================
-    // PDF DOWNLOAD FUNCTIONS
+    // PDF DOWNLOAD FUNCTIONS - FIXED VERSION
     // ======================================================
 
     window.downloadSingleReport = async function(reportId) {
         try {
-            // Find the report
+            // Get the report from the SAME arrays the preview uses
             const report = allReports.find(r => r.id === reportId) || 
                           filteredReports.find(r => r.id === reportId);
             
             if (!report) {
-                throw new Error('Report not found. Please refresh the page and try again.');
+                alert('Report not found. Please refresh the page and try again.');
+                return;
             }
 
-            // Show progress modal
-            showPdfProgressModal('Preparing PDF download...', 10);
+            // Show progress
+            showPdfProgress('Generating PDF...', 10);
             
             // Check if jsPDF is available
             if (typeof window.jspdf === 'undefined') {
-                throw new Error('PDF library not loaded. Please check your internet connection.');
+                alert('PDF library not loaded. Please check your internet connection.');
+                return;
             }
 
             const { jsPDF } = window.jspdf;
             
-            updatePdfProgress('Creating PDF document...', 30);
+            showPdfProgress('Creating document...', 30);
             
-            // Create new PDF document with better settings
+            // Create PDF document
             const doc = new jsPDF({
                 orientation: 'portrait',
                 unit: 'mm',
-                format: 'a4',
-                compress: true
+                format: 'a4'
             });
 
             // Set document properties
             doc.setProperties({
-                title: `Tutor Report - ${report.studentName || 'Student'} - ${report.tutorName || 'Tutor'}`,
+                title: `Tutor Report - ${report.studentName} - ${report.tutorName}`,
                 subject: 'Tutor Progress Report',
-                author: report.tutorName || 'Tutor Management System',
-                keywords: 'tutor, report, progress, student, education',
+                author: report.tutorName,
                 creator: 'Tutor Management System'
             });
 
-            updatePdfProgress('Adding content to PDF...', 50);
+            showPdfProgress('Adding content...', 50);
 
             // Page dimensions
             const pageWidth = doc.internal.pageSize.getWidth();
-            const pageHeight = doc.internal.pageSize.getHeight();
             const margin = 20;
             let yPos = margin;
             
-            // Add header with background
-            doc.setFillColor(46, 125, 50); // Green color
-            doc.rect(0, 0, pageWidth, 30, 'F');
-            
-            // Header text
-            doc.setTextColor(255, 255, 255);
-            doc.setFontSize(22);
+            // Title
+            doc.setFontSize(20);
             doc.setFont('helvetica', 'bold');
-            doc.text('TUTOR PROGRESS REPORT', pageWidth / 2, 20, { align: 'center' });
+            doc.text('TUTOR PROGRESS REPORT', pageWidth / 2, yPos, { align: 'center' });
+            yPos += 15;
             
-            // Reset text color
-            doc.setTextColor(0, 0, 0);
-            yPos = 40;
-
-            // Report Information Section
-            doc.setFontSize(14);
-            doc.setFont('helvetica', 'bold');
-            doc.text('REPORT INFORMATION', margin, yPos);
-            yPos += 10;
-            
-            // Draw line under section title
-            doc.setDrawColor(46, 125, 50);
+            // Line
+            doc.setDrawColor(0);
             doc.setLineWidth(0.5);
-            doc.line(margin, yPos - 5, pageWidth - margin, yPos - 5);
-            yPos += 5;
+            doc.line(margin, yPos, pageWidth - margin, yPos);
+            yPos += 10;
 
-            // Report details in a table-like format
+            // Report details - using EXACT same data as preview
             const details = [
-                ['Tutor Name:', report.tutorName || 'Not specified'],
-                ['Tutor Email:', report.tutorEmail || 'Not specified'],
-                ['Student Name:', report.studentName || 'Not specified'],
-                ['Parent Name:', report.parentName || 'Not specified'],
-                ['Grade Level:', report.grade || 'Not specified'],
+                ['Tutor:', report.tutorName || ''],
+                ['Tutor Email:', report.tutorEmail || ''],
+                ['Student:', report.studentName || ''],
+                ['Parent:', report.parentName || ''],
+                ['Grade:', report.grade || ''],
                 ['Submission Date:', report.submittedAt ? 
-                    new Date(report.submittedAt.seconds * 1000).toLocaleDateString('en-US', {
-                        weekday: 'long',
-                        year: 'numeric',
-                        month: 'long',
-                        day: 'numeric'
-                    }) : 'Not specified']
+                    new Date(report.submittedAt.seconds * 1000).toLocaleDateString() : '']
             ];
 
-            doc.setFontSize(11);
+            doc.setFontSize(12);
             doc.setFont('helvetica', 'normal');
             
             details.forEach(([label, value]) => {
-                // Check if we need a new page
-                if (yPos > pageHeight - 30) {
+                if (yPos > 250) {
                     doc.addPage();
                     yPos = margin;
                 }
-                
                 doc.setFont('helvetica', 'bold');
                 doc.text(label, margin, yPos);
                 doc.setFont('helvetica', 'normal');
-                
-                // Split value if too long
-                const maxWidth = pageWidth - margin * 2 - 40;
-                const valueLines = doc.splitTextToSize(value, maxWidth);
-                
-                valueLines.forEach((line, index) => {
-                    doc.text(line, margin + 40, yPos + (index * 5));
-                });
-                
-                yPos += Math.max(8, valueLines.length * 5);
+                doc.text(value, margin + 40, yPos);
+                yPos += 8;
             });
+            
+            yPos += 5;
 
-            updatePdfProgress('Adding report content...', 70);
-
-            // Function to add section with title
-            function addSection(title, content) {
-                if (!content || content.trim() === '') return yPos;
+            // Function to add content sections - using EXACT same data
+            function addContentSection(title, content) {
+                if (!content || content.trim() === '') {
+                    return yPos; // Skip empty sections
+                }
                 
-                // Check if we need a new page
-                if (yPos > pageHeight - 50) {
+                if (yPos > 230) {
                     doc.addPage();
                     yPos = margin;
                 }
                 
-                yPos += 10; // Add space before new section
-                
-                // Section title
-                doc.setFontSize(14);
                 doc.setFont('helvetica', 'bold');
-                doc.setTextColor(46, 125, 50); // Green color
+                doc.setFontSize(14);
                 doc.text(title, margin, yPos);
                 yPos += 8;
                 
-                // Underline
-                doc.setDrawColor(46, 125, 50);
-                doc.setLineWidth(0.3);
-                doc.line(margin, yPos - 3, margin + 50, yPos - 3);
-                yPos += 5;
-                
-                // Reset text color
-                doc.setTextColor(0, 0, 0);
-                
-                // Content
-                doc.setFontSize(11);
                 doc.setFont('helvetica', 'normal');
+                doc.setFontSize(11);
                 
-                const contentLines = doc.splitTextToSize(content, pageWidth - margin * 2);
+                // Split text to fit page width
+                const contentLines = doc.splitTextToSize(content, pageWidth - 2 * margin);
                 
                 contentLines.forEach(line => {
-                    if (yPos > pageHeight - 20) {
+                    if (yPos > 250) {
                         doc.addPage();
                         yPos = margin;
                     }
                     doc.text(line, margin, yPos);
-                    yPos += 6;
+                    yPos += 7;
                 });
                 
+                yPos += 5;
                 return yPos;
             }
 
-            // Add report sections
-            yPos = addSection('TOPICS COVERED', report.topics || 'No topics were covered in this session.');
-            yPos = addSection('PROGRESS ACHIEVED', report.progress || 'No progress was reported for this session.');
-            yPos = addSection('STRENGTHS & WEAKNESSES', report.strengthsWeaknesses || 'Not specified.');
-            yPos = addSection('RECOMMENDATIONS', report.recommendations || 'No specific recommendations were provided.');
+            // Add all sections - using EXACT same field names as preview
+            yPos = addContentSection('TOPICS COVERED:', report.topics || '');
+            yPos = addContentSection('PROGRESS:', report.progress || '');
+            yPos = addContentSection('STRENGTHS & WEAKNESSES:', report.strengthsWeaknesses || '');
+            yPos = addContentSection('RECOMMENDATIONS:', report.recommendations || '');
             
             if (report.introduction) {
-                yPos = addSection('INTRODUCTION', report.introduction);
+                yPos = addContentSection('INTRODUCTION:', report.introduction);
             }
 
-            updatePdfProgress('Adding footer and finalizing...', 90);
+            showPdfProgress('Finalizing PDF...', 90);
 
-            // Add page numbers and footer to all pages
+            // Add page numbers
             const totalPages = doc.getNumberOfPages();
             for (let i = 1; i <= totalPages; i++) {
                 doc.setPage(i);
-                
-                // Footer line
-                doc.setDrawColor(200, 200, 200);
-                doc.setLineWidth(0.2);
-                doc.line(margin, pageHeight - 15, pageWidth - margin, pageHeight - 15);
-                
-                // Footer text
                 doc.setFontSize(8);
-                doc.setTextColor(100, 100, 100);
-                doc.text(`Generated by Tutor Management System • Page ${i} of ${totalPages}`, 
-                        pageWidth / 2, pageHeight - 10, { align: 'center' });
-                
-                // Report ID in footer (small)
-                doc.setFontSize(7);
-                doc.text(`Report ID: ${report.id.substring(0, 12)}...`, margin, pageHeight - 10);
-                
-                // Date in footer
-                const now = new Date();
-                doc.text(`Generated: ${now.toLocaleDateString()} ${now.toLocaleTimeString()}`, 
-                        pageWidth - margin, pageHeight - 10, { align: 'right' });
+                doc.setTextColor(128);
+                doc.text(`Page ${i} of ${totalPages}`, pageWidth - margin, 290, { align: 'right' });
+                doc.text('Generated by Tutor Management System', margin, 290);
             }
 
-            updatePdfProgress('PDF ready for download...', 100);
+            showPdfProgress('Download ready...', 100);
 
             // Generate filename
-            const safeTutorName = (report.tutorName || 'Tutor')
-                .replace(/[^\w\s-]/gi, '')
-                .replace(/\s+/g, '_')
-                .substring(0, 30);
-                
-            const safeStudentName = (report.studentName || 'Student')
-                .replace(/[^\w\s-]/gi, '')
-                .replace(/\s+/g, '_')
-                .substring(0, 30);
-                
-            const dateStr = report.submittedAt ? 
-                new Date(report.submittedAt.seconds * 1000).toISOString().split('T')[0] : 
-                new Date().toISOString().split('T')[0];
-            
-            const fileName = `Tutor_Report_${safeTutorName}_${safeStudentName}_${dateStr}.pdf`;
+            const safeTutorName = (report.tutorName || 'Tutor').replace(/[^\w\s]/gi, '_').replace(/\s+/g, '_');
+            const safeStudentName = (report.studentName || 'Student').replace(/[^\w\s]/gi, '_').replace(/\s+/g, '_');
+            const fileName = `Tutor_Report_${safeTutorName}_${safeStudentName}.pdf`;
 
-            // Save the PDF
+            // Save PDF
             doc.save(fileName);
             
-            // Hide progress modal after delay
-            setTimeout(() => {
-                hidePdfProgressModal();
-            }, 1000);
+            // Hide progress
+            setTimeout(() => hidePdfProgress(), 1000);
 
         } catch (error) {
             console.error('Error generating PDF:', error);
-            showPdfError(`Failed to generate PDF: ${error.message}`);
-            
-            // Hide modal after 3 seconds
-            setTimeout(() => {
-                hidePdfProgressModal();
-            }, 3000);
+            alert('Failed to generate PDF: ' + error.message);
+            hidePdfProgress();
         }
     };
 
     window.zipAndDownloadTutorReports = async function(reports, tutorName, buttonElement) {
         try {
             if (!reports || reports.length === 0) {
-                throw new Error('No reports to download');
+                alert('No reports to download');
+                return;
             }
 
-            // Show progress modal
-            showPdfProgressModal(`Preparing ${reports.length} report${reports.length > 1 ? 's' : ''} for download...`, 5);
+            showPdfProgress(`Preparing ${reports.length} reports...`, 5);
             
-            // Disable button during processing
             if (buttonElement) {
-                const originalHTML = buttonElement.innerHTML;
                 buttonElement.disabled = true;
-                buttonElement.innerHTML = '<span class="flex items-center justify-center">⏳ Processing...</span>';
-                
-                // Re-enable button on error
-                const reenableButton = () => {
-                    buttonElement.disabled = false;
-                    buttonElement.innerHTML = originalHTML;
-                };
+                const originalText = buttonElement.innerHTML;
+                buttonElement.innerHTML = '⏳ Processing...';
             }
 
-            // Check if required libraries are available
-            if (typeof window.jspdf === 'undefined') {
-                throw new Error('PDF library not loaded');
-            }
-            
-            if (typeof JSZip === 'undefined') {
-                throw new Error('ZIP library not loaded');
+            // Check libraries
+            if (typeof window.jspdf === 'undefined' || typeof JSZip === 'undefined') {
+                throw new Error('Required libraries not loaded');
             }
 
             const { jsPDF } = window.jspdf;
@@ -3158,221 +3068,166 @@ async function renderTutorReportsPanel(container) {
 
             for (const report of reports) {
                 try {
-                    updatePdfProgress(`Generating report: ${report.studentName || 'Unknown Student'}`, 
+                    showPdfProgress(`Creating report ${processedCount + 1} of ${reports.length}...`, 
                         Math.round((processedCount / reports.length) * 90));
                     
-                    // Create PDF for each report
-                    const doc = new jsPDF({
-                        orientation: 'portrait',
-                        unit: 'mm',
-                        format: 'a4',
-                        compress: true
-                    });
-
-                    // Set document properties
+                    // Create PDF - using EXACT same data
+                    const doc = new jsPDF();
+                    
+                    // Set properties
                     doc.setProperties({
-                        title: `Tutor Report - ${report.studentName || 'Student'} - ${report.tutorName || 'Tutor'}`,
-                        subject: 'Tutor Progress Report',
-                        author: report.tutorName || 'Tutor Management System',
-                        creator: 'Tutor Management System'
+                        title: `Tutor Report - ${report.studentName} - ${report.tutorName}`,
+                        author: report.tutorName
                     });
 
-                    // Page dimensions
                     const pageWidth = doc.internal.pageSize.getWidth();
-                    const pageHeight = doc.internal.pageSize.getHeight();
                     const margin = 20;
                     let yPos = margin;
                     
-                    // Add header
-                    doc.setFillColor(46, 125, 50);
-                    doc.rect(0, 0, pageWidth, 30, 'F');
-                    
-                    doc.setTextColor(255, 255, 255);
-                    doc.setFontSize(22);
+                    // Title
+                    doc.setFontSize(20);
                     doc.setFont('helvetica', 'bold');
-                    doc.text('TUTOR PROGRESS REPORT', pageWidth / 2, 20, { align: 'center' });
+                    doc.text('TUTOR PROGRESS REPORT', pageWidth / 2, yPos, { align: 'center' });
+                    yPos += 15;
                     
-                    doc.setTextColor(0, 0, 0);
-                    yPos = 40;
-
-                    // Report Information
-                    doc.setFontSize(14);
-                    doc.setFont('helvetica', 'bold');
-                    doc.text('REPORT INFORMATION', margin, yPos);
-                    yPos += 10;
-                    
-                    doc.setDrawColor(46, 125, 50);
+                    // Line
+                    doc.setDrawColor(0);
                     doc.setLineWidth(0.5);
-                    doc.line(margin, yPos - 5, pageWidth - margin, yPos - 5);
-                    yPos += 5;
+                    doc.line(margin, yPos, pageWidth - margin, yPos);
+                    yPos += 10;
 
-                    // Report details
+                    // Details - using EXACT same data
                     const details = [
-                        ['Tutor Name:', report.tutorName || 'Not specified'],
-                        ['Tutor Email:', report.tutorEmail || 'Not specified'],
-                        ['Student Name:', report.studentName || 'Not specified'],
-                        ['Parent Name:', report.parentName || 'Not specified'],
-                        ['Grade Level:', report.grade || 'Not specified'],
+                        ['Tutor:', report.tutorName || ''],
+                        ['Tutor Email:', report.tutorEmail || ''],
+                        ['Student:', report.studentName || ''],
+                        ['Parent:', report.parentName || ''],
+                        ['Grade:', report.grade || ''],
                         ['Submission Date:', report.submittedAt ? 
-                            new Date(report.submittedAt.seconds * 1000).toLocaleDateString() : 'Not specified']
+                            new Date(report.submittedAt.seconds * 1000).toLocaleDateString() : '']
                     ];
 
-                    doc.setFontSize(11);
+                    doc.setFontSize(12);
                     doc.setFont('helvetica', 'normal');
                     
                     details.forEach(([label, value]) => {
-                        if (yPos > pageHeight - 30) {
+                        if (yPos > 250) {
                             doc.addPage();
                             yPos = margin;
                         }
-                        
                         doc.setFont('helvetica', 'bold');
                         doc.text(label, margin, yPos);
                         doc.setFont('helvetica', 'normal');
                         doc.text(value, margin + 40, yPos);
                         yPos += 8;
                     });
+                    
+                    yPos += 5;
 
-                    // Function to add section
-                    function addSectionToZipPDF(title, content) {
-                        if (!content || content.trim() === '') return yPos;
+                    // Content sections
+                    const sections = [
+                        { title: 'TOPICS COVERED:', content: report.topics },
+                        { title: 'PROGRESS:', content: report.progress },
+                        { title: 'STRENGTHS & WEAKNESSES:', content: report.strengthsWeaknesses },
+                        { title: 'RECOMMENDATIONS:', content: report.recommendations },
+                        { title: 'INTRODUCTION:', content: report.introduction }
+                    ];
+
+                    sections.forEach(section => {
+                        if (!section.content || section.content.trim() === '') return;
                         
-                        if (yPos > pageHeight - 50) {
+                        if (yPos > 230) {
                             doc.addPage();
                             yPos = margin;
                         }
                         
-                        yPos += 10;
-                        doc.setFontSize(14);
                         doc.setFont('helvetica', 'bold');
-                        doc.setTextColor(46, 125, 50);
-                        doc.text(title, margin, yPos);
+                        doc.setFontSize(14);
+                        doc.text(section.title, margin, yPos);
                         yPos += 8;
                         
-                        doc.setDrawColor(46, 125, 50);
-                        doc.setLineWidth(0.3);
-                        doc.line(margin, yPos - 3, margin + 50, yPos - 3);
-                        yPos += 5;
-                        
-                        doc.setTextColor(0, 0, 0);
-                        doc.setFontSize(11);
                         doc.setFont('helvetica', 'normal');
+                        doc.setFontSize(11);
                         
-                        const contentLines = doc.splitTextToSize(content, pageWidth - margin * 2);
-                        
+                        const contentLines = doc.splitTextToSize(section.content, pageWidth - 2 * margin);
                         contentLines.forEach(line => {
-                            if (yPos > pageHeight - 20) {
+                            if (yPos > 250) {
                                 doc.addPage();
                                 yPos = margin;
                             }
                             doc.text(line, margin, yPos);
-                            yPos += 6;
+                            yPos += 7;
                         });
                         
-                        return yPos;
-                    }
+                        yPos += 5;
+                    });
 
-                    // Add all sections
-                    yPos = addSectionToZipPDF('TOPICS COVERED', report.topics || 'No topics covered.');
-                    yPos = addSectionToZipPDF('PROGRESS ACHIEVED', report.progress || 'No progress reported.');
-                    yPos = addSectionToZipPDF('STRENGTHS & WEAKNESSES', report.strengthsWeaknesses || 'Not specified.');
-                    yPos = addSectionToZipPDF('RECOMMENDATIONS', report.recommendations || 'No recommendations.');
-                    
-                    if (report.introduction) {
-                        yPos = addSectionToZipPDF('INTRODUCTION', report.introduction);
-                    }
-
-                    // Add footer to all pages
+                    // Footer
                     const totalPages = doc.getNumberOfPages();
                     for (let i = 1; i <= totalPages; i++) {
                         doc.setPage(i);
                         doc.setFontSize(8);
-                        doc.setTextColor(100, 100, 100);
-                        doc.text(`Page ${i} of ${totalPages}`, pageWidth / 2, pageHeight - 10, { align: 'center' });
+                        doc.setTextColor(128);
+                        doc.text(`Page ${i} of ${totalPages}`, pageWidth - margin, 290, { align: 'right' });
                     }
 
-                    // Generate PDF as blob
+                    // Add to ZIP
                     const pdfBlob = doc.output('blob');
-                    
-                    // Create safe filename
-                    const safeStudentName = (report.studentName || 'Student')
-                        .replace(/[^\w\s-]/gi, '')
-                        .replace(/\s+/g, '_')
-                        .substring(0, 30);
-                        
+                    const safeStudentName = (report.studentName || 'Student').replace(/[^\w\s]/gi, '_').replace(/\s+/g, '_');
                     const dateStr = report.submittedAt ? 
                         new Date(report.submittedAt.seconds * 1000).toISOString().split('T')[0] : 
-                        'nodate';
+                        'unknown';
                     
-                    const fileName = `Report_${safeStudentName}_${dateStr}.pdf`;
-                    
-                    // Add to ZIP
-                    zip.file(fileName, pdfBlob);
+                    zip.file(`Report_${safeStudentName}_${dateStr}.pdf`, pdfBlob);
                     processedCount++;
                     
                 } catch (error) {
-                    console.error(`Error processing report ${report.id}:`, error);
-                    // Continue with next report
+                    console.error(`Error with report ${report.id}:`, error);
                 }
             }
 
             if (processedCount === 0) {
-                throw new Error('Could not generate any PDF files');
+                throw new Error('Could not generate any PDFs');
             }
 
-            updatePdfProgress('Creating ZIP archive...', 95);
+            showPdfProgress('Creating ZIP file...', 95);
 
-            // Generate ZIP file
-            const zipBlob = await zip.generateAsync({ 
-                type: 'blob',
-                compression: 'DEFLATE',
-                compressionOptions: { level: 6 }
-            });
-
-            // Create download link
+            // Create and download ZIP
+            const zipBlob = await zip.generateAsync({ type: 'blob' });
             const link = document.createElement('a');
-            const safeTutorName = (tutorName || 'Tutor')
-                .replace(/[^\w\s-]/gi, '')
-                .replace(/\s+/g, '_')
-                .substring(0, 30);
-                
+            const safeTutorName = (tutorName || 'Tutor').replace(/[^\w\s]/gi, '_').replace(/\s+/g, '_');
+            
             link.href = URL.createObjectURL(zipBlob);
-            link.download = `Tutor_Reports_${safeTutorName}_${new Date().toISOString().split('T')[0]}.zip`;
-            
-            // Trigger download
-            document.body.appendChild(link);
+            link.download = `Tutor_Reports_${safeTutorName}.zip`;
             link.click();
-            document.body.removeChild(link);
             
-            // Clean up
+            // Cleanup
             setTimeout(() => {
                 URL.revokeObjectURL(link.href);
             }, 1000);
 
-            updatePdfProgress('Download complete!', 100);
+            showPdfProgress('Download complete!', 100);
 
-            // Re-enable button
+            // Reset button
             if (buttonElement) {
                 setTimeout(() => {
                     buttonElement.disabled = false;
-                    buttonElement.innerHTML = buttonElement.innerHTML.replace('⏳ Processing...', 
-                        `<svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    buttonElement.innerHTML = `
+                        <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10"></path>
                         </svg>
-                        📦 ZIP & DOWNLOAD ALL REPORTS FOR ${tutorName.toUpperCase()}`);
+                        📦 ZIP & DOWNLOAD ALL REPORTS FOR ${tutorName.toUpperCase()}
+                    `;
                 }, 1000);
             }
 
-            // Hide modal
-            setTimeout(() => {
-                hidePdfProgressModal();
-            }, 1500);
+            setTimeout(() => hidePdfProgress(), 1500);
 
         } catch (error) {
-            console.error('Error creating ZIP file:', error);
-            showPdfError(`Failed to create ZIP file: ${error.message}`);
+            console.error('Error creating ZIP:', error);
+            alert('Failed to create ZIP: ' + error.message);
+            hidePdfProgress();
             
-            // Re-enable button
             if (buttonElement) {
                 buttonElement.disabled = false;
                 buttonElement.innerHTML = buttonElement.innerHTML.replace('⏳ Processing...', 
@@ -3381,53 +3236,28 @@ async function renderTutorReportsPanel(container) {
                     </svg>
                     📦 ZIP & DOWNLOAD ALL REPORTS FOR ${tutorName.toUpperCase()}`);
             }
-            
-            // Hide modal after error
-            setTimeout(() => {
-                hidePdfProgressModal();
-            }, 3000);
         }
     };
 
-    // Helper functions for PDF progress modal
-    function showPdfProgressModal(message, progress) {
+    // Helper functions for progress modal
+    function showPdfProgress(message, progress) {
         const modal = document.getElementById('pdf-progress-modal');
         const messageEl = document.getElementById('pdf-progress-message');
         const progressBar = document.getElementById('pdf-progress-bar');
         const progressText = document.getElementById('pdf-progress-text');
-        const errorEl = document.getElementById('pdf-error-message');
         
         if (modal) {
             modal.classList.remove('hidden');
             if (messageEl) messageEl.textContent = message;
-            if (progressBar) progressBar.style.width = `${Math.min(100, progress)}%`;
-            if (progressText) progressText.textContent = `${Math.min(100, progress)}%`;
-            if (errorEl) errorEl.classList.add('hidden');
+            if (progressBar) progressBar.style.width = `${progress}%`;
+            if (progressText) progressText.textContent = `${progress}%`;
         }
     }
 
-    function updatePdfProgress(message, progress) {
-        const messageEl = document.getElementById('pdf-progress-message');
-        const progressBar = document.getElementById('pdf-progress-bar');
-        const progressText = document.getElementById('pdf-progress-text');
-        
-        if (messageEl) messageEl.textContent = message;
-        if (progressBar) progressBar.style.width = `${Math.min(100, progress)}%`;
-        if (progressText) progressText.textContent = `${Math.min(100, progress)}%`;
-    }
-
-    function hidePdfProgressModal() {
+    function hidePdfProgress() {
         const modal = document.getElementById('pdf-progress-modal');
         if (modal) {
             modal.classList.add('hidden');
-        }
-    }
-
-    function showPdfError(message) {
-        const errorEl = document.getElementById('pdf-error-message');
-        if (errorEl) {
-            errorEl.textContent = message;
-            errorEl.classList.remove('hidden');
         }
     }
 }
@@ -6507,6 +6337,7 @@ onAuthStateChanged(auth, async (user) => {
         window.location.href = "management-auth.html";
     }
 });
+
 
 
 
