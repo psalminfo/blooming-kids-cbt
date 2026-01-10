@@ -3897,7 +3897,7 @@ async function approveEnrollmentWithDetails(enrollmentId) {
                 const tutor = tutors.find(t => t.email === tutorEmail);
                 const tutorName = tutor ? tutor.name : tutorEmail;
                 
-                // Create pending student entry WITHOUT tutor fee (left blank)
+                // Create pending student entry WITH ALL PARENT DETAILS
                 studentAssignments.push({
                     studentName: student.name,
                     studentId: `pending_${Date.now()}_${index}`,
@@ -3909,6 +3909,11 @@ async function approveEnrollmentWithDetails(enrollmentId) {
                     academicTime: academicTime,
                     days: academicDays,
                     startDate: student.startDate || '', // Include start date
+                    // Parent information - FIXED: Include all parent details
+                    parentName: enrollmentData.parent?.name || '',
+                    parentPhone: enrollmentData.parent?.phone || '',
+                    parentEmail: enrollmentData.parent?.email || '',
+                    parentAddress: enrollmentData.parent?.address || '',
                     // Note: No tutorFee field - left blank as requested
                     parentFee: finalFee, // Parent payment amount
                     enrollmentId: enrollmentId,
@@ -3934,7 +3939,7 @@ async function approveEnrollmentWithDetails(enrollmentId) {
                 batch.set(pendingStudentRef, student);
             });
         } else if (approvalType === 'without_tutor') {
-            // Create pending student entries without tutor assignment
+            // Create pending student entries without tutor assignment but WITH ALL PARENT DETAILS
             enrollmentData.students.forEach((student, index) => {
                 const pendingStudentRef = doc(collection(db, "pending_students"));
                 batch.set(pendingStudentRef, {
@@ -3948,6 +3953,11 @@ async function approveEnrollmentWithDetails(enrollmentId) {
                     academicTime: academicTime,
                     days: academicDays,
                     startDate: student.startDate || '', // Include start date
+                    // Parent information - FIXED: Include all parent details
+                    parentName: enrollmentData.parent?.name || '',
+                    parentPhone: enrollmentData.parent?.phone || '',
+                    parentEmail: enrollmentData.parent?.email || '',
+                    parentAddress: enrollmentData.parent?.address || '',
                     // Note: No tutorFee field - left blank as requested
                     parentFee: finalFee, // Parent payment amount
                     enrollmentId: enrollmentId,
@@ -4085,7 +4095,7 @@ window.downloadEnrollmentInvoice = async function(enrollmentId) {
                             <thead>
                                 <tr>
                                     <th>Student Name</th>
-                                    <th>actualGrade</th>
+                                    <th>Grade</th>
                                     <th>Start Date</th>
                                     <th>Subjects</th>
                                 </tr>
@@ -4094,7 +4104,7 @@ window.downloadEnrollmentInvoice = async function(enrollmentId) {
                                 ${enrollment.students ? enrollment.students.map(student => `
                                     <tr>
                                         <td>${student.name || ''}</td>
-                                        <td>${student.actualGrade || ''}</td>
+                                        <td>${student.grade || ''}</td>
                                         <td>${student.startDate || ''}</td>
                                         <td>${student.selectedSubjects ? student.selectedSubjects.join(', ') : ''}</td>
                                     </tr>
@@ -6272,6 +6282,7 @@ onAuthStateChanged(auth, async (user) => {
         window.location.href = "management-auth.html";
     }
 });
+
 
 
 
