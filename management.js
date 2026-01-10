@@ -4085,7 +4085,7 @@ window.downloadEnrollmentInvoice = async function(enrollmentId) {
                             <thead>
                                 <tr>
                                     <th>Student Name</th>
-                                    <th>Grade</th>
+                                    <th>actualGrade</th>
                                     <th>Start Date</th>
                                     <th>Subjects</th>
                                 </tr>
@@ -4094,7 +4094,7 @@ window.downloadEnrollmentInvoice = async function(enrollmentId) {
                                 ${enrollment.students ? enrollment.students.map(student => `
                                     <tr>
                                         <td>${student.name || ''}</td>
-                                        <td>${student.grade || ''}</td>
+                                        <td>${student.actualGrade || ''}</td>
                                         <td>${student.startDate || ''}</td>
                                         <td>${student.selectedSubjects ? student.selectedSubjects.join(', ') : ''}</td>
                                     </tr>
@@ -6272,6 +6272,7 @@ onAuthStateChanged(auth, async (user) => {
         window.location.href = "management-auth.html";
     }
 });
+
 
 
 
