@@ -4381,17 +4381,38 @@ async function renderSummerBreakPanel(container) {
         </div>
     `;
     
-    // Add event listeners
     document.getElementById('refresh-break-btn').addEventListener('click', () => fetchAndRenderBreakStudents(true));
+    document.getElementById('break-search').addEventListener('input', (e) => handleBreakSearch(e.target.value));
     
-    // Add search event listener
-    const searchInput = document.getElementById('break-search');
-    searchInput.addEventListener('input', function(e) {
-        renderBreakStudentsFromCache(e.target.value);
-    });
+    // Initialize the cache if it doesn't exist
+    if (!sessionCache.breakStudents) {
+        sessionCache.breakStudents = [];
+    }
     
-    // Fetch initial data
     fetchAndRenderBreakStudents();
+}
+
+// Helper function to handle search
+function handleBreakSearch(searchTerm) {
+    // Check if data is available in cache
+    if (!sessionCache.breakStudents || sessionCache.breakStudents.length === 0) {
+        // If no data in cache, show message and fetch data
+        const listContainer = document.getElementById('break-students-list');
+        if (listContainer) {
+            listContainer.innerHTML = `
+                <div class="text-center py-10">
+                    <div class="loading-spinner mx-auto" style="width: 40px; height: 40px;"></div>
+                    <p class="text-green-600 font-semibold mt-4">Loading data for search...</p>
+                </div>
+            `;
+        }
+        // Fetch data first, then search
+        fetchAndRenderBreakStudents();
+        return;
+    }
+    
+    // If data exists, perform search
+    renderBreakStudentsFromCache(searchTerm);
 }
 
 async function fetchAndRenderBreakStudents(forceRefresh = false) {
@@ -4399,28 +4420,31 @@ async function fetchAndRenderBreakStudents(forceRefresh = false) {
     const listContainer = document.getElementById('break-students-list');
 
     try {
-        // Show loading state
-        listContainer.innerHTML = `<div class="text-center py-10">
-            <div class="loading-spinner mx-auto" style="width: 40px; height: 40px;"></div>
-            <p class="text-green-600 font-semibold mt-4">Fetching student break status...</p>
-        </div>`;
-        
-        if (!sessionCache.breakStudents || forceRefresh) {
+        // Check if we need to fetch fresh data
+        if (forceRefresh || !sessionCache.breakStudents || sessionCache.breakStudents.length === 0) {
+            if (listContainer) {
+                listContainer.innerHTML = `<div class="text-center py-10">
+                    <div class="loading-spinner mx-auto" style="width: 40px; height: 40px;"></div>
+                    <p class="text-green-600 font-semibold mt-4">Fetching student break status...</p>
+                </div>`;
+            }
+            
             const snapshot = await getDocs(query(collection(db, "students"), where("summerBreak", "==", true)));
             const allBreakStudents = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
             
+            // Filter for active/approved students only
             const activeBreakStudents = allBreakStudents.filter(student => 
                 !student.status || student.status === 'active' || student.status === 'approved'
             );
             
+            // Update both session cache and localStorage
+            sessionCache.breakStudents = activeBreakStudents;
             saveToLocalStorage('breakStudents', activeBreakStudents);
         }
         
-        // Get current search term to maintain it after refresh
+        // Get current search term and render
         const searchInput = document.getElementById('break-search');
         const currentSearchTerm = searchInput ? searchInput.value : '';
-        
-        // Render with current search term
         renderBreakStudentsFromCache(currentSearchTerm);
         
     } catch(error) {
@@ -4445,26 +4469,35 @@ function renderBreakStudentsFromCache(searchTerm = '') {
     const listContainer = document.getElementById('break-students-list');
     if (!listContainer) return;
     
-    const lowerCaseSearchTerm = searchTerm.toLowerCase();
-    let filteredStudents = breakStudents;
-    
-    if (searchTerm) {
-        filteredStudents = breakStudents.filter(student => 
-            student.studentName?.toLowerCase().includes(lowerCaseSearchTerm) ||
-            student.tutorEmail?.toLowerCase().includes(lowerCaseSearchTerm) ||
-            student.tutorName?.toLowerCase().includes(lowerCaseSearchTerm) ||
-            student.parentName?.toLowerCase().includes(lowerCaseSearchTerm) ||
-            student.parentPhone?.toLowerCase().includes(lowerCaseSearchTerm)
-        );
-    }
-    
+    // Update counts with ALL break students (not filtered ones)
     const uniqueTutors = [...new Set(breakStudents.map(s => s.tutorEmail))].filter(Boolean);
-    
-    // Update counts
     document.getElementById('break-count-badge').textContent = breakStudents.length;
     document.getElementById('break-tutor-count').textContent = uniqueTutors.length;
     
-    // Show appropriate message based on results
+    // Filter students if search term exists
+    const lowerCaseSearchTerm = searchTerm.toLowerCase().trim();
+    let filteredStudents = breakStudents;
+    
+    if (searchTerm) {
+        filteredStudents = breakStudents.filter(student => {
+            // Check all searchable fields
+            const searchFields = [
+                student.studentName,
+                student.tutorEmail,
+                student.tutorName,
+                student.parentName,
+                student.parentPhone,
+                student.grade,
+                student.days
+            ];
+            
+            return searchFields.some(field => 
+                field && field.toString().toLowerCase().includes(lowerCaseSearchTerm)
+            );
+        });
+    }
+    
+    // Handle empty results
     if (filteredStudents.length === 0) {
         if (searchTerm) {
             listContainer.innerHTML = `
@@ -4472,6 +4505,10 @@ function renderBreakStudentsFromCache(searchTerm = '') {
                     <i class="fas fa-search text-gray-400 text-4xl mb-4"></i>
                     <p class="text-gray-600">No students found matching "${searchTerm}"</p>
                     <p class="text-sm text-gray-400 mt-2">Try a different search term</p>
+                    <button onclick="document.getElementById('break-search').value = ''; renderBreakStudentsFromCache('')" 
+                            class="mt-4 bg-gray-100 text-gray-700 px-4 py-2 rounded hover:bg-gray-200">
+                        Clear Search
+                    </button>
                 </div>
             `;
         } else {
@@ -4502,7 +4539,6 @@ function renderBreakStudentsFromCache(searchTerm = '') {
     
     let html = '';
     
-    // Generate HTML for each tutor group
     Object.values(studentsByTutor).forEach(tutorGroup => {
         const studentItems = tutorGroup.students.map(student => {
             const breakInfo = student.lastBreakStart ? 
@@ -4571,9 +4607,9 @@ function renderBreakStudentsFromCache(searchTerm = '') {
     // Add event listeners to End Break buttons
     document.querySelectorAll('.end-break-btn').forEach(button => {
         button.addEventListener('click', async (e) => {
-            const studentId = e.target.dataset.studentId;
-            const studentName = e.target.dataset.studentName;
-            const tutorName = e.target.dataset.tutorName;
+            const studentId = e.currentTarget.dataset.studentId;
+            const studentName = e.currentTarget.dataset.studentName;
+            const tutorName = e.currentTarget.dataset.tutorName;
             
             const confirmation = confirm(`Are you sure you want to take ${studentName} off summer break and return them to ${tutorName}?`);
             
@@ -4582,9 +4618,9 @@ function renderBreakStudentsFromCache(searchTerm = '') {
             }
             
             try {
-                const originalText = e.target.innerHTML;
-                e.target.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> Ending Break...';
-                e.target.disabled = true;
+                const originalText = e.currentTarget.innerHTML;
+                e.currentTarget.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> Ending Break...';
+                e.currentTarget.disabled = true;
                 
                 await updateDoc(doc(db, "students", studentId), { 
                     summerBreak: false, 
@@ -4602,19 +4638,21 @@ function renderBreakStudentsFromCache(searchTerm = '') {
                     statusMessage.classList.add('hidden');
                 }, 4000);
                 
-                // Invalidate caches
+                // Invalidate caches and refresh data
                 invalidateCache('breakStudents');
                 invalidateCache('students');
                 invalidateCache('tutorAssignments');
                 
-                // Refresh the data
-                const currentSearch = document.getElementById('break-search').value;
+                // Get current search term before refreshing
+                const searchInput = document.getElementById('break-search');
+                const currentSearchTerm = searchInput ? searchInput.value : '';
+                
+                // Force refresh and then re-apply search if needed
                 await fetchAndRenderBreakStudents(true);
                 
-                // Restore search term if any
-                if (currentSearch) {
-                    document.getElementById('break-search').value = currentSearch;
-                    renderBreakStudentsFromCache(currentSearch);
+                if (searchInput && currentSearchTerm) {
+                    searchInput.value = currentSearchTerm;
+                    renderBreakStudentsFromCache(currentSearchTerm);
                 }
                 
             } catch (error) {
@@ -4630,9 +4668,9 @@ function renderBreakStudentsFromCache(searchTerm = '') {
                     statusMessage.classList.add('hidden');
                 }, 5000);
                 
-                // Restore button state
-                e.target.innerHTML = originalText;
-                e.target.disabled = false;
+                // Reset button
+                e.currentTarget.innerHTML = originalText;
+                e.currentTarget.disabled = false;
             }
         });
     });
@@ -6234,5 +6272,6 @@ onAuthStateChanged(auth, async (user) => {
         window.location.href = "management-auth.html";
     }
 });
+
 
 
