@@ -2998,12 +2998,14 @@ async function renderEnrollmentsPanel(container) {
     fetchAndRenderEnrollments();
 }
 
-// Helper: Get tutor assignment status for enrollment
-async function getEnrollmentTutorStatus(enrollmentId) {
+// Updated Helper: Check Tutor Assignments 
+// FIXED: Queries students by enrollmentId and robustly checks for tutor details
+async function checkTutorAssignments(enrollmentId, studentNames = []) {
     try {
         const assignments = [];
+        console.log(`Checking assignments for Enrollment: ${enrollmentId}`);
         
-        // Search in 'students' collection for enrollmentId
+        // 1. Search in 'students' collection for enrollmentId
         const studentsQuery = query(
             collection(db, "students"), 
             where("enrollmentId", "==", enrollmentId)
@@ -3011,27 +3013,39 @@ async function getEnrollmentTutorStatus(enrollmentId) {
         
         const studentsSnapshot = await getDocs(studentsQuery);
         
+        if (studentsSnapshot.empty) {
+            console.log(`No student documents found for enrollmentId: ${enrollmentId}`);
+        }
+
+        // 2. Iterate through results
         studentsSnapshot.forEach(doc => {
             const data = doc.data();
             
+            // 3. Robust Data Retrieval
+            // We use the enrollmentId match as the primary validator.
+            // If the ID matches, we assume this student record belongs to this enrollment.
+            // We then verify if a tutor is actually assigned.
+
             let tName = data.tutorName;
             let tEmail = data.tutorEmail;
             let aDate = data.assignedDate;
 
-            // Check nested 'tutor' object
+            // Check nested 'tutor' object (common in some data structures)
             if (data.tutor) {
                 if (!tName) tName = data.tutor.tutorName || data.tutor.name;
                 if (!tEmail) tEmail = data.tutor.tutorEmail || data.tutor.email;
                 if (!aDate) aDate = data.tutor.assignedDate;
             }
 
-            // If we have a tutor but no assigned date, use creation date
+            // Fallback: If we have a tutor but no specific assigned date, use the record creation date
             if ((tName || tEmail) && !aDate) {
                 aDate = data.createdAt;
             }
 
-            // If tutor is assigned
+            // 4. Verification
+            // If we found a tutor name or email, we consider this "Assigned"
             if (tName || tEmail) {
+                console.log(`Found Tutor for student ${data.name}: ${tName}`);
                 assignments.push({
                     studentName: data.name,
                     tutorName: tName,
@@ -3039,59 +3053,16 @@ async function getEnrollmentTutorStatus(enrollmentId) {
                     assignedDate: aDate,
                     source: 'students_collection'
                 });
+            } else {
+                console.log(`Student ${data.name} found, but no tutor fields detected.`);
             }
         });
         
         return assignments;
     } catch (error) {
-        console.error("Error getting tutor status:", error);
+        console.error("Error checking tutor assignments:", error);
         return [];
     }
-}
-
-// Helper: Get assignment summary for the "Assigned/Date" column
-function getAssignmentSummary(assignments) {
-    if (!assignments || assignments.length === 0) {
-        return {
-            status: 'Not Assigned',
-            date: null,
-            tutors: [],
-            allAssigned: false,
-            partialAssignment: false
-        };
-    }
-    
-    const totalStudents = assignments.length;
-    const assignedStudents = assignments.filter(a => a.tutorName || a.tutorEmail).length;
-    
-    // Find the earliest assignment date
-    let earliestDate = null;
-    assignments.forEach(assignment => {
-        if (assignment.assignedDate) {
-            const date = assignment.assignedDate.seconds ? 
-                new Date(assignment.assignedDate.seconds * 1000) : 
-                new Date(assignment.assignedDate);
-            
-            if (!earliestDate || date < earliestDate) {
-                earliestDate = date;
-            }
-        }
-    });
-    
-    // Get unique tutor names
-    const tutorNames = [...new Set(assignments
-        .filter(a => a.tutorName)
-        .map(a => a.tutorName))];
-    
-    return {
-        status: assignedStudents === totalStudents ? 'Fully Assigned' : 
-                assignedStudents > 0 ? 'Partially Assigned' : 'Not Assigned',
-        date: earliestDate,
-        tutors: tutorNames,
-        allAssigned: assignedStudents === totalStudents,
-        assignedCount: assignedStudents,
-        totalCount: totalStudents
-    };
 }
 
 async function fetchAndRenderEnrollments(forceRefresh = false) {
@@ -3112,15 +3083,13 @@ async function fetchAndRenderEnrollments(forceRefresh = false) {
                 ...doc.data() 
             }));
             
-            // Fetch tutor assignments for all enrollments
+            // Fetch tutor assignments for all enrollments using the updated Logic
             const enrollmentsWithAssignments = await Promise.all(enrollmentsData.map(async (enrollment) => {
-                const assignments = await getEnrollmentTutorStatus(enrollment.id);
-                const assignmentSummary = getAssignmentSummary(assignments);
-                
+                const studentNames = enrollment.students?.map(s => s.name) || [];
+                const assignments = await checkTutorAssignments(enrollment.id, studentNames);
                 return {
                     ...enrollment,
-                    tutorAssignments: assignments,
-                    assignmentSummary: assignmentSummary
+                    tutorAssignments: assignments
                 };
             }));
             
@@ -3248,6 +3217,25 @@ function renderEnrollmentsFromCache(searchTerm = '') {
         return;
     }
 
+    function parseFeeValue(feeValue) {
+        if (!feeValue && feeValue !== 0) return 0;
+        
+        if (typeof feeValue === 'number') {
+            return Math.round(feeValue);
+        }
+        
+        if (typeof feeValue === 'string') {
+            const cleaned = feeValue
+                .replace(/[^0-9.-]/g, '')
+                .trim();
+            
+            const parsed = parseFloat(cleaned);
+            return isNaN(parsed) ? 0 : Math.round(parsed);
+        }
+        
+        return 0;
+    }
+
     const tableRows = filteredEnrollments.map(enrollment => {
         const createdAt = enrollment.createdAt ? new Date(enrollment.createdAt).toLocaleDateString() : 
                         enrollment.timestamp ? new Date(enrollment.timestamp).toLocaleDateString() : 'N/A';
@@ -3285,35 +3273,26 @@ function renderEnrollmentsFromCache(searchTerm = '') {
         
         const referralCode = enrollment.referral?.code || 'None';
         
-        // Assigned/Date column - UPDATED WITH BETTER STATUS DISPLAY
+        // Tutor assignment status - UPDATED
         let assignmentStatus = '';
-        const assignmentSummary = enrollment.assignmentSummary || getAssignmentSummary(enrollment.tutorAssignments || []);
+        const tutorAssignments = enrollment.tutorAssignments || [];
         
-        if (assignmentSummary.status === 'Fully Assigned') {
-            const dateStr = assignmentSummary.date ? assignmentSummary.date.toLocaleDateString() : 'Date unknown';
-            const tutorsStr = assignmentSummary.tutors.length > 0 ? 
-                assignmentSummary.tutors.join(', ') : 'Multiple tutors';
+        if (tutorAssignments.length > 0) {
+            const firstAssignment = tutorAssignments[0];
+            const assignedDate = firstAssignment.assignedDate ? 
+                new Date(firstAssignment.assignedDate.seconds * 1000 || firstAssignment.assignedDate).toLocaleDateString() : 
+                'Unknown date';
             
+            const tutorNames = tutorAssignments.map(a => a.tutorName).filter(name => name).join(', ');
             assignmentStatus = `
-                <div class="text-sm" title="All students assigned - ${tutorsStr}">
-                    <span class="text-green-600 font-medium">✓ Assigned</span>
-                    <div class="text-xs text-gray-500">${dateStr}</div>
-                    <div class="text-xs text-gray-400">${assignmentSummary.assignedCount}/${assignmentSummary.totalCount} students</div>
-                </div>
-            `;
-        } else if (assignmentSummary.status === 'Partially Assigned') {
-            const dateStr = assignmentSummary.date ? assignmentSummary.date.toLocaleDateString() : 'Date unknown';
-            
-            assignmentStatus = `
-                <div class="text-sm" title="Only ${assignmentSummary.assignedCount} of ${assignmentSummary.totalCount} students assigned">
-                    <span class="text-yellow-600 font-medium">Partial</span>
-                    <div class="text-xs text-gray-500">${dateStr}</div>
-                    <div class="text-xs text-gray-400">${assignmentSummary.assignedCount}/${assignmentSummary.totalCount} students</div>
+                <div class="text-sm text-gray-900" title="Assigned to: ${tutorNames}">
+                    <span class="text-green-600 font-medium">Assigned</span>
+                    <div class="text-xs text-gray-500">${assignedDate}</div>
                 </div>
             `;
         } else {
             assignmentStatus = `
-                <div class="text-sm text-gray-500" title="No tutor assignments found">
+                <div class="text-sm text-gray-500" title="No tutor found in Students database">
                     Not Assigned
                 </div>
             `;
@@ -3390,7 +3369,233 @@ function renderEnrollmentsFromCache(searchTerm = '') {
     enrollmentsList.innerHTML = tableRows;
 }
 
-// UPDATED: Enrollment Details Modal with Tutor Assignments under each student
+function filterEnrollments(searchTerm) {
+    renderEnrollmentsFromCache(searchTerm);
+}
+
+function applyEnrollmentFilters() {
+    renderEnrollmentsFromCache(document.getElementById('enrollments-search').value);
+}
+
+// Export Functions
+function showExportRangePicker() {
+    const exportRangeDiv = document.getElementById('export-date-range');
+    if (exportRangeDiv) {
+        exportRangeDiv.classList.remove('hidden');
+    }
+}
+
+function hideExportRangePicker() {
+    const exportRangeDiv = document.getElementById('export-date-range');
+    if (exportRangeDiv) {
+        exportRangeDiv.classList.add('hidden');
+    }
+}
+
+async function exportEnrollmentsToExcel() {
+    try {
+        const exportDateFrom = document.getElementById('export-date-from')?.value;
+        const exportDateTo = document.getElementById('export-date-to')?.value;
+        
+        let enrollmentsToExport = sessionCache.enrollments || [];
+        
+        // Apply date filter if export range is specified
+        if (exportDateFrom || exportDateTo) {
+            enrollmentsToExport = enrollmentsToExport.filter(enrollment => {
+                const createdDate = new Date(enrollment.createdAt || enrollment.timestamp);
+                
+                if (exportDateFrom) {
+                    const fromDate = new Date(exportDateFrom);
+                    if (createdDate < fromDate) return false;
+                }
+                
+                if (exportDateTo) {
+                    const toDate = new Date(exportDateTo);
+                    toDate.setHours(23, 59, 59, 999);
+                    if (createdDate > toDate) return false;
+                }
+                
+                return true;
+            });
+        }
+        
+        if (enrollmentsToExport.length === 0) {
+            alert("No enrollments found for the selected criteria.");
+            return;
+        }
+        
+        // Prepare data for Excel
+        const excelData = enrollmentsToExport.map(enrollment => {
+            const studentNames = enrollment.students?.map(s => s.name).join(', ') || '';
+            const studentGrades = enrollment.students?.map(s => s.grade || s.actualGrade || '').join(', ') || '';
+            const tutorAssignments = enrollment.tutorAssignments || [];
+            const tutorNames = tutorAssignments.map(a => a.tutorName).filter(name => name).join(', ') || 'Not Assigned';
+            const assignedDate = tutorAssignments.length > 0 ? 
+                new Date(tutorAssignments[0].assignedDate?.seconds * 1000 || tutorAssignments[0].assignedDate).toLocaleDateString() : 
+                'Not Assigned';
+            
+            return {
+                'Application ID': enrollment.id,
+                'Parent Name': enrollment.parent?.name || '',
+                'Parent Email': enrollment.parent?.email || '',
+                'Parent Phone': enrollment.parent?.phone || '',
+                'Students': studentNames,
+                'Student Grades': studentGrades,
+                'Academic Days': enrollment.academicDays || '',
+                'Academic Time': enrollment.academicTime || '',
+                'Total Fee': `₦${parseFeeValue(enrollment.summary?.totalFee).toLocaleString()}`,
+                'Referral Code': enrollment.referral?.code || '',
+                'Status': enrollment.status || '',
+                'Created Date': enrollment.createdAt ? new Date(enrollment.createdAt).toLocaleDateString() : '',
+                'Approval Date': enrollment.approvedAt ? new Date(enrollment.approvedAt?.seconds * 1000).toLocaleDateString() : '',
+                'Payment Method': enrollment.payment?.method || '',
+                'Payment Reference': enrollment.payment?.reference || '',
+                'Payment Amount': `₦${(enrollment.payment?.amount || 0).toLocaleString()}`,
+                'Assigned Tutors': tutorNames,
+                'Assignment Date': assignedDate,
+                'Address': enrollment.parent?.address || '',
+                'Notes': enrollment.additionalNotes || ''
+            };
+        });
+        
+        // Create worksheet
+        const worksheet = XLSX.utils.json_to_sheet(excelData);
+        
+        // Create workbook
+        const workbook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(workbook, worksheet, "Enrollments");
+        
+        // Generate Excel file
+        const fileName = exportDateFrom || exportDateTo ? 
+            `Enrollments_${exportDateFrom || 'all'}_to_${exportDateTo || 'all'}.xlsx` :
+            `All_Enrollments.xlsx`;
+        
+        XLSX.writeFile(workbook, fileName);
+        
+        // Hide export range picker after successful export
+        hideExportRangePicker();
+        
+    } catch (error) {
+        console.error("Error exporting to Excel:", error);
+        alert("Failed to export enrollments. Please try again.");
+    }
+}
+
+// Export single enrollment to Excel - FIXED REFERENCE ERROR & UPDATED LOGIC
+window.exportSingleEnrollmentToExcel = async function(enrollmentId) {
+    try {
+        const enrollmentDoc = await getDoc(doc(db, "enrollments", enrollmentId));
+        if (!enrollmentDoc.exists()) {
+            alert("Enrollment not found!");
+            return;
+        }
+
+        const enrollment = enrollmentDoc.data();
+        const studentNames = enrollment.students?.map(s => s.name) || [];
+        
+        // Fetch fresh assignments using updated logic
+        const tutorAssignments = await checkTutorAssignments(enrollmentId, studentNames);
+        
+        // Prepare detailed data
+        const enrollmentData = [{
+            'Application ID': enrollmentId,
+            'Parent Name': enrollment.parent?.name || '',
+            'Parent Email': enrollment.parent?.email || '',
+            'Parent Phone': enrollment.parent?.phone || '',
+            'Parent Address': enrollment.parent?.address || '',
+            'Status': enrollment.status || '',
+            'Created Date': enrollment.createdAt ? new Date(enrollment.createdAt).toLocaleDateString() : '',
+            'Approval Date': enrollment.approvedAt ? new Date(enrollment.approvedAt?.seconds * 1000).toLocaleDateString() : '',
+            'Academic Days': enrollment.academicDays || '',
+            'Academic Time': enrollment.academicTime || '',
+            'Total Fee': `₦${parseFeeValue(enrollment.summary?.totalFee).toLocaleString()}`,
+            'Referral Code': enrollment.referral?.code || '',
+            'Payment Method': enrollment.payment?.method || '',
+            'Payment Reference': enrollment.payment?.reference || '',
+            'Payment Amount': `₦${(enrollment.payment?.amount || 0).toLocaleString()}`,
+            'Approved By': enrollment.payment?.approvedBy || ''
+        }];
+
+        // Prepare students data
+        const studentsData = enrollment.students?.map(student => {
+            const studentAssignment = tutorAssignments.find(a => a.studentName === student.name);
+            return {
+                'Student Name': student.name || '',
+                'Grade': student.grade || '',
+                'Actual Grade': student.actualGrade || '',
+                'DOB': student.dob || '',
+                'Gender': student.gender || '',
+                'Start Date': student.startDate || '',
+                'Preferred Tutor': student.preferredTutor || '',
+                'Academic Days': student.academicDays || '',
+                'Academic Time': student.academicTime || '',
+                'Subjects': student.selectedSubjects?.join(', ') || '',
+                'Extracurricular': student.extracurriculars?.map(e => `${e.name} (${e.frequency})`).join(', ') || '',
+                'Test Prep': student.testPrep?.map(t => `${t.name} (${t.hours} hrs)`).join(', ') || '',
+                'Assigned Tutor': studentAssignment?.tutorName || 'Not Assigned',
+                'Assignment Date': studentAssignment?.assignedDate ? 
+                    new Date(studentAssignment.assignedDate?.seconds * 1000 || studentAssignment.assignedDate).toLocaleDateString() : 
+                    'Not Assigned',
+                'Notes': student.additionalNotes || ''
+            };
+        }) || [];
+
+        // Create workbook with multiple sheets
+        const workbook = XLSX.utils.book_new();
+        
+        // Enrollment details sheet
+        const enrollmentSheet = XLSX.utils.json_to_sheet(enrollmentData);
+        XLSX.utils.book_append_sheet(workbook, enrollmentSheet, "Enrollment");
+        
+        // Students sheet
+        if (studentsData.length > 0) {
+            const studentsSheet = XLSX.utils.json_to_sheet(studentsData);
+            XLSX.utils.book_append_sheet(workbook, studentsSheet, "Students");
+        }
+        
+        // Fee breakdown sheet
+        if (enrollment.summary) {
+            const feeData = [{
+                'Academic Fees': `₦${parseFeeValue(enrollment.summary.academicFee).toLocaleString()}`,
+                'Extracurricular Fees': `₦${parseFeeValue(enrollment.summary.extracurricularFee).toLocaleString()}`,
+                'Test Prep Fees': `₦${parseFeeValue(enrollment.summary.testPrepFee).toLocaleString()}`,
+                'Discount': `-₦${parseFeeValue(enrollment.summary.discountAmount).toLocaleString()}`,
+                'Total Fee': `₦${parseFeeValue(enrollment.summary.totalFee).toLocaleString()}`
+            }];
+            const feeSheet = XLSX.utils.json_to_sheet(feeData);
+            XLSX.utils.book_append_sheet(workbook, feeSheet, "Fees");
+        }
+        
+        // Generate file
+        const fileName = `Enrollment_${enrollmentId.substring(0, 8)}.xlsx`;
+        XLSX.writeFile(workbook, fileName);
+        
+    } catch (error) {
+        console.error("Error exporting single enrollment:", error);
+        alert("Failed to export enrollment details. Please try again.");
+    }
+};
+
+// Helper function for fee parsing
+function parseFeeValue(feeValue) {
+    if (!feeValue && feeValue !== 0) return 0;
+    
+    if (typeof feeValue === 'number') {
+        return Math.round(feeValue);
+    }
+    
+    if (typeof feeValue === 'string') {
+        const cleaned = feeValue
+            .replace(/[^0-9.-]/g, '')
+            .trim();
+        
+        const parsed = parseFloat(cleaned);
+        return isNaN(parsed) ? 0 : Math.round(parsed);
+    }
+    
+    return 0;
+}
+
 window.showEnrollmentDetails = async function(enrollmentId) {
     try {
         const enrollmentDoc = await getDoc(doc(db, "enrollments", enrollmentId));
@@ -3401,22 +3606,18 @@ window.showEnrollmentDetails = async function(enrollmentId) {
 
         const enrollment = { id: enrollmentDoc.id, ...enrollmentDoc.data() };
         
-        // Get tutor assignments for this enrollment
-        const tutorAssignments = await getEnrollmentTutorStatus(enrollmentId);
+        // Check for tutor assignments
+        const studentNames = enrollment.students?.map(s => s.name) || [];
+        const tutorAssignments = await checkTutorAssignments(enrollmentId, studentNames);
         
         const createdAt = enrollment.createdAt ? new Date(enrollment.createdAt).toLocaleString() : 
                          enrollment.timestamp ? new Date(enrollment.timestamp).toLocaleString() : 'N/A';
         
-        // Build students HTML with tutor assignments integrated under each student
+        // Build students HTML
         let studentsHTML = '';
         if (enrollment.students && enrollment.students.length > 0) {
             studentsHTML = enrollment.students.map((student, index) => {
-                // Find tutor assignment for this specific student
-                const studentAssignment = tutorAssignments.find(a => 
-                    a.studentName === student.name || 
-                    (student.name && a.studentName && 
-                     a.studentName.toLowerCase().includes(student.name.toLowerCase()))
-                );
+                const studentAssignment = tutorAssignments.find(a => a.studentName === student.name);
                 
                 let subjectsHTML = '';
                 if (student.selectedSubjects && student.selectedSubjects.length > 0) {
@@ -3437,57 +3638,30 @@ window.showEnrollmentDetails = async function(enrollmentId) {
                 const academicDays = student.academicDays || enrollment.academicDays || 'Not specified';
                 const academicTime = student.academicTime || enrollment.academicTime || 'Not specified';
                 
-                // Tutor assignment info - NOW INTEGRATED UNDER EACH STUDENT
+                // Tutor assignment info
                 let tutorHTML = '';
                 if (studentAssignment) {
                     const assignedDate = studentAssignment.assignedDate ? 
-                        (studentAssignment.assignedDate.seconds ? 
-                            new Date(studentAssignment.assignedDate.seconds * 1000).toLocaleDateString() : 
-                            new Date(studentAssignment.assignedDate).toLocaleDateString()) : 
+                        new Date(studentAssignment.assignedDate.seconds * 1000 || studentAssignment.assignedDate).toLocaleDateString() : 
                         'Unknown date';
-                    
                     tutorHTML = `
-                        <div class="mt-2 p-3 bg-green-50 border border-green-200 rounded-lg">
-                            <div class="flex justify-between items-start">
-                                <div>
-                                    <p class="text-sm font-semibold text-green-700">✓ Tutor Assigned</p>
-                                    <p class="text-sm"><strong>Tutor:</strong> ${studentAssignment.tutorName || 'Name not available'}</p>
-                                    <p class="text-xs text-gray-600">Email: ${studentAssignment.tutorEmail || 'Not available'}</p>
-                                </div>
-                                <div class="text-right">
-                                    <p class="text-xs font-medium text-gray-600">Assigned Date</p>
-                                    <p class="text-sm">${assignedDate}</p>
-                                </div>
-                            </div>
-                            <div class="mt-2 pt-2 border-t border-green-200">
-                                <p class="text-xs text-gray-500">Source: ${studentAssignment.source || 'students_collection'}</p>
-                            </div>
+                        <div class="mt-2 p-2 bg-green-50 border border-green-200 rounded">
+                            <p class="text-sm"><strong>Assigned Tutor:</strong> ${studentAssignment.tutorName}</p>
+                            <p class="text-xs text-gray-600">Assigned on: ${assignedDate} (via ${studentAssignment.source})</p>
                         </div>
                     `;
                 } else {
                     tutorHTML = `
-                        <div class="mt-2 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
-                            <div class="flex items-center">
-                                <svg class="w-4 h-4 text-yellow-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.196 16.5c-.77.833.192 2.5 1.732 2.5z"></path>
-                                </svg>
-                                <p class="text-sm text-yellow-700">No tutor assigned yet</p>
-                            </div>
-                            <p class="text-xs text-yellow-600 mt-1">This student is not linked to any tutor in the system</p>
+                        <div class="mt-2 p-2 bg-yellow-50 border border-yellow-200 rounded">
+                            <p class="text-sm text-yellow-700">No tutor assigned yet</p>
                         </div>
                     `;
                 }
                 
                 return `
-                    <div class="border rounded-lg p-4 mb-4 bg-gray-50">
-                        <div class="flex justify-between items-start mb-3">
-                            <h4 class="font-bold text-lg text-gray-800">${student.name || 'Unnamed Student'}</h4>
-                            <span class="px-2 py-1 text-xs rounded-full ${studentAssignment ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}">
-                                ${studentAssignment ? 'Assigned' : 'Unassigned'}
-                            </span>
-                        </div>
-                        
-                        <div class="grid grid-cols-2 gap-2 text-sm mb-3">
+                    <div class="border rounded-lg p-4 mb-3 bg-gray-50">
+                        <h4 class="font-bold text-lg mb-2">${student.name || 'Unnamed Student'}</h4>
+                        <div class="grid grid-cols-2 gap-2 text-sm">
                             <p><strong>Grade:</strong> ${student.grade || 'N/A'}</p>
                             <p><strong>DOB:</strong> ${student.dob || 'N/A'}</p>
                             <p><strong>Start Date:</strong> ${student.startDate || 'N/A'}</p>
@@ -3497,50 +3671,17 @@ window.showEnrollmentDetails = async function(enrollmentId) {
                             <p><strong>Academic Days:</strong> ${academicDays}</p>
                             <p><strong>Academic Time:</strong> ${academicTime}</p>
                         </div>
-                        
-                        <!-- Tutor Assignment Section - Now under each student -->
                         ${tutorHTML}
-                        
-                        <!-- Additional Information -->
-                        <div class="mt-3">
-                            ${subjectsHTML}
-                            ${extracurricularHTML}
-                            ${testPrepHTML}
-                            ${student.additionalNotes ? `<p class="text-sm mt-2"><strong>Notes:</strong> ${student.additionalNotes}</p>` : ''}
-                        </div>
+                        ${subjectsHTML}
+                        ${extracurricularHTML}
+                        ${testPrepHTML}
+                        ${student.additionalNotes ? `<p class="text-sm mt-2"><strong>Notes:</strong> ${student.additionalNotes}</p>` : ''}
                     </div>
                 `;
             }).join('');
         }
 
-        // Build summary of tutor assignments (removed since now shown under each student)
-        let tutorSummaryHTML = '';
-        if (tutorAssignments.length > 0) {
-            const assignedCount = tutorAssignments.filter(a => a.tutorName).length;
-            const totalCount = enrollment.students?.length || 0;
-            
-            tutorSummaryHTML = `
-                <div class="mb-6 p-4 bg-gradient-to-r from-purple-50 to-blue-50 rounded-lg border">
-                    <h4 class="font-bold text-lg text-purple-700 mb-2">Tutor Assignment Summary</h4>
-                    <div class="flex items-center justify-between">
-                        <div>
-                            <p class="text-sm"><strong>Status:</strong> ${assignedCount === totalCount ? 'All Students Assigned' : `${assignedCount}/${totalCount} Students Assigned`}</p>
-                            <p class="text-sm"><strong>Assigned Tutors:</strong> ${[...new Set(tutorAssignments.filter(a => a.tutorName).map(a => a.tutorName))].join(', ')}</p>
-                        </div>
-                        <div class="text-right">
-                            <p class="text-sm text-gray-600">Last Assignment</p>
-                            <p class="text-sm font-medium">${tutorAssignments[0]?.assignedDate ? 
-                                (tutorAssignments[0].assignedDate.seconds ? 
-                                    new Date(tutorAssignments[0].assignedDate.seconds * 1000).toLocaleDateString() : 
-                                    new Date(tutorAssignments[0].assignedDate).toLocaleDateString()) : 
-                                'Unknown'}</p>
-                        </div>
-                    </div>
-                </div>
-            `;
-        }
-
-        // Build referral HTML
+        // Build referral HTML (initialize as empty string)
         let referralHTML = '';
         if (enrollment.referral && enrollment.referral.code) {
             referralHTML = `
@@ -3554,7 +3695,7 @@ window.showEnrollmentDetails = async function(enrollmentId) {
             `;
         }
 
-        // Build payment HTML
+        // Build payment HTML (initialize as empty string)
         let paymentHTML = '';
         if (enrollment.payment) {
             const paymentDate = enrollment.payment.date ? 
@@ -3608,6 +3749,28 @@ window.showEnrollmentDetails = async function(enrollmentId) {
             `;
         }
 
+        // Build tutor assignments summary
+        let tutorSummaryHTML = '';
+        if (tutorAssignments.length > 0) {
+            tutorSummaryHTML = `
+                <div class="border-l-4 border-purple-500 pl-4 bg-purple-50 p-3 rounded">
+                    <h4 class="font-bold text-purple-700">Tutor Assignments</h4>
+                    ${tutorAssignments.map(assignment => {
+                        const assignedDate = assignment.assignedDate ? 
+                            new Date(assignment.assignedDate.seconds * 1000 || assignment.assignedDate).toLocaleDateString() : 
+                            'Unknown date';
+                        return `
+                            <div class="mb-2 p-2 bg-white rounded border">
+                                <p class="font-medium">${assignment.studentName}</p>
+                                <p class="text-sm">Tutor: ${assignment.tutorName}</p>
+                                <p class="text-xs text-gray-500">Assigned: ${assignedDate} (${assignment.source})</p>
+                            </div>
+                        `;
+                    }).join('')}
+                </div>
+            `;
+        }
+
         const isApproved = enrollment.status === 'completed' || enrollment.status === 'payment_received';
         const approveButtonHTML = isApproved ? 
             '<span class="px-4 py-2 bg-green-100 text-green-800 rounded cursor-help" title="This enrollment has already been approved">Approved</span>' : 
@@ -3644,7 +3807,6 @@ window.showEnrollmentDetails = async function(enrollmentId) {
                     
                     <div class="mt-6">
                         <h4 class="font-bold text-lg mb-2">Student Information (${enrollment.students?.length || 0} students)</h4>
-                        <p class="text-sm text-gray-600 mb-3">Each student section shows tutor assignment status below their details</p>
                         ${studentsHTML || '<p class="text-gray-500">No student information available.</p>'}
                     </div>
                     
@@ -3668,6 +3830,519 @@ window.showEnrollmentDetails = async function(enrollmentId) {
     } catch (error) {
         console.error("Error showing enrollment details:", error);
         alert("Failed to load enrollment details. Please try again.");
+    }
+};
+
+window.approveEnrollmentModal = async function(enrollmentId) {
+    try {
+        const enrollmentDoc = await getDoc(doc(db, "enrollments", enrollmentId));
+        if (!enrollmentDoc.exists()) {
+            alert("Enrollment not found!");
+            return;
+        }
+
+        const enrollment = enrollmentDoc.data();
+        
+        // Get tutors for assignment from tutor directory
+        let tutors = sessionCache.tutors || [];
+        if (tutors.length === 0) {
+            const tutorsSnapshot = await getDocs(query(collection(db, "tutors"), where("status", "==", "active")));
+            tutors = tutorsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            saveToLocalStorage('tutors', tutors);
+        }
+        
+        if (tutors.length === 0) {
+            alert("No active tutors available. Please add tutors first.");
+            return;
+        }
+        
+        // Get academic days and time from enrollment
+        const firstStudent = enrollment.students && enrollment.students.length > 0 ? enrollment.students[0] : {};
+        const academicDays = firstStudent.academicDays || enrollment.academicDays || '';
+        const academicTime = firstStudent.academicTime || enrollment.academicTime || '';
+        
+        const modalHtml = `
+            <div id="approveEnrollmentModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-center justify-center">
+                <div class="relative p-8 bg-white w-96 max-w-lg rounded-lg shadow-xl">
+                    <button class="absolute top-2 right-2 text-gray-500 hover:text-gray-800 text-2xl font-bold" onclick="closeManagementModal('approveEnrollmentModal')">&times;</button>
+                    <h3 class="text-xl font-bold mb-4">Approve Enrollment</h3>
+                    <form id="approve-enrollment-form">
+                        <input type="hidden" id="approve-enrollment-id" value="${enrollmentId}">
+                        
+                        <div class="mb-4">
+                            <label class="block text-sm font-medium mb-2">Payment Method</label>
+                            <select id="payment-method" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2">
+                                <option value="">Select payment method</option>
+                                <option value="bank_transfer">Bank Transfer</option>
+                                <option value="credit_card">Credit Card</option>
+                                <option value="debit_card">Debit Card</option>
+                                <option value="cash">Cash</option>
+                                <option value="online_payment">Online Payment</option>
+                                <option value="pos">POS</option>
+                            </select>
+                        </div>
+                        
+                        <div class="mb-4">
+                            <label class="block text-sm font-medium mb-2">Payment Reference (Optional)</label>
+                            <input type="text" id="payment-reference" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2" placeholder="e.g., transaction ID">
+                        </div>
+                        
+                        <div class="mb-4">
+                            <label class="block text-sm font-medium mb-2">Payment Date</label>
+                            <input type="date" id="payment-date" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2" value="${new Date().toISOString().split('T')[0]}">
+                        </div>
+                        
+                        <div class="mb-4">
+                            <label class="block text-sm font-medium mb-2">Academic Days</label>
+                            <input type="text" id="academic-days" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2" value="${academicDays}" placeholder="e.g., Monday, Wednesday, Friday">
+                        </div>
+                        
+                        <div class="mb-4">
+                            <label class="block text-sm font-medium mb-2">Academic Time</label>
+                            <input type="text" id="academic-time" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2" value="${academicTime}" placeholder="e.g., 3:00 PM - 5:00 PM">
+                        </div>
+                        
+                        <div class="mb-4">
+                            <label class="block text-sm font-medium mb-2">Assign Tutor (for each student)</label>
+                            <div id="student-tutor-assignments">
+                                ${enrollment.students ? enrollment.students.map((student, index) => `
+                                    <div class="mb-3 p-2 border rounded">
+                                        <p class="text-sm font-medium mb-1">${student.name}</p>
+                                        <div class="relative">
+                                            <input type="text" 
+                                                   id="tutor-search-${index}" 
+                                                   class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2 text-sm"
+                                                   placeholder="Search tutor by name..."
+                                                   autocomplete="off">
+                                            <div id="tutor-results-${index}" class="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-y-auto hidden"></div>
+                                            <input type="hidden" name="tutor-assignment-${index}" id="selected-tutor-${index}" value="">
+                                        </div>
+                                    </div>
+                                `).join('') : ''}
+                            </div>
+                        </div>
+                        
+                        <div class="mb-4">
+                            <label class="block text-sm font-medium mb-2">Final Fee (₦)</label>
+                            <input type="number" id="final-fee" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2" 
+                                   value="${enrollment.summary?.totalFee || 0}" min="0" step="1000">
+                        </div>
+                        
+                        <div class="mb-4">
+                            <label class="block text-sm font-medium mb-2">Status</label>
+                            <select id="enrollment-status" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2">
+                                <option value="completed">Completed</option>
+                                <option value="payment_received">Payment Received</option>
+                            </select>
+                        </div>
+                        
+                        <div class="flex justify-end mt-4">
+                            <button type="button" onclick="closeManagementModal('approveEnrollmentModal')" class="mr-2 px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300">Cancel</button>
+                            <button type="submit" class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700">Approve Enrollment</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        `;
+        
+        document.body.insertAdjacentHTML('beforeend', modalHtml);
+        
+        // Initialize tutor search for each student
+        if (enrollment.students) {
+            enrollment.students.forEach((student, index) => {
+                const searchInput = document.getElementById(`tutor-search-${index}`);
+                const resultsContainer = document.getElementById(`tutor-results-${index}`);
+                const hiddenInput = document.getElementById(`selected-tutor-${index}`);
+                
+                if (searchInput && resultsContainer && hiddenInput) {
+                    // Add focus event to show all tutors initially
+                    searchInput.addEventListener('focus', function() {
+                        displayTutorResults(this.value, tutors, resultsContainer, hiddenInput, searchInput);
+                    });
+                    
+                    // Add input event for searching
+                    searchInput.addEventListener('input', function() {
+                        displayTutorResults(this.value, tutors, resultsContainer, hiddenInput, searchInput);
+                    });
+                    
+                    // Close results when clicking outside
+                    document.addEventListener('click', function(event) {
+                        if (!searchInput.contains(event.target) && !resultsContainer.contains(event.target)) {
+                            resultsContainer.classList.add('hidden');
+                        }
+                    });
+                }
+            });
+        }
+        
+        document.getElementById('approve-enrollment-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            await approveEnrollmentWithDetails(enrollmentId);
+        });
+        
+    } catch (error) {
+        console.error("Error showing approve modal:", error);
+        alert("Failed to load approval form. Please try again.");
+    }
+};
+
+function displayTutorResults(searchTerm, tutors, resultsContainer, hiddenInput, searchInput) {
+    const term = searchTerm.toLowerCase().trim();
+    let filteredTutors = tutors;
+    
+    if (term) {
+        filteredTutors = tutors.filter(tutor => 
+            tutor.name.toLowerCase().includes(term) || 
+            tutor.email.toLowerCase().includes(term)
+        );
+    }
+    
+    if (filteredTutors.length === 0) {
+        resultsContainer.innerHTML = '<div class="p-2 text-sm text-gray-500">No tutors found</div>';
+        resultsContainer.classList.remove('hidden');
+        return;
+    }
+    
+    const resultsHTML = filteredTutors.map(tutor => `
+        <div class="p-2 hover:bg-gray-100 cursor-pointer border-b border-gray-100 tutor-option" 
+             data-tutor-email="${tutor.email}"
+             data-tutor-name="${tutor.name}">
+            <div class="font-medium">${tutor.name}</div>
+            <div class="text-xs text-gray-500">${tutor.email}</div>
+        </div>
+    `).join('');
+    
+    resultsContainer.innerHTML = resultsHTML;
+    resultsContainer.classList.remove('hidden');
+    
+    // Add click event to tutor options
+    resultsContainer.querySelectorAll('.tutor-option').forEach(option => {
+        option.addEventListener('click', function() {
+            const tutorEmail = this.getAttribute('data-tutor-email');
+            const tutorName = this.getAttribute('data-tutor-name');
+            
+            hiddenInput.value = tutorEmail;
+            searchInput.value = tutorName;
+            resultsContainer.classList.add('hidden');
+        });
+    });
+}
+
+async function approveEnrollmentWithDetails(enrollmentId) {
+    const form = document.getElementById('approve-enrollment-form');
+    if (!form) return;
+    
+    const paymentMethod = form.elements['payment-method'].value;
+    const paymentReference = form.elements['payment-reference'].value;
+    const paymentDate = form.elements['payment-date'].value;
+    const finalFee = parseFloat(form.elements['final-fee'].value);
+    const academicDays = form.elements['academic-days'].value;
+    const academicTime = form.elements['academic-time'].value;
+    const enrollmentStatus = form.elements['enrollment-status'].value;
+    
+    if (!paymentMethod) {
+        alert("Please select a payment method.");
+        return;
+    }
+    
+    if (isNaN(finalFee) || finalFee < 0) {
+        alert("Please enter a valid fee amount.");
+        return;
+    }
+    
+    try {
+        // Get enrollment data
+        const enrollmentDoc = await getDoc(doc(db, "enrollments", enrollmentId));
+        const enrollmentData = enrollmentDoc.data();
+        
+        // Get tutor assignments
+        const studentAssignments = [];
+        const errors = [];
+        
+        enrollmentData.students.forEach((student, index) => {
+            const tutorEmail = document.getElementById(`selected-tutor-${index}`)?.value;
+            if (!tutorEmail) {
+                errors.push(`Please select a tutor for student: ${student.name}`);
+                return;
+            }
+            
+            // Get tutor name from tutors cache
+            const tutors = sessionCache.tutors || [];
+            const tutor = tutors.find(t => t.email === tutorEmail);
+            const tutorName = tutor ? tutor.name : tutorEmail;
+            
+            studentAssignments.push({
+                studentName: student.name,
+                studentId: `pending_${Date.now()}_${index}`,
+                tutorEmail: tutorEmail,
+                tutorName: tutorName,
+                grade: student.grade,
+                subjects: student.selectedSubjects || [],
+                academicDays: academicDays,
+                academicTime: academicTime,
+                days: academicDays, // For backward compatibility
+                studentFee: Math.round(finalFee / enrollmentData.students.length)
+            });
+        });
+        
+        if (errors.length > 0) {
+            alert(errors.join('\n'));
+            return;
+        }
+        
+        if (studentAssignments.length === 0) {
+            alert("Please assign tutors to all students.");
+            return;
+        }
+        
+        const batch = writeBatch(db);
+        
+        // Update enrollment status
+        batch.update(doc(db, "enrollments", enrollmentId), {
+            status: enrollmentStatus,
+            payment: {
+                method: paymentMethod,
+                reference: paymentReference || '',
+                date: Timestamp.fromDate(new Date(paymentDate)),
+                amount: finalFee,
+                approvedBy: window.userData?.name || window.userData?.email || 'Management',
+                approvedAt: Timestamp.now()
+            },
+            finalFee: finalFee,
+            academicDays: academicDays,
+            academicTime: academicTime,
+            approvedAt: Timestamp.now(),
+            approvedBy: window.userData?.email || 'management',
+            lastUpdated: Timestamp.now()
+        });
+        
+        // Create pending student entries for each student
+        studentAssignments.forEach(student => {
+            const pendingStudentRef = doc(collection(db, "pending_students"));
+            batch.set(pendingStudentRef, {
+                ...student,
+                parentName: enrollmentData.parent?.name,
+                parentPhone: enrollmentData.parent?.phone,
+                parentEmail: enrollmentData.parent?.email,
+                enrollmentId: enrollmentId,
+                status: 'pending',
+                createdAt: Timestamp.now(),
+                source: 'enrollment_approval'
+            });
+        });
+        
+        await batch.commit();
+        
+        alert("Enrollment approved successfully! Students have been added to pending approvals.");
+        
+        closeManagementModal('approveEnrollmentModal');
+        invalidateCache('enrollments');
+        invalidateCache('pendingStudents');
+        
+        // Refresh the view
+        const currentNavId = document.querySelector('.nav-item.active')?.dataset.navId;
+        const mainContent = document.getElementById('main-content');
+        if (currentNavId && allNavItems[currentNavId] && mainContent) {
+            allNavItems[currentNavId].fn(mainContent);
+        }
+        
+    } catch (error) {
+        console.error("Error approving enrollment:", error);
+        alert("Failed to approve enrollment. Please try again.");
+    }
+}
+
+window.deleteEnrollment = async function(enrollmentId) {
+    if (!confirm("Are you sure you want to delete this enrollment? This action cannot be undone.")) {
+        return;
+    }
+    
+    try {
+        await deleteDoc(doc(db, "enrollments", enrollmentId));
+        alert("Enrollment deleted successfully!");
+        
+        invalidateCache('enrollments');
+        renderEnrollmentsFromCache(document.getElementById('enrollments-search')?.value || '');
+        
+    } catch (error) {
+        console.error("Error deleting enrollment:", error);
+        alert("Failed to delete enrollment. Please try again.");
+    }
+};
+
+window.downloadEnrollmentInvoice = async function(enrollmentId) {
+    try {
+        const enrollmentDoc = await getDoc(doc(db, "enrollments", enrollmentId));
+        if (!enrollmentDoc.exists()) {
+            alert("Enrollment not found!");
+            return;
+        }
+        
+        const enrollment = enrollmentDoc.data();
+        
+        // Create invoice HTML
+        const invoiceDate = new Date(enrollment.approvedAt || enrollment.createdAt || Date.now());
+        const invoiceNumber = `INV-${enrollmentId.substring(0, 8).toUpperCase()}`;
+        
+        // Get academic days and time
+        const firstStudent = enrollment.students && enrollment.students.length > 0 ? enrollment.students[0] : {};
+        const academicDays = firstStudent.academicDays || enrollment.academicDays || 'Not specified';
+        const academicTime = firstStudent.academicTime || enrollment.academicTime || 'Not specified';
+        
+        const invoiceHTML = `
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <meta charset="UTF-8">
+                <title>Invoice ${invoiceNumber}</title>
+                <style>
+                    body { font-family: Arial, sans-serif; margin: 40px; }
+                    .invoice-container { max-width: 800px; margin: 0 auto; border: 1px solid #ddd; padding: 30px; }
+                    .header { text-align: center; margin-bottom: 30px; border-bottom: 2px solid #4CAF50; padding-bottom: 20px; }
+                    .company-name { font-size: 28px; font-weight: bold; color: #4CAF50; margin-bottom: 5px; }
+                    .invoice-title { font-size: 24px; margin: 10px 0; }
+                    .invoice-info { display: flex; justify-content: space-between; margin: 20px 0; }
+                    .section { margin: 20px 0; }
+                    .section-title { font-weight: bold; border-bottom: 1px solid #ddd; padding-bottom: 5px; margin-bottom: 10px; }
+                    table { width: 100%; border-collapse: collapse; margin: 10px 0; }
+                    th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+                    th { background-color: #f2f2f2; }
+                    .total-row { font-weight: bold; background-color: #f9f9f9; }
+                    .footer { margin-top: 40px; padding-top: 20px; border-top: 1px solid #ddd; text-align: center; color: #666; }
+                </style>
+            </head>
+            <body>
+                <div class="invoice-container">
+                    <div class="header">
+                        <div class="company-name">Blooming Kids House</div>
+                        <div class="invoice-title">INVOICE</div>
+                        <div>Invoice #: ${invoiceNumber}</div>
+                        <div>Date: ${invoiceDate.toLocaleDateString()}</div>
+                    </div>
+                    
+                    <div class="invoice-info">
+                        <div>
+                            <strong>Bill To:</strong><br>
+                            ${enrollment.parent?.name || ''}<br>
+                            ${enrollment.parent?.email || ''}<br>
+                            ${enrollment.parent?.phone || ''}
+                        </div>
+                        <div>
+                            <strong>Invoice Details:</strong><br>
+                            Status: ${enrollment.status || 'Completed'}<br>
+                            Approved By: ${enrollment.payment?.approvedBy || window.userData?.name || 'Management'}<br>
+                            Payment Method: ${enrollment.payment?.method || 'Not specified'}<br>
+                            Schedule: ${academicDays} • ${academicTime}
+                        </div>
+                    </div>
+                    
+                    <div class="section">
+                        <div class="section-title">Student Details</div>
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Student Name</th>
+                                    <th>Actual Grade</th>
+                                    <th>Subjects</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${enrollment.students ? enrollment.students.map(student => `
+                                    <tr>
+                                        <td>${student.name || ''}</td>
+                                        <td>${student.actualGrade || ''}</td>
+                                        <td>${student.selectedSubjects ? student.selectedSubjects.join(', ') : ''}</td>
+                                    </tr>
+                                `).join('') : '<tr><td colspan="3">No student information</td></tr>'}
+                            </tbody>
+                        </table>
+                    </div>
+                    
+                    <div class="section">
+                        <div class="section-title">Fee Breakdown</div>
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Description</th>
+                                    <th>Amount (₦)</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>Academic Fees</td>
+                                    <td>${(enrollment.summary?.academicFee || 0).toLocaleString()}</td>
+                                </tr>
+                                <tr>
+                                    <td>Extracurricular Activities</td>
+                                    <td>${(enrollment.summary?.extracurricularFee || 0).toLocaleString()}</td>
+                                </tr>
+                                <tr>
+                                    <td>Test Preparation</td>
+                                    <td>${(enrollment.summary?.testPrepFee || 0).toLocaleString()}</td>
+                                </tr>
+                                <tr>
+                                    <td>Discount</td>
+                                    <td>-${(enrollment.summary?.discountAmount || 0).toLocaleString()}</td>
+                                </tr>
+                                <tr class="total-row">
+                                    <td><strong>TOTAL</strong></td>
+                                    <td><strong>₦${(enrollment.summary?.totalFee || 0).toLocaleString()}</strong></td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    
+                    <div class="section">
+                        <div class="section-title">Payment Information</div>
+                        <p>Payment Status: <strong>${enrollment.status === 'payment_received' ? 'PAID' : 'PENDING'}</strong></p>
+                        ${enrollment.payment?.reference ? `<p>Reference: ${enrollment.payment.reference}</p>` : ''}
+                        ${enrollment.payment?.date ? `<p>Payment Date: ${new Date(enrollment.payment.date.seconds * 1000).toLocaleDateString()}</p>` : ''}
+                    </div>
+                    
+                    <div class="footer">
+                        <p>Thank you for choosing Blooming Kids House!</p>
+                        <p>For inquiries, contact: info@bloomingkidshouse.com | 0707 896 1070 | 0902 914 7024</p>
+                        <p>This is a computer-generated invoice. No signature required.</p>
+                    </div>
+                </div>
+            </body>
+            </html>
+        `;
+        
+        // Create a temporary iframe to render the HTML
+        const iframe = document.createElement('iframe');
+        iframe.style.position = 'absolute';
+        iframe.style.left = '-9999px';
+        iframe.style.top = '0';
+        iframe.style.width = '800px';
+        iframe.style.height = '1200px';
+        document.body.appendChild(iframe);
+        
+        iframe.contentDocument.open();
+        iframe.contentDocument.write(invoiceHTML);
+        iframe.contentDocument.close();
+        
+        // Wait for the iframe to load
+        setTimeout(() => {
+            html2canvas(iframe.contentDocument.body).then(canvas => {
+                const imgData = canvas.toDataURL('image/jpeg', 0.95);
+                const link = document.createElement('a');
+                link.href = imgData;
+                link.download = `Invoice_${invoiceNumber}.jpg`;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                document.body.removeChild(iframe);
+            }).catch(error => {
+                console.error("Error generating invoice image:", error);
+                alert("Failed to generate invoice image. Please try again.");
+                document.body.removeChild(iframe);
+            });
+        }, 1000);
+        
+    } catch (error) {
+        console.error("Error downloading invoice:", error);
+        alert("Failed to download invoice. Please try again.");
     }
 };
 
@@ -5745,22 +6420,3 @@ onAuthStateChanged(auth, async (user) => {
         window.location.href = "management-auth.html";
     }
 });
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
