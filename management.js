@@ -2986,9 +2986,9 @@ async function renderEnrollmentsPanel(container) {
     // Event Listeners
     document.getElementById('refresh-enrollments-btn').addEventListener('click', () => fetchAndRenderEnrollments(true));
     document.getElementById('enrollments-search').addEventListener('input', (e) => filterEnrollments(e.target.value));
-    document.getElementById('status-filter').addEventListener('change', applyEnrollmentFilters);
-    document.getElementById('date-from').addEventListener('change', applyEnrollmentFilters);
-    document.getElementById('date-to').addEventListener('change', applyEnrollmentFilters);
+    document.getElementById('status-filter').addEventListener('change', () => applyEnrollmentFilters());
+    document.getElementById('date-from').addEventListener('change', () => applyEnrollmentFilters());
+    document.getElementById('date-to').addEventListener('change', () => applyEnrollmentFilters());
     
     // Excel Export Buttons
     document.getElementById('export-excel-btn').addEventListener('click', () => exportEnrollmentsToExcel());
@@ -2998,14 +2998,12 @@ async function renderEnrollmentsPanel(container) {
     fetchAndRenderEnrollments();
 }
 
-// Updated Helper: Check Tutor Assignments 
-// FIXED: Queries students by enrollmentId and robustly checks for tutor details
-async function checkTutorAssignments(enrollmentId, studentNames = []) {
+// Helper: Get tutor assignment status for enrollment
+async function getEnrollmentTutorStatus(enrollmentId) {
     try {
         const assignments = [];
-        console.log(`Checking assignments for Enrollment: ${enrollmentId}`);
         
-        // 1. Search in 'students' collection for enrollmentId
+        // Search in 'students' collection for enrollmentId
         const studentsQuery = query(
             collection(db, "students"), 
             where("enrollmentId", "==", enrollmentId)
@@ -3013,39 +3011,27 @@ async function checkTutorAssignments(enrollmentId, studentNames = []) {
         
         const studentsSnapshot = await getDocs(studentsQuery);
         
-        if (studentsSnapshot.empty) {
-            console.log(`No student documents found for enrollmentId: ${enrollmentId}`);
-        }
-
-        // 2. Iterate through results
         studentsSnapshot.forEach(doc => {
             const data = doc.data();
             
-            // 3. Robust Data Retrieval
-            // We use the enrollmentId match as the primary validator.
-            // If the ID matches, we assume this student record belongs to this enrollment.
-            // We then verify if a tutor is actually assigned.
-
             let tName = data.tutorName;
             let tEmail = data.tutorEmail;
             let aDate = data.assignedDate;
 
-            // Check nested 'tutor' object (common in some data structures)
+            // Check nested 'tutor' object
             if (data.tutor) {
                 if (!tName) tName = data.tutor.tutorName || data.tutor.name;
                 if (!tEmail) tEmail = data.tutor.tutorEmail || data.tutor.email;
                 if (!aDate) aDate = data.tutor.assignedDate;
             }
 
-            // Fallback: If we have a tutor but no specific assigned date, use the record creation date
+            // If we have a tutor but no assigned date, use creation date
             if ((tName || tEmail) && !aDate) {
                 aDate = data.createdAt;
             }
 
-            // 4. Verification
-            // If we found a tutor name or email, we consider this "Assigned"
+            // If tutor is assigned
             if (tName || tEmail) {
-                console.log(`Found Tutor for student ${data.name}: ${tName}`);
                 assignments.push({
                     studentName: data.name,
                     tutorName: tName,
@@ -3053,16 +3039,59 @@ async function checkTutorAssignments(enrollmentId, studentNames = []) {
                     assignedDate: aDate,
                     source: 'students_collection'
                 });
-            } else {
-                console.log(`Student ${data.name} found, but no tutor fields detected.`);
             }
         });
         
         return assignments;
     } catch (error) {
-        console.error("Error checking tutor assignments:", error);
+        console.error("Error getting tutor status:", error);
         return [];
     }
+}
+
+// Helper: Get assignment summary for the "Assigned/Date" column
+function getAssignmentSummary(assignments) {
+    if (!assignments || assignments.length === 0) {
+        return {
+            status: 'Not Assigned',
+            date: null,
+            tutors: [],
+            allAssigned: false,
+            partialAssignment: false
+        };
+    }
+    
+    const totalStudents = assignments.length;
+    const assignedStudents = assignments.filter(a => a.tutorName || a.tutorEmail).length;
+    
+    // Find the earliest assignment date
+    let earliestDate = null;
+    assignments.forEach(assignment => {
+        if (assignment.assignedDate) {
+            const date = assignment.assignedDate.seconds ? 
+                new Date(assignment.assignedDate.seconds * 1000) : 
+                new Date(assignment.assignedDate);
+            
+            if (!earliestDate || date < earliestDate) {
+                earliestDate = date;
+            }
+        }
+    });
+    
+    // Get unique tutor names
+    const tutorNames = [...new Set(assignments
+        .filter(a => a.tutorName)
+        .map(a => a.tutorName))];
+    
+    return {
+        status: assignedStudents === totalStudents ? 'Fully Assigned' : 
+                assignedStudents > 0 ? 'Partially Assigned' : 'Not Assigned',
+        date: earliestDate,
+        tutors: tutorNames,
+        allAssigned: assignedStudents === totalStudents,
+        assignedCount: assignedStudents,
+        totalCount: totalStudents
+    };
 }
 
 async function fetchAndRenderEnrollments(forceRefresh = false) {
@@ -3083,13 +3112,15 @@ async function fetchAndRenderEnrollments(forceRefresh = false) {
                 ...doc.data() 
             }));
             
-            // Fetch tutor assignments for all enrollments using the updated Logic
+            // Fetch tutor assignments for all enrollments
             const enrollmentsWithAssignments = await Promise.all(enrollmentsData.map(async (enrollment) => {
-                const studentNames = enrollment.students?.map(s => s.name) || [];
-                const assignments = await checkTutorAssignments(enrollment.id, studentNames);
+                const assignments = await getEnrollmentTutorStatus(enrollment.id);
+                const assignmentSummary = getAssignmentSummary(assignments);
+                
                 return {
                     ...enrollment,
-                    tutorAssignments: assignments
+                    tutorAssignments: assignments,
+                    assignmentSummary: assignmentSummary
                 };
             }));
             
@@ -3217,25 +3248,6 @@ function renderEnrollmentsFromCache(searchTerm = '') {
         return;
     }
 
-    function parseFeeValue(feeValue) {
-        if (!feeValue && feeValue !== 0) return 0;
-        
-        if (typeof feeValue === 'number') {
-            return Math.round(feeValue);
-        }
-        
-        if (typeof feeValue === 'string') {
-            const cleaned = feeValue
-                .replace(/[^0-9.-]/g, '')
-                .trim();
-            
-            const parsed = parseFloat(cleaned);
-            return isNaN(parsed) ? 0 : Math.round(parsed);
-        }
-        
-        return 0;
-    }
-
     const tableRows = filteredEnrollments.map(enrollment => {
         const createdAt = enrollment.createdAt ? new Date(enrollment.createdAt).toLocaleDateString() : 
                         enrollment.timestamp ? new Date(enrollment.timestamp).toLocaleDateString() : 'N/A';
@@ -3273,26 +3285,35 @@ function renderEnrollmentsFromCache(searchTerm = '') {
         
         const referralCode = enrollment.referral?.code || 'None';
         
-        // Tutor assignment status - UPDATED
+        // Assigned/Date column - UPDATED WITH BETTER STATUS DISPLAY
         let assignmentStatus = '';
-        const tutorAssignments = enrollment.tutorAssignments || [];
+        const assignmentSummary = enrollment.assignmentSummary || getAssignmentSummary(enrollment.tutorAssignments || []);
         
-        if (tutorAssignments.length > 0) {
-            const firstAssignment = tutorAssignments[0];
-            const assignedDate = firstAssignment.assignedDate ? 
-                new Date(firstAssignment.assignedDate.seconds * 1000 || firstAssignment.assignedDate).toLocaleDateString() : 
-                'Unknown date';
+        if (assignmentSummary.status === 'Fully Assigned') {
+            const dateStr = assignmentSummary.date ? assignmentSummary.date.toLocaleDateString() : 'Date unknown';
+            const tutorsStr = assignmentSummary.tutors.length > 0 ? 
+                assignmentSummary.tutors.join(', ') : 'Multiple tutors';
             
-            const tutorNames = tutorAssignments.map(a => a.tutorName).filter(name => name).join(', ');
             assignmentStatus = `
-                <div class="text-sm text-gray-900" title="Assigned to: ${tutorNames}">
-                    <span class="text-green-600 font-medium">Assigned</span>
-                    <div class="text-xs text-gray-500">${assignedDate}</div>
+                <div class="text-sm" title="All students assigned - ${tutorsStr}">
+                    <span class="text-green-600 font-medium">✓ Assigned</span>
+                    <div class="text-xs text-gray-500">${dateStr}</div>
+                    <div class="text-xs text-gray-400">${assignmentSummary.assignedCount}/${assignmentSummary.totalCount} students</div>
+                </div>
+            `;
+        } else if (assignmentSummary.status === 'Partially Assigned') {
+            const dateStr = assignmentSummary.date ? assignmentSummary.date.toLocaleDateString() : 'Date unknown';
+            
+            assignmentStatus = `
+                <div class="text-sm" title="Only ${assignmentSummary.assignedCount} of ${assignmentSummary.totalCount} students assigned">
+                    <span class="text-yellow-600 font-medium">Partial</span>
+                    <div class="text-xs text-gray-500">${dateStr}</div>
+                    <div class="text-xs text-gray-400">${assignmentSummary.assignedCount}/${assignmentSummary.totalCount} students</div>
                 </div>
             `;
         } else {
             assignmentStatus = `
-                <div class="text-sm text-gray-500" title="No tutor found in Students database">
+                <div class="text-sm text-gray-500" title="No tutor assignments found">
                     Not Assigned
                 </div>
             `;
@@ -3481,7 +3502,7 @@ async function exportEnrollmentsToExcel() {
     }
 }
 
-// Export single enrollment to Excel - FIXED REFERENCE ERROR & UPDATED LOGIC
+// Export single enrollment to Excel
 window.exportSingleEnrollmentToExcel = async function(enrollmentId) {
     try {
         const enrollmentDoc = await getDoc(doc(db, "enrollments", enrollmentId));
@@ -3494,7 +3515,7 @@ window.exportSingleEnrollmentToExcel = async function(enrollmentId) {
         const studentNames = enrollment.students?.map(s => s.name) || [];
         
         // Fetch fresh assignments using updated logic
-        const tutorAssignments = await checkTutorAssignments(enrollmentId, studentNames);
+        const tutorAssignments = await getEnrollmentTutorStatus(enrollmentId);
         
         // Prepare detailed data
         const enrollmentData = [{
@@ -3596,6 +3617,7 @@ function parseFeeValue(feeValue) {
     return 0;
 }
 
+// UPDATED: Enrollment Details Modal with Tutor Assignments under each student
 window.showEnrollmentDetails = async function(enrollmentId) {
     try {
         const enrollmentDoc = await getDoc(doc(db, "enrollments", enrollmentId));
@@ -3606,18 +3628,22 @@ window.showEnrollmentDetails = async function(enrollmentId) {
 
         const enrollment = { id: enrollmentDoc.id, ...enrollmentDoc.data() };
         
-        // Check for tutor assignments
-        const studentNames = enrollment.students?.map(s => s.name) || [];
-        const tutorAssignments = await checkTutorAssignments(enrollmentId, studentNames);
+        // Get tutor assignments for this enrollment
+        const tutorAssignments = await getEnrollmentTutorStatus(enrollmentId);
         
         const createdAt = enrollment.createdAt ? new Date(enrollment.createdAt).toLocaleString() : 
                          enrollment.timestamp ? new Date(enrollment.timestamp).toLocaleString() : 'N/A';
         
-        // Build students HTML
+        // Build students HTML with tutor assignments integrated under each student
         let studentsHTML = '';
         if (enrollment.students && enrollment.students.length > 0) {
             studentsHTML = enrollment.students.map((student, index) => {
-                const studentAssignment = tutorAssignments.find(a => a.studentName === student.name);
+                // Find tutor assignment for this specific student
+                const studentAssignment = tutorAssignments.find(a => 
+                    a.studentName === student.name || 
+                    (student.name && a.studentName && 
+                     a.studentName.toLowerCase().includes(student.name.toLowerCase()))
+                );
                 
                 let subjectsHTML = '';
                 if (student.selectedSubjects && student.selectedSubjects.length > 0) {
@@ -3638,30 +3664,57 @@ window.showEnrollmentDetails = async function(enrollmentId) {
                 const academicDays = student.academicDays || enrollment.academicDays || 'Not specified';
                 const academicTime = student.academicTime || enrollment.academicTime || 'Not specified';
                 
-                // Tutor assignment info
+                // Tutor assignment info - NOW INTEGRATED UNDER EACH STUDENT
                 let tutorHTML = '';
                 if (studentAssignment) {
                     const assignedDate = studentAssignment.assignedDate ? 
-                        new Date(studentAssignment.assignedDate.seconds * 1000 || studentAssignment.assignedDate).toLocaleDateString() : 
+                        (studentAssignment.assignedDate.seconds ? 
+                            new Date(studentAssignment.assignedDate.seconds * 1000).toLocaleDateString() : 
+                            new Date(studentAssignment.assignedDate).toLocaleDateString()) : 
                         'Unknown date';
+                    
                     tutorHTML = `
-                        <div class="mt-2 p-2 bg-green-50 border border-green-200 rounded">
-                            <p class="text-sm"><strong>Assigned Tutor:</strong> ${studentAssignment.tutorName}</p>
-                            <p class="text-xs text-gray-600">Assigned on: ${assignedDate} (via ${studentAssignment.source})</p>
+                        <div class="mt-2 p-3 bg-green-50 border border-green-200 rounded-lg">
+                            <div class="flex justify-between items-start">
+                                <div>
+                                    <p class="text-sm font-semibold text-green-700">✓ Tutor Assigned</p>
+                                    <p class="text-sm"><strong>Tutor:</strong> ${studentAssignment.tutorName || 'Name not available'}</p>
+                                    <p class="text-xs text-gray-600">Email: ${studentAssignment.tutorEmail || 'Not available'}</p>
+                                </div>
+                                <div class="text-right">
+                                    <p class="text-xs font-medium text-gray-600">Assigned Date</p>
+                                    <p class="text-sm">${assignedDate}</p>
+                                </div>
+                            </div>
+                            <div class="mt-2 pt-2 border-t border-green-200">
+                                <p class="text-xs text-gray-500">Source: ${studentAssignment.source || 'students_collection'}</p>
+                            </div>
                         </div>
                     `;
                 } else {
                     tutorHTML = `
-                        <div class="mt-2 p-2 bg-yellow-50 border border-yellow-200 rounded">
-                            <p class="text-sm text-yellow-700">No tutor assigned yet</p>
+                        <div class="mt-2 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                            <div class="flex items-center">
+                                <svg class="w-4 h-4 text-yellow-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.196 16.5c-.77.833.192 2.5 1.732 2.5z"></path>
+                                </svg>
+                                <p class="text-sm text-yellow-700">No tutor assigned yet</p>
+                            </div>
+                            <p class="text-xs text-yellow-600 mt-1">This student is not linked to any tutor in the system</p>
                         </div>
                     `;
                 }
                 
                 return `
-                    <div class="border rounded-lg p-4 mb-3 bg-gray-50">
-                        <h4 class="font-bold text-lg mb-2">${student.name || 'Unnamed Student'}</h4>
-                        <div class="grid grid-cols-2 gap-2 text-sm">
+                    <div class="border rounded-lg p-4 mb-4 bg-gray-50">
+                        <div class="flex justify-between items-start mb-3">
+                            <h4 class="font-bold text-lg text-gray-800">${student.name || 'Unnamed Student'}</h4>
+                            <span class="px-2 py-1 text-xs rounded-full ${studentAssignment ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}">
+                                ${studentAssignment ? 'Assigned' : 'Unassigned'}
+                            </span>
+                        </div>
+                        
+                        <div class="grid grid-cols-2 gap-2 text-sm mb-3">
                             <p><strong>Grade:</strong> ${student.grade || 'N/A'}</p>
                             <p><strong>DOB:</strong> ${student.dob || 'N/A'}</p>
                             <p><strong>Start Date:</strong> ${student.startDate || 'N/A'}</p>
@@ -3671,17 +3724,50 @@ window.showEnrollmentDetails = async function(enrollmentId) {
                             <p><strong>Academic Days:</strong> ${academicDays}</p>
                             <p><strong>Academic Time:</strong> ${academicTime}</p>
                         </div>
+                        
+                        <!-- Tutor Assignment Section - Now under each student -->
                         ${tutorHTML}
-                        ${subjectsHTML}
-                        ${extracurricularHTML}
-                        ${testPrepHTML}
-                        ${student.additionalNotes ? `<p class="text-sm mt-2"><strong>Notes:</strong> ${student.additionalNotes}</p>` : ''}
+                        
+                        <!-- Additional Information -->
+                        <div class="mt-3">
+                            ${subjectsHTML}
+                            ${extracurricularHTML}
+                            ${testPrepHTML}
+                            ${student.additionalNotes ? `<p class="text-sm mt-2"><strong>Notes:</strong> ${student.additionalNotes}</p>` : ''}
+                        </div>
                     </div>
                 `;
             }).join('');
         }
 
-        // Build referral HTML (initialize as empty string)
+        // Build summary of tutor assignments (removed since now shown under each student)
+        let tutorSummaryHTML = '';
+        if (tutorAssignments.length > 0) {
+            const assignedCount = tutorAssignments.filter(a => a.tutorName).length;
+            const totalCount = enrollment.students?.length || 0;
+            
+            tutorSummaryHTML = `
+                <div class="mb-6 p-4 bg-gradient-to-r from-purple-50 to-blue-50 rounded-lg border">
+                    <h4 class="font-bold text-lg text-purple-700 mb-2">Tutor Assignment Summary</h4>
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-sm"><strong>Status:</strong> ${assignedCount === totalCount ? 'All Students Assigned' : `${assignedCount}/${totalCount} Students Assigned`}</p>
+                            <p class="text-sm"><strong>Assigned Tutors:</strong> ${[...new Set(tutorAssignments.filter(a => a.tutorName).map(a => a.tutorName))].join(', ')}</p>
+                        </div>
+                        <div class="text-right">
+                            <p class="text-sm text-gray-600">Last Assignment</p>
+                            <p class="text-sm font-medium">${tutorAssignments[0]?.assignedDate ? 
+                                (tutorAssignments[0].assignedDate.seconds ? 
+                                    new Date(tutorAssignments[0].assignedDate.seconds * 1000).toLocaleDateString() : 
+                                    new Date(tutorAssignments[0].assignedDate).toLocaleDateString()) : 
+                                'Unknown'}</p>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        // Build referral HTML
         let referralHTML = '';
         if (enrollment.referral && enrollment.referral.code) {
             referralHTML = `
@@ -3695,7 +3781,7 @@ window.showEnrollmentDetails = async function(enrollmentId) {
             `;
         }
 
-        // Build payment HTML (initialize as empty string)
+        // Build payment HTML
         let paymentHTML = '';
         if (enrollment.payment) {
             const paymentDate = enrollment.payment.date ? 
@@ -3749,28 +3835,6 @@ window.showEnrollmentDetails = async function(enrollmentId) {
             `;
         }
 
-        // Build tutor assignments summary
-        let tutorSummaryHTML = '';
-        if (tutorAssignments.length > 0) {
-            tutorSummaryHTML = `
-                <div class="border-l-4 border-purple-500 pl-4 bg-purple-50 p-3 rounded">
-                    <h4 class="font-bold text-purple-700">Tutor Assignments</h4>
-                    ${tutorAssignments.map(assignment => {
-                        const assignedDate = assignment.assignedDate ? 
-                            new Date(assignment.assignedDate.seconds * 1000 || assignment.assignedDate).toLocaleDateString() : 
-                            'Unknown date';
-                        return `
-                            <div class="mb-2 p-2 bg-white rounded border">
-                                <p class="font-medium">${assignment.studentName}</p>
-                                <p class="text-sm">Tutor: ${assignment.tutorName}</p>
-                                <p class="text-xs text-gray-500">Assigned: ${assignedDate} (${assignment.source})</p>
-                            </div>
-                        `;
-                    }).join('')}
-                </div>
-            `;
-        }
-
         const isApproved = enrollment.status === 'completed' || enrollment.status === 'payment_received';
         const approveButtonHTML = isApproved ? 
             '<span class="px-4 py-2 bg-green-100 text-green-800 rounded cursor-help" title="This enrollment has already been approved">Approved</span>' : 
@@ -3807,6 +3871,7 @@ window.showEnrollmentDetails = async function(enrollmentId) {
                     
                     <div class="mt-6">
                         <h4 class="font-bold text-lg mb-2">Student Information (${enrollment.students?.length || 0} students)</h4>
+                        <p class="text-sm text-gray-600 mb-3">Each student section shows tutor assignment status below their details</p>
                         ${studentsHTML || '<p class="text-gray-500">No student information available.</p>'}
                     </div>
                     
@@ -6420,3 +6485,4 @@ onAuthStateChanged(auth, async (user) => {
         window.location.href = "management-auth.html";
     }
 });
+
