@@ -3057,11 +3057,13 @@ async function checkTutorAssignments(enrollmentId, studentNames = []) {
                 const data = doc.data();
                 if (data.tutor) {
                     assignments.push({
-                        studentName: data.name,
-                        tutorName: typeof data.tutor === 'string' ? data.tutor : data.tutor.name,
-                        tutorEmail: data.tutorEmail,
-                        assignedDate: data.createdAt,
-                        source: 'students'
+                        if (data.tutorEmail || data.tutorName) {
+    assignments.push({
+        studentName: data.name,
+        tutorName: data.tutorName || data.tutorEmail,
+        tutorEmail: data.tutorEmail,
+        assignedDate: data.createdAt || data.assignedDate,
+        source: 'students'
                     });
                 }
             });
@@ -5910,6 +5912,7 @@ onAuthStateChanged(auth, async (user) => {
         window.location.href = "management-auth.html";
     }
 });
+
 
 
 
