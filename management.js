@@ -2873,7 +2873,7 @@ async function renderTutorReportsPanel(container) {
 }
 
 // ======================================================
-// SUBSECTION 5.2: Enrollments Panel (UPDATED LOGIC)
+// SUBSECTION 5.2: Enrollments Panel (FIXED TUTOR DISPLAY)
 // ======================================================
 
 async function renderEnrollmentsPanel(container) {
@@ -2999,10 +2999,11 @@ async function renderEnrollmentsPanel(container) {
 }
 
 // Updated Helper: Check Tutor Assignments 
-// Logic: Query 'students' collection by enrollmentId -> Match student names -> Check for tutorEmail, tutorName, assignedDate
+// FIXED: Queries students by enrollmentId and robustly checks for tutor details
 async function checkTutorAssignments(enrollmentId, studentNames = []) {
     try {
         const assignments = [];
+        console.log(`Checking assignments for Enrollment: ${enrollmentId}`);
         
         // 1. Search in 'students' collection for enrollmentId
         const studentsQuery = query(
@@ -3012,43 +3013,48 @@ async function checkTutorAssignments(enrollmentId, studentNames = []) {
         
         const studentsSnapshot = await getDocs(studentsQuery);
         
+        if (studentsSnapshot.empty) {
+            console.log(`No student documents found for enrollmentId: ${enrollmentId}`);
+        }
+
         // 2. Iterate through results
         studentsSnapshot.forEach(doc => {
             const data = doc.data();
             
-            // 3. Check if this student is part of the enrollment (matching by name)
-            // (Using strict inclusion check, or exact match if preferred)
-            const isStudentInEnrollment = studentNames.includes(data.name);
+            // 3. Robust Data Retrieval
+            // We use the enrollmentId match as the primary validator.
+            // If the ID matches, we assume this student record belongs to this enrollment.
+            // We then verify if a tutor is actually assigned.
 
-            if (isStudentInEnrollment) {
-                // 4. Check for presence of tutorEmail, tutorName, and assignedDate
-                // Support both direct fields and nested 'tutor' object structure
-                let tName = data.tutorName;
-                let tEmail = data.tutorEmail;
-                let aDate = data.assignedDate;
+            let tName = data.tutorName;
+            let tEmail = data.tutorEmail;
+            let aDate = data.assignedDate;
 
-                // If not found in top level, check nested 'tutor' object
-                if (data.tutor) {
-                    if (!tName) tName = data.tutor.tutorName || data.tutor.name;
-                    if (!tEmail) tEmail = data.tutor.tutorEmail || data.tutor.email;
-                    if (!aDate) aDate = data.tutor.assignedDate;
-                }
+            // Check nested 'tutor' object (common in some data structures)
+            if (data.tutor) {
+                if (!tName) tName = data.tutor.tutorName || data.tutor.name;
+                if (!tEmail) tEmail = data.tutor.tutorEmail || data.tutor.email;
+                if (!aDate) aDate = data.tutor.assignedDate;
+            }
 
-                // Fallback for date if missing but tutor is present
-                if ((tName || tEmail) && !aDate) {
-                    aDate = data.createdAt; // Use created date as fallback if strictly assigned
-                }
+            // Fallback: If we have a tutor but no specific assigned date, use the record creation date
+            if ((tName || tEmail) && !aDate) {
+                aDate = data.createdAt;
+            }
 
-                // 5. If all required fields are present (or at least tutor is identified), add to assignments
-                if (tName || tEmail) {
-                    assignments.push({
-                        studentName: data.name,
-                        tutorName: tName,
-                        tutorEmail: tEmail,
-                        assignedDate: aDate,
-                        source: 'students_collection'
-                    });
-                }
+            // 4. Verification
+            // If we found a tutor name or email, we consider this "Assigned"
+            if (tName || tEmail) {
+                console.log(`Found Tutor for student ${data.name}: ${tName}`);
+                assignments.push({
+                    studentName: data.name,
+                    tutorName: tName,
+                    tutorEmail: tEmail,
+                    assignedDate: aDate,
+                    source: 'students_collection'
+                });
+            } else {
+                console.log(`Student ${data.name} found, but no tutor fields detected.`);
             }
         });
         
@@ -6414,6 +6420,7 @@ onAuthStateChanged(auth, async (user) => {
         window.location.href = "management-auth.html";
     }
 });
+
 
 
 
