@@ -3044,7 +3044,7 @@ async function checkTutorAssignments(enrollmentId, studentNames = []) {
             }
         });
         
-        // Check students collection (if students have been created)
+        // Check students collection (look for tutorEmail and tutorName fields)
         for (const studentName of studentNames) {
             const studentsQuery = query(
                 collection(db, "students"),
@@ -3055,15 +3055,14 @@ async function checkTutorAssignments(enrollmentId, studentNames = []) {
             
             studentsSnapshot.forEach(doc => {
                 const data = doc.data();
-                if (data.tutor) {
+                // Check for tutorEmail or tutorName fields
+                if (data.tutorEmail || data.tutorName) {
                     assignments.push({
-                        if (data.tutorEmail || data.tutorName) {
-    assignments.push({
-        studentName: data.name,
-        tutorName: data.tutorName || data.tutorEmail,
-        tutorEmail: data.tutorEmail,
-        assignedDate: data.createdAt || data.assignedDate,
-        source: 'students'
+                        studentName: data.name,
+                        tutorName: data.tutorName || data.tutorEmail,
+                        tutorEmail: data.tutorEmail,
+                        assignedDate: data.createdAt || data.assignedDate,
+                        source: 'students'
                     });
                 }
             });
@@ -3837,6 +3836,522 @@ async function exportSingleEnrollmentToExcel(enrollmentId) {
         alert("Failed to export enrollment details. Please try again.");
     }
 }
+
+// Keep all existing functions below (approveEnrollmentModal, approveEnrollmentWithDetails, 
+// displayTutorResults, deleteEnrollment, downloadEnrollmentInvoice) exactly as they are
+
+window.approveEnrollmentModal = async function(enrollmentId) {
+    try {
+        const enrollmentDoc = await getDoc(doc(db, "enrollments", enrollmentId));
+        if (!enrollmentDoc.exists()) {
+            alert("Enrollment not found!");
+            return;
+        }
+
+        const enrollment = enrollmentDoc.data();
+        
+        // Get tutors for assignment from tutor directory
+        let tutors = sessionCache.tutors || [];
+        if (tutors.length === 0) {
+            const tutorsSnapshot = await getDocs(query(collection(db, "tutors"), where("status", "==", "active")));
+            tutors = tutorsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            saveToLocalStorage('tutors', tutors);
+        }
+        
+        if (tutors.length === 0) {
+            alert("No active tutors available. Please add tutors first.");
+            return;
+        }
+        
+        // Get academic days and time from enrollment
+        const firstStudent = enrollment.students && enrollment.students.length > 0 ? enrollment.students[0] : {};
+        const academicDays = firstStudent.academicDays || enrollment.academicDays || '';
+        const academicTime = firstStudent.academicTime || enrollment.academicTime || '';
+        
+        const modalHtml = `
+            <div id="approveEnrollmentModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-center justify-center">
+                <div class="relative p-8 bg-white w-96 max-w-lg rounded-lg shadow-xl">
+                    <button class="absolute top-2 right-2 text-gray-500 hover:text-gray-800 text-2xl font-bold" onclick="closeManagementModal('approveEnrollmentModal')">&times;</button>
+                    <h3 class="text-xl font-bold mb-4">Approve Enrollment</h3>
+                    <form id="approve-enrollment-form">
+                        <input type="hidden" id="approve-enrollment-id" value="${enrollmentId}">
+                        
+                        <div class="mb-4">
+                            <label class="block text-sm font-medium mb-2">Payment Method</label>
+                            <select id="payment-method" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2">
+                                <option value="">Select payment method</option>
+                                <option value="bank_transfer">Bank Transfer</option>
+                                <option value="credit_card">Credit Card</option>
+                                <option value="debit_card">Debit Card</option>
+                                <option value="cash">Cash</option>
+                                <option value="online_payment">Online Payment</option>
+                                <option value="pos">POS</option>
+                            </select>
+                        </div>
+                        
+                        <div class="mb-4">
+                            <label class="block text-sm font-medium mb-2">Payment Reference (Optional)</label>
+                            <input type="text" id="payment-reference" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2" placeholder="e.g., transaction ID">
+                        </div>
+                        
+                        <div class="mb-4">
+                            <label class="block text-sm font-medium mb-2">Payment Date</label>
+                            <input type="date" id="payment-date" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2" value="${new Date().toISOString().split('T')[0]}">
+                        </div>
+                        
+                        <div class="mb-4">
+                            <label class="block text-sm font-medium mb-2">Academic Days</label>
+                            <input type="text" id="academic-days" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2" value="${academicDays}" placeholder="e.g., Monday, Wednesday, Friday">
+                        </div>
+                        
+                        <div class="mb-4">
+                            <label class="block text-sm font-medium mb-2">Academic Time</label>
+                            <input type="text" id="academic-time" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2" value="${academicTime}" placeholder="e.g., 3:00 PM - 5:00 PM">
+                        </div>
+                        
+                        <div class="mb-4">
+                            <label class="block text-sm font-medium mb-2">Assign Tutor (for each student)</label>
+                            <div id="student-tutor-assignments">
+                                ${enrollment.students ? enrollment.students.map((student, index) => `
+                                    <div class="mb-3 p-2 border rounded">
+                                        <p class="text-sm font-medium mb-1">${student.name}</p>
+                                        <div class="relative">
+                                            <input type="text" 
+                                                   id="tutor-search-${index}" 
+                                                   class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2 text-sm"
+                                                   placeholder="Search tutor by name..."
+                                                   autocomplete="off">
+                                            <div id="tutor-results-${index}" class="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-y-auto hidden"></div>
+                                            <input type="hidden" name="tutor-assignment-${index}" id="selected-tutor-${index}" value="">
+                                        </div>
+                                    </div>
+                                `).join('') : ''}
+                            </div>
+                        </div>
+                        
+                        <div class="mb-4">
+                            <label class="block text-sm font-medium mb-2">Final Fee (₦)</label>
+                            <input type="number" id="final-fee" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2" 
+                                   value="${enrollment.summary?.totalFee || 0}" min="0" step="1000">
+                        </div>
+                        
+                        <div class="mb-4">
+                            <label class="block text-sm font-medium mb-2">Status</label>
+                            <select id="enrollment-status" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2">
+                                <option value="completed">Completed</option>
+                                <option value="payment_received">Payment Received</option>
+                            </select>
+                        </div>
+                        
+                        <div class="flex justify-end mt-4">
+                            <button type="button" onclick="closeManagementModal('approveEnrollmentModal')" class="mr-2 px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300">Cancel</button>
+                            <button type="submit" class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700">Approve Enrollment</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        `;
+        
+        document.body.insertAdjacentHTML('beforeend', modalHtml);
+        
+        // Initialize tutor search for each student
+        if (enrollment.students) {
+            enrollment.students.forEach((student, index) => {
+                const searchInput = document.getElementById(`tutor-search-${index}`);
+                const resultsContainer = document.getElementById(`tutor-results-${index}`);
+                const hiddenInput = document.getElementById(`selected-tutor-${index}`);
+                
+                if (searchInput && resultsContainer && hiddenInput) {
+                    // Add focus event to show all tutors initially
+                    searchInput.addEventListener('focus', function() {
+                        displayTutorResults(this.value, tutors, resultsContainer, hiddenInput, searchInput);
+                    });
+                    
+                    // Add input event for searching
+                    searchInput.addEventListener('input', function() {
+                        displayTutorResults(this.value, tutors, resultsContainer, hiddenInput, searchInput);
+                    });
+                    
+                    // Close results when clicking outside
+                    document.addEventListener('click', function(event) {
+                        if (!searchInput.contains(event.target) && !resultsContainer.contains(event.target)) {
+                            resultsContainer.classList.add('hidden');
+                        }
+                    });
+                }
+            });
+        }
+        
+        document.getElementById('approve-enrollment-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            await approveEnrollmentWithDetails(enrollmentId);
+        });
+        
+    } catch (error) {
+        console.error("Error showing approve modal:", error);
+        alert("Failed to load approval form. Please try again.");
+    }
+};
+
+function displayTutorResults(searchTerm, tutors, resultsContainer, hiddenInput, searchInput) {
+    const term = searchTerm.toLowerCase().trim();
+    let filteredTutors = tutors;
+    
+    if (term) {
+        filteredTutors = tutors.filter(tutor => 
+            tutor.name.toLowerCase().includes(term) || 
+            tutor.email.toLowerCase().includes(term)
+        );
+    }
+    
+    if (filteredTutors.length === 0) {
+        resultsContainer.innerHTML = '<div class="p-2 text-sm text-gray-500">No tutors found</div>';
+        resultsContainer.classList.remove('hidden');
+        return;
+    }
+    
+    const resultsHTML = filteredTutors.map(tutor => `
+        <div class="p-2 hover:bg-gray-100 cursor-pointer border-b border-gray-100 tutor-option" 
+             data-tutor-email="${tutor.email}"
+             data-tutor-name="${tutor.name}">
+            <div class="font-medium">${tutor.name}</div>
+            <div class="text-xs text-gray-500">${tutor.email}</div>
+        </div>
+    `).join('');
+    
+    resultsContainer.innerHTML = resultsHTML;
+    resultsContainer.classList.remove('hidden');
+    
+    // Add click event to tutor options
+    resultsContainer.querySelectorAll('.tutor-option').forEach(option => {
+        option.addEventListener('click', function() {
+            const tutorEmail = this.getAttribute('data-tutor-email');
+            const tutorName = this.getAttribute('data-tutor-name');
+            
+            hiddenInput.value = tutorEmail;
+            searchInput.value = tutorName;
+            resultsContainer.classList.add('hidden');
+        });
+    });
+}
+
+async function approveEnrollmentWithDetails(enrollmentId) {
+    const form = document.getElementById('approve-enrollment-form');
+    if (!form) return;
+    
+    const paymentMethod = form.elements['payment-method'].value;
+    const paymentReference = form.elements['payment-reference'].value;
+    const paymentDate = form.elements['payment-date'].value;
+    const finalFee = parseFloat(form.elements['final-fee'].value);
+    const academicDays = form.elements['academic-days'].value;
+    const academicTime = form.elements['academic-time'].value;
+    const enrollmentStatus = form.elements['enrollment-status'].value;
+    
+    if (!paymentMethod) {
+        alert("Please select a payment method.");
+        return;
+    }
+    
+    if (isNaN(finalFee) || finalFee < 0) {
+        alert("Please enter a valid fee amount.");
+        return;
+    }
+    
+    try {
+        // Get enrollment data
+        const enrollmentDoc = await getDoc(doc(db, "enrollments", enrollmentId));
+        const enrollmentData = enrollmentDoc.data();
+        
+        // Get tutor assignments
+        const studentAssignments = [];
+        const errors = [];
+        
+        enrollmentData.students.forEach((student, index) => {
+            const tutorEmail = document.getElementById(`selected-tutor-${index}`)?.value;
+            if (!tutorEmail) {
+                errors.push(`Please select a tutor for student: ${student.name}`);
+                return;
+            }
+            
+            // Get tutor name from tutors cache
+            const tutors = sessionCache.tutors || [];
+            const tutor = tutors.find(t => t.email === tutorEmail);
+            const tutorName = tutor ? tutor.name : tutorEmail;
+            
+            studentAssignments.push({
+                studentName: student.name,
+                studentId: `pending_${Date.now()}_${index}`,
+                tutorEmail: tutorEmail,
+                tutorName: tutorName,
+                grade: student.grade,
+                subjects: student.selectedSubjects || [],
+                academicDays: academicDays,
+                academicTime: academicTime,
+                days: academicDays, // For backward compatibility
+                studentFee: Math.round(finalFee / enrollmentData.students.length)
+            });
+        });
+        
+        if (errors.length > 0) {
+            alert(errors.join('\n'));
+            return;
+        }
+        
+        if (studentAssignments.length === 0) {
+            alert("Please assign tutors to all students.");
+            return;
+        }
+        
+        const batch = writeBatch(db);
+        
+        // Update enrollment status
+        batch.update(doc(db, "enrollments", enrollmentId), {
+            status: enrollmentStatus,
+            payment: {
+                method: paymentMethod,
+                reference: paymentReference || '',
+                date: Timestamp.fromDate(new Date(paymentDate)),
+                amount: finalFee,
+                approvedBy: window.userData?.name || window.userData?.email || 'Management',
+                approvedAt: Timestamp.now()
+            },
+            finalFee: finalFee,
+            academicDays: academicDays,
+            academicTime: academicTime,
+            approvedAt: Timestamp.now(),
+            approvedBy: window.userData?.email || 'management',
+            lastUpdated: Timestamp.now()
+        });
+        
+        // Create pending student entries for each student
+        studentAssignments.forEach(student => {
+            const pendingStudentRef = doc(collection(db, "pending_students"));
+            batch.set(pendingStudentRef, {
+                ...student,
+                parentName: enrollmentData.parent?.name,
+                parentPhone: enrollmentData.parent?.phone,
+                parentEmail: enrollmentData.parent?.email,
+                enrollmentId: enrollmentId,
+                status: 'pending',
+                createdAt: Timestamp.now(),
+                source: 'enrollment_approval'
+            });
+        });
+        
+        await batch.commit();
+        
+        alert("Enrollment approved successfully! Students have been added to pending approvals.");
+        
+        closeManagementModal('approveEnrollmentModal');
+        invalidateCache('enrollments');
+        invalidateCache('pendingStudents');
+        
+        // Refresh the view
+        const currentNavId = document.querySelector('.nav-item.active')?.dataset.navId;
+        const mainContent = document.getElementById('main-content');
+        if (currentNavId && allNavItems[currentNavId] && mainContent) {
+            allNavItems[currentNavId].fn(mainContent);
+        }
+        
+    } catch (error) {
+        console.error("Error approving enrollment:", error);
+        alert("Failed to approve enrollment. Please try again.");
+    }
+}
+
+window.deleteEnrollment = async function(enrollmentId) {
+    if (!confirm("Are you sure you want to delete this enrollment? This action cannot be undone.")) {
+        return;
+    }
+    
+    try {
+        await deleteDoc(doc(db, "enrollments", enrollmentId));
+        alert("Enrollment deleted successfully!");
+        
+        invalidateCache('enrollments');
+        renderEnrollmentsFromCache(document.getElementById('enrollments-search')?.value || '');
+        
+    } catch (error) {
+        console.error("Error deleting enrollment:", error);
+        alert("Failed to delete enrollment. Please try again.");
+    }
+};
+
+window.downloadEnrollmentInvoice = async function(enrollmentId) {
+    try {
+        const enrollmentDoc = await getDoc(doc(db, "enrollments", enrollmentId));
+        if (!enrollmentDoc.exists()) {
+            alert("Enrollment not found!");
+            return;
+        }
+        
+        const enrollment = enrollmentDoc.data();
+        
+        // Create invoice HTML
+        const invoiceDate = new Date(enrollment.approvedAt || enrollment.createdAt || Date.now());
+        const invoiceNumber = `INV-${enrollmentId.substring(0, 8).toUpperCase()}`;
+        
+        // Get academic days and time
+        const firstStudent = enrollment.students && enrollment.students.length > 0 ? enrollment.students[0] : {};
+        const academicDays = firstStudent.academicDays || enrollment.academicDays || 'Not specified';
+        const academicTime = firstStudent.academicTime || enrollment.academicTime || 'Not specified';
+        
+        const invoiceHTML = `
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <meta charset="UTF-8">
+                <title>Invoice ${invoiceNumber}</title>
+                <style>
+                    body { font-family: Arial, sans-serif; margin: 40px; }
+                    .invoice-container { max-width: 800px; margin: 0 auto; border: 1px solid #ddd; padding: 30px; }
+                    .header { text-align: center; margin-bottom: 30px; border-bottom: 2px solid #4CAF50; padding-bottom: 20px; }
+                    .company-name { font-size: 28px; font-weight: bold; color: #4CAF50; margin-bottom: 5px; }
+                    .invoice-title { font-size: 24px; margin: 10px 0; }
+                    .invoice-info { display: flex; justify-content: space-between; margin: 20px 0; }
+                    .section { margin: 20px 0; }
+                    .section-title { font-weight: bold; border-bottom: 1px solid #ddd; padding-bottom: 5px; margin-bottom: 10px; }
+                    table { width: 100%; border-collapse: collapse; margin: 10px 0; }
+                    th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+                    th { background-color: #f2f2f2; }
+                    .total-row { font-weight: bold; background-color: #f9f9f9; }
+                    .footer { margin-top: 40px; padding-top: 20px; border-top: 1px solid #ddd; text-align: center; color: #666; }
+                </style>
+            </head>
+            <body>
+                <div class="invoice-container">
+                    <div class="header">
+                        <div class="company-name">Blooming Kids House</div>
+                        <div class="invoice-title">INVOICE</div>
+                        <div>Invoice #: ${invoiceNumber}</div>
+                        <div>Date: ${invoiceDate.toLocaleDateString()}</div>
+                    </div>
+                    
+                    <div class="invoice-info">
+                        <div>
+                            <strong>Bill To:</strong><br>
+                            ${enrollment.parent?.name || ''}<br>
+                            ${enrollment.parent?.email || ''}<br>
+                            ${enrollment.parent?.phone || ''}
+                        </div>
+                        <div>
+                            <strong>Invoice Details:</strong><br>
+                            Status: ${enrollment.status || 'Completed'}<br>
+                            Approved By: ${enrollment.payment?.approvedBy || window.userData?.name || 'Management'}<br>
+                            Payment Method: ${enrollment.payment?.method || 'Not specified'}<br>
+                            Schedule: ${academicDays} • ${academicTime}
+                        </div>
+                    </div>
+                    
+                    <div class="section">
+                        <div class="section-title">Student Details</div>
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Student Name</th>
+                                    <th>Actual Grade</th>
+                                    <th>Subjects</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${enrollment.students ? enrollment.students.map(student => `
+                                    <tr>
+                                        <td>${student.name || ''}</td>
+                                        <td>${student.actualGrade || ''}</td>
+                                        <td>${student.selectedSubjects ? student.selectedSubjects.join(', ') : ''}</td>
+                                    </tr>
+                                `).join('') : '<tr><td colspan="3">No student information</td></tr>'}
+                            </tbody>
+                        </table>
+                    </div>
+                    
+                    <div class="section">
+                        <div class="section-title">Fee Breakdown</div>
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Description</th>
+                                    <th>Amount (₦)</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>Academic Fees</td>
+                                    <td>${(enrollment.summary?.academicFee || 0).toLocaleString()}</td>
+                                </tr>
+                                <tr>
+                                    <td>Extracurricular Activities</td>
+                                    <td>${(enrollment.summary?.extracurricularFee || 0).toLocaleString()}</td>
+                                </tr>
+                                <tr>
+                                    <td>Test Preparation</td>
+                                    <td>${(enrollment.summary?.testPrepFee || 0).toLocaleString()}</td>
+                                </tr>
+                                <tr>
+                                    <td>Discount</td>
+                                    <td>-${(enrollment.summary?.discountAmount || 0).toLocaleString()}</td>
+                                </tr>
+                                <tr class="total-row">
+                                    <td><strong>TOTAL</strong></td>
+                                    <td><strong>₦${(enrollment.summary?.totalFee || 0).toLocaleString()}</strong></td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    
+                    <div class="section">
+                        <div class="section-title">Payment Information</div>
+                        <p>Payment Status: <strong>${enrollment.status === 'payment_received' ? 'PAID' : 'PENDING'}</strong></p>
+                        ${enrollment.payment?.reference ? `<p>Reference: ${enrollment.payment.reference}</p>` : ''}
+                        ${enrollment.payment?.date ? `<p>Payment Date: ${new Date(enrollment.payment.date.seconds * 1000).toLocaleDateString()}</p>` : ''}
+                    </div>
+                    
+                    <div class="footer">
+                        <p>Thank you for choosing Blooming Kids House!</p>
+                        <p>For inquiries, contact: info@bloomingkidshouse.com | 0707 896 1070 | 0902 914 7024</p>
+                        <p>This is a computer-generated invoice. No signature required.</p>
+                    </div>
+                </div>
+            </body>
+            </html>
+        `;
+        
+        // Create a temporary iframe to render the HTML
+        const iframe = document.createElement('iframe');
+        iframe.style.position = 'absolute';
+        iframe.style.left = '-9999px';
+        iframe.style.top = '0';
+        iframe.style.width = '800px';
+        iframe.style.height = '1200px';
+        document.body.appendChild(iframe);
+        
+        iframe.contentDocument.open();
+        iframe.contentDocument.write(invoiceHTML);
+        iframe.contentDocument.close();
+        
+        // Wait for the iframe to load
+        setTimeout(() => {
+            html2canvas(iframe.contentDocument.body).then(canvas => {
+                const imgData = canvas.toDataURL('image/jpeg', 0.95);
+                const link = document.createElement('a');
+                link.href = imgData;
+                link.download = `Invoice_${invoiceNumber}.jpg`;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                document.body.removeChild(iframe);
+            }).catch(error => {
+                console.error("Error generating invoice image:", error);
+                alert("Failed to generate invoice image. Please try again.");
+                document.body.removeChild(iframe);
+            });
+        }, 1000);
+        
+    } catch (error) {
+        console.error("Error downloading invoice:", error);
+        alert("Failed to download invoice. Please try again.");
+    }
+};
 
 // ======================================================
 // SUBSECTION 5.3: Pending Approvals Panel (UPDATED)
@@ -5912,6 +6427,7 @@ onAuthStateChanged(auth, async (user) => {
         window.location.href = "management-auth.html";
     }
 });
+
 
 
 
