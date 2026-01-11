@@ -3068,48 +3068,91 @@ async function checkTutorAssignments(enrollmentId, studentNames = []) {
     }
 }
 
-// Helper: Get assignment summary for the "Assigned/Date" column
-function getAssignmentSummary(assignments) {
-    if (!assignments || assignments.length === 0) {
+// NEW HELPER: Get comprehensive assignment status for each enrollment
+function getEnrollmentAssignmentStatus(enrollment, tutorAssignments) {
+    if (!enrollment.students || enrollment.students.length === 0) {
         return {
-            status: 'Not Assigned',
+            status: 'No Students',
             date: null,
-            tutors: [],
             allAssigned: false,
-            partialAssignment: false
+            assignedCount: 0,
+            totalCount: 0,
+            needsExtracurricularTutors: 0,
+            hasExtracurricularTutors: 0
         };
     }
     
-    const totalStudents = assignments.length;
-    const assignedStudents = assignments.filter(a => a.tutorName || a.tutorEmail).length;
-    
-    // Find the earliest assignment date
+    const totalStudents = enrollment.students.length;
+    let assignedStudents = 0;
+    let needsExtracurricularTutors = 0;
+    let hasExtracurricularTutors = 0;
     let earliestDate = null;
-    assignments.forEach(assignment => {
-        if (assignment.assignedDate) {
-            const date = assignment.assignedDate.seconds ? 
-                new Date(assignment.assignedDate.seconds * 1000) : 
-                new Date(assignment.assignedDate);
+    
+    // Check each student
+    enrollment.students.forEach(student => {
+        const studentAssignment = tutorAssignments.find(a => 
+            a.studentName === student.name || 
+            (student.name && a.studentName && 
+             a.studentName.toLowerCase().includes(student.name.toLowerCase()))
+        );
+        
+        // Check if student has academic tutor
+        if (studentAssignment && (studentAssignment.tutorName || studentAssignment.tutorEmail)) {
+            assignedStudents++;
             
-            if (!earliestDate || date < earliestDate) {
-                earliestDate = date;
+            // Check assigned date
+            if (studentAssignment.assignedDate) {
+                const date = studentAssignment.assignedDate.seconds ? 
+                    new Date(studentAssignment.assignedDate.seconds * 1000) : 
+                    new Date(studentAssignment.assignedDate);
+                
+                if (!earliestDate || date < earliestDate) {
+                    earliestDate = date;
+                }
+            }
+            
+            // Check extracurricular activities
+            if (student.extracurriculars && student.extracurriculars.length > 0) {
+                needsExtracurricularTutors += student.extracurriculars.length;
+                
+                // Count assigned extracurricular tutors
+                if (studentAssignment.extracurricularTutors) {
+                    hasExtracurricularTutors += studentAssignment.extracurricularTutors.length;
+                }
             }
         }
     });
     
-    // Get unique tutor names
-    const tutorNames = [...new Set(assignments
-        .filter(a => a.tutorName)
-        .map(a => a.tutorName))];
+    // Determine overall status
+    let status = '';
+    if (assignedStudents === 0) {
+        status = 'Not Assigned';
+    } else if (assignedStudents < totalStudents) {
+        status = 'Partially Assigned';
+    } else {
+        // All students have academic tutors
+        if (needsExtracurricularTutors > 0) {
+            if (hasExtracurricularTutors === needsExtracurricularTutors) {
+                status = '✓ Fully Assigned';
+            } else if (hasExtracurricularTutors > 0) {
+                status = 'Partial Extracurricular';
+            } else {
+                status = 'Needs Extracurricular';
+            }
+        } else {
+            status = '✓ Fully Assigned';
+        }
+    }
     
     return {
-        status: assignedStudents === totalStudents ? 'Fully Assigned' : 
-                assignedStudents > 0 ? 'Partially Assigned' : 'Not Assigned',
+        status: status,
         date: earliestDate,
-        tutors: tutorNames,
-        allAssigned: assignedStudents === totalStudents,
+        allAssigned: assignedStudents === totalStudents && 
+                    (needsExtracurricularTutors === 0 || hasExtracurricularTutors === needsExtracurricularTutors),
         assignedCount: assignedStudents,
-        totalCount: totalStudents
+        totalCount: totalStudents,
+        needsExtracurricularTutors: needsExtracurricularTutors,
+        hasExtracurricularTutors: hasExtracurricularTutors
     };
 }
 
@@ -3135,12 +3178,12 @@ async function fetchAndRenderEnrollments(forceRefresh = false) {
             const enrollmentsWithAssignments = await Promise.all(enrollmentsData.map(async (enrollment) => {
                 const studentNames = enrollment.students?.map(s => s.name) || [];
                 const assignments = await checkTutorAssignments(enrollment.id, studentNames);
-                const assignmentSummary = getAssignmentSummary(assignments);
+                const assignmentStatus = getEnrollmentAssignmentStatus(enrollment, assignments);
                 
                 return {
                     ...enrollment,
                     tutorAssignments: assignments,
-                    assignmentSummary: assignmentSummary
+                    assignmentStatus: assignmentStatus
                 };
             }));
             
@@ -3305,36 +3348,58 @@ function renderEnrollmentsFromCache(searchTerm = '') {
         
         const referralCode = enrollment.referral?.code || 'None';
         
-        // Assigned/Date column - UPDATED WITH BETTER STATUS DISPLAY
+        // Assigned/Date column - UPDATED WITH COMPREHENSIVE STATUS
         let assignmentStatus = '';
-        const assignmentSummary = enrollment.assignmentSummary || getAssignmentSummary(enrollment.tutorAssignments || []);
+        const assignmentInfo = enrollment.assignmentStatus || getEnrollmentAssignmentStatus(enrollment, enrollment.tutorAssignments || []);
         
-        if (assignmentSummary.status === 'Fully Assigned') {
-            const dateStr = assignmentSummary.date ? assignmentSummary.date.toLocaleDateString() : 'Date unknown';
-            const tutorsStr = assignmentSummary.tutors.length > 0 ? 
-                assignmentSummary.tutors.join(', ') : 'Multiple tutors';
+        if (assignmentInfo.status === '✓ Fully Assigned') {
+            const dateStr = assignmentInfo.date ? assignmentInfo.date.toLocaleDateString() : 'Date unknown';
             
             assignmentStatus = `
-                <div class="text-sm" title="All students assigned - ${tutorsStr}">
+                <div class="text-sm" title="All students fully assigned${assignmentInfo.needsExtracurricularTutors > 0 ? ' including extracurricular tutors' : ''}">
                     <span class="text-green-600 font-medium">✓ Assigned</span>
                     <div class="text-xs text-gray-500">${dateStr}</div>
-                    <div class="text-xs text-gray-400">${assignmentSummary.assignedCount}/${assignmentSummary.totalCount} students</div>
+                    <div class="text-xs text-gray-400">${assignmentInfo.assignedCount}/${assignmentInfo.totalCount} students</div>
+                    ${assignmentInfo.needsExtracurricularTutors > 0 ? 
+                        `<div class="text-xs text-green-500">+${assignmentInfo.hasExtracurricularTutors} extracurricular</div>` : ''}
                 </div>
             `;
-        } else if (assignmentSummary.status === 'Partially Assigned') {
-            const dateStr = assignmentSummary.date ? assignmentSummary.date.toLocaleDateString() : 'Date unknown';
+        } else if (assignmentInfo.status === 'Not Assigned') {
+            assignmentStatus = `
+                <div class="text-sm text-gray-500" title="No tutors assigned">
+                    Not Assigned
+                </div>
+            `;
+        } else if (assignmentInfo.status === 'Needs Extracurricular') {
+            const dateStr = assignmentInfo.date ? assignmentInfo.date.toLocaleDateString() : 'Date unknown';
             
             assignmentStatus = `
-                <div class="text-sm" title="Only ${assignmentSummary.assignedCount} of ${assignmentSummary.totalCount} students assigned">
-                    <span class="text-yellow-600 font-medium">Partial</span>
+                <div class="text-sm" title="Academic tutors assigned, but extracurricular tutors needed">
+                    <span class="text-yellow-600 font-medium">Needs EC Tutors</span>
                     <div class="text-xs text-gray-500">${dateStr}</div>
-                    <div class="text-xs text-gray-400">${assignmentSummary.assignedCount}/${assignmentSummary.totalCount} students</div>
+                    <div class="text-xs text-gray-400">${assignmentInfo.assignedCount}/${assignmentInfo.totalCount} students</div>
+                    <div class="text-xs text-yellow-500">${assignmentInfo.hasExtracurricularTutors}/${assignmentInfo.needsExtracurricularTutors} extracurricular</div>
                 </div>
             `;
-        } else {
+        } else if (assignmentInfo.status === 'Partial Extracurricular') {
+            const dateStr = assignmentInfo.date ? assignmentInfo.date.toLocaleDateString() : 'Date unknown';
+            
             assignmentStatus = `
-                <div class="text-sm text-gray-500" title="No tutor assignments found">
-                    Not Assigned
+                <div class="text-sm" title="Some extracurricular tutors assigned">
+                    <span class="text-blue-600 font-medium">Partial EC</span>
+                    <div class="text-xs text-gray-500">${dateStr}</div>
+                    <div class="text-xs text-gray-400">${assignmentInfo.assignedCount}/${assignmentInfo.totalCount} students</div>
+                    <div class="text-xs text-blue-500">${assignmentInfo.hasExtracurricularTutors}/${assignmentInfo.needsExtracurricularTutors} extracurricular</div>
+                </div>
+            `;
+        } else if (assignmentInfo.status === 'Partially Assigned') {
+            const dateStr = assignmentInfo.date ? assignmentInfo.date.toLocaleDateString() : 'Date unknown';
+            
+            assignmentStatus = `
+                <div class="text-sm" title="Only ${assignmentInfo.assignedCount} of ${assignmentInfo.totalCount} students assigned">
+                    <span class="text-yellow-600 font-medium">Partial</span>
+                    <div class="text-xs text-gray-500">${dateStr}</div>
+                    <div class="text-xs text-gray-400">${assignmentInfo.assignedCount}/${assignmentInfo.totalCount} students</div>
                 </div>
             `;
         }
@@ -3637,7 +3702,7 @@ function parseFeeValue(feeValue) {
     return 0;
 }
 
-// UPDATED: Enrollment Details Modal with Tutor Assignments under each student
+// UPDATED: Enrollment Details Modal with Tutor Assignments UNDER EACH STUDENT (no separate summary)
 window.showEnrollmentDetails = async function(enrollmentId) {
     try {
         const enrollmentDoc = await getDoc(doc(db, "enrollments", enrollmentId));
@@ -3685,7 +3750,7 @@ window.showEnrollmentDetails = async function(enrollmentId) {
                 const academicDays = student.academicDays || enrollment.academicDays || 'Not specified';
                 const academicTime = student.academicTime || enrollment.academicTime || 'Not specified';
                 
-                // Tutor assignment info - NOW INTEGRATED UNDER EACH STUDENT
+                // Tutor assignment info - INTEGRATED UNDER EACH STUDENT
                 let tutorHTML = '';
                 if (studentAssignment) {
                     const assignedDate = studentAssignment.assignedDate ? 
@@ -3694,12 +3759,12 @@ window.showEnrollmentDetails = async function(enrollmentId) {
                             new Date(studentAssignment.assignedDate).toLocaleDateString()) : 
                         'Unknown date';
                     
-                    // Build main tutor assignment section
+                    // Main Academic Tutor
                     tutorHTML = `
                         <div class="mt-3 p-3 bg-green-50 border border-green-200 rounded-lg">
                             <div class="flex justify-between items-start">
                                 <div>
-                                    <p class="text-sm font-semibold text-green-700">✓ Main Tutor Assigned</p>
+                                    <p class="text-sm font-semibold text-green-700">✓ Academic Tutor</p>
                                     <p class="text-sm"><strong>Tutor:</strong> ${studentAssignment.tutorName || 'Name not available'}</p>
                                     <p class="text-xs text-gray-600">Email: ${studentAssignment.tutorEmail || 'Not available'}</p>
                                 </div>
@@ -3708,72 +3773,101 @@ window.showEnrollmentDetails = async function(enrollmentId) {
                                     <p class="text-sm">${assignedDate}</p>
                                 </div>
                             </div>
-                            <div class="mt-2 pt-2 border-t border-green-200">
-                                <p class="text-xs text-gray-500">Source: ${studentAssignment.source || 'students_collection'}</p>
-                            </div>
                         </div>
                     `;
                     
                     // Check for extracurricular tutors
-                    if (studentAssignment.extracurricularTutors && studentAssignment.extracurricularTutors.length > 0) {
-                        tutorHTML += `
-                            <div class="mt-2 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                                <p class="text-sm font-semibold text-blue-700 mb-2">Extracurricular Tutors</p>
-                                ${studentAssignment.extracurricularTutors.map(ecTutor => {
-                                    const ecAssignedDate = ecTutor.assignedDate ? 
-                                        (ecTutor.assignedDate.seconds ? 
-                                            new Date(ecTutor.assignedDate.seconds * 1000).toLocaleDateString() : 
-                                            new Date(ecTutor.assignedDate).toLocaleDateString()) : 
-                                        'Unknown date';
-                                    return `
-                                        <div class="mb-2 p-2 bg-white rounded border border-blue-100">
-                                            <p class="text-sm"><strong>${ecTutor.activity || 'Activity'}:</strong> ${ecTutor.tutorName || 'Not assigned'}</p>
-                                            <p class="text-xs text-gray-600">Email: ${ecTutor.tutorEmail || 'Not available'}</p>
-                                            <p class="text-xs text-gray-500">Assigned: ${ecAssignedDate}</p>
+                    if (student.extracurriculars && student.extracurriculars.length > 0) {
+                        const extracurricularList = student.extracurriculars;
+                        const ecTutors = studentAssignment.extracurricularTutors || [];
+                        
+                        extracurricularList.forEach(ec => {
+                            const ecTutor = ecTutors.find(t => t.activity === ec.name);
+                            
+                            if (ecTutor) {
+                                const ecAssignedDate = ecTutor.assignedDate ? 
+                                    (ecTutor.assignedDate.seconds ? 
+                                        new Date(ecTutor.assignedDate.seconds * 1000).toLocaleDateString() : 
+                                        new Date(ecTutor.assignedDate).toLocaleDateString()) : 
+                                    'Unknown date';
+                                
+                                tutorHTML += `
+                                    <div class="mt-2 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                                        <div class="flex justify-between items-start">
+                                            <div>
+                                                <p class="text-sm font-semibold text-blue-700">✓ Extracurricular: ${ec.name}</p>
+                                                <p class="text-sm"><strong>Tutor:</strong> ${ecTutor.tutorName || 'Not assigned'}</p>
+                                                <p class="text-xs text-gray-600">Email: ${ecTutor.tutorEmail || 'Not available'}</p>
+                                            </div>
+                                            <div class="text-right">
+                                                <p class="text-xs font-medium text-gray-600">Assigned Date</p>
+                                                <p class="text-sm">${ecAssignedDate}</p>
+                                            </div>
                                         </div>
-                                    `;
-                                }).join('')}
-                            </div>
-                        `;
+                                        <p class="text-xs text-gray-500 mt-1">Frequency: ${ec.frequency}</p>
+                                    </div>
+                                `;
+                            } else {
+                                tutorHTML += `
+                                    <div class="mt-2 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                                        <div class="flex items-center">
+                                            <svg class="w-4 h-4 text-yellow-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.196 16.5c-.77.833.192 2.5 1.732 2.5z"></path>
+                                            </svg>
+                                            <div>
+                                                <p class="text-sm text-yellow-700">Extracurricular: ${ec.name}</p>
+                                                <p class="text-xs text-yellow-600">No tutor assigned for this activity</p>
+                                            </div>
+                                        </div>
+                                        <p class="text-xs text-gray-500 mt-1">Frequency: ${ec.frequency}</p>
+                                    </div>
+                                `;
+                            }
+                        });
                     }
                     
                     // Check for subject-specific tutors
                     if (studentAssignment.subjectTutors && studentAssignment.subjectTutors.length > 0) {
-                        tutorHTML += `
-                            <div class="mt-2 p-3 bg-purple-50 border border-purple-200 rounded-lg">
-                                <p class="text-sm font-semibold text-purple-700 mb-2">Subject-Specific Tutors</p>
-                                ${studentAssignment.subjectTutors.map(subjectTutor => {
-                                    const subjectAssignedDate = subjectTutor.assignedDate ? 
-                                        (subjectTutor.assignedDate.seconds ? 
-                                            new Date(subjectTutor.assignedDate.seconds * 1000).toLocaleDateString() : 
-                                            new Date(subjectTutor.assignedDate).toLocaleDateString()) : 
-                                        'Unknown date';
-                                    return `
-                                        <div class="mb-2 p-2 bg-white rounded border border-purple-100">
-                                            <p class="text-sm"><strong>${subjectTutor.subject || 'Subject'}:</strong> ${subjectTutor.tutorName || 'Not assigned'}</p>
+                        studentAssignment.subjectTutors.forEach(subjectTutor => {
+                            const subjectAssignedDate = subjectTutor.assignedDate ? 
+                                (subjectTutor.assignedDate.seconds ? 
+                                    new Date(subjectTutor.assignedDate.seconds * 1000).toLocaleDateString() : 
+                                    new Date(subjectTutor.assignedDate).toLocaleDateString()) : 
+                                'Unknown date';
+                            
+                            tutorHTML += `
+                                <div class="mt-2 p-3 bg-purple-50 border border-purple-200 rounded-lg">
+                                    <div class="flex justify-between items-start">
+                                        <div>
+                                            <p class="text-sm font-semibold text-purple-700">✓ Subject: ${subjectTutor.subject || 'Subject'}</p>
+                                            <p class="text-sm"><strong>Tutor:</strong> ${subjectTutor.tutorName || 'Not assigned'}</p>
                                             <p class="text-xs text-gray-600">Email: ${subjectTutor.tutorEmail || 'Not available'}</p>
-                                            <p class="text-xs text-gray-500">Assigned: ${subjectAssignedDate}</p>
                                         </div>
-                                    `;
-                                }).join('')}
-                            </div>
-                        `;
+                                        <div class="text-right">
+                                            <p class="text-xs font-medium text-gray-600">Assigned Date</p>
+                                            <p class="text-sm">${subjectAssignedDate}</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            `;
+                        });
                     }
                 } else {
+                    // No tutor assigned at all
                     tutorHTML = `
                         <div class="mt-3 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
                             <div class="flex items-center">
                                 <svg class="w-4 h-4 text-yellow-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.196 16.5c-.77.833.192 2.5 1.732 2.5z"></path>
                                 </svg>
-                                <p class="text-sm text-yellow-700">No tutor assigned yet</p>
+                                <p class="text-sm text-yellow-700">No academic tutor assigned yet</p>
                             </div>
-                            <p class="text-xs text-yellow-600 mt-1">This student is not linked to any tutor in the system</p>
+                            <p class="text-xs text-yellow-600 mt-1">This student needs an academic tutor</p>
                             
-                            <!-- Extracurricular Activities Section with Tutor Assignment Placeholder -->
+                            <!-- Extracurricular Activities Section -->
                             ${student.extracurriculars && student.extracurriculars.length > 0 ? `
                                 <div class="mt-3 pt-3 border-t border-yellow-200">
-                                    <p class="text-sm font-medium text-yellow-700 mb-2">Extracurricular Activities Available:</p>
+                                    <p class="text-sm font-medium text-yellow-700 mb-2">Extracurricular Activities:</p>
                                     <div class="space-y-2">
                                         ${student.extracurriculars.map((ec, ecIndex) => `
                                             <div class="p-2 bg-white border border-yellow-100 rounded">
@@ -3808,7 +3902,7 @@ window.showEnrollmentDetails = async function(enrollmentId) {
                             <p><strong>Academic Time:</strong> ${academicTime}</p>
                         </div>
                         
-                        <!-- Tutor Assignment Section - Now under each student -->
+                        <!-- Tutor Assignment Section - Integrated under each student -->
                         ${tutorHTML}
                         
                         <!-- Additional Information -->
@@ -3821,51 +3915,6 @@ window.showEnrollmentDetails = async function(enrollmentId) {
                     </div>
                 `;
             }).join('');
-        }
-
-        // Build summary of tutor assignments
-        let tutorSummaryHTML = '';
-        if (tutorAssignments.length > 0) {
-            const assignedCount = tutorAssignments.filter(a => a.tutorName).length;
-            const totalCount = enrollment.students?.length || 0;
-            const uniqueTutors = [...new Set(tutorAssignments
-                .filter(a => a.tutorName)
-                .map(a => a.tutorName))];
-            
-            // Count extracurricular tutors
-            let extracurricularTutorCount = 0;
-            let subjectTutorCount = 0;
-            
-            tutorAssignments.forEach(assignment => {
-                if (assignment.extracurricularTutors) {
-                    extracurricularTutorCount += assignment.extracurricularTutors.length;
-                }
-                if (assignment.subjectTutors) {
-                    subjectTutorCount += assignment.subjectTutors.length;
-                }
-            });
-            
-            tutorSummaryHTML = `
-                <div class="mb-6 p-4 bg-gradient-to-r from-purple-50 to-blue-50 rounded-lg border">
-                    <h4 class="font-bold text-lg text-purple-700 mb-2">Tutor Assignment Summary</h4>
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                            <p class="text-sm"><strong>Main Tutors:</strong> ${uniqueTutors.length > 0 ? uniqueTutors.join(', ') : 'None'}</p>
-                            <p class="text-sm"><strong>Status:</strong> ${assignedCount === totalCount ? 'All Students Assigned' : `${assignedCount}/${totalCount} Students Assigned`}</p>
-                            ${extracurricularTutorCount > 0 ? `<p class="text-sm"><strong>Extracurricular Tutors:</strong> ${extracurricularTutorCount} assigned</p>` : ''}
-                            ${subjectTutorCount > 0 ? `<p class="text-sm"><strong>Subject Tutors:</strong> ${subjectTutorCount} assigned</p>` : ''}
-                        </div>
-                        <div class="text-right">
-                            <p class="text-sm text-gray-600">Last Assignment</p>
-                            <p class="text-sm font-medium">${tutorAssignments[0]?.assignedDate ? 
-                                (tutorAssignments[0].assignedDate.seconds ? 
-                                    new Date(tutorAssignments[0].assignedDate.seconds * 1000).toLocaleDateString() : 
-                                    new Date(tutorAssignments[0].assignedDate).toLocaleDateString()) : 
-                                'Unknown'}</p>
-                        </div>
-                    </div>
-                </div>
-            `;
         }
 
         // Build referral HTML
@@ -3968,11 +4017,10 @@ window.showEnrollmentDetails = async function(enrollmentId) {
                     
                     ${referralHTML}
                     ${paymentHTML}
-                    ${tutorSummaryHTML}
                     
                     <div class="mt-6">
                         <h4 class="font-bold text-lg mb-2">Student Information (${enrollment.students?.length || 0} students)</h4>
-                        <p class="text-sm text-gray-600 mb-3">Each student section shows tutor assignment status below their details</p>
+                        <p class="text-sm text-gray-600 mb-3">Tutor assignments are shown under each student</p>
                         ${studentsHTML || '<p class="text-gray-500">No student information available.</p>'}
                     </div>
                     
@@ -3998,6 +4046,7 @@ window.showEnrollmentDetails = async function(enrollmentId) {
         alert("Failed to load enrollment details. Please try again.");
     }
 };
+
 
 // ======================================================
 // SUBSECTION 5.3: Pending Approvals Panel (UPDATED)
