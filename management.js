@@ -2876,6 +2876,26 @@ async function renderTutorReportsPanel(container) {
 // SUBSECTION 5.2: Enrollments Panel (COMPREHENSIVE TUTOR DISPLAY)
 // ======================================================
 
+// Helper function for fee parsing - MOVED TO GLOBAL SCOPE
+function parseFeeValue(feeValue) {
+    if (!feeValue && feeValue !== 0) return 0;
+    
+    if (typeof feeValue === 'number') {
+        return Math.round(feeValue);
+    }
+    
+    if (typeof feeValue === 'string') {
+        const cleaned = feeValue
+            .replace(/[^0-9.-]/g, '')
+            .trim();
+        
+        const parsed = parseFloat(cleaned);
+        return isNaN(parsed) ? 0 : Math.round(parsed);
+    }
+    
+    return 0;
+}
+
 async function renderEnrollmentsPanel(container) {
     container.innerHTML = `
         <div class="bg-white p-6 rounded-lg shadow-md">
@@ -3354,26 +3374,6 @@ function renderEnrollmentsFromCache(searchTerm = '') {
             </tr>
         `;
         return;
-    }
-
-    // Helper function for fee parsing
-    function parseFeeValue(feeValue) {
-        if (!feeValue && feeValue !== 0) return 0;
-        
-        if (typeof feeValue === 'number') {
-            return Math.round(feeValue);
-        }
-        
-        if (typeof feeValue === 'string') {
-            const cleaned = feeValue
-                .replace(/[^0-9.-]/g, '')
-                .trim();
-            
-            const parsed = parseFloat(cleaned);
-            return isNaN(parsed) ? 0 : Math.round(parsed);
-        }
-        
-        return 0;
     }
 
     const tableRows = filteredEnrollments.map(enrollment => {
@@ -7136,6 +7136,7 @@ onAuthStateChanged(auth, async (user) => {
         window.location.href = "management-auth.html";
     }
 });
+
 
 
 
