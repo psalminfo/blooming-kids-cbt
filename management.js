@@ -2876,6 +2876,165 @@ async function renderTutorReportsPanel(container) {
 // SUBSECTION 5.2: Enrollments Panel (COMPREHENSIVE TUTOR DISPLAY)
 // ======================================================
 
+// EXTRACTED: Function to display tutor assignments under each student (Comprehensive Version)
+function buildComprehensiveStudentTutorAssignmentsHTML(student, studentAssignment, enrollment) {
+    let tutorHTML = '';
+    
+    // Academic days and time
+    const academicDays = student.academicDays || enrollment.academicDays || 'Not specified';
+    const academicTime = student.academicTime || enrollment.academicTime || 'Not specified';
+    
+    if (studentAssignment) {
+        // Main Academic Tutor Section
+        if (studentAssignment.tutorName || studentAssignment.tutorEmail) {
+            const assignedDate = studentAssignment.assignedDate ? 
+                (studentAssignment.assignedDate.seconds ? 
+                    new Date(studentAssignment.assignedDate.seconds * 1000).toLocaleDateString() : 
+                    new Date(studentAssignment.assignedDate).toLocaleDateString()) : 
+                'Unknown date';
+            
+            tutorHTML += `
+                <div class="mt-3 p-3 bg-green-50 border border-green-200 rounded-lg">
+                    <div class="flex justify-between items-start">
+                        <div>
+                            <p class="text-sm font-semibold text-green-700">✓ Academic Tutor</p>
+                            <p class="text-sm"><strong>Tutor:</strong> ${studentAssignment.tutorName || 'Name not available'}</p>
+                            <p class="text-xs text-gray-600">Email: ${studentAssignment.tutorEmail || 'Not available'}</p>
+                        </div>
+                        <div class="text-right">
+                            <p class="text-xs font-medium text-gray-600">Assigned Date</p>
+                            <p class="text-sm">${assignedDate}</p>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+        
+        // Check for extracurricular tutors - TREATING EACH EXTRACURRICULAR AS SEPARATE ASSIGNMENT
+        if (student.extracurriculars && student.extracurriculars.length > 0) {
+            const extracurricularList = student.extracurriculars;
+            const ecTutors = studentAssignment.extracurricularTutors || [];
+            
+            extracurricularList.forEach(ec => {
+                const ecTutor = ecTutors.find(t => t.activity === ec.name);
+                
+                if (ecTutor) {
+                    const ecAssignedDate = ecTutor.assignedDate ? 
+                        (ecTutor.assignedDate.seconds ? 
+                            new Date(ecTutor.assignedDate.seconds * 1000).toLocaleDateString() : 
+                            new Date(ecTutor.assignedDate).toLocaleDateString()) : 
+                        'Unknown date';
+                    
+                    tutorHTML += `
+                        <div class="mt-2 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                            <div class="flex justify-between items-start">
+                                <div>
+                                    <p class="text-sm font-semibold text-blue-700">✓ Extracurricular: ${ec.name}</p>
+                                    <p class="text-sm"><strong>Tutor:</strong> ${ecTutor.tutorName || 'Not assigned'}</p>
+                                    <p class="text-xs text-gray-600">Email: ${ecTutor.tutorEmail || 'Not available'}</p>
+                                </div>
+                                <div class="text-right">
+                                    <p class="text-xs font-medium text-gray-600">Assigned Date</p>
+                                    <p class="text-sm">${ecAssignedDate}</p>
+                                </div>
+                            </div>
+                            <p class="text-xs text-gray-500 mt-1">Frequency: ${ec.frequency}</p>
+                        </div>
+                    `;
+                } else {
+                    // Each extracurricular activity without a tutor gets its own unassigned section
+                    tutorHTML += `
+                        <div class="mt-2 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                            <div class="flex items-center">
+                                <svg class="w-4 h-4 text-yellow-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.196 16.5c-.77.833.192 2.5 1.732 2.5z"></path>
+                                </svg>
+                                <div>
+                                    <p class="text-sm font-semibold text-yellow-700">Extracurricular: ${ec.name}</p>
+                                    <p class="text-xs text-yellow-600">No tutor assigned for this activity</p>
+                                </div>
+                            </div>
+                            <p class="text-xs text-gray-500 mt-1">Frequency: ${ec.frequency}</p>
+                        </div>
+                    `;
+                }
+            });
+        }
+        
+        // Check for subject-specific tutors
+        if (studentAssignment.subjectTutors && studentAssignment.subjectTutors.length > 0) {
+            studentAssignment.subjectTutors.forEach(subjectTutor => {
+                const subjectAssignedDate = subjectTutor.assignedDate ? 
+                    (subjectTutor.assignedDate.seconds ? 
+                        new Date(subjectTutor.assignedDate.seconds * 1000).toLocaleDateString() : 
+                        new Date(subjectTutor.assignedDate).toLocaleDateString()) : 
+                    'Unknown date';
+                
+                tutorHTML += `
+                    <div class="mt-2 p-3 bg-purple-50 border border-purple-200 rounded-lg">
+                        <div class="flex justify-between items-start">
+                            <div>
+                                <p class="text-sm font-semibold text-purple-700">✓ Subject: ${subjectTutor.subject || 'Subject'}</p>
+                                <p class="text-sm"><strong>Tutor:</strong> ${subjectTutor.tutorName || 'Not assigned'}</p>
+                                <p class="text-xs text-gray-600">Email: ${subjectTutor.tutorEmail || 'Not available'}</p>
+                            </div>
+                            <div class="text-right">
+                                <p class="text-xs font-medium text-gray-600">Assigned Date</p>
+                                <p class="text-sm">${subjectAssignedDate}</p>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+        }
+    } else {
+        // No tutor assigned at all - Comprehensive view
+        tutorHTML = `
+            <div class="mt-3 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                <div class="flex items-center">
+                    <svg class="w-4 h-4 text-yellow-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.196 16.5c-.77.833.192 2.5 1.732 2.5z"></path>
+                    </svg>
+                    <p class="text-sm text-yellow-700">No academic tutor assigned yet</p>
+                </div>
+                <p class="text-xs text-yellow-600 mt-1">This student needs an academic tutor</p>
+                
+                <!-- Extracurricular Activities Section - Each as separate unassigned item -->
+                ${student.extracurriculars && student.extracurriculars.length > 0 ? `
+                    <div class="mt-3 pt-3 border-t border-yellow-200">
+                        <p class="text-sm font-medium text-yellow-700 mb-2">Extracurricular Activities:</p>
+                        <div class="space-y-2">
+                            ${student.extracurriculars.map((ec, ecIndex) => `
+                                <div class="p-2 bg-white border border-yellow-100 rounded">
+                                    <p class="text-sm font-medium">${ec.name} (${ec.frequency})</p>
+                                    <p class="text-xs text-gray-600">No tutor assigned for this activity</p>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                ` : ''}
+                
+                <!-- Subjects Section -->
+                ${student.selectedSubjects && student.selectedSubjects.length > 0 ? `
+                    <div class="mt-3 pt-3 border-t border-yellow-200">
+                        <p class="text-sm font-medium text-yellow-700 mb-2">Subjects:</p>
+                        <div class="space-y-2">
+                            ${student.selectedSubjects.map((subject, subIndex) => `
+                                <div class="p-2 bg-white border border-yellow-100 rounded">
+                                    <p class="text-sm font-medium">${subject}</p>
+                                    <p class="text-xs text-gray-600">No subject-specific tutor assigned</p>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                ` : ''}
+            </div>
+        `;
+    }
+    
+    return tutorHTML;
+}
+
 // Helper function for fee parsing - MOVED TO GLOBAL SCOPE
 function parseFeeValue(feeValue) {
     if (!feeValue && feeValue !== 0) return 0;
@@ -3158,7 +3317,7 @@ function getEnrollmentAssignmentStatus(enrollment, tutorAssignments) {
                 }
             }
             
-            // Check extracurricular activities
+            // Check extracurricular activities - TREAT EACH AS SEPARATE
             if (student.extracurriculars && student.extracurriculars.length > 0) {
                 needsExtracurricularTutors += student.extracurriculars.length;
                 
@@ -3873,7 +4032,7 @@ window.exportSingleEnrollmentToExcel = async function(enrollmentId) {
     }
 };
 
-// UPDATED: Enrollment Details Modal with Tutor Assignments UNDER EACH STUDENT
+// UPDATED: Enrollment Details Modal with Comprehensive Tutor Assignments UNDER EACH STUDENT
 window.showEnrollmentDetails = async function(enrollmentId) {
     try {
         const enrollmentDoc = await getDoc(doc(db, "enrollments", enrollmentId));
@@ -3921,175 +4080,43 @@ window.showEnrollmentDetails = async function(enrollmentId) {
                 const academicDays = student.academicDays || enrollment.academicDays || 'Not specified';
                 const academicTime = student.academicTime || enrollment.academicTime || 'Not specified';
                 
-                // Tutor assignment info - INTEGRATED UNDER EACH STUDENT
-                let tutorHTML = '';
+                // Tutor assignment info - USING THE EXTRACTED COMPREHENSIVE FUNCTION
+                const tutorHTML = buildComprehensiveStudentTutorAssignmentsHTML(student, studentAssignment, enrollment);
+                
+                // Determine overall assignment status for badge
+                let assignmentStatusBadge = '';
+                let assignmentStatusText = '';
+                
                 if (studentAssignment) {
-                    // Main Academic Tutor Section
-                    if (studentAssignment.tutorName || studentAssignment.tutorEmail) {
-                        const assignedDate = studentAssignment.assignedDate ? 
-                            (studentAssignment.assignedDate.seconds ? 
-                                new Date(studentAssignment.assignedDate.seconds * 1000).toLocaleDateString() : 
-                                new Date(studentAssignment.assignedDate).toLocaleDateString()) : 
-                            'Unknown date';
-                        
-                        tutorHTML += `
-                            <div class="mt-3 p-3 bg-green-50 border border-green-200 rounded-lg">
-                                <div class="flex justify-between items-start">
-                                    <div>
-                                        <p class="text-sm font-semibold text-green-700">✓ Academic Tutor</p>
-                                        <p class="text-sm"><strong>Tutor:</strong> ${studentAssignment.tutorName || 'Name not available'}</p>
-                                        <p class="text-xs text-gray-600">Email: ${studentAssignment.tutorEmail || 'Not available'}</p>
-                                    </div>
-                                    <div class="text-right">
-                                        <p class="text-xs font-medium text-gray-600">Assigned Date</p>
-                                        <p class="text-sm">${assignedDate}</p>
-                                    </div>
-                                </div>
-                            </div>
-                        `;
+                    // Count total assignments needed vs assigned
+                    const totalNeeded = 1 + (student.extracurriculars?.length || 0) + (student.selectedSubjects?.length || 0);
+                    let totalAssigned = 0;
+                    
+                    if (studentAssignment.hasAcademicTutor) totalAssigned++;
+                    if (studentAssignment.extracurricularTutors) totalAssigned += studentAssignment.extracurricularTutors.length;
+                    if (studentAssignment.subjectTutors) totalAssigned += studentAssignment.subjectTutors.length;
+                    
+                    if (totalAssigned === 0) {
+                        assignmentStatusBadge = 'bg-red-100 text-red-800';
+                        assignmentStatusText = 'Unassigned';
+                    } else if (totalAssigned < totalNeeded) {
+                        assignmentStatusBadge = 'bg-yellow-100 text-yellow-800';
+                        assignmentStatusText = 'Partial';
                     } else {
-                        tutorHTML += `
-                            <div class="mt-3 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
-                                <div class="flex items-center">
-                                    <svg class="w-4 h-4 text-yellow-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.196 16.5c-.77.833.192 2.5 1.732 2.5z"></path>
-                                    </svg>
-                                    <div>
-                                        <p class="text-sm text-yellow-700">No academic tutor assigned yet</p>
-                                        <p class="text-xs text-yellow-600">This student needs an academic tutor</p>
-                                    </div>
-                                </div>
-                            </div>
-                        `;
-                    }
-                    
-                    // Check for extracurricular tutors
-                    if (student.extracurriculars && student.extracurriculars.length > 0) {
-                        const extracurricularList = student.extracurriculars;
-                        const ecTutors = studentAssignment.extracurricularTutors || [];
-                        
-                        extracurricularList.forEach(ec => {
-                            const ecTutor = ecTutors.find(t => t.activity === ec.name);
-                            
-                            if (ecTutor) {
-                                const ecAssignedDate = ecTutor.assignedDate ? 
-                                    (ecTutor.assignedDate.seconds ? 
-                                        new Date(ecTutor.assignedDate.seconds * 1000).toLocaleDateString() : 
-                                        new Date(ecTutor.assignedDate).toLocaleDateString()) : 
-                                    'Unknown date';
-                                
-                                tutorHTML += `
-                                    <div class="mt-2 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                                        <div class="flex justify-between items-start">
-                                            <div>
-                                                <p class="text-sm font-semibold text-blue-700">✓ Extracurricular: ${ec.name}</p>
-                                                <p class="text-sm"><strong>Tutor:</strong> ${ecTutor.tutorName || 'Not assigned'}</p>
-                                                <p class="text-xs text-gray-600">Email: ${ecTutor.tutorEmail || 'Not available'}</p>
-                                            </div>
-                                            <div class="text-right">
-                                                <p class="text-xs font-medium text-gray-600">Assigned Date</p>
-                                                <p class="text-sm">${ecAssignedDate}</p>
-                                            </div>
-                                        </div>
-                                        <p class="text-xs text-gray-500 mt-1">Frequency: ${ec.frequency}</p>
-                                    </div>
-                                `;
-                            } else {
-                                tutorHTML += `
-                                    <div class="mt-2 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
-                                        <div class="flex items-center">
-                                            <svg class="w-4 h-4 text-yellow-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.196 16.5c-.77.833.192 2.5 1.732 2.5z"></path>
-                                            </svg>
-                                            <div>
-                                                <p class="text-sm text-yellow-700">Extracurricular: ${ec.name}</p>
-                                                <p class="text-xs text-yellow-600">No tutor assigned for this activity</p>
-                                            </div>
-                                        </div>
-                                        <p class="text-xs text-gray-500 mt-1">Frequency: ${ec.frequency}</p>
-                                    </div>
-                                `;
-                            }
-                        });
-                    }
-                    
-                    // Check for subject-specific tutors
-                    if (studentAssignment.subjectTutors && studentAssignment.subjectTutors.length > 0) {
-                        studentAssignment.subjectTutors.forEach(subjectTutor => {
-                            const subjectAssignedDate = subjectTutor.assignedDate ? 
-                                (subjectTutor.assignedDate.seconds ? 
-                                    new Date(subjectTutor.assignedDate.seconds * 1000).toLocaleDateString() : 
-                                    new Date(subjectTutor.assignedDate).toLocaleDateString()) : 
-                                'Unknown date';
-                            
-                            tutorHTML += `
-                                <div class="mt-2 p-3 bg-purple-50 border border-purple-200 rounded-lg">
-                                    <div class="flex justify-between items-start">
-                                        <div>
-                                            <p class="text-sm font-semibold text-purple-700">✓ Subject: ${subjectTutor.subject || 'Subject'}</p>
-                                            <p class="text-sm"><strong>Tutor:</strong> ${subjectTutor.tutorName || 'Not assigned'}</p>
-                                            <p class="text-xs text-gray-600">Email: ${subjectTutor.tutorEmail || 'Not available'}</p>
-                                        </div>
-                                        <div class="text-right">
-                                            <p class="text-xs font-medium text-gray-600">Assigned Date</p>
-                                            <p class="text-sm">${subjectAssignedDate}</p>
-                                        </div>
-                                    </div>
-                                </div>
-                            `;
-                        });
+                        assignmentStatusBadge = 'bg-green-100 text-green-800';
+                        assignmentStatusText = 'Fully Assigned';
                     }
                 } else {
-                    // No tutor assigned at all
-                    tutorHTML = `
-                        <div class="mt-3 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
-                            <div class="flex items-center">
-                                <svg class="w-4 h-4 text-yellow-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.196 16.5c-.77.833.192 2.5 1.732 2.5z"></path>
-                                </svg>
-                                <p class="text-sm text-yellow-700">No academic tutor assigned yet</p>
-                            </div>
-                            <p class="text-xs text-yellow-600 mt-1">This student needs an academic tutor</p>
-                            
-                            <!-- Extracurricular Activities Section -->
-                            ${student.extracurriculars && student.extracurriculars.length > 0 ? `
-                                <div class="mt-3 pt-3 border-t border-yellow-200">
-                                    <p class="text-sm font-medium text-yellow-700 mb-2">Extracurricular Activities:</p>
-                                    <div class="space-y-2">
-                                        ${student.extracurriculars.map((ec, ecIndex) => `
-                                            <div class="p-2 bg-white border border-yellow-100 rounded">
-                                                <p class="text-sm"><strong>${ec.name}</strong> (${ec.frequency})</p>
-                                                <p class="text-xs text-gray-600">No tutor assigned for this activity</p>
-                                            </div>
-                                        `).join('')}
-                                    </div>
-                                </div>
-                            ` : ''}
-                            
-                            <!-- Subjects Section -->
-                            ${student.selectedSubjects && student.selectedSubjects.length > 0 ? `
-                                <div class="mt-3 pt-3 border-t border-yellow-200">
-                                    <p class="text-sm font-medium text-yellow-700 mb-2">Subjects:</p>
-                                    <div class="space-y-2">
-                                        ${student.selectedSubjects.map((subject, subIndex) => `
-                                            <div class="p-2 bg-white border border-yellow-100 rounded">
-                                                <p class="text-sm"><strong>${subject}</strong></p>
-                                                <p class="text-xs text-gray-600">No subject-specific tutor assigned</p>
-                                            </div>
-                                        `).join('')}
-                                    </div>
-                                </div>
-                            ` : ''}
-                        </div>
-                    `;
+                    assignmentStatusBadge = 'bg-red-100 text-red-800';
+                    assignmentStatusText = 'Unassigned';
                 }
                 
                 return `
                     <div class="border rounded-lg p-4 mb-4 bg-gray-50">
                         <div class="flex justify-between items-start mb-3">
                             <h4 class="font-bold text-lg text-gray-800">${student.name || 'Unnamed Student'}</h4>
-                            <span class="px-2 py-1 text-xs rounded-full ${studentAssignment?.hasAcademicTutor ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}">
-                                ${studentAssignment?.hasAcademicTutor ? 'Assigned' : 'Unassigned'}
+                            <span class="px-2 py-1 text-xs rounded-full ${assignmentStatusBadge}">
+                                ${assignmentStatusText}
                             </span>
                         </div>
                         
@@ -4436,7 +4463,7 @@ window.approveEnrollmentModal = async function(enrollmentId) {
                         <!-- Student Tutor Assignments -->
                         <div class="mb-6">
                             <h4 class="text-lg font-bold mb-4">Tutor Assignments</h4>
-                            <p class="text-sm text-gray-600 mb-4">Assign tutors for each student below. Academic tutors are required.</p>
+                            <p class="text-sm text-gray-600 mb-4">Assign tutors for each student below. Academic tutors are required. Each extracurricular activity requires its own tutor.</p>
                             ${studentAssignmentHTML}
                         </div>
                         
@@ -4468,7 +4495,7 @@ window.approveEnrollmentModal = async function(enrollmentId) {
                     tutors
                 );
                 
-                // Extracurricular tutors
+                // Extracurricular tutors - EACH ACTIVITY GETS ITS OWN FIELD
                 if (student.extracurriculars) {
                     student.extracurriculars.forEach((activity, ecIndex) => {
                         initializeTutorSearch(
@@ -4640,7 +4667,7 @@ async function approveEnrollmentWithDetails(enrollmentId) {
                 return;
             }
             
-            // Collect extracurricular tutor assignments
+            // Collect extracurricular tutor assignments - EACH ACTIVITY SEPARATELY
             const extracurricularTutors = [];
             if (student.extracurriculars) {
                 student.extracurriculars.forEach((activity, ecIndex) => {
@@ -4656,7 +4683,27 @@ async function approveEnrollmentWithDetails(enrollmentId) {
                                 assignedDate: Timestamp.now(),
                                 frequency: activity.frequency
                             });
+                        } else {
+                            // Note: Extracurricular tutors are optional but can be assigned
+                            extracurricularTutors.push({
+                                activity: activity.name,
+                                tutorId: null,
+                                tutorName: null,
+                                tutorEmail: null,
+                                assignedDate: null,
+                                frequency: activity.frequency
+                            });
                         }
+                    } else {
+                        // No tutor selected for this extracurricular activity
+                        extracurricularTutors.push({
+                            activity: activity.name,
+                            tutorId: null,
+                            tutorName: null,
+                            tutorEmail: null,
+                            assignedDate: null,
+                            frequency: activity.frequency
+                        });
                     }
                 });
             }
@@ -7136,6 +7183,7 @@ onAuthStateChanged(auth, async (user) => {
         window.location.href = "management-auth.html";
     }
 });
+
 
 
 
