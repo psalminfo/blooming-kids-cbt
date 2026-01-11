@@ -2873,7 +2873,7 @@ async function renderTutorReportsPanel(container) {
 }
 
 // ======================================================
-// SUBSECTION 5.2: Enrollments Panel (FIXED & UPDATED)
+// SUBSECTION 5.2: Enrollments Panel (UPDATED LOGIC)
 // ======================================================
 
 async function renderEnrollmentsPanel(container) {
@@ -2998,12 +2998,13 @@ async function renderEnrollmentsPanel(container) {
     fetchAndRenderEnrollments();
 }
 
-// Updated Helper: Check Tutor Assignments (Source of Truth = Students Collection)
+// Updated Helper: Check Tutor Assignments 
+// Logic: Query 'students' collection by enrollmentId -> Match student names -> Check for tutorEmail, tutorName, assignedDate
 async function checkTutorAssignments(enrollmentId, studentNames = []) {
     try {
         const assignments = [];
         
-        // Query the 'students' collection specifically by enrollmentId
+        // 1. Search in 'students' collection for enrollmentId
         const studentsQuery = query(
             collection(db, "students"), 
             where("enrollmentId", "==", enrollmentId)
@@ -3011,36 +3012,43 @@ async function checkTutorAssignments(enrollmentId, studentNames = []) {
         
         const studentsSnapshot = await getDocs(studentsQuery);
         
+        // 2. Iterate through results
         studentsSnapshot.forEach(doc => {
             const data = doc.data();
             
-            // Check for assignment details
-            // We look for direct fields (tutorName) OR nested object (tutor.name/tutorName)
-            let tName = null;
-            let tEmail = null;
-            let aDate = null;
+            // 3. Check if this student is part of the enrollment (matching by name)
+            // (Using strict inclusion check, or exact match if preferred)
+            const isStudentInEnrollment = studentNames.includes(data.name);
 
-            if (data.tutorName || data.tutorEmail) {
-                // Direct fields found
-                tName = data.tutorName;
-                tEmail = data.tutorEmail;
-                aDate = data.assignedDate || data.createdAt;
-            } else if (data.tutor) {
-                // Nested object found
-                tName = data.tutor.tutorName || data.tutor.name;
-                tEmail = data.tutor.tutorEmail || data.tutor.email;
-                aDate = data.tutor.assignedDate || data.createdAt;
-            }
+            if (isStudentInEnrollment) {
+                // 4. Check for presence of tutorEmail, tutorName, and assignedDate
+                // Support both direct fields and nested 'tutor' object structure
+                let tName = data.tutorName;
+                let tEmail = data.tutorEmail;
+                let aDate = data.assignedDate;
 
-            // Only push if we actually found a tutor assignment
-            if (tName || tEmail) {
-                assignments.push({
-                    studentName: data.name,
-                    tutorName: tName,
-                    tutorEmail: tEmail,
-                    assignedDate: aDate,
-                    source: 'students_collection'
-                });
+                // If not found in top level, check nested 'tutor' object
+                if (data.tutor) {
+                    if (!tName) tName = data.tutor.tutorName || data.tutor.name;
+                    if (!tEmail) tEmail = data.tutor.tutorEmail || data.tutor.email;
+                    if (!aDate) aDate = data.tutor.assignedDate;
+                }
+
+                // Fallback for date if missing but tutor is present
+                if ((tName || tEmail) && !aDate) {
+                    aDate = data.createdAt; // Use created date as fallback if strictly assigned
+                }
+
+                // 5. If all required fields are present (or at least tutor is identified), add to assignments
+                if (tName || tEmail) {
+                    assignments.push({
+                        studentName: data.name,
+                        tutorName: tName,
+                        tutorEmail: tEmail,
+                        assignedDate: aDate,
+                        source: 'students_collection'
+                    });
+                }
             }
         });
         
@@ -3467,7 +3475,7 @@ async function exportEnrollmentsToExcel() {
     }
 }
 
-// Export single enrollment to Excel - FIXED REFERENCE ERROR
+// Export single enrollment to Excel - FIXED REFERENCE ERROR & UPDATED LOGIC
 window.exportSingleEnrollmentToExcel = async function(enrollmentId) {
     try {
         const enrollmentDoc = await getDoc(doc(db, "enrollments", enrollmentId));
@@ -6406,6 +6414,7 @@ onAuthStateChanged(auth, async (user) => {
         window.location.href = "management-auth.html";
     }
 });
+
 
 
 
