@@ -3044,7 +3044,7 @@ async function checkTutorAssignments(enrollmentId, studentNames = []) {
             }
         });
         
-        // Check students collection (look for tutorEmail and tutorName fields)
+        // Check students collection (look for tutor object with tutorEmail/tutorName)
         for (const studentName of studentNames) {
             const studentsQuery = query(
                 collection(db, "students"),
@@ -3055,8 +3055,18 @@ async function checkTutorAssignments(enrollmentId, studentNames = []) {
             
             studentsSnapshot.forEach(doc => {
                 const data = doc.data();
-                // Check for tutorEmail or tutorName fields
-                if (data.tutorEmail || data.tutorName) {
+                // Check for nested tutor object with tutorEmail or tutorName
+                if (data.tutor && (data.tutor.tutorEmail || data.tutor.tutorName)) {
+                    assignments.push({
+                        studentName: data.name,
+                        tutorName: data.tutor.tutorName || data.tutor.tutorEmail,
+                        tutorEmail: data.tutor.tutorEmail,
+                        assignedDate: data.createdAt || data.assignedDate,
+                        source: 'students'
+                    });
+                }
+                // Also check for direct tutorEmail/tutorName fields (backward compatibility)
+                else if (data.tutorEmail || data.tutorName) {
                     assignments.push({
                         studentName: data.name,
                         tutorName: data.tutorName || data.tutorEmail,
@@ -3836,9 +3846,6 @@ async function exportSingleEnrollmentToExcel(enrollmentId) {
         alert("Failed to export enrollment details. Please try again.");
     }
 }
-
-// Keep all existing functions below (approveEnrollmentModal, approveEnrollmentWithDetails, 
-// displayTutorResults, deleteEnrollment, downloadEnrollmentInvoice) exactly as they are
 
 window.approveEnrollmentModal = async function(enrollmentId) {
     try {
@@ -6427,6 +6434,7 @@ onAuthStateChanged(auth, async (user) => {
         window.location.href = "management-auth.html";
     }
 });
+
 
 
 
