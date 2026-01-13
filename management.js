@@ -900,20 +900,27 @@ window.refreshAllDashboardData = async function() {
 // Helper function for safe string operations
 function safeToString(value) {
     if (value === null || value === undefined) return '';
-    if (typeof value === 'object') return JSON.stringify(value);
+    if (typeof value === 'object') {
+        try {
+            return JSON.stringify(value);
+        } catch (e) {
+            return '';
+        }
+    }
     return String(value);
 }
 
 // Helper function for safe search
 function safeSearch(text, searchTerm) {
-    if (!searchTerm || searchTerm.trim() === '') return true;
+    if (!searchTerm || safeToString(searchTerm).trim() === '') return true;
     if (!text) return false;
     return safeToString(text).toLowerCase().includes(safeToString(searchTerm).toLowerCase());
 }
 
 // Function to search student comprehensively
 function searchStudentFromFirebase(student, searchTerm, tutors = []) {
-    if (!searchTerm || searchTerm.trim() === '') return true;
+    if (!student) return false;
+    if (!searchTerm || safeToString(searchTerm).trim() === '') return true;
     
     const searchLower = safeToString(searchTerm).toLowerCase();
     
@@ -932,7 +939,7 @@ function searchStudentFromFirebase(student, searchTerm, tutors = []) {
     }
     
     // Search student fee
-    if (typeof student.studentFee === 'number') {
+    if (student.studentFee !== undefined && student.studentFee !== null) {
         if (safeToString(student.studentFee).includes(searchLower)) return true;
     }
     
@@ -948,8 +955,8 @@ function searchStudentFromFirebase(student, searchTerm, tutors = []) {
     }
     
     // Search tutor information
-    if (student.tutorEmail && tutors.length > 0) {
-        const tutor = tutors.find(t => t.email === student.tutorEmail);
+    if (student.tutorEmail && tutors && tutors.length > 0) {
+        const tutor = tutors.find(t => t && t.email === student.tutorEmail);
         if (tutor) {
             // Search tutor properties
             const tutorFieldsToSearch = ['name', 'email', 'phone', 'qualification', 'subjects'];
@@ -995,63 +1002,75 @@ async function renderManagementTutorView(container) {
         </div>
     `;
     
-    // Add event listeners
-    document.getElementById('assign-student-btn').addEventListener('click', showAssignStudentModal);
-    document.getElementById('reassign-student-btn').addEventListener('click', showReassignStudentModal);
-    document.getElementById('refresh-directory-btn').addEventListener('click', () => fetchAndRenderDirectory(true));
-    document.getElementById('directory-search').addEventListener('input', (e) => renderDirectoryFromCache(e.target.value));
-    
-    document.getElementById('view-tutor-history-directory-btn').addEventListener('click', async () => {
-        if (!sessionCache.tutorAssignments || Object.keys(sessionCache.tutorAssignments).length === 0) {
-            alert("No tutor history available. Please refresh the directory first.");
-            return;
-        }
+    // Add event listeners - wrapped in try-catch to prevent crash if elements missing
+    try {
+        document.getElementById('assign-student-btn').addEventListener('click', showAssignStudentModal);
+        document.getElementById('reassign-student-btn').addEventListener('click', showReassignStudentModal);
+        document.getElementById('refresh-directory-btn').addEventListener('click', () => fetchAndRenderDirectory(true));
+        document.getElementById('directory-search').addEventListener('input', (e) => renderDirectoryFromCache(e.target.value));
         
-        const students = sessionCache.students || [];
-        const activeStudents = students.filter(student => 
-            !student.status || student.status === 'active' || student.status === 'approved'
-        );
-        
-        if (activeStudents.length === 0) {
-            alert("No active students found.");
-            return;
-        }
-        
-        const studentOptions = activeStudents.map(student => 
-            `<option value="${student.id}">${student.studentName} (${student.grade || 'No grade'})</option>`
-        ).join('');
-        
-        const modalHtml = `
-            <div id="select-student-modal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-center justify-center">
-                <div class="relative p-8 bg-white w-96 max-w-lg rounded-lg shadow-xl">
-                    <button class="absolute top-2 right-2 text-gray-500 hover:text-gray-800 text-2xl font-bold" onclick="closeManagementModal('select-student-modal')">&times;</button>
-                    <h3 class="text-xl font-bold mb-4">Select Student to View Tutor History</h3>
-                    <form id="select-student-form">
-                        <div class="mb-4">
-                            <label class="block text-sm font-medium mb-2">Select Student</label>
-                            <select id="select-student" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2">
-                                <option value="" disabled selected>Select a student...</option>
-                                ${studentOptions}
-                            </select>
-                        </div>
-                        <div class="flex justify-end mt-4">
-                            <button type="button" onclick="closeManagementModal('select-student-modal')" class="mr-2 px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300">Cancel</button>
-                            <button type="submit" class="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700">View History</button>
-                        </div>
-                    </form>
+        document.getElementById('view-tutor-history-directory-btn').addEventListener('click', async () => {
+            if (!sessionCache.tutorAssignments || Object.keys(sessionCache.tutorAssignments).length === 0) {
+                alert("No tutor history available. Please refresh the directory first.");
+                return;
+            }
+            
+            const students = sessionCache.students || [];
+            const activeStudents = students.filter(student => 
+                student && (!student.status || student.status === 'active' || student.status === 'approved')
+            );
+            
+            if (activeStudents.length === 0) {
+                alert("No active students found.");
+                return;
+            }
+            
+            const studentOptions = activeStudents.map(student => 
+                `<option value="${student.id}">${student.studentName} (${student.grade || 'No grade'})</option>`
+            ).join('');
+            
+            const modalHtml = `
+                <div id="select-student-modal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-center justify-center">
+                    <div class="relative p-8 bg-white w-96 max-w-lg rounded-lg shadow-xl">
+                        <button class="absolute top-2 right-2 text-gray-500 hover:text-gray-800 text-2xl font-bold" onclick="closeManagementModal('select-student-modal')">&times;</button>
+                        <h3 class="text-xl font-bold mb-4">Select Student to View Tutor History</h3>
+                        <form id="select-student-form">
+                            <div class="mb-4">
+                                <label class="block text-sm font-medium mb-2">Select Student</label>
+                                <select id="select-student" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2">
+                                    <option value="" disabled selected>Select a student...</option>
+                                    ${studentOptions}
+                                </select>
+                            </div>
+                            <div class="flex justify-end mt-4">
+                                <button type="button" onclick="closeManagementModal('select-student-modal')" class="mr-2 px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300">Cancel</button>
+                                <button type="submit" class="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700">View History</button>
+                            </div>
+                        </form>
+                    </div>
                 </div>
-            </div>
-        `;
-        
-        document.body.insertAdjacentHTML('beforeend', modalHtml);
-        
-        document.getElementById('select-student-form').addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const studentId = document.getElementById('select-student').value;
-            closeManagementModal('select-student-modal');
-            window.viewStudentTutorHistory(studentId);
+            `;
+            
+            document.body.insertAdjacentHTML('beforeend', modalHtml);
+            
+            const form = document.getElementById('select-student-form');
+            if(form) {
+                form.addEventListener('submit', async (e) => {
+                    e.preventDefault();
+                    const selectEl = document.getElementById('select-student');
+                    if (selectEl) {
+                        const studentId = selectEl.value;
+                        closeManagementModal('select-student-modal');
+                        if (typeof window.viewStudentTutorHistory === 'function') {
+                            window.viewStudentTutorHistory(studentId);
+                        }
+                    }
+                });
+            }
         });
-    });
+    } catch (e) {
+        console.error("Error attaching event listeners:", e);
+    }
     
     fetchAndRenderDirectory();
 }
@@ -1095,7 +1114,7 @@ async function fetchAndRenderDirectory(forceRefresh = false) {
         });
         
         const activeTutors = allTutors.filter(tutor => 
-            !tutor.status || tutor.status === 'active'
+            tutor && (!tutor.status || tutor.status === 'active')
         );
         
         // Process students with safe data handling
@@ -1120,10 +1139,8 @@ async function fetchAndRenderDirectory(forceRefresh = false) {
             };
         });
         
-        console.log("All students loaded:", allStudents.length);
-        
         const activeStudents = allStudents.filter(student => 
-            !student.status || student.status === 'active' || student.status === 'approved'
+            student && (!student.status || student.status === 'active' || student.status === 'approved')
         );
         
         // Process tutor assignments with safe data handling
@@ -1216,6 +1233,7 @@ function renderDirectoryFromCache(searchTerm = '') {
     const studentsByTutor = {};
     
     students.forEach(student => {
+        if (!student) return;
         const tutorEmail = student.tutorEmail || '';
         if (tutorEmail) {
             if (!studentsByTutor[tutorEmail]) {
@@ -1227,6 +1245,7 @@ function renderDirectoryFromCache(searchTerm = '') {
 
     // Filter tutors based on search term
     const filteredTutors = tutors.filter(tutor => {
+        if (!tutor) return false;
         if (!searchTerm) return true;
         
         const assignedStudents = studentsByTutor[tutor.email] || [];
@@ -1272,8 +1291,11 @@ function renderDirectoryFromCache(searchTerm = '') {
 
     // Build the directory view
     directoryList.innerHTML = filteredTutors.map(tutor => {
+        if (!tutor) return '';
+        
         const assignedStudents = (studentsByTutor[tutor.email] || [])
             .filter(student => {
+                if (!student) return false;
                 if (!searchTerm) return true;
                 return searchStudentFromFirebase(student, searchTerm, tutors) || safeSearch(tutor.name, searchTerm);
             })
@@ -1382,7 +1404,7 @@ function renderDirectoryFromCache(searchTerm = '') {
 }
 
 // ======================================================
-// UPDATED SHOWREASSIGNSTUDENTMODAL - FIX APPLIED
+// UPDATED SHOWREASSIGNSTUDENTMODAL - WITH ROBUST ERROR HANDLING
 // ======================================================
 
 // Check if showReassignStudentModal already exists
@@ -1408,9 +1430,9 @@ if (typeof window.showReassignStudentModal === 'undefined') {
                 return;
             }
             
-            // Filter active students
+            // Filter active students - WITH NULL CHECKING
             const activeStudents = students.filter(student => 
-                !student.status || student.status === 'active' || student.status === 'approved'
+                student && (!student.status || student.status === 'active' || student.status === 'approved')
             );
             
             if (activeStudents.length === 0) {
@@ -1418,9 +1440,10 @@ if (typeof window.showReassignStudentModal === 'undefined') {
                 return;
             }
             
-            // Create student options
+            // Create student options - WITH NULL CHECKING
             const studentOptions = activeStudents.map(student => {
-                const currentTutor = tutors.find(t => t.email === student.tutorEmail);
+                if (!student) return '';
+                const currentTutor = tutors.find(t => t && t.email === student.tutorEmail);
                 const tutorInfo = currentTutor ? currentTutor.name : 'No tutor';
                 
                 // Build display text
@@ -1434,9 +1457,9 @@ if (typeof window.showReassignStudentModal === 'undefined') {
                 return `<option value="${student.id}">${displayText}</option>`;
             }).join('');
             
-            // Create tutor options
+            // Create tutor options - WITH NULL CHECKING
             const tutorOptions = tutors.map(tutor => 
-                `<option value="${tutor.email}">${tutor.name} (${tutor.email})</option>`
+                tutor ? `<option value="${tutor.email}">${tutor.name} (${tutor.email})</option>` : ''
             ).join('');
             
             const modalHtml = `
@@ -1507,7 +1530,10 @@ if (typeof window.showReassignStudentModal === 'undefined') {
                 const originalOptions = Array.from(studentSelect.options);
                 
                 searchInput.addEventListener('input', (e) => {
-                    const searchTerm = safeToString(e.target.value).toLowerCase();
+                    // SAFE VALUE RETRIEVAL
+                    const target = e.target;
+                    const val = target ? target.value : '';
+                    const searchTerm = safeToString(val).toLowerCase();
                     
                     if (!searchTerm.trim()) {
                         // Show all options when search is cleared
@@ -1525,6 +1551,7 @@ if (typeof window.showReassignStudentModal === 'undefined') {
                             // Keep placeholder visible
                             option.style.display = '';
                         } else {
+                            // SAFE OPTION TEXT RETRIEVAL
                             const optionText = option.text ? safeToString(option.text).toLowerCase() : '';
                             option.style.display = optionText.includes(searchTerm) ? '' : 'none';
                         }
@@ -1549,9 +1576,10 @@ if (typeof window.showReassignStudentModal === 'undefined') {
                         return;
                     }
                     
-                    const student = students.find(s => s.id === studentId);
-                    const tutor = tutors.find(t => t.email === tutorEmail);
-                    const currentTutor = tutors.find(t => t.email === student?.tutorEmail);
+                    // SAFE LOOKUPS
+                    const student = students.find(s => s && s.id === studentId);
+                    const tutor = tutors.find(t => t && t.email === tutorEmail);
+                    const currentTutor = tutors.find(t => t && t.email === student?.tutorEmail);
                     
                     if (!student) {
                         alert("Selected student not found.");
@@ -7689,6 +7717,7 @@ onAuthStateChanged(auth, async (user) => {
         window.location.href = "management-auth.html";
     }
 });
+
 
 
 
