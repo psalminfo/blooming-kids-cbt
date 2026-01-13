@@ -1057,19 +1057,12 @@ function renderDirectoryFromCache(searchTerm = '') {
 
     const filteredTutors = tutors.filter(tutor => {
         const assignedStudents = studentsByTutor[tutor.email] || [];
-        const tutorMatch = tutor.name && tutor.name.toLowerCase().includes(lowerCaseSearchTerm);
-        
-        const studentMatch = assignedStudents.some(s => {
-            const studentNameMatch = s.studentName && 
-                                     s.studentName.toLowerCase().includes(lowerCaseSearchTerm);
-            const parentNameMatch = s.parentName && 
-                                    s.parentName.toLowerCase().includes(lowerCaseSearchTerm);
-            const parentPhoneMatch = s.parentPhone && 
-                                     String(s.parentPhone).toLowerCase().includes(lowerCaseSearchTerm);
-            
-            return studentNameMatch || parentNameMatch || parentPhoneMatch;
-        });
-        
+        const tutorMatch = tutor.name.toLowerCase().includes(lowerCaseSearchTerm);
+        const studentMatch = assignedStudents.some(s =>
+            s.studentName.toLowerCase().includes(lowerCaseSearchTerm) ||
+            (s.parentName && s.parentName.toLowerCase().includes(lowerCaseSearchTerm)) ||
+            (s.parentPhone && String(s.parentPhone).toLowerCase().includes(lowerCaseSearchTerm))
+        );
         return tutorMatch || studentMatch;
     });
 
@@ -1090,19 +1083,13 @@ function renderDirectoryFromCache(searchTerm = '') {
 
     directoryList.innerHTML = filteredTutors.map(tutor => {
         const assignedStudents = (studentsByTutor[tutor.email] || [])
-            .filter(s => {
-                if (searchTerm === '') return true;
-                
-                const tutorMatch = tutor.name && tutor.name.toLowerCase().includes(lowerCaseSearchTerm);
-                const studentNameMatch = s.studentName && 
-                                         s.studentName.toLowerCase().includes(lowerCaseSearchTerm);
-                const parentNameMatch = s.parentName && 
-                                        s.parentName.toLowerCase().includes(lowerCaseSearchTerm);
-                const parentPhoneMatch = s.parentPhone && 
-                                         String(s.parentPhone).toLowerCase().includes(lowerCaseSearchTerm);
-                
-                return tutorMatch || studentNameMatch || parentNameMatch || parentPhoneMatch;
-            });
+            .filter(s =>
+                searchTerm === '' ||
+                tutor.name.toLowerCase().includes(lowerCaseSearchTerm) ||
+                s.studentName.toLowerCase().includes(lowerCaseSearchTerm) ||
+                (s.parentName && s.parentName.toLowerCase().includes(lowerCaseSearchTerm)) ||
+                (s.parentPhone && String(s.parentPhone).toLowerCase().includes(lowerCaseSearchTerm))
+            );
 
         const studentsTableRows = assignedStudents
             .sort((a, b) => a.studentName.localeCompare(b.studentName))
@@ -1119,10 +1106,10 @@ function renderDirectoryFromCache(searchTerm = '') {
                 `;
                 return `
                     <tr class="hover:bg-gray-50">
-                        <td class="px-4 py-2 font-medium">${student.studentName || 'N/A'}</td>
+                        <td class="px-4 py-2 font-medium">${student.studentName}</td>
                         <td class="px-4 py-2">₦${(student.studentFee || 0).toFixed(2)}</td>
-                        <td class="px-4 py-2">${student.grade || 'N/A'}</td>
-                        <td class="px-4 py-2">${student.days || 'N/A'}</td>
+                        <td class="px-4 py-2">${student.grade}</td>
+                        <td class="px-4 py-2">${student.days}</td>
                         <td class="px-4 py-2">${subjects}</td>
                         <td class="px-4 py-2">${student.parentName || 'N/A'}</td>
                         <td class="px-4 py-2">${student.parentPhone || 'N/A'}</td>
@@ -1135,7 +1122,7 @@ function renderDirectoryFromCache(searchTerm = '') {
             <div class="border rounded-lg shadow-sm">
                 <details open>
                     <summary class="p-4 cursor-pointer flex justify-between items-center font-semibold text-lg">
-                        ${tutor.name || 'Unnamed Tutor'}
+                        ${tutor.name}
                         <span class="ml-2 text-sm font-normal text-gray-500">(${assignedStudents.length} students shown)</span>
                     </summary>
                     <div class="border-t p-2">
@@ -7196,6 +7183,7 @@ onAuthStateChanged(auth, async (user) => {
         window.location.href = "management-auth.html";
     }
 });
+
 
 
 
