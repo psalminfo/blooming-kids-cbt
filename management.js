@@ -894,82 +894,19 @@ window.refreshAllDashboardData = async function() {
 };
 
 // ======================================================
-// SUBSECTION 3.1: Tutor Directory Panel - COMPLETE FIX WITH FIREBASE SEARCH
+// SUBSECTION 3.1: Tutor Directory Panel - UPDATED
 // ======================================================
 
 // Helper function for safe string operations
 function safeToString(value) {
     if (value === null || value === undefined) return '';
-    if (typeof value === 'object') return JSON.stringify(value);
     return String(value);
 }
 
 // Helper function for safe search
 function safeSearch(text, searchTerm) {
-    if (!searchTerm || searchTerm.trim() === '') return true;
-    if (!text) return false;
+    if (!text || !searchTerm) return false;
     return safeToString(text).toLowerCase().includes(safeToString(searchTerm).toLowerCase());
-}
-
-// Function to search student comprehensively from Firebase data
-function searchStudentFromFirebase(student, searchTerm, tutors = []) {
-    if (!searchTerm || searchTerm.trim() === '') return true;
-    
-    const searchLower = safeToString(searchTerm).toLowerCase();
-    
-    // Search ALL student properties from Firebase
-    const studentFieldsToSearch = [
-        'studentName', 'grade', 'days', 'parentName', 'parentPhone', 
-        'parentEmail', 'address', 'status', 'tutorEmail', 'tutorName',
-        'createdBy', 'updatedBy', 'notes', 'school', 'location'
-    ];
-    
-    // Check all known student fields
-    for (const field of studentFieldsToSearch) {
-        if (student[field] && safeSearch(student[field], searchTerm)) {
-            return true;
-        }
-    }
-    
-    // Search student fee
-    if (typeof student.studentFee === 'number') {
-        if (safeToString(student.studentFee).includes(searchLower)) return true;
-    }
-    
-    // Search subjects (can be string or array)
-    if (student.subjects) {
-        if (Array.isArray(student.subjects)) {
-            for (const subject of student.subjects) {
-                if (safeSearch(subject, searchTerm)) return true;
-            }
-        } else {
-            if (safeSearch(student.subjects, searchTerm)) return true;
-        }
-    }
-    
-    // Search tutor information
-    if (student.tutorEmail && tutors.length > 0) {
-        const tutor = tutors.find(t => t.email === student.tutorEmail);
-        if (tutor) {
-            // Search ALL tutor properties
-            const tutorFieldsToSearch = ['name', 'email', 'phone', 'qualification', 'subjects'];
-            for (const field of tutorFieldsToSearch) {
-                if (tutor[field] && safeSearch(tutor[field], searchTerm)) return true;
-            }
-        }
-    }
-    
-    // Search for any other properties in the student object
-    for (const key in student) {
-        if (student.hasOwnProperty(key) && !studentFieldsToSearch.includes(key)) {
-            const value = student[key];
-            if (value && safeSearch(value, searchTerm)) {
-                return true;
-            }
-        }
-    }
-    
-    return false;
 }
 
 async function renderManagementTutorView(container) {
@@ -978,7 +915,7 @@ async function renderManagementTutorView(container) {
             <div class="flex justify-between items-center mb-4 flex-wrap gap-4">
                 <h2 class="text-2xl font-bold text-green-700">Tutor & Student Directory</h2>
                 <div class="flex items-center gap-4 flex-wrap">
-                    <input type="search" id="directory-search" placeholder="Search Tutors, Students, Parents, Subjects, Grades..." class="p-2 border rounded-md w-64">
+                    <input type="search" id="directory-search" placeholder="Search Tutors, Students, Parents..." class="p-2 border rounded-md w-64">
                     <button id="assign-student-btn" class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700">Assign New Student</button>
                     <button id="reassign-student-btn" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Reassign Student</button>
                     <button id="view-tutor-history-directory-btn" class="bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700">View Tutor History</button>
@@ -1074,21 +1011,18 @@ async function fetchAndRenderDirectory(forceRefresh = false) {
     }
 
     try {
-        const directoryList = document.getElementById('directory-list');
-        if (directoryList) {
-            directoryList.innerHTML = `<p class="text-center text-gray-500 py-10">Fetching data from Firebase...</p>`;
-        }
+        document.getElementById('directory-list').innerHTML = `<p class="text-center text-gray-500 py-10">Fetching data from server...</p>`;
         
-        // Fetch all data from Firebase in parallel
+        // Fetch all data in parallel
         const [tutorsSnapshot, studentsSnapshot, tutorAssignmentsSnapshot] = await Promise.all([
             getDocs(query(collection(db, "tutors"), orderBy("name"))),
             getDocs(query(collection(db, "students"), orderBy("studentName"))),
             getDocs(collection(db, "tutorAssignments"))
         ]);
         
-        console.log(`✅ Firebase Data Fetched: ${tutorsSnapshot.size} tutors, ${studentsSnapshot.size} students, ${tutorAssignmentsSnapshot.size} tutor assignments`);
+        console.log(`Fetched ${tutorsSnapshot.size} tutors, ${studentsSnapshot.size} students, ${tutorAssignmentsSnapshot.size} tutor assignments`);
         
-        // Process ALL tutors data from Firebase (preserve all fields)
+        // Process tutors with safe data handling
         const allTutors = tutorsSnapshot.docs.map(doc => {
             const data = doc.data();
             return {
@@ -1100,27 +1034,21 @@ async function fetchAndRenderDirectory(forceRefresh = false) {
                 subjects: Array.isArray(data.subjects) ? data.subjects : (data.subjects ? [data.subjects] : []),
                 qualification: data.qualification || '',
                 createdAt: data.createdAt || new Date().toISOString(),
-                ...data // Include ALL Firebase fields
+                ...data // Include all other fields
             };
         });
-        
-        // Log all tutor fields for debugging
-        if (allTutors.length > 0) {
-            console.log("Sample tutor fields:", Object.keys(allTutors[0]));
-        }
         
         const activeTutors = allTutors.filter(tutor => 
             !tutor.status || tutor.status === 'active'
         );
         
-        // Process ALL students data from Firebase (preserve all fields)
+        // Process students with safe data handling
         const allStudents = studentsSnapshot.docs.map(doc => {
             const data = doc.data();
             return {
                 id: doc.id,
                 studentName: data.studentName || 'Unnamed Student',
                 tutorEmail: data.tutorEmail || '',
-                tutorName: data.tutorName || '',
                 studentFee: typeof data.studentFee === 'number' ? data.studentFee : 0,
                 grade: data.grade || '',
                 days: data.days || '',
@@ -1131,23 +1059,18 @@ async function fetchAndRenderDirectory(forceRefresh = false) {
                 address: data.address || '',
                 status: data.status || 'active',
                 createdAt: data.createdAt || new Date().toISOString(),
-                ...data // Include ALL Firebase fields
+                ...data // Include all other fields
             };
         });
         
-        console.log("✅ All students loaded from Firebase:", allStudents.length);
-        
-        // Log all student fields for debugging
-        if (allStudents.length > 0) {
-            console.log("Sample student fields:", Object.keys(allStudents[0]));
-            console.log("Sample student data:", allStudents[0]);
-        }
+        console.log("All students loaded:", allStudents.length);
+        console.log("Sample student:", allStudents[0]);
         
         const activeStudents = allStudents.filter(student => 
             !student.status || student.status === 'active' || student.status === 'approved'
         );
         
-        // Process tutor assignments from Firebase
+        // Process tutor assignments with safe data handling
         const tutorAssignments = {};
         tutorAssignmentsSnapshot.docs.forEach(doc => {
             const data = doc.data();
@@ -1169,7 +1092,7 @@ async function fetchAndRenderDirectory(forceRefresh = false) {
                     reason: data.reason || '',
                     assignedBy: data.assignedBy || '',
                     assignedAt: data.assignedAt || new Date().toISOString(),
-                    ...data // Include ALL Firebase fields
+                    ...data // Include all other fields
                 });
             }
         });
@@ -1186,7 +1109,7 @@ async function fetchAndRenderDirectory(forceRefresh = false) {
         saveToLocalStorage('students', activeStudents);
         sessionCache.tutorAssignments = tutorAssignments;
         
-        console.log("✅ Cache updated from Firebase:", {
+        console.log("Cache updated:", {
             tutors: activeTutors.length,
             students: activeStudents.length,
             assignments: Object.keys(tutorAssignments).length
@@ -1195,18 +1118,15 @@ async function fetchAndRenderDirectory(forceRefresh = false) {
         renderDirectoryFromCache();
         
     } catch (error) {
-        console.error("❌ Error fetching directory data from Firebase:", error);
-        const directoryList = document.getElementById('directory-list');
-        if (directoryList) {
-            directoryList.innerHTML = `
-                <div class="text-center py-10">
-                    <p class="text-red-500 mb-4">Failed to load data from Firebase: ${error.message}</p>
-                    <button onclick="fetchAndRenderDirectory(true)" class="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600">
-                        Retry Loading Data
-                    </button>
-                </div>
-            `;
-        }
+        console.error("Error fetching directory data:", error);
+        document.getElementById('directory-list').innerHTML = `
+            <div class="text-center py-10">
+                <p class="text-red-500 mb-4">Failed to load data: ${error.message}</p>
+                <button onclick="fetchAndRenderDirectory(true)" class="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600">
+                    Retry Loading Data
+                </button>
+            </div>
+        `;
     }
 }
 
@@ -1223,7 +1143,7 @@ function renderDirectoryFromCache(searchTerm = '') {
             <p class="text-center text-gray-500 py-10">
                 No directory data found. 
                 <button onclick="fetchAndRenderDirectory(true)" class="text-blue-500 hover:underline ml-1">
-                    Click here to fetch from Firebase
+                    Click here to fetch from server
                 </button>
             </p>
         `;
@@ -1252,42 +1172,22 @@ function renderDirectoryFromCache(searchTerm = '') {
         
         const assignedStudents = studentsByTutor[tutor.email] || [];
         
-        // Check ALL tutor info from Firebase
+        // Check tutor info
         const tutorNameMatch = safeSearch(tutor.name, searchTerm);
         const tutorEmailMatch = safeSearch(tutor.email, searchTerm);
-        const tutorPhoneMatch = safeSearch(tutor.phone, searchTerm);
-        const tutorQualificationMatch = safeSearch(tutor.qualification, searchTerm);
-        
-        // Check tutor subjects
-        let tutorSubjectsMatch = false;
-        if (tutor.subjects) {
-            if (Array.isArray(tutor.subjects)) {
-                tutorSubjectsMatch = tutor.subjects.some(subject => safeSearch(subject, searchTerm));
-            } else {
-                tutorSubjectsMatch = safeSearch(tutor.subjects, searchTerm);
-            }
-        }
         
         // Check if any assigned student matches
         const studentMatch = assignedStudents.some(student => {
-            return searchStudentFromFirebase(student, searchTerm, tutors);
+            return safeSearch(student.studentName, searchTerm) ||
+                   safeSearch(student.parentName, searchTerm) ||
+                   safeSearch(student.parentPhone, searchTerm) ||
+                   safeSearch(student.grade, searchTerm) ||
+                   safeSearch(student.days, searchTerm) ||
+                   (Array.isArray(student.subjects) && 
+                    student.subjects.some(subject => safeSearch(subject, searchTerm)));
         });
         
-        // Search ALL other tutor properties
-        let otherTutorFieldsMatch = false;
-        for (const key in tutor) {
-            if (key !== 'name' && key !== 'email' && key !== 'phone' && 
-                key !== 'qualification' && key !== 'subjects' && key !== 'id') {
-                if (safeSearch(tutor[key], searchTerm)) {
-                    otherTutorFieldsMatch = true;
-                    break;
-                }
-            }
-        }
-        
-        return tutorNameMatch || tutorEmailMatch || tutorPhoneMatch || 
-               tutorQualificationMatch || tutorSubjectsMatch || 
-               studentMatch || otherTutorFieldsMatch;
+        return tutorNameMatch || tutorEmailMatch || studentMatch;
     });
 
     if (searchTerm && filteredTutors.length === 0) {
@@ -1304,13 +1204,9 @@ function renderDirectoryFromCache(searchTerm = '') {
     }
 
     // Update counters
-    const tutorCountBadge = document.getElementById('tutor-count-badge');
-    const studentCountBadge = document.getElementById('student-count-badge');
-    const historyCountBadge = document.getElementById('history-count-badge');
-    
-    if (tutorCountBadge) tutorCountBadge.textContent = tutors.length;
-    if (studentCountBadge) studentCountBadge.textContent = students.length;
-    if (historyCountBadge) historyCountBadge.textContent = Object.keys(tutorAssignments).length;
+    document.getElementById('tutor-count-badge').textContent = tutors.length;
+    document.getElementById('student-count-badge').textContent = students.length;
+    document.getElementById('history-count-badge').textContent = Object.keys(tutorAssignments).length;
 
     // Check permissions
     const canEditStudents = window.userData?.permissions?.actions?.canEditStudents === true;
@@ -1322,7 +1218,15 @@ function renderDirectoryFromCache(searchTerm = '') {
         const assignedStudents = (studentsByTutor[tutor.email] || [])
             .filter(student => {
                 if (!searchTerm) return true;
-                return searchStudentFromFirebase(student, searchTerm, tutors) || safeSearch(tutor.name, searchTerm);
+                
+                return safeSearch(tutor.name, searchTerm) ||
+                       safeSearch(student.studentName, searchTerm) ||
+                       safeSearch(student.parentName, searchTerm) ||
+                       safeSearch(student.parentPhone, searchTerm) ||
+                       safeSearch(student.grade, searchTerm) ||
+                       safeSearch(student.days, searchTerm) ||
+                       (Array.isArray(student.subjects) && 
+                        student.subjects.some(subject => safeSearch(subject, searchTerm)));
             })
             .sort((a, b) => safeToString(a.studentName).localeCompare(safeToString(b.studentName)));
 
@@ -1418,236 +1322,100 @@ function renderDirectoryFromCache(searchTerm = '') {
     }
     
     document.querySelectorAll('.view-history-btn').forEach(button => {
-        button.addEventListener('click', () => {
-            if (typeof window.viewStudentTutorHistory === 'function') {
-                window.viewStudentTutorHistory(button.dataset.studentId);
-            } else {
-                alert('View history function not available');
-            }
-        });
+        button.addEventListener('click', () => window.viewStudentTutorHistory(button.dataset.studentId));
     });
 }
 
 // ======================================================
-// REASSIGN STUDENT MODAL FUNCTION - WITH FIREBASE SEARCH
+// REASSIGN STUDENT MODAL FUNCTION - UPDATED
 // ======================================================
 
-// Only declare showReassignStudentModal if it doesn't already exist
-if (typeof showReassignStudentModal === 'undefined') {
-    window.showReassignStudentModal = async function() {
-        try {
-            console.log("🔄 Loading reassign modal with Firebase data...");
-            
-            // Always fetch fresh data from Firebase for the reassign modal
-            // This ensures we search through EVERYTHING in Firebase
-            const loadingToast = document.createElement('div');
-            loadingToast.className = 'fixed top-4 right-4 bg-blue-500 text-white px-4 py-2 rounded-lg shadow-lg z-50';
-            loadingToast.textContent = 'Loading student data from Firebase...';
-            document.body.appendChild(loadingToast);
-            
-            // Fetch fresh data directly from Firebase
-            const [tutorsSnapshot, studentsSnapshot] = await Promise.all([
-                getDocs(query(collection(db, "tutors"), orderBy("name"))),
-                getDocs(query(collection(db, "students"), orderBy("studentName")))
-            ]);
-            
-            // Remove loading toast
-            loadingToast.remove();
-            
-            console.log("✅ Firebase data fetched for reassign modal");
-            
-            // Process ALL tutors from Firebase
-            const tutors = tutorsSnapshot.docs.map(doc => {
-                const data = doc.data();
-                return {
-                    id: doc.id,
-                    name: data.name || 'Unnamed Tutor',
-                    email: data.email || '',
-                    status: data.status || 'active',
-                    phone: data.phone || '',
-                    subjects: Array.isArray(data.subjects) ? data.subjects : (data.subjects ? [data.subjects] : []),
-                    qualification: data.qualification || '',
-                    createdAt: data.createdAt || new Date().toISOString(),
-                    ...data // Include ALL Firebase fields
-                };
-            });
-            
-            // Process ALL students from Firebase
-            const allStudents = studentsSnapshot.docs.map(doc => {
-                const data = doc.data();
-                return {
-                    id: doc.id,
-                    studentName: data.studentName || 'Unnamed Student',
-                    tutorEmail: data.tutorEmail || '',
-                    tutorName: data.tutorName || '',
-                    studentFee: typeof data.studentFee === 'number' ? data.studentFee : 0,
-                    grade: data.grade || '',
-                    days: data.days || '',
-                    subjects: Array.isArray(data.subjects) ? data.subjects : (data.subjects ? [data.subjects] : []),
-                    parentName: data.parentName || '',
-                    parentPhone: data.parentPhone || '',
-                    parentEmail: data.parentEmail || '',
-                    address: data.address || '',
-                    status: data.status || 'active',
-                    createdAt: data.createdAt || new Date().toISOString(),
-                    ...data // Include ALL Firebase fields
-                };
-            });
-            
-            console.log("📊 Students loaded from Firebase for reassign:", allStudents.length);
-            console.log("📊 Tutors loaded from Firebase for reassign:", tutors.length);
-            
-            // Log sample data to see all available fields
-            if (allStudents.length > 0) {
-                console.log("Sample student for reassign (all fields):", allStudents[0]);
-                console.log("Available student fields:", Object.keys(allStudents[0]));
-            }
-            
-            if (tutors.length > 0) {
-                console.log("Sample tutor for reassign (all fields):", tutors[0]);
-                console.log("Available tutor fields:", Object.keys(tutors[0]));
-            }
-            
-            if (allStudents.length === 0) {
-                alert("No students found in Firebase database. Please add students first.");
-                return;
-            }
-            
-            if (tutors.length === 0) {
-                alert("No tutors found in Firebase database. Please add tutors first.");
-                return;
-            }
-            
-            // Filter active students
-            const activeStudents = allStudents.filter(student => 
-                !student.status || student.status === 'active' || student.status === 'approved'
-            );
-            
-            if (activeStudents.length === 0) {
-                alert("No active students available for reassignment in Firebase.");
-                return;
-            }
-            
-            // Create student options with ALL data from Firebase
-            const studentOptions = activeStudents.map(student => {
-                const currentTutor = tutors.find(t => t.email === student.tutorEmail);
-                const tutorInfo = currentTutor ? `${currentTutor.name}` : 'No tutor';
-                
-                // Build a comprehensive display string with ALL searchable info
-                const displayInfo = [
-                    student.studentName || '',
-                    student.grade ? `Grade: ${student.grade}` : '',
-                    student.parentName ? `Parent: ${student.parentName}` : '',
-                    student.parentPhone ? `Phone: ${student.parentPhone}` : '',
-                    student.subjects ? `Subjects: ${Array.isArray(student.subjects) ? student.subjects.join(', ') : student.subjects}` : '',
-                    student.studentFee ? `Fee: ₦${student.studentFee}` : '',
-                    tutorInfo ? `Current: ${tutorInfo}` : ''
-                ].filter(Boolean).join(' | ');
-                
-                return `<option value="${student.id}" 
-                        data-student='${JSON.stringify(student).replace(/'/g, "&apos;")}'
-                        data-tutor-email="${student.tutorEmail || ''}">
-                        ${displayInfo}
-                    </option>`;
-            }).join('');
-            
-            // Create tutor options
-            const tutorOptions = tutors.map(tutor => {
-                const displayInfo = [
-                    tutor.name || '',
-                    tutor.email ? `Email: ${tutor.email}` : '',
-                    tutor.subjects ? `Subjects: ${Array.isArray(tutor.subjects) ? tutor.subjects.join(', ') : tutor.subjects}` : '',
-                    tutor.phone ? `Phone: ${tutor.phone}` : ''
-                ].filter(Boolean).join(' | ');
-                
-                return `<option value="${tutor.email}" data-tutor='${JSON.stringify(tutor).replace(/'/g, "&apos;")}'>
-                        ${displayInfo}
-                    </option>`;
-            }).join('');
-            
-            const modalHtml = `
-                <div id="reassign-student-modal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-center justify-center">
-                    <div class="relative p-8 bg-white w-full max-w-5xl rounded-lg shadow-xl">
-                        <button class="absolute top-2 right-2 text-gray-500 hover:text-gray-800 text-2xl font-bold" onclick="closeManagementModal('reassign-student-modal')">&times;</button>
-                        <h3 class="text-xl font-bold mb-4 text-blue-700">Reassign Student to Different Tutor</h3>
-                        
-                        <div class="mb-6">
-                            <div class="relative">
-                                <input type="search" id="reassign-search" 
-                                       placeholder="Search ALL student information from Firebase: name, grade, parent, subjects, phone, email, address, fee, tutor, etc..." 
-                                       class="w-full p-3 pl-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
-                                <div class="absolute left-3 top-3.5 text-gray-400">
-                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
-                                    </svg>
-                                </div>
-                            </div>
-                            <p class="text-xs text-gray-500 mt-2">
-                                🔍 Searching through <strong>ALL ${activeStudents.length} students</strong> from Firebase database. Searches EVERY field including custom fields.
-                            </p>
-                        </div>
-                        
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+async function showReassignStudentModal() {
+    try {
+        // Ensure we have fresh data
+        if (!sessionCache.students || sessionCache.students.length === 0) {
+            await fetchAndRenderDirectory();
+        }
+        
+        const students = sessionCache.students || [];
+        const tutors = sessionCache.tutors || [];
+        
+        if (students.length === 0) {
+            alert("No students found. Please add students first.");
+            return;
+        }
+        
+        if (tutors.length === 0) {
+            alert("No tutors found. Please add tutors first.");
+            return;
+        }
+        
+        // Filter active students
+        const activeStudents = students.filter(student => 
+            !student.status || student.status === 'active' || student.status === 'approved'
+        );
+        
+        if (activeStudents.length === 0) {
+            alert("No active students available for reassignment.");
+            return;
+        }
+        
+        // Create student options with safe data handling
+        const studentOptions = activeStudents.map(student => 
+            `<option value="${student.id}">${student.studentName} (Current: ${student.tutorEmail || 'No tutor'})</option>`
+        ).join('');
+        
+        // Create tutor options with safe data handling
+        const tutorOptions = tutors.map(tutor => 
+            `<option value="${tutor.email}">${tutor.name} (${tutor.email})</option>`
+        ).join('');
+        
+        const modalHtml = `
+            <div id="reassign-student-modal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-center justify-center">
+                <div class="relative p-8 bg-white w-full max-w-2xl rounded-lg shadow-xl">
+                    <button class="absolute top-2 right-2 text-gray-500 hover:text-gray-800 text-2xl font-bold" onclick="closeManagementModal('reassign-student-modal')">&times;</button>
+                    <h3 class="text-xl font-bold mb-4 text-blue-700">Reassign Student to Different Tutor</h3>
+                    
+                    <div class="mb-6">
+                        <input type="search" id="reassign-search" placeholder="Search students by name, parent, or current tutor..." 
+                               class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                    </div>
+                    
+                    <form id="reassign-student-form">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                             <div>
-                                <label class="block text-sm font-medium mb-2">
-                                    Select Student (${activeStudents.length} active students)
-                                </label>
-                                <div class="relative">
-                                    <select id="reassign-student-id" required 
-                                            class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2 h-80 overflow-y-auto">
-                                        <option value="" disabled selected>Select a student...</option>
-                                        ${studentOptions}
-                                    </select>
-                                    <div class="mt-2 p-3 bg-blue-50 rounded border hidden" id="selected-student-info">
-                                        <h4 class="font-semibold text-blue-800 mb-2">📋 Selected Student Details</h4>
-                                        <div class="grid grid-cols-2 gap-2 text-sm">
-                                            <div><strong>Name:</strong> <span id="selected-student-name"></span></div>
-                                            <div><strong>Grade:</strong> <span id="selected-grade"></span></div>
-                                            <div><strong>Fee:</strong> ₦<span id="selected-fee"></span></div>
-                                            <div><strong>Days:</strong> <span id="selected-days"></span></div>
-                                            <div><strong>Subjects:</strong> <span id="selected-subjects"></span></div>
-                                            <div><strong>Current Tutor:</strong> <span id="selected-current-tutor"></span></div>
-                                            <div><strong>Parent:</strong> <span id="selected-parent"></span></div>
-                                            <div><strong>Phone:</strong> <span id="selected-phone"></span></div>
-                                        </div>
-                                    </div>
-                                </div>
+                                <label class="block text-sm font-medium mb-2">Select Student</label>
+                                <select id="reassign-student-id" required 
+                                        class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2 h-64 overflow-y-auto">
+                                    <option value="" disabled selected>Select a student...</option>
+                                    ${studentOptions}
+                                </select>
+                                <p class="text-xs text-gray-500 mt-1">${activeStudents.length} active students</p>
                             </div>
                             <div>
-                                <label class="block text-sm font-medium mb-2">
-                                    Assign to New Tutor (${tutors.length} active tutors)
-                                </label>
+                                <label class="block text-sm font-medium mb-2">Assign to Tutor</label>
                                 <select id="reassign-tutor-email" required 
-                                        class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2 h-48">
+                                        class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2">
                                     <option value="" disabled selected>Select a tutor...</option>
                                     ${tutorOptions}
                                 </select>
-                                <div class="mt-2 p-3 bg-green-50 rounded border hidden" id="selected-tutor-info">
-                                    <h4 class="font-semibold text-green-800 mb-2">👨‍🏫 Selected Tutor Details</h4>
-                                    <div class="grid grid-cols-2 gap-2 text-sm">
-                                        <div><strong>Name:</strong> <span id="selected-tutor-name"></span></div>
-                                        <div><strong>Email:</strong> <span id="selected-tutor-email-display"></span></div>
-                                        <div><strong>Phone:</strong> <span id="selected-tutor-phone"></span></div>
-                                        <div><strong>Subjects:</strong> <span id="selected-tutor-subjects"></span></div>
-                                        <div><strong>Qualification:</strong> <span id="selected-tutor-qualification"></span></div>
-                                    </div>
-                                </div>
+                                <p class="text-xs text-gray-500 mt-1">${tutors.length} active tutors</p>
                             </div>
                         </div>
                         
                         <div class="mb-4">
-                            <label class="block text-sm font-medium mb-2">Reason for Reassignment (Optional)</label>
+                            <label class="block text-sm font-medium mb-2">Reason for Reassignment</label>
                             <textarea id="reassign-reason" 
                                       class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2" 
                                       rows="3" 
-                                      placeholder="Enter reason for reassignment..."></textarea>
+                                      placeholder="Enter reason for reassignment (optional)"></textarea>
                         </div>
                         
-                        <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
-                            <h4 class="font-semibold text-blue-800 mb-2">ℹ️ Search Information</h4>
-                            <p class="text-sm text-blue-700">
-                                <strong>Searching through:</strong> Student name, grade, subjects, parent info (name, phone, email), 
-                                address, fee, current tutor, days, status, and ANY other fields stored in Firebase.
+                        <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-4">
+                            <h4 class="font-semibold text-yellow-800 mb-2">Important Note</h4>
+                            <p class="text-sm text-yellow-700">
+                                Reassigning a student will create a history record and update all future sessions. 
+                                Past sessions will remain with the previous tutor.
                             </p>
                         </div>
                         
@@ -1656,7 +1424,7 @@ if (typeof showReassignStudentModal === 'undefined') {
                                     class="px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300">
                                 Cancel
                             </button>
-                            <button type="submit" id="reassign-submit-btn"
+                            <button type="submit" 
                                     class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center">
                                 <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"></path>
@@ -1664,279 +1432,378 @@ if (typeof showReassignStudentModal === 'undefined') {
                                 Reassign Student
                             </button>
                         </div>
-                    </div>
+                    </form>
                 </div>
-            `;
+            </div>
+        `;
+        
+        document.body.insertAdjacentHTML('beforeend', modalHtml);
+        
+        // Add search functionality
+        const searchInput = document.getElementById('reassign-search');
+        const studentSelect = document.getElementById('reassign-student-id');
+        
+        searchInput.addEventListener('input', (e) => {
+            const searchTerm = safeToString(e.target.value).toLowerCase();
+            const options = studentSelect.options;
             
-            document.body.insertAdjacentHTML('beforeend', modalHtml);
+            for (let i = 0; i < options.length; i++) {
+                const option = options[i];
+                const optionText = safeToString(option.textContent).toLowerCase();
+                option.style.display = optionText.includes(searchTerm) || option.value === '' ? '' : 'none';
+            }
+        });
+        
+        // Handle form submission
+        document.getElementById('reassign-student-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
             
-            // Add search functionality that searches ALL Firebase fields
-            const searchInput = document.getElementById('reassign-search');
-            const studentSelect = document.getElementById('reassign-student-id');
+            const studentId = document.getElementById('reassign-student-id').value;
+            const tutorEmail = document.getElementById('reassign-tutor-email').value;
+            const reason = document.getElementById('reassign-reason').value;
             
-            // Store all student data for search
-            const studentDataMap = {};
-            activeStudents.forEach(student => {
-                studentDataMap[student.id] = student;
-            });
+            if (!studentId || !tutorEmail) {
+                alert("Please select both a student and a tutor.");
+                return;
+            }
             
-            // Store all options for filtering
-            const allStudentOptions = Array.from(studentSelect.options).slice(1);
+            // Find student and tutor details
+            const student = students.find(s => s.id === studentId);
+            const tutor = tutors.find(t => t.email === tutorEmail);
+            const currentTutorEmail = student?.tutorEmail;
             
-            // Function to search through ALL student data
-            const searchAllStudentData = (student, searchTerm) => {
-                if (!searchTerm || searchTerm.trim() === '') return true;
-                
-                const searchLower = safeToString(searchTerm).toLowerCase();
-                
-                // Search through EVERY property in the student object
-                for (const key in student) {
-                    if (student.hasOwnProperty(key)) {
-                        const value = student[key];
-                        
-                        // Skip id and other non-searchable fields
-                        if (key === 'id' || value === undefined || value === null) continue;
-                        
-                        // Convert value to string and search
-                        const valueStr = safeToString(value).toLowerCase();
-                        if (valueStr.includes(searchLower)) {
-                            return true;
-                        }
-                        
-                        // Special handling for arrays (like subjects)
-                        if (Array.isArray(value)) {
-                            for (const item of value) {
-                                if (safeToString(item).toLowerCase().includes(searchLower)) {
-                                    return true;
-                                }
-                            }
-                        }
-                    }
-                }
-                
-                return false;
-            };
+            if (!student) {
+                alert("Selected student not found.");
+                return;
+            }
             
-            // Filter options based on search
-            const filterStudentOptions = (searchTerm) => {
-                const searchLower = safeToString(searchTerm).toLowerCase();
+            if (!tutor) {
+                alert("Selected tutor not found.");
+                return;
+            }
+            
+            if (currentTutorEmail === tutorEmail) {
+                alert("Student is already assigned to this tutor.");
+                return;
+            }
+            
+            // Confirm reassignment
+            const confirmMessage = `Are you sure you want to reassign ${student.studentName} from ${currentTutorEmail || 'No tutor'} to ${tutor.name} (${tutor.email})?`;
+            
+            if (!confirm(confirmMessage)) {
+                return;
+            }
+            
+            try {
+                // Show loading
+                const submitButton = e.target.querySelector('button[type="submit"]');
+                const originalText = submitButton.innerHTML;
+                submitButton.innerHTML = '<span class="flex items-center"><svg class="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> Reassigning...</span>';
+                submitButton.disabled = true;
                 
-                if (!searchTerm.trim()) {
-                    // Show all options if search is empty
-                    allStudentOptions.forEach(option => {
-                        option.style.display = '';
-                    });
-                    return;
-                }
+                // Get current user info
+                const currentUser = window.userData?.name || 'Admin';
+                const currentUserEmail = window.userData?.email || 'admin@system';
                 
-                let matchCount = 0;
+                // 1. Create tutor assignment history record
+                const assignmentData = {
+                    studentId: studentId,
+                    studentName: student.studentName,
+                    oldTutorEmail: currentTutorEmail,
+                    newTutorEmail: tutorEmail,
+                    newTutorName: tutor.name,
+                    reason: reason || 'Reassignment',
+                    assignedBy: currentUser,
+                    assignedByEmail: currentUserEmail,
+                    assignedAt: new Date().toISOString(),
+                    timestamp: serverTimestamp()
+                };
                 
-                // Filter options based on comprehensive search
-                allStudentOptions.forEach(option => {
-                    const studentId = option.value;
-                    const student = studentDataMap[studentId];
-                    
-                    if (student && searchAllStudentData(student, searchTerm)) {
-                        option.style.display = '';
-                        matchCount++;
-                    } else {
-                        option.style.display = 'none';
-                    }
+                await addDoc(collection(db, "tutorAssignments"), assignmentData);
+                
+                // 2. Update student document with new tutor
+                await updateDoc(doc(db, "students", studentId), {
+                    tutorEmail: tutorEmail,
+                    tutorName: tutor.name,
+                    updatedAt: new Date().toISOString(),
+                    updatedBy: currentUser,
+                    updatedByEmail: currentUserEmail
                 });
                 
-                // Update search placeholder with match count
-                searchInput.placeholder = `Found ${matchCount} students - Search ALL student info...`;
-            };
-            
-            // Initial search input setup
-            searchInput.addEventListener('input', (e) => {
-                filterStudentOptions(e.target.value);
-            });
-            
-            // Show selected student info
-            studentSelect.addEventListener('change', function() {
-                const studentId = this.value;
-                const studentInfoDiv = document.getElementById('selected-student-info');
-                
-                if (studentId) {
-                    const student = studentDataMap[studentId];
-                    const currentTutor = tutors.find(t => t.email === student?.tutorEmail);
-                    
-                    if (student) {
-                        document.getElementById('selected-student-name').textContent = student.studentName || 'N/A';
-                        document.getElementById('selected-grade').textContent = student.grade || 'N/A';
-                        document.getElementById('selected-fee').textContent = (student.studentFee || 0).toFixed(2);
-                        document.getElementById('selected-days').textContent = student.days || 'N/A';
-                        document.getElementById('selected-subjects').textContent = 
-                            Array.isArray(student.subjects) ? student.subjects.join(', ') : (student.subjects || 'N/A');
-                        document.getElementById('selected-current-tutor').textContent = currentTutor ? 
-                            `${currentTutor.name} (${currentTutor.email})` : 'No tutor assigned';
-                        document.getElementById('selected-parent').textContent = student.parentName || 'N/A';
-                        document.getElementById('selected-phone').textContent = student.parentPhone || 'N/A';
-                        
-                        studentInfoDiv.classList.remove('hidden');
+                // 3. Update cache
+                if (sessionCache.students) {
+                    const studentIndex = sessionCache.students.findIndex(s => s.id === studentId);
+                    if (studentIndex !== -1) {
+                        sessionCache.students[studentIndex].tutorEmail = tutorEmail;
+                        sessionCache.students[studentIndex].tutorName = tutor.name;
+                        saveToLocalStorage('students', sessionCache.students);
                     }
-                } else {
-                    studentInfoDiv.classList.add('hidden');
-                }
-            });
-            
-            // Show selected tutor info
-            const tutorSelect = document.getElementById('reassign-tutor-email');
-            tutorSelect.addEventListener('change', function() {
-                const tutorEmail = this.value;
-                const tutorInfoDiv = document.getElementById('selected-tutor-info');
-                const selectedOption = this.options[this.selectedIndex];
-                
-                if (tutorEmail && selectedOption.dataset.tutor) {
-                    try {
-                        const tutor = JSON.parse(selectedOption.dataset.tutor);
-                        
-                        document.getElementById('selected-tutor-name').textContent = tutor.name || 'N/A';
-                        document.getElementById('selected-tutor-email-display').textContent = tutor.email || 'N/A';
-                        document.getElementById('selected-tutor-phone').textContent = tutor.phone || 'N/A';
-                        document.getElementById('selected-tutor-subjects').textContent = 
-                            Array.isArray(tutor.subjects) ? tutor.subjects.join(', ') : (tutor.subjects || 'N/A');
-                        document.getElementById('selected-tutor-qualification').textContent = tutor.qualification || 'N/A';
-                        
-                        tutorInfoDiv.classList.remove('hidden');
-                    } catch (e) {
-                        console.error("Error parsing tutor data:", e);
-                    }
-                } else {
-                    tutorInfoDiv.classList.add('hidden');
-                }
-            });
-            
-            // Handle form submission
-            const modalForm = document.createElement('form');
-            modalForm.id = 'reassign-student-form';
-            modalForm.addEventListener('submit', async (e) => {
-                e.preventDefault();
-                
-                const studentId = studentSelect.value;
-                const tutorEmail = tutorSelect.value;
-                const reason = document.getElementById('reassign-reason').value;
-                
-                if (!studentId || !tutorEmail) {
-                    alert("Please select both a student and a tutor.");
-                    return;
                 }
                 
-                const student = studentDataMap[studentId];
-                const tutor = tutors.find(t => t.email === tutorEmail);
-                const currentTutor = tutors.find(t => t.email === student?.tutorEmail);
-                const currentTutorEmail = student?.tutorEmail;
+                // 4. Show success message
+                alert(`Successfully reassigned ${student.studentName} to ${tutor.name}!`);
                 
-                if (!student) {
-                    alert("Selected student not found.");
-                    return;
-                }
+                // 5. Close modal and refresh view
+                closeManagementModal('reassign-student-modal');
+                fetchAndRenderDirectory(true);
                 
-                if (!tutor) {
-                    alert("Selected tutor not found.");
-                    return;
-                }
+            } catch (error) {
+                console.error("Error reassigning student:", error);
+                alert(`Failed to reassign student: ${error.message}`);
                 
-                if (currentTutorEmail === tutorEmail) {
-                    alert(`Student "${student.studentName}" is already assigned to ${tutor.name}.`);
-                    return;
-                }
-                
-                // Confirm reassignment
-                const confirmMessage = `Are you sure you want to reassign "${student.studentName}" (Grade: ${student.grade || 'N/A'}) from ${currentTutor ? currentTutor.name : 'No tutor'} to ${tutor.name}?`;
-                
-                if (!confirm(confirmMessage)) {
-                    return;
-                }
-                
-                try {
-                    // Show loading
-                    const submitButton = document.getElementById('reassign-submit-btn');
-                    const originalText = submitButton.innerHTML;
-                    submitButton.innerHTML = '<span class="flex items-center"><svg class="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> Updating Firebase...</span>';
-                    submitButton.disabled = true;
-                    
-                    // Get current user info
-                    const currentUser = window.userData?.name || 'Admin';
-                    const currentUserEmail = window.userData?.email || 'admin@system';
-                    
-                    // 1. Create tutor assignment history record in Firebase
-                    const assignmentData = {
-                        studentId: studentId,
-                        studentName: student.studentName,
-                        oldTutorEmail: currentTutorEmail,
-                        oldTutorName: currentTutor?.name || 'Unknown',
-                        newTutorEmail: tutorEmail,
-                        newTutorName: tutor.name,
-                        reason: reason || 'Reassignment',
-                        assignedBy: currentUser,
-                        assignedByEmail: currentUserEmail,
-                        assignedAt: new Date().toISOString(),
-                        timestamp: serverTimestamp()
-                    };
-                    
-                    await addDoc(collection(db, "tutorAssignments"), assignmentData);
-                    
-                    // 2. Update student document in Firebase with new tutor
-                    await updateDoc(doc(db, "students", studentId), {
-                        tutorEmail: tutorEmail,
-                        tutorName: tutor.name,
-                        updatedAt: new Date().toISOString(),
-                        updatedBy: currentUser,
-                        updatedByEmail: currentUserEmail
-                    });
-                    
-                    // 3. Update cache
-                    if (sessionCache.students) {
-                        const studentIndex = sessionCache.students.findIndex(s => s.id === studentId);
-                        if (studentIndex !== -1) {
-                            sessionCache.students[studentIndex].tutorEmail = tutorEmail;
-                            sessionCache.students[studentIndex].tutorName = tutor.name;
-                            saveToLocalStorage('students', sessionCache.students);
-                        }
-                    }
-                    
-                    // 4. Show success message
-                    alert(`✅ Successfully reassigned "${student.studentName}" to ${tutor.name}!\n\nFirebase has been updated with the new assignment.`);
-                    
-                    // 5. Close modal and refresh view
-                    closeManagementModal('reassign-student-modal');
-                    fetchAndRenderDirectory(true);
-                    
-                } catch (error) {
-                    console.error("❌ Error reassigning student in Firebase:", error);
-                    alert(`❌ Failed to reassign student: ${error.message}\n\nPlease check your Firebase connection.`);
-                    
-                    // Reset button
-                    const submitButton = document.getElementById('reassign-submit-btn');
-                    submitButton.innerHTML = originalText;
-                    submitButton.disabled = false;
-                }
-            });
-            
-            // Add the form to the modal
-            const modalContent = document.querySelector('#reassign-student-modal > div');
-            modalContent.appendChild(modalForm);
-            
-        } catch (error) {
-            console.error("❌ Error loading reassign modal:", error);
-            alert(`Error loading student data from Firebase: ${error.message}\n\nPlease check your internet connection and try again.`);
+                // Reset button
+                const submitButton = e.target.querySelector('button[type="submit"]');
+                submitButton.innerHTML = originalText;
+                submitButton.disabled = false;
+            }
+        });
+        
+    } catch (error) {
+        console.error("Error showing reassign modal:", error);
+        alert(`Error: ${error.message}`);
+    }
+}
+
+// ======================================================
+// ASSIGN STUDENT MODAL FUNCTION - UPDATED
+// ======================================================
+
+async function showAssignStudentModal() {
+    try {
+        // Ensure we have fresh tutor data
+        if (!sessionCache.tutors || sessionCache.tutors.length === 0) {
+            await fetchAndRenderDirectory();
         }
-    };
+        
+        const tutors = sessionCache.tutors || [];
+        
+        if (tutors.length === 0) {
+            alert("No tutors available. Please add tutors first.");
+            return;
+        }
+        
+        // Create tutor options
+        const tutorOptions = tutors.map(tutor => 
+            `<option value="${tutor.email}">${tutor.name} (${tutor.email})</option>`
+        ).join('');
+        
+        const modalHtml = `
+            <div id="assign-student-modal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-center justify-center">
+                <div class="relative p-8 bg-white w-full max-w-2xl rounded-lg shadow-xl">
+                    <button class="absolute top-2 right-2 text-gray-500 hover:text-gray-800 text-2xl font-bold" onclick="closeManagementModal('assign-student-modal')">&times;</button>
+                    <h3 class="text-xl font-bold mb-4 text-green-700">Assign New Student to Tutor</h3>
+                    
+                    <form id="assign-student-form">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                            <div>
+                                <label class="block text-sm font-medium mb-2">Student Name *</label>
+                                <input type="text" id="assign-student-name" required 
+                                       class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2" 
+                                       placeholder="Enter student full name">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium mb-2">Grade/Class *</label>
+                                <input type="text" id="assign-grade" required 
+                                       class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2" 
+                                       placeholder="e.g., Grade 10, JSS 2">
+                            </div>
+                        </div>
+                        
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                            <div>
+                                <label class="block text-sm font-medium mb-2">Assign to Tutor *</label>
+                                <select id="assign-tutor-email" required 
+                                        class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2">
+                                    <option value="" disabled selected>Select a tutor...</option>
+                                    ${tutorOptions}
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium mb-2">Monthly Fee (₦) *</label>
+                                <input type="number" id="assign-fee" required 
+                                       class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2" 
+                                       placeholder="e.g., 50000" min="0" step="1000">
+                            </div>
+                        </div>
+                        
+                        <div class="mb-4">
+                            <label class="block text-sm font-medium mb-2">Subjects *</label>
+                            <input type="text" id="assign-subjects" required 
+                                   class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2" 
+                                   placeholder="e.g., Mathematics, Physics, Chemistry (comma separated)">
+                        </div>
+                        
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                            <div>
+                                <label class="block text-sm font-medium mb-2">Days per Week</label>
+                                <input type="text" id="assign-days" 
+                                       class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2" 
+                                       placeholder="e.g., Mon, Wed, Fri">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium mb-2">Parent's Name</label>
+                                <input type="text" id="assign-parent-name" 
+                                       class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2" 
+                                       placeholder="Parent/Guardian name">
+                            </div>
+                        </div>
+                        
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                            <div>
+                                <label class="block text-sm font-medium mb-2">Parent's Phone</label>
+                                <input type="tel" id="assign-parent-phone" 
+                                       class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2" 
+                                       placeholder="Phone number">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium mb-2">Parent's Email</label>
+                                <input type="email" id="assign-parent-email" 
+                                       class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2" 
+                                       placeholder="Email address">
+                            </div>
+                        </div>
+                        
+                        <div class="flex justify-end space-x-2">
+                            <button type="button" onclick="closeManagementModal('assign-student-modal')" 
+                                    class="px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300">
+                                Cancel
+                            </button>
+                            <button type="submit" 
+                                    class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 flex items-center">
+                                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
+                                </svg>
+                                Assign Student
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        `;
+        
+        document.body.insertAdjacentHTML('beforeend', modalHtml);
+        
+        // Handle form submission
+        document.getElementById('assign-student-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            // Get form values
+            const studentName = document.getElementById('assign-student-name').value.trim();
+            const grade = document.getElementById('assign-grade').value.trim();
+            const tutorEmail = document.getElementById('assign-tutor-email').value;
+            const fee = parseFloat(document.getElementById('assign-fee').value);
+            const subjects = document.getElementById('assign-subjects').value.split(',').map(s => s.trim()).filter(s => s);
+            const days = document.getElementById('assign-days').value.trim();
+            const parentName = document.getElementById('assign-parent-name').value.trim();
+            const parentPhone = document.getElementById('assign-parent-phone').value.trim();
+            const parentEmail = document.getElementById('assign-parent-email').value.trim();
+            
+            // Validation
+            if (!studentName || !grade || !tutorEmail || isNaN(fee) || subjects.length === 0) {
+                alert("Please fill in all required fields (*)");
+                return;
+            }
+            
+            // Find tutor
+            const tutor = tutors.find(t => t.email === tutorEmail);
+            if (!tutor) {
+                alert("Selected tutor not found.");
+                return;
+            }
+            
+            // Get current user info
+            const currentUser = window.userData?.name || 'Admin';
+            const currentUserEmail = window.userData?.email || 'admin@system';
+            
+            try {
+                // Show loading
+                const submitButton = e.target.querySelector('button[type="submit"]');
+                const originalText = submitButton.innerHTML;
+                submitButton.innerHTML = '<span class="flex items-center"><svg class="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> Assigning...</span>';
+                submitButton.disabled = true;
+                
+                // Create student document
+                const studentData = {
+                    studentName: studentName,
+                    grade: grade,
+                    tutorEmail: tutorEmail,
+                    tutorName: tutor.name,
+                    studentFee: fee,
+                    subjects: subjects,
+                    days: days || 'Not specified',
+                    parentName: parentName || '',
+                    parentPhone: parentPhone || '',
+                    parentEmail: parentEmail || '',
+                    status: 'active',
+                    createdAt: new Date().toISOString(),
+                    createdBy: currentUser,
+                    createdByEmail: currentUserEmail,
+                    updatedAt: new Date().toISOString()
+                };
+                
+                // Add to Firebase
+                const docRef = await addDoc(collection(db, "students"), studentData);
+                
+                // Create tutor assignment history
+                const assignmentData = {
+                    studentId: docRef.id,
+                    studentName: studentName,
+                    newTutorEmail: tutorEmail,
+                    newTutorName: tutor.name,
+                    reason: 'Initial assignment',
+                    assignedBy: currentUser,
+                    assignedByEmail: currentUserEmail,
+                    assignedAt: new Date().toISOString(),
+                    timestamp: serverTimestamp()
+                };
+                
+                await addDoc(collection(db, "tutorAssignments"), assignmentData);
+                
+                // Update cache
+                const newStudent = {
+                    id: docRef.id,
+                    ...studentData
+                };
+                
+                if (!sessionCache.students) {
+                    sessionCache.students = [];
+                }
+                sessionCache.students.push(newStudent);
+                saveToLocalStorage('students', sessionCache.students);
+                
+                // Show success
+                alert(`Successfully assigned ${studentName} to ${tutor.name}!`);
+                
+                // Close modal and refresh
+                closeManagementModal('assign-student-modal');
+                fetchAndRenderDirectory(true);
+                
+            } catch (error) {
+                console.error("Error assigning student:", error);
+                alert(`Failed to assign student: ${error.message}`);
+                
+                // Reset button
+                const submitButton = e.target.querySelector('button[type="submit"]');
+                submitButton.innerHTML = originalText;
+                submitButton.disabled = false;
+            }
+        });
+        
+    } catch (error) {
+        console.error("Error showing assign modal:", error);
+        alert(`Error: ${error.message}`);
+    }
 }
 
 // ======================================================
 // CLOSE MODAL FUNCTION
 // ======================================================
 
-if (typeof closeManagementModal === 'undefined') {
-    window.closeManagementModal = function(modalId) {
-        const modal = document.getElementById(modalId);
-        if (modal) {
-            modal.remove();
-        }
-    };
+function closeManagementModal(modalId) {
+    const modal = document.getElementById(modalId);
+    if (modal) {
+        modal.remove();
+    }
 }
 
 // ======================================================
@@ -7968,6 +7835,7 @@ onAuthStateChanged(auth, async (user) => {
         window.location.href = "management-auth.html";
     }
 });
+
 
 
 
