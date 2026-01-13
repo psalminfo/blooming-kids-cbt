@@ -1404,21 +1404,25 @@ function renderDirectoryFromCache(searchTerm = '') {
 }
 
 // ======================================================
-// UPDATED SHOWREASSIGNSTUDENTMODAL - WITH ROBUST ERROR HANDLING
+// UPDATED SHOWREASSIGNSTUDENTMODAL - WITH ROBUST FETCHING & FILTERING
 // ======================================================
 
 // Check if showReassignStudentModal already exists
 if (typeof window.showReassignStudentModal === 'undefined') {
     window.showReassignStudentModal = async function() {
         try {
-            // Ensure we have fresh data
-            if (!sessionCache.students || sessionCache.students.length === 0 || 
-                !sessionCache.tutors || sessionCache.tutors.length === 0) {
-                await fetchAndRenderDirectory();
+            // STEP 1: FORCE FETCH IF CACHE IS MISSING OR MALFORMED
+            // This ensures we get data from the EXACT same source as the directory
+            if (!sessionCache.students || !Array.isArray(sessionCache.students) || sessionCache.students.length === 0 || 
+                !sessionCache.tutors || !Array.isArray(sessionCache.tutors) || sessionCache.tutors.length === 0) {
+                console.log("Reassign Modal: Data missing, forcing fetch...");
+                await fetchAndRenderDirectory(true);
             }
             
-            const students = sessionCache.students || [];
-            const tutors = sessionCache.tutors || [];
+            // STEP 2: CLEAN THE DATA (Remove nulls/undefined)
+            // This fixes the "Cannot read properties of undefined" error
+            const students = (sessionCache.students || []).filter(s => s !== null && s !== undefined);
+            const tutors = (sessionCache.tutors || []).filter(t => t !== null && t !== undefined);
             
             if (students.length === 0) {
                 alert("No students found. Please add students first.");
@@ -1430,8 +1434,9 @@ if (typeof window.showReassignStudentModal === 'undefined') {
                 return;
             }
             
-            // Filter active students - WITH NULL CHECKING
+            // Filter active students - SAFE CHECK
             const activeStudents = students.filter(student => 
+                // Redundant safety check just in case
                 student && (!student.status || student.status === 'active' || student.status === 'approved')
             );
             
@@ -1440,7 +1445,7 @@ if (typeof window.showReassignStudentModal === 'undefined') {
                 return;
             }
             
-            // Create student options - WITH NULL CHECKING
+            // Create student options - SAFE CHECK
             const studentOptions = activeStudents.map(student => {
                 if (!student) return '';
                 const currentTutor = tutors.find(t => t && t.email === student.tutorEmail);
@@ -1457,7 +1462,7 @@ if (typeof window.showReassignStudentModal === 'undefined') {
                 return `<option value="${student.id}">${displayText}</option>`;
             }).join('');
             
-            // Create tutor options - WITH NULL CHECKING
+            // Create tutor options - SAFE CHECK
             const tutorOptions = tutors.map(tutor => 
                 tutor ? `<option value="${tutor.email}">${tutor.name} (${tutor.email})</option>` : ''
             ).join('');
@@ -1640,7 +1645,7 @@ if (typeof window.showReassignStudentModal === 'undefined') {
                         
                         // 3. Update cache
                         if (sessionCache.students) {
-                            const studentIndex = sessionCache.students.findIndex(s => s.id === studentId);
+                            const studentIndex = sessionCache.students.findIndex(s => s && s.id === studentId);
                             if (studentIndex !== -1) {
                                 sessionCache.students[studentIndex].tutorEmail = tutorEmail;
                                 sessionCache.students[studentIndex].tutorName = tutor.name;
@@ -7717,6 +7722,7 @@ onAuthStateChanged(auth, async (user) => {
         window.location.href = "management-auth.html";
     }
 });
+
 
 
 
