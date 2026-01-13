@@ -898,7 +898,7 @@ window.refreshAllDashboardData = async function() {
 // ======================================================
 
 // ======================================================
-// SUBSECTION 3.1: Tutor Directory Panel
+// SUBSECTION 3.1: Tutor Directory Panel - UPDATED
 // ======================================================
 
 async function renderManagementTutorView(container) {
@@ -933,6 +933,8 @@ async function renderManagementTutorView(container) {
             </div>
         </div>
     `;
+    
+    // Add event listeners
     document.getElementById('assign-student-btn').addEventListener('click', showAssignStudentModal);
     document.getElementById('reassign-student-btn').addEventListener('click', showReassignStudentModal);
     document.getElementById('refresh-directory-btn').addEventListener('click', () => fetchAndRenderDirectory(true));
@@ -1001,35 +1003,106 @@ async function fetchAndRenderDirectory(forceRefresh = false) {
     }
 
     try {
-        if (!sessionCache.tutors || !sessionCache.students) {
-            document.getElementById('directory-list').innerHTML = `<p class="text-center text-gray-500 py-10">Fetching data from server...</p>`;
-            const [tutorsSnapshot, studentsSnapshot] = await Promise.all([
-                getDocs(query(collection(db, "tutors"), orderBy("name"))),
-                getDocs(collection(db, "students"))
-            ]);
-            
-            const allTutors = tutorsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-            const activeTutors = allTutors.filter(tutor => 
-                !tutor.status || tutor.status === 'active'
-            );
-            
-            const allStudents = studentsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-            const activeStudents = allStudents.filter(student => 
-                !student.status || student.status === 'active' || student.status === 'approved'
-            );
-            
-            saveToLocalStorage('tutors', activeTutors);
-            saveToLocalStorage('students', activeStudents);
-        }
+        document.getElementById('directory-list').innerHTML = `<p class="text-center text-gray-500 py-10">Fetching data from server...</p>`;
         
-        if (!sessionCache.tutorAssignments || forceRefresh) {
-            await fetchTutorAssignmentHistory();
-        }
+        // Fetch all data in parallel
+        const [tutorsSnapshot, studentsSnapshot, tutorAssignmentsSnapshot] = await Promise.all([
+            getDocs(query(collection(db, "tutors"), orderBy("name"))),
+            getDocs(query(collection(db, "students"), orderBy("studentName"))),
+            getDocs(collection(db, "tutorAssignments"))
+        ]);
+        
+        // Process tutors with safe data handling
+        const allTutors = tutorsSnapshot.docs.map(doc => {
+            const data = doc.data();
+            return {
+                id: doc.id,
+                name: data.name || 'Unnamed Tutor',
+                email: data.email || '',
+                status: data.status || 'active',
+                phone: data.phone || '',
+                subjects: data.subjects || [],
+                qualification: data.qualification || '',
+                createdAt: data.createdAt || new Date().toISOString()
+            };
+        });
+        
+        const activeTutors = allTutors.filter(tutor => 
+            !tutor.status || tutor.status === 'active'
+        );
+        
+        // Process students with safe data handling
+        const allStudents = studentsSnapshot.docs.map(doc => {
+            const data = doc.data();
+            return {
+                id: doc.id,
+                studentName: data.studentName || 'Unnamed Student',
+                tutorEmail: data.tutorEmail || '',
+                studentFee: typeof data.studentFee === 'number' ? data.studentFee : 0,
+                grade: data.grade || '',
+                days: data.days || '',
+                subjects: Array.isArray(data.subjects) ? data.subjects : (data.subjects ? [data.subjects] : []),
+                parentName: data.parentName || '',
+                parentPhone: data.parentPhone || '',
+                parentEmail: data.parentEmail || '',
+                address: data.address || '',
+                status: data.status || 'active',
+                createdAt: data.createdAt || new Date().toISOString()
+            };
+        });
+        
+        const activeStudents = allStudents.filter(student => 
+            !student.status || student.status === 'active' || student.status === 'approved'
+        );
+        
+        // Process tutor assignments with safe data handling
+        const tutorAssignments = {};
+        tutorAssignmentsSnapshot.docs.forEach(doc => {
+            const data = doc.data();
+            const studentId = data.studentId;
+            
+            if (studentId) {
+                if (!tutorAssignments[studentId]) {
+                    tutorAssignments[studentId] = [];
+                }
+                
+                tutorAssignments[studentId].push({
+                    tutorId: data.tutorId || '',
+                    tutorName: data.tutorName || '',
+                    tutorEmail: data.tutorEmail || '',
+                    startDate: data.startDate || '',
+                    endDate: data.endDate || '',
+                    reason: data.reason || '',
+                    assignedBy: data.assignedBy || '',
+                    assignedAt: data.assignedAt || new Date().toISOString()
+                });
+            }
+        });
+        
+        // Sort tutor assignments by date (most recent first)
+        Object.keys(tutorAssignments).forEach(studentId => {
+            tutorAssignments[studentId].sort((a, b) => 
+                new Date(b.assignedAt) - new Date(a.assignedAt)
+            );
+        });
+        
+        // Save to cache with proper serialization
+        saveToLocalStorage('tutors', activeTutors);
+        saveToLocalStorage('students', activeStudents);
+        sessionCache.tutorAssignments = tutorAssignments;
         
         renderDirectoryFromCache();
+        
     } catch (error) {
         console.error("Error fetching directory data:", error);
-        document.getElementById('directory-list').innerHTML = `<p class="text-center text-red-500 py-10">Failed to load data.</p>`;
+        document.getElementById('directory-list').innerHTML = `
+            <div class="text-center py-10">
+                <p class="text-red-500 mb-4">Failed to load data. Please check your connection and try again.</p>
+                <button onclick="fetchAndRenderDirectory(true)" class="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600">
+                    Retry Loading Data
+                </button>
+            </div>
+        `;
     }
 }
 
@@ -1038,120 +1111,223 @@ function renderDirectoryFromCache(searchTerm = '') {
     const students = sessionCache.students || [];
     const tutorAssignments = sessionCache.tutorAssignments || {};
     const directoryList = document.getElementById('directory-list');
+    
     if (!directoryList) return;
 
     if (tutors.length === 0 && students.length === 0) {
-        directoryList.innerHTML = `<p class="text-center text-gray-500 py-10">No directory data found. Click Refresh to fetch from the server.</p>`;
+        directoryList.innerHTML = `
+            <p class="text-center text-gray-500 py-10">
+                No directory data found. 
+                <button onclick="fetchAndRenderDirectory(true)" class="text-blue-500 hover:underline ml-1">
+                    Click here to fetch from server
+                </button>
+            </p>
+        `;
         return;
     }
 
-    const lowerCaseSearchTerm = searchTerm.toLowerCase();
+    // Safe search term handling
+    const lowerCaseSearchTerm = (searchTerm || '').toLowerCase().trim();
+    
+    // Group students by tutor email
     const studentsByTutor = {};
     
     students.forEach(student => {
-        if (!studentsByTutor[student.tutorEmail]) {
-            studentsByTutor[student.tutorEmail] = [];
+        if (student.tutorEmail) {
+            if (!studentsByTutor[student.tutorEmail]) {
+                studentsByTutor[student.tutorEmail] = [];
+            }
+            studentsByTutor[student.tutorEmail].push(student);
         }
-        studentsByTutor[student.tutorEmail].push(student);
     });
 
+    // Filter tutors based on search term
     const filteredTutors = tutors.filter(tutor => {
+        if (!searchTerm) return true;
+        
         const assignedStudents = studentsByTutor[tutor.email] || [];
-        const tutorMatch = tutor.name.toLowerCase().includes(lowerCaseSearchTerm);
-        const studentMatch = assignedStudents.some(s =>
-            s.studentName.toLowerCase().includes(lowerCaseSearchTerm) ||
-            (s.parentName && s.parentName.toLowerCase().includes(lowerCaseSearchTerm)) ||
-            (s.parentPhone && String(s.parentPhone).toLowerCase().includes(lowerCaseSearchTerm))
-        );
-        return tutorMatch || studentMatch;
+        
+        // Check tutor info
+        const tutorNameMatch = tutor.name && tutor.name.toLowerCase().includes(lowerCaseSearchTerm);
+        const tutorEmailMatch = tutor.email && tutor.email.toLowerCase().includes(lowerCaseSearchTerm);
+        
+        // Check if any assigned student matches
+        const studentMatch = assignedStudents.some(student => {
+            // Safe string conversion for all fields
+            const studentName = (student.studentName || '').toLowerCase();
+            const parentName = (student.parentName || '').toLowerCase();
+            const parentPhone = String(student.parentPhone || '').toLowerCase();
+            const grade = (student.grade || '').toLowerCase();
+            const subjects = Array.isArray(student.subjects) ? 
+                student.subjects.map(s => s.toLowerCase()).join(' ') : 
+                (student.subjects || '').toLowerCase();
+            
+            return studentName.includes(lowerCaseSearchTerm) ||
+                   parentName.includes(lowerCaseSearchTerm) ||
+                   parentPhone.includes(lowerCaseSearchTerm) ||
+                   grade.includes(lowerCaseSearchTerm) ||
+                   subjects.includes(lowerCaseSearchTerm);
+        });
+        
+        return tutorNameMatch || tutorEmailMatch || studentMatch;
     });
 
-    if (filteredTutors.length === 0) {
-        directoryList.innerHTML = `<p class="text-center text-gray-500 py-10">No results found for "${searchTerm}".</p>`;
+    if (searchTerm && filteredTutors.length === 0) {
+        directoryList.innerHTML = `
+            <div class="text-center py-10">
+                <p class="text-gray-500 mb-2">No results found for "${searchTerm}"</p>
+                <button onclick="document.getElementById('directory-search').value = ''; renderDirectoryFromCache();" 
+                        class="text-blue-500 hover:underline">
+                    Clear search
+                </button>
+            </div>
+        `;
         return;
     }
 
+    // Update counters
     document.getElementById('tutor-count-badge').textContent = tutors.length;
     document.getElementById('student-count-badge').textContent = students.length;
-    
-    const studentsWithHistory = Object.keys(tutorAssignments).length;
-    document.getElementById('history-count-badge').textContent = studentsWithHistory;
+    document.getElementById('history-count-badge').textContent = Object.keys(tutorAssignments).length;
 
+    // Check permissions
     const canEditStudents = window.userData?.permissions?.actions?.canEditStudents === true;
     const canDeleteStudents = window.userData?.permissions?.actions?.canDeleteStudents === true;
     const showActionsColumn = canEditStudents || canDeleteStudents;
 
+    // Build the directory view
     directoryList.innerHTML = filteredTutors.map(tutor => {
         const assignedStudents = (studentsByTutor[tutor.email] || [])
-            .filter(s =>
-                searchTerm === '' ||
-                tutor.name.toLowerCase().includes(lowerCaseSearchTerm) ||
-                s.studentName.toLowerCase().includes(lowerCaseSearchTerm) ||
-                (s.parentName && s.parentName.toLowerCase().includes(lowerCaseSearchTerm)) ||
-                (s.parentPhone && String(s.parentPhone).toLowerCase().includes(lowerCaseSearchTerm))
-            );
+            .filter(student => {
+                if (!searchTerm) return true;
+                
+                // Safe string conversion for filtering
+                const studentName = (student.studentName || '').toLowerCase();
+                const parentName = (student.parentName || '').toLowerCase();
+                const parentPhone = String(student.parentPhone || '').toLowerCase();
+                const grade = (student.grade || '').toLowerCase();
+                const subjects = Array.isArray(student.subjects) ? 
+                    student.subjects.map(s => s.toLowerCase()).join(' ') : 
+                    (student.subjects || '').toLowerCase();
+                const tutorName = (tutor.name || '').toLowerCase();
+                
+                return studentName.includes(lowerCaseSearchTerm) ||
+                       parentName.includes(lowerCaseSearchTerm) ||
+                       parentPhone.includes(lowerCaseSearchTerm) ||
+                       grade.includes(lowerCaseSearchTerm) ||
+                       subjects.includes(lowerCaseSearchTerm) ||
+                       tutorName.includes(lowerCaseSearchTerm);
+            });
 
         const studentsTableRows = assignedStudents
-            .sort((a, b) => a.studentName.localeCompare(b.studentName))
+            .sort((a, b) => (a.studentName || '').localeCompare(b.studentName || ''))
             .map(student => {
-                const subjects = student.subjects && Array.isArray(student.subjects) ? student.subjects.join(', ') : 'N/A';
+                const subjects = Array.isArray(student.subjects) ? 
+                    student.subjects.join(', ') : 
+                    (student.subjects || 'N/A');
+                
                 const studentHistory = tutorAssignments[student.id];
                 const historyButton = studentHistory ? 
-                    `<button class="view-history-btn bg-purple-500 text-white px-3 py-1 rounded-full text-xs ml-1" data-student-id="${student.id}">History</button>` : '';
+                    `<button class="view-history-btn bg-purple-500 text-white px-3 py-1 rounded-full text-xs ml-1 hover:bg-purple-600" data-student-id="${student.id}">History</button>` : '';
                 
                 const actionButtons = `
-                    ${canEditStudents ? `<button class="edit-student-btn bg-blue-500 text-white px-3 py-1 rounded-full text-xs" data-student-id="${student.id}">Edit</button>` : ''}
-                    ${canDeleteStudents ? `<button class="delete-student-btn bg-red-500 text-white px-3 py-1 rounded-full text-xs" data-student-id="${student.id}">Delete</button>` : ''}
+                    ${canEditStudents ? `<button class="edit-student-btn bg-blue-500 text-white px-3 py-1 rounded-full text-xs hover:bg-blue-600" data-student-id="${student.id}">Edit</button>` : ''}
+                    ${canDeleteStudents ? `<button class="delete-student-btn bg-red-500 text-white px-3 py-1 rounded-full text-xs hover:bg-red-600" data-student-id="${student.id}">Delete</button>` : ''}
                     ${historyButton}
                 `;
+                
                 return `
                     <tr class="hover:bg-gray-50">
-                        <td class="px-4 py-2 font-medium">${student.studentName}</td>
+                        <td class="px-4 py-2 font-medium">${student.studentName || 'N/A'}</td>
                         <td class="px-4 py-2">₦${(student.studentFee || 0).toFixed(2)}</td>
-                        <td class="px-4 py-2">${student.grade}</td>
-                        <td class="px-4 py-2">${student.days}</td>
+                        <td class="px-4 py-2">${student.grade || 'N/A'}</td>
+                        <td class="px-4 py-2">${student.days || 'N/A'}</td>
                         <td class="px-4 py-2">${subjects}</td>
                         <td class="px-4 py-2">${student.parentName || 'N/A'}</td>
                         <td class="px-4 py-2">${student.parentPhone || 'N/A'}</td>
-                        ${showActionsColumn || historyButton ? `<td class="px-4 py-2">${actionButtons}</td>` : ''}
+                        ${showActionsColumn || historyButton ? `<td class="px-4 py-2 space-x-1">${actionButtons}</td>` : ''}
                     </tr>
                 `;
             }).join('');
 
         return `
-            <div class="border rounded-lg shadow-sm">
+            <div class="border rounded-lg shadow-sm hover:shadow-md transition-shadow">
                 <details open>
-                    <summary class="p-4 cursor-pointer flex justify-between items-center font-semibold text-lg">
-                        ${tutor.name}
-                        <span class="ml-2 text-sm font-normal text-gray-500">(${assignedStudents.length} students shown)</span>
+                    <summary class="p-4 cursor-pointer flex justify-between items-center font-semibold text-lg bg-gray-50 hover:bg-gray-100">
+                        <div>
+                            <span class="text-green-700">${tutor.name}</span>
+                            <span class="ml-2 text-sm font-normal text-gray-500">${tutor.email || ''}</span>
+                        </div>
+                        <div class="flex items-center">
+                            <span class="ml-2 text-sm font-normal px-2 py-1 bg-green-100 text-green-800 rounded-full">
+                                ${assignedStudents.length} student${assignedStudents.length !== 1 ? 's' : ''}
+                            </span>
+                            <svg class="w-5 h-5 ml-2 text-gray-500 transform transition-transform duration-200 group-open:rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                            </svg>
+                        </div>
                     </summary>
-                    <div class="border-t p-2">
-                        <table class="min-w-full text-sm">
-                            <thead class="bg-gray-50 text-left"><tr>
-                                <th class="px-4 py-2 font-medium">Student Name</th><th class="px-4 py-2 font-medium">Fee</th>
-                                <th class="px-4 py-2 font-medium">Grade</th><th class="px-4 py-2 font-medium">Days/Week</th>
-                                <th class="px-4 py-2 font-medium">Subject</th><th class="px-4 py-2 font-medium">Parent's Name</th>
-                                <th class="px-4 py-2 font-medium">Parent's Phone</th>
-                                ${showActionsColumn ? `<th class="px-4 py-2 font-medium">Actions</th>` : ''}
-                            </tr></thead>
-                            <tbody class="bg-white divide-y divide-gray-200">${studentsTableRows}</tbody>
-                        </table>
+                    <div class="border-t">
+                        ${assignedStudents.length > 0 ? `
+                            <div class="overflow-x-auto">
+                                <table class="min-w-full text-sm">
+                                    <thead class="bg-gray-50 text-left">
+                                        <tr>
+                                            <th class="px-4 py-2 font-medium">Student Name</th>
+                                            <th class="px-4 py-2 font-medium">Fee</th>
+                                            <th class="px-4 py-2 font-medium">Grade</th>
+                                            <th class="px-4 py-2 font-medium">Days/Week</th>
+                                            <th class="px-4 py-2 font-medium">Subject</th>
+                                            <th class="px-4 py-2 font-medium">Parent's Name</th>
+                                            <th class="px-4 py-2 font-medium">Parent's Phone</th>
+                                            ${showActionsColumn ? `<th class="px-4 py-2 font-medium">Actions</th>` : ''}
+                                        </tr>
+                                    </thead>
+                                    <tbody class="bg-white divide-y divide-gray-200">
+                                        ${studentsTableRows}
+                                    </tbody>
+                                </table>
+                            </div>
+                        ` : `
+                            <div class="p-6 text-center text-gray-500">
+                                No students assigned to this tutor${searchTerm ? ' matching your search' : ''}.
+                            </div>
+                        `}
                     </div>
                 </details>
             </div>
         `;
     }).join('');
 
+    // Add event listeners for action buttons
     if (canEditStudents) {
-        document.querySelectorAll('.edit-student-btn').forEach(button => button.addEventListener('click', () => handleEditStudent(button.dataset.studentId)));
+        document.querySelectorAll('.edit-student-btn').forEach(button => {
+            button.addEventListener('click', () => handleEditStudent(button.dataset.studentId));
+        });
     }
+    
     if (canDeleteStudents) {
-        document.querySelectorAll('.delete-student-btn').forEach(button => button.addEventListener('click', () => handleDeleteStudent(button.dataset.studentId)));
+        document.querySelectorAll('.delete-student-btn').forEach(button => {
+            button.addEventListener('click', () => handleDeleteStudent(button.dataset.studentId));
+        });
     }
     
     document.querySelectorAll('.view-history-btn').forEach(button => {
         button.addEventListener('click', () => window.viewStudentTutorHistory(button.dataset.studentId));
     });
+}
+
+// Helper function for safe data handling
+function safeString(value) {
+    if (value === null || value === undefined) return '';
+    return String(value);
+}
+
+// Helper function for safe array handling
+function safeArray(value) {
+    if (!value) return [];
+    if (Array.isArray(value)) return value;
+    return [value];
 }
 
 // ======================================================
@@ -7183,6 +7359,7 @@ onAuthStateChanged(auth, async (user) => {
         window.location.href = "management-auth.html";
     }
 });
+
 
 
 
