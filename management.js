@@ -897,6 +897,18 @@ window.refreshAllDashboardData = async function() {
 // SUBSECTION 3.1: Tutor Directory Panel - UPDATED
 // ======================================================
 
+// Helper function for safe string operations
+function safeToString(value) {
+    if (value === null || value === undefined) return '';
+    return String(value);
+}
+
+// Helper function for safe search
+function safeSearch(text, searchTerm) {
+    if (!text || !searchTerm) return false;
+    return safeToString(text).toLowerCase().includes(safeToString(searchTerm).toLowerCase());
+}
+
 async function renderManagementTutorView(container) {
     container.innerHTML = `
         <div class="bg-white p-6 rounded-lg shadow-md">
@@ -1008,6 +1020,8 @@ async function fetchAndRenderDirectory(forceRefresh = false) {
             getDocs(collection(db, "tutorAssignments"))
         ]);
         
+        console.log(`Fetched ${tutorsSnapshot.size} tutors, ${studentsSnapshot.size} students, ${tutorAssignmentsSnapshot.size} tutor assignments`);
+        
         // Process tutors with safe data handling
         const allTutors = tutorsSnapshot.docs.map(doc => {
             const data = doc.data();
@@ -1017,9 +1031,10 @@ async function fetchAndRenderDirectory(forceRefresh = false) {
                 email: data.email || '',
                 status: data.status || 'active',
                 phone: data.phone || '',
-                subjects: data.subjects || [],
+                subjects: Array.isArray(data.subjects) ? data.subjects : (data.subjects ? [data.subjects] : []),
                 qualification: data.qualification || '',
-                createdAt: data.createdAt || new Date().toISOString()
+                createdAt: data.createdAt || new Date().toISOString(),
+                ...data // Include all other fields
             };
         });
         
@@ -1043,9 +1058,13 @@ async function fetchAndRenderDirectory(forceRefresh = false) {
                 parentEmail: data.parentEmail || '',
                 address: data.address || '',
                 status: data.status || 'active',
-                createdAt: data.createdAt || new Date().toISOString()
+                createdAt: data.createdAt || new Date().toISOString(),
+                ...data // Include all other fields
             };
         });
+        
+        console.log("All students loaded:", allStudents.length);
+        console.log("Sample student:", allStudents[0]);
         
         const activeStudents = allStudents.filter(student => 
             !student.status || student.status === 'active' || student.status === 'approved'
@@ -1063,6 +1082,8 @@ async function fetchAndRenderDirectory(forceRefresh = false) {
                 }
                 
                 tutorAssignments[studentId].push({
+                    id: doc.id,
+                    studentId: studentId,
                     tutorId: data.tutorId || '',
                     tutorName: data.tutorName || '',
                     tutorEmail: data.tutorEmail || '',
@@ -1070,7 +1091,8 @@ async function fetchAndRenderDirectory(forceRefresh = false) {
                     endDate: data.endDate || '',
                     reason: data.reason || '',
                     assignedBy: data.assignedBy || '',
-                    assignedAt: data.assignedAt || new Date().toISOString()
+                    assignedAt: data.assignedAt || new Date().toISOString(),
+                    ...data // Include all other fields
                 });
             }
         });
@@ -1078,14 +1100,20 @@ async function fetchAndRenderDirectory(forceRefresh = false) {
         // Sort tutor assignments by date (most recent first)
         Object.keys(tutorAssignments).forEach(studentId => {
             tutorAssignments[studentId].sort((a, b) => 
-                new Date(b.assignedAt) - new Date(a.assignedAt)
+                new Date(b.assignedAt || 0) - new Date(a.assignedAt || 0)
             );
         });
         
-        // Save to cache with proper serialization
+        // Save to cache
         saveToLocalStorage('tutors', activeTutors);
         saveToLocalStorage('students', activeStudents);
         sessionCache.tutorAssignments = tutorAssignments;
+        
+        console.log("Cache updated:", {
+            tutors: activeTutors.length,
+            students: activeStudents.length,
+            assignments: Object.keys(tutorAssignments).length
+        });
         
         renderDirectoryFromCache();
         
@@ -1093,7 +1121,7 @@ async function fetchAndRenderDirectory(forceRefresh = false) {
         console.error("Error fetching directory data:", error);
         document.getElementById('directory-list').innerHTML = `
             <div class="text-center py-10">
-                <p class="text-red-500 mb-4">Failed to load data. Please check your connection and try again.</p>
+                <p class="text-red-500 mb-4">Failed to load data: ${error.message}</p>
                 <button onclick="fetchAndRenderDirectory(true)" class="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600">
                     Retry Loading Data
                 </button>
@@ -1123,17 +1151,18 @@ function renderDirectoryFromCache(searchTerm = '') {
     }
 
     // Safe search term handling
-    const lowerCaseSearchTerm = (searchTerm || '').toLowerCase().trim();
+    const searchTermLower = safeToString(searchTerm).toLowerCase();
     
     // Group students by tutor email
     const studentsByTutor = {};
     
     students.forEach(student => {
-        if (student.tutorEmail) {
-            if (!studentsByTutor[student.tutorEmail]) {
-                studentsByTutor[student.tutorEmail] = [];
+        const tutorEmail = student.tutorEmail || '';
+        if (tutorEmail) {
+            if (!studentsByTutor[tutorEmail]) {
+                studentsByTutor[tutorEmail] = [];
             }
-            studentsByTutor[student.tutorEmail].push(student);
+            studentsByTutor[tutorEmail].push(student);
         }
     });
 
@@ -1144,25 +1173,18 @@ function renderDirectoryFromCache(searchTerm = '') {
         const assignedStudents = studentsByTutor[tutor.email] || [];
         
         // Check tutor info
-        const tutorNameMatch = tutor.name && tutor.name.toLowerCase().includes(lowerCaseSearchTerm);
-        const tutorEmailMatch = tutor.email && tutor.email.toLowerCase().includes(lowerCaseSearchTerm);
+        const tutorNameMatch = safeSearch(tutor.name, searchTerm);
+        const tutorEmailMatch = safeSearch(tutor.email, searchTerm);
         
         // Check if any assigned student matches
         const studentMatch = assignedStudents.some(student => {
-            // Safe string conversion for all fields
-            const studentName = (student.studentName || '').toLowerCase();
-            const parentName = (student.parentName || '').toLowerCase();
-            const parentPhone = String(student.parentPhone || '').toLowerCase();
-            const grade = (student.grade || '').toLowerCase();
-            const subjects = Array.isArray(student.subjects) ? 
-                student.subjects.map(s => s.toLowerCase()).join(' ') : 
-                (student.subjects || '').toLowerCase();
-            
-            return studentName.includes(lowerCaseSearchTerm) ||
-                   parentName.includes(lowerCaseSearchTerm) ||
-                   parentPhone.includes(lowerCaseSearchTerm) ||
-                   grade.includes(lowerCaseSearchTerm) ||
-                   subjects.includes(lowerCaseSearchTerm);
+            return safeSearch(student.studentName, searchTerm) ||
+                   safeSearch(student.parentName, searchTerm) ||
+                   safeSearch(student.parentPhone, searchTerm) ||
+                   safeSearch(student.grade, searchTerm) ||
+                   safeSearch(student.days, searchTerm) ||
+                   (Array.isArray(student.subjects) && 
+                    student.subjects.some(subject => safeSearch(subject, searchTerm)));
         });
         
         return tutorNameMatch || tutorEmailMatch || studentMatch;
@@ -1197,61 +1219,52 @@ function renderDirectoryFromCache(searchTerm = '') {
             .filter(student => {
                 if (!searchTerm) return true;
                 
-                // Safe string conversion for filtering
-                const studentName = (student.studentName || '').toLowerCase();
-                const parentName = (student.parentName || '').toLowerCase();
-                const parentPhone = String(student.parentPhone || '').toLowerCase();
-                const grade = (student.grade || '').toLowerCase();
-                const subjects = Array.isArray(student.subjects) ? 
-                    student.subjects.map(s => s.toLowerCase()).join(' ') : 
-                    (student.subjects || '').toLowerCase();
-                const tutorName = (tutor.name || '').toLowerCase();
-                
-                return studentName.includes(lowerCaseSearchTerm) ||
-                       parentName.includes(lowerCaseSearchTerm) ||
-                       parentPhone.includes(lowerCaseSearchTerm) ||
-                       grade.includes(lowerCaseSearchTerm) ||
-                       subjects.includes(lowerCaseSearchTerm) ||
-                       tutorName.includes(lowerCaseSearchTerm);
-            });
+                return safeSearch(tutor.name, searchTerm) ||
+                       safeSearch(student.studentName, searchTerm) ||
+                       safeSearch(student.parentName, searchTerm) ||
+                       safeSearch(student.parentPhone, searchTerm) ||
+                       safeSearch(student.grade, searchTerm) ||
+                       safeSearch(student.days, searchTerm) ||
+                       (Array.isArray(student.subjects) && 
+                        student.subjects.some(subject => safeSearch(subject, searchTerm)));
+            })
+            .sort((a, b) => safeToString(a.studentName).localeCompare(safeToString(b.studentName)));
 
-        const studentsTableRows = assignedStudents
-            .sort((a, b) => (a.studentName || '').localeCompare(b.studentName || ''))
-            .map(student => {
-                const subjects = Array.isArray(student.subjects) ? 
-                    student.subjects.join(', ') : 
-                    (student.subjects || 'N/A');
-                
-                const studentHistory = tutorAssignments[student.id];
-                const historyButton = studentHistory ? 
-                    `<button class="view-history-btn bg-purple-500 text-white px-3 py-1 rounded-full text-xs ml-1 hover:bg-purple-600" data-student-id="${student.id}">History</button>` : '';
-                
-                const actionButtons = `
-                    ${canEditStudents ? `<button class="edit-student-btn bg-blue-500 text-white px-3 py-1 rounded-full text-xs hover:bg-blue-600" data-student-id="${student.id}">Edit</button>` : ''}
-                    ${canDeleteStudents ? `<button class="delete-student-btn bg-red-500 text-white px-3 py-1 rounded-full text-xs hover:bg-red-600" data-student-id="${student.id}">Delete</button>` : ''}
-                    ${historyButton}
-                `;
-                
-                return `
-                    <tr class="hover:bg-gray-50">
-                        <td class="px-4 py-2 font-medium">${student.studentName || 'N/A'}</td>
-                        <td class="px-4 py-2">₦${(student.studentFee || 0).toFixed(2)}</td>
-                        <td class="px-4 py-2">${student.grade || 'N/A'}</td>
-                        <td class="px-4 py-2">${student.days || 'N/A'}</td>
-                        <td class="px-4 py-2">${subjects}</td>
-                        <td class="px-4 py-2">${student.parentName || 'N/A'}</td>
-                        <td class="px-4 py-2">${student.parentPhone || 'N/A'}</td>
-                        ${showActionsColumn || historyButton ? `<td class="px-4 py-2 space-x-1">${actionButtons}</td>` : ''}
-                    </tr>
-                `;
-            }).join('');
+        const studentsTableRows = assignedStudents.map(student => {
+            const subjects = Array.isArray(student.subjects) ? 
+                student.subjects.join(', ') : 
+                safeToString(student.subjects);
+            
+            const studentHistory = tutorAssignments[student.id];
+            const historyButton = studentHistory ? 
+                `<button class="view-history-btn bg-purple-500 text-white px-3 py-1 rounded-full text-xs ml-1 hover:bg-purple-600" data-student-id="${student.id}">History</button>` : '';
+            
+            const actionButtons = `
+                ${canEditStudents ? `<button class="edit-student-btn bg-blue-500 text-white px-3 py-1 rounded-full text-xs hover:bg-blue-600" data-student-id="${student.id}">Edit</button>` : ''}
+                ${canDeleteStudents ? `<button class="delete-student-btn bg-red-500 text-white px-3 py-1 rounded-full text-xs hover:bg-red-600" data-student-id="${student.id}">Delete</button>` : ''}
+                ${historyButton}
+            `;
+            
+            return `
+                <tr class="hover:bg-gray-50">
+                    <td class="px-4 py-2 font-medium">${student.studentName || 'N/A'}</td>
+                    <td class="px-4 py-2">₦${(student.studentFee || 0).toFixed(2)}</td>
+                    <td class="px-4 py-2">${student.grade || 'N/A'}</td>
+                    <td class="px-4 py-2">${student.days || 'N/A'}</td>
+                    <td class="px-4 py-2">${subjects || 'N/A'}</td>
+                    <td class="px-4 py-2">${student.parentName || 'N/A'}</td>
+                    <td class="px-4 py-2">${student.parentPhone || 'N/A'}</td>
+                    ${showActionsColumn || historyButton ? `<td class="px-4 py-2 space-x-1">${actionButtons}</td>` : ''}
+                </tr>
+            `;
+        }).join('');
 
         return `
             <div class="border rounded-lg shadow-sm hover:shadow-md transition-shadow">
                 <details open>
                     <summary class="p-4 cursor-pointer flex justify-between items-center font-semibold text-lg bg-gray-50 hover:bg-gray-100">
                         <div>
-                            <span class="text-green-700">${tutor.name}</span>
+                            <span class="text-green-700">${tutor.name || 'Unnamed Tutor'}</span>
                             <span class="ml-2 text-sm font-normal text-gray-500">${tutor.email || ''}</span>
                         </div>
                         <div class="flex items-center">
@@ -1313,17 +1326,484 @@ function renderDirectoryFromCache(searchTerm = '') {
     });
 }
 
-// Helper function for safe data handling
-function safeString(value) {
-    if (value === null || value === undefined) return '';
-    return String(value);
+// ======================================================
+// REASSIGN STUDENT MODAL FUNCTION - UPDATED
+// ======================================================
+
+async function showReassignStudentModal() {
+    try {
+        // Ensure we have fresh data
+        if (!sessionCache.students || sessionCache.students.length === 0) {
+            await fetchAndRenderDirectory();
+        }
+        
+        const students = sessionCache.students || [];
+        const tutors = sessionCache.tutors || [];
+        
+        if (students.length === 0) {
+            alert("No students found. Please add students first.");
+            return;
+        }
+        
+        if (tutors.length === 0) {
+            alert("No tutors found. Please add tutors first.");
+            return;
+        }
+        
+        // Filter active students
+        const activeStudents = students.filter(student => 
+            !student.status || student.status === 'active' || student.status === 'approved'
+        );
+        
+        if (activeStudents.length === 0) {
+            alert("No active students available for reassignment.");
+            return;
+        }
+        
+        // Create student options with safe data handling
+        const studentOptions = activeStudents.map(student => 
+            `<option value="${student.id}">${student.studentName} (Current: ${student.tutorEmail || 'No tutor'})</option>`
+        ).join('');
+        
+        // Create tutor options with safe data handling
+        const tutorOptions = tutors.map(tutor => 
+            `<option value="${tutor.email}">${tutor.name} (${tutor.email})</option>`
+        ).join('');
+        
+        const modalHtml = `
+            <div id="reassign-student-modal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-center justify-center">
+                <div class="relative p-8 bg-white w-full max-w-2xl rounded-lg shadow-xl">
+                    <button class="absolute top-2 right-2 text-gray-500 hover:text-gray-800 text-2xl font-bold" onclick="closeManagementModal('reassign-student-modal')">&times;</button>
+                    <h3 class="text-xl font-bold mb-4 text-blue-700">Reassign Student to Different Tutor</h3>
+                    
+                    <div class="mb-6">
+                        <input type="search" id="reassign-search" placeholder="Search students by name, parent, or current tutor..." 
+                               class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                    </div>
+                    
+                    <form id="reassign-student-form">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                            <div>
+                                <label class="block text-sm font-medium mb-2">Select Student</label>
+                                <select id="reassign-student-id" required 
+                                        class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2 h-64 overflow-y-auto">
+                                    <option value="" disabled selected>Select a student...</option>
+                                    ${studentOptions}
+                                </select>
+                                <p class="text-xs text-gray-500 mt-1">${activeStudents.length} active students</p>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium mb-2">Assign to Tutor</label>
+                                <select id="reassign-tutor-email" required 
+                                        class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2">
+                                    <option value="" disabled selected>Select a tutor...</option>
+                                    ${tutorOptions}
+                                </select>
+                                <p class="text-xs text-gray-500 mt-1">${tutors.length} active tutors</p>
+                            </div>
+                        </div>
+                        
+                        <div class="mb-4">
+                            <label class="block text-sm font-medium mb-2">Reason for Reassignment</label>
+                            <textarea id="reassign-reason" 
+                                      class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2" 
+                                      rows="3" 
+                                      placeholder="Enter reason for reassignment (optional)"></textarea>
+                        </div>
+                        
+                        <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-4">
+                            <h4 class="font-semibold text-yellow-800 mb-2">Important Note</h4>
+                            <p class="text-sm text-yellow-700">
+                                Reassigning a student will create a history record and update all future sessions. 
+                                Past sessions will remain with the previous tutor.
+                            </p>
+                        </div>
+                        
+                        <div class="flex justify-end space-x-2">
+                            <button type="button" onclick="closeManagementModal('reassign-student-modal')" 
+                                    class="px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300">
+                                Cancel
+                            </button>
+                            <button type="submit" 
+                                    class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center">
+                                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"></path>
+                                </svg>
+                                Reassign Student
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        `;
+        
+        document.body.insertAdjacentHTML('beforeend', modalHtml);
+        
+        // Add search functionality
+        const searchInput = document.getElementById('reassign-search');
+        const studentSelect = document.getElementById('reassign-student-id');
+        
+        searchInput.addEventListener('input', (e) => {
+            const searchTerm = safeToString(e.target.value).toLowerCase();
+            const options = studentSelect.options;
+            
+            for (let i = 0; i < options.length; i++) {
+                const option = options[i];
+                const optionText = safeToString(option.textContent).toLowerCase();
+                option.style.display = optionText.includes(searchTerm) || option.value === '' ? '' : 'none';
+            }
+        });
+        
+        // Handle form submission
+        document.getElementById('reassign-student-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const studentId = document.getElementById('reassign-student-id').value;
+            const tutorEmail = document.getElementById('reassign-tutor-email').value;
+            const reason = document.getElementById('reassign-reason').value;
+            
+            if (!studentId || !tutorEmail) {
+                alert("Please select both a student and a tutor.");
+                return;
+            }
+            
+            // Find student and tutor details
+            const student = students.find(s => s.id === studentId);
+            const tutor = tutors.find(t => t.email === tutorEmail);
+            const currentTutorEmail = student?.tutorEmail;
+            
+            if (!student) {
+                alert("Selected student not found.");
+                return;
+            }
+            
+            if (!tutor) {
+                alert("Selected tutor not found.");
+                return;
+            }
+            
+            if (currentTutorEmail === tutorEmail) {
+                alert("Student is already assigned to this tutor.");
+                return;
+            }
+            
+            // Confirm reassignment
+            const confirmMessage = `Are you sure you want to reassign ${student.studentName} from ${currentTutorEmail || 'No tutor'} to ${tutor.name} (${tutor.email})?`;
+            
+            if (!confirm(confirmMessage)) {
+                return;
+            }
+            
+            try {
+                // Show loading
+                const submitButton = e.target.querySelector('button[type="submit"]');
+                const originalText = submitButton.innerHTML;
+                submitButton.innerHTML = '<span class="flex items-center"><svg class="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> Reassigning...</span>';
+                submitButton.disabled = true;
+                
+                // Get current user info
+                const currentUser = window.userData?.name || 'Admin';
+                const currentUserEmail = window.userData?.email || 'admin@system';
+                
+                // 1. Create tutor assignment history record
+                const assignmentData = {
+                    studentId: studentId,
+                    studentName: student.studentName,
+                    oldTutorEmail: currentTutorEmail,
+                    newTutorEmail: tutorEmail,
+                    newTutorName: tutor.name,
+                    reason: reason || 'Reassignment',
+                    assignedBy: currentUser,
+                    assignedByEmail: currentUserEmail,
+                    assignedAt: new Date().toISOString(),
+                    timestamp: serverTimestamp()
+                };
+                
+                await addDoc(collection(db, "tutorAssignments"), assignmentData);
+                
+                // 2. Update student document with new tutor
+                await updateDoc(doc(db, "students", studentId), {
+                    tutorEmail: tutorEmail,
+                    tutorName: tutor.name,
+                    updatedAt: new Date().toISOString(),
+                    updatedBy: currentUser,
+                    updatedByEmail: currentUserEmail
+                });
+                
+                // 3. Update cache
+                if (sessionCache.students) {
+                    const studentIndex = sessionCache.students.findIndex(s => s.id === studentId);
+                    if (studentIndex !== -1) {
+                        sessionCache.students[studentIndex].tutorEmail = tutorEmail;
+                        sessionCache.students[studentIndex].tutorName = tutor.name;
+                        saveToLocalStorage('students', sessionCache.students);
+                    }
+                }
+                
+                // 4. Show success message
+                alert(`Successfully reassigned ${student.studentName} to ${tutor.name}!`);
+                
+                // 5. Close modal and refresh view
+                closeManagementModal('reassign-student-modal');
+                fetchAndRenderDirectory(true);
+                
+            } catch (error) {
+                console.error("Error reassigning student:", error);
+                alert(`Failed to reassign student: ${error.message}`);
+                
+                // Reset button
+                const submitButton = e.target.querySelector('button[type="submit"]');
+                submitButton.innerHTML = originalText;
+                submitButton.disabled = false;
+            }
+        });
+        
+    } catch (error) {
+        console.error("Error showing reassign modal:", error);
+        alert(`Error: ${error.message}`);
+    }
 }
 
-// Helper function for safe array handling
-function safeArray(value) {
-    if (!value) return [];
-    if (Array.isArray(value)) return value;
-    return [value];
+// ======================================================
+// ASSIGN STUDENT MODAL FUNCTION - UPDATED
+// ======================================================
+
+async function showAssignStudentModal() {
+    try {
+        // Ensure we have fresh tutor data
+        if (!sessionCache.tutors || sessionCache.tutors.length === 0) {
+            await fetchAndRenderDirectory();
+        }
+        
+        const tutors = sessionCache.tutors || [];
+        
+        if (tutors.length === 0) {
+            alert("No tutors available. Please add tutors first.");
+            return;
+        }
+        
+        // Create tutor options
+        const tutorOptions = tutors.map(tutor => 
+            `<option value="${tutor.email}">${tutor.name} (${tutor.email})</option>`
+        ).join('');
+        
+        const modalHtml = `
+            <div id="assign-student-modal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-center justify-center">
+                <div class="relative p-8 bg-white w-full max-w-2xl rounded-lg shadow-xl">
+                    <button class="absolute top-2 right-2 text-gray-500 hover:text-gray-800 text-2xl font-bold" onclick="closeManagementModal('assign-student-modal')">&times;</button>
+                    <h3 class="text-xl font-bold mb-4 text-green-700">Assign New Student to Tutor</h3>
+                    
+                    <form id="assign-student-form">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                            <div>
+                                <label class="block text-sm font-medium mb-2">Student Name *</label>
+                                <input type="text" id="assign-student-name" required 
+                                       class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2" 
+                                       placeholder="Enter student full name">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium mb-2">Grade/Class *</label>
+                                <input type="text" id="assign-grade" required 
+                                       class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2" 
+                                       placeholder="e.g., Grade 10, JSS 2">
+                            </div>
+                        </div>
+                        
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                            <div>
+                                <label class="block text-sm font-medium mb-2">Assign to Tutor *</label>
+                                <select id="assign-tutor-email" required 
+                                        class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2">
+                                    <option value="" disabled selected>Select a tutor...</option>
+                                    ${tutorOptions}
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium mb-2">Monthly Fee (₦) *</label>
+                                <input type="number" id="assign-fee" required 
+                                       class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2" 
+                                       placeholder="e.g., 50000" min="0" step="1000">
+                            </div>
+                        </div>
+                        
+                        <div class="mb-4">
+                            <label class="block text-sm font-medium mb-2">Subjects *</label>
+                            <input type="text" id="assign-subjects" required 
+                                   class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2" 
+                                   placeholder="e.g., Mathematics, Physics, Chemistry (comma separated)">
+                        </div>
+                        
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                            <div>
+                                <label class="block text-sm font-medium mb-2">Days per Week</label>
+                                <input type="text" id="assign-days" 
+                                       class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2" 
+                                       placeholder="e.g., Mon, Wed, Fri">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium mb-2">Parent's Name</label>
+                                <input type="text" id="assign-parent-name" 
+                                       class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2" 
+                                       placeholder="Parent/Guardian name">
+                            </div>
+                        </div>
+                        
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                            <div>
+                                <label class="block text-sm font-medium mb-2">Parent's Phone</label>
+                                <input type="tel" id="assign-parent-phone" 
+                                       class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2" 
+                                       placeholder="Phone number">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium mb-2">Parent's Email</label>
+                                <input type="email" id="assign-parent-email" 
+                                       class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2" 
+                                       placeholder="Email address">
+                            </div>
+                        </div>
+                        
+                        <div class="flex justify-end space-x-2">
+                            <button type="button" onclick="closeManagementModal('assign-student-modal')" 
+                                    class="px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300">
+                                Cancel
+                            </button>
+                            <button type="submit" 
+                                    class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 flex items-center">
+                                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
+                                </svg>
+                                Assign Student
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        `;
+        
+        document.body.insertAdjacentHTML('beforeend', modalHtml);
+        
+        // Handle form submission
+        document.getElementById('assign-student-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            // Get form values
+            const studentName = document.getElementById('assign-student-name').value.trim();
+            const grade = document.getElementById('assign-grade').value.trim();
+            const tutorEmail = document.getElementById('assign-tutor-email').value;
+            const fee = parseFloat(document.getElementById('assign-fee').value);
+            const subjects = document.getElementById('assign-subjects').value.split(',').map(s => s.trim()).filter(s => s);
+            const days = document.getElementById('assign-days').value.trim();
+            const parentName = document.getElementById('assign-parent-name').value.trim();
+            const parentPhone = document.getElementById('assign-parent-phone').value.trim();
+            const parentEmail = document.getElementById('assign-parent-email').value.trim();
+            
+            // Validation
+            if (!studentName || !grade || !tutorEmail || isNaN(fee) || subjects.length === 0) {
+                alert("Please fill in all required fields (*)");
+                return;
+            }
+            
+            // Find tutor
+            const tutor = tutors.find(t => t.email === tutorEmail);
+            if (!tutor) {
+                alert("Selected tutor not found.");
+                return;
+            }
+            
+            // Get current user info
+            const currentUser = window.userData?.name || 'Admin';
+            const currentUserEmail = window.userData?.email || 'admin@system';
+            
+            try {
+                // Show loading
+                const submitButton = e.target.querySelector('button[type="submit"]');
+                const originalText = submitButton.innerHTML;
+                submitButton.innerHTML = '<span class="flex items-center"><svg class="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> Assigning...</span>';
+                submitButton.disabled = true;
+                
+                // Create student document
+                const studentData = {
+                    studentName: studentName,
+                    grade: grade,
+                    tutorEmail: tutorEmail,
+                    tutorName: tutor.name,
+                    studentFee: fee,
+                    subjects: subjects,
+                    days: days || 'Not specified',
+                    parentName: parentName || '',
+                    parentPhone: parentPhone || '',
+                    parentEmail: parentEmail || '',
+                    status: 'active',
+                    createdAt: new Date().toISOString(),
+                    createdBy: currentUser,
+                    createdByEmail: currentUserEmail,
+                    updatedAt: new Date().toISOString()
+                };
+                
+                // Add to Firebase
+                const docRef = await addDoc(collection(db, "students"), studentData);
+                
+                // Create tutor assignment history
+                const assignmentData = {
+                    studentId: docRef.id,
+                    studentName: studentName,
+                    newTutorEmail: tutorEmail,
+                    newTutorName: tutor.name,
+                    reason: 'Initial assignment',
+                    assignedBy: currentUser,
+                    assignedByEmail: currentUserEmail,
+                    assignedAt: new Date().toISOString(),
+                    timestamp: serverTimestamp()
+                };
+                
+                await addDoc(collection(db, "tutorAssignments"), assignmentData);
+                
+                // Update cache
+                const newStudent = {
+                    id: docRef.id,
+                    ...studentData
+                };
+                
+                if (!sessionCache.students) {
+                    sessionCache.students = [];
+                }
+                sessionCache.students.push(newStudent);
+                saveToLocalStorage('students', sessionCache.students);
+                
+                // Show success
+                alert(`Successfully assigned ${studentName} to ${tutor.name}!`);
+                
+                // Close modal and refresh
+                closeManagementModal('assign-student-modal');
+                fetchAndRenderDirectory(true);
+                
+            } catch (error) {
+                console.error("Error assigning student:", error);
+                alert(`Failed to assign student: ${error.message}`);
+                
+                // Reset button
+                const submitButton = e.target.querySelector('button[type="submit"]');
+                submitButton.innerHTML = originalText;
+                submitButton.disabled = false;
+            }
+        });
+        
+    } catch (error) {
+        console.error("Error showing assign modal:", error);
+        alert(`Error: ${error.message}`);
+    }
+}
+
+// ======================================================
+// CLOSE MODAL FUNCTION
+// ======================================================
+
+function closeManagementModal(modalId) {
+    const modal = document.getElementById(modalId);
+    if (modal) {
+        modal.remove();
+    }
 }
 
 // ======================================================
@@ -7355,6 +7835,7 @@ onAuthStateChanged(auth, async (user) => {
         window.location.href = "management-auth.html";
     }
 });
+
 
 
 
