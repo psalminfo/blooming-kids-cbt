@@ -1404,7 +1404,7 @@ function renderDirectoryFromCache(searchTerm = '') {
 }
 
 // ======================================================
-// UPDATED SHOWREASSIGNSTUDENTMODAL - WITH ROBUST FETCHING & FILTERING
+// UPDATED SHOWREASSIGNSTUDENTMODAL - CRASH PROOF SEARCH
 // ======================================================
 
 // Check if showReassignStudentModal already exists
@@ -1451,7 +1451,7 @@ if (typeof window.showReassignStudentModal === 'undefined') {
                 const currentTutor = tutors.find(t => t && t.email === student.tutorEmail);
                 const tutorInfo = currentTutor ? currentTutor.name : 'No tutor';
                 
-                // Build display text
+                // Build display text using studentName
                 const displayText = [
                     student.studentName || 'Unnamed',
                     student.grade ? `Grade: ${student.grade}` : '',
@@ -1526,7 +1526,7 @@ if (typeof window.showReassignStudentModal === 'undefined') {
             
             document.body.insertAdjacentHTML('beforeend', modalHtml);
             
-            // Add search functionality
+            // Add search functionality - WITH CRASH PROTECTION
             const searchInput = document.getElementById('reassign-search');
             const studentSelect = document.getElementById('reassign-student-id');
             
@@ -1535,32 +1535,36 @@ if (typeof window.showReassignStudentModal === 'undefined') {
                 const originalOptions = Array.from(studentSelect.options);
                 
                 searchInput.addEventListener('input', (e) => {
-                    // SAFE VALUE RETRIEVAL
-                    const target = e.target;
-                    const val = target ? target.value : '';
-                    const searchTerm = safeToString(val).toLowerCase();
-                    
-                    if (!searchTerm.trim()) {
-                        // Show all options when search is cleared
+                    try {
+                        // SAFE VALUE RETRIEVAL
+                        const target = e.target;
+                        const val = target ? target.value : '';
+                        const searchTerm = safeToString(val).toLowerCase();
+                        
+                        if (!searchTerm.trim()) {
+                            // Show all options when search is cleared
+                            originalOptions.forEach(option => {
+                                if (option.value !== "") { // Keep the placeholder
+                                    option.style.display = '';
+                                }
+                            });
+                            return;
+                        }
+                        
+                        // Filter options based on search term
                         originalOptions.forEach(option => {
-                            if (option.value !== "") { // Keep the placeholder
+                            if (option.value === "") {
+                                // Keep placeholder visible
                                 option.style.display = '';
+                            } else {
+                                // SAFE OPTION TEXT RETRIEVAL - PREVENTS CRASH
+                                const optionText = option.text ? safeToString(option.text).toLowerCase() : '';
+                                option.style.display = optionText.includes(searchTerm) ? '' : 'none';
                             }
                         });
-                        return;
+                    } catch (err) {
+                        console.error("Error in search filter:", err);
                     }
-                    
-                    // Filter options based on search term
-                    originalOptions.forEach(option => {
-                        if (option.value === "") {
-                            // Keep placeholder visible
-                            option.style.display = '';
-                        } else {
-                            // SAFE OPTION TEXT RETRIEVAL
-                            const optionText = option.text ? safeToString(option.text).toLowerCase() : '';
-                            option.style.display = optionText.includes(searchTerm) ? '' : 'none';
-                        }
-                    });
                 });
             } else {
                 console.error("Search input or student select element not found");
@@ -7722,6 +7726,7 @@ onAuthStateChanged(auth, async (user) => {
         window.location.href = "management-auth.html";
     }
 });
+
 
 
 
