@@ -898,8 +898,29 @@ window.refreshAllDashboardData = async function() {
 // ======================================================
 
 // ======================================================
-// SUBSECTION 3.1: Tutor Directory Panel - UPDATED
 // ======================================================
+// SUBSECTION 3.1: Tutor Directory Panel - COMPREHENSIVE UPDATE
+// ======================================================
+
+// Helper function for safe string operations
+function safeString(value, defaultValue = '') {
+    if (value === null || value === undefined) return defaultValue;
+    return String(value).trim();
+}
+
+// Helper function for safe array operations
+function safeArray(value) {
+    if (!value) return [];
+    if (Array.isArray(value)) return value;
+    if (typeof value === 'string') return [value];
+    return [String(value)];
+}
+
+// Helper function for safe number operations
+function safeNumber(value, defaultValue = 0) {
+    const num = Number(value);
+    return isNaN(num) ? defaultValue : num;
+}
 
 async function renderManagementTutorView(container) {
     container.innerHTML = `
@@ -911,9 +932,15 @@ async function renderManagementTutorView(container) {
                     <button id="assign-student-btn" class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700">Assign New Student</button>
                     <button id="reassign-student-btn" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Reassign Student</button>
                     <button id="view-tutor-history-directory-btn" class="bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700">View Tutor History</button>
+                    <button id="diagnostic-btn" class="bg-yellow-600 text-white px-4 py-2 rounded hover:bg-yellow-700">Diagnostic Check</button>
                     <button id="refresh-directory-btn" class="bg-gray-600 text-white px-4 py-2 rounded hover:bg-gray-700">Refresh</button>
                 </div>
             </div>
+            
+            <div id="diagnostic-info" class="hidden mb-4 p-3 bg-blue-50 rounded-lg">
+                <p class="text-sm text-blue-800" id="diagnostic-message"></p>
+            </div>
+            
             <div class="flex space-x-4 mb-4">
                 <div class="bg-green-100 p-3 rounded-lg text-center shadow w-full">
                     <h4 class="font-bold text-green-800 text-sm">Active Tutors</h4>
@@ -928,6 +955,32 @@ async function renderManagementTutorView(container) {
                     <p id="history-count-badge" class="text-2xl font-extrabold">0</p>
                 </div>
             </div>
+            
+            <div id="directory-stats" class="hidden mb-4 p-3 bg-gray-50 rounded-lg">
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                        <h4 class="font-bold text-gray-700">Data Sources</h4>
+                        <ul class="text-sm text-gray-600">
+                            <li id="tutors-source">Tutors: Loading...</li>
+                            <li id="students-source">Students: Loading...</li>
+                            <li id="assignments-source">Assignments: Loading...</li>
+                        </ul>
+                    </div>
+                    <div>
+                        <h4 class="font-bold text-gray-700">Data Health</h4>
+                        <ul class="text-sm text-gray-600">
+                            <li id="tutors-active">Active Tutors: Loading...</li>
+                            <li id="students-active">Active Students: Loading...</li>
+                            <li id="students-no-tutor">Students without tutor: Loading...</li>
+                        </ul>
+                    </div>
+                    <div>
+                        <h4 class="font-bold text-gray-700">Last Updated</h4>
+                        <p id="last-updated" class="text-sm text-gray-600">Never</p>
+                    </div>
+                </div>
+            </div>
+            
             <div id="directory-list" class="space-y-4">
                 <p class="text-center text-gray-500 py-10">Loading directory...</p>
             </div>
@@ -939,6 +992,7 @@ async function renderManagementTutorView(container) {
     document.getElementById('reassign-student-btn').addEventListener('click', showReassignStudentModal);
     document.getElementById('refresh-directory-btn').addEventListener('click', () => fetchAndRenderDirectory(true));
     document.getElementById('directory-search').addEventListener('input', (e) => renderDirectoryFromCache(e.target.value));
+    document.getElementById('diagnostic-btn').addEventListener('click', runDiagnosticCheck);
     
     document.getElementById('view-tutor-history-directory-btn').addEventListener('click', async () => {
         if (!sessionCache.tutorAssignments || Object.keys(sessionCache.tutorAssignments).length === 0) {
@@ -947,9 +1001,10 @@ async function renderManagementTutorView(container) {
         }
         
         const students = sessionCache.students || [];
-        const activeStudents = students.filter(student => 
-            !student.status || student.status === 'active' || student.status === 'approved'
-        );
+        const activeStudents = students.filter(student => {
+            const status = safeString(student.status);
+            return !status || status === 'active' || status === 'approved';
+        });
         
         if (activeStudents.length === 0) {
             alert("No active students found.");
@@ -957,7 +1012,7 @@ async function renderManagementTutorView(container) {
         }
         
         const studentOptions = activeStudents.map(student => 
-            `<option value="${student.id}">${student.studentName} (${student.grade || 'No grade'})</option>`
+            `<option value="${student.id}">${safeString(student.studentName)} (${safeString(student.grade, 'No grade')})</option>`
         ).join('');
         
         const modalHtml = `
@@ -992,7 +1047,68 @@ async function renderManagementTutorView(container) {
         });
     });
     
+    // Show stats panel
+    document.getElementById('directory-stats').classList.remove('hidden');
+    
     fetchAndRenderDirectory();
+}
+
+async function runDiagnosticCheck() {
+    const diagnosticDiv = document.getElementById('diagnostic-info');
+    const messageEl = document.getElementById('diagnostic-message');
+    
+    diagnosticDiv.classList.remove('hidden');
+    messageEl.textContent = "Running diagnostic check...";
+    
+    try {
+        // Check all collections
+        const [tutorsSnapshot, studentsSnapshot, assignmentsSnapshot] = await Promise.all([
+            getDocs(query(collection(db, "tutors"), orderBy("name"))),
+            getDocs(collection(db, "students")),
+            getDocs(collection(db, "tutorAssignments"))
+        ]);
+        
+        const tutorsCount = tutorsSnapshot.size;
+        const studentsCount = studentsSnapshot.size;
+        const assignmentsCount = assignmentsSnapshot.size;
+        
+        let message = `Diagnostic Results:\n`;
+        message += `✅ Tutors Collection: ${tutorsCount} documents found\n`;
+        message += `✅ Students Collection: ${studentsCount} documents found\n`;
+        message += `✅ Tutor Assignments: ${assignmentsCount} documents found\n\n`;
+        
+        // Check sample data
+        if (studentsCount > 0) {
+            const sampleStudent = studentsSnapshot.docs[0].data();
+            message += `Sample Student Fields:\n`;
+            message += `- ID: ${studentsSnapshot.docs[0].id}\n`;
+            message += `- Name: ${sampleStudent.studentName || 'Missing'}\n`;
+            message += `- Tutor Email: ${sampleStudent.tutorEmail || 'Missing'}\n`;
+            message += `- Status: ${sampleStudent.status || 'Missing'}\n`;
+        }
+        
+        // Check for common issues
+        const studentsWithoutTutor = studentsSnapshot.docs.filter(doc => {
+            const data = doc.data();
+            return !data.tutorEmail || data.tutorEmail.trim() === '';
+        });
+        
+        if (studentsWithoutTutor.length > 0) {
+            message += `\n⚠️ ${studentsWithoutTutor.length} students without tutor assignment\n`;
+        }
+        
+        messageEl.textContent = message;
+        
+        // Update stats panel
+        document.getElementById('tutors-source').textContent = `Tutors: ${tutorsCount} documents`;
+        document.getElementById('students-source').textContent = `Students: ${studentsCount} documents`;
+        document.getElementById('assignments-source').textContent = `Assignments: ${assignmentsCount} documents`;
+        document.getElementById('students-no-tutor').textContent = `Students without tutor: ${studentsWithoutTutor.length}`;
+        
+    } catch (error) {
+        messageEl.textContent = `❌ Diagnostic Error: ${error.message}`;
+        console.error("Diagnostic error:", error);
+    }
 }
 
 async function fetchAndRenderDirectory(forceRefresh = false) {
@@ -1003,106 +1119,146 @@ async function fetchAndRenderDirectory(forceRefresh = false) {
     }
 
     try {
-        document.getElementById('directory-list').innerHTML = `<p class="text-center text-gray-500 py-10">Fetching data from server...</p>`;
+        const directoryList = document.getElementById('directory-list');
+        if (directoryList) {
+            directoryList.innerHTML = `<p class="text-center text-gray-500 py-10">Fetching data from server...</p>`;
+        }
         
-        // Fetch all data in parallel
-        const [tutorsSnapshot, studentsSnapshot, tutorAssignmentsSnapshot] = await Promise.all([
+        // Update last updated time
+        document.getElementById('last-updated').textContent = new Date().toLocaleString();
+        
+        // Fetch all data in parallel with error handling for each
+        const [tutorsSnapshot, studentsSnapshot, tutorAssignmentsSnapshot] = await Promise.allSettled([
             getDocs(query(collection(db, "tutors"), orderBy("name"))),
-            getDocs(query(collection(db, "students"), orderBy("studentName"))),
+            getDocs(collection(db, "students")),
             getDocs(collection(db, "tutorAssignments"))
         ]);
         
-        // Process tutors with safe data handling
-        const allTutors = tutorsSnapshot.docs.map(doc => {
-            const data = doc.data();
-            return {
-                id: doc.id,
-                name: data.name || 'Unnamed Tutor',
-                email: data.email || '',
-                status: data.status || 'active',
-                phone: data.phone || '',
-                subjects: data.subjects || [],
-                qualification: data.qualification || '',
-                createdAt: data.createdAt || new Date().toISOString()
-            };
+        // Handle tutors data
+        let allTutors = [];
+        if (tutorsSnapshot.status === 'fulfilled') {
+            allTutors = tutorsSnapshot.value.docs.map(doc => {
+                const data = doc.data();
+                return {
+                    id: doc.id,
+                    name: safeString(data.name, 'Unnamed Tutor'),
+                    email: safeString(data.email).toLowerCase(),
+                    status: safeString(data.status, 'active'),
+                    phone: safeString(data.phone),
+                    subjects: safeArray(data.subjects),
+                    qualification: safeString(data.qualification),
+                    createdAt: data.createdAt || new Date().toISOString()
+                };
+            });
+        } else {
+            console.error("Failed to fetch tutors:", tutorsSnapshot.reason);
+        }
+        
+        // Handle students data
+        let allStudents = [];
+        if (studentsSnapshot.status === 'fulfilled') {
+            allStudents = studentsSnapshot.value.docs.map(doc => {
+                const data = doc.data();
+                return {
+                    id: doc.id,
+                    studentName: safeString(data.studentName, 'Unnamed Student'),
+                    tutorEmail: safeString(data.tutorEmail).toLowerCase(),
+                    studentFee: safeNumber(data.studentFee, 0),
+                    grade: safeString(data.grade),
+                    days: safeString(data.days),
+                    subjects: safeArray(data.subjects),
+                    parentName: safeString(data.parentName),
+                    parentPhone: safeString(data.parentPhone),
+                    parentEmail: safeString(data.parentEmail),
+                    address: safeString(data.address),
+                    status: safeString(data.status, 'active'),
+                    createdAt: data.createdAt || new Date().toISOString(),
+                    notes: safeString(data.notes),
+                    paymentStatus: safeString(data.paymentStatus)
+                };
+            });
+        } else {
+            console.error("Failed to fetch students:", studentsSnapshot.reason);
+        }
+        
+        // Filter active tutors and students
+        const activeTutors = allTutors.filter(tutor => {
+            const status = safeString(tutor.status);
+            return !status || status === 'active';
         });
         
-        const activeTutors = allTutors.filter(tutor => 
-            !tutor.status || tutor.status === 'active'
-        );
-        
-        // Process students with safe data handling
-        const allStudents = studentsSnapshot.docs.map(doc => {
-            const data = doc.data();
-            return {
-                id: doc.id,
-                studentName: data.studentName || 'Unnamed Student',
-                tutorEmail: data.tutorEmail || '',
-                studentFee: typeof data.studentFee === 'number' ? data.studentFee : 0,
-                grade: data.grade || '',
-                days: data.days || '',
-                subjects: Array.isArray(data.subjects) ? data.subjects : (data.subjects ? [data.subjects] : []),
-                parentName: data.parentName || '',
-                parentPhone: data.parentPhone || '',
-                parentEmail: data.parentEmail || '',
-                address: data.address || '',
-                status: data.status || 'active',
-                createdAt: data.createdAt || new Date().toISOString()
-            };
+        const activeStudents = allStudents.filter(student => {
+            const status = safeString(student.status);
+            return !status || status === 'active' || status === 'approved';
         });
         
-        const activeStudents = allStudents.filter(student => 
-            !student.status || student.status === 'active' || student.status === 'approved'
-        );
-        
-        // Process tutor assignments with safe data handling
-        const tutorAssignments = {};
-        tutorAssignmentsSnapshot.docs.forEach(doc => {
-            const data = doc.data();
-            const studentId = data.studentId;
-            
-            if (studentId) {
-                if (!tutorAssignments[studentId]) {
-                    tutorAssignments[studentId] = [];
-                }
+        // Handle tutor assignments
+        let tutorAssignments = {};
+        if (tutorAssignmentsSnapshot.status === 'fulfilled') {
+            tutorAssignmentsSnapshot.value.docs.forEach(doc => {
+                const data = doc.data();
+                const studentId = data.studentId;
                 
-                tutorAssignments[studentId].push({
-                    tutorId: data.tutorId || '',
-                    tutorName: data.tutorName || '',
-                    tutorEmail: data.tutorEmail || '',
-                    startDate: data.startDate || '',
-                    endDate: data.endDate || '',
-                    reason: data.reason || '',
-                    assignedBy: data.assignedBy || '',
-                    assignedAt: data.assignedAt || new Date().toISOString()
-                });
-            }
-        });
+                if (studentId) {
+                    if (!tutorAssignments[studentId]) {
+                        tutorAssignments[studentId] = [];
+                    }
+                    
+                    tutorAssignments[studentId].push({
+                        id: doc.id,
+                        tutorId: safeString(data.tutorId),
+                        tutorName: safeString(data.tutorName),
+                        tutorEmail: safeString(data.tutorEmail),
+                        startDate: safeString(data.startDate),
+                        endDate: safeString(data.endDate),
+                        reason: safeString(data.reason),
+                        assignedBy: safeString(data.assignedBy),
+                        assignedAt: data.assignedAt || new Date().toISOString()
+                    });
+                }
+            });
+            
+            // Sort tutor assignments by date (most recent first)
+            Object.keys(tutorAssignments).forEach(studentId => {
+                tutorAssignments[studentId].sort((a, b) => 
+                    new Date(b.assignedAt) - new Date(a.assignedAt)
+                );
+            });
+        }
         
-        // Sort tutor assignments by date (most recent first)
-        Object.keys(tutorAssignments).forEach(studentId => {
-            tutorAssignments[studentId].sort((a, b) => 
-                new Date(b.assignedAt) - new Date(a.assignedAt)
-            );
-        });
-        
-        // Save to cache with proper serialization
+        // Save to cache
         saveToLocalStorage('tutors', activeTutors);
         saveToLocalStorage('students', activeStudents);
         sessionCache.tutorAssignments = tutorAssignments;
+        
+        // Update stats
+        document.getElementById('tutors-active').textContent = `Active Tutors: ${activeTutors.length}`;
+        document.getElementById('students-active').textContent = `Active Students: ${activeStudents.length}`;
+        
+        // Count students without tutor
+        const studentsWithoutTutor = activeStudents.filter(s => !s.tutorEmail || s.tutorEmail.trim() === '');
+        document.getElementById('students-no-tutor').textContent = `Students without tutor: ${studentsWithoutTutor.length}`;
         
         renderDirectoryFromCache();
         
     } catch (error) {
         console.error("Error fetching directory data:", error);
-        document.getElementById('directory-list').innerHTML = `
-            <div class="text-center py-10">
-                <p class="text-red-500 mb-4">Failed to load data. Please check your connection and try again.</p>
-                <button onclick="fetchAndRenderDirectory(true)" class="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600">
-                    Retry Loading Data
-                </button>
-            </div>
-        `;
+        const directoryList = document.getElementById('directory-list');
+        if (directoryList) {
+            directoryList.innerHTML = `
+                <div class="text-center py-10">
+                    <p class="text-red-500 mb-4">Failed to load data: ${error.message}</p>
+                    <div class="space-x-2">
+                        <button onclick="fetchAndRenderDirectory(true)" class="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600">
+                            Retry Loading
+                        </button>
+                        <button onclick="runDiagnosticCheck()" class="bg-yellow-500 text-white px-4 py-2 rounded hover:bg-yellow-600">
+                            Run Diagnostic
+                        </button>
+                    </div>
+                </div>
+            `;
+        }
     }
 }
 
@@ -1116,28 +1272,32 @@ function renderDirectoryFromCache(searchTerm = '') {
 
     if (tutors.length === 0 && students.length === 0) {
         directoryList.innerHTML = `
-            <p class="text-center text-gray-500 py-10">
-                No directory data found. 
-                <button onclick="fetchAndRenderDirectory(true)" class="text-blue-500 hover:underline ml-1">
-                    Click here to fetch from server
+            <div class="text-center py-10">
+                <p class="text-gray-500 mb-4">No directory data found.</p>
+                <button onclick="fetchAndRenderDirectory(true)" class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">
+                    Fetch from Server
                 </button>
-            </p>
+            </div>
         `;
         return;
     }
 
     // Safe search term handling
-    const lowerCaseSearchTerm = (searchTerm || '').toLowerCase().trim();
+    const lowerCaseSearchTerm = safeString(searchTerm).toLowerCase();
     
     // Group students by tutor email
     const studentsByTutor = {};
+    const studentsWithoutTutor = [];
     
     students.forEach(student => {
-        if (student.tutorEmail) {
-            if (!studentsByTutor[student.tutorEmail]) {
-                studentsByTutor[student.tutorEmail] = [];
+        const tutorEmail = safeString(student.tutorEmail).toLowerCase();
+        if (tutorEmail && tutorEmail !== 'null' && tutorEmail !== 'undefined') {
+            if (!studentsByTutor[tutorEmail]) {
+                studentsByTutor[tutorEmail] = [];
             }
-            studentsByTutor[student.tutorEmail].push(student);
+            studentsByTutor[tutorEmail].push(student);
+        } else {
+            studentsWithoutTutor.push(student);
         }
     });
 
@@ -1145,45 +1305,32 @@ function renderDirectoryFromCache(searchTerm = '') {
     const filteredTutors = tutors.filter(tutor => {
         if (!searchTerm) return true;
         
-        const assignedStudents = studentsByTutor[tutor.email] || [];
+        const tutorEmail = safeString(tutor.email).toLowerCase();
+        const assignedStudents = studentsByTutor[tutorEmail] || [];
         
         // Check tutor info
-        const tutorNameMatch = tutor.name && tutor.name.toLowerCase().includes(lowerCaseSearchTerm);
-        const tutorEmailMatch = tutor.email && tutor.email.toLowerCase().includes(lowerCaseSearchTerm);
+        const tutorNameMatch = safeString(tutor.name).toLowerCase().includes(lowerCaseSearchTerm);
+        const tutorEmailMatch = tutorEmail.includes(lowerCaseSearchTerm);
         
         // Check if any assigned student matches
         const studentMatch = assignedStudents.some(student => {
-            // Safe string conversion for all fields
-            const studentName = (student.studentName || '').toLowerCase();
-            const parentName = (student.parentName || '').toLowerCase();
-            const parentPhone = String(student.parentPhone || '').toLowerCase();
-            const grade = (student.grade || '').toLowerCase();
-            const subjects = Array.isArray(student.subjects) ? 
-                student.subjects.map(s => s.toLowerCase()).join(' ') : 
-                (student.subjects || '').toLowerCase();
+            const studentName = safeString(student.studentName).toLowerCase();
+            const parentName = safeString(student.parentName).toLowerCase();
+            const parentPhone = safeString(student.parentPhone).toLowerCase();
+            const grade = safeString(student.grade).toLowerCase();
+            const subjects = safeArray(student.subjects).map(s => s.toLowerCase()).join(' ');
+            const address = safeString(student.address).toLowerCase();
             
             return studentName.includes(lowerCaseSearchTerm) ||
                    parentName.includes(lowerCaseSearchTerm) ||
                    parentPhone.includes(lowerCaseSearchTerm) ||
                    grade.includes(lowerCaseSearchTerm) ||
-                   subjects.includes(lowerCaseSearchTerm);
+                   subjects.includes(lowerCaseSearchTerm) ||
+                   address.includes(lowerCaseSearchTerm);
         });
         
         return tutorNameMatch || tutorEmailMatch || studentMatch;
     });
-
-    if (searchTerm && filteredTutors.length === 0) {
-        directoryList.innerHTML = `
-            <div class="text-center py-10">
-                <p class="text-gray-500 mb-2">No results found for "${searchTerm}"</p>
-                <button onclick="document.getElementById('directory-search').value = ''; renderDirectoryFromCache();" 
-                        class="text-blue-500 hover:underline">
-                    Clear search
-                </button>
-            </div>
-        `;
-        return;
-    }
 
     // Update counters
     document.getElementById('tutor-count-badge').textContent = tutors.length;
@@ -1195,109 +1342,204 @@ function renderDirectoryFromCache(searchTerm = '') {
     const canDeleteStudents = window.userData?.permissions?.actions?.canDeleteStudents === true;
     const showActionsColumn = canEditStudents || canDeleteStudents;
 
-    // Build the directory view
-    directoryList.innerHTML = filteredTutors.map(tutor => {
-        const assignedStudents = (studentsByTutor[tutor.email] || [])
-            .filter(student => {
-                if (!searchTerm) return true;
-                
-                // Safe string conversion for filtering
-                const studentName = (student.studentName || '').toLowerCase();
-                const parentName = (student.parentName || '').toLowerCase();
-                const parentPhone = String(student.parentPhone || '').toLowerCase();
-                const grade = (student.grade || '').toLowerCase();
-                const subjects = Array.isArray(student.subjects) ? 
-                    student.subjects.map(s => s.toLowerCase()).join(' ') : 
-                    (student.subjects || '').toLowerCase();
-                const tutorName = (tutor.name || '').toLowerCase();
-                
-                return studentName.includes(lowerCaseSearchTerm) ||
-                       parentName.includes(lowerCaseSearchTerm) ||
-                       parentPhone.includes(lowerCaseSearchTerm) ||
-                       grade.includes(lowerCaseSearchTerm) ||
-                       subjects.includes(lowerCaseSearchTerm) ||
-                       tutorName.includes(lowerCaseSearchTerm);
-            });
-
-        const studentsTableRows = assignedStudents
-            .sort((a, b) => (a.studentName || '').localeCompare(b.studentName || ''))
-            .map(student => {
-                const subjects = Array.isArray(student.subjects) ? 
-                    student.subjects.join(', ') : 
-                    (student.subjects || 'N/A');
-                
-                const studentHistory = tutorAssignments[student.id];
-                const historyButton = studentHistory ? 
-                    `<button class="view-history-btn bg-purple-500 text-white px-3 py-1 rounded-full text-xs ml-1 hover:bg-purple-600" data-student-id="${student.id}">History</button>` : '';
-                
-                const actionButtons = `
-                    ${canEditStudents ? `<button class="edit-student-btn bg-blue-500 text-white px-3 py-1 rounded-full text-xs hover:bg-blue-600" data-student-id="${student.id}">Edit</button>` : ''}
-                    ${canDeleteStudents ? `<button class="delete-student-btn bg-red-500 text-white px-3 py-1 rounded-full text-xs hover:bg-red-600" data-student-id="${student.id}">Delete</button>` : ''}
-                    ${historyButton}
-                `;
-                
-                return `
-                    <tr class="hover:bg-gray-50">
-                        <td class="px-4 py-2 font-medium">${student.studentName || 'N/A'}</td>
-                        <td class="px-4 py-2">₦${(student.studentFee || 0).toFixed(2)}</td>
-                        <td class="px-4 py-2">${student.grade || 'N/A'}</td>
-                        <td class="px-4 py-2">${student.days || 'N/A'}</td>
-                        <td class="px-4 py-2">${subjects}</td>
-                        <td class="px-4 py-2">${student.parentName || 'N/A'}</td>
-                        <td class="px-4 py-2">${student.parentPhone || 'N/A'}</td>
-                        ${showActionsColumn || historyButton ? `<td class="px-4 py-2 space-x-1">${actionButtons}</td>` : ''}
-                    </tr>
-                `;
-            }).join('');
-
-        return `
-            <div class="border rounded-lg shadow-sm hover:shadow-md transition-shadow">
-                <details open>
-                    <summary class="p-4 cursor-pointer flex justify-between items-center font-semibold text-lg bg-gray-50 hover:bg-gray-100">
-                        <div>
-                            <span class="text-green-700">${tutor.name}</span>
-                            <span class="ml-2 text-sm font-normal text-gray-500">${tutor.email || ''}</span>
-                        </div>
-                        <div class="flex items-center">
-                            <span class="ml-2 text-sm font-normal px-2 py-1 bg-green-100 text-green-800 rounded-full">
-                                ${assignedStudents.length} student${assignedStudents.length !== 1 ? 's' : ''}
-                            </span>
-                            <svg class="w-5 h-5 ml-2 text-gray-500 transform transition-transform duration-200 group-open:rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
-                            </svg>
-                        </div>
-                    </summary>
-                    <div class="border-t">
-                        ${assignedStudents.length > 0 ? `
+    // Build directory content
+    let directoryContent = '';
+    
+    // Add students without tutor section
+    if (studentsWithoutTutor.length > 0) {
+        const filteredOrphanStudents = studentsWithoutTutor.filter(student => {
+            if (!searchTerm) return true;
+            
+            const studentName = safeString(student.studentName).toLowerCase();
+            const parentName = safeString(student.parentName).toLowerCase();
+            const parentPhone = safeString(student.parentPhone).toLowerCase();
+            const grade = safeString(student.grade).toLowerCase();
+            const subjects = safeArray(student.subjects).map(s => s.toLowerCase()).join(' ');
+            
+            return studentName.includes(lowerCaseSearchTerm) ||
+                   parentName.includes(lowerCaseSearchTerm) ||
+                   parentPhone.includes(lowerCaseSearchTerm) ||
+                   grade.includes(lowerCaseSearchTerm) ||
+                   subjects.includes(lowerCaseSearchTerm);
+        });
+        
+        if (filteredOrphanStudents.length > 0) {
+            directoryContent += `
+                <div class="border border-red-300 rounded-lg shadow-sm bg-red-50">
+                    <details open>
+                        <summary class="p-4 cursor-pointer flex justify-between items-center font-semibold text-lg bg-red-100 hover:bg-red-200">
+                            <div class="flex items-center">
+                                <span class="text-red-700">Unassigned Students</span>
+                                <span class="ml-2 text-xs font-normal px-2 py-1 bg-red-200 text-red-800 rounded-full">
+                                    ${filteredOrphanStudents.length} student${filteredOrphanStudents.length !== 1 ? 's' : ''}
+                                </span>
+                            </div>
+                            <div class="text-sm text-red-600">
+                                Needs tutor assignment
+                            </div>
+                        </summary>
+                        <div class="border-t border-red-200 p-4">
                             <div class="overflow-x-auto">
                                 <table class="min-w-full text-sm">
-                                    <thead class="bg-gray-50 text-left">
+                                    <thead class="bg-red-50 text-left">
                                         <tr>
-                                            <th class="px-4 py-2 font-medium">Student Name</th>
-                                            <th class="px-4 py-2 font-medium">Fee</th>
-                                            <th class="px-4 py-2 font-medium">Grade</th>
-                                            <th class="px-4 py-2 font-medium">Days/Week</th>
-                                            <th class="px-4 py-2 font-medium">Subject</th>
-                                            <th class="px-4 py-2 font-medium">Parent's Name</th>
-                                            <th class="px-4 py-2 font-medium">Parent's Phone</th>
-                                            ${showActionsColumn ? `<th class="px-4 py-2 font-medium">Actions</th>` : ''}
+                                            <th class="px-4 py-2 font-medium text-red-800">Student Name</th>
+                                            <th class="px-4 py-2 font-medium text-red-800">Grade</th>
+                                            <th class="px-4 py-2 font-medium text-red-800">Parent's Name</th>
+                                            <th class="px-4 py-2 font-medium text-red-800">Parent's Phone</th>
+                                            <th class="px-4 py-2 font-medium text-red-800">Actions</th>
                                         </tr>
                                     </thead>
-                                    <tbody class="bg-white divide-y divide-gray-200">
-                                        ${studentsTableRows}
+                                    <tbody class="bg-white divide-y divide-red-100">
+                                        ${filteredOrphanStudents.map(student => {
+                                            const historyButton = tutorAssignments[student.id] ? 
+                                                `<button class="view-history-btn bg-purple-500 text-white px-3 py-1 rounded-full text-xs hover:bg-purple-600" data-student-id="${student.id}">History</button>` : '';
+                                            
+                                            return `
+                                                <tr class="hover:bg-red-50">
+                                                    <td class="px-4 py-2 font-medium">${safeString(student.studentName)}</td>
+                                                    <td class="px-4 py-2">${safeString(student.grade)}</td>
+                                                    <td class="px-4 py-2">${safeString(student.parentName)}</td>
+                                                    <td class="px-4 py-2">${safeString(student.parentPhone)}</td>
+                                                    <td class="px-4 py-2 space-x-1">
+                                                        <button class="assign-tutor-btn bg-green-500 text-white px-3 py-1 rounded-full text-xs hover:bg-green-600" data-student-id="${student.id}">Assign Tutor</button>
+                                                        ${canEditStudents ? `<button class="edit-student-btn bg-blue-500 text-white px-3 py-1 rounded-full text-xs hover:bg-blue-600" data-student-id="${student.id}">Edit</button>` : ''}
+                                                        ${historyButton}
+                                                    </td>
+                                                </tr>
+                                            `;
+                                        }).join('')}
                                     </tbody>
                                 </table>
                             </div>
-                        ` : `
-                            <div class="p-6 text-center text-gray-500">
-                                No students assigned to this tutor${searchTerm ? ' matching your search' : ''}.
+                        </div>
+                    </details>
+                </div>
+            `;
+        }
+    }
+    
+    // Add tutors with students
+    if (filteredTutors.length > 0) {
+        directoryContent += filteredTutors.map(tutor => {
+            const tutorEmail = safeString(tutor.email).toLowerCase();
+            const assignedStudents = (studentsByTutor[tutorEmail] || [])
+                .filter(student => {
+                    if (!searchTerm) return true;
+                    
+                    const studentName = safeString(student.studentName).toLowerCase();
+                    const parentName = safeString(student.parentName).toLowerCase();
+                    const parentPhone = safeString(student.parentPhone).toLowerCase();
+                    const grade = safeString(student.grade).toLowerCase();
+                    const subjects = safeArray(student.subjects).map(s => s.toLowerCase()).join(' ');
+                    const tutorName = safeString(tutor.name).toLowerCase();
+                    
+                    return studentName.includes(lowerCaseSearchTerm) ||
+                           parentName.includes(lowerCaseSearchTerm) ||
+                           parentPhone.includes(lowerCaseSearchTerm) ||
+                           grade.includes(lowerCaseSearchTerm) ||
+                           subjects.includes(lowerCaseSearchTerm) ||
+                           tutorName.includes(lowerCaseSearchTerm);
+                });
+
+            const studentsTableRows = assignedStudents
+                .sort((a, b) => safeString(a.studentName).localeCompare(safeString(b.studentName)))
+                .map(student => {
+                    const subjects = safeArray(student.subjects).join(', ');
+                    const studentHistory = tutorAssignments[student.id];
+                    const historyButton = studentHistory ? 
+                        `<button class="view-history-btn bg-purple-500 text-white px-3 py-1 rounded-full text-xs ml-1 hover:bg-purple-600" data-student-id="${student.id}">History</button>` : '';
+                    
+                    const actionButtons = `
+                        ${canEditStudents ? `<button class="edit-student-btn bg-blue-500 text-white px-3 py-1 rounded-full text-xs hover:bg-blue-600" data-student-id="${student.id}">Edit</button>` : ''}
+                        ${canDeleteStudents ? `<button class="delete-student-btn bg-red-500 text-white px-3 py-1 rounded-full text-xs hover:bg-red-600" data-student-id="${student.id}">Delete</button>` : ''}
+                        ${historyButton}
+                    `;
+                    
+                    return `
+                        <tr class="hover:bg-gray-50">
+                            <td class="px-4 py-2 font-medium">${safeString(student.studentName)}</td>
+                            <td class="px-4 py-2">₦${safeNumber(student.studentFee).toFixed(2)}</td>
+                            <td class="px-4 py-2">${safeString(student.grade)}</td>
+                            <td class="px-4 py-2">${safeString(student.days)}</td>
+                            <td class="px-4 py-2">${subjects}</td>
+                            <td class="px-4 py-2">${safeString(student.parentName)}</td>
+                            <td class="px-4 py-2">${safeString(student.parentPhone)}</td>
+                            ${showActionsColumn || historyButton ? `<td class="px-4 py-2 space-x-1">${actionButtons}</td>` : ''}
+                        </tr>
+                    `;
+                }).join('');
+
+            return `
+                <div class="border rounded-lg shadow-sm hover:shadow-md transition-shadow">
+                    <details open>
+                        <summary class="p-4 cursor-pointer flex justify-between items-center font-semibold text-lg bg-gray-50 hover:bg-gray-100">
+                            <div>
+                                <span class="text-green-700">${safeString(tutor.name)}</span>
+                                <span class="ml-2 text-sm font-normal text-gray-500">${safeString(tutor.email)}</span>
                             </div>
-                        `}
-                    </div>
-                </details>
+                            <div class="flex items-center">
+                                <span class="ml-2 text-sm font-normal px-2 py-1 bg-green-100 text-green-800 rounded-full">
+                                    ${assignedStudents.length} student${assignedStudents.length !== 1 ? 's' : ''}
+                                </span>
+                                <svg class="w-5 h-5 ml-2 text-gray-500 transform transition-transform duration-200 group-open:rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                                </svg>
+                            </div>
+                        </summary>
+                        <div class="border-t">
+                            ${assignedStudents.length > 0 ? `
+                                <div class="overflow-x-auto">
+                                    <table class="min-w-full text-sm">
+                                        <thead class="bg-gray-50 text-left">
+                                            <tr>
+                                                <th class="px-4 py-2 font-medium">Student Name</th>
+                                                <th class="px-4 py-2 font-medium">Fee</th>
+                                                <th class="px-4 py-2 font-medium">Grade</th>
+                                                <th class="px-4 py-2 font-medium">Days/Week</th>
+                                                <th class="px-4 py-2 font-medium">Subject</th>
+                                                <th class="px-4 py-2 font-medium">Parent's Name</th>
+                                                <th class="px-4 py-2 font-medium">Parent's Phone</th>
+                                                ${showActionsColumn ? `<th class="px-4 py-2 font-medium">Actions</th>` : ''}
+                                            </tr>
+                                        </thead>
+                                        <tbody class="bg-white divide-y divide-gray-200">
+                                            ${studentsTableRows}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            ` : `
+                                <div class="p-6 text-center text-gray-500">
+                                    No students assigned to this tutor${searchTerm ? ' matching your search' : ''}.
+                                </div>
+                            `}
+                        </div>
+                    </details>
+                </div>
+            `;
+        }).join('');
+    }
+    
+    // Handle no results
+    if (!directoryContent && searchTerm) {
+        directoryContent = `
+            <div class="text-center py-10">
+                <p class="text-gray-500 mb-2">No results found for "${searchTerm}"</p>
+                <button onclick="document.getElementById('directory-search').value = ''; renderDirectoryFromCache();" 
+                        class="text-blue-500 hover:underline">
+                    Clear search
+                </button>
             </div>
         `;
-    }).join('');
+    } else if (!directoryContent) {
+        directoryContent = `
+            <div class="text-center py-10">
+                <p class="text-gray-500">No tutors or students found.</p>
+            </div>
+        `;
+    }
+    
+    directoryList.innerHTML = directoryContent;
 
     // Add event listeners for action buttons
     if (canEditStudents) {
@@ -1315,20 +1557,363 @@ function renderDirectoryFromCache(searchTerm = '') {
     document.querySelectorAll('.view-history-btn').forEach(button => {
         button.addEventListener('click', () => window.viewStudentTutorHistory(button.dataset.studentId));
     });
+    
+    document.querySelectorAll('.assign-tutor-btn').forEach(button => {
+        button.addEventListener('click', () => {
+            const studentId = button.dataset.studentId;
+            showReassignStudentModal(studentId);
+        });
+    });
 }
 
-// Helper function for safe data handling
-function safeString(value) {
-    if (value === null || value === undefined) return '';
-    return String(value);
+// ======================================================
+// FIXED: Reassign Student Modal with Safe Data Handling
+// ======================================================
+
+async function showReassignStudentModal(preSelectedStudentId = null) {
+    try {
+        // Ensure we have fresh data
+        if (!sessionCache.tutors || !sessionCache.students) {
+            await fetchAndRenderDirectory();
+        }
+        
+        const tutors = sessionCache.tutors || [];
+        const students = sessionCache.students || [];
+        
+        // Filter active students
+        const activeStudents = students.filter(student => {
+            const status = safeString(student.status);
+            return !status || status === 'active' || status === 'approved';
+        });
+        
+        if (activeStudents.length === 0) {
+            alert("No active students found to reassign.");
+            return;
+        }
+        
+        // Create student options
+        const studentOptions = activeStudents.map(student => {
+            const selected = preSelectedStudentId === student.id ? 'selected' : '';
+            const tutorEmail = safeString(student.tutorEmail);
+            const currentTutor = tutors.find(t => safeString(t.email).toLowerCase() === tutorEmail.toLowerCase());
+            const tutorInfo = currentTutor ? ` (Currently with: ${safeString(currentTutor.name)})` : ' (No current tutor)';
+            return `<option value="${student.id}" ${selected}>${safeString(student.studentName)}${tutorInfo}</option>`;
+        }).join('');
+        
+        // Create tutor options
+        const tutorOptions = tutors.map(tutor => 
+            `<option value="${safeString(tutor.email)}">${safeString(tutor.name)} (${safeString(tutor.email)})</option>`
+        ).join('');
+        
+        const modalHtml = `
+            <div id="reassign-student-modal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-center justify-center">
+                <div class="relative p-8 bg-white w-full max-w-lg rounded-lg shadow-xl">
+                    <button class="absolute top-2 right-2 text-gray-500 hover:text-gray-800 text-2xl font-bold" onclick="closeManagementModal('reassign-student-modal')">&times;</button>
+                    <h3 class="text-xl font-bold mb-4">Reassign Student to Different Tutor</h3>
+                    <form id="reassign-student-form">
+                        <div class="mb-4">
+                            <label class="block text-sm font-medium mb-2">Select Student</label>
+                            <select id="reassign-student-select" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2">
+                                <option value="" disabled ${!preSelectedStudentId ? 'selected' : ''}>Select a student...</option>
+                                ${studentOptions}
+                            </select>
+                        </div>
+                        <div class="mb-4">
+                            <label class="block text-sm font-medium mb-2">Select New Tutor</label>
+                            <select id="reassign-tutor-select" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2">
+                                <option value="" disabled selected>Select a tutor...</option>
+                                ${tutorOptions}
+                            </select>
+                        </div>
+                        <div class="mb-4">
+                            <label class="block text-sm font-medium mb-2">Reason for Reassignment</label>
+                            <textarea id="reassign-reason" rows="3" placeholder="Enter reason for reassignment..." class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2"></textarea>
+                        </div>
+                        <div class="flex justify-end mt-4">
+                            <button type="button" onclick="closeManagementModal('reassign-student-modal')" class="mr-2 px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300">Cancel</button>
+                            <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">Reassign Student</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        `;
+        
+        document.body.insertAdjacentHTML('beforeend', modalHtml);
+        
+        document.getElementById('reassign-student-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            await handleReassignStudent();
+        });
+        
+    } catch (error) {
+        console.error("Error showing reassign modal:", error);
+        alert(`Failed to load reassign form: ${error.message}`);
+    }
 }
 
-// Helper function for safe array handling
-function safeArray(value) {
-    if (!value) return [];
-    if (Array.isArray(value)) return value;
-    return [value];
+async function handleReassignStudent() {
+    try {
+        const studentSelect = document.getElementById('reassign-student-select');
+        const tutorSelect = document.getElementById('reassign-tutor-select');
+        const reasonInput = document.getElementById('reassign-reason');
+        
+        if (!studentSelect || !tutorSelect) {
+            throw new Error("Form elements not found");
+        }
+        
+        const studentId = safeString(studentSelect.value);
+        const newTutorEmail = safeString(tutorSelect.value);
+        const reason = safeString(reasonInput.value);
+        
+        if (!studentId || !newTutorEmail) {
+            alert("Please select both a student and a tutor.");
+            return;
+        }
+        
+        // Find the student
+        const students = sessionCache.students || [];
+        const student = students.find(s => s.id === studentId);
+        
+        if (!student) {
+            alert("Student not found. Please refresh and try again.");
+            return;
+        }
+        
+        // Find the new tutor
+        const tutors = sessionCache.tutors || [];
+        const newTutor = tutors.find(t => 
+            safeString(t.email).toLowerCase() === newTutorEmail.toLowerCase()
+        );
+        
+        if (!newTutor) {
+            alert("Selected tutor not found. Please refresh and try again.");
+            return;
+        }
+        
+        // Find the current tutor
+        const currentTutorEmail = safeString(student.tutorEmail);
+        const currentTutor = tutors.find(t => 
+            safeString(t.email).toLowerCase() === currentTutorEmail.toLowerCase()
+        );
+        
+        // Ask for confirmation
+        const confirmMessage = `Are you sure you want to reassign ${safeString(student.studentName)} 
+from ${currentTutor ? safeString(currentTutor.name) : 'No tutor'} 
+to ${safeString(newTutor.name)}?`;
+        
+        if (!confirm(confirmMessage)) {
+            return;
+        }
+        
+        // Update student document
+        const studentRef = doc(db, "students", studentId);
+        await updateDoc(studentRef, {
+            tutorEmail: newTutorEmail,
+            updatedAt: new Date().toISOString()
+        });
+        
+        // Create tutor assignment history record
+        const assignmentData = {
+            studentId: studentId,
+            studentName: safeString(student.studentName),
+            previousTutorEmail: currentTutorEmail,
+            previousTutorName: currentTutor ? safeString(currentTutor.name) : '',
+            newTutorEmail: newTutorEmail,
+            newTutorName: safeString(newTutor.name),
+            newTutorId: newTutor.id,
+            reason: reason,
+            assignedBy: window.userData?.email || 'Unknown',
+            assignedAt: new Date().toISOString(),
+            type: 'reassignment'
+        };
+        
+        await addDoc(collection(db, "tutorAssignments"), assignmentData);
+        
+        // Update cache
+        student.tutorEmail = newTutorEmail;
+        saveToLocalStorage('students', students);
+        
+        // Refresh tutor assignments cache
+        await fetchTutorAssignmentHistory();
+        
+        // Show success message
+        alert(`Successfully reassigned ${safeString(student.studentName)} to ${safeString(newTutor.name)}!`);
+        
+        // Close modal and refresh view
+        closeManagementModal('reassign-student-modal');
+        fetchAndRenderDirectory(true);
+        
+    } catch (error) {
+        console.error("Error reassigning student:", error);
+        alert(`Failed to reassign student: ${error.message}`);
+    }
 }
+
+// ======================================================
+// FIXED: Search Functionality with Safe Data Handling
+// ======================================================
+
+function searchStudents(query) {
+    try {
+        const students = sessionCache.students || [];
+        const lowerCaseQuery = safeString(query).toLowerCase().trim();
+        
+        if (!lowerCaseQuery) {
+            return students; // Return all students if no query
+        }
+        
+        return students.filter(student => {
+            // Safely get all searchable fields
+            const searchFields = [
+                safeString(student.studentName).toLowerCase(),
+                safeString(student.parentName).toLowerCase(),
+                safeString(student.parentPhone).toLowerCase(),
+                safeString(student.parentEmail).toLowerCase(),
+                safeString(student.grade).toLowerCase(),
+                safeString(student.address).toLowerCase(),
+                safeString(student.notes).toLowerCase(),
+                safeArray(student.subjects).map(s => s.toLowerCase()).join(' '),
+                safeString(student.tutorEmail).toLowerCase()
+            ];
+            
+            // Check if query exists in any search field
+            return searchFields.some(field => field.includes(lowerCaseQuery));
+        });
+        
+    } catch (error) {
+        console.error("Error searching students:", error);
+        return []; // Return empty array on error
+    }
+}
+
+// ======================================================
+// DATA BACKUP SOLUTION
+// ======================================================
+
+async function backupFirebaseData() {
+    try {
+        console.log("Starting Firebase data backup...");
+        
+        // Get all collections
+        const collections = ['tutors', 'students', 'tutorAssignments', 'users', 'payments'];
+        const backupData = {
+            timestamp: new Date().toISOString(),
+            collections: {}
+        };
+        
+        for (const collectionName of collections) {
+            try {
+                const snapshot = await getDocs(collection(db, collectionName));
+                backupData.collections[collectionName] = snapshot.docs.map(doc => ({
+                    id: doc.id,
+                    ...doc.data()
+                }));
+                console.log(`Backed up ${snapshot.size} documents from ${collectionName}`);
+            } catch (error) {
+                console.warn(`Could not backup ${collectionName}:`, error.message);
+                backupData.collections[collectionName] = [];
+            }
+        }
+        
+        // Convert to JSON
+        const jsonData = JSON.stringify(backupData, null, 2);
+        
+        // Create download link
+        const blob = new Blob([jsonData], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `firebase-backup-${new Date().toISOString().split('T')[0]}.json`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        
+        console.log("Backup completed successfully!");
+        return true;
+        
+    } catch (error) {
+        console.error("Backup failed:", error);
+        return false;
+    }
+}
+
+// Add backup button to your UI
+function addBackupButton() {
+    const backupBtn = document.createElement('button');
+    backupBtn.id = 'backup-data-btn';
+    backupBtn.className = 'bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700';
+    backupBtn.textContent = 'Backup All Data';
+    backupBtn.onclick = backupFirebaseData;
+    
+    // Add to your toolbar
+    const toolbar = document.querySelector('.flex.items-center.gap-4.flex-wrap');
+    if (toolbar) {
+        toolbar.appendChild(backupBtn);
+    }
+}
+
+// ======================================================
+// RESTORE DATA FUNCTION
+// ======================================================
+
+async function restoreFirebaseData(file) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = async (e) => {
+            try {
+                const backupData = JSON.parse(e.target.result);
+                console.log("Restoring backup data...", backupData);
+                
+                // Verify backup structure
+                if (!backupData.timestamp || !backupData.collections) {
+                    throw new Error("Invalid backup file format");
+                }
+                
+                // Ask for confirmation
+                const collectionCounts = Object.entries(backupData.collections)
+                    .map(([name, data]) => `${name}: ${data.length}`)
+                    .join(', ');
+                
+                if (!confirm(`Restore backup from ${backupData.timestamp}?\nCollections: ${collectionCounts}\n\nWARNING: This may overwrite existing data!`)) {
+                    resolve(false);
+                    return;
+                }
+                
+                // Restore each collection
+                for (const [collectionName, documents] of Object.entries(backupData.collections)) {
+                    console.log(`Restoring ${documents.length} documents to ${collectionName}...`);
+                    
+                    for (const docData of documents) {
+                        try {
+                            const docRef = doc(db, collectionName, docData.id);
+                            await setDoc(docRef, docData);
+                        } catch (error) {
+                            console.warn(`Could not restore document ${docData.id} in ${collectionName}:`, error.message);
+                        }
+                    }
+                }
+                
+                console.log("Restore completed!");
+                alert("Data restore completed successfully!");
+                resolve(true);
+                
+            } catch (error) {
+                console.error("Restore failed:", error);
+                alert(`Restore failed: ${error.message}`);
+                reject(error);
+            }
+        };
+        reader.onerror = () => reject(new Error("Failed to read file"));
+        reader.readAsText(file);
+    });
+}
+
+// Call this when your management view loads
+document.addEventListener('DOMContentLoaded', function() {
+    // Add backup button after a delay to ensure UI is loaded
+    setTimeout(addBackupButton, 1000);
+});
 
 // ======================================================
 // SUBSECTION 3.2: Inactive Tutors Panel
@@ -7359,9 +7944,6 @@ onAuthStateChanged(auth, async (user) => {
         window.location.href = "management-auth.html";
     }
 });
-
-
-
 
 
 
