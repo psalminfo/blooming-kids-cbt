@@ -6,6 +6,7 @@
     <title>Parent Portal - Blooming Kids House</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" />
     <link rel="icon" href="favicon.ico" />
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
 
     <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-firestore-compat.js"></script>
@@ -14,7 +15,6 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.9.2/html2pdf.bundle.min.js"></script>
     
-    <!-- Global Phone Number Support -->
     <script src="https://cdn.jsdelivr.net/npm/libphonenumber-js@1.9.6/bundle/libphonenumber-js.min.js"></script>
 
     <style>
@@ -64,6 +64,7 @@
         .tab-active-main {
             background-color: #10b981;
             color: white;
+            border-bottom: 2px solid #064e3b;
         }
         .tab-inactive-main {
             background-color: #ecfdf5;
@@ -86,6 +87,14 @@
             display: inline-block;
             margin-right: 8px;
             vertical-align: middle;
+        }
+        .loading-spinner-small {
+            border: 2px solid #f3f3f3;
+            border-top: 2px solid #16a34a;
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            animation: spin 1s linear infinite;
         }
         @keyframes spin {
             0% { transform: rotate(0deg); }
@@ -113,9 +122,6 @@
         .toast.error {
             background-color: #ef4444;
         }
-        .toast.warning {
-            background-color: #f59e0b;
-        }
         .response-bubble {
             background-color: #f0fdf4;
             border: 1px solid #bbf7d0;
@@ -139,7 +145,7 @@
                  alt="Blooming Kids House Logo" 
                  class="h-20 w-auto mx-auto logo-glow mb-4">
             <h1 class="text-4xl font-bold text-green-800 mb-2">Parent Portal</h1>
-            <p class="text-green-600 text-lg">Secure Access to Your Children's Progress Reports</p>
+            <p class="text-green-600 text-lg">Secure Access to Your Children's Progress & Schedules</p>
         </div>
 
         <div id="authArea" class="bg-white rounded-2xl card-glow p-8 mb-8 fade-in">
@@ -207,11 +213,13 @@
                         <label for="signupPhone" class="block text-sm font-medium text-gray-700 mb-2">
                             Phone Number
                         </label>
-                        <input id="signupPhone" 
-                               type="tel" 
-                               placeholder="Enter your phone number (any format)"
-                               class="w-full px-4 py-3 border border-gray-300 rounded-xl input-focus focus:outline-none transition-all duration-200"
-                               required>
+                        <div class="flex gap-2">
+                             <input id="signupPhone" 
+                                type="tel" 
+                                placeholder="Enter your phone number"
+                                class="w-full px-4 py-3 border border-gray-300 rounded-xl input-focus focus:outline-none transition-all duration-200"
+                                required>
+                        </div>
                     </div>
                     
                     <div>
@@ -262,16 +270,16 @@
         </div>
 
         <div id="reportArea" class="hidden fade-in">
-            <div class="bg-green-50 border-l-4 border-green-600 p-6 rounded-lg mb-6">
+            <div class="bg-green-50 border-l-4 border-green-600 p-6 rounded-lg mb-6 shadow-sm">
                 <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                     <div>
                         <h2 id="welcomeMessage" class="text-2xl font-bold text-green-800">Welcome!</h2>
-                        <p class="text-green-600">Thank you for being part of Blooming Kids House family</p>
+                        <p class="text-green-600">Track your child's schedule, homework, and progress.</p>
                     </div>
                     <div class="flex flex-col sm:flex-row gap-2 w-full md:w-auto">
                         <button onclick="showFeedbackModal()" 
                                 class="bg-green-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-green-700 transition-all duration-200 btn-glow flex items-center justify-center">
-                            <span class="mr-2">📝</span> Feedback & Requests
+                            <span class="mr-2">📝</span> Feedback
                         </button>
                         <button onclick="logout()" 
                                 class="bg-red-500 text-white px-6 py-3 rounded-lg font-semibold hover:bg-red-600 transition-all duration-200 flex items-center justify-center">
@@ -281,17 +289,34 @@
                 </div>
             </div>
 
-            <div class="flex mb-6 rounded-xl overflow-hidden shadow-lg border border-green-200">
-                <button id="reportTab" class="flex-1 py-3 font-semibold tab-active-main hover:bg-green-500 transition-all duration-200">
-                    <span class="mr-2">📄</span> Progress Reports
+            <div class="flex mb-6 rounded-xl overflow-hidden shadow-lg border border-green-200 bg-white">
+                <button id="dashboardTab" class="flex-1 py-4 font-semibold tab-active-main transition-all duration-200 border-r border-green-100">
+                    <span class="mr-2">🏠</span> Dashboard
                 </button>
-                <button id="rewardsTab" class="flex-1 py-3 font-semibold tab-inactive-main hover:bg-green-100 transition-all duration-200">
-                    <span class="mr-2">🎁</span> Rewards Dashboard
+                <button id="reportTab" class="flex-1 py-4 font-semibold tab-inactive-main transition-all duration-200 border-r border-green-100">
+                    <span class="mr-2">📄</span> Reports
+                </button>
+                <button id="rewardsTab" class="flex-1 py-4 font-semibold tab-inactive-main transition-all duration-200">
+                    <span class="mr-2">🎁</span> Rewards
                 </button>
             </div>
 
-            <div id="reportContentArea">
-                <h2 class="text-2xl font-bold text-green-800 mb-6">Your Children's Reports</h2>
+            <div id="dashboardContentArea" class="space-y-6">
+                <div id="dashboardContent">
+                    <div class="text-center py-12">
+                        <div class="loading-spinner" style="width: 40px; height: 40px;"></div>
+                        <p class="mt-4 text-green-600">Loading Dashboard...</p>
+                    </div>
+                </div>
+            </div>
+
+            <div id="reportContentArea" class="hidden">
+                <div class="flex justify-between items-center mb-6">
+                    <h2 class="text-2xl font-bold text-green-800">Academic Reports</h2>
+                    <button id="manualRefreshBtn" class="bg-green-100 text-green-700 px-4 py-2 rounded-lg text-sm hover:bg-green-200 font-semibold">
+                        <i class="fas fa-sync-alt mr-1"></i> Refresh
+                    </button>
+                </div>
                 
                 <div id="reportsLoading" class="hidden text-center py-8">
                     <div class="loading-spinner mx-auto" style="width: 40px; height: 40px;"></div>
@@ -301,7 +326,7 @@
                 <div id="reportsEmpty" class="hidden text-center py-12 bg-white rounded-xl card-glow">
                     <div class="text-6xl mb-4">📬</div>
                     <h3 class="text-xl font-bold text-gray-700 mb-2">No Reports Available</h3>
-                    <p class="text-gray-500 max-w-md mx-auto">No progress reports are available for your children at this time. Please check back later.</p>
+                    <p class="text-gray-500 max-w-md mx-auto">No progress reports are available for your children at this time.</p>
                 </div>
                 
                 <div id="reportContent" class="space-y-6">
@@ -311,7 +336,7 @@
             <div id="rewardsContentArea" class="hidden">
                 <h2 class="text-2xl font-bold text-green-800 mb-6">Parent Referral Rewards</h2>
                 <div id="rewardsContent" class="bg-white rounded-xl card-glow p-6 min-h-[400px]">
-                    </div>
+                     </div>
             </div>
         </div>
 
@@ -319,21 +344,15 @@
             <div class="bg-white rounded-2xl p-6 md:p-8 max-w-2xl w-full mx-auto card-glow max-h-[90vh] overflow-y-auto">
                 <div class="flex justify-between items-center mb-6">
                     <h3 class="text-2xl font-bold text-gray-800">Feedback & Requests</h3>
-                    <button onclick="hideFeedbackModal()" class="text-gray-500 hover:text-gray-700 text-2xl">
-                        &times;
-                    </button>
+                    <button onclick="hideFeedbackModal()" class="text-gray-500 hover:text-gray-700 text-2xl">&times;</button>
                 </div>
                 
                 <p class="text-gray-600 mb-6">We value your feedback. Please share your thoughts, requests, or concerns with us.</p>
                 
                 <div class="space-y-4">
                     <div>
-                        <label for="feedbackCategory" class="block text-sm font-medium text-gray-700 mb-2">
-                            Category *
-                        </label>
-                        <select id="feedbackCategory" 
-                                class="w-full px-4 py-3 border border-gray-300 rounded-xl input-focus focus:outline-none transition-all duration-200"
-                                required>
+                        <label for="feedbackCategory" class="block text-sm font-medium text-gray-700 mb-2">Category *</label>
+                        <select id="feedbackCategory" class="w-full px-4 py-3 border border-gray-300 rounded-xl input-focus focus:outline-none transition-all duration-200" required>
                             <option value="">Select a category</option>
                             <option value="Feedback">Feedback</option>
                             <option value="Request">Request</option>
@@ -343,12 +362,8 @@
                     </div>
 
                     <div>
-                        <label for="feedbackPriority" class="block text-sm font-medium text-gray-700 mb-2">
-                            Priority *
-                        </label>
-                        <select id="feedbackPriority" 
-                                class="w-full px-4 py-3 border border-gray-300 rounded-xl input-focus focus:outline-none transition-all duration-200"
-                                required>
+                        <label for="feedbackPriority" class="block text-sm font-medium text-gray-700 mb-2">Priority *</label>
+                        <select id="feedbackPriority" class="w-full px-4 py-3 border border-gray-300 rounded-xl input-focus focus:outline-none transition-all duration-200" required>
                             <option value="">Select priority level</option>
                             <option value="Low">Low</option>
                             <option value="Medium">Medium</option>
@@ -358,44 +373,24 @@
                     </div>
 
                     <div>
-                        <label for="feedbackStudent" class="block text-sm font-medium text-gray-700 mb-2">
-                            Regarding Student *
-                        </label>
-                        <select id="feedbackStudent" 
-                                class="w-full px-4 py-3 border border-gray-300 rounded-xl input-focus focus:outline-none transition-all duration-200"
-                                required>
+                        <label for="feedbackStudent" class="block text-sm font-medium text-gray-700 mb-2">Regarding Student *</label>
+                        <select id="feedbackStudent" class="w-full px-4 py-3 border border-gray-300 rounded-xl input-focus focus:outline-none transition-all duration-200" required>
                             <option value="">Select student</option>
                         </select>
                     </div>
 
                     <div>
-                        <label for="feedbackMessage" class="block text-sm font-medium text-gray-700 mb-2">
-                            Message *
-                        </label>
-                        <textarea id="feedbackMessage" 
-                                  rows="6"
-                                  placeholder="Please provide detailed feedback, request, or concern..."
-                                  class="w-full px-4 py-3 border border-gray-300 rounded-xl input-focus focus:outline-none transition-all duration-200"
-                                  required></textarea>
+                        <label for="feedbackMessage" class="block text-sm font-medium text-gray-700 mb-2">Message *</label>
+                        <textarea id="feedbackMessage" rows="6" placeholder="Please provide detailed feedback..." class="w-full px-4 py-3 border border-gray-300 rounded-xl input-focus focus:outline-none transition-all duration-200" required></textarea>
                     </div>
                     
                     <div class="flex flex-col sm:flex-row gap-2 pt-4">
-                        <button id="submitFeedbackBtn" 
-                                class="flex-1 bg-green-600 text-white py-3 rounded-xl font-semibold btn-glow hover:bg-green-700 transition-all duration-200 flex justify-center items-center">
+                        <button id="submitFeedbackBtn" class="flex-1 bg-green-600 text-white py-3 rounded-xl font-semibold btn-glow hover:bg-green-700 transition-all duration-200 flex justify-center items-center">
                             <span id="submitFeedbackText">Submit Feedback</span>
                             <div id="submitFeedbackSpinner" class="loading-spinner hidden"></div>
                         </button>
-                        <button onclick="hideFeedbackModal()" 
-                                class="flex-1 bg-gray-500 text-white py-3 rounded-xl font-semibold hover:bg-gray-600 transition-all duration-200">
-                            Cancel
-                        </button>
+                        <button onclick="hideFeedbackModal()" class="flex-1 bg-gray-500 text-white py-3 rounded-xl font-semibold hover:bg-gray-600 transition-all duration-200">Cancel</button>
                     </div>
-                </div>
-
-                <div class="mt-6 text-center">
-                    <p class="text-sm text-gray-500">
-                        Your feedback will be sent to our management team and you'll receive a response within 24-48 hours.
-                    </p>
                 </div>
             </div>
         </div>
@@ -403,20 +398,12 @@
         <div id="responsesModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden z-50 p-4">
             <div class="bg-white rounded-2xl p-6 md:p-8 max-w-4xl w-full mx-auto card-glow max-h-[90vh] overflow-y-auto">
                 <div class="flex justify-between items-center mb-6">
-                    <h3 class="text-2xl font-bold text-gray-800">Admin Responses to Your Feedback</h3>
-                    <button onclick="hideResponsesModal()" class="text-gray-500 hover:text-gray-700 text-2xl">
-                        &times;
-                    </button>
+                    <h3 class="text-2xl font-bold text-gray-800">Admin Responses</h3>
+                    <button onclick="hideResponsesModal()" class="text-gray-500 hover:text-gray-700 text-2xl">&times;</button>
                 </div>
-                
-                <div id="responsesContent" class="space-y-4">
-                    </div>
-
+                <div id="responsesContent" class="space-y-4"></div>
                 <div class="mt-6 text-center">
-                    <button onclick="hideResponsesModal()" 
-                            class="bg-gray-500 text-white px-6 py-3 rounded-lg font-semibold hover:bg-gray-600 transition-all duration-200">
-                        Close
-                    </button>
+                    <button onclick="hideResponsesModal()" class="bg-gray-500 text-white px-6 py-3 rounded-lg font-semibold hover:bg-gray-600 transition-all duration-200">Close</button>
                 </div>
             </div>
         </div>
@@ -425,35 +412,18 @@
             <div class="bg-white rounded-2xl p-6 md:p-8 max-w-md w-full mx-auto card-glow">
                 <h3 class="text-2xl font-bold text-gray-800 mb-4 text-center">Reset Password</h3>
                 <p class="text-gray-600 mb-4 text-center">Enter your email address to receive a password reset link.</p>
-                
                 <div class="space-y-4">
                     <div>
-                        <label for="resetEmail" class="block text-sm font-medium text-gray-700 mb-2">
-                            Email Address
-                        </label>
-                        <input id="resetEmail" 
-                               type="email" 
-                               placeholder="Enter your registered email"
-                               class="w-full px-4 py-3 border border-gray-300 rounded-xl input-focus focus:outline-none transition-all duration-200"
-                               required>
+                        <label for="resetEmail" class="block text-sm font-medium text-gray-700 mb-2">Email Address</label>
+                        <input id="resetEmail" type="email" placeholder="Enter your registered email" class="w-full px-4 py-3 border border-gray-300 rounded-xl input-focus focus:outline-none transition-all duration-200" required>
                     </div>
-                    
                     <div class="flex flex-col sm:flex-row gap-2">
-                        <button id="sendResetBtn" 
-                                class="flex-1 bg-green-600 text-white py-3 rounded-xl font-semibold btn-glow hover:bg-green-700 transition-all duration-200 flex justify-center items-center">
+                        <button id="sendResetBtn" class="flex-1 bg-green-600 text-white py-3 rounded-xl font-semibold btn-glow hover:bg-green-700 transition-all duration-200 flex justify-center items-center">
                             <span id="sendResetText">Send Reset Link</span>
                             <div id="sendResetSpinner" class="loading-spinner hidden"></div>
                         </button>
-                        <button id="cancelResetBtn" 
-                                class="flex-1 bg-gray-500 text-white py-3 rounded-xl font-semibold hover:bg-gray-600 transition-all duration-200">
-                            Cancel
-                        </button>
+                        <button id="cancelResetBtn" class="flex-1 bg-gray-500 text-white py-3 rounded-xl font-semibold hover:bg-gray-600 transition-all duration-200">Cancel</button>
                     </div>
-                </div>
-                
-                <div id="resetLoader" class="hidden text-center mt-4">
-                    <div class="loading-spinner mx-auto"></div>
-                    <p class="text-green-600 font-semibold mt-2">Sending reset link...</p>
                 </div>
             </div>
         </div>
@@ -464,6 +434,7 @@
         </div>
     </div>
 
+    <script src="firebaseParentConfig.js"></script>
     <script src="parent.js"></script>
 </body>
 </html>
