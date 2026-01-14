@@ -3275,6 +3275,51 @@
             }
 
             // ==============================================
+            // GOOGLE APPS SCRIPT EMAIL INTEGRATION
+            // ==============================================
+            
+            async sendEmailNotifications(enrollmentData, invoiceHtml = null) {
+                try {
+                    const scriptUrl = "https://script.google.com/macros/s/AKfycbxKPivWuCyEywMCxgleEoP7MBNxT6ZEvd5WWomDNGYADZmDcBcsO4Eif-JyHSJ5mpXBaw/exec";
+                    
+                    // Prepare the data to send
+                    const emailData = {
+                        action: "send_enrollment_notification",
+                        timestamp: new Date().toISOString(),
+                        applicationId: enrollmentData.id || this.currentApplicationId,
+                        parent: {
+                            name: enrollmentData.parent?.name || document.getElementById('parentName')?.value || "",
+                            email: enrollmentData.parent?.email || document.getElementById('parentEmail')?.value || "",
+                            phone: enrollmentData.parent?.phone || `${document.getElementById('countryCode')?.value || "+234"}-${document.getElementById('parentPhone')?.value || ""}`
+                        },
+                        managementEmail: "psalm4all@gmail.com",
+                        students: enrollmentData.students?.length || document.querySelectorAll('.student-entry').length,
+                        totalFee: enrollmentData.summary?.totalFee || parseInt(document.getElementById('total-fee')?.textContent.replace(/[^0-9]/g, '') || "0"),
+                        status: enrollmentData.status || 'submitted',
+                        invoiceGenerated: invoiceHtml ? true : false
+                    };
+                    
+                    // Send to Google Apps Script
+                    const response = await fetch(scriptUrl, {
+                        method: "POST",
+                        mode: "no-cors", // Important for Google Apps Script
+                        headers: {
+                            "Content-Type": "application/json",
+                        },
+                        body: JSON.stringify(emailData)
+                    });
+                    
+                    console.log("Email notifications sent via Google Apps Script");
+                    return true;
+                    
+                } catch (error) {
+                    console.warn("Failed to send email notifications:", error);
+                    // Don't show error to user - emails are secondary
+                    return false;
+                }
+            }
+
+            // ==============================================
             // SAVE/RESUME FUNCTIONALITY WITH EMAIL INTEGRATION
             // ==============================================
             
