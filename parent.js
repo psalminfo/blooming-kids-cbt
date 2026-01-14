@@ -1,22 +1,25 @@
 // -------------------------------------------------------------------
-// FIREBASE CONFIGURATION
-// -------------------------------------------------------------------
-// NOTE: Firebase configuration is now loaded from firebaseParentConfig.js
-// Please ensure that file is included in your HTML before this script.
-// <script src="firebaseParentConfig.js"></script>
+// FIREBASE CONFIGURATION & INITIALIZATION
 // -------------------------------------------------------------------
 
+// 1. Define your config (I restored your keys from the file you uploaded)
+const firebaseConfig = {
+    apiKey: "AIzaSyD1lJhsWMMs_qerLBSzk7wKhjLyI_11RJg",
+    authDomain: "bloomingkidsassessment.firebaseapp.com",
+    projectId: "bloomingkidsassessment",
+    storageBucket: "bloomingkidsassessment.appspot.com",
+    messagingSenderId: "238975054977",
+    appId: "1:238975054977:web:87c70b4db044998a204980"
+};
+
+// 2. Initialize Firebase (Checks if it's already running to prevent errors)
+if (!firebase.apps.length) {
+    firebase.initializeApp(firebaseConfig);
+}
+
+// 3. Define services
 const db = firebase.firestore();
 const auth = firebase.auth();
-
-// Global variables for user data and listeners
-let currentUserData = null;
-let userChildren = [];
-let myStudents = []; // Stores full student objects found in DB
-let currentStudentId = null; // Currently selected student for Dashboard
-let unreadResponsesCount = 0;
-let realTimeListeners = []; 
-let dashboardListeners = []; // Specific listeners for dashboard data
 
 // Load libphonenumber-js
 const libphonenumberScript = document.createElement('script');
@@ -754,3 +757,4 @@ document.addEventListener('DOMContentLoaded', function() {
     document.getElementById("signInBtn")?.addEventListener("click", handleSignIn);
     document.getElementById("manualRefreshBtn")?.addEventListener("click", () => window.location.reload());
 });
+
