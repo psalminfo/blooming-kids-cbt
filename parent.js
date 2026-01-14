@@ -1,5 +1,5 @@
-// firebaseParentConfig.js - Use CommonJS format
-var firebaseParentConfig = {
+// Direct Firebase config in parent.js (most reliable)
+const firebaseConfig = {
     apiKey: "AIzaSyD1lJhsWMMs_qerLBSzk7wKhjLyI_11RJg",
     authDomain: "bloomingkidsassessment.firebaseapp.com",
     projectId: "bloomingkidsassessment",
@@ -7,8 +7,9 @@ var firebaseParentConfig = {
     messagingSenderId: "238975054977",
     appId: "1:238975054977:web:87c70b4db044998a204980"
 };
-};
-document.head.appendChild(firebaseConfigScript);
+
+// Initialize Firebase
+firebase.initializeApp(firebaseConfig);
 
 const db = firebase.firestore();
 const auth = firebase.auth();
@@ -3099,4 +3100,5 @@ document.addEventListener('DOMContentLoaded', function() {
     document.getElementById("rewardsTab")?.addEventListener("click", () => switchMainTab('rewards'));
     // --- END: NEW MAIN TAB SWITCHING LISTENERS (PHASE 3) ---
 });
+
 
