@@ -1531,23 +1531,44 @@ function createReassignModalHtml(students, tutors) {
                 `Current: ${currentTutorName}`
             ].filter(part => part && part.trim() !== '');
             
+            // Create comprehensive search text that includes all searchable fields
+            const searchText = [
+                student.studentName || '',
+                student.grade || '',
+                student.parentName || '',
+                student.parentPhone || '',
+                student.parentEmail || '',
+                Array.isArray(student.subjects) ? student.subjects.join(' ') : (student.subjects || ''),
+                currentTutorName
+            ].join(' ').toLowerCase();
+            
             return `
                 <option value="${student.id}" 
                         data-tutor-email="${student.tutorEmail || ''}"
                         data-student-name="${student.studentName || ''}"
-                        data-search-text="${displayParts.join(' ').toLowerCase()}">
+                        data-search-text="${searchText}">
                     ${displayParts.join(' | ')}
                 </option>
             `;
         }).join('');
     
-    const tutorOptions = tutors.map(tutor => `
-        <option value="${tutor.email}" 
-                data-tutor-name="${tutor.name || ''}"
-                data-search-text="${(tutor.name + ' ' + tutor.email).toLowerCase()}">
-            ${tutor.name} (${tutor.email})
-        </option>
-    `).join('');
+    const tutorOptions = tutors.map(tutor => {
+        // Create comprehensive search text for tutors
+        const searchText = [
+            tutor.name || '',
+            tutor.email || '',
+            tutor.phone || '',
+            Array.isArray(tutor.subjects) ? tutor.subjects.join(' ') : (tutor.subjects || '')
+        ].join(' ').toLowerCase();
+        
+        return `
+            <option value="${tutor.email}" 
+                    data-tutor-name="${tutor.name || ''}"
+                    data-search-text="${searchText}">
+                ${tutor.name} (${tutor.email})
+            </option>
+        `;
+    }).join('');
     
     return `
         <div id="reassign-student-modal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-center justify-center p-4">
@@ -1568,19 +1589,42 @@ function createReassignModalHtml(students, tutors) {
                 <div class="p-6">
                     <form id="reassign-student-form">
                         <!-- Search Section -->
-                        <div class="mb-6">
-                            <div class="relative">
-                                <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                    <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
-                                    </svg>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">
+                                    Search Students
+                                </label>
+                                <div class="relative">
+                                    <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                        <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                                        </svg>
+                                    </div>
+                                    <input type="search" 
+                                           id="reassign-search-students" 
+                                           placeholder="Search by name, grade, parent, subject..." 
+                                           class="pl-10 w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all">
                                 </div>
-                                <input type="search" 
-                                       id="reassign-search" 
-                                       placeholder="Search students by name, grade, parent, subject..." 
-                                       class="pl-10 w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all">
+                                <p class="text-xs text-gray-500 mt-2">Search anywhere in student details</p>
                             </div>
-                            <p class="text-xs text-gray-500 mt-2">Search will filter the student list below</p>
+                            
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">
+                                    Search Tutors
+                                </label>
+                                <div class="relative">
+                                    <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                        <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                                        </svg>
+                                    </div>
+                                    <input type="search" 
+                                           id="reassign-search-tutors" 
+                                           placeholder="Search by name, email, phone, subject..." 
+                                           class="pl-10 w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all">
+                                </div>
+                                <p class="text-xs text-gray-500 mt-2">Search anywhere in tutor details</p>
+                            </div>
                         </div>
                         
                         <!-- Selection Grid -->
@@ -1600,7 +1644,7 @@ function createReassignModalHtml(students, tutors) {
                                         ${studentOptions}
                                     </select>
                                     <div id="student-count" class="absolute bottom-2 right-2 text-xs text-gray-500 bg-white px-2 py-1 rounded">
-                                        ${students.length} students
+                                        ${students.filter(s => s.tutorEmail && s.tutorEmail.trim() !== '').length} assigned students
                                     </div>
                                 </div>
                                 <div id="selected-student-info" class="mt-3 p-3 bg-blue-50 rounded-md hidden">
@@ -1673,11 +1717,46 @@ function createReassignModalHtml(students, tutors) {
 }
 
 /**
+ * Enhanced search function that searches anywhere in text
+ */
+function enhancedSearchFilter(options, searchTerm, searchAttribute = 'data-search-text') {
+    if (!searchTerm.trim()) {
+        // Show all options when search is empty
+        options.forEach(option => {
+            if (option.value !== "") {
+                option.style.display = 'block';
+            }
+        });
+        return options.filter(opt => opt.value !== "" && opt.style.display !== 'none');
+    }
+    
+    const searchLower = searchTerm.toLowerCase();
+    
+    options.forEach(option => {
+        if (option.value === "") {
+            // Keep placeholder visible
+            option.style.display = 'block';
+        } else {
+            // Get search text from data attribute or option text
+            const searchText = option.getAttribute(searchAttribute) || 
+                             option.textContent.toLowerCase();
+            
+            // Check if search term appears anywhere in the search text
+            const isMatch = searchText.includes(searchLower);
+            option.style.display = isMatch ? 'block' : 'none';
+        }
+    });
+    
+    return options.filter(opt => opt.value !== "" && opt.style.display !== 'none');
+}
+
+/**
  * Initialize modal functionality
  */
 function initializeReassignModal(students, tutors) {
     // Get DOM elements
-    const searchInput = document.getElementById('reassign-search');
+    const studentSearchInput = document.getElementById('reassign-search-students');
+    const tutorSearchInput = document.getElementById('reassign-search-tutors');
     const studentSelect = document.getElementById('reassign-student-id');
     const tutorSelect = document.getElementById('reassign-tutor-email');
     const reasonTextarea = document.getElementById('reassign-reason');
@@ -1687,6 +1766,7 @@ function initializeReassignModal(students, tutors) {
     
     // Store original options for filtering
     const originalStudentOptions = Array.from(studentSelect.options);
+    const originalTutorOptions = Array.from(tutorSelect.options);
     
     // Initialize character counter
     if (reasonTextarea) {
@@ -1698,27 +1778,52 @@ function initializeReassignModal(students, tutors) {
         });
     }
     
-    // Initialize search functionality
-    if (searchInput && studentSelect) {
-        searchInput.addEventListener('input', function() {
-            const searchTerm = safeToString(this.value).toLowerCase().trim();
-            
-            originalStudentOptions.forEach(option => {
-                if (option.value === "") {
-                    option.style.display = 'block';
-                    return;
-                }
-                
-                const searchText = option.getAttribute('data-search-text') || '';
-                option.style.display = searchText.includes(searchTerm) ? 'block' : 'none';
-            });
+    // Initialize student search functionality
+    if (studentSearchInput && studentSelect) {
+        studentSearchInput.addEventListener('input', function() {
+            const searchTerm = this.value.trim();
+            const visibleOptions = enhancedSearchFilter(originalStudentOptions, searchTerm, 'data-search-text');
             
             // Update student count
-            const visibleOptions = Array.from(studentSelect.options)
-                .filter(opt => opt.style.display !== 'none' && opt.value !== "");
             const countElement = document.getElementById('student-count');
             if (countElement) {
-                countElement.textContent = `${visibleOptions.length} students`;
+                countElement.textContent = `${visibleOptions.length} students found`;
+            }
+        });
+        
+        // Clear search when clicking X in search field
+        studentSearchInput.addEventListener('search', function() {
+            if (this.value === '') {
+                const visibleOptions = enhancedSearchFilter(originalStudentOptions, '', 'data-search-text');
+                const countElement = document.getElementById('student-count');
+                if (countElement) {
+                    countElement.textContent = `${visibleOptions.length} assigned students`;
+                }
+            }
+        });
+    }
+    
+    // Initialize tutor search functionality
+    if (tutorSearchInput && tutorSelect) {
+        tutorSearchInput.addEventListener('input', function() {
+            const searchTerm = this.value.trim();
+            const visibleOptions = enhancedSearchFilter(originalTutorOptions, searchTerm, 'data-search-text');
+            
+            // Update tutor count
+            const countElement = document.getElementById('tutor-count');
+            if (countElement) {
+                countElement.textContent = `${visibleOptions.length} tutors found`;
+            }
+        });
+        
+        // Clear search when clicking X in search field
+        tutorSearchInput.addEventListener('search', function() {
+            if (this.value === '') {
+                const visibleOptions = enhancedSearchFilter(originalTutorOptions, '', 'data-search-text');
+                const countElement = document.getElementById('tutor-count');
+                if (countElement) {
+                    countElement.textContent = `${visibleOptions.length} tutors`;
+                }
             }
         });
     }
@@ -1741,12 +1846,19 @@ function initializeReassignModal(students, tutors) {
                     studentInfoDiv.classList.remove('hidden');
                 }
                 
-                // Auto-select the current tutor in tutor dropdown for reference
-                if (tutorSelect && tutorEmail) {
+                // Reset tutor highlighting
+                if (tutorSelect) {
                     for (let i = 0; i < tutorSelect.options.length; i++) {
-                        if (tutorSelect.options[i].value === tutorEmail) {
-                            tutorSelect.options[i].style.backgroundColor = '#fef3c7';
-                            break;
+                        tutorSelect.options[i].style.backgroundColor = '';
+                    }
+                    
+                    // Highlight current tutor if found
+                    if (tutorEmail) {
+                        for (let i = 0; i < tutorSelect.options.length; i++) {
+                            if (tutorSelect.options[i].value === tutorEmail) {
+                                tutorSelect.options[i].style.backgroundColor = '#fef3c7';
+                                break;
+                            }
                         }
                     }
                 }
@@ -1860,7 +1972,7 @@ async function performReassignment(student, newTutor, reason, currentTutor = nul
             assignedBy: currentUser,
             assignedByEmail: currentUserEmail,
             assignedAt: new Date().toISOString(),
-            timestamp: serverTimestamp()
+            timestamp: new Date().toISOString() // Fixed: Use regular Date instead of serverTimestamp
         };
         
         await addDoc(collection(db, "tutorAssignments"), assignmentData);
@@ -2092,6 +2204,31 @@ if (!document.getElementById('reassign-modal-styles')) {
             option[data-is-current="true"] {
                 background-color: #fef3c7;
                 font-weight: 500;
+            }
+            
+            /* Better select styling */
+            select option {
+                padding: 8px 12px;
+                border-bottom: 1px solid #f1f1f1;
+            }
+            
+            select option:hover {
+                background-color: #f3f4f6;
+            }
+            
+            /* Search input clear button */
+            input[type="search"]::-webkit-search-cancel-button {
+                -webkit-appearance: none;
+                height: 1em;
+                width: 1em;
+                background: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="%23999"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>') no-repeat;
+                background-size: contain;
+                opacity: 0.5;
+                cursor: pointer;
+            }
+            
+            input[type="search"]::-webkit-search-cancel-button:hover {
+                opacity: 0.8;
             }
         </style>
     `;
@@ -8150,6 +8287,7 @@ onAuthStateChanged(auth, async (user) => {
         window.location.href = "management-auth.html";
     }
 });
+
 
 
 
