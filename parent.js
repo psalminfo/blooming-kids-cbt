@@ -1,4 +1,8 @@
-// Direct Firebase config in parent.js (most reliable)
+// ============================================
+// FIREBASE INITIALIZATION (DIRECT CONFIG - MOST RELIABLE)
+// ============================================
+
+// Direct Firebase configuration
 const firebaseConfig = {
     apiKey: "AIzaSyD1lJhsWMMs_qerLBSzk7wKhjLyI_11RJg",
     authDomain: "bloomingkidsassessment.firebaseapp.com",
@@ -9,15 +13,45 @@ const firebaseConfig = {
 };
 
 // Initialize Firebase
-firebase.initializeApp(firebaseConfig);
+try {
+    firebase.initializeApp(firebaseConfig);
+    console.log('Firebase initialized successfully');
+} catch (error) {
+    console.error('Firebase initialization error:', error);
+    // Try alternative initialization if default already exists
+    try {
+        firebase.initializeApp(firebaseConfig, 'BloomingKidsParent');
+        console.log('Firebase initialized with alternative name');
+    } catch (error2) {
+        console.error('Alternative initialization also failed:', error2);
+    }
+}
 
 const db = firebase.firestore();
 const auth = firebase.auth();
+
+// ============================================
+// LIBRARY LOADING
+// ============================================
 
 // Load libphonenumber-js for phone number validation
 const libphonenumberScript = document.createElement('script');
 libphonenumberScript.src = 'https://cdn.jsdelivr.net/npm/libphonenumber-js@1.10.14/bundle/libphonenumber-js.min.js';
 document.head.appendChild(libphonenumberScript);
+
+// ============================================
+// GLOBAL VARIABLES
+// ============================================
+
+let currentUserData = null;
+let userChildren = [];
+let unreadResponsesCount = 0;
+let realTimeListeners = [];
+let childRealTimeListeners = {};
+
+// ============================================
+// UTILITY FUNCTIONS
+// ============================================
 
 // Add this function to create the country dropdown
 function createCountryCodeDropdown() {
@@ -277,22 +311,32 @@ function capitalize(str) {
     return str.replace(/\b\w/g, l => l.toUpperCase());
 }
 
-// Global variables for user data
-let currentUserData = null;
-let userChildren = [];
-let unreadResponsesCount = 0; // Track unread responses
-let realTimeListeners = []; // Track real-time listeners
-let childRealTimeListeners = {}; // Track per-child listeners
+// ============================================
+// NOTIFICATION BADGES FUNCTIONS (MISSING FUNCTION ADDED)
+// ============================================
 
-// -------------------------------------------------------------------
-// START: NEW REFERRAL SYSTEM FUNCTIONS (PHASE 1 & 3)
-// -------------------------------------------------------------------
+function addNotificationBadges() {
+    console.log('Adding notification badges...');
+    
+    // Check for unread responses
+    checkForNewResponses();
+    
+    // Check for new homework/topics for each child
+    if (userChildren && userChildren.length > 0) {
+        userChildren.forEach(child => {
+            if (child.id) {
+                // Update counts for each child
+                updateTopicCount(child.id, 0); // Will be updated by real-time listeners
+                updateHomeworkCount(child.id, 0); // Will be updated by real-time listeners
+            }
+        });
+    }
+}
 
-/**
- * Generates a unique, alphanumeric referral code prefixed with 'BKH'.
- * Checks for uniqueness in the parent_users collection.
- * @returns {string} A unique referral code (e.g., BKH7A3X9M)
- */
+// ============================================
+// REFERRAL SYSTEM FUNCTIONS
+// ============================================
+
 async function generateReferralCode() {
     const chars = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ';
     const prefix = 'BKH';
@@ -315,12 +359,10 @@ async function generateReferralCode() {
     return code;
 }
 
-/**
- * Loads the parent's referral data for the Rewards Dashboard.
- * @param {string} parentUid The UID of the current parent user.
- */
 async function loadReferralRewards(parentUid) {
     const rewardsContent = document.getElementById('rewardsContent');
+    if (!rewardsContent) return;
+    
     rewardsContent.innerHTML = '<div class="text-center py-8"><div class="loading-spinner mx-auto" style="width: 40px; height: 40px;"></div><p class="text-green-600 font-semibold mt-4">Loading rewards data...</p></div>';
 
     try {
@@ -427,9 +469,9 @@ async function loadReferralRewards(parentUid) {
     }
 }
 
-// -------------------------------------------------------------------
-// END: NEW REFERRAL SYSTEM FUNCTIONS
-// -------------------------------------------------------------------
+// ============================================
+// AUTHENTICATION FUNCTIONS
+// ============================================
 
 // Remember Me Functionality
 function setupRememberMe() {
@@ -455,86 +497,6 @@ function handleRememberMe() {
     }
 }
 
-/**
- * Generates a unique, personalized recommendation using a smart template.
- * It summarizes performance instead of just listing topics.
- * @param {string} studentName The name of the student.
- * @param {string} tutorName The name of the tutor.
- * @param {Array} results The student's test results.
- * @returns {string} A personalized recommendation string.
- */
-function generateTemplatedRecommendation(studentName, tutorName, results) {
-    const strengths = [];
-    const weaknesses = [];
-    results.forEach(res => {
-        const percentage = res.total > 0 ? (res.correct / res.total) * 100 : 0;
-        const topicList = res.topics.length > 0 ? res.topics : [res.subject];
-        if (percentage >= 75) {
-            strengths.push(...topicList);
-        } else if (percentage < 50) {
-            weaknesses.push(...topicList);
-        }
-    });
-
-    const uniqueStrengths = [...new Set(strengths)];
-    const uniqueWeaknesses = [...new Set(weaknesses)];
-
-    let praiseClause = "";
-    if (uniqueStrengths.length > 2) {
-        praiseClause = `It was great to see ${studentName} demonstrate a solid understanding of several key concepts, particularly in areas like ${uniqueStrengths[0]} and ${uniqueStrengths[1]}. `;
-    } else if (uniqueStrengths.length > 0) {
-        praiseClause = `${studentName} showed strong potential, especially in the topic of ${uniqueStrengths.join(', ')}. `;
-    } else {
-        praiseClause = `${studentName} has put in a commendable effort on this initial assessment. `;
-    }
-
-    let improvementClause = "";
-    if (uniqueWeaknesses.length > 2) {
-        improvementClause = `Our next step will be to focus on building more confidence in a few areas, such as ${uniqueWeaknesses[0]} and ${uniqueWeaknesses[1]}. `;
-    } else if (uniqueWeaknesses.length > 0) {
-        improvementClause = `To continue this positive progress, our focus will be on the topic of ${uniqueWeaknesses.join(', ')}. `;
-    } else {
-        improvementClause = "We will continue to build on these fantastic results and explore more advanced topics. ";
-    }
-
-    const closingStatement = `With personalized support from their tutor, ${tutorName}, at Blooming Kids House, we are very confident that ${studentName} will master these skills and unlock their full potential.`;
-
-    return praiseClause + improvementClause + closingStatement;
-}
-
-/**
- * Checks if the search name matches the stored name, allowing for extra names added by tutors
- * @param {string} storedName The name stored in the database
- * @param {string} searchName The name entered by the parent
- * @returns {boolean} True if names match (case insensitive and allows extra names)
- */
-function nameMatches(storedName, searchName) {
-    if (!storedName || !searchName) return false;
-    
-    const storedLower = storedName.toLowerCase().trim();
-    const searchLower = searchName.toLowerCase().trim();
-    
-    // Exact match
-    if (storedLower === searchLower) return true;
-    
-    // If stored name contains the search name (tutor added extra names)
-    if (storedLower.includes(searchLower)) return true;
-    
-    // If search name contains the stored name (parent entered full name but stored has partial)
-    if (searchLower.includes(storedLower)) return true;
-    
-    // Split into words and check if all search words are in stored name
-    const searchWords = searchLower.split(/\s+/).filter(word => word.length > 1);
-    const storedWords = storedLower.split(/\s+/);
-    
-    if (searchWords.length > 0) {
-        return searchWords.every(word => storedWords.some(storedWord => storedWord.includes(word)));
-    }
-    
-    return false;
-}
-
-// Find parent name from students collection (SAME AS TUTOR.JS)
 async function findParentNameFromStudents(parentPhone) {
     try {
         console.log("Searching for parent name with phone:", parentPhone);
@@ -607,7 +569,6 @@ async function findParentNameFromStudents(parentPhone) {
     }
 }
 
-// Authentication Functions
 async function handleSignUp() {
     const countryCode = document.getElementById('countryCode').value;
     const localPhone = document.getElementById('signupPhone').value.trim();
@@ -659,7 +620,7 @@ async function handleSignUp() {
         const userCredential = await auth.createUserWithEmailAndPassword(email, password);
         const user = userCredential.user;
 
-        // Find parent name from existing data (SAME SOURCE AS TUTOR.JS)
+        // Find parent name from existing data
         const parentName = await findParentNameFromStudents(normalizedPhone);
         
         // Generate referral code
@@ -680,7 +641,7 @@ async function handleSignUp() {
 
         showMessage('Account created successfully!', 'success');
         
-        // Automatically load reports after signup
+        // Automatically load dashboard after signup
         await loadParentDashboard(user.uid);
 
     } catch (error) {
@@ -2529,28 +2490,10 @@ function showNoChildrenView() {
     `;
 }
 
-function showNotification(message, type = 'info') {
-    const notification = document.createElement('div');
-    notification.className = `fixed top-4 right-4 p-4 rounded-lg shadow-lg z-50 max-w-sm ${
-        type === 'error' ? 'bg-red-500 text-white' :
-        type === 'success' ? 'bg-green-500 text-white' :
-        type === 'warning' ? 'bg-yellow-500 text-white' :
-        'bg-blue-500 text-white'
-    }`;
-    notification.textContent = message;
-    
-    document.body.appendChild(notification);
-    
-    setTimeout(() => {
-        notification.remove();
-    }, 5000);
-}
-
 // ============================================
-// EXISTING FUNCTIONS (KEPT FOR COMPATIBILITY)
+// FEEDBACK AND RESPONSE SYSTEM
 // ============================================
 
-// Feedback System Functions (existing)
 function showFeedbackModal() {
     populateStudentDropdown();
     document.getElementById('feedbackModal').classList.remove('hidden');
@@ -2630,8 +2573,8 @@ async function submitFeedback() {
             status: 'New',
             timestamp: firebase.firestore.FieldValue.serverTimestamp(),
             emailSent: false,
-            parentUid: user.uid, // Add parent UID for querying responses
-            responses: [] // Initialize empty responses array
+            parentUid: user.uid,
+            responses: []
         };
 
         // Save to Firestore
@@ -2652,11 +2595,10 @@ async function submitFeedback() {
     }
 }
 
-// Admin Responses Functions (existing)
+// Admin Responses Functions
 function showResponsesModal() {
     document.getElementById('responsesModal').classList.remove('hidden');
     loadAdminResponses();
-    // Reset notification count when user views responses
     resetNotificationCount();
 }
 
@@ -2674,7 +2616,6 @@ async function loadAdminResponses() {
             throw new Error('Please sign in to view responses');
         }
 
-        // Query feedback where parentUid matches current user AND responses array exists and is not empty
         const feedbackSnapshot = await db.collection('parent_feedback')
             .where('parentUid', '==', user.uid)
             .get();
@@ -2776,7 +2717,7 @@ async function loadAdminResponses() {
     }
 }
 
-// Notification System for Responses (existing)
+// Notification System for Responses
 async function checkForNewResponses() {
     try {
         const user = auth.currentUser;
@@ -2829,7 +2770,6 @@ function updateNotificationBadge(count) {
 }
 
 function resetNotificationCount() {
-    // When user views responses, mark them as read and reset counter
     updateNotificationBadge(0);
     unreadResponsesCount = 0;
 }
@@ -2880,7 +2820,7 @@ function addViewResponsesButton() {
     }, 1000);
 }
 
-// MANUAL REFRESH FUNCTION (existing)
+// MANUAL REFRESH FUNCTION
 async function manualRefreshReports() {
     const user = auth.currentUser;
     if (!user) return;
@@ -2907,7 +2847,7 @@ async function manualRefreshReports() {
     }
 }
 
-// ADD MANUAL REFRESH BUTTON TO WELCOME SECTION (existing)
+// ADD MANUAL REFRESH BUTTON TO WELCOME SECTION
 function addManualRefreshButton() {
     const welcomeSection = document.querySelector('.bg-green-50');
     if (!welcomeSection) return;
@@ -2928,7 +2868,10 @@ function addManualRefreshButton() {
     buttonContainer.insertBefore(refreshBtn, buttonContainer.lastElementChild);
 }
 
-// Clean up listeners on logout
+// ============================================
+// CLEANUP AND UTILITY FUNCTIONS
+// ============================================
+
 function cleanupListeners() {
     // Clean up global listeners
     realTimeListeners.forEach(unsubscribe => {
@@ -2986,6 +2929,23 @@ function showMessage(message, type) {
     }, 5000);
 }
 
+function showNotification(message, type = 'info') {
+    const notification = document.createElement('div');
+    notification.className = `fixed top-4 right-4 p-4 rounded-lg shadow-lg z-50 max-w-sm ${
+        type === 'error' ? 'bg-red-500 text-white' :
+        type === 'success' ? 'bg-green-500 text-white' :
+        type === 'warning' ? 'bg-yellow-500 text-white' :
+        'bg-blue-500 text-white'
+    }`;
+    notification.textContent = message;
+    
+    document.body.appendChild(notification);
+    
+    setTimeout(() => {
+        notification.remove();
+    }, 5000);
+}
+
 function switchTab(tab) {
     const signInTab = document.getElementById('signInTab');
     const signUpTab = document.getElementById('signUpTab');
@@ -3036,7 +2996,7 @@ function switchMainTab(tab) {
         rewardsTab?.classList.add('tab-active-main');
         rewardsContentArea?.classList.remove('hidden');
         
-        // Reload rewards data when the tab is clicked to ensure it's up-to-date
+        // Reload rewards data when the tab is clicked
         const user = auth.currentUser;
         if (user) {
             loadReferralRewards(user.uid);
@@ -3044,7 +3004,10 @@ function switchMainTab(tab) {
     }
 }
 
-// Initialize the page
+// ============================================
+// PAGE INITIALIZATION
+// ============================================
+
 document.addEventListener('DOMContentLoaded', function() {
     // Setup Remember Me
     setupRememberMe();
@@ -3095,10 +3058,7 @@ document.addEventListener('DOMContentLoaded', function() {
         if (e.key === 'Enter') handlePasswordReset();
     });
     
-    // --- START: NEW MAIN TAB SWITCHING LISTENERS (PHASE 3) ---
+    // Main tab switching listeners
     document.getElementById("reportTab")?.addEventListener("click", () => switchMainTab('reports'));
     document.getElementById("rewardsTab")?.addEventListener("click", () => switchMainTab('rewards'));
-    // --- END: NEW MAIN TAB SWITCHING LISTENERS (PHASE 3) ---
 });
-
-
