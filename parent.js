@@ -1,11 +1,12 @@
-// Use external Firebase config - DO NOT EXPOSE CONFIG
-const firebaseConfigScript = document.createElement('script');
-firebaseConfigScript.src = 'https://cdn.jsdelivr.net/gh/psalminfo/blooming-kids-cbt@main/firebaseParentConfig.js';
-firebaseConfigScript.onload = function() {
-    if (typeof firebaseParentConfig !== 'undefined') {
-        firebase.initializeApp(firebaseParentConfig);
-        console.log('Firebase initialized from external config');
-    }
+// firebaseParentConfig.js - Use CommonJS format
+var firebaseParentConfig = {
+    apiKey: "AIzaSyD1lJhsWMMs_qerLBSzk7wKhjLyI_11RJg",
+    authDomain: "bloomingkidsassessment.firebaseapp.com",
+    projectId: "bloomingkidsassessment",
+    storageBucket: "bloomingkidsassessment.appspot.com",
+    messagingSenderId: "238975054977",
+    appId: "1:238975054977:web:87c70b4db044998a204980"
+};
 };
 document.head.appendChild(firebaseConfigScript);
 
@@ -3098,3 +3099,4 @@ document.addEventListener('DOMContentLoaded', function() {
     document.getElementById("rewardsTab")?.addEventListener("click", () => switchMainTab('rewards'));
     // --- END: NEW MAIN TAB SWITCHING LISTENERS (PHASE 3) ---
 });
+
