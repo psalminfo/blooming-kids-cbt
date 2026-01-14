@@ -679,42 +679,37 @@ const SUBJECT_CATEGORIES = {
     "Specialized": ["Music", "Coding","ICT", "Chess", "Public Speaking", "English Proficiency", "Counseling Programs"]
 };
 
-// --- UPDATED: Schedule Days and Times with 11PM to 12AM ---
+// --- UPDATED: Schedule Days and Times with 24-hour support ---
 const DAYS_OF_WEEK = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
-const TIME_SLOTS = Array.from({length: 49}, (_, i) => {
-    const hour = Math.floor(i / 2);
-    const minute = i % 2 === 0 ? "00" : "30";
-    let label;
-    
-    if (hour === 0 && minute === "00") {
-        label = "12:00 AM (Midnight)";
-    } else if (hour === 12 && minute === "00") {
-        label = "12:00 PM (Noon)";
-    } else {
-        const period = hour >= 12 ? 'PM' : 'AM';
-        const displayHour = hour % 12 || 12;
-        label = `${displayHour}:${minute} ${period}`;
+
+// Create time slots from 00:00 to 23:30 in 30-minute intervals
+const TIME_SLOTS = [];
+for (let hour = 0; hour < 24; hour++) {
+    for (let minute = 0; minute < 60; minute += 30) {
+        const timeValue = `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
+        let label;
+        
+        if (hour === 0 && minute === 0) {
+            label = "12:00 AM (Midnight)";
+        } else if (hour === 12 && minute === 0) {
+            label = "12:00 PM (Noon)";
+        } else {
+            const period = hour >= 12 ? 'PM' : 'AM';
+            const displayHour = hour % 12 || 12;
+            label = `${displayHour}:${minute.toString().padStart(2, '0')} ${period}`;
+        }
+        
+        TIME_SLOTS.push({ value: timeValue, label: label });
     }
-    
-    return {
-        value: `${hour.toString().padStart(2, '0')}:${minute}`,
-        label: label
-    };
-});
-
-TIME_SLOTS.push({value: "23:30", label: "11:30 PM"});
-
-const midnightSlot = TIME_SLOTS.find(slot => slot.value === "00:00");
-if (midnightSlot) {
-    const index = TIME_SLOTS.indexOf(midnightSlot);
-    TIME_SLOTS.splice(index, 1);
-    TIME_SLOTS.push(midnightSlot);
 }
 
+// Add an extra slot for 23:30 if not already included
+if (!TIME_SLOTS.find(slot => slot.value === "23:30")) {
+    TIME_SLOTS.push({value: "23:30", label: "11:30 PM"});
+}
+
+// Sort time slots in chronological order
 TIME_SLOTS.sort((a, b) => {
-    if (a.value === "00:00") return 1;
-    if (b.value === "00:00") return -1;
-    
     const timeToMinutes = (time) => {
         const [hours, minutes] = time.split(':').map(Number);
         return hours * 60 + minutes;
@@ -763,7 +758,7 @@ function normalizePhoneNumber(phone) {
     return cleaned;
 }
 
-// --- UPDATED: Schedule Management Functions for ALL students ---
+// --- FIXED: Schedule Management Functions for ALL students ---
 let allStudents = [];
 let currentStudentIndex = 0;
 let schedulePopup = null;
@@ -779,9 +774,8 @@ async function checkAndShowSchedulePopup(tutor) {
         allStudents = [];
         studentsSnapshot.forEach(doc => {
             const student = { id: doc.id, ...doc.data() };
-            // Filter out archived students
-            if (!['archived', 'graduated', 'transferred'].includes(student.status) &&
-                (!student.schedule || student.schedule.length === 0)) {
+            // Filter out archived students but include ALL students regardless of schedule
+            if (!['archived', 'graduated', 'transferred'].includes(student.status)) {
                 allStudents.push(student);
             }
         });
@@ -791,13 +785,61 @@ async function checkAndShowSchedulePopup(tutor) {
         if (allStudents.length > 0) {
             showBulkSchedulePopup(allStudents[0], tutor, allStudents.length);
             return true;
+        } else {
+            // FIX: Show a message if no students found
+            showCustomAlert('No students found. Please add students first.');
+            return false;
         }
         
-        return false;
     } catch (error) {
         console.error("Error checking schedules:", error);
+        showCustomAlert('Error loading students. Please try again.');
         return false;
     }
+}
+
+// --- FIXED: Time validation to allow 12 AM to 1 AM and overnight classes ---
+function validateScheduleTime(start, end) {
+    const timeToMinutes = (time) => {
+        const [hours, minutes] = time.split(':').map(Number);
+        return hours * 60 + minutes;
+    };
+    
+    const startMinutes = timeToMinutes(start);
+    const endMinutes = timeToMinutes(end);
+    
+    // Allow overnight classes (e.g., 11 PM to 1 AM)
+    if (endMinutes < startMinutes) {
+        // This is an overnight class (e.g., 23:00 to 01:00)
+        // End time is actually the next day
+        const adjustedEndMinutes = endMinutes + (24 * 60);
+        const duration = adjustedEndMinutes - startMinutes;
+        
+        // Ensure minimum duration (e.g., at least 30 minutes)
+        if (duration < 30) {
+            return { valid: false, message: 'Class must be at least 30 minutes long' };
+        }
+        
+        // Ensure maximum duration (e.g., no more than 4 hours)
+        if (duration > 4 * 60) {
+            return { valid: false, message: 'Class cannot exceed 4 hours' };
+        }
+        
+        return { valid: true, isOvernight: true, duration: duration };
+    }
+    
+    // Normal daytime class
+    const duration = endMinutes - startMinutes;
+    
+    if (duration < 30) {
+        return { valid: false, message: 'Class must be at least 30 minutes long' };
+    }
+    
+    if (duration > 4 * 60) {
+        return { valid: false, message: 'Class cannot exceed 4 hours' };
+    }
+    
+    return { valid: true, isOvernight: false, duration: duration };
 }
 
 function showBulkSchedulePopup(student, tutor, totalCount = 0) {
@@ -816,6 +858,7 @@ function showBulkSchedulePopup(student, tutor, totalCount = 0) {
                     <div class="mb-4 p-3 bg-blue-50 rounded-lg">
                         <p class="text-sm text-blue-700">Student: <strong>${student.studentName}</strong> | Grade: ${student.grade}</p>
                         <p class="text-xs text-blue-600">${student.subjects ? student.subjects.join(', ') : 'No subjects'}</p>
+                        <p class="text-xs text-blue-500 mt-1">Note: You can schedule overnight classes (e.g., 11 PM to 1 AM)</p>
                     </div>
                     
                     <div id="schedule-entries" class="space-y-4">
@@ -882,28 +925,26 @@ function showBulkSchedulePopup(student, tutor, totalCount = 0) {
         const schedule = [];
         let hasError = false;
         
-        scheduleEntries.forEach(entry => {
+        for (const entry of scheduleEntries) {
             const day = entry.querySelector('.schedule-day').value;
             const start = entry.querySelector('.schedule-start').value;
             const end = entry.querySelector('.schedule-end').value;
             
-            const timeToMinutes = (time) => {
-                const [hours, minutes] = time.split(':').map(Number);
-                if (hours === 0 && minutes === 0) return 24 * 60;
-                return hours * 60 + minutes;
-            };
-            
-            const startMinutes = timeToMinutes(start);
-            const endMinutes = timeToMinutes(end);
-            
-            if (startMinutes >= endMinutes) {
-                showCustomAlert('End time must be after start time.');
+            const validation = validateScheduleTime(start, end);
+            if (!validation.valid) {
+                showCustomAlert(validation.message);
                 hasError = true;
-                return;
+                break;
             }
             
-            schedule.push({ day, start, end });
-        });
+            schedule.push({ 
+                day, 
+                start, 
+                end,
+                isOvernight: validation.isOvernight || false,
+                duration: validation.duration
+            });
+        }
         
         if (hasError) return;
         
@@ -955,6 +996,8 @@ function showBulkSchedulePopup(student, tutor, totalCount = 0) {
             setTimeout(() => {
                 showBulkSchedulePopup(allStudents[currentStudentIndex], tutor, allStudents.length);
             }, 500);
+        } else {
+            showCustomAlert('Skipped all students.');
         }
     });
 }
@@ -1378,7 +1421,8 @@ function renderCalendarView(students) {
                 start: slot.start,
                 end: slot.end,
                 time: `${formatTime(slot.start)} - ${formatTime(slot.end)}`,
-                studentId: student.id
+                studentId: student.id,
+                isOvernight: slot.isOvernight || false
             });
         });
     });
@@ -1404,7 +1448,7 @@ function renderCalendarView(students) {
                         dayEvents.map(event => `
                             <div class="calendar-event">
                                 <div class="font-medium text-xs">${event.student}</div>
-                                <div class="calendar-event-time">${event.time}</div>
+                                <div class="calendar-event-time">${event.time} ${event.isOvernight ? '🌙' : ''}</div>
                                 <div class="text-xs text-gray-500">${event.grade}</div>
                                 <button class="edit-schedule-btn mt-1" data-student-id="${event.studentId}">Edit</button>
                             </div>
@@ -1447,6 +1491,7 @@ function renderCalendarView(students) {
     });
 }
 
+// --- FIXED: Edit schedule modal with proper time validation ---
 function showEditScheduleModal(student) {
     const modalHTML = `
         <div class="modal-overlay">
@@ -1457,6 +1502,7 @@ function showEditScheduleModal(student) {
                 <div class="modal-body">
                     <div class="mb-4 p-3 bg-blue-50 rounded-lg">
                         <p class="text-sm text-blue-700">Student: <strong>${student.studentName}</strong> | Grade: ${student.grade}</p>
+                        <p class="text-xs text-blue-500">Note: You can schedule overnight classes (e.g., 11 PM to 1 AM)</p>
                     </div>
                     
                     <div id="schedule-entries" class="space-y-4">
@@ -1486,7 +1532,29 @@ function showEditScheduleModal(student) {
                                     <button class="btn btn-danger btn-sm mt-2 remove-schedule-btn">Remove</button>
                                 </div>
                             `).join('') : 
-                            `<div class="text-center text-gray-500">No schedule set for this student</div>`
+                            `<div class="schedule-entry bg-gray-50 p-4 rounded-lg border">
+                                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                    <div>
+                                        <label class="form-label">Day of Week</label>
+                                        <select class="form-input schedule-day">
+                                            ${DAYS_OF_WEEK.map(day => `<option value="${day}">${day}</option>`).join('')}
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label class="form-label">Start Time</label>
+                                        <select class="form-input schedule-start">
+                                            ${TIME_SLOTS.map(timeSlot => `<option value="${timeSlot.value}">${timeSlot.label}</option>`).join('')}
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label class="form-label">End Time</label>
+                                        <select class="form-input schedule-end">
+                                            ${TIME_SLOTS.map(timeSlot => `<option value="${timeSlot.value}">${timeSlot.label}</option>`).join('')}
+                                        </select>
+                                    </div>
+                                </div>
+                                <button class="btn btn-danger btn-sm mt-2 remove-schedule-btn hidden">Remove</button>
+                            </div>`
                         }
                     </div>
                     
@@ -1510,10 +1578,13 @@ function showEditScheduleModal(student) {
     
     document.getElementById('add-schedule-entry').addEventListener('click', () => {
         const scheduleEntries = document.getElementById('schedule-entries');
-        const newEntry = scheduleEntries.querySelector('.schedule-entry:last-child').cloneNode(true);
+        const firstEntry = scheduleEntries.querySelector('.schedule-entry');
+        const newEntry = firstEntry.cloneNode(true);
+        // Reset values for new entry
         newEntry.querySelector('.schedule-day').selectedIndex = 0;
         newEntry.querySelector('.schedule-start').selectedIndex = 0;
         newEntry.querySelector('.schedule-end').selectedIndex = 0;
+        newEntry.querySelector('.remove-schedule-btn').classList.remove('hidden');
         scheduleEntries.appendChild(newEntry);
     });
     
@@ -1538,28 +1609,26 @@ function showEditScheduleModal(student) {
         const schedule = [];
         let hasError = false;
         
-        scheduleEntries.forEach(entry => {
+        for (const entry of scheduleEntries) {
             const day = entry.querySelector('.schedule-day').value;
             const start = entry.querySelector('.schedule-start').value;
             const end = entry.querySelector('.schedule-end').value;
             
-            const timeToMinutes = (time) => {
-                const [hours, minutes] = time.split(':').map(Number);
-                if (hours === 0 && minutes === 0) return 24 * 60;
-                return hours * 60 + minutes;
-            };
-            
-            const startMinutes = timeToMinutes(start);
-            const endMinutes = timeToMinutes(end);
-            
-            if (startMinutes >= endMinutes) {
-                showCustomAlert('End time must be after start time.');
+            const validation = validateScheduleTime(start, end);
+            if (!validation.valid) {
+                showCustomAlert(validation.message);
                 hasError = true;
-                return;
+                break;
             }
             
-            schedule.push({ day, start, end });
-        });
+            schedule.push({ 
+                day, 
+                start, 
+                end,
+                isOvernight: validation.isOvernight || false,
+                duration: validation.duration
+            });
+        }
         
         if (hasError) return;
         
