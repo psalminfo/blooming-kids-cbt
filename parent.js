@@ -1,5 +1,5 @@
 // ============================================
-// FIREBASE INITIALIZATION (DIRECT CONFIG - MOST RELIABLE)
+// FIREBASE INITIALIZATION (DIRECT CONFIG)
 // ============================================
 
 // Direct Firebase configuration
@@ -14,30 +14,16 @@ const firebaseConfig = {
 
 // Initialize Firebase
 try {
-    firebase.initializeApp(firebaseConfig);
+    if (!firebase.apps.length) {
+        firebase.initializeApp(firebaseConfig);
+    }
     console.log('Firebase initialized successfully');
 } catch (error) {
     console.error('Firebase initialization error:', error);
-    // Try alternative initialization if default already exists
-    try {
-        firebase.initializeApp(firebaseConfig, 'BloomingKidsParent');
-        console.log('Firebase initialized with alternative name');
-    } catch (error2) {
-        console.error('Alternative initialization also failed:', error2);
-    }
 }
 
 const db = firebase.firestore();
 const auth = firebase.auth();
-
-// ============================================
-// LIBRARY LOADING
-// ============================================
-
-// Load libphonenumber-js for phone number validation
-const libphonenumberScript = document.createElement('script');
-libphonenumberScript.src = 'https://cdn.jsdelivr.net/npm/libphonenumber-js@1.10.14/bundle/libphonenumber-js.min.js';
-document.head.appendChild(libphonenumberScript);
 
 // ============================================
 // GLOBAL VARIABLES
@@ -47,27 +33,23 @@ let currentUserData = null;
 let userChildren = [];
 let unreadResponsesCount = 0;
 let realTimeListeners = [];
-let childRealTimeListeners = {};
+let currentStudentTab = null;
 
 // ============================================
 // UTILITY FUNCTIONS
 // ============================================
 
-// Add this function to create the country dropdown
 function createCountryCodeDropdown() {
     const phoneInputContainer = document.getElementById('signupPhone').parentNode;
     
-    // Create container for country code and phone number
     const container = document.createElement('div');
     container.className = 'flex gap-2';
     
-    // Create country code dropdown
     const countryCodeSelect = document.createElement('select');
     countryCodeSelect.id = 'countryCode';
     countryCodeSelect.className = 'w-32 px-3 py-3 border border-gray-300 rounded-xl input-focus focus:outline-none transition-all duration-200';
     countryCodeSelect.required = true;
     
-    // Country codes list (40 countries with USA/Canada as default)
     const countries = [
         { code: '+1', name: 'USA/Canada (+1)' },
         { code: '+234', name: 'Nigeria (+234)' },
@@ -111,7 +93,6 @@ function createCountryCodeDropdown() {
         { code: '+52', name: 'Mexico (+52)' }
     ];
     
-    // Add options to dropdown
     countries.forEach(country => {
         const option = document.createElement('option');
         option.value = country.code;
@@ -119,21 +100,17 @@ function createCountryCodeDropdown() {
         countryCodeSelect.appendChild(option);
     });
     
-    // Set USA/Canada as default
     countryCodeSelect.value = '+1';
     
-    // Get the existing phone input
     const phoneInput = document.getElementById('signupPhone');
     phoneInput.placeholder = 'Enter phone number without country code';
     phoneInput.className = 'flex-1 px-4 py-3 border border-gray-300 rounded-xl input-focus focus:outline-none transition-all duration-200';
     
-    // Replace the original input with new structure
     container.appendChild(countryCodeSelect);
     container.appendChild(phoneInput);
     phoneInputContainer.appendChild(container);
 }
 
-// ENHANCED MULTI-NORMALIZATION FUNCTION FOR ALL COUNTRIES
 function multiNormalizePhoneNumber(phone) {
     if (!phone || typeof phone !== 'string') {
         return { normalized: null, country: null, valid: false, error: 'Invalid input' };
@@ -144,137 +121,25 @@ function multiNormalizePhoneNumber(phone) {
     const normalizationAttempts = [];
     
     try {
-        // Clean the phone number - remove all non-digit characters except +
         let cleaned = phone.replace(/[^\d+]/g, '');
         
-        // ATTEMPT 1: Standard normalization (current logic)
-        let attempt1 = null;
-        try {
-            const parsed1 = libphonenumber.parsePhoneNumberFromString(cleaned);
-            if (parsed1 && parsed1.isValid()) {
-                attempt1 = {
-                    normalized: parsed1.format('E.164'),
-                    country: parsed1.country,
-                    valid: true,
-                    attempt: 'standard'
-                };
-                normalizationAttempts.push(attempt1);
-                console.log("🔧 Attempt 1 (Standard):", attempt1.normalized);
-            }
-        } catch (e) {
-            console.log("🔧 Attempt 1 failed:", e.message);
+        // For now, return simple normalization until libphonenumber loads
+        if (cleaned.startsWith('+')) {
+            normalizationAttempts.push({
+                normalized: cleaned,
+                country: null,
+                valid: true,
+                attempt: 'simple'
+            });
+        } else if (cleaned.length >= 10) {
+            normalizationAttempts.push({
+                normalized: '+' + cleaned,
+                country: null,
+                valid: true,
+                attempt: 'simple'
+            });
         }
-
-        // ATTEMPT 2: Country code correction for common patterns
-        let attempt2 = null;
-        try {
-            // US/Canada patterns
-            if (cleaned.match(/^(1)?(469|214|972|713|281|832|210|817)/) && !cleaned.startsWith('+')) {
-                const usNumber = '+1' + cleaned.replace(/^1/, '');
-                const parsed2 = libphonenumber.parsePhoneNumberFromString(usNumber);
-                if (parsed2 && parsed2.isValid()) {
-                    attempt2 = {
-                        normalized: parsed2.format('E.164'),
-                        country: parsed2.country,
-                        valid: true,
-                        attempt: 'us_correction'
-                    };
-                    normalizationAttempts.push(attempt2);
-                    console.log("🔧 Attempt 2 (US Correction):", attempt2.normalized);
-                }
-            }
-            
-            // UK patterns
-            if (cleaned.match(/^(44)?(20|7|1|2|3|8|9)/) && !cleaned.startsWith('+')) {
-                const ukNumber = '+44' + cleaned.replace(/^44/, '');
-                const parsed2 = libphonenumber.parsePhoneNumberFromString(ukNumber);
-                if (parsed2 && parsed2.isValid()) {
-                    attempt2 = {
-                        normalized: parsed2.format('E.164'),
-                        country: parsed2.country,
-                        valid: true,
-                        attempt: 'uk_correction'
-                    };
-                    normalizationAttempts.push(attempt2);
-                    console.log("🔧 Attempt 2 (UK Correction):", attempt2.normalized);
-                }
-            }
-            
-            // Nigeria patterns
-            if (cleaned.match(/^(234)?(80|70|81|90|91)/) && !cleaned.startsWith('+')) {
-                const ngNumber = '+234' + cleaned.replace(/^234/, '');
-                const parsed2 = libphonenumber.parsePhoneNumberFromString(ngNumber);
-                if (parsed2 && parsed2.isValid()) {
-                    attempt2 = {
-                        normalized: parsed2.format('E.164'),
-                        country: parsed2.country,
-                        valid: true,
-                        attempt: 'nigeria_correction'
-                    };
-                    normalizationAttempts.push(attempt2);
-                    console.log("🔧 Attempt 2 (Nigeria Correction):", attempt2.normalized);
-                }
-            }
-        } catch (e) {
-            console.log("🔧 Attempt 2 failed:", e.message);
-        }
-
-        // ATTEMPT 3: Area code only (for numbers that lost country code)
-        let attempt3 = null;
-        try {
-            // Common area codes that might be missing country codes
-            const areaCodePatterns = [
-                { code: '1', patterns: [/^(469|214|972|713|281|832|210|817)/] }, // US
-                { code: '44', patterns: [/^(20|7|1|2|3|8|9)/] }, // UK
-                { code: '234', patterns: [/^(80|70|81|90|91)/] }, // Nigeria
-                { code: '33', patterns: [/^(1|2|3|4|5)/] }, // France
-                { code: '49', patterns: [/^(15|16|17|17)/] }, // Germany
-                { code: '91', patterns: [/^(98|99|90|80)/] }, // India
-            ];
-            
-            for (const country of areaCodePatterns) {
-                for (const pattern of country.patterns) {
-                    if (pattern.test(cleaned) && !cleaned.startsWith('+')) {
-                        const correctedNumber = '+' + country.code + cleaned;
-                        const parsed3 = libphonenumber.parsePhoneNumberFromString(correctedNumber);
-                        if (parsed3 && parsed3.isValid()) {
-                            attempt3 = {
-                                normalized: parsed3.format('E.164'),
-                                country: parsed3.country,
-                                valid: true,
-                                attempt: 'area_code_correction'
-                            };
-                            normalizationAttempts.push(attempt3);
-                            console.log("🔧 Attempt 3 (Area Code Correction):", attempt3.normalized);
-                            break;
-                        }
-                    }
-                }
-                if (attempt3) break;
-            }
-        } catch (e) {
-            console.log("🔧 Attempt 3 failed:", e.message);
-        }
-
-        // ATTEMPT 4: Digits only (fallback)
-        let attempt4 = null;
-        try {
-            const digitsOnly = cleaned.replace(/\D/g, '');
-            if (digitsOnly.length >= 8 && digitsOnly.length <= 15) {
-                attempt4 = {
-                    normalized: digitsOnly,
-                    country: null,
-                    valid: true,
-                    attempt: 'digits_only'
-                };
-                normalizationAttempts.push(attempt4);
-                console.log("🔧 Attempt 4 (Digits Only):", attempt4.normalized);
-            }
-        } catch (e) {
-            console.log("🔧 Attempt 4 failed:", e.message);
-        }
-
-        // Return all valid normalization attempts
+        
         if (normalizationAttempts.length > 0) {
             console.log("🎯 Multi-normalization results:", normalizationAttempts.map(a => a.normalized));
             return normalizationAttempts;
@@ -300,7 +165,6 @@ function multiNormalizePhoneNumber(phone) {
     }
 }
 
-// Simple phone cleaning - fallback if library not loaded
 function cleanPhoneNumber(phone) {
     if (!phone) return '';
     return phone.trim();
@@ -312,168 +176,9 @@ function capitalize(str) {
 }
 
 // ============================================
-// NOTIFICATION BADGES FUNCTIONS (MISSING FUNCTION ADDED)
-// ============================================
-
-function addNotificationBadges() {
-    console.log('Adding notification badges...');
-    
-    // Check for unread responses
-    checkForNewResponses();
-    
-    // Check for new homework/topics for each child
-    if (userChildren && userChildren.length > 0) {
-        userChildren.forEach(child => {
-            if (child.id) {
-                // Update counts for each child
-                updateTopicCount(child.id, 0); // Will be updated by real-time listeners
-                updateHomeworkCount(child.id, 0); // Will be updated by real-time listeners
-            }
-        });
-    }
-}
-
-// ============================================
-// REFERRAL SYSTEM FUNCTIONS
-// ============================================
-
-async function generateReferralCode() {
-    const chars = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ';
-    const prefix = 'BKH';
-    let code;
-    let isUnique = false;
-
-    while (!isUnique) {
-        let suffix = '';
-        for (let i = 0; i < 6; i++) {
-            suffix += chars.charAt(Math.floor(Math.random() * chars.length));
-        }
-        code = prefix + suffix;
-
-        // Check uniqueness in Firestore
-        const snapshot = await db.collection('parent_users').where('referralCode', '==', code).limit(1).get();
-        if (snapshot.empty) {
-            isUnique = true;
-        }
-    }
-    return code;
-}
-
-async function loadReferralRewards(parentUid) {
-    const rewardsContent = document.getElementById('rewardsContent');
-    if (!rewardsContent) return;
-    
-    rewardsContent.innerHTML = '<div class="text-center py-8"><div class="loading-spinner mx-auto" style="width: 40px; height: 40px;"></div><p class="text-green-600 font-semibold mt-4">Loading rewards data...</p></div>';
-
-    try {
-        // 1. Get the parent's referral code and current earnings
-        const userDoc = await db.collection('parent_users').doc(parentUid).get();
-        if (!userDoc.exists) {
-            rewardsContent.innerHTML = '<p class="text-red-500 text-center py-8">User data not found. Please sign in again.</p>';
-            return;
-        }
-        const userData = userDoc.data();
-        const referralCode = userData.referralCode || 'N/A';
-        const totalEarnings = userData.referralEarnings || 0;
-        
-        // 2. Query the referral_transactions collection for all transactions belonging to this code owner
-        const transactionsSnapshot = await db.collection('referral_transactions')
-            .where('ownerUid', '==', parentUid)
-            .orderBy('timestamp', 'desc')
-            .get();
-
-        let referralsHtml = '';
-        let pendingCount = 0;
-        let approvedCount = 0;
-        let paidCount = 0;
-
-        if (transactionsSnapshot.empty) {
-            referralsHtml = `
-                <tr><td colspan="4" class="text-center py-4 text-gray-500">No one has used your referral code yet.</td></tr>
-            `;
-        } else {
-            transactionsSnapshot.forEach(doc => {
-                const data = doc.data();
-                const status = data.status || 'pending';
-                const statusColor = status === 'paid' ? 'bg-green-100 text-green-800' : 
-                                    status === 'approved' ? 'bg-blue-100 text-blue-800' : 
-                                    'bg-yellow-100 text-yellow-800';
-                
-                if (status === 'pending') pendingCount++;
-                if (status === 'approved') approvedCount++;
-                if (status === 'paid') paidCount++;
-
-                const referredName = capitalize(data.referredStudentName || data.referredStudentPhone);
-                const rewardAmount = data.rewardAmount ? `₦${data.rewardAmount.toLocaleString()}` : '₦5,000';
-                const referralDate = data.timestamp?.toDate().toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }) || 'N/A';
-
-                referralsHtml += `
-                    <tr class="hover:bg-gray-50">
-                        <td class="px-4 py-3 text-sm font-medium text-gray-900">${referredName}</td>
-                        <td class="px-4 py-3 text-sm text-gray-500">${referralDate}</td>
-                        <td class="px-4 py-3 text-sm">
-                            <span class="inline-flex items-center px-3 py-0.5 rounded-full text-xs font-medium ${statusColor}">
-                                ${capitalize(status)}
-                            </span>
-                        </td>
-                        <td class="px-4 py-3 text-sm text-gray-900 font-bold">${rewardAmount}</td>
-                    </tr>
-                `;
-            });
-        }
-        
-        // Display the dashboard
-        rewardsContent.innerHTML = `
-            <div class="bg-blue-50 border-l-4 border-blue-600 p-4 rounded-lg mb-8 shadow-md">
-                <h2 class="text-2xl font-bold text-blue-800 mb-1">Your Referral Code</h2>
-                <p class="text-xl font-mono text-blue-600 tracking-wider p-2 bg-white inline-block rounded-lg border border-dashed border-blue-300 select-all">${referralCode}</p>
-                <p class="text-blue-700 mt-2">Share this code with other parents. They use it when registering their child, and you earn **₦5,000** once their child completes their first month!</p>
-            </div>
-
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-                <div class="bg-green-100 p-6 rounded-xl shadow-lg border-b-4 border-green-600">
-                    <p class="text-sm font-medium text-green-700">Total Earnings</p>
-                    <p class="text-3xl font-extrabold text-green-900 mt-1">₦${totalEarnings.toLocaleString()}</p>
-                </div>
-                <div class="bg-yellow-100 p-6 rounded-xl shadow-lg border-b-4 border-yellow-600">
-                    <p class="text-sm font-medium text-yellow-700">Approved Rewards (Awaiting Payment)</p>
-                    <p class="text-3xl font-extrabold text-yellow-900 mt-1">${approvedCount}</p>
-                </div>
-                <div class="bg-gray-100 p-6 rounded-xl shadow-lg border-b-4 border-gray-600">
-                    <p class="text-sm font-medium text-gray-700">Total Successful Referrals (Paid)</p>
-                    <p class="text-3xl font-extrabold text-gray-900 mt-1">${paidCount}</p>
-                </div>
-            </div>
-
-            <h3 class="text-xl font-bold text-gray-800 mb-4">Referral History</h3>
-            <div class="overflow-x-auto bg-white rounded-lg shadow">
-                <table class="min-w-full divide-y divide-gray-200">
-                    <thead class="bg-gray-50">
-                        <tr>
-                            <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Referred Parent/Student</th>
-                            <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date Used</th>
-                            <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                            <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Reward</th>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y divide-gray-200">
-                        ${referralsHtml}
-                    </tbody>
-                </table>
-            </div>
-        `;
-        
-    } catch (error) {
-        console.error('Error loading referral rewards:', error);
-        rewardsContent.innerHTML = '<p class="text-red-500 text-center py-8">An error occurred while loading your rewards data. Please try again later.</p>';
-    }
-}
-
-// ============================================
 // AUTHENTICATION FUNCTIONS
 // ============================================
 
-// Remember Me Functionality
 function setupRememberMe() {
     const rememberMe = localStorage.getItem('rememberMe');
     const savedEmail = localStorage.getItem('savedEmail');
@@ -501,15 +206,12 @@ async function findParentNameFromStudents(parentPhone) {
     try {
         console.log("Searching for parent name with phone:", parentPhone);
         
-        // Use multi-normalization to get all possible phone versions
         const normalizedVersions = multiNormalizePhoneNumber(parentPhone);
         const validVersions = normalizedVersions.filter(v => v.valid && v.normalized);
         
-        // Search with each normalized version
         for (const version of validVersions) {
-            console.log(`🔍 Searching parent name with: ${version.normalized} (${version.attempt})`);
+            console.log(`🔍 Searching parent name with: ${version.normalized}`);
             
-            // PRIMARY SEARCH: students collection
             const studentsSnapshot = await db.collection("students")
                 .where("normalizedParentPhone", "==", version.normalized)
                 .limit(1)
@@ -526,7 +228,6 @@ async function findParentNameFromStudents(parentPhone) {
                 }
             }
 
-            // SECONDARY SEARCH: pending_students collection
             const pendingStudentsSnapshot = await db.collection("pending_students")
                 .where("normalizedParentPhone", "==", version.normalized)
                 .limit(1)
@@ -543,7 +244,6 @@ async function findParentNameFromStudents(parentPhone) {
                 }
             }
 
-            // FALLBACK SEARCH: original phone fields
             const fallbackStudentsSnapshot = await db.collection("students")
                 .where("parentPhone", "==", version.normalized)
                 .limit(1)
@@ -576,7 +276,6 @@ async function handleSignUp() {
     const password = document.getElementById('signupPassword').value;
     const confirmPassword = document.getElementById('signupConfirmPassword').value;
 
-    // Validation
     if (!countryCode || !localPhone || !email || !password || !confirmPassword) {
         showMessage('Please fill in all fields including country code', 'error');
         return;
@@ -592,10 +291,8 @@ async function handleSignUp() {
         return;
     }
 
-    // Combine country code with local phone number
     const fullPhoneNumber = countryCode + localPhone.replace(/\D/g, '');
     
-    // Use multi-normalization for phone validation
     const phoneValidations = multiNormalizePhoneNumber(fullPhoneNumber);
     const validVersions = phoneValidations.filter(v => v.valid && v.normalized);
     
@@ -604,7 +301,6 @@ async function handleSignUp() {
         return;
     }
 
-    // Use the first valid normalized version
     const normalizedPhone = validVersions[0].normalized;
 
     const signUpBtn = document.getElementById('signUpBtn');
@@ -616,22 +312,18 @@ async function handleSignUp() {
     authLoader.classList.remove('hidden');
 
     try {
-        // Create user with email and password
         const userCredential = await auth.createUserWithEmailAndPassword(email, password);
         const user = userCredential.user;
 
-        // Find parent name from existing data
         const parentName = await findParentNameFromStudents(normalizedPhone);
         
-        // Generate referral code
         const referralCode = await generateReferralCode();
 
-        // Store user data in Firestore for easy retrieval
         await db.collection('parent_users').doc(user.uid).set({
-            phone: fullPhoneNumber, // Store full number with country code
-            normalizedPhone: normalizedPhone, // Store normalized version
-            countryCode: countryCode, // Store selected country code
-            localPhone: localPhone, // Store local number part
+            phone: fullPhoneNumber,
+            normalizedPhone: normalizedPhone,
+            countryCode: countryCode,
+            localPhone: localPhone,
             email: email,
             parentName: parentName || 'Parent',
             createdAt: firebase.firestore.FieldValue.serverTimestamp(),
@@ -641,7 +333,6 @@ async function handleSignUp() {
 
         showMessage('Account created successfully!', 'success');
         
-        // Automatically load dashboard after signup
         await loadParentDashboard(user.uid);
 
     } catch (error) {
@@ -694,12 +385,9 @@ async function handleSignIn() {
         let userId;
         let normalizedPhone;
         
-        // Determine if identifier is email or phone
         if (identifier.includes('@')) {
-            // Sign in with email
             userCredential = await auth.signInWithEmailAndPassword(identifier, password);
             userId = userCredential.user.uid;
-            // Get phone from user profile
             const userDoc = await db.collection('parent_users').doc(userId).get();
             if (userDoc.exists) {
                 const userData = userDoc.data();
@@ -707,7 +395,6 @@ async function handleSignIn() {
                 normalizedPhone = userData.normalizedPhone;
             }
         } else {
-            // Sign in with phone - use multi-normalization
             const phoneValidations = multiNormalizePhoneNumber(identifier);
             const validVersions = phoneValidations.filter(v => v.valid && v.normalized);
             
@@ -717,7 +404,6 @@ async function handleSignIn() {
             
             normalizedPhone = validVersions[0].normalized;
             
-            // Find user by any normalized phone version
             let userFound = false;
             for (const version of validVersions) {
                 const userQuery = await db.collection('parent_users')
@@ -736,7 +422,6 @@ async function handleSignIn() {
             }
 
             if (!userFound) {
-                // Fallback: search by original phone field
                 const fallbackQuery = await db.collection('parent_users')
                     .where('phone', '==', identifier)
                     .limit(1)
@@ -754,7 +439,6 @@ async function handleSignIn() {
         }
 
         if (!normalizedPhone && userPhone) {
-            // Normalize the phone if we have it
             const phoneValidations = multiNormalizePhoneNumber(userPhone);
             const validVersions = phoneValidations.filter(v => v.valid && v.normalized);
             if (validVersions.length > 0) {
@@ -766,10 +450,8 @@ async function handleSignIn() {
             throw new Error('Could not retrieve valid phone number for user');
         }
         
-        // Handle Remember Me
         handleRememberMe();
         
-        // Load parent dashboard
         await loadParentDashboard(userId);
 
     } catch (error) {
@@ -840,10 +522,9 @@ async function handlePasswordReset() {
 }
 
 // ============================================
-// NEW FEATURES: HELPER FUNCTIONS
+// NEW FEATURES: HELPER FUNCTIONS (FIXED)
 // ============================================
 
-// Format time function
 function formatTime(dateString) {
     if (!dateString) return 'N/A';
     
@@ -870,7 +551,6 @@ function formatTime(dateString) {
     }
 }
 
-// Format date function
 function formatDate(dateString) {
     if (!dateString) return 'N/A';
     
@@ -896,7 +576,6 @@ function formatDate(dateString) {
     }
 }
 
-// Format date without time
 function formatDateOnly(dateString) {
     if (!dateString) return 'N/A';
     
@@ -921,7 +600,6 @@ function formatDateOnly(dateString) {
     }
 }
 
-// Get days remaining until due date
 function getDaysRemaining(dueDate) {
     if (!dueDate) return null;
     
@@ -949,7 +627,6 @@ function getDaysRemaining(dueDate) {
     }
 }
 
-// Get homework status badge color
 function getHomeworkStatusColor(status) {
     const colors = {
         'assigned': 'bg-blue-100 text-blue-800',
@@ -961,7 +638,6 @@ function getHomeworkStatusColor(status) {
     return colors[status] || 'bg-gray-100 text-gray-800';
 }
 
-// Format time from string (HH:MM)
 function formatTimeFromString(timeString) {
     if (!timeString) return 'N/A';
     
@@ -981,41 +657,51 @@ function formatTimeFromString(timeString) {
 }
 
 // ============================================
-// TODAY'S TOPICS MANAGEMENT
+// TODAY'S TOPICS MANAGEMENT (FIXED - NO INDEX REQUIRED)
 // ============================================
 
 async function loadTodaysTopics(studentId, studentName) {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    const tomorrow = new Date(today);
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    
-    const weekAgo = new Date(today);
-    weekAgo.setDate(weekAgo.getDate() - 7);
     
     try {
-        // Get today's topics
+        // Get all topics for student (simple query - no index needed)
         const topicsSnapshot = await db.collection('daily_topics')
             .where('studentId', '==', studentId)
-            .where('date', '>=', today)
-            .where('date', '<', tomorrow)
-            .orderBy('date', 'desc')
             .get();
         
-        // Get past week's topics for history
-        const historySnapshot = await db.collection('daily_topics')
-            .where('studentId', '==', studentId)
-            .where('date', '>=', weekAgo)
-            .where('date', '<', today)
-            .orderBy('date', 'desc')
-            .get();
+        let todaysTopics = [];
+        let historicalTopics = [];
+        const weekAgo = new Date();
+        weekAgo.setDate(weekAgo.getDate() - 7);
+        
+        // Filter in JavaScript instead of Firestore query
+        topicsSnapshot.forEach(doc => {
+            const topic = doc.data();
+            const topicDate = topic.date?.toDate();
+            
+            if (topicDate) {
+                const isToday = topicDate.getDate() === today.getDate() &&
+                               topicDate.getMonth() === today.getMonth() &&
+                               topicDate.getFullYear() === today.getFullYear();
+                
+                if (isToday) {
+                    todaysTopics.push({ ...topic, id: doc.id });
+                } else if (topicDate >= weekAgo) {
+                    historicalTopics.push({ ...topic, id: doc.id });
+                }
+            }
+        });
+        
+        // Sort by date
+        todaysTopics.sort((a, b) => (b.date?.toDate() || 0) - (a.date?.toDate() || 0));
+        historicalTopics.sort((a, b) => (b.date?.toDate() || 0) - (a.date?.toDate() || 0));
         
         let topicsContent = '';
         
         // Today's topics
-        if (!topicsSnapshot.empty) {
-            topicsSnapshot.forEach(doc => {
-                const topic = doc.data();
+        if (todaysTopics.length > 0) {
+            todaysTopics.forEach(topic => {
                 const formattedDate = formatDate(topic.date);
                 
                 topicsContent += `
@@ -1048,9 +734,8 @@ async function loadTodaysTopics(studentId, studentName) {
         
         // Historical topics
         let historyContent = '';
-        if (!historySnapshot.empty) {
-            historySnapshot.forEach(doc => {
-                const topic = doc.data();
+        if (historicalTopics.length > 0) {
+            historicalTopics.forEach(topic => {
                 const formattedDate = formatDate(topic.date);
                 
                 historyContent += `
@@ -1069,8 +754,11 @@ async function loadTodaysTopics(studentId, studentName) {
             historyContent = '<p class="text-gray-500 text-center py-4">No recent topics</p>';
         }
         
+        // Update topic count
+        updateTopicCount(studentId, todaysTopics.length);
+        
         // Create topics section
-        const topicsSection = `
+        return `
             <div class="mb-8">
                 <div class="flex items-center justify-between mb-4">
                     <h3 class="text-lg font-bold text-green-800">Today's Topics</h3>
@@ -1092,11 +780,6 @@ async function loadTodaysTopics(studentId, studentName) {
                 </div>
             </div>
         `;
-        
-        // Add real-time listener for new topics
-        setupTopicsListener(studentId);
-        
-        return topicsSection;
     } catch (error) {
         console.error('Error loading topics:', error);
         return `
@@ -1108,32 +791,6 @@ async function loadTodaysTopics(studentId, studentName) {
             </div>
         `;
     }
-}
-
-function setupTopicsListener(studentId) {
-    if (childRealTimeListeners[`topics-${studentId}`]) return;
-    
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const tomorrow = new Date(today);
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    
-    const listener = db.collection('daily_topics')
-        .where('studentId', '==', studentId)
-        .where('date', '>=', today)
-        .where('date', '<', tomorrow)
-        .onSnapshot((snapshot) => {
-            snapshot.docChanges().forEach((change) => {
-                if (change.type === 'added') {
-                    showNotification('New topic added for today!', 'info');
-                    // Update topic count
-                    updateTopicCount(studentId, snapshot.size);
-                }
-            });
-        });
-    
-    childRealTimeListeners[`topics-${studentId}`] = listener;
-    realTimeListeners.push(listener);
 }
 
 function updateTopicCount(studentId, count) {
@@ -1181,7 +838,6 @@ function showTopicsHistory(studentId, studentName) {
     
     document.body.appendChild(modal);
     
-    // Load history data
     loadTopicsHistory(studentId);
 }
 
@@ -1189,16 +845,39 @@ async function loadTopicsHistory(studentId) {
     const content = document.getElementById('topicsHistoryContent');
     
     try {
-        const monthAgo = new Date();
-        monthAgo.setDate(monthAgo.getDate() - 30);
-        
+        // Simple query - get all topics and filter in JavaScript
         const snapshot = await db.collection('daily_topics')
             .where('studentId', '==', studentId)
-            .where('date', '>=', monthAgo)
-            .orderBy('date', 'desc')
             .get();
         
         if (snapshot.empty) {
+            content.innerHTML = `
+                <div class="text-center py-12">
+                    <div class="text-4xl mb-4">📚</div>
+                    <h4 class="text-lg font-semibold text-gray-700 mb-2">No Topic History</h4>
+                    <p class="text-gray-500">No topics have been recorded.</p>
+                </div>
+            `;
+            return;
+        }
+        
+        let topics = [];
+        snapshot.forEach(doc => {
+            topics.push({ id: doc.id, ...doc.data() });
+        });
+        
+        // Sort by date descending
+        topics.sort((a, b) => (b.date?.toDate() || 0) - (a.date?.toDate() || 0));
+        
+        // Take only last 30 days worth
+        const monthAgo = new Date();
+        monthAgo.setDate(monthAgo.getDate() - 30);
+        topics = topics.filter(topic => {
+            const topicDate = topic.date?.toDate();
+            return topicDate && topicDate >= monthAgo;
+        });
+        
+        if (topics.length === 0) {
             content.innerHTML = `
                 <div class="text-center py-12">
                     <div class="text-4xl mb-4">📚</div>
@@ -1212,9 +891,10 @@ async function loadTopicsHistory(studentId) {
         let historyHTML = '';
         let currentDate = '';
         
-        snapshot.forEach(doc => {
-            const topic = doc.data();
-            const topicDate = topic.date.toDate();
+        topics.forEach(topic => {
+            const topicDate = topic.date?.toDate();
+            if (!topicDate) return;
+            
             const dateString = topicDate.toLocaleDateString('en-US', {
                 weekday: 'long',
                 year: 'numeric',
@@ -1265,13 +945,13 @@ async function loadTopicsHistory(studentId) {
 
 async function loadHomeworkAssignments(studentId, studentName) {
     try {
-        // Get active assignments
+        // Get all assignments for student
         const snapshot = await db.collection('homework_assignments')
             .where('studentId', '==', studentId)
-            .orderBy('dueDate', 'asc')
             .get();
         
         if (snapshot.empty) {
+            updateHomeworkCount(studentId, 0);
             return `
                 <div class="mb-8">
                     <h3 class="text-lg font-bold text-green-800 mb-4">Homework Assignments</h3>
@@ -1284,24 +964,43 @@ async function loadHomeworkAssignments(studentId, studentName) {
             `;
         }
         
-        let assignmentsHTML = '';
+        let assignments = [];
         let pendingCount = 0;
         let overdueCount = 0;
         const today = new Date();
         
         snapshot.forEach(doc => {
             const assignment = { id: doc.id, ...doc.data() };
+            assignments.push(assignment);
+            
             const dueDate = assignment.dueDate?.toDate();
-            const daysRemaining = getDaysRemaining(assignment.dueDate);
             let status = assignment.status || 'assigned';
             
-            // Check if overdue
             if (dueDate && dueDate < today && status === 'assigned') {
                 status = 'overdue';
                 overdueCount++;
             }
             
             if (status === 'assigned') pendingCount++;
+        });
+        
+        // Sort by due date
+        assignments.sort((a, b) => {
+            const dateA = a.dueDate?.toDate() || new Date(0);
+            const dateB = b.dueDate?.toDate() || new Date(0);
+            return dateA - dateB;
+        });
+        
+        let assignmentsHTML = '';
+        
+        assignments.forEach(assignment => {
+            const dueDate = assignment.dueDate?.toDate();
+            const daysRemaining = getDaysRemaining(assignment.dueDate);
+            let status = assignment.status || 'assigned';
+            
+            if (dueDate && dueDate < today && status === 'assigned') {
+                status = 'overdue';
+            }
             
             const statusColor = getHomeworkStatusColor(status);
             const dueText = dueDate ? formatDateOnly(dueDate) : 'No due date';
@@ -1338,7 +1037,7 @@ async function loadHomeworkAssignments(studentId, studentName) {
                                     <span class="mr-1">📎</span> Download
                                 </button>
                             ` : ''}
-                            <button onclick="viewHomeworkDetails('${studentId}', '${studentName}', '${doc.id}')" 
+                            <button onclick="viewHomeworkDetails('${studentId}', '${studentName}', '${assignment.id}')" 
                                     class="text-green-600 hover:text-green-800 text-sm font-medium">
                                 View Details
                             </button>
@@ -1409,7 +1108,6 @@ async function loadHomeworkAssignments(studentId, studentName) {
 }
 
 function downloadHomeworkFile(fileUrl, fileName) {
-    // Create a temporary link and trigger download
     const link = document.createElement('a');
     link.href = fileUrl;
     link.download = fileName || 'homework_file';
@@ -1454,7 +1152,6 @@ function viewHomeworkDetails(studentId, studentName, homeworkId) {
     
     document.body.appendChild(modal);
     
-    // Load homework details
     loadHomeworkDetails(studentId, homeworkId);
 }
 
@@ -1591,223 +1288,11 @@ async function loadHomeworkDetails(studentId, homeworkId) {
     }
 }
 
-function showAllHomework(studentId, studentName) {
-    const modal = document.createElement('div');
-    modal.id = 'allHomeworkModal';
-    modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4';
-    
-    modal.innerHTML = `
-        <div class="bg-white rounded-xl shadow-2xl w-full max-w-4xl max-h-[80vh] flex flex-col">
-            <div class="flex justify-between items-center border-b p-6">
-                <h3 class="text-xl font-bold text-green-800">All Homework - ${studentName}</h3>
-                <button onclick="document.getElementById('allHomeworkModal').remove()" 
-                        class="text-gray-500 hover:text-gray-700 text-2xl">
-                    ×
-                </button>
-            </div>
-            
-            <div class="p-6 overflow-y-auto flex-1">
-                <div class="mb-4 flex gap-2">
-                    <button onclick="filterHomework('all')" class="filter-btn active px-4 py-2 rounded-lg bg-green-100 text-green-800">
-                        All
-                    </button>
-                    <button onclick="filterHomework('pending')" class="filter-btn px-4 py-2 rounded-lg bg-gray-100 text-gray-800">
-                        Pending
-                    </button>
-                    <button onclick="filterHomework('overdue')" class="filter-btn px-4 py-2 rounded-lg bg-red-100 text-red-800">
-                        Overdue
-                    </button>
-                    <button onclick="filterHomework('completed')" class="filter-btn px-4 py-2 rounded-lg bg-purple-100 text-purple-800">
-                        Completed
-                    </button>
-                </div>
-                <div id="allHomeworkContent" class="space-y-4">
-                    <div class="text-center py-8">
-                        <div class="loading-spinner mx-auto"></div>
-                        <p class="text-green-600 font-semibold mt-4">Loading homework...</p>
-                    </div>
-                </div>
-            </div>
-            
-            <div class="border-t p-4 flex justify-between">
-                <div class="text-sm text-gray-500" id="homeworkCount">
-                    
-                </div>
-                <button onclick="document.getElementById('allHomeworkModal').remove()" 
-                        class="bg-gray-100 hover:bg-gray-200 text-gray-800 px-4 py-2 rounded-lg">
-                    Close
-                </button>
-            </div>
-        </div>
-    `;
-    
-    document.body.appendChild(modal);
-    
-    // Load all homework
-    loadAllHomework(studentId);
-}
-
-async function loadAllHomework(studentId) {
-    const content = document.getElementById('allHomeworkContent');
-    
-    try {
-        const snapshot = await db.collection('homework_assignments')
-            .where('studentId', '==', studentId)
-            .orderBy('dueDate', 'desc')
-            .get();
-        
-        if (snapshot.empty) {
-            content.innerHTML = `
-                <div class="text-center py-12">
-                    <div class="text-4xl mb-4">📝</div>
-                    <h4 class="text-lg font-semibold text-gray-700 mb-2">No Homework Assignments</h4>
-                    <p class="text-gray-500">No homework has been assigned yet.</p>
-                </div>
-            `;
-            document.getElementById('homeworkCount').textContent = '0 assignments';
-            return;
-        }
-        
-        let assignments = [];
-        snapshot.forEach(doc => {
-            assignments.push({ id: doc.id, ...doc.data() });
-        });
-        
-        // Update count
-        document.getElementById('homeworkCount').textContent = `${assignments.length} assignment${assignments.length !== 1 ? 's' : ''}`;
-        
-        // Render all assignments
-        renderHomeworkList(assignments);
-        
-        // Setup filter functionality
-        setupHomeworkFilters(assignments);
-    } catch (error) {
-        console.error('Error loading all homework:', error);
-        content.innerHTML = `
-            <div class="bg-red-50 border border-red-200 rounded-lg p-4">
-                <p class="text-red-600">Error loading homework. Please try again.</p>
-            </div>
-        `;
-    }
-}
-
-function renderHomeworkList(assignments) {
-    const content = document.getElementById('allHomeworkContent');
-    const today = new Date();
-    
-    if (assignments.length === 0) {
-        content.innerHTML = '<p class="text-gray-500 text-center py-8">No assignments match the filter.</p>';
-        return;
-    }
-    
-    let html = '';
-    
-    assignments.forEach(assignment => {
-        const dueDate = assignment.dueDate?.toDate();
-        const daysRemaining = getDaysRemaining(assignment.dueDate);
-        let status = assignment.status || 'assigned';
-        
-        if (dueDate && dueDate < today && status === 'assigned') {
-            status = 'overdue';
-        }
-        
-        const statusColor = getHomeworkStatusColor(status);
-        
-        html += `
-            <div class="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow" data-status="${status}">
-                <div class="flex justify-between items-start">
-                    <div class="flex-1">
-                        <h4 class="font-semibold text-gray-800">${assignment.title || 'Untitled Assignment'}</h4>
-                        <p class="text-gray-600 text-sm mt-1 line-clamp-2">
-                            ${assignment.description || 'No description'}
-                        </p>
-                    </div>
-                    <span class="ml-3 px-3 py-1 rounded-full text-xs font-semibold ${statusColor} whitespace-nowrap">
-                        ${status.charAt(0).toUpperCase() + status.slice(1)}
-                    </span>
-                </div>
-                
-                <div class="flex flex-wrap justify-between items-center mt-4 text-sm">
-                    <div class="space-y-1">
-                        <div class="text-gray-500">
-                            <strong>Due:</strong> ${dueDate ? formatDate(dueDate) : 'No due date'}
-                        </div>
-                        <div>
-                            ${assignment.tutorName ? `
-                                <span class="text-gray-500">Tutor: ${assignment.tutorName}</span>
-                            ` : ''}
-                        </div>
-                    </div>
-                    
-                    <div class="flex gap-2 mt-2">
-                        ${assignment.fileUrl ? `
-                            <button onclick="downloadHomeworkFile('${assignment.fileUrl}', '${assignment.title}')" 
-                                    class="text-blue-600 hover:text-blue-800 text-sm font-medium">
-                                Download
-                            </button>
-                        ` : ''}
-                        <button onclick="viewHomeworkDetails('${assignment.studentId}', '${assignment.studentName || ''}', '${assignment.id}')" 
-                                class="text-green-600 hover:text-green-800 text-sm font-medium">
-                            View
-                        </button>
-                    </div>
-                </div>
-            </div>
-        `;
-    });
-    
-    content.innerHTML = html;
-}
-
-function setupHomeworkFilters(assignments) {
-    // Add click handlers to filter buttons
-    const filterButtons = document.querySelectorAll('.filter-btn');
-    filterButtons.forEach(btn => {
-        btn.addEventListener('click', function() {
-            // Update active state
-            filterButtons.forEach(b => b.classList.remove('active', 'bg-green-100', 'text-green-800'));
-            filterButtons.forEach(b => b.classList.add('bg-gray-100', 'text-gray-800'));
-            this.classList.add('active', 'bg-green-100', 'text-green-800');
-            this.classList.remove('bg-gray-100', 'text-gray-800');
-            
-            // Filter assignments
-            const filter = this.textContent.toLowerCase();
-            let filtered = assignments;
-            
-            if (filter === 'pending') {
-                filtered = assignments.filter(a => (a.status || 'assigned') === 'assigned' && 
-                    (!a.dueDate || a.dueDate.toDate() >= new Date()));
-            } else if (filter === 'overdue') {
-                filtered = assignments.filter(a => (a.status || 'assigned') === 'assigned' && 
-                    a.dueDate && a.dueDate.toDate() < new Date());
-            } else if (filter === 'completed') {
-                filtered = assignments.filter(a => ['submitted', 'graded', 'completed'].includes(a.status || ''));
-            }
-            
-            renderHomeworkList(filtered);
-        });
-    });
-}
-
 function updateHomeworkCount(studentId, count) {
     const countElement = document.getElementById(`hwCount-${studentId}`);
     if (countElement) {
         countElement.textContent = `${count} assignment${count !== 1 ? 's' : ''}`;
     }
-}
-
-function setupHomeworkListener(studentId) {
-    if (childRealTimeListeners[`homework-${studentId}`]) return;
-    
-    const listener = db.collection('homework_assignments')
-        .where('studentId', '==', studentId)
-        .where('status', 'in', ['assigned', 'submitted'])
-        .onSnapshot((snapshot) => {
-            updateHomeworkCount(studentId, snapshot.size);
-        });
-    
-    childRealTimeListeners[`homework-${studentId}`] = listener;
-    realTimeListeners.push(listener);
 }
 
 function toggleEmailReminders(studentId) {
@@ -1816,7 +1301,6 @@ function toggleEmailReminders(studentId) {
     
     if (!button || !status) return;
     
-    // Toggle the status
     const currentStatus = status.textContent.toLowerCase();
     const newStatus = currentStatus === 'enabled' ? 'Disabled' : 'Enabled';
     const newColor = currentStatus === 'enabled' ? 'text-red-600' : 'text-green-600';
@@ -1824,7 +1308,6 @@ function toggleEmailReminders(studentId) {
     status.textContent = newStatus;
     status.className = newColor;
     
-    // Store preference in localStorage
     localStorage.setItem(`emailReminders-${studentId}`, newStatus.toLowerCase());
     
     showNotification(`Email reminders ${newStatus.toLowerCase()} for this student`, 'info');
@@ -1836,7 +1319,6 @@ function toggleEmailReminders(studentId) {
 
 async function loadWeeklySchedule(studentId, studentName) {
     try {
-        // Get schedule for student
         const snapshot = await db.collection('schedules')
             .where('studentId', '==', studentId)
             .limit(1)
@@ -1848,7 +1330,6 @@ async function loadWeeklySchedule(studentId, studentName) {
             const scheduleData = snapshot.docs[0].data();
             const schedule = scheduleData.schedule || [];
             
-            // Get tutor info if available
             let tutorInfo = {};
             if (scheduleData.tutorId) {
                 try {
@@ -1861,10 +1342,7 @@ async function loadWeeklySchedule(studentId, studentName) {
                 }
             }
             
-            // Create weekly schedule
             scheduleHTML = createWeeklyScheduleView(schedule, tutorInfo);
-            
-            // Update next class
             updateNextClass(studentId, schedule);
         } else {
             scheduleHTML = `
@@ -1898,9 +1376,6 @@ async function loadWeeklySchedule(studentId, studentName) {
                 
                 <div class="mt-4 text-sm text-gray-500">
                     <p><strong>Note:</strong> Schedule may change due to tutor availability or holidays.</p>
-                    ${scheduleHTML.includes('overnight-indicator') ? `
-                        <p class="mt-1">🌙 Overnight classes extend past midnight</p>
-                    ` : ''}
                 </div>
             </div>
         `;
@@ -1918,10 +1393,8 @@ async function loadWeeklySchedule(studentId, studentName) {
 }
 
 function createWeeklyScheduleView(scheduleArray, tutorInfo) {
-    // Define days of week
     const daysOfWeek = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
     
-    // Group by day
     const scheduleByDay = {};
     daysOfWeek.forEach(day => scheduleByDay[day] = []);
     
@@ -1932,7 +1405,6 @@ function createWeeklyScheduleView(scheduleArray, tutorInfo) {
         }
     });
     
-    // Sort sessions by start time
     Object.keys(scheduleByDay).forEach(day => {
         scheduleByDay[day].sort((a, b) => {
             const timeA = a.startTime || '00:00';
@@ -1941,7 +1413,6 @@ function createWeeklyScheduleView(scheduleArray, tutorInfo) {
         });
     });
     
-    // Create schedule HTML
     let scheduleHTML = `
         <div class="overflow-x-auto">
             <table class="min-w-full divide-y divide-gray-200">
@@ -2009,15 +1480,11 @@ function renderDaySchedule(sessions, tutorInfo) {
         const endTime = session.endTime || '00:00';
         const subject = session.subject || 'Class';
         
-        // Check if overnight (end time is earlier than start time)
-        const isOvernight = startTime > endTime;
-        
         sessionsHTML += `
             <div class="mb-3 p-3 bg-blue-50 border border-blue-200 rounded-lg ${index > 0 ? 'mt-2' : ''}">
                 <div class="font-medium text-blue-800 mb-1">${subject}</div>
                 <div class="text-sm text-gray-600 mb-1">
                     ${formatTimeFromString(startTime)} - ${formatTimeFromString(endTime)}
-                    ${isOvernight ? ' <span class="overnight-indicator">🌙</span>' : ''}
                 </div>
                 ${session.notes ? `
                     <div class="text-xs text-gray-500 mt-1">${session.notes}</div>
@@ -2052,152 +1519,8 @@ function updateNextClass(studentId, scheduleArray) {
     }
 }
 
-function printSchedule(studentId, studentName) {
-    const scheduleElement = document.getElementById(`schedule-${studentId}`);
-    if (!scheduleElement) return;
-    
-    const printWindow = window.open('', '_blank');
-    printWindow.document.write(`
-        <html>
-            <head>
-                <title>Schedule - ${studentName}</title>
-                <style>
-                    body { font-family: Arial, sans-serif; margin: 20px; }
-                    h1 { color: #166534; }
-                    table { border-collapse: collapse; width: 100%; margin-top: 20px; }
-                    th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-                    th { background-color: #f0fdf4; color: #166534; }
-                    .session { background-color: #eff6ff; margin: 5px 0; padding: 5px; border-radius: 3px; }
-                    .footer { margin-top: 20px; font-size: 12px; color: #666; }
-                </style>
-            </head>
-            <body>
-                <h1>Weekly Schedule - ${studentName}</h1>
-                <p>Printed on ${new Date().toLocaleDateString()}</p>
-                ${scheduleElement.outerHTML}
-                <div class="footer">
-                    <p>Blooming Kids House - Parent Portal</p>
-                </div>
-            </body>
-        </html>
-    `);
-    printWindow.document.close();
-    printWindow.print();
-}
-
-function exportSchedule(studentId, studentName) {
-    const scheduleElement = document.getElementById(`schedule-${studentId}`);
-    if (!scheduleElement) return;
-    
-    const htmlContent = `
-        <!DOCTYPE html>
-        <html>
-            <head>
-                <meta charset="UTF-8">
-                <title>Schedule - ${studentName}</title>
-                <style>
-                    body { font-family: Arial, sans-serif; margin: 20px; }
-                    h1 { color: #166534; }
-                    table { border-collapse: collapse; width: 100%; margin-top: 20px; }
-                    th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-                    th { background-color: #f0fdf4; color: #166534; }
-                    .session { background-color: #eff6ff; margin: 5px 0; padding: 5px; border-radius: 3px; }
-                </style>
-            </head>
-            <body>
-                <h1>Weekly Schedule - ${studentName}</h1>
-                <p>Exported on ${new Date().toLocaleDateString()}</p>
-                ${scheduleElement.outerHTML}
-            </body>
-        </html>
-    `;
-    
-    const blob = new Blob([htmlContent], { type: 'text/html' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `Schedule_${studentName}_${new Date().toISOString().split('T')[0]}.html`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-}
-
 // ============================================
-// CHILD DETAILS VIEW
-// ============================================
-
-async function loadChildDetails(studentId) {
-    const detailsContent = document.getElementById(`childDetails-${studentId}`);
-    if (!detailsContent) return;
-    
-    try {
-        // Get student details
-        const studentDoc = await db.collection('students').doc(studentId).get();
-        if (!studentDoc.exists) {
-            detailsContent.innerHTML = '<p class="text-red-500">Student not found</p>';
-            return;
-        }
-        
-        const studentData = studentDoc.data();
-        const studentName = studentData.fullName || studentId;
-        
-        // Show loading state
-        detailsContent.innerHTML = `
-            <div class="text-center py-8">
-                <div class="loading-spinner mx-auto"></div>
-                <p class="text-green-600 font-semibold mt-4">Loading ${studentName}'s details...</p>
-            </div>
-        `;
-        
-        // Load all sections
-        const topicsHTML = await loadTodaysTopics(studentId, studentName);
-        const homeworkHTML = await loadHomeworkAssignments(studentId, studentName);
-        const scheduleHTML = await loadWeeklySchedule(studentId, studentName);
-        
-        // Combine all sections
-        detailsContent.innerHTML = `
-            <div class="space-y-8">
-                ${topicsHTML}
-                ${homeworkHTML}
-                ${scheduleHTML}
-            </div>
-        `;
-        
-    } catch (error) {
-        console.error('Error loading child details:', error);
-        detailsContent.innerHTML = `
-            <div class="bg-red-50 border border-red-200 rounded-lg p-4">
-                <p class="text-red-600">Error loading details. Please try again.</p>
-            </div>
-        `;
-    }
-}
-
-function toggleChildDetails(studentId, studentName) {
-    const detailsContent = document.getElementById(`childDetails-${studentId}`);
-    const toggleBtn = document.getElementById(`toggleBtn-${studentId}`);
-    
-    if (!detailsContent || !toggleBtn) return;
-    
-    if (detailsContent.classList.contains('hidden')) {
-        // Show details
-        detailsContent.classList.remove('hidden');
-        toggleBtn.innerHTML = `<span class="mr-1">▲</span> Hide Details`;
-        
-        // Load details if not already loaded
-        if (detailsContent.innerHTML.trim() === '') {
-            loadChildDetails(studentId);
-        }
-    } else {
-        // Hide details
-        detailsContent.classList.add('hidden');
-        toggleBtn.innerHTML = `<span class="mr-1">▼</span> View Details`;
-    }
-}
-
-// ============================================
-// MAIN PARENT DASHBOARD
+// MAIN PARENT DASHBOARD WITH STUDENT TABS
 // ============================================
 
 async function loadParentDashboard(parentUid) {
@@ -2210,7 +1533,6 @@ async function loadParentDashboard(parentUid) {
     authLoader.classList.remove("hidden");
 
     try {
-        // Get parent data
         const parentDoc = await db.collection('parent_users').doc(parentUid).get();
         if (!parentDoc.exists) {
             showMessage('Parent data not found. Please sign in again.', 'error');
@@ -2221,7 +1543,6 @@ async function loadParentDashboard(parentUid) {
         const parentPhone = parentData.normalizedPhone || parentData.phone;
         const parentName = parentData.parentName || 'Parent';
         
-        // Update welcome message
         welcomeMessage.textContent = `Welcome, ${parentName}!`;
         currentUserData = parentData;
         
@@ -2230,13 +1551,11 @@ async function loadParentDashboard(parentUid) {
             .where('normalizedParentPhone', '==', parentPhone)
             .get();
         
-        // Also check pending students
         const pendingSnapshot = await db.collection('pending_students')
             .where('normalizedParentPhone', '==', parentPhone)
             .get();
         
         if (studentsSnapshot.empty && pendingSnapshot.empty) {
-            // No children found
             showNoChildrenView();
             authArea.classList.add("hidden");
             reportArea.classList.remove("hidden");
@@ -2249,19 +1568,9 @@ async function loadParentDashboard(parentUid) {
         // Add CSS for new features
         addDashboardCSS();
         
-        // Add notification badges to navigation
-        addNotificationBadges();
-        
-        // Create children list
-        let childrenHTML = `
-            <div class="mb-8">
-                <h2 class="text-2xl font-bold text-green-800 mb-6">Your Children</h2>
-                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        `;
-        
+        // Combine all children
         const allChildren = [];
         
-        // Add active students
         studentsSnapshot.forEach((doc, index) => {
             const child = doc.data();
             const childId = doc.id;
@@ -2269,7 +1578,6 @@ async function loadParentDashboard(parentUid) {
             allChildren.push({ id: childId, name: childName, data: child, type: 'active' });
         });
         
-        // Add pending students
         pendingSnapshot.forEach((doc, index) => {
             const child = doc.data();
             const childId = doc.id;
@@ -2277,12 +1585,143 @@ async function loadParentDashboard(parentUid) {
             allChildren.push({ id: childId, name: childName, data: child, type: 'pending' });
         });
         
-        // Display each child
+        // Store children globally
+        userChildren = allChildren;
+        
+        // Create tabs for each student
+        let tabsHTML = `
+            <div class="mb-6">
+                <div class="flex flex-wrap gap-2 border-b">
+        `;
+        
+        // Add "All Children" tab first
+        tabsHTML += `
+            <button onclick="switchStudentTab('all')" 
+                    id="studentTab-all"
+                    class="px-4 py-2 font-medium rounded-t-lg student-tab active-student-tab">
+                👨‍👩‍👧‍👦 All Children
+            </button>
+        `;
+        
+        // Add tab for each child
         allChildren.forEach((child, index) => {
             const childId = child.id;
             const childName = child.name;
             const childType = child.type;
+            const tabClass = childType === 'active' ? 'bg-green-50 text-green-700' : 'bg-yellow-50 text-yellow-700';
+            
+            tabsHTML += `
+                <button onclick="switchStudentTab('${childId}')" 
+                        id="studentTab-${childId}"
+                        class="px-4 py-2 font-medium rounded-t-lg student-tab ${tabClass}">
+                    ${childName} ${childType === 'pending' ? '(Pending)' : ''}
+                </button>
+            `;
+        });
+        
+        tabsHTML += `
+                </div>
+            </div>
+            
+            <div id="studentContentArea">
+                <div id="studentContent-all" class="student-content active-student-content">
+                    <!-- All children view will be loaded here -->
+                </div>
+        `;
+        
+        // Add content area for each child
+        allChildren.forEach(child => {
+            const childId = child.id;
+            tabsHTML += `
+                <div id="studentContent-${childId}" class="student-content hidden">
+                    <!-- Individual child content will be loaded here -->
+                </div>
+            `;
+        });
+        
+        tabsHTML += `</div>`;
+        
+        reportContent.innerHTML = tabsHTML;
+        
+        // Load content for "All Children" tab
+        await loadAllChildrenView(allChildren);
+        
+        // Load content for each child tab
+        allChildren.forEach(async (child) => {
+            await loadStudentContent(child.id, child.name, child.type);
+        });
+        
+        // Show dashboard
+        authArea.classList.add("hidden");
+        reportArea.classList.remove("hidden");
+        
+        // Add navigation buttons
+        addViewResponsesButton();
+        addManualRefreshButton();
+        
+        // Load referral data
+        loadReferralRewards(parentUid);
+        
+    } catch (error) {
+        console.error('Error loading parent dashboard:', error);
+        showMessage('Error loading dashboard. Please try again.', 'error');
+    } finally {
+        authLoader.classList.add("hidden");
+    }
+}
+
+async function loadAllChildrenView(children) {
+    const contentArea = document.getElementById('studentContent-all');
+    if (!contentArea) return;
+    
+    contentArea.innerHTML = `
+        <div class="text-center py-8">
+            <div class="loading-spinner mx-auto"></div>
+            <p class="text-green-600 font-semibold mt-4">Loading children overview...</p>
+        </div>
+    `;
+    
+    try {
+        let childrenHTML = `
+            <div class="mb-8">
+                <h2 class="text-2xl font-bold text-green-800 mb-6">All Your Children</h2>
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        `;
+        
+        for (const child of children) {
+            const childId = child.id;
+            const childName = child.name;
+            const childType = child.type;
             const childData = child.data;
+            
+            // Get counts for this child
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            
+            // Get topic count
+            const topicsSnapshot = await db.collection('daily_topics')
+                .where('studentId', '==', childId)
+                .get();
+            
+            let todaysTopicCount = 0;
+            topicsSnapshot.forEach(doc => {
+                const topic = doc.data();
+                const topicDate = topic.date?.toDate();
+                if (topicDate) {
+                    const isToday = topicDate.getDate() === today.getDate() &&
+                                   topicDate.getMonth() === today.getMonth() &&
+                                   topicDate.getFullYear() === today.getFullYear();
+                    if (isToday) todaysTopicCount++;
+                }
+            });
+            
+            // Get homework count
+            const homeworkSnapshot = await db.collection('homework_assignments')
+                .where('studentId', '==', childId)
+                .where('status', 'in', ['assigned', 'submitted'])
+                .get();
+            
+            const hwCount = homeworkSnapshot.size;
             
             childrenHTML += `
                 <div class="child-card bg-white border border-gray-200 rounded-xl p-6 shadow-sm hover:shadow-md transition-shadow">
@@ -2299,167 +1738,345 @@ async function loadParentDashboard(parentUid) {
                     <div class="space-y-3 mb-6">
                         <div class="flex items-center text-sm">
                             <span class="mr-2">📚</span>
-                            <span>Today's Topics: <span id="topicCount-${childId}" class="font-semibold">Loading...</span></span>
+                            <span>Today's Topics: <span class="font-semibold">${todaysTopicCount} topic${todaysTopicCount !== 1 ? 's' : ''}</span></span>
                         </div>
                         <div class="flex items-center text-sm">
                             <span class="mr-2">📝</span>
-                            <span>Homework: <span id="hwCount-${childId}" class="font-semibold">Loading...</span></span>
+                            <span>Homework: <span class="font-semibold">${hwCount} assignment${hwCount !== 1 ? 's' : ''}</span></span>
                         </div>
                         <div class="flex items-center text-sm">
                             <span class="mr-2">📅</span>
-                            <span>Next Class: <span id="nextClass-${childId}" class="font-semibold">Loading...</span></span>
+                            <span>Status: <span class="font-semibold">${childType === 'active' ? 'Active' : 'Pending Registration'}</span></span>
                         </div>
                     </div>
                     
-                    <button onclick="toggleChildDetails('${childId}', '${childName}')" 
-                            id="toggleBtn-${childId}"
-                            class="w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-2 px-4 rounded-lg transition-colors flex items-center justify-center">
-                        <span class="mr-1">▼</span> View Details
+                    <button onclick="switchStudentTab('${childId}')" 
+                            class="w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-2 px-4 rounded-lg transition-colors">
+                        View ${childName}'s Details
                     </button>
-                    
-                    <div id="childDetails-${childId}" class="hidden mt-6 pt-6 border-t">
-                        <!-- Details will be loaded here -->
-                    </div>
                 </div>
             `;
-        });
+        }
         
         childrenHTML += `
                 </div>
             </div>
+            
+            <div class="bg-blue-50 border-l-4 border-blue-600 p-6 rounded-lg">
+                <h3 class="text-xl font-bold text-blue-800 mb-3">Quick Actions</h3>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <button onclick="showFeedbackModal()" class="bg-white border border-blue-200 rounded-lg p-4 hover:bg-blue-50 transition-colors">
+                        <div class="text-2xl mb-2">💬</div>
+                        <h4 class="font-semibold text-blue-700">Send Feedback</h4>
+                        <p class="text-sm text-gray-600 mt-1">Contact tutors or admins</p>
+                    </button>
+                    <button onclick="showResponsesModal()" class="bg-white border border-green-200 rounded-lg p-4 hover:bg-green-50 transition-colors">
+                        <div class="text-2xl mb-2">📨</div>
+                        <h4 class="font-semibold text-green-700">View Responses</h4>
+                        <p class="text-sm text-gray-600 mt-1">Check admin replies</p>
+                    </button>
+                    <button onclick="switchMainTab('rewards')" class="bg-white border border-yellow-200 rounded-lg p-4 hover:bg-yellow-50 transition-colors">
+                        <div class="text-2xl mb-2">💰</div>
+                        <h4 class="font-semibold text-yellow-700">Referral Rewards</h4>
+                        <p class="text-sm text-gray-600 mt-1">Earn ₦5,000 per referral</p>
+                    </button>
+                </div>
+            </div>
         `;
         
-        reportContent.innerHTML = childrenHTML;
-        
-        // Load initial counts and details for each child
-        allChildren.forEach(async (child) => {
-            const childId = child.id;
-            const childName = child.name;
-            
-            // Load counts
-            await loadChildCounts(childId, childName);
-            
-            // Setup real-time listeners
-            setupChildListeners(childId);
-        });
-        
-        // Show dashboard
-        authArea.classList.add("hidden");
-        reportArea.classList.remove("hidden");
-        
-        // Add buttons to welcome section
-        addViewResponsesButton();
-        addManualRefreshButton();
-        
-        // Load initial referral data for the rewards dashboard tab
-        loadReferralRewards(parentUid);
+        contentArea.innerHTML = childrenHTML;
         
     } catch (error) {
-        console.error('Error loading parent dashboard:', error);
-        showMessage('Error loading dashboard. Please try again.', 'error');
-    } finally {
-        authLoader.classList.add("hidden");
+        console.error('Error loading all children view:', error);
+        contentArea.innerHTML = `
+            <div class="bg-red-50 border border-red-200 rounded-lg p-4">
+                <p class="text-red-600">Error loading children overview. Please try again.</p>
+            </div>
+        `;
     }
 }
 
-async function loadChildCounts(childId, childName) {
+async function loadStudentContent(studentId, studentName, studentType) {
+    const contentArea = document.getElementById(`studentContent-${studentId}`);
+    if (!contentArea) return;
+    
+    contentArea.innerHTML = `
+        <div class="text-center py-8">
+            <div class="loading-spinner mx-auto"></div>
+            <p class="text-green-600 font-semibold mt-4">Loading ${studentName}'s details...</p>
+        </div>
+    `;
+    
     try {
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-        const tomorrow = new Date(today);
-        tomorrow.setDate(tomorrow.getDate() + 1);
+        // Load all sections for this student
+        const topicsHTML = await loadTodaysTopics(studentId, studentName);
+        const homeworkHTML = await loadHomeworkAssignments(studentId, studentName);
+        const scheduleHTML = await loadWeeklySchedule(studentId, studentName);
         
-        // Load topic count
-        const topicsSnapshot = await db.collection('daily_topics')
-            .where('studentId', '==', childId)
-            .where('date', '>=', today)
-            .where('date', '<', tomorrow)
-            .get();
+        const studentInfo = userChildren.find(c => c.id === studentId);
+        const studentData = studentInfo?.data || {};
         
-        const topicCount = topicsSnapshot.size;
-        updateTopicCount(childId, topicCount);
-        
-        // Load homework count
-        const homeworkSnapshot = await db.collection('homework_assignments')
-            .where('studentId', '==', childId)
-            .where('status', 'in', ['assigned', 'submitted'])
-            .get();
-        
-        const hwCount = homeworkSnapshot.size;
-        updateHomeworkCount(childId, hwCount);
-        
-        // Load schedule for next class
-        const scheduleSnapshot = await db.collection('schedules')
-            .where('studentId', '==', childId)
-            .limit(1)
-            .get();
-        
-        let nextClassText = 'No schedule';
-        if (!scheduleSnapshot.empty) {
-            const schedule = scheduleSnapshot.docs[0].data().schedule || [];
-            updateNextClass(childId, schedule);
-        } else {
-            updateNextClass(childId, null);
-        }
+        contentArea.innerHTML = `
+            <div class="mb-6 bg-white border border-gray-200 rounded-xl p-6 shadow-sm">
+                <div class="flex flex-wrap justify-between items-start">
+                    <div>
+                        <h2 class="text-2xl font-bold text-green-800 mb-2">${studentName}</h2>
+                        <div class="flex flex-wrap gap-4">
+                            <div class="text-sm">
+                                <span class="text-gray-600">Grade:</span>
+                                <span class="font-semibold ml-1">${studentData.grade || 'N/A'}</span>
+                            </div>
+                            <div class="text-sm">
+                                <span class="text-gray-600">Status:</span>
+                                <span class="font-semibold ml-1 ${studentType === 'active' ? 'text-green-600' : 'text-yellow-600'}">
+                                    ${studentType === 'active' ? 'Active' : 'Pending Registration'}
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                    <button onclick="switchStudentTab('all')" 
+                            class="text-green-600 hover:text-green-800 font-medium">
+                        ← Back to All Children
+                    </button>
+                </div>
+            </div>
+            
+            <div class="space-y-8">
+                ${topicsHTML}
+                ${homeworkHTML}
+                ${scheduleHTML}
+            </div>
+        `;
         
     } catch (error) {
-        console.error('Error loading child counts:', error);
+        console.error('Error loading student content:', error);
+        contentArea.innerHTML = `
+            <div class="bg-red-50 border border-red-200 rounded-lg p-4">
+                <p class="text-red-600">Error loading ${studentName}'s details. Please try again.</p>
+            </div>
+        `;
     }
 }
 
-function setupChildListeners(childId) {
-    // Setup topic listener
-    setupTopicsListener(childId);
+function switchStudentTab(studentId) {
+    // Update current tab
+    currentStudentTab = studentId;
     
-    // Setup homework listener
-    setupHomeworkListener(childId);
+    // Hide all content areas
+    document.querySelectorAll('.student-content').forEach(content => {
+        content.classList.add('hidden');
+        content.classList.remove('active-student-content');
+    });
     
-    // Setup schedule listener
-    setupScheduleListener(childId);
-}
-
-function setupScheduleListener(studentId) {
-    if (childRealTimeListeners[`schedule-${studentId}`]) return;
+    // Deactivate all tabs
+    document.querySelectorAll('.student-tab').forEach(tab => {
+        tab.classList.remove('active-student-tab', 'bg-green-100', 'text-green-800');
+        tab.classList.add('bg-gray-100', 'text-gray-700');
+    });
     
-    const listener = db.collection('schedules')
-        .where('studentId', '==', studentId)
-        .limit(1)
-        .onSnapshot((snapshot) => {
-            if (!snapshot.empty) {
-                const schedule = snapshot.docs[0].data().schedule || [];
-                updateNextClass(studentId, schedule);
-            } else {
-                updateNextClass(studentId, null);
-            }
-        });
+    // Activate selected tab
+    const selectedTab = document.getElementById(`studentTab-${studentId}`);
+    if (selectedTab) {
+        selectedTab.classList.remove('bg-gray-100', 'text-gray-700');
+        selectedTab.classList.add('active-student-tab', 'bg-green-100', 'text-green-800');
+    }
     
-    childRealTimeListeners[`schedule-${studentId}`] = listener;
-    realTimeListeners.push(listener);
+    // Show selected content
+    const selectedContent = document.getElementById(`studentContent-${studentId}`);
+    if (selectedContent) {
+        selectedContent.classList.remove('hidden');
+        selectedContent.classList.add('active-student-content');
+    }
 }
 
 function addDashboardCSS() {
-    // Check if CSS already added
     if (document.getElementById('parentDashboardCSS')) return;
     
     const style = document.createElement('style');
     style.id = 'parentDashboardCSS';
     style.textContent = `
-        .overnight-indicator { color: #9333ea; }
-        .filter-btn.active { background-color: #dcfce7; color: #166534; }
-        .line-clamp-2 { overflow: hidden; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
-        .preserve-whitespace { white-space: pre-wrap; }
-        .loading-spinner { border: 3px solid #f3f3f3; border-top: 3px solid #10b981; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; }
-        .loading-spinner-small { border: 2px solid #f3f3f3; border-top: 2px solid #10b981; border-radius: 50%; width: 16px; height: 16px; animation: spin 1s linear infinite; display: inline-block; }
-        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-        .child-card { transition: all 0.3s ease; }
-        .child-card:hover { transform: translateY(-2px); box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1); }
-        .tab-active-main { background-color: #10b981; color: white; }
-        .tab-inactive-main { background-color: #f3f4f6; color: #4b5563; }
-        .tab-active-main:hover { background-color: #059669; }
-        .tab-inactive-main:hover { background-color: #e5e7eb; }
+        .student-tab {
+            transition: all 0.2s ease;
+            border: 1px solid transparent;
+            margin-bottom: -1px;
+        }
+        .active-student-tab {
+            background-color: #10b981 !important;
+            color: white !important;
+            border-color: #059669;
+            border-bottom-color: white;
+        }
+        .student-content {
+            animation: fadeIn 0.3s ease;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        .line-clamp-2 { 
+            overflow: hidden;
+            display: -webkit-box;
+            -webkit-box-orient: vertical;
+            -webkit-line-clamp: 2;
+        }
+        .loading-spinner { 
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #10b981;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin { 
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .child-card { 
+            transition: all 0.3s ease;
+        }
+        .child-card:hover { 
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+        }
     `;
     document.head.appendChild(style);
 }
+
+// ============================================
+// REFERRAL SYSTEM FUNCTIONS
+// ============================================
+
+async function generateReferralCode() {
+    const chars = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+    const prefix = 'BKH';
+    let code;
+    let isUnique = false;
+
+    while (!isUnique) {
+        let suffix = '';
+        for (let i = 0; i < 6; i++) {
+            suffix += chars.charAt(Math.floor(Math.random() * chars.length));
+        }
+        code = prefix + suffix;
+
+        const snapshot = await db.collection('parent_users').where('referralCode', '==', code).limit(1).get();
+        if (snapshot.empty) {
+            isUnique = true;
+        }
+    }
+    return code;
+}
+
+async function loadReferralRewards(parentUid) {
+    const rewardsContent = document.getElementById('rewardsContent');
+    if (!rewardsContent) return;
+    
+    rewardsContent.innerHTML = '<div class="text-center py-8"><div class="loading-spinner mx-auto" style="width: 40px; height: 40px;"></div><p class="text-green-600 font-semibold mt-4">Loading rewards data...</p></div>';
+
+    try {
+        const userDoc = await db.collection('parent_users').doc(parentUid).get();
+        if (!userDoc.exists) {
+            rewardsContent.innerHTML = '<p class="text-red-500 text-center py-8">User data not found. Please sign in again.</p>';
+            return;
+        }
+        const userData = userDoc.data();
+        const referralCode = userData.referralCode || 'N/A';
+        const totalEarnings = userData.referralEarnings || 0;
+        
+        const transactionsSnapshot = await db.collection('referral_transactions')
+            .where('ownerUid', '==', parentUid)
+            .orderBy('timestamp', 'desc')
+            .get();
+
+        let referralsHtml = '';
+        let pendingCount = 0;
+        let approvedCount = 0;
+        let paidCount = 0;
+
+        if (transactionsSnapshot.empty) {
+            referralsHtml = `
+                <tr><td colspan="4" class="text-center py-4 text-gray-500">No one has used your referral code yet.</td></tr>
+            `;
+        } else {
+            transactionsSnapshot.forEach(doc => {
+                const data = doc.data();
+                const status = data.status || 'pending';
+                const statusColor = status === 'paid' ? 'bg-green-100 text-green-800' : 
+                                    status === 'approved' ? 'bg-blue-100 text-blue-800' : 
+                                    'bg-yellow-100 text-yellow-800';
+                
+                if (status === 'pending') pendingCount++;
+                if (status === 'approved') approvedCount++;
+                if (status === 'paid') paidCount++;
+
+                const referredName = capitalize(data.referredStudentName || data.referredStudentPhone);
+                const rewardAmount = data.rewardAmount ? `₦${data.rewardAmount.toLocaleString()}` : '₦5,000';
+                const referralDate = data.timestamp?.toDate().toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }) || 'N/A';
+
+                referralsHtml += `
+                    <tr class="hover:bg-gray-50">
+                        <td class="px-4 py-3 text-sm font-medium text-gray-900">${referredName}</td>
+                        <td class="px-4 py-3 text-sm text-gray-500">${referralDate}</td>
+                        <td class="px-4 py-3 text-sm">
+                            <span class="inline-flex items-center px-3 py-0.5 rounded-full text-xs font-medium ${statusColor}">
+                                ${capitalize(status)}
+                            </span>
+                        </td>
+                        <td class="px-4 py-3 text-sm text-gray-900 font-bold">${rewardAmount}</td>
+                    </tr>
+                `;
+            });
+        }
+        
+        rewardsContent.innerHTML = `
+            <div class="bg-blue-50 border-l-4 border-blue-600 p-4 rounded-lg mb-8 shadow-md">
+                <h2 class="text-2xl font-bold text-blue-800 mb-1">Your Referral Code</h2>
+                <p class="text-xl font-mono text-blue-600 tracking-wider p-2 bg-white inline-block rounded-lg border border-dashed border-blue-300 select-all">${referralCode}</p>
+                <p class="text-blue-700 mt-2">Share this code with other parents. They use it when registering their child, and you earn **₦5,000** once their child completes their first month!</p>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                <div class="bg-green-100 p-6 rounded-xl shadow-lg border-b-4 border-green-600">
+                    <p class="text-sm font-medium text-green-700">Total Earnings</p>
+                    <p class="text-3xl font-extrabold text-green-900 mt-1">₦${totalEarnings.toLocaleString()}</p>
+                </div>
+                <div class="bg-yellow-100 p-6 rounded-xl shadow-lg border-b-4 border-yellow-600">
+                    <p class="text-sm font-medium text-yellow-700">Approved Rewards (Awaiting Payment)</p>
+                    <p class="text-3xl font-extrabold text-yellow-900 mt-1">${approvedCount}</p>
+                </div>
+                <div class="bg-gray-100 p-6 rounded-xl shadow-lg border-b-4 border-gray-600">
+                    <p class="text-sm font-medium text-gray-700">Total Successful Referrals (Paid)</p>
+                    <p class="text-3xl font-extrabold text-gray-900 mt-1">${paidCount}</p>
+                </div>
+            </div>
+
+            <h3 class="text-xl font-bold text-gray-800 mb-4">Referral History</h3>
+            <div class="overflow-x-auto bg-white rounded-lg shadow">
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Referred Parent/Student</th>
+                            <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date Used</th>
+                            <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                            <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Reward</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-200">
+                        ${referralsHtml}
+                    </tbody>
+                </table>
+            </div>
+        `;
+        
+    } catch (error) {
+        console.error('Error loading referral rewards:', error);
+        rewardsContent.innerHTML = '<p class="text-red-500 text-center py-8">An error occurred while loading your rewards data. Please try again later.</p>';
+    }
+}
+
+// ============================================
+// OTHER FUNCTIONS (FEEDBACK, RESPONSES, ETC.)
+// ============================================
 
 function showNoChildrenView() {
     const reportContent = document.getElementById('reportContent');
@@ -2490,424 +2107,7 @@ function showNoChildrenView() {
     `;
 }
 
-// ============================================
-// FEEDBACK AND RESPONSE SYSTEM
-// ============================================
-
-function showFeedbackModal() {
-    populateStudentDropdown();
-    document.getElementById('feedbackModal').classList.remove('hidden');
-}
-
-function hideFeedbackModal() {
-    document.getElementById('feedbackModal').classList.add('hidden');
-    // Reset form
-    document.getElementById('feedbackCategory').value = '';
-    document.getElementById('feedbackPriority').value = '';
-    document.getElementById('feedbackStudent').value = '';
-    document.getElementById('feedbackMessage').value = '';
-}
-
-function populateStudentDropdown() {
-    const studentDropdown = document.getElementById('feedbackStudent');
-    studentDropdown.innerHTML = '<option value="">Select student</option>';
-    
-    // Get student names from the dashboard
-    const studentHeaders = document.querySelectorAll('.child-card h3');
-    
-    if (studentHeaders.length === 0) {
-        studentDropdown.innerHTML += '<option value="" disabled>No students found</option>';
-        return;
-    }
-
-    studentHeaders.forEach(header => {
-        const studentName = header.textContent.trim();
-        const option = document.createElement('option');
-        option.value = studentName;
-        option.textContent = studentName;
-        studentDropdown.appendChild(option);
-    });
-}
-
-async function submitFeedback() {
-    const category = document.getElementById('feedbackCategory').value;
-    const priority = document.getElementById('feedbackPriority').value;
-    const student = document.getElementById('feedbackStudent').value;
-    const message = document.getElementById('feedbackMessage').value;
-
-    // Validation
-    if (!category || !priority || !student || !message) {
-        showMessage('Please fill in all required fields', 'error');
-        return;
-    }
-
-    if (message.length < 10) {
-        showMessage('Please provide a more detailed message (at least 10 characters)', 'error');
-        return;
-    }
-
-    const submitBtn = document.getElementById('submitFeedbackBtn');
-    submitBtn.disabled = true;
-    document.getElementById('submitFeedbackText').textContent = 'Submitting...';
-    document.getElementById('submitFeedbackSpinner').classList.remove('hidden');
-
-    try {
-        const user = auth.currentUser;
-        if (!user) {
-            throw new Error('Please sign in to submit feedback');
-        }
-
-        // Get user data
-        const userDoc = await db.collection('parent_users').doc(user.uid).get();
-        const userData = userDoc.data();
-
-        // Create feedback document
-        const feedbackData = {
-            parentName: currentUserData?.parentName || userData.parentName || 'Unknown Parent',
-            parentPhone: userData.phone,
-            parentEmail: userData.email,
-            studentName: student,
-            category: category,
-            priority: priority,
-            message: message,
-            status: 'New',
-            timestamp: firebase.firestore.FieldValue.serverTimestamp(),
-            emailSent: false,
-            parentUid: user.uid,
-            responses: []
-        };
-
-        // Save to Firestore
-        await db.collection('parent_feedback').add(feedbackData);
-
-        showMessage('Thank you! Your feedback has been submitted successfully. We will respond within 24-48 hours.', 'success');
-        
-        // Close modal and reset form
-        hideFeedbackModal();
-
-    } catch (error) {
-        console.error('Feedback submission error:', error);
-        showMessage('Failed to submit feedback. Please try again.', 'error');
-    } finally {
-        submitBtn.disabled = false;
-        document.getElementById('submitFeedbackText').textContent = 'Submit Feedback';
-        document.getElementById('submitFeedbackSpinner').classList.add('hidden');
-    }
-}
-
-// Admin Responses Functions
-function showResponsesModal() {
-    document.getElementById('responsesModal').classList.remove('hidden');
-    loadAdminResponses();
-    resetNotificationCount();
-}
-
-function hideResponsesModal() {
-    document.getElementById('responsesModal').classList.add('hidden');
-}
-
-async function loadAdminResponses() {
-    const responsesContent = document.getElementById('responsesContent');
-    responsesContent.innerHTML = '<div class="text-center py-8"><div class="loading-spinner mx-auto" style="width: 40px; height: 40px;"></div><p class="text-green-600 font-semibold mt-4">Loading responses...</p></div>';
-
-    try {
-        const user = auth.currentUser;
-        if (!user) {
-            throw new Error('Please sign in to view responses');
-        }
-
-        const feedbackSnapshot = await db.collection('parent_feedback')
-            .where('parentUid', '==', user.uid)
-            .get();
-
-        if (feedbackSnapshot.empty) {
-            responsesContent.innerHTML = `
-                <div class="text-center py-12">
-                    <div class="text-6xl mb-4">📭</div>
-                    <h3 class="text-xl font-bold text-gray-700 mb-2">No Responses Yet</h3>
-                    <p class="text-gray-500 max-w-md mx-auto">You haven't received any responses from our staff yet. We'll respond to your feedback within 24-48 hours.</p>
-                </div>
-            `;
-            return;
-        }
-
-        // Filter feedback that has responses
-        const feedbackWithResponses = [];
-        feedbackSnapshot.forEach(doc => {
-            const feedback = { id: doc.id, ...doc.data() };
-            if (feedback.responses && feedback.responses.length > 0) {
-                feedbackWithResponses.push(feedback);
-            }
-        });
-
-        if (feedbackWithResponses.length === 0) {
-            responsesContent.innerHTML = `
-                <div class="text-center py-12">
-                    <div class="text-6xl mb-4">📭</div>
-                    <h3 class="text-xl font-bold text-gray-700 mb-2">No Responses Yet</h3>
-                    <p class="text-gray-500 max-w-md mx-auto">You haven't received any responses from our staff yet. We'll respond to your feedback within 24-48 hours.</p>
-                </div>
-            `;
-            return;
-        }
-
-        // Sort by most recent response
-        feedbackWithResponses.sort((a, b) => {
-            const aDate = a.responses[0]?.responseDate?.toDate() || new Date(0);
-            const bDate = b.responses[0]?.responseDate?.toDate() || new Date(0);
-            return bDate - aDate;
-        });
-
-        responsesContent.innerHTML = '';
-
-        feedbackWithResponses.forEach((feedback) => {
-            feedback.responses.forEach((response, index) => {
-                const responseDate = response.responseDate?.toDate() || feedback.timestamp?.toDate() || new Date();
-                const formattedDate = responseDate.toLocaleDateString('en-US', {
-                    year: 'numeric',
-                    month: 'long',
-                    day: 'numeric',
-                    hour: '2-digit',
-                    minute: '2-digit'
-                });
-
-                const responseElement = document.createElement('div');
-                responseElement.className = 'bg-white border border-gray-200 rounded-xl p-6 mb-4';
-                responseElement.innerHTML = `
-                    <div class="flex justify-between items-start mb-4">
-                        <div class="flex flex-wrap gap-2">
-                            <span class="inline-block px-3 py-1 rounded-full text-sm font-semibold ${getCategoryColor(feedback.category)}">
-                                ${feedback.category}
-                            </span>
-                            <span class="inline-block px-3 py-1 rounded-full text-sm font-semibold ${getPriorityColor(feedback.priority)}">
-                                ${feedback.priority} Priority
-                            </span>
-                        </div>
-                        <span class="text-sm text-gray-500">${formattedDate}</span>
-                    </div>
-                    
-                    <div class="mb-4">
-                        <h4 class="font-semibold text-gray-800 mb-2">Regarding: ${feedback.studentName}</h4>
-                        <p class="text-gray-700 bg-gray-50 p-4 rounded-lg border">${feedback.message}</p>
-                    </div>
-                    
-                    <div class="response-bubble">
-                        <div class="response-header">📨 Response from ${response.responderName || 'Admin'}:</div>
-                        <p class="text-gray-700 mt-2">${response.responseText}</p>
-                        <div class="text-sm text-gray-500 mt-2">
-                            Responded by: ${response.responderName || 'Admin Staff'} 
-                            ${response.responderEmail ? `(${response.responderEmail})` : ''}
-                        </div>
-                    </div>
-                `;
-
-                responsesContent.appendChild(responseElement);
-            });
-        });
-
-    } catch (error) {
-        console.error('Error loading responses:', error);
-        responsesContent.innerHTML = `
-            <div class="text-center py-8">
-                <div class="text-4xl mb-4">❌</div>
-                <h3 class="text-xl font-bold text-red-700 mb-2">Error Loading Responses</h3>
-                <p class="text-gray-500">Unable to load responses at this time. Please try again later.</p>
-            </div>
-        `;
-    }
-}
-
-// Notification System for Responses
-async function checkForNewResponses() {
-    try {
-        const user = auth.currentUser;
-        if (!user) return;
-
-        const feedbackSnapshot = await db.collection('parent_feedback')
-            .where('parentUid', '==', user.uid)
-            .get();
-
-        let totalResponses = 0;
-        
-        feedbackSnapshot.forEach(doc => {
-            const feedback = doc.data();
-            if (feedback.responses && feedback.responses.length > 0) {
-                totalResponses += feedback.responses.length;
-            }
-        });
-
-        // Update notification badge
-        updateNotificationBadge(totalResponses > 0 ? totalResponses : 0);
-        
-        // Store for later use
-        unreadResponsesCount = totalResponses;
-
-    } catch (error) {
-        console.error('Error checking for new responses:', error);
-    }
-}
-
-function updateNotificationBadge(count) {
-    let badge = document.getElementById('responseNotificationBadge');
-    const viewResponsesBtn = document.getElementById('viewResponsesBtn');
-    
-    if (!viewResponsesBtn) return;
-    
-    if (!badge) {
-        badge = document.createElement('span');
-        badge.id = 'responseNotificationBadge';
-        badge.className = 'absolute -top-2 -right-2 bg-red-500 text-white rounded-full text-xs w-6 h-6 flex items-center justify-center font-bold animate-pulse';
-        viewResponsesBtn.style.position = 'relative';
-        viewResponsesBtn.appendChild(badge);
-    }
-    
-    if (count > 0) {
-        badge.textContent = count > 9 ? '9+' : count;
-        badge.classList.remove('hidden');
-    } else {
-        badge.classList.add('hidden');
-    }
-}
-
-function resetNotificationCount() {
-    updateNotificationBadge(0);
-    unreadResponsesCount = 0;
-}
-
-function getCategoryColor(category) {
-    const colors = {
-        'Feedback': 'bg-blue-100 text-blue-800',
-        'Request': 'bg-green-100 text-green-800',
-        'Complaint': 'bg-red-100 text-red-800',
-        'Suggestion': 'bg-purple-100 text-purple-800'
-    };
-    return colors[category] || 'bg-gray-100 text-gray-800';
-}
-
-function getPriorityColor(priority) {
-    const colors = {
-        'Low': 'bg-gray-100 text-gray-800',
-        'Medium': 'bg-yellow-100 text-yellow-800',
-        'High': 'bg-orange-100 text-orange-800',
-        'Urgent': 'bg-red-100 text-red-800'
-    };
-    return colors[priority] || 'bg-gray-100 text-gray-800';
-}
-
-// Add View Responses button to the welcome section with notification badge
-function addViewResponsesButton() {
-    const welcomeSection = document.querySelector('.bg-green-50');
-    if (!welcomeSection) return;
-    
-    const buttonContainer = welcomeSection.querySelector('.flex.gap-2');
-    if (!buttonContainer) return;
-    
-    // Check if button already exists
-    if (document.getElementById('viewResponsesBtn')) return;
-    
-    const viewResponsesBtn = document.createElement('button');
-    viewResponsesBtn.id = 'viewResponsesBtn';
-    viewResponsesBtn.onclick = showResponsesModal;
-    viewResponsesBtn.className = 'bg-blue-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-blue-700 transition-all duration-200 btn-glow flex items-center justify-center relative';
-    viewResponsesBtn.innerHTML = '<span class="mr-2">📨</span> View Responses';
-    
-    // Insert before the logout button
-    buttonContainer.insertBefore(viewResponsesBtn, buttonContainer.lastElementChild);
-    
-    // Check for responses to show notification
-    setTimeout(() => {
-        checkForNewResponses();
-    }, 1000);
-}
-
-// MANUAL REFRESH FUNCTION
-async function manualRefreshReports() {
-    const user = auth.currentUser;
-    if (!user) return;
-    
-    const refreshBtn = document.getElementById('manualRefreshBtn');
-    const originalText = refreshBtn.innerHTML;
-    
-    // Show loading state
-    refreshBtn.innerHTML = '<div class="loading-spinner-small mr-2"></div> Checking...';
-    refreshBtn.disabled = true;
-    
-    try {
-        // Force reload dashboard
-        await loadParentDashboard(user.uid);
-        
-        showMessage('Dashboard refreshed successfully!', 'success');
-    } catch (error) {
-        console.error('Manual refresh error:', error);
-        showMessage('Refresh failed. Please try again.', 'error');
-    } finally {
-        // Restore button state
-        refreshBtn.innerHTML = originalText;
-        refreshBtn.disabled = false;
-    }
-}
-
-// ADD MANUAL REFRESH BUTTON TO WELCOME SECTION
-function addManualRefreshButton() {
-    const welcomeSection = document.querySelector('.bg-green-50');
-    if (!welcomeSection) return;
-    
-    const buttonContainer = welcomeSection.querySelector('.flex.gap-2');
-    if (!buttonContainer) return;
-    
-    // Check if button already exists
-    if (document.getElementById('manualRefreshBtn')) return;
-    
-    const refreshBtn = document.createElement('button');
-    refreshBtn.id = 'manualRefreshBtn';
-    refreshBtn.onclick = manualRefreshReports;
-    refreshBtn.className = 'bg-green-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-green-700 transition-all duration-200 btn-glow flex items-center justify-center';
-    refreshBtn.innerHTML = '<span class="mr-2">🔄</span> Check for New Updates';
-    
-    // Insert before the logout button
-    buttonContainer.insertBefore(refreshBtn, buttonContainer.lastElementChild);
-}
-
-// ============================================
-// CLEANUP AND UTILITY FUNCTIONS
-// ============================================
-
-function cleanupListeners() {
-    // Clean up global listeners
-    realTimeListeners.forEach(unsubscribe => {
-        if (typeof unsubscribe === 'function') {
-            unsubscribe();
-        }
-    });
-    realTimeListeners = [];
-    
-    // Clean up child-specific listeners
-    Object.keys(childRealTimeListeners).forEach(key => {
-        const unsubscribe = childRealTimeListeners[key];
-        if (typeof unsubscribe === 'function') {
-            unsubscribe();
-        }
-    });
-    childRealTimeListeners = {};
-    
-    console.log("🧹 Cleaned up all real-time listeners");
-}
-
-function logout() {
-    // Clear remember me on logout
-    localStorage.removeItem('rememberMe');
-    localStorage.removeItem('savedEmail');
-    
-    // Clean up real-time listeners
-    cleanupListeners();
-    
-    auth.signOut().then(() => {
-        window.location.reload();
-    });
-}
-
 function showMessage(message, type) {
-    // Remove any existing message
     const existingMessage = document.querySelector('.message-toast');
     if (existingMessage) {
         existingMessage.remove();
@@ -2923,7 +2123,6 @@ function showMessage(message, type) {
     
     document.body.appendChild(messageDiv);
     
-    // Auto remove after 5 seconds
     setTimeout(() => {
         messageDiv.remove();
     }, 5000);
@@ -2944,6 +2143,20 @@ function showNotification(message, type = 'info') {
     setTimeout(() => {
         notification.remove();
     }, 5000);
+}
+
+function logout() {
+    localStorage.removeItem('rememberMe');
+    localStorage.removeItem('savedEmail');
+    
+    realTimeListeners.forEach(unsubscribe => {
+        if (typeof unsubscribe === 'function') unsubscribe();
+    });
+    realTimeListeners = [];
+    
+    auth.signOut().then(() => {
+        window.location.reload();
+    });
 }
 
 function switchTab(tab) {
@@ -2976,17 +2189,14 @@ function switchMainTab(tab) {
     const reportContentArea = document.getElementById('reportContentArea');
     const rewardsContentArea = document.getElementById('rewardsContentArea');
     
-    // Deactivate all tabs
     reportTab?.classList.remove('tab-active-main');
     reportTab?.classList.add('tab-inactive-main');
     rewardsTab?.classList.remove('tab-active-main');
     rewardsTab?.classList.add('tab-inactive-main');
     
-    // Hide all content areas
     reportContentArea?.classList.add('hidden');
     rewardsContentArea?.classList.add('hidden');
     
-    // Activate selected tab and show content
     if (tab === 'reports') {
         reportTab?.classList.remove('tab-inactive-main');
         reportTab?.classList.add('tab-active-main');
@@ -2996,7 +2206,6 @@ function switchMainTab(tab) {
         rewardsTab?.classList.add('tab-active-main');
         rewardsContentArea?.classList.remove('hidden');
         
-        // Reload rewards data when the tab is clicked
         const user = auth.currentUser;
         if (user) {
             loadReferralRewards(user.uid);
@@ -3009,56 +2218,53 @@ function switchMainTab(tab) {
 // ============================================
 
 document.addEventListener('DOMContentLoaded', function() {
-    // Setup Remember Me
     setupRememberMe();
-    
-    // Create country code dropdown when page loads
     createCountryCodeDropdown();
     
-    // Check authentication state
     auth.onAuthStateChanged((user) => {
         if (user) {
-            // User is signed in, load their dashboard
             loadParentDashboard(user.uid);
         } else {
-            // User signed out - clean up listeners
-            cleanupListeners();
+            realTimeListeners.forEach(unsubscribe => {
+                if (typeof unsubscribe === 'function') unsubscribe();
+            });
+            realTimeListeners = [];
         }
     });
 
-    // Set up event listeners
+    // Event listeners
     document.getElementById("signInBtn").addEventListener("click", handleSignIn);
     document.getElementById("signUpBtn").addEventListener("click", handleSignUp);
     document.getElementById("sendResetBtn").addEventListener("click", handlePasswordReset);
-    document.getElementById("submitFeedbackBtn").addEventListener("click", submitFeedback);
+    document.getElementById("submitFeedbackBtn")?.addEventListener("click", submitFeedback);
     
     document.getElementById("signInTab").addEventListener("click", () => switchTab('signin'));
     document.getElementById("signUpTab").addEventListener("click", () => switchTab('signup'));
     
-    document.getElementById("forgotPasswordBtn").addEventListener("click", () => {
+    document.getElementById("forgotPasswordBtn")?.addEventListener("click", () => {
         document.getElementById("passwordResetModal").classList.remove("hidden");
     });
     
-    document.getElementById("cancelResetBtn").addEventListener("click", () => {
+    document.getElementById("cancelResetBtn")?.addEventListener("click", () => {
         document.getElementById("passwordResetModal").classList.add("hidden");
     });
 
-    document.getElementById("rememberMe").addEventListener("change", handleRememberMe);
+    document.getElementById("rememberMe")?.addEventListener("change", handleRememberMe);
 
-    // Allow Enter key to submit forms
-    document.getElementById('loginPassword').addEventListener('keypress', (e) => {
+    // Enter key support
+    document.getElementById('loginPassword')?.addEventListener('keypress', (e) => {
         if (e.key === 'Enter') handleSignIn();
     });
     
-    document.getElementById('signupConfirmPassword').addEventListener('keypress', (e) => {
+    document.getElementById('signupConfirmPassword')?.addEventListener('keypress', (e) => {
         if (e.key === 'Enter') handleSignUp();
     });
     
-    document.getElementById('resetEmail').addEventListener('keypress', (e) => {
+    document.getElementById('resetEmail')?.addEventListener('keypress', (e) => {
         if (e.key === 'Enter') handlePasswordReset();
     });
     
-    // Main tab switching listeners
+    // Main tab switching
     document.getElementById("reportTab")?.addEventListener("click", () => switchMainTab('reports'));
     document.getElementById("rewardsTab")?.addEventListener("click", () => switchMainTab('rewards'));
 });
