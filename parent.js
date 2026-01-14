@@ -1,12 +1,13 @@
-// Firebase config for the 'bloomingkidsassessment' project
-firebase.initializeApp({
-    apiKey: "AIzaSyD1lJhsWMMs_qerLBSzk7wKhjLyI_11RJg",
-    authDomain: "bloomingkidsassessment.firebaseapp.com",
-    projectId: "bloomingkidsassessment",
-    storageBucket: "bloomingkidsassessment.appspot.com",
-    messagingSenderId: "238975054977",
-    appId: "1:238975054977:web:87c70b4db044998a204980"
-});
+// Use external Firebase config - DO NOT EXPOSE CONFIG
+const firebaseConfigScript = document.createElement('script');
+firebaseConfigScript.src = 'https://cdn.jsdelivr.net/gh/psalminfo/blooming-kids-cbt@main/firebaseParentConfig.js';
+firebaseConfigScript.onload = function() {
+    if (typeof firebaseParentConfig !== 'undefined') {
+        firebase.initializeApp(firebaseParentConfig);
+        console.log('Firebase initialized from external config');
+    }
+};
+document.head.appendChild(firebaseConfigScript);
 
 const db = firebase.firestore();
 const auth = firebase.auth();
@@ -279,6 +280,7 @@ let currentUserData = null;
 let userChildren = [];
 let unreadResponsesCount = 0; // Track unread responses
 let realTimeListeners = []; // Track real-time listeners
+let childRealTimeListeners = {}; // Track per-child listeners
 
 // -------------------------------------------------------------------
 // START: NEW REFERRAL SYSTEM FUNCTIONS (PHASE 1 & 3)
@@ -677,7 +679,7 @@ async function handleSignUp() {
         showMessage('Account created successfully!', 'success');
         
         // Automatically load reports after signup
-        await loadAllReportsForParent(normalizedPhone, user.uid);
+        await loadParentDashboard(user.uid);
 
     } catch (error) {
         console.error('Sign up error:', error);
@@ -804,8 +806,8 @@ async function handleSignIn() {
         // Handle Remember Me
         handleRememberMe();
         
-        // Load all reports for the parent using the normalized phone number
-        await loadAllReportsForParent(normalizedPhone, userId);
+        // Load parent dashboard
+        await loadParentDashboard(userId);
 
     } catch (error) {
         console.error('Sign in error:', error);
@@ -874,7 +876,1679 @@ async function handlePasswordReset() {
     }
 }
 
-// Feedback System Functions
+// ============================================
+// NEW FEATURES: HELPER FUNCTIONS
+// ============================================
+
+// Format time function
+function formatTime(dateString) {
+    if (!dateString) return 'N/A';
+    
+    try {
+        let date;
+        if (dateString.toDate) {
+            date = dateString.toDate();
+        } else if (typeof dateString === 'string') {
+            date = new Date(dateString);
+        } else if (dateString.seconds) {
+            date = new Date(dateString.seconds * 1000);
+        } else {
+            date = new Date(dateString);
+        }
+        
+        return date.toLocaleTimeString('en-US', {
+            hour: 'numeric',
+            minute: '2-digit',
+            hour12: true
+        });
+    } catch (error) {
+        console.error('Error formatting time:', error);
+        return 'Invalid Time';
+    }
+}
+
+// Format date function
+function formatDate(dateString) {
+    if (!dateString) return 'N/A';
+    
+    try {
+        let date;
+        if (dateString.toDate) {
+            date = dateString.toDate();
+        } else if (dateString.seconds) {
+            date = new Date(dateString.seconds * 1000);
+        } else {
+            date = new Date(dateString);
+        }
+        
+        return date.toLocaleDateString('en-US', {
+            weekday: 'short',
+            year: 'numeric',
+            month: 'short',
+            day: 'numeric'
+        });
+    } catch (error) {
+        console.error('Error formatting date:', error);
+        return 'Invalid Date';
+    }
+}
+
+// Format date without time
+function formatDateOnly(dateString) {
+    if (!dateString) return 'N/A';
+    
+    try {
+        let date;
+        if (dateString.toDate) {
+            date = dateString.toDate();
+        } else if (dateString.seconds) {
+            date = new Date(dateString.seconds * 1000);
+        } else {
+            date = new Date(dateString);
+        }
+        
+        return date.toLocaleDateString('en-US', {
+            year: 'numeric',
+            month: 'short',
+            day: 'numeric'
+        });
+    } catch (error) {
+        console.error('Error formatting date:', error);
+        return 'Invalid Date';
+    }
+}
+
+// Get days remaining until due date
+function getDaysRemaining(dueDate) {
+    if (!dueDate) return null;
+    
+    try {
+        let date;
+        if (dueDate.toDate) {
+            date = dueDate.toDate();
+        } else if (dueDate.seconds) {
+            date = new Date(dueDate.seconds * 1000);
+        } else {
+            date = new Date(dueDate);
+        }
+        
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        date.setHours(0, 0, 0, 0);
+        
+        const diffTime = date - today;
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+        
+        return diffDays;
+    } catch (error) {
+        console.error('Error calculating days remaining:', error);
+        return null;
+    }
+}
+
+// Get homework status badge color
+function getHomeworkStatusColor(status) {
+    const colors = {
+        'assigned': 'bg-blue-100 text-blue-800',
+        'submitted': 'bg-yellow-100 text-yellow-800',
+        'graded': 'bg-green-100 text-green-800',
+        'overdue': 'bg-red-100 text-red-800',
+        'completed': 'bg-purple-100 text-purple-800'
+    };
+    return colors[status] || 'bg-gray-100 text-gray-800';
+}
+
+// Format time from string (HH:MM)
+function formatTimeFromString(timeString) {
+    if (!timeString) return 'N/A';
+    
+    try {
+        const [hours, minutes] = timeString.split(':').map(Number);
+        const date = new Date();
+        date.setHours(hours, minutes, 0, 0);
+        
+        return date.toLocaleTimeString('en-US', {
+            hour: 'numeric',
+            minute: '2-digit',
+            hour12: true
+        });
+    } catch (error) {
+        return timeString;
+    }
+}
+
+// ============================================
+// TODAY'S TOPICS MANAGEMENT
+// ============================================
+
+async function loadTodaysTopics(studentId, studentName) {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    
+    const weekAgo = new Date(today);
+    weekAgo.setDate(weekAgo.getDate() - 7);
+    
+    try {
+        // Get today's topics
+        const topicsSnapshot = await db.collection('daily_topics')
+            .where('studentId', '==', studentId)
+            .where('date', '>=', today)
+            .where('date', '<', tomorrow)
+            .orderBy('date', 'desc')
+            .get();
+        
+        // Get past week's topics for history
+        const historySnapshot = await db.collection('daily_topics')
+            .where('studentId', '==', studentId)
+            .where('date', '>=', weekAgo)
+            .where('date', '<', today)
+            .orderBy('date', 'desc')
+            .get();
+        
+        let topicsContent = '';
+        
+        // Today's topics
+        if (!topicsSnapshot.empty) {
+            topicsSnapshot.forEach(doc => {
+                const topic = doc.data();
+                const formattedDate = formatDate(topic.date);
+                
+                topicsContent += `
+                    <div class="bg-white border border-green-200 rounded-lg p-4 mb-3 shadow-sm">
+                        <div class="flex justify-between items-start mb-2">
+                            <h4 class="font-semibold text-green-700">${formattedDate}</h4>
+                            <span class="text-sm text-gray-500">${topic.tutorName || 'Tutor'}</span>
+                        </div>
+                        <div class="topic-content">
+                            ${topic.topics ? topic.topics.split('\n').map(line => 
+                                `<p class="text-gray-700 mb-1">• ${line}</p>`
+                            ).join('') : '<p class="text-gray-500">No topics listed</p>'}
+                        </div>
+                        ${topic.notes ? `
+                            <div class="mt-3 pt-3 border-t">
+                                <p class="text-sm text-gray-600"><strong>Tutor Notes:</strong> ${topic.notes}</p>
+                            </div>
+                        ` : ''}
+                    </div>
+                `;
+            });
+        } else {
+            topicsContent = `
+                <div class="text-center py-6">
+                    <div class="text-4xl mb-3">📚</div>
+                    <p class="text-gray-500">No topics recorded for today</p>
+                </div>
+            `;
+        }
+        
+        // Historical topics
+        let historyContent = '';
+        if (!historySnapshot.empty) {
+            historySnapshot.forEach(doc => {
+                const topic = doc.data();
+                const formattedDate = formatDate(topic.date);
+                
+                historyContent += `
+                    <div class="border-b border-gray-100 py-3">
+                        <div class="flex justify-between items-start">
+                            <span class="font-medium text-gray-700">${formattedDate}</span>
+                            <span class="text-xs text-gray-500">${topic.tutorName || ''}</span>
+                        </div>
+                        <p class="text-sm text-gray-600 mt-1 truncate">
+                            ${topic.topics ? topic.topics.replace(/\n/g, ', ') : 'No topics'}
+                        </p>
+                    </div>
+                `;
+            });
+        } else {
+            historyContent = '<p class="text-gray-500 text-center py-4">No recent topics</p>';
+        }
+        
+        // Create topics section
+        const topicsSection = `
+            <div class="mb-8">
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="text-lg font-bold text-green-800">Today's Topics</h3>
+                    <button onclick="showTopicsHistory('${studentId}', '${studentName}')" 
+                            class="text-sm text-green-600 hover:text-green-800 font-medium">
+                        View History →
+                    </button>
+                </div>
+                
+                <div id="todaysTopics-${studentId}">
+                    ${topicsContent}
+                </div>
+                
+                <div class="mt-6">
+                    <h4 class="font-semibold text-gray-700 mb-3">Recent Topics (Last 7 Days)</h4>
+                    <div class="bg-gray-50 rounded-lg p-4 max-h-60 overflow-y-auto">
+                        ${historyContent}
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        // Add real-time listener for new topics
+        setupTopicsListener(studentId);
+        
+        return topicsSection;
+    } catch (error) {
+        console.error('Error loading topics:', error);
+        return `
+            <div class="mb-8">
+                <h3 class="text-lg font-bold text-green-800 mb-4">Today's Topics</h3>
+                <div class="bg-red-50 border border-red-200 rounded-lg p-4">
+                    <p class="text-red-600">Error loading topics. Please try again.</p>
+                </div>
+            </div>
+        `;
+    }
+}
+
+function setupTopicsListener(studentId) {
+    if (childRealTimeListeners[`topics-${studentId}`]) return;
+    
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    
+    const listener = db.collection('daily_topics')
+        .where('studentId', '==', studentId)
+        .where('date', '>=', today)
+        .where('date', '<', tomorrow)
+        .onSnapshot((snapshot) => {
+            snapshot.docChanges().forEach((change) => {
+                if (change.type === 'added') {
+                    showNotification('New topic added for today!', 'info');
+                    // Update topic count
+                    updateTopicCount(studentId, snapshot.size);
+                }
+            });
+        });
+    
+    childRealTimeListeners[`topics-${studentId}`] = listener;
+    realTimeListeners.push(listener);
+}
+
+function updateTopicCount(studentId, count) {
+    const countElement = document.getElementById(`topicCount-${studentId}`);
+    if (countElement) {
+        countElement.textContent = `${count} topic${count !== 1 ? 's' : ''}`;
+    }
+}
+
+function showTopicsHistory(studentId, studentName) {
+    const modal = document.createElement('div');
+    modal.id = 'topicsHistoryModal';
+    modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4';
+    
+    modal.innerHTML = `
+        <div class="bg-white rounded-xl shadow-2xl w-full max-w-4xl max-h-[80vh] flex flex-col">
+            <div class="flex justify-between items-center border-b p-6">
+                <h3 class="text-xl font-bold text-green-800">Topic History - ${studentName}</h3>
+                <button onclick="document.getElementById('topicsHistoryModal').remove()" 
+                        class="text-gray-500 hover:text-gray-700 text-2xl">
+                    ×
+                </button>
+            </div>
+            
+            <div class="p-6 overflow-y-auto flex-1">
+                <div id="topicsHistoryContent" class="space-y-4">
+                    <div class="text-center py-8">
+                        <div class="loading-spinner mx-auto"></div>
+                        <p class="text-green-600 font-semibold mt-4">Loading history...</p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="border-t p-4 flex justify-between">
+                <div class="text-sm text-gray-500">
+                    Showing last 30 days of topics
+                </div>
+                <button onclick="document.getElementById('topicsHistoryModal').remove()" 
+                        class="bg-gray-100 hover:bg-gray-200 text-gray-800 px-4 py-2 rounded-lg">
+                    Close
+                </button>
+            </div>
+        </div>
+    `;
+    
+    document.body.appendChild(modal);
+    
+    // Load history data
+    loadTopicsHistory(studentId);
+}
+
+async function loadTopicsHistory(studentId) {
+    const content = document.getElementById('topicsHistoryContent');
+    
+    try {
+        const monthAgo = new Date();
+        monthAgo.setDate(monthAgo.getDate() - 30);
+        
+        const snapshot = await db.collection('daily_topics')
+            .where('studentId', '==', studentId)
+            .where('date', '>=', monthAgo)
+            .orderBy('date', 'desc')
+            .get();
+        
+        if (snapshot.empty) {
+            content.innerHTML = `
+                <div class="text-center py-12">
+                    <div class="text-4xl mb-4">📚</div>
+                    <h4 class="text-lg font-semibold text-gray-700 mb-2">No Topic History</h4>
+                    <p class="text-gray-500">No topics have been recorded in the last 30 days.</p>
+                </div>
+            `;
+            return;
+        }
+        
+        let historyHTML = '';
+        let currentDate = '';
+        
+        snapshot.forEach(doc => {
+            const topic = doc.data();
+            const topicDate = topic.date.toDate();
+            const dateString = topicDate.toLocaleDateString('en-US', {
+                weekday: 'long',
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric'
+            });
+            
+            if (dateString !== currentDate) {
+                historyHTML += `
+                    <div class="border-t border-gray-200 pt-4 mt-4">
+                        <h4 class="font-bold text-green-700 text-lg mb-2">${dateString}</h4>
+                `;
+                currentDate = dateString;
+            }
+            
+            historyHTML += `
+                <div class="ml-4 mb-4 p-3 bg-gray-50 rounded-lg">
+                    <div class="flex justify-between items-start mb-2">
+                        <span class="font-medium text-gray-800">Tutor: ${topic.tutorName || 'N/A'}</span>
+                        <span class="text-sm text-gray-500">${formatTime(topic.date)}</span>
+                    </div>
+                    <div class="topic-content whitespace-pre-line text-gray-700">
+                        ${topic.topics || 'No topics listed'}
+                    </div>
+                    ${topic.notes ? `
+                        <div class="mt-2 pt-2 border-t border-gray-200">
+                            <p class="text-sm text-gray-600"><strong>Notes:</strong> ${topic.notes}</p>
+                        </div>
+                    ` : ''}
+                </div>
+            `;
+        });
+        
+        content.innerHTML = historyHTML;
+    } catch (error) {
+        console.error('Error loading topics history:', error);
+        content.innerHTML = `
+            <div class="bg-red-50 border border-red-200 rounded-lg p-4">
+                <p class="text-red-600">Error loading topic history. Please try again.</p>
+            </div>
+        `;
+    }
+}
+
+// ============================================
+// HOMEWORK MANAGEMENT
+// ============================================
+
+async function loadHomeworkAssignments(studentId, studentName) {
+    try {
+        // Get active assignments
+        const snapshot = await db.collection('homework_assignments')
+            .where('studentId', '==', studentId)
+            .orderBy('dueDate', 'asc')
+            .get();
+        
+        if (snapshot.empty) {
+            return `
+                <div class="mb-8">
+                    <h3 class="text-lg font-bold text-green-800 mb-4">Homework Assignments</h3>
+                    <div class="text-center py-8 bg-gray-50 rounded-lg">
+                        <div class="text-4xl mb-3">📝</div>
+                        <p class="text-gray-500">No homework assignments</p>
+                        <p class="text-sm text-gray-400 mt-2">Check back later for new assignments</p>
+                    </div>
+                </div>
+            `;
+        }
+        
+        let assignmentsHTML = '';
+        let pendingCount = 0;
+        let overdueCount = 0;
+        const today = new Date();
+        
+        snapshot.forEach(doc => {
+            const assignment = { id: doc.id, ...doc.data() };
+            const dueDate = assignment.dueDate?.toDate();
+            const daysRemaining = getDaysRemaining(assignment.dueDate);
+            let status = assignment.status || 'assigned';
+            
+            // Check if overdue
+            if (dueDate && dueDate < today && status === 'assigned') {
+                status = 'overdue';
+                overdueCount++;
+            }
+            
+            if (status === 'assigned') pendingCount++;
+            
+            const statusColor = getHomeworkStatusColor(status);
+            const dueText = dueDate ? formatDateOnly(dueDate) : 'No due date';
+            
+            assignmentsHTML += `
+                <div class="border border-gray-200 rounded-lg p-4 mb-3 hover:shadow-md transition-shadow">
+                    <div class="flex justify-between items-start mb-2">
+                        <h4 class="font-semibold text-gray-800">${assignment.title || 'Untitled Assignment'}</h4>
+                        <span class="text-xs px-2 py-1 rounded-full ${statusColor}">
+                            ${status.charAt(0).toUpperCase() + status.slice(1)}
+                        </span>
+                    </div>
+                    
+                    <p class="text-gray-600 text-sm mb-3 line-clamp-2">
+                        ${assignment.description || 'No description provided.'}
+                    </p>
+                    
+                    <div class="flex flex-wrap justify-between items-center text-sm">
+                        <div class="space-x-4">
+                            <span class="text-gray-500">
+                                <strong>Due:</strong> ${dueText}
+                            </span>
+                            ${daysRemaining !== null ? `
+                                <span class="${daysRemaining <= 0 ? 'text-red-600' : 'text-green-600'}">
+                                    ${daysRemaining <= 0 ? 'Overdue' : `${daysRemaining} day${daysRemaining !== 1 ? 's' : ''} left`}
+                                </span>
+                            ` : ''}
+                        </div>
+                        
+                        <div class="flex gap-2 mt-2 sm:mt-0">
+                            ${assignment.fileUrl ? `
+                                <button onclick="downloadHomeworkFile('${assignment.fileUrl}', '${assignment.title || 'homework'}')" 
+                                        class="text-blue-600 hover:text-blue-800 text-sm font-medium flex items-center">
+                                    <span class="mr-1">📎</span> Download
+                                </button>
+                            ` : ''}
+                            <button onclick="viewHomeworkDetails('${studentId}', '${studentName}', '${doc.id}')" 
+                                    class="text-green-600 hover:text-green-800 text-sm font-medium">
+                                View Details
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `;
+        });
+        
+        // Add notification badges
+        let notificationHTML = '';
+        if (overdueCount > 0) {
+            notificationHTML += `
+                <span class="ml-2 bg-red-100 text-red-800 text-xs font-semibold px-2 py-1 rounded-full">
+                    ${overdueCount} overdue
+                </span>
+            `;
+        }
+        if (pendingCount > 0) {
+            notificationHTML += `
+                <span class="ml-2 bg-blue-100 text-blue-800 text-xs font-semibold px-2 py-1 rounded-full">
+                    ${pendingCount} pending
+                </span>
+            `;
+        }
+        
+        // Update homework count
+        const totalCount = pendingCount + overdueCount;
+        updateHomeworkCount(studentId, totalCount);
+        
+        return `
+            <div class="mb-8">
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="text-lg font-bold text-green-800 flex items-center">
+                        Homework Assignments
+                        ${notificationHTML}
+                    </h3>
+                    <button onclick="showAllHomework('${studentId}', '${studentName}')" 
+                            class="text-sm text-green-600 hover:text-green-800 font-medium">
+                        View All →
+                    </button>
+                </div>
+                
+                <div id="homeworkList-${studentId}">
+                    ${assignmentsHTML}
+                </div>
+                
+                <div class="mt-4 text-center">
+                    <button onclick="toggleEmailReminders('${studentId}')" 
+                            id="emailToggle-${studentId}"
+                            class="text-sm text-gray-600 hover:text-gray-800">
+                        ⏰ Email reminders: <span id="emailStatus-${studentId}">Enabled</span>
+                    </button>
+                </div>
+            </div>
+        `;
+    } catch (error) {
+        console.error('Error loading homework:', error);
+        return `
+            <div class="mb-8">
+                <h3 class="text-lg font-bold text-green-800 mb-4">Homework Assignments</h3>
+                <div class="bg-red-50 border border-red-200 rounded-lg p-4">
+                    <p class="text-red-600">Error loading homework assignments.</p>
+                </div>
+            </div>
+        `;
+    }
+}
+
+function downloadHomeworkFile(fileUrl, fileName) {
+    // Create a temporary link and trigger download
+    const link = document.createElement('a');
+    link.href = fileUrl;
+    link.download = fileName || 'homework_file';
+    link.target = '_blank';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+}
+
+function viewHomeworkDetails(studentId, studentName, homeworkId) {
+    const modal = document.createElement('div');
+    modal.id = 'homeworkDetailsModal';
+    modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4';
+    
+    modal.innerHTML = `
+        <div class="bg-white rounded-xl shadow-2xl w-full max-w-2xl max-h-[80vh] flex flex-col">
+            <div class="flex justify-between items-center border-b p-6">
+                <h3 class="text-xl font-bold text-green-800">Homework Details</h3>
+                <button onclick="document.getElementById('homeworkDetailsModal').remove()" 
+                        class="text-gray-500 hover:text-gray-700 text-2xl">
+                    ×
+                </button>
+            </div>
+            
+            <div class="p-6 overflow-y-auto flex-1">
+                <div id="homeworkDetailsContent">
+                    <div class="text-center py-8">
+                        <div class="loading-spinner mx-auto"></div>
+                        <p class="text-green-600 font-semibold mt-4">Loading details...</p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="border-t p-4 flex justify-end">
+                <button onclick="document.getElementById('homeworkDetailsModal').remove()" 
+                        class="bg-gray-100 hover:bg-gray-200 text-gray-800 px-4 py-2 rounded-lg">
+                    Close
+                </button>
+            </div>
+        </div>
+    `;
+    
+    document.body.appendChild(modal);
+    
+    // Load homework details
+    loadHomeworkDetails(studentId, homeworkId);
+}
+
+async function loadHomeworkDetails(studentId, homeworkId) {
+    const content = document.getElementById('homeworkDetailsContent');
+    
+    try {
+        const doc = await db.collection('homework_assignments').doc(homeworkId).get();
+        
+        if (!doc.exists) {
+            content.innerHTML = `
+                <div class="bg-red-50 border border-red-200 rounded-lg p-4">
+                    <p class="text-red-600">Homework assignment not found.</p>
+                </div>
+            `;
+            return;
+        }
+        
+        const assignment = { id: doc.id, ...doc.data() };
+        const dueDate = assignment.dueDate?.toDate();
+        const assignedDate = assignment.assignedDate?.toDate();
+        const daysRemaining = getDaysRemaining(assignment.dueDate);
+        let status = assignment.status || 'assigned';
+        
+        if (dueDate && dueDate < new Date() && status === 'assigned') {
+            status = 'overdue';
+        }
+        
+        const statusColor = getHomeworkStatusColor(status);
+        
+        content.innerHTML = `
+            <div class="space-y-6">
+                <div class="flex justify-between items-start">
+                    <div>
+                        <h4 class="text-xl font-bold text-gray-800">${assignment.title || 'Untitled Assignment'}</h4>
+                        <p class="text-gray-500 mt-1">Assigned: ${assignedDate ? formatDate(assignedDate) : 'N/A'}</p>
+                    </div>
+                    <span class="px-3 py-1 rounded-full text-sm font-semibold ${statusColor}">
+                        ${status.charAt(0).toUpperCase() + status.slice(1)}
+                    </span>
+                </div>
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 bg-gray-50 p-4 rounded-lg">
+                    <div>
+                        <p class="text-sm text-gray-600">Due Date</p>
+                        <p class="font-semibold">${dueDate ? formatDate(dueDate) : 'No due date'}</p>
+                        ${daysRemaining !== null ? `
+                            <p class="text-sm ${daysRemaining <= 0 ? 'text-red-600' : 'text-green-600'} mt-1">
+                                ${daysRemaining <= 0 ? 'Overdue' : `${daysRemaining} day${daysRemaining !== 1 ? 's' : ''} remaining`}
+                            </p>
+                        ` : ''}
+                    </div>
+                    <div>
+                        <p class="text-sm text-gray-600">Assigned By</p>
+                        <p class="font-semibold">${assignment.tutorName || 'Tutor'}</p>
+                        <p class="text-sm text-gray-500">${assignment.tutorEmail || ''}</p>
+                    </div>
+                </div>
+                
+                <div>
+                    <h5 class="font-semibold text-gray-700 mb-2">Description</h5>
+                    <div class="bg-white border border-gray-200 rounded-lg p-4 whitespace-pre-line">
+                        ${assignment.description || 'No description provided.'}
+                    </div>
+                </div>
+                
+                ${assignment.instructions ? `
+                    <div>
+                        <h5 class="font-semibold text-gray-700 mb-2">Instructions</h5>
+                        <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-4 whitespace-pre-line">
+                            ${assignment.instructions}
+                        </div>
+                    </div>
+                ` : ''}
+                
+                ${assignment.fileUrl ? `
+                    <div>
+                        <h5 class="font-semibold text-gray-700 mb-2">Attached Files</h5>
+                        <div class="flex items-center p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                            <span class="text-2xl mr-3">📎</span>
+                            <div class="flex-1">
+                                <p class="font-medium text-gray-800">Homework File</p>
+                                <p class="text-sm text-gray-500">Click download to save</p>
+                            </div>
+                            <button onclick="downloadHomeworkFile('${assignment.fileUrl}', '${assignment.title || 'homework'}')" 
+                                    class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium">
+                                Download
+                            </button>
+                        </div>
+                    </div>
+                ` : ''}
+                
+                ${assignment.submission ? `
+                    <div>
+                        <h5 class="font-semibold text-gray-700 mb-2">Submission</h5>
+                        <div class="bg-green-50 border border-green-200 rounded-lg p-4">
+                            <p class="text-gray-800"><strong>Submitted:</strong> ${formatDate(assignment.submission.submittedAt)}</p>
+                            ${assignment.submission.notes ? `
+                                <p class="text-gray-800 mt-2"><strong>Notes:</strong> ${assignment.submission.notes}</p>
+                            ` : ''}
+                            ${assignment.submission.fileUrl ? `
+                                <div class="mt-3">
+                                    <button onclick="downloadHomeworkFile('${assignment.submission.fileUrl}', 'submission')" 
+                                            class="text-green-600 hover:text-green-800 font-medium">
+                                        📥 Download Submission
+                                    </button>
+                                </div>
+                            ` : ''}
+                        </div>
+                    </div>
+                ` : ''}
+                
+                ${assignment.grade ? `
+                    <div>
+                        <h5 class="font-semibold text-gray-700 mb-2">Grading</h5>
+                        <div class="bg-purple-50 border border-purple-200 rounded-lg p-4">
+                            <p class="text-gray-800"><strong>Grade:</strong> ${assignment.grade.score || 'N/A'}</p>
+                            ${assignment.grade.feedback ? `
+                                <p class="text-gray-800 mt-2"><strong>Feedback:</strong> ${assignment.grade.feedback}</p>
+                            ` : ''}
+                            <p class="text-sm text-gray-500 mt-2">Graded on: ${formatDate(assignment.grade.gradedAt)}</p>
+                        </div>
+                    </div>
+                ` : ''}
+            </div>
+        `;
+    } catch (error) {
+        console.error('Error loading homework details:', error);
+        content.innerHTML = `
+            <div class="bg-red-50 border border-red-200 rounded-lg p-4">
+                <p class="text-red-600">Error loading homework details. Please try again.</p>
+            </div>
+        `;
+    }
+}
+
+function showAllHomework(studentId, studentName) {
+    const modal = document.createElement('div');
+    modal.id = 'allHomeworkModal';
+    modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4';
+    
+    modal.innerHTML = `
+        <div class="bg-white rounded-xl shadow-2xl w-full max-w-4xl max-h-[80vh] flex flex-col">
+            <div class="flex justify-between items-center border-b p-6">
+                <h3 class="text-xl font-bold text-green-800">All Homework - ${studentName}</h3>
+                <button onclick="document.getElementById('allHomeworkModal').remove()" 
+                        class="text-gray-500 hover:text-gray-700 text-2xl">
+                    ×
+                </button>
+            </div>
+            
+            <div class="p-6 overflow-y-auto flex-1">
+                <div class="mb-4 flex gap-2">
+                    <button onclick="filterHomework('all')" class="filter-btn active px-4 py-2 rounded-lg bg-green-100 text-green-800">
+                        All
+                    </button>
+                    <button onclick="filterHomework('pending')" class="filter-btn px-4 py-2 rounded-lg bg-gray-100 text-gray-800">
+                        Pending
+                    </button>
+                    <button onclick="filterHomework('overdue')" class="filter-btn px-4 py-2 rounded-lg bg-red-100 text-red-800">
+                        Overdue
+                    </button>
+                    <button onclick="filterHomework('completed')" class="filter-btn px-4 py-2 rounded-lg bg-purple-100 text-purple-800">
+                        Completed
+                    </button>
+                </div>
+                <div id="allHomeworkContent" class="space-y-4">
+                    <div class="text-center py-8">
+                        <div class="loading-spinner mx-auto"></div>
+                        <p class="text-green-600 font-semibold mt-4">Loading homework...</p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="border-t p-4 flex justify-between">
+                <div class="text-sm text-gray-500" id="homeworkCount">
+                    
+                </div>
+                <button onclick="document.getElementById('allHomeworkModal').remove()" 
+                        class="bg-gray-100 hover:bg-gray-200 text-gray-800 px-4 py-2 rounded-lg">
+                    Close
+                </button>
+            </div>
+        </div>
+    `;
+    
+    document.body.appendChild(modal);
+    
+    // Load all homework
+    loadAllHomework(studentId);
+}
+
+async function loadAllHomework(studentId) {
+    const content = document.getElementById('allHomeworkContent');
+    
+    try {
+        const snapshot = await db.collection('homework_assignments')
+            .where('studentId', '==', studentId)
+            .orderBy('dueDate', 'desc')
+            .get();
+        
+        if (snapshot.empty) {
+            content.innerHTML = `
+                <div class="text-center py-12">
+                    <div class="text-4xl mb-4">📝</div>
+                    <h4 class="text-lg font-semibold text-gray-700 mb-2">No Homework Assignments</h4>
+                    <p class="text-gray-500">No homework has been assigned yet.</p>
+                </div>
+            `;
+            document.getElementById('homeworkCount').textContent = '0 assignments';
+            return;
+        }
+        
+        let assignments = [];
+        snapshot.forEach(doc => {
+            assignments.push({ id: doc.id, ...doc.data() });
+        });
+        
+        // Update count
+        document.getElementById('homeworkCount').textContent = `${assignments.length} assignment${assignments.length !== 1 ? 's' : ''}`;
+        
+        // Render all assignments
+        renderHomeworkList(assignments);
+        
+        // Setup filter functionality
+        setupHomeworkFilters(assignments);
+    } catch (error) {
+        console.error('Error loading all homework:', error);
+        content.innerHTML = `
+            <div class="bg-red-50 border border-red-200 rounded-lg p-4">
+                <p class="text-red-600">Error loading homework. Please try again.</p>
+            </div>
+        `;
+    }
+}
+
+function renderHomeworkList(assignments) {
+    const content = document.getElementById('allHomeworkContent');
+    const today = new Date();
+    
+    if (assignments.length === 0) {
+        content.innerHTML = '<p class="text-gray-500 text-center py-8">No assignments match the filter.</p>';
+        return;
+    }
+    
+    let html = '';
+    
+    assignments.forEach(assignment => {
+        const dueDate = assignment.dueDate?.toDate();
+        const daysRemaining = getDaysRemaining(assignment.dueDate);
+        let status = assignment.status || 'assigned';
+        
+        if (dueDate && dueDate < today && status === 'assigned') {
+            status = 'overdue';
+        }
+        
+        const statusColor = getHomeworkStatusColor(status);
+        
+        html += `
+            <div class="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow" data-status="${status}">
+                <div class="flex justify-between items-start">
+                    <div class="flex-1">
+                        <h4 class="font-semibold text-gray-800">${assignment.title || 'Untitled Assignment'}</h4>
+                        <p class="text-gray-600 text-sm mt-1 line-clamp-2">
+                            ${assignment.description || 'No description'}
+                        </p>
+                    </div>
+                    <span class="ml-3 px-3 py-1 rounded-full text-xs font-semibold ${statusColor} whitespace-nowrap">
+                        ${status.charAt(0).toUpperCase() + status.slice(1)}
+                    </span>
+                </div>
+                
+                <div class="flex flex-wrap justify-between items-center mt-4 text-sm">
+                    <div class="space-y-1">
+                        <div class="text-gray-500">
+                            <strong>Due:</strong> ${dueDate ? formatDate(dueDate) : 'No due date'}
+                        </div>
+                        <div>
+                            ${assignment.tutorName ? `
+                                <span class="text-gray-500">Tutor: ${assignment.tutorName}</span>
+                            ` : ''}
+                        </div>
+                    </div>
+                    
+                    <div class="flex gap-2 mt-2">
+                        ${assignment.fileUrl ? `
+                            <button onclick="downloadHomeworkFile('${assignment.fileUrl}', '${assignment.title}')" 
+                                    class="text-blue-600 hover:text-blue-800 text-sm font-medium">
+                                Download
+                            </button>
+                        ` : ''}
+                        <button onclick="viewHomeworkDetails('${assignment.studentId}', '${assignment.studentName || ''}', '${assignment.id}')" 
+                                class="text-green-600 hover:text-green-800 text-sm font-medium">
+                            View
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `;
+    });
+    
+    content.innerHTML = html;
+}
+
+function setupHomeworkFilters(assignments) {
+    // Add click handlers to filter buttons
+    const filterButtons = document.querySelectorAll('.filter-btn');
+    filterButtons.forEach(btn => {
+        btn.addEventListener('click', function() {
+            // Update active state
+            filterButtons.forEach(b => b.classList.remove('active', 'bg-green-100', 'text-green-800'));
+            filterButtons.forEach(b => b.classList.add('bg-gray-100', 'text-gray-800'));
+            this.classList.add('active', 'bg-green-100', 'text-green-800');
+            this.classList.remove('bg-gray-100', 'text-gray-800');
+            
+            // Filter assignments
+            const filter = this.textContent.toLowerCase();
+            let filtered = assignments;
+            
+            if (filter === 'pending') {
+                filtered = assignments.filter(a => (a.status || 'assigned') === 'assigned' && 
+                    (!a.dueDate || a.dueDate.toDate() >= new Date()));
+            } else if (filter === 'overdue') {
+                filtered = assignments.filter(a => (a.status || 'assigned') === 'assigned' && 
+                    a.dueDate && a.dueDate.toDate() < new Date());
+            } else if (filter === 'completed') {
+                filtered = assignments.filter(a => ['submitted', 'graded', 'completed'].includes(a.status || ''));
+            }
+            
+            renderHomeworkList(filtered);
+        });
+    });
+}
+
+function updateHomeworkCount(studentId, count) {
+    const countElement = document.getElementById(`hwCount-${studentId}`);
+    if (countElement) {
+        countElement.textContent = `${count} assignment${count !== 1 ? 's' : ''}`;
+    }
+}
+
+function setupHomeworkListener(studentId) {
+    if (childRealTimeListeners[`homework-${studentId}`]) return;
+    
+    const listener = db.collection('homework_assignments')
+        .where('studentId', '==', studentId)
+        .where('status', 'in', ['assigned', 'submitted'])
+        .onSnapshot((snapshot) => {
+            updateHomeworkCount(studentId, snapshot.size);
+        });
+    
+    childRealTimeListeners[`homework-${studentId}`] = listener;
+    realTimeListeners.push(listener);
+}
+
+function toggleEmailReminders(studentId) {
+    const button = document.getElementById(`emailToggle-${studentId}`);
+    const status = document.getElementById(`emailStatus-${studentId}`);
+    
+    if (!button || !status) return;
+    
+    // Toggle the status
+    const currentStatus = status.textContent.toLowerCase();
+    const newStatus = currentStatus === 'enabled' ? 'Disabled' : 'Enabled';
+    const newColor = currentStatus === 'enabled' ? 'text-red-600' : 'text-green-600';
+    
+    status.textContent = newStatus;
+    status.className = newColor;
+    
+    // Store preference in localStorage
+    localStorage.setItem(`emailReminders-${studentId}`, newStatus.toLowerCase());
+    
+    showNotification(`Email reminders ${newStatus.toLowerCase()} for this student`, 'info');
+}
+
+// ============================================
+// WEEKLY SCHEDULE CALENDAR
+// ============================================
+
+async function loadWeeklySchedule(studentId, studentName) {
+    try {
+        // Get schedule for student
+        const snapshot = await db.collection('schedules')
+            .where('studentId', '==', studentId)
+            .limit(1)
+            .get();
+        
+        let scheduleHTML = '';
+        
+        if (!snapshot.empty) {
+            const scheduleData = snapshot.docs[0].data();
+            const schedule = scheduleData.schedule || [];
+            
+            // Get tutor info if available
+            let tutorInfo = {};
+            if (scheduleData.tutorId) {
+                try {
+                    const tutorDoc = await db.collection('tutors').doc(scheduleData.tutorId).get();
+                    if (tutorDoc.exists) {
+                        tutorInfo = tutorDoc.data();
+                    }
+                } catch (error) {
+                    console.error('Error fetching tutor info:', error);
+                }
+            }
+            
+            // Create weekly schedule
+            scheduleHTML = createWeeklyScheduleView(schedule, tutorInfo);
+            
+            // Update next class
+            updateNextClass(studentId, schedule);
+        } else {
+            scheduleHTML = `
+                <div class="text-center py-8 bg-gray-50 rounded-lg">
+                    <div class="text-4xl mb-3">📅</div>
+                    <p class="text-gray-500">No schedule found for ${studentName}</p>
+                    <p class="text-sm text-gray-400 mt-2">Contact the tutor to set up a schedule</p>
+                </div>
+            `;
+        }
+        
+        return `
+            <div class="mb-8">
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="text-lg font-bold text-green-800">Weekly Schedule</h3>
+                    <div class="flex gap-2">
+                        <button onclick="printSchedule('${studentId}', '${studentName}')" 
+                                class="text-sm text-green-600 hover:text-green-800 font-medium flex items-center">
+                            <span class="mr-1">🖨️</span> Print
+                        </button>
+                        <button onclick="exportSchedule('${studentId}', '${studentName}')" 
+                                class="text-sm text-green-600 hover:text-green-800 font-medium flex items-center">
+                            <span class="mr-1">📥</span> Export
+                        </button>
+                    </div>
+                </div>
+                
+                <div id="schedule-${studentId}" class="bg-white rounded-lg border overflow-hidden">
+                    ${scheduleHTML}
+                </div>
+                
+                <div class="mt-4 text-sm text-gray-500">
+                    <p><strong>Note:</strong> Schedule may change due to tutor availability or holidays.</p>
+                    ${scheduleHTML.includes('overnight-indicator') ? `
+                        <p class="mt-1">🌙 Overnight classes extend past midnight</p>
+                    ` : ''}
+                </div>
+            </div>
+        `;
+    } catch (error) {
+        console.error('Error loading schedule:', error);
+        return `
+            <div class="mb-8">
+                <h3 class="text-lg font-bold text-green-800 mb-4">Weekly Schedule</h3>
+                <div class="bg-red-50 border border-red-200 rounded-lg p-4">
+                    <p class="text-red-600">Error loading schedule.</p>
+                </div>
+            </div>
+        `;
+    }
+}
+
+function createWeeklyScheduleView(scheduleArray, tutorInfo) {
+    // Define days of week
+    const daysOfWeek = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+    
+    // Group by day
+    const scheduleByDay = {};
+    daysOfWeek.forEach(day => scheduleByDay[day] = []);
+    
+    scheduleArray.forEach(session => {
+        const day = session.day || 'Monday';
+        if (scheduleByDay[day]) {
+            scheduleByDay[day].push(session);
+        }
+    });
+    
+    // Sort sessions by start time
+    Object.keys(scheduleByDay).forEach(day => {
+        scheduleByDay[day].sort((a, b) => {
+            const timeA = a.startTime || '00:00';
+            const timeB = b.startTime || '00:00';
+            return timeA.localeCompare(timeB);
+        });
+    });
+    
+    // Create schedule HTML
+    let scheduleHTML = `
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-200">
+                <thead class="bg-green-50">
+                    <tr>
+                        ${daysOfWeek.map(day => `
+                            <th class="px-4 py-3 text-left text-xs font-medium text-green-800 uppercase tracking-wider border-r">
+                                ${day}
+                            </th>
+                        `).join('')}
+                    </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-gray-200">
+                    <tr>
+                        ${daysOfWeek.map(day => `
+                            <td class="px-4 py-4 text-sm border-r" style="min-height: 200px;">
+                                ${renderDaySchedule(scheduleByDay[day], tutorInfo)}
+                            </td>
+                        `).join('')}
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+        
+        <div class="border-t p-4 bg-gray-50">
+            <div class="flex flex-wrap gap-4">
+                ${tutorInfo.name ? `
+                    <div class="flex items-center">
+                        <span class="text-sm font-medium text-gray-700 mr-2">Tutor:</span>
+                        <span class="text-sm text-gray-600">${tutorInfo.name}</span>
+                    </div>
+                ` : ''}
+                ${tutorInfo.email ? `
+                    <div class="flex items-center">
+                        <span class="text-sm font-medium text-gray-700 mr-2">Email:</span>
+                        <span class="text-sm text-gray-600">${tutorInfo.email}</span>
+                    </div>
+                ` : ''}
+                ${tutorInfo.phone ? `
+                    <div class="flex items-center">
+                        <span class="text-sm font-medium text-gray-700 mr-2">Phone:</span>
+                        <span class="text-sm text-gray-600">${tutorInfo.phone}</span>
+                    </div>
+                ` : ''}
+            </div>
+        </div>
+    `;
+    
+    return scheduleHTML;
+}
+
+function renderDaySchedule(sessions, tutorInfo) {
+    if (sessions.length === 0) {
+        return `
+            <div class="text-center py-8">
+                <span class="text-gray-400">No classes</span>
+            </div>
+        `;
+    }
+    
+    let sessionsHTML = '';
+    
+    sessions.forEach((session, index) => {
+        const startTime = session.startTime || '00:00';
+        const endTime = session.endTime || '00:00';
+        const subject = session.subject || 'Class';
+        
+        // Check if overnight (end time is earlier than start time)
+        const isOvernight = startTime > endTime;
+        
+        sessionsHTML += `
+            <div class="mb-3 p-3 bg-blue-50 border border-blue-200 rounded-lg ${index > 0 ? 'mt-2' : ''}">
+                <div class="font-medium text-blue-800 mb-1">${subject}</div>
+                <div class="text-sm text-gray-600 mb-1">
+                    ${formatTimeFromString(startTime)} - ${formatTimeFromString(endTime)}
+                    ${isOvernight ? ' <span class="overnight-indicator">🌙</span>' : ''}
+                </div>
+                ${session.notes ? `
+                    <div class="text-xs text-gray-500 mt-1">${session.notes}</div>
+                ` : ''}
+            </div>
+        `;
+    });
+    
+    return sessionsHTML;
+}
+
+function updateNextClass(studentId, scheduleArray) {
+    if (!scheduleArray || scheduleArray.length === 0) {
+        const nextClassElement = document.getElementById(`nextClass-${studentId}`);
+        if (nextClassElement) {
+            nextClassElement.textContent = 'No schedule';
+        }
+        return;
+    }
+    
+    const todayName = new Date().toLocaleDateString('en-US', { weekday: 'long' });
+    const todaySchedule = scheduleArray.find(s => s.day === todayName);
+    
+    let nextClassText = 'Check schedule';
+    if (todaySchedule) {
+        nextClassText = `Today ${formatTimeFromString(todaySchedule.startTime)}`;
+    }
+    
+    const nextClassElement = document.getElementById(`nextClass-${studentId}`);
+    if (nextClassElement) {
+        nextClassElement.textContent = nextClassText;
+    }
+}
+
+function printSchedule(studentId, studentName) {
+    const scheduleElement = document.getElementById(`schedule-${studentId}`);
+    if (!scheduleElement) return;
+    
+    const printWindow = window.open('', '_blank');
+    printWindow.document.write(`
+        <html>
+            <head>
+                <title>Schedule - ${studentName}</title>
+                <style>
+                    body { font-family: Arial, sans-serif; margin: 20px; }
+                    h1 { color: #166534; }
+                    table { border-collapse: collapse; width: 100%; margin-top: 20px; }
+                    th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+                    th { background-color: #f0fdf4; color: #166534; }
+                    .session { background-color: #eff6ff; margin: 5px 0; padding: 5px; border-radius: 3px; }
+                    .footer { margin-top: 20px; font-size: 12px; color: #666; }
+                </style>
+            </head>
+            <body>
+                <h1>Weekly Schedule - ${studentName}</h1>
+                <p>Printed on ${new Date().toLocaleDateString()}</p>
+                ${scheduleElement.outerHTML}
+                <div class="footer">
+                    <p>Blooming Kids House - Parent Portal</p>
+                </div>
+            </body>
+        </html>
+    `);
+    printWindow.document.close();
+    printWindow.print();
+}
+
+function exportSchedule(studentId, studentName) {
+    const scheduleElement = document.getElementById(`schedule-${studentId}`);
+    if (!scheduleElement) return;
+    
+    const htmlContent = `
+        <!DOCTYPE html>
+        <html>
+            <head>
+                <meta charset="UTF-8">
+                <title>Schedule - ${studentName}</title>
+                <style>
+                    body { font-family: Arial, sans-serif; margin: 20px; }
+                    h1 { color: #166534; }
+                    table { border-collapse: collapse; width: 100%; margin-top: 20px; }
+                    th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+                    th { background-color: #f0fdf4; color: #166534; }
+                    .session { background-color: #eff6ff; margin: 5px 0; padding: 5px; border-radius: 3px; }
+                </style>
+            </head>
+            <body>
+                <h1>Weekly Schedule - ${studentName}</h1>
+                <p>Exported on ${new Date().toLocaleDateString()}</p>
+                ${scheduleElement.outerHTML}
+            </body>
+        </html>
+    `;
+    
+    const blob = new Blob([htmlContent], { type: 'text/html' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `Schedule_${studentName}_${new Date().toISOString().split('T')[0]}.html`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+}
+
+// ============================================
+// CHILD DETAILS VIEW
+// ============================================
+
+async function loadChildDetails(studentId) {
+    const detailsContent = document.getElementById(`childDetails-${studentId}`);
+    if (!detailsContent) return;
+    
+    try {
+        // Get student details
+        const studentDoc = await db.collection('students').doc(studentId).get();
+        if (!studentDoc.exists) {
+            detailsContent.innerHTML = '<p class="text-red-500">Student not found</p>';
+            return;
+        }
+        
+        const studentData = studentDoc.data();
+        const studentName = studentData.fullName || studentId;
+        
+        // Show loading state
+        detailsContent.innerHTML = `
+            <div class="text-center py-8">
+                <div class="loading-spinner mx-auto"></div>
+                <p class="text-green-600 font-semibold mt-4">Loading ${studentName}'s details...</p>
+            </div>
+        `;
+        
+        // Load all sections
+        const topicsHTML = await loadTodaysTopics(studentId, studentName);
+        const homeworkHTML = await loadHomeworkAssignments(studentId, studentName);
+        const scheduleHTML = await loadWeeklySchedule(studentId, studentName);
+        
+        // Combine all sections
+        detailsContent.innerHTML = `
+            <div class="space-y-8">
+                ${topicsHTML}
+                ${homeworkHTML}
+                ${scheduleHTML}
+            </div>
+        `;
+        
+    } catch (error) {
+        console.error('Error loading child details:', error);
+        detailsContent.innerHTML = `
+            <div class="bg-red-50 border border-red-200 rounded-lg p-4">
+                <p class="text-red-600">Error loading details. Please try again.</p>
+            </div>
+        `;
+    }
+}
+
+function toggleChildDetails(studentId, studentName) {
+    const detailsContent = document.getElementById(`childDetails-${studentId}`);
+    const toggleBtn = document.getElementById(`toggleBtn-${studentId}`);
+    
+    if (!detailsContent || !toggleBtn) return;
+    
+    if (detailsContent.classList.contains('hidden')) {
+        // Show details
+        detailsContent.classList.remove('hidden');
+        toggleBtn.innerHTML = `<span class="mr-1">▲</span> Hide Details`;
+        
+        // Load details if not already loaded
+        if (detailsContent.innerHTML.trim() === '') {
+            loadChildDetails(studentId);
+        }
+    } else {
+        // Hide details
+        detailsContent.classList.add('hidden');
+        toggleBtn.innerHTML = `<span class="mr-1">▼</span> View Details`;
+    }
+}
+
+// ============================================
+// MAIN PARENT DASHBOARD
+// ============================================
+
+async function loadParentDashboard(parentUid) {
+    const reportArea = document.getElementById("reportArea");
+    const reportContent = document.getElementById("reportContent");
+    const authArea = document.getElementById("authArea");
+    const authLoader = document.getElementById("authLoader");
+    const welcomeMessage = document.getElementById("welcomeMessage");
+
+    authLoader.classList.remove("hidden");
+
+    try {
+        // Get parent data
+        const parentDoc = await db.collection('parent_users').doc(parentUid).get();
+        if (!parentDoc.exists) {
+            showMessage('Parent data not found. Please sign in again.', 'error');
+            return;
+        }
+        
+        const parentData = parentDoc.data();
+        const parentPhone = parentData.normalizedPhone || parentData.phone;
+        const parentName = parentData.parentName || 'Parent';
+        
+        // Update welcome message
+        welcomeMessage.textContent = `Welcome, ${parentName}!`;
+        currentUserData = parentData;
+        
+        // Find parent's children
+        const studentsSnapshot = await db.collection('students')
+            .where('normalizedParentPhone', '==', parentPhone)
+            .get();
+        
+        // Also check pending students
+        const pendingSnapshot = await db.collection('pending_students')
+            .where('normalizedParentPhone', '==', parentPhone)
+            .get();
+        
+        if (studentsSnapshot.empty && pendingSnapshot.empty) {
+            // No children found
+            showNoChildrenView();
+            authArea.classList.add("hidden");
+            reportArea.classList.remove("hidden");
+            return;
+        }
+        
+        // Clear existing content
+        reportContent.innerHTML = '';
+        
+        // Add CSS for new features
+        addDashboardCSS();
+        
+        // Add notification badges to navigation
+        addNotificationBadges();
+        
+        // Create children list
+        let childrenHTML = `
+            <div class="mb-8">
+                <h2 class="text-2xl font-bold text-green-800 mb-6">Your Children</h2>
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        `;
+        
+        const allChildren = [];
+        
+        // Add active students
+        studentsSnapshot.forEach((doc, index) => {
+            const child = doc.data();
+            const childId = doc.id;
+            const childName = child.fullName || child.name || `Child ${index + 1}`;
+            allChildren.push({ id: childId, name: childName, data: child, type: 'active' });
+        });
+        
+        // Add pending students
+        pendingSnapshot.forEach((doc, index) => {
+            const child = doc.data();
+            const childId = doc.id;
+            const childName = child.fullName || child.name || `Pending Child ${index + 1}`;
+            allChildren.push({ id: childId, name: childName, data: child, type: 'pending' });
+        });
+        
+        // Display each child
+        allChildren.forEach((child, index) => {
+            const childId = child.id;
+            const childName = child.name;
+            const childType = child.type;
+            const childData = child.data;
+            
+            childrenHTML += `
+                <div class="child-card bg-white border border-gray-200 rounded-xl p-6 shadow-sm hover:shadow-md transition-shadow">
+                    <div class="flex justify-between items-start mb-4">
+                        <div>
+                            <h3 class="text-lg font-bold text-green-800">${childName}</h3>
+                            <p class="text-gray-600 text-sm">Grade: ${childData.grade || 'N/A'}</p>
+                        </div>
+                        <span class="${childType === 'active' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'} text-xs font-semibold px-3 py-1 rounded-full">
+                            ${childType === 'active' ? 'Active' : 'Pending'}
+                        </span>
+                    </div>
+                    
+                    <div class="space-y-3 mb-6">
+                        <div class="flex items-center text-sm">
+                            <span class="mr-2">📚</span>
+                            <span>Today's Topics: <span id="topicCount-${childId}" class="font-semibold">Loading...</span></span>
+                        </div>
+                        <div class="flex items-center text-sm">
+                            <span class="mr-2">📝</span>
+                            <span>Homework: <span id="hwCount-${childId}" class="font-semibold">Loading...</span></span>
+                        </div>
+                        <div class="flex items-center text-sm">
+                            <span class="mr-2">📅</span>
+                            <span>Next Class: <span id="nextClass-${childId}" class="font-semibold">Loading...</span></span>
+                        </div>
+                    </div>
+                    
+                    <button onclick="toggleChildDetails('${childId}', '${childName}')" 
+                            id="toggleBtn-${childId}"
+                            class="w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-2 px-4 rounded-lg transition-colors flex items-center justify-center">
+                        <span class="mr-1">▼</span> View Details
+                    </button>
+                    
+                    <div id="childDetails-${childId}" class="hidden mt-6 pt-6 border-t">
+                        <!-- Details will be loaded here -->
+                    </div>
+                </div>
+            `;
+        });
+        
+        childrenHTML += `
+                </div>
+            </div>
+        `;
+        
+        reportContent.innerHTML = childrenHTML;
+        
+        // Load initial counts and details for each child
+        allChildren.forEach(async (child) => {
+            const childId = child.id;
+            const childName = child.name;
+            
+            // Load counts
+            await loadChildCounts(childId, childName);
+            
+            // Setup real-time listeners
+            setupChildListeners(childId);
+        });
+        
+        // Show dashboard
+        authArea.classList.add("hidden");
+        reportArea.classList.remove("hidden");
+        
+        // Add buttons to welcome section
+        addViewResponsesButton();
+        addManualRefreshButton();
+        
+        // Load initial referral data for the rewards dashboard tab
+        loadReferralRewards(parentUid);
+        
+    } catch (error) {
+        console.error('Error loading parent dashboard:', error);
+        showMessage('Error loading dashboard. Please try again.', 'error');
+    } finally {
+        authLoader.classList.add("hidden");
+    }
+}
+
+async function loadChildCounts(childId, childName) {
+    try {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const tomorrow = new Date(today);
+        tomorrow.setDate(tomorrow.getDate() + 1);
+        
+        // Load topic count
+        const topicsSnapshot = await db.collection('daily_topics')
+            .where('studentId', '==', childId)
+            .where('date', '>=', today)
+            .where('date', '<', tomorrow)
+            .get();
+        
+        const topicCount = topicsSnapshot.size;
+        updateTopicCount(childId, topicCount);
+        
+        // Load homework count
+        const homeworkSnapshot = await db.collection('homework_assignments')
+            .where('studentId', '==', childId)
+            .where('status', 'in', ['assigned', 'submitted'])
+            .get();
+        
+        const hwCount = homeworkSnapshot.size;
+        updateHomeworkCount(childId, hwCount);
+        
+        // Load schedule for next class
+        const scheduleSnapshot = await db.collection('schedules')
+            .where('studentId', '==', childId)
+            .limit(1)
+            .get();
+        
+        let nextClassText = 'No schedule';
+        if (!scheduleSnapshot.empty) {
+            const schedule = scheduleSnapshot.docs[0].data().schedule || [];
+            updateNextClass(childId, schedule);
+        } else {
+            updateNextClass(childId, null);
+        }
+        
+    } catch (error) {
+        console.error('Error loading child counts:', error);
+    }
+}
+
+function setupChildListeners(childId) {
+    // Setup topic listener
+    setupTopicsListener(childId);
+    
+    // Setup homework listener
+    setupHomeworkListener(childId);
+    
+    // Setup schedule listener
+    setupScheduleListener(childId);
+}
+
+function setupScheduleListener(studentId) {
+    if (childRealTimeListeners[`schedule-${studentId}`]) return;
+    
+    const listener = db.collection('schedules')
+        .where('studentId', '==', studentId)
+        .limit(1)
+        .onSnapshot((snapshot) => {
+            if (!snapshot.empty) {
+                const schedule = snapshot.docs[0].data().schedule || [];
+                updateNextClass(studentId, schedule);
+            } else {
+                updateNextClass(studentId, null);
+            }
+        });
+    
+    childRealTimeListeners[`schedule-${studentId}`] = listener;
+    realTimeListeners.push(listener);
+}
+
+function addDashboardCSS() {
+    // Check if CSS already added
+    if (document.getElementById('parentDashboardCSS')) return;
+    
+    const style = document.createElement('style');
+    style.id = 'parentDashboardCSS';
+    style.textContent = `
+        .overnight-indicator { color: #9333ea; }
+        .filter-btn.active { background-color: #dcfce7; color: #166534; }
+        .line-clamp-2 { overflow: hidden; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
+        .preserve-whitespace { white-space: pre-wrap; }
+        .loading-spinner { border: 3px solid #f3f3f3; border-top: 3px solid #10b981; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; }
+        .loading-spinner-small { border: 2px solid #f3f3f3; border-top: 2px solid #10b981; border-radius: 50%; width: 16px; height: 16px; animation: spin 1s linear infinite; display: inline-block; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        .child-card { transition: all 0.3s ease; }
+        .child-card:hover { transform: translateY(-2px); box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1); }
+        .tab-active-main { background-color: #10b981; color: white; }
+        .tab-inactive-main { background-color: #f3f4f6; color: #4b5563; }
+        .tab-active-main:hover { background-color: #059669; }
+        .tab-inactive-main:hover { background-color: #e5e7eb; }
+    `;
+    document.head.appendChild(style);
+}
+
+function showNoChildrenView() {
+    const reportContent = document.getElementById('reportContent');
+    
+    reportContent.innerHTML = `
+        <div class="text-center py-16">
+            <div class="text-6xl mb-6">👨‍👩‍👧‍👦</div>
+            <h2 class="text-2xl font-bold text-gray-800 mb-4">No Children Linked</h2>
+            <p class="text-gray-600 max-w-2xl mx-auto mb-6">
+                We couldn't find any children linked to your account. This could be because:
+            </p>
+            <div class="bg-blue-50 border border-blue-200 rounded-lg p-6 max-w-2xl mx-auto mb-6">
+                <ul class="text-left text-gray-700 space-y-3">
+                    <li>• Your phone number doesn't match the one on file with the tutor</li>
+                    <li>• The tutor hasn't registered your child yet</li>
+                    <li>• There might be a mismatch in the phone number format</li>
+                </ul>
+            </div>
+            <div class="flex flex-col sm:flex-row gap-4 justify-center items-center">
+                <button onclick="showFeedbackModal()" class="bg-blue-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-blue-700 transition-all duration-200 flex items-center">
+                    <span class="mr-2">💬</span> Contact Support
+                </button>
+                <button onclick="location.reload()" class="bg-green-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-green-700 transition-all duration-200 flex items-center">
+                    <span class="mr-2">🔄</span> Refresh Page
+                </button>
+            </div>
+        </div>
+    `;
+}
+
+function showNotification(message, type = 'info') {
+    const notification = document.createElement('div');
+    notification.className = `fixed top-4 right-4 p-4 rounded-lg shadow-lg z-50 max-w-sm ${
+        type === 'error' ? 'bg-red-500 text-white' :
+        type === 'success' ? 'bg-green-500 text-white' :
+        type === 'warning' ? 'bg-yellow-500 text-white' :
+        'bg-blue-500 text-white'
+    }`;
+    notification.textContent = message;
+    
+    document.body.appendChild(notification);
+    
+    setTimeout(() => {
+        notification.remove();
+    }, 5000);
+}
+
+// ============================================
+// EXISTING FUNCTIONS (KEPT FOR COMPATIBILITY)
+// ============================================
+
+// Feedback System Functions (existing)
 function showFeedbackModal() {
     populateStudentDropdown();
     document.getElementById('feedbackModal').classList.remove('hidden');
@@ -893,11 +2567,11 @@ function populateStudentDropdown() {
     const studentDropdown = document.getElementById('feedbackStudent');
     studentDropdown.innerHTML = '<option value="">Select student</option>';
     
-    // Get student names from the report headers that are already displayed
-    const studentHeaders = document.querySelectorAll('[class*="bg-green-100"] h2');
+    // Get student names from the dashboard
+    const studentHeaders = document.querySelectorAll('.child-card h3');
     
     if (studentHeaders.length === 0) {
-        studentDropdown.innerHTML += '<option value="" disabled>No students found - please wait for reports to load</option>';
+        studentDropdown.innerHTML += '<option value="" disabled>No students found</option>';
         return;
     }
 
@@ -976,7 +2650,7 @@ async function submitFeedback() {
     }
 }
 
-// Admin Responses Functions with Notification Counter
+// Admin Responses Functions (existing)
 function showResponsesModal() {
     document.getElementById('responsesModal').classList.remove('hidden');
     loadAdminResponses();
@@ -1100,7 +2774,7 @@ async function loadAdminResponses() {
     }
 }
 
-// Notification System for Responses
+// Notification System for Responses (existing)
 async function checkForNewResponses() {
     try {
         const user = auth.currentUser;
@@ -1204,302 +2878,7 @@ function addViewResponsesButton() {
     }, 1000);
 }
 
-// ENHANCED MULTI-LAYER SEARCH SYSTEM FOR ALL COUNTRIES
-async function performMultiLayerSearch(parentPhone, parentEmail, userId) {
-    console.log("🔍 Starting multi-layer search for:", parentPhone);
-    
-    let assessmentResults = [];
-    let monthlyResults = [];
-    
-    try {
-        // Get multiple normalized versions of the phone number
-        const normalizedVersions = multiNormalizePhoneNumber(parentPhone);
-        const validVersions = normalizedVersions.filter(v => v.valid && v.normalized);
-        
-        console.log(`🎯 Searching with ${validVersions.length} normalized versions:`, validVersions.map(v => v.normalized));
-
-        // --- ASSESSMENT REPORTS SEARCH ---
-        for (const version of validVersions) {
-            console.log(`📊 ASSESSMENT SEARCH - Attempt with: ${version.normalized} (${version.attempt})`);
-            
-            // Layer 1: Normalized phone search
-            let assessmentSnapshot = await db.collection("student_results")
-                .where("normalizedParentPhone", "==", version.normalized)
-                .get();
-            
-            if (!assessmentSnapshot.empty) {
-                console.log(`✅ Assessment FOUND with version: ${version.normalized}`);
-                assessmentSnapshot.forEach(doc => {
-                    const data = doc.data();
-                    // Check if we already have this result to avoid duplicates
-                    if (!assessmentResults.some(r => r.id === doc.id)) {
-                        assessmentResults.push({ 
-                            id: doc.id,
-                            ...data,
-                            timestamp: data.submittedAt?.seconds || Date.now() / 1000,
-                            type: 'assessment',
-                            foundWith: version.normalized
-                        });
-                    }
-                });
-                break; // Stop searching if we found results
-            }
-        }
-
-        // If no results from normalized search, try original fields
-        if (assessmentResults.length === 0) {
-            console.log("📊 ASSESSMENT SEARCH - Layer 2: Original phone fields");
-            for (const version of validVersions) {
-                let assessmentSnapshot = await db.collection("student_results")
-                    .where("parentPhone", "==", version.normalized)
-                    .get();
-                
-                if (!assessmentSnapshot.empty) {
-                    console.log(`✅ Assessment FOUND in original fields with: ${version.normalized}`);
-                    assessmentSnapshot.forEach(doc => {
-                        const data = doc.data();
-                        if (!assessmentResults.some(r => r.id === doc.id)) {
-                            assessmentResults.push({ 
-                                id: doc.id,
-                                ...data,
-                                timestamp: data.submittedAt?.seconds || Date.now() / 1000,
-                                type: 'assessment',
-                                foundWith: version.normalized
-                            });
-                        }
-                    });
-                    break;
-                }
-            }
-        }
-
-        // If still no results, try email search
-        if (assessmentResults.length === 0 && parentEmail) {
-            console.log("📊 ASSESSMENT SEARCH - Layer 3: Email search");
-            let assessmentSnapshot = await db.collection("student_results")
-                .where("parentEmail", "==", parentEmail)
-                .get();
-            
-            if (!assessmentSnapshot.empty) {
-                console.log("✅ Assessment FOUND with email");
-                assessmentSnapshot.forEach(doc => {
-                    const data = doc.data();
-                    if (!assessmentResults.some(r => r.id === doc.id)) {
-                        assessmentResults.push({ 
-                            id: doc.id,
-                            ...data,
-                            timestamp: data.submittedAt?.seconds || Date.now() / 1000,
-                            type: 'assessment',
-                            foundWith: 'email'
-                        });
-                    }
-                });
-            }
-        }
-
-        // --- MONTHLY REPORTS SEARCH ---
-        for (const version of validVersions) {
-            console.log(`📈 MONTHLY REPORTS SEARCH - Attempt with: ${version.normalized} (${version.attempt})`);
-            
-            // Layer 1: Normalized phone search
-            let monthlySnapshot = await db.collection("tutor_submissions")
-                .where("normalizedParentPhone", "==", version.normalized)
-                .get();
-            
-            if (!monthlySnapshot.empty) {
-                console.log(`✅ Monthly reports FOUND with version: ${version.normalized}`);
-                monthlySnapshot.forEach(doc => {
-                    const data = doc.data();
-                    if (!monthlyResults.some(r => r.id === doc.id)) {
-                        monthlyResults.push({ 
-                            id: doc.id,
-                            ...data,
-                            timestamp: data.submittedAt?.seconds || Date.now() / 1000,
-                            type: 'monthly',
-                            foundWith: version.normalized
-                        });
-                    }
-                });
-                break;
-            }
-        }
-
-        // If no results from normalized search, try original fields
-        if (monthlyResults.length === 0) {
-            console.log("📈 MONTHLY REPORTS SEARCH - Layer 2: Original phone fields");
-            for (const version of validVersions) {
-                let monthlySnapshot = await db.collection("tutor_submissions")
-                    .where("parentPhone", "==", version.normalized)
-                    .get();
-                
-                if (!monthlySnapshot.empty) {
-                    console.log(`✅ Monthly reports FOUND in original fields with: ${version.normalized}`);
-                    monthlySnapshot.forEach(doc => {
-                        const data = doc.data();
-                        if (!monthlyResults.some(r => r.id === doc.id)) {
-                            monthlyResults.push({ 
-                                id: doc.id,
-                                ...data,
-                                timestamp: data.submittedAt?.seconds || Date.now() / 1000,
-                                type: 'monthly',
-                                foundWith: version.normalized
-                            });
-                        }
-                    });
-                    break;
-                }
-            }
-        }
-
-        // If still no results, try email search
-        if (monthlyResults.length === 0 && parentEmail) {
-            console.log("📈 MONTHLY REPORTS SEARCH - Layer 3: Email search");
-            let monthlySnapshot = await db.collection("tutor_submissions")
-                .where("parentEmail", "==", parentEmail)
-                .get();
-            
-            if (!monthlySnapshot.empty) {
-                console.log("✅ Monthly reports FOUND with email");
-                monthlySnapshot.forEach(doc => {
-                    const data = doc.data();
-                    if (!monthlyResults.some(r => r.id === doc.id)) {
-                        monthlyResults.push({ 
-                            id: doc.id,
-                            ...data,
-                            timestamp: data.submittedAt?.seconds || Date.now() / 1000,
-                            type: 'monthly',
-                            foundWith: 'email'
-                        });
-                    }
-                });
-            }
-        }
-
-        console.log("🎯 SEARCH SUMMARY - Assessments:", assessmentResults.length, "Monthly:", monthlyResults.length);
-        
-    } catch (error) {
-        console.error("❌ Error during multi-layer search:", error);
-    }
-    
-    return { assessmentResults, monthlyResults };
-}
-
-// HYBRID REAL-TIME MONITORING SYSTEM
-function setupRealTimeMonitoring(parentPhone, parentEmail, userId) {
-    // Clear any existing listeners
-    cleanupRealTimeListeners();
-    
-    console.log("🔍 Setting up real-time monitoring for:", parentPhone);
-    
-    // Get normalized phone versions for monitoring
-    const normalizedVersions = multiNormalizePhoneNumber(parentPhone);
-    const validVersions = normalizedVersions.filter(v => v.valid && v.normalized);
-    
-    // Monitor assessment reports
-    validVersions.forEach(version => {
-        const assessmentListener = db.collection("student_results")
-            .where("normalizedParentPhone", "==", version.normalized)
-            .onSnapshot((snapshot) => {
-                snapshot.docChanges().forEach((change) => {
-                    if (change.type === "added") {
-                        console.log("🆕 NEW ASSESSMENT REPORT DETECTED!");
-                        showNewReportNotification('assessment');
-                        // Reload reports after a short delay
-                        setTimeout(() => {
-                            loadAllReportsForParent(parentPhone, userId);
-                        }, 2000);
-                    }
-                });
-            });
-        realTimeListeners.push(assessmentListener);
-    });
-    
-    // Monitor monthly reports
-    validVersions.forEach(version => {
-        const monthlyListener = db.collection("tutor_submissions")
-            .where("normalizedParentPhone", "==", version.normalized)
-            .onSnapshot((snapshot) => {
-                snapshot.docChanges().forEach((change) => {
-                    if (change.type === "added") {
-                        console.log("🆕 NEW MONTHLY REPORT DETECTED!");
-                        showNewReportNotification('monthly');
-                        // Reload reports after a short delay
-                        setTimeout(() => {
-                            loadAllReportsForParent(parentPhone, userId);
-                        }, 2000);
-                    }
-                });
-            });
-        realTimeListeners.push(monthlyListener);
-    });
-    
-    // Also monitor by email if available
-    if (parentEmail) {
-        const emailAssessmentListener = db.collection("student_results")
-            .where("parentEmail", "==", parentEmail)
-            .onSnapshot((snapshot) => {
-                snapshot.docChanges().forEach((change) => {
-                    if (change.type === "added") {
-                        console.log("🆕 NEW ASSESSMENT REPORT DETECTED VIA EMAIL!");
-                        showNewReportNotification('assessment');
-                        setTimeout(() => {
-                            loadAllReportsForParent(parentPhone, userId);
-                        }, 2000);
-                    }
-                });
-            });
-        realTimeListeners.push(emailAssessmentListener);
-        
-        const emailMonthlyListener = db.collection("tutor_submissions")
-            .where("parentEmail", "==", parentEmail)
-            .onSnapshot((snapshot) => {
-                snapshot.docChanges().forEach((change) => {
-                    if (change.type === "added") {
-                        console.log("🆕 NEW MONTHLY REPORT DETECTED VIA EMAIL!");
-                        showNewReportNotification('monthly');
-                        setTimeout(() => {
-                            loadAllReportsForParent(parentPhone, userId);
-                        }, 2000);
-                    }
-                });
-            });
-        realTimeListeners.push(emailMonthlyListener);
-    }
-}
-
-function cleanupRealTimeListeners() {
-    realTimeListeners.forEach(unsubscribe => {
-        if (typeof unsubscribe === 'function') {
-            unsubscribe();
-        }
-    });
-    realTimeListeners = [];
-    console.log("🧹 Cleaned up real-time listeners");
-}
-
-function showNewReportNotification(type) {
-    const reportType = type === 'assessment' ? 'Assessment Report' : 'Monthly Report';
-    showMessage(`New ${reportType} available! Loading now...`, 'success');
-    
-    // Add a visual indicator in the UI
-    const existingIndicator = document.getElementById('newReportIndicator');
-    if (existingIndicator) {
-        existingIndicator.remove();
-    }
-    
-    const indicator = document.createElement('div');
-    indicator.id = 'newReportIndicator';
-    indicator.className = 'fixed top-20 right-4 bg-green-500 text-white px-4 py-2 rounded-lg shadow-lg z-40 animate-pulse';
-    indicator.innerHTML = `📄 New ${reportType} Available!`;
-    document.body.appendChild(indicator);
-    
-    // Remove after 5 seconds
-    setTimeout(() => {
-        indicator.remove();
-    }, 5000);
-}
-
-// MANUAL REFRESH FUNCTION
+// MANUAL REFRESH FUNCTION (existing)
 async function manualRefreshReports() {
     const user = auth.currentUser;
     if (!user) return;
@@ -1512,17 +2891,10 @@ async function manualRefreshReports() {
     refreshBtn.disabled = true;
     
     try {
-        // Get user data
-        const userDoc = await db.collection('parent_users').doc(user.uid).get();
-        if (userDoc.exists) {
-            const userData = userDoc.data();
-            const userPhone = userData.normalizedPhone || userData.phone;
-            
-            // Force reload reports (bypass cache)
-            await loadAllReportsForParent(userPhone, user.uid, true);
-            
-            showMessage('Reports refreshed successfully!', 'success');
-        }
+        // Force reload dashboard
+        await loadParentDashboard(user.uid);
+        
+        showMessage('Dashboard refreshed successfully!', 'success');
     } catch (error) {
         console.error('Manual refresh error:', error);
         showMessage('Refresh failed. Please try again.', 'error');
@@ -1533,7 +2905,7 @@ async function manualRefreshReports() {
     }
 }
 
-// ADD MANUAL REFRESH BUTTON TO WELCOME SECTION
+// ADD MANUAL REFRESH BUTTON TO WELCOME SECTION (existing)
 function addManualRefreshButton() {
     const welcomeSection = document.querySelector('.bg-green-50');
     if (!welcomeSection) return;
@@ -1548,522 +2920,32 @@ function addManualRefreshButton() {
     refreshBtn.id = 'manualRefreshBtn';
     refreshBtn.onclick = manualRefreshReports;
     refreshBtn.className = 'bg-green-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-green-700 transition-all duration-200 btn-glow flex items-center justify-center';
-    refreshBtn.innerHTML = '<span class="mr-2">🔄</span> Check for New Reports';
+    refreshBtn.innerHTML = '<span class="mr-2">🔄</span> Check for New Updates';
     
     // Insert before the logout button
     buttonContainer.insertBefore(refreshBtn, buttonContainer.lastElementChild);
 }
 
-// MAIN REPORT LOADING FUNCTION - UPDATED WITH HYBRID SYSTEM
-async function loadAllReportsForParent(parentPhone, userId, forceRefresh = false) {
-    const reportArea = document.getElementById("reportArea");
-    const reportContent = document.getElementById("reportContent");
-    const authArea = document.getElementById("authArea");
-    const authLoader = document.getElementById("authLoader");
-    const welcomeMessage = document.getElementById("welcomeMessage");
-
-    authLoader.classList.remove("hidden");
-
-    try {
-        // --- CACHE IMPLEMENTATION (skip if force refresh) ---
-        const cacheKey = `reportCache_${parentPhone}`;
-        const twoWeeksInMillis = 14 * 24 * 60 * 60 * 1000;
-        
-        if (!forceRefresh) {
-            try {
-                const cachedItem = localStorage.getItem(cacheKey);
-                if (cachedItem) {
-                    const { timestamp, html, chartConfigs, userData } = JSON.parse(cachedItem);
-                    if (Date.now() - timestamp < twoWeeksInMillis) {
-                        console.log("Loading reports from cache.");
-                        reportContent.innerHTML = html;
-                        
-                        // Set welcome message from cache
-                        if (userData && userData.parentName) {
-                            welcomeMessage.textContent = `Welcome, ${userData.parentName}!`;
-                            currentUserData = userData;
-                        } else {
-                            welcomeMessage.textContent = `Welcome!`;
-                        }
-                        
-                        // Re-initialize charts from cached configuration
-                        if (chartConfigs && chartConfigs.length > 0) {
-                            setTimeout(() => {
-                                chartConfigs.forEach(chart => {
-                                    const ctx = document.getElementById(chart.canvasId);
-                                    if (ctx) new Chart(ctx, chart.config);
-                                });
-                            }, 0);
-                        }
-
-                        authArea.classList.add("hidden");
-                        reportArea.classList.remove("hidden");
-                        
-                        // Add buttons to welcome section
-                        addViewResponsesButton();
-                        addManualRefreshButton();
-                        
-                        // Setup real-time monitoring
-                        const userDoc = await db.collection('parent_users').doc(userId).get();
-                        const userData = userDoc.data();
-                        setupRealTimeMonitoring(parentPhone, userData.email, userId);
-                        
-                        // Load initial referral data
-                        loadReferralRewards(userId);
-
-                        return;
-                    }
-                }
-            } catch (e) {
-                console.error("Could not read from cache:", e);
-                localStorage.removeItem(cacheKey);
-            }
+// Clean up listeners on logout
+function cleanupListeners() {
+    // Clean up global listeners
+    realTimeListeners.forEach(unsubscribe => {
+        if (typeof unsubscribe === 'function') {
+            unsubscribe();
         }
-        // --- END CACHE IMPLEMENTATION ---
-
-        // FIND PARENT NAME FROM SAME SOURCES AS TUTOR.JS
-        let parentName = await findParentNameFromStudents(parentPhone);
-        
-        // Get parent's email and latest user data from their account document
-        const userDocRef = db.collection('parent_users').doc(userId);
-        let userDoc = await userDocRef.get();
-        let userData = userDoc.data();
-        const parentEmail = userData.email;
-
-        // --- START: REFERRAL CODE CHECK/GENERATION FOR EXISTING USERS (FIX) ---
-        if (!userData.referralCode) {
-            console.log("Existing user detected without a referral code. Generating and assigning now.");
-            try {
-                const newReferralCode = await generateReferralCode();
-                await userDocRef.update({
-                    referralCode: newReferralCode,
-                    referralEarnings: userData.referralEarnings || 0 // Initialize if missing
-                });
-                
-                // Re-fetch updated user data
-                userDoc = await userDocRef.get();
-                userData = userDoc.data();
-                console.log("Referral code assigned successfully:", newReferralCode);
-                
-            } catch (error) {
-                console.error('Error auto-assigning referral code:', error);
-                // Non-critical failure, continue loading reports
-            }
+    });
+    realTimeListeners = [];
+    
+    // Clean up child-specific listeners
+    Object.keys(childRealTimeListeners).forEach(key => {
+        const unsubscribe = childRealTimeListeners[key];
+        if (typeof unsubscribe === 'function') {
+            unsubscribe();
         }
-        // --- END: REFERRAL CODE CHECK/GENERATION FOR EXISTING USERS (FIX) ---
-
-        // If not found in students collections, use name from user document
-        if (!parentName && userId) {
-            if (userDoc.exists) {
-                parentName = userData.parentName;
-            }
-        }
-
-        // Final fallback
-        if (!parentName) {
-            parentName = 'Parent';
-        }
-
-        // Store user data globally
-        currentUserData = {
-            parentName: parentName,
-            parentPhone: parentPhone
-        };
-
-        // UPDATE WELCOME MESSAGE WITH PARENT NAME
-        welcomeMessage.textContent = `Welcome, ${currentUserData.parentName}!`;
-
-        // Update parent name in user document if we found a better one
-        if (userId && parentName && parentName !== 'Parent' && userData.parentName !== parentName) {
-            try {
-                await userDocRef.update({
-                    parentName: parentName
-                });
-            } catch (error) {
-                console.error('Error updating parent name:', error);
-            }
-        }
-
-        console.log("🔍 Starting enhanced multi-layer search for:", parentPhone);
-
-        // --- USE ENHANCED MULTI-LAYER SEARCH SYSTEM ---
-        const { assessmentResults, monthlyResults } = await performMultiLayerSearch(parentPhone, parentEmail, userId);
-
-        // SETUP REAL-TIME MONITORING (whether reports exist or not)
-        setupRealTimeMonitoring(parentPhone, parentEmail, userId);
-
-        if (assessmentResults.length === 0 && monthlyResults.length === 0) {
-            // NO REPORTS FOUND - SHOW WAITING STATE
-            reportContent.innerHTML = `
-                <div class="text-center py-16">
-                    <div class="text-6xl mb-6">📊</div>
-                    <h2 class="text-2xl font-bold text-gray-800 mb-4">Waiting for Your Child's First Report</h2>
-                    <p class="text-gray-600 max-w-2xl mx-auto mb-6">
-                        No reports found for your account yet. This usually means:
-                    </p>
-                    <div class="bg-blue-50 border border-blue-200 rounded-lg p-6 max-w-2xl mx-auto mb-6">
-                        <ul class="text-left text-gray-700 space-y-3">
-                            <li>• Your child's tutor hasn't submitted their first assessment or monthly report yet</li>
-                            <li>• The phone number/email used doesn't match what the tutor has on file</li>
-                            <li>• Reports are being processed and will appear soon</li>
-                        </ul>
-                    </div>
-                    <div class="bg-green-50 border border-green-200 rounded-lg p-6 max-w-2xl mx-auto">
-                        <h3 class="font-semibold text-green-800 mb-2">What happens next?</h3>
-                        <p class="text-green-700 mb-4">
-                            <strong>We're automatically monitoring for new reports!</strong> When your child's tutor submits 
-                            their first report, it will appear here automatically. You don't need to do anything.
-                        </p>
-                        <div class="flex flex-col sm:flex-row gap-4 justify-center items-center">
-                            <button onclick="manualRefreshReports()" class="bg-green-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-green-700 transition-all duration-200 flex items-center">
-                                <span class="mr-2">🔄</span> Check Now
-                            </button>
-                            <button onclick="showFeedbackModal()" class="bg-blue-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-blue-700 transition-all duration-200 flex items-center">
-                                <span class="mr-2">💬</span> Contact Support
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            `;
-            
-            authArea.classList.add("hidden");
-            reportArea.classList.remove("hidden");
-            
-            // Add buttons to welcome section
-            addViewResponsesButton();
-            addManualRefreshButton();
-            
-            // Load initial referral data for the rewards dashboard tab even if no reports
-            loadReferralRewards(userId);
-
-            return;
-        }
-        
-        // REPORTS FOUND - DISPLAY THEM
-        reportContent.innerHTML = "";
-        const chartConfigsToCache = [];
-
-        // Group reports by student name and extract parent name
-        const studentsMap = new Map();
-
-        // Process assessment reports
-        assessmentResults.forEach(result => {
-            const studentName = result.studentName;
-            if (!studentsMap.has(studentName)) {
-                studentsMap.set(studentName, { assessments: [], monthly: [] });
-            }
-            studentsMap.get(studentName).assessments.push(result);
-        });
-
-        // Process monthly reports
-        monthlyResults.forEach(report => {
-            const studentName = report.studentName;
-            if (!studentsMap.has(studentName)) {
-                studentsMap.set(studentName, { assessments: [], monthly: [] });
-            }
-            studentsMap.get(studentName).monthly.push(report);
-        });
-
-        userChildren = Array.from(studentsMap.keys());
-
-        // Display reports for each student
-        let studentIndex = 0;
-        for (const [studentName, reports] of studentsMap) {
-            const fullName = capitalize(studentName);
-            
-            // Add student header
-            const studentHeader = `
-                <div class="bg-green-100 border-l-4 border-green-600 p-4 rounded-lg mb-6">
-                    <h2 class="text-xl font-bold text-green-800">${fullName}</h2>
-                    <p class="text-green-600">Showing all reports for ${fullName}</p>
-                </div>
-            `;
-            reportContent.innerHTML += studentHeader;
-
-            // Display Assessment Reports for this student - NO DUPLICATES
-            if (reports.assessments.length > 0) {
-                // Group by unique test sessions using timestamp
-                const uniqueSessions = new Map();
-                
-                reports.assessments.forEach((result) => {
-                    const sessionKey = Math.floor(result.timestamp / 86400); // Group by day
-                    if (!uniqueSessions.has(sessionKey)) {
-                        uniqueSessions.set(sessionKey, []);
-                    }
-                    uniqueSessions.get(sessionKey).push(result);
-                });
-
-                let assessmentIndex = 0;
-                for (const [sessionKey, session] of uniqueSessions) {
-                    const tutorEmail = session[0].tutorEmail || 'N/A';
-                    const studentCountry = session[0].studentCountry || 'N/A';
-                    const formattedDate = new Date(session[0].timestamp * 1000).toLocaleString('en-US', {
-                        dateStyle: 'long',
-                        timeStyle: 'short'
-                    });
-
-                    let tutorName = 'N/A';
-                    if (tutorEmail && tutorEmail !== 'N/A') {
-                        try {
-                            const tutorDoc = await db.collection("tutors").doc(tutorEmail).get();
-                            if (tutorDoc.exists) {
-                                tutorName = tutorDoc.data().name;
-                            }
-                        } catch (error) {
-                            // Silent fail - tutor name will remain 'N/A'
-                        }
-                    }
-
-                    const results = session.map(testResult => {
-                        const topics = [...new Set(testResult.answers?.map(a => a.topic).filter(t => t))] || [];
-                        return {
-                            subject: testResult.subject,
-                            correct: testResult.score !== undefined ? testResult.score : 0,
-                            total: testResult.totalScoreableQuestions !== undefined ? testResult.totalScoreableQuestions : 0,
-                            topics: topics,
-                        };
-                    });
-
-                    const tableRows = results.map(res => `<tr><td class="border px-2 py-1">${res.subject.toUpperCase()}</td><td class="border px-2 py-1 text-center">${res.correct} / ${res.total}</td></tr>`).join("");
-                    const topicsTableRows = results.map(res => `<tr><td class="border px-2 py-1 font-semibold">${res.subject.toUpperCase()}</td><td class="border px-2 py-1">${res.topics.join(', ') || 'N/A'}</td></tr>`).join("");
-
-                    const recommendation = generateTemplatedRecommendation(fullName, tutorName, results);
-                    const creativeWritingAnswer = session[0].answers?.find(a => a.type === 'creative-writing');
-                    const tutorReport = creativeWritingAnswer?.tutorReport || 'Pending review.';
-
-                    const assessmentBlock = `
-                        <div class="border rounded-lg shadow mb-8 p-6 bg-white" id="assessment-block-${studentIndex}-${assessmentIndex}">
-                            <div class="text-center mb-6 border-b pb-4">
-                                <img src="https://res.cloudinary.com/dy2hxcyaf/image/upload/v1757700806/newbhlogo_umwqzy.svg" 
-                                     alt="Blooming Kids House Logo" 
-                                     class="h-16 w-auto mx-auto mb-3">
-                                <h2 class="text-2xl font-bold text-green-800">Assessment Report</h2>
-                                <p class="text-gray-600">Date: ${formattedDate}</p>
-                            </div>
-
-                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6 bg-green-50 p-4 rounded-lg">
-                                <div>
-                                    <p><strong>Student's Name:</strong> ${fullName}</p>
-                                    <p><strong>Parent's Phone:</strong> ${session[0].parentPhone || 'N/A'}</p>
-                                    <p><strong>Grade:</strong> ${session[0].grade}</p>
-                                </div>
-                                <div>
-                                    <p><strong>Tutor:</strong> ${tutorName || 'N/A'}</p>
-                                    <p><strong>Location:</strong> ${studentCountry || 'N/A'}</p>
-                                </div>
-                            </div>
-                            
-                            <h3 class="text-lg font-semibold mt-4 mb-2 text-green-700">Performance Summary</h3>
-                            <table class="w-full text-sm mb-4 border border-collapse">
-                                <thead class="bg-gray-100"><tr><th class="border px-2 py-1 text-left">Subject</th><th class="border px-2 py-1 text-center">Score</th></tr></thead>
-                                <tbody>${tableRows}</tbody>
-                            </table>
-                            
-                            <h3 class="text-lg font-semibold mt-4 mb-2 text-green-700">Knowledge & Skill Analysis</h3>
-                            <table class="w-full text-sm mb-4 border border-collapse">
-                                <thead class="bg-gray-100"><tr><th class="border px-2 py-1 text-left">Subject</th><th class="border px-2 py-1 text-left">Topics Covered</th></tr></thead>
-                                <tbody>${topicsTableRows}</tbody>
-                            </table>
-                            
-                            <h3 class="text-lg font-semibold mt-4 mb-2 text-green-700">Tutor's Recommendation</h3>
-                            <p class="mb-2 text-gray-700 leading-relaxed">${recommendation}</p>
-
-                            ${creativeWritingAnswer ? `
-                            <h3 class="text-lg font-semibold mt-4 mb-2 text-green-700">Creative Writing Feedback</h3>
-                            <p class="mb-2 text-gray-700"><strong>Tutor's Report:</strong> ${tutorReport}</p>
-                            ` : ''}
-
-                            ${results.length > 0 ? `
-                            <canvas id="chart-${studentIndex}-${assessmentIndex}" class="w-full h-48 mb-4"></canvas>
-                            ` : ''}
-                            
-                            <div class="bg-yellow-50 p-4 rounded-lg mt-6">
-                                <h3 class="text-lg font-semibold mb-1 text-green-700">Director's Message</h3>
-                                <p class="italic text-sm text-gray-700">At Blooming Kids House, we are committed to helping every child succeed. We believe that with personalized support from our tutors, ${fullName} will unlock their full potential. Keep up the great work!<br/>– Mrs. Yinka Isikalu, Director</p>
-                            </div>
-                            
-                            <div class="mt-6 text-center">
-                                <button onclick="downloadSessionReport(${studentIndex}, ${assessmentIndex}, '${fullName}', 'assessment')" class="bg-green-600 text-white px-6 py-2 rounded-lg font-semibold hover:bg-green-700 transition-all duration-200">
-                                    Download Assessment PDF
-                                </button>
-                            </div>
-                        </div>
-                    `;
-
-                    reportContent.innerHTML += assessmentBlock;
-
-                    if (results.length > 0) {
-                        const ctx = document.getElementById(`chart-${studentIndex}-${assessmentIndex}`);
-                        if (ctx) {
-                            const chartConfig = {
-                                type: 'bar',
-                                data: {
-                                    labels: results.map(r => r.subject.toUpperCase()),
-                                    datasets: [
-                                        { label: 'Correct Answers', data: results.map(s => s.correct), backgroundColor: '#4CAF50' }, 
-                                        { label: 'Incorrect/Unanswered', data: results.map(s => s.total - s.correct), backgroundColor: '#FFCD56' }
-                                    ]
-                                },
-                                options: {
-                                    responsive: true,
-                                    scales: { x: { stacked: true }, y: { stacked: true, beginAtZero: true } },
-                                    plugins: { title: { display: true, text: 'Score Distribution by Subject' } }
-                                }
-                            };
-                            new Chart(ctx, chartConfig);
-                            chartConfigsToCache.push({ canvasId: `chart-${studentIndex}-${assessmentIndex}`, config: chartConfig });
-                        }
-                    }
-                    assessmentIndex++;
-                }
-            }
-            
-            // Display Monthly Reports for this student
-            if (reports.monthly.length > 0) {
-                const groupedMonthly = {};
-                reports.monthly.forEach((result) => {
-                    const sessionKey = Math.floor(result.timestamp / 86400); 
-                    if (!groupedMonthly[sessionKey]) groupedMonthly[sessionKey] = [];
-                    groupedMonthly[sessionKey].push(result);
-                });
-
-                let monthlyIndex = 0;
-                for (const key in groupedMonthly) {
-                    const session = groupedMonthly[key];
-                    const formattedDate = new Date(session[0].timestamp * 1000).toLocaleString('en-US', {
-                        dateStyle: 'long',
-                        timeStyle: 'short'
-                    });
-
-                    session.forEach((monthlyReport, reportIndex) => {
-                        const monthlyBlock = `
-                            <div class="border rounded-lg shadow mb-8 p-6 bg-white" id="monthly-block-${studentIndex}-${monthlyIndex}">
-                                <div class="text-center mb-6 border-b pb-4">
-                                    <img src="https://res.cloudinary.com/dy2hxcyaf/image/upload/v1757700806/newbhlogo_umwqzy.svg" 
-                                         alt="Blooming Kids House Logo" 
-                                         class="h-16 w-auto mx-auto mb-3">
-                                    <h2 class="text-2xl font-bold text-green-800">MONTHLY LEARNING REPORT</h2>
-                                    <p class="text-gray-600">Date: ${formattedDate}</p>
-                                </div>
-                                
-                                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6 bg-green-50 p-4 rounded-lg">
-                                    <div>
-                                        <p><strong>Student's Name:</strong> ${monthlyReport.studentName || 'N/A'}</p>
-                                        <p><strong>Parent's Name:</strong> ${monthlyReport.parentName || 'N/A'}</p>
-                                        <p><strong>Parent's Phone:</strong> ${monthlyReport.parentPhone || 'N/A'}</p>
-                                    </div>
-                                    <div>
-                                        <p><strong>Grade:</strong> ${monthlyReport.grade || 'N/A'}</p>
-                                        <p><strong>Tutor's Name:</strong> ${monthlyReport.tutorName || 'N/A'}</p>
-                                    </div>
-                                </div>
-
-                                ${monthlyReport.introduction ? `
-                                <div class="mb-6">
-                                    <h3 class="text-lg font-semibold text-green-700 mb-2 border-b pb-1">INTRODUCTION</h3>
-                                    <p class="text-gray-700 leading-relaxed preserve-whitespace">${monthlyReport.introduction}</p>
-                                </div>
-                                ` : ''}
-
-                                ${monthlyReport.topics ? `
-                                <div class="mb-6">
-                                    <h3 class="text-lg font-semibold text-green-700 mb-2 border-b pb-1">TOPICS & REMARKS</h3>
-                                    <p class="text-gray-700 leading-relaxed preserve-whitespace">${monthlyReport.topics}</p>
-                                </div>
-                                ` : ''}
-
-                                ${monthlyReport.progress ? `
-                                <div class="mb-6">
-                                    <h3 class="text-lg font-semibold text-green-700 mb-2 border-b pb-1">PROGRESS & ACHIEVEMENTS</h3>
-                                    <p class="text-gray-700 leading-relaxed preserve-whitespace">${monthlyReport.progress}</p>
-                                </div>
-                                ` : ''}
-
-                                ${monthlyReport.strengthsWeaknesses ? `
-                                <div class="mb-6">
-                                    <h3 class="text-lg font-semibold text-green-700 mb-2 border-b pb-1">STRENGTHS AND WEAKNESSES</h3>
-                                    <p class="text-gray-700 leading-relaxed preserve-whitespace">${monthlyReport.strengthsWeaknesses}</p>
-                                </div>
-                                ` : ''}
-
-                                ${monthlyReport.recommendations ? `
-                                <div class="mb-6">
-                                    <h3 class="text-lg font-semibold text-green-700 mb-2 border-b pb-1">RECOMMENDATIONS</h3>
-                                    <p class="text-gray-700 leading-relaxed preserve-whitespace">${monthlyReport.recommendations}</p>
-                                </div>
-                                ` : ''}
-
-                                ${monthlyReport.generalComments ? `
-                                <div class="mb-6">
-                                    <h3 class="text-lg font-semibold text-green-700 mb-2 border-b pb-1">GENERAL TUTOR'S COMMENTS</h3>
-                                    <p class="text-gray-700 leading-relaxed preserve-whitespace">${monthlyReport.generalComments}</p>
-                                </div>
-                                ` : ''}
-
-                                <div class="text-right mt-8 pt-4 border-t">
-                                    <p class="text-gray-600">Best regards,</p>
-                                    <p class="font-semibold text-green-800">${monthlyReport.tutorName || 'N/A'}</p>
-                                </div>
-
-                                <div class="mt-6 text-center">
-                                    <button onclick="downloadMonthlyReport(${studentIndex}, ${monthlyIndex}, '${fullName}')" class="bg-green-600 text-white px-6 py-2 rounded-lg font-semibold hover:bg-green-700 transition-all duration-200">
-                                        Download Monthly Report PDF
-                                    </button>
-                                </div>
-                            </div>
-                        `;
-                        reportContent.innerHTML += monthlyBlock;
-                        monthlyIndex++;
-                    });
-                }
-            }
-            
-            studentIndex++;
-        }
-        
-        // --- CACHE SAVING LOGIC ---
-        try {
-            const dataToCache = {
-                timestamp: Date.now(),
-                html: reportContent.innerHTML,
-                chartConfigs: chartConfigsToCache,
-                userData: currentUserData
-            };
-            localStorage.setItem(cacheKey, JSON.stringify(dataToCache));
-            console.log("Report data cached successfully.");
-        } catch (e) {
-            console.error("Could not write to cache:", e);
-        }
-        // --- END CACHE SAVING ---
-
-        authArea.classList.add("hidden");
-        reportArea.classList.remove("hidden");
-
-        // Add buttons to welcome section
-        addViewResponsesButton();
-        addManualRefreshButton();
-        
-        // Load initial referral data for the rewards dashboard tab
-        loadReferralRewards(userId);
-
-    } catch (error) {
-        console.error("Error loading reports:", error);
-        showMessage("Sorry, there was an error loading the reports. Please try again.", "error");
-    } finally {
-        authLoader.classList.add("hidden");
-    }
-}
-
-function downloadSessionReport(studentIndex, sessionIndex, studentName, type) {
-    const element = document.getElementById(`${type}-block-${studentIndex}-${sessionIndex}`);
-    const safeStudentName = studentName.replace(/ /g, '_');
-    const fileName = `${type === 'assessment' ? 'Assessment' : 'Monthly'}_Report_${safeStudentName}.pdf`;
-    const opt = { margin: 0.5, filename: fileName, image: { type: 'jpeg', quality: 0.98 }, html2canvas: { scale: 2, useCORS: true }, jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' } };
-    html2pdf().from(element).set(opt).save();
-}
-
-function downloadMonthlyReport(studentIndex, monthlyIndex, studentName) {
-    downloadSessionReport(studentIndex, monthlyIndex, studentName, 'monthly');
+    });
+    childRealTimeListeners = {};
+    
+    console.log("🧹 Cleaned up all real-time listeners");
 }
 
 function logout() {
@@ -2072,7 +2954,7 @@ function logout() {
     localStorage.removeItem('savedEmail');
     
     // Clean up real-time listeners
-    cleanupRealTimeListeners();
+    cleanupListeners();
     
     auth.signOut().then(() => {
         window.location.reload();
@@ -2171,22 +3053,11 @@ document.addEventListener('DOMContentLoaded', function() {
     // Check authentication state
     auth.onAuthStateChanged((user) => {
         if (user) {
-            // User is signed in, load their reports
-            // Get phone from Firestore user document
-            db.collection('parent_users').doc(user.uid).get()
-                .then((doc) => {
-                    if (doc.exists) {
-                        const userPhone = doc.data().phone;
-                        const normalizedPhone = doc.data().normalizedPhone;
-                        loadAllReportsForParent(normalizedPhone || userPhone, user.uid);
-                    }
-                })
-                .catch((error) => {
-                    console.error('Error getting user data:', error);
-                });
+            // User is signed in, load their dashboard
+            loadParentDashboard(user.uid);
         } else {
             // User signed out - clean up listeners
-            cleanupRealTimeListeners();
+            cleanupListeners();
         }
     });
 
