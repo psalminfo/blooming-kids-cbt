@@ -1563,7 +1563,7 @@ function showNewReportNotification(type) {
 }
 
 // -------------------------------------------------------------------
-// ACCORDION SYSTEM FUNCTIONS (RESTORED)
+// ACCORDION SYSTEM FUNCTIONS (RESTORED AND FIXED)
 // -------------------------------------------------------------------
 
 function createAccordionReportView(reportsByStudent) {
@@ -1583,17 +1583,17 @@ function createAccordionReportView(reportsByStudent) {
                         <div class="text-left">
                             <h3 class="font-bold text-green-800 text-lg">${fullName}</h3>
                             <p class="text-green-600 text-sm">
-                                ${reports.assessments.length} Assessment(s), ${reports.monthly.length} Monthly Report(s)
+                                ${reports.assessments.size} Assessment(s), ${reports.monthly.size} Monthly Report(s)
                             </p>
                         </div>
                     </div>
-                    <span class="accordion-arrow text-green-600 text-xl">▼</span>
+                    <span id="student-${studentIndex}-arrow" class="accordion-arrow text-green-600 text-xl">▼</span>
                 </button>
                 <div id="student-${studentIndex}-content" class="accordion-content hidden p-4 bg-white border border-t-0 border-gray-200 rounded-b-lg">
         `;
         
         // Assessment Reports
-        if (reports.assessments.length > 0) {
+        if (reports.assessments.size > 0) {
             html += `<h4 class="font-semibold text-gray-700 mb-3 mt-2">📊 Assessment Reports</h4>`;
             
             let assessmentIndex = 0;
@@ -1608,7 +1608,7 @@ function createAccordionReportView(reportsByStudent) {
         }
         
         // Monthly Reports
-        if (reports.monthly.length > 0) {
+        if (reports.monthly.size > 0) {
             html += `<h4 class="font-semibold text-gray-700 mb-3 mt-6">📈 Monthly Reports</h4>`;
             
             let monthlyIndex = 0;
@@ -1633,9 +1633,15 @@ function createAccordionReportView(reportsByStudent) {
     return html;
 }
 
+// FIXED: This function now properly handles the accordion toggle
 function toggleAccordion(studentId) {
     const content = document.getElementById(`${studentId}-content`);
-    const arrow = document.querySelector(`#${studentId} .accordion-arrow`);
+    const arrow = document.getElementById(`${studentId}-arrow`);
+    
+    if (!content || !arrow) {
+        console.error(`Could not find accordion elements for ${studentId}`);
+        return;
+    }
     
     if (content.classList.contains('hidden')) {
         content.classList.remove('hidden');
@@ -1729,6 +1735,8 @@ async function manualRefreshReports() {
     if (!user) return;
     
     const refreshBtn = document.getElementById('manualRefreshBtn');
+    if (!refreshBtn) return;
+    
     const originalText = refreshBtn.innerHTML;
     
     // Show loading state
@@ -1786,15 +1794,20 @@ async function loadAllReportsForParent(parentPhone, userId, forceRefresh = false
     const authLoader = document.getElementById("authLoader");
     const welcomeMessage = document.getElementById("welcomeMessage");
 
-    // SHOW DASHBOARD IF USER IS AUTHENTICATED
+    // Show dashboard if user is authenticated
     const user = auth.currentUser;
     if (user && authArea && reportArea) {
         authArea.classList.add("hidden");
         reportArea.classList.remove("hidden");
         authLoader.classList.add("hidden");
+        
+        // Store auth state in localStorage to persist across page refreshes
+        localStorage.setItem('isAuthenticated', 'true');
+    } else {
+        localStorage.removeItem('isAuthenticated');
     }
 
-    authLoader.classList.remove("hidden");
+    if (authLoader) authLoader.classList.remove("hidden");
 
     try {
         // --- CACHE IMPLEMENTATION (skip if force refresh) ---
@@ -1808,18 +1821,20 @@ async function loadAllReportsForParent(parentPhone, userId, forceRefresh = false
                     const { timestamp, html, userData } = JSON.parse(cachedItem);
                     if (Date.now() - timestamp < twoWeeksInMillis) {
                         console.log("Loading reports from cache.");
-                        reportContent.innerHTML = html;
+                        if (reportContent) reportContent.innerHTML = html;
                         
                         // Set welcome message from cache
-                        if (userData && userData.parentName) {
+                        if (userData && userData.parentName && welcomeMessage) {
                             welcomeMessage.textContent = `Welcome, ${userData.parentName}!`;
                             currentUserData = userData;
-                        } else {
+                        } else if (welcomeMessage) {
                             welcomeMessage.textContent = `Welcome!`;
                         }
 
-                        authArea.classList.add("hidden");
-                        reportArea.classList.remove("hidden");
+                        if (authArea && reportArea) {
+                            authArea.classList.add("hidden");
+                            reportArea.classList.remove("hidden");
+                        }
                         
                         // Add buttons to welcome section
                         addMessagesButton();
@@ -1894,7 +1909,7 @@ async function loadAllReportsForParent(parentPhone, userId, forceRefresh = false
         };
 
         // UPDATE WELCOME MESSAGE WITH PARENT NAME
-        welcomeMessage.textContent = `Welcome, ${currentUserData.parentName}!`;
+        if (welcomeMessage) welcomeMessage.textContent = `Welcome, ${currentUserData.parentName}!`;
 
         // Update parent name in user document if we found a better one
         if (userId && parentName && parentName !== 'Parent' && userData.parentName !== parentName) {
@@ -1984,13 +1999,13 @@ async function loadAllReportsForParent(parentPhone, userId, forceRefresh = false
         }
 
         // Create accordion view
-        reportContent.innerHTML = createAccordionReportView(reportsByStudent);
+        if (reportContent) reportContent.innerHTML = createAccordionReportView(reportsByStudent);
         
         // --- CACHE SAVING LOGIC ---
         try {
             const dataToCache = {
                 timestamp: Date.now(),
-                html: reportContent.innerHTML,
+                html: reportContent ? reportContent.innerHTML : '',
                 userData: currentUserData
             };
             localStorage.setItem(cacheKey, JSON.stringify(dataToCache));
@@ -2000,8 +2015,10 @@ async function loadAllReportsForParent(parentPhone, userId, forceRefresh = false
         }
         // --- END CACHE SAVING ---
 
-        authArea.classList.add("hidden");
-        reportArea.classList.remove("hidden");
+        if (authArea && reportArea) {
+            authArea.classList.add("hidden");
+            reportArea.classList.remove("hidden");
+        }
 
         // Add buttons to welcome section
         addMessagesButton();
@@ -2015,25 +2032,27 @@ async function loadAllReportsForParent(parentPhone, userId, forceRefresh = false
 
     } catch (error) {
         console.error("Error loading reports:", error);
-        reportContent.innerHTML = `
-            <div class="text-center py-16">
-                <div class="text-6xl mb-6">❌</div>
-                <h2 class="text-2xl font-bold text-red-800 mb-4">Error Loading Reports</h2>
-                <p class="text-gray-600 max-w-2xl mx-auto mb-6">
-                    Sorry, there was an error loading your reports. Please try again.
-                </p>
-                <div class="flex flex-col sm:flex-row gap-4 justify-center items-center">
-                    <button onclick="window.location.reload()" class="bg-green-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-green-700 transition-all duration-200 flex items-center">
-                        <span class="mr-2">🔄</span> Reload Page
-                    </button>
-                    <button onclick="showComposeMessageModal()" class="bg-blue-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-blue-700 transition-all duration-200 flex items-center">
-                        <span class="mr-2">💬</span> Contact Support
-                    </button>
+        if (reportContent) {
+            reportContent.innerHTML = `
+                <div class="text-center py-16">
+                    <div class="text-6xl mb-6">❌</div>
+                    <h2 class="text-2xl font-bold text-red-800 mb-4">Error Loading Reports</h2>
+                    <p class="text-gray-600 max-w-2xl mx-auto mb-6">
+                        Sorry, there was an error loading your reports. Please try again.
+                    </p>
+                    <div class="flex flex-col sm:flex-row gap-4 justify-center items-center">
+                        <button onclick="window.location.reload()" class="bg-green-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-green-700 transition-all duration-200 flex items-center">
+                            <span class="mr-2">🔄</span> Reload Page
+                        </button>
+                        <button onclick="showComposeMessageModal()" class="bg-blue-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-blue-700 transition-all duration-200 flex items-center">
+                            <span class="mr-2">💬</span> Contact Support
+                        </button>
+                    </div>
                 </div>
-            </div>
-        `;
+            `;
+        }
     } finally {
-        authLoader.classList.add("hidden");
+        if (authLoader) authLoader.classList.add("hidden");
     }
 }
 
@@ -2041,6 +2060,7 @@ function logout() {
     // Clear remember me on logout
     localStorage.removeItem('rememberMe');
     localStorage.removeItem('savedEmail');
+    localStorage.removeItem('isAuthenticated');
     
     // Clean up real-time listeners
     cleanupRealTimeListeners();
@@ -2069,7 +2089,9 @@ function showMessage(message, type) {
     
     // Auto remove after 5 seconds
     setTimeout(() => {
-        messageDiv.remove();
+        if (messageDiv.parentNode) {
+            messageDiv.remove();
+        }
     }, 5000);
 }
 
@@ -2151,6 +2173,9 @@ document.addEventListener('DOMContentLoaded', function() {
     // Create country code dropdown when page loads
     createCountryCodeDropdown();
     
+    // Check if user was previously authenticated (persists across page refreshes)
+    const wasAuthenticated = localStorage.getItem('isAuthenticated') === 'true';
+    
     // CRITICAL SESSION PERSISTENCE FIX
     // Check authentication state IMMEDIATELY on page load
     auth.onAuthStateChanged((user) => {
@@ -2170,6 +2195,9 @@ document.addEventListener('DOMContentLoaded', function() {
             if (authLoader) {
                 authLoader.classList.add("hidden");
             }
+            
+            // Store auth state
+            localStorage.setItem('isAuthenticated', 'true');
             
             // Get phone from Firestore user document and load reports
             db.collection('parent_users').doc(user.uid).get()
@@ -2193,51 +2221,97 @@ document.addEventListener('DOMContentLoaded', function() {
             // User signed out - clean up listeners and show auth
             console.log("User not authenticated, showing auth form");
             cleanupRealTimeListeners();
+            localStorage.removeItem('isAuthenticated');
             
             if (authArea && reportArea) {
                 authArea.classList.remove("hidden");
                 reportArea.classList.add("hidden");
             }
+            
+            // Only show loader briefly then hide
+            if (authLoader) {
+                setTimeout(() => {
+                    authLoader.classList.add("hidden");
+                }, 500);
+            }
         }
     });
 
     // Set up event listeners
-    document.getElementById("signInBtn").addEventListener("click", handleSignIn);
-    document.getElementById("signUpBtn").addEventListener("click", handleSignUp);
-    document.getElementById("sendResetBtn").addEventListener("click", handlePasswordReset);
-    document.getElementById("submitMessageBtn").addEventListener("click", submitMessage);
+    const signInBtn = document.getElementById("signInBtn");
+    const signUpBtn = document.getElementById("signUpBtn");
+    const sendResetBtn = document.getElementById("sendResetBtn");
+    const submitMessageBtn = document.getElementById("submitMessageBtn");
     
-    document.getElementById("signInTab").addEventListener("click", () => switchTab('signin'));
-    document.getElementById("signUpTab").addEventListener("click", () => switchTab('signup'));
+    if (signInBtn) signInBtn.addEventListener("click", handleSignIn);
+    if (signUpBtn) signUpBtn.addEventListener("click", handleSignUp);
+    if (sendResetBtn) sendResetBtn.addEventListener("click", handlePasswordReset);
+    if (submitMessageBtn) submitMessageBtn.addEventListener("click", submitMessage);
     
-    document.getElementById("forgotPasswordBtn").addEventListener("click", () => {
-        document.getElementById("passwordResetModal").classList.remove("hidden");
-    });
+    const signInTab = document.getElementById("signInTab");
+    const signUpTab = document.getElementById("signUpTab");
     
-    document.getElementById("cancelResetBtn").addEventListener("click", () => {
-        document.getElementById("passwordResetModal").classList.add("hidden");
-    });
+    if (signInTab) signInTab.addEventListener("click", () => switchTab('signin'));
+    if (signUpTab) signUpTab.addEventListener("click", () => switchTab('signup'));
     
-    document.getElementById("cancelMessageBtn").addEventListener("click", hideComposeMessageModal);
-    document.getElementById("cancelMessagesModalBtn").addEventListener("click", hideMessagesModal);
+    const forgotPasswordBtn = document.getElementById("forgotPasswordBtn");
+    if (forgotPasswordBtn) {
+        forgotPasswordBtn.addEventListener("click", () => {
+            document.getElementById("passwordResetModal").classList.remove("hidden");
+        });
+    }
+    
+    const cancelResetBtn = document.getElementById("cancelResetBtn");
+    if (cancelResetBtn) {
+        cancelResetBtn.addEventListener("click", () => {
+            document.getElementById("passwordResetModal").classList.add("hidden");
+        });
+    }
+    
+    // FIXED: Added event listener for cancel message button
+    const cancelMessageBtn = document.getElementById("cancelMessageBtn");
+    if (cancelMessageBtn) {
+        cancelMessageBtn.addEventListener("click", hideComposeMessageModal);
+    }
+    
+    const cancelMessagesModalBtn = document.getElementById("cancelMessagesModalBtn");
+    if (cancelMessagesModalBtn) {
+        cancelMessagesModalBtn.addEventListener("click", hideMessagesModal);
+    }
 
-    document.getElementById("rememberMe").addEventListener("change", handleRememberMe);
+    const rememberMeCheckbox = document.getElementById("rememberMe");
+    if (rememberMeCheckbox) {
+        rememberMeCheckbox.addEventListener("change", handleRememberMe);
+    }
 
     // Allow Enter key to submit forms
-    document.getElementById('loginPassword').addEventListener('keypress', (e) => {
-        if (e.key === 'Enter') handleSignIn();
-    });
+    const loginPassword = document.getElementById('loginPassword');
+    if (loginPassword) {
+        loginPassword.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') handleSignIn();
+        });
+    }
     
-    document.getElementById('signupConfirmPassword').addEventListener('keypress', (e) => {
-        if (e.key === 'Enter') handleSignUp();
-    });
+    const signupConfirmPassword = document.getElementById('signupConfirmPassword');
+    if (signupConfirmPassword) {
+        signupConfirmPassword.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') handleSignUp();
+        });
+    }
     
-    document.getElementById('resetEmail').addEventListener('keypress', (e) => {
-        if (e.key === 'Enter') handlePasswordReset();
-    });
+    const resetEmail = document.getElementById('resetEmail');
+    if (resetEmail) {
+        resetEmail.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') handlePasswordReset();
+        });
+    }
     
     // Main tab switching listeners
-    document.getElementById("reportTab")?.addEventListener("click", () => switchMainTab('reports'));
-    document.getElementById("academicsTab")?.addEventListener("click", () => switchMainTab('academics'));
-    document.getElementById("rewardsTab")?.addEventListener("click", () => switchMainTab('rewards'));
+    const reportTab = document.getElementById("reportTab");
+    const academicsTab = document.getElementById("academicsTab");
+    const rewardsTab = document.getElementById("rewardsTab");
+    
+    if (reportTab) reportTab.addEventListener("click", () => switchMainTab('reports'));
+    if (academicsTab) academicsTab.addEventListener("click", () => switchMainTab('academics'));
+    if (rewardsTab) rewardsTab.addEventListener("click", () => switchMainTab('rewards'));
 });
