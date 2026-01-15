@@ -2167,6 +2167,8 @@ function switchMainTab(tab) {
 
 // Initialize the page
 document.addEventListener('DOMContentLoaded', function() {
+    console.log("DOM loaded - initializing parent portal");
+    
     // Setup Remember Me
     setupRememberMe();
     
@@ -2268,16 +2270,22 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
     
-    // FIXED: Added event listener for cancel message button
-    const cancelMessageBtn = document.getElementById("cancelMessageBtn");
-    if (cancelMessageBtn) {
-        cancelMessageBtn.addEventListener("click", hideComposeMessageModal);
-    }
-    
-    const cancelMessagesModalBtn = document.getElementById("cancelMessagesModalBtn");
-    if (cancelMessagesModalBtn) {
-        cancelMessagesModalBtn.addEventListener("click", hideMessagesModal);
-    }
+    // FIXED: Event delegation for dynamically created cancel buttons
+    document.addEventListener('click', function(event) {
+        // Check if cancel message button was clicked
+        if (event.target.id === 'cancelMessageBtn' || 
+            event.target.closest('#cancelMessageBtn')) {
+            event.preventDefault();
+            hideComposeMessageModal();
+        }
+        
+        // Check if cancel messages modal button was clicked
+        if (event.target.id === 'cancelMessagesModalBtn' ||
+            event.target.closest('#cancelMessagesModalBtn')) {
+            event.preventDefault();
+            hideMessagesModal();
+        }
+    });
 
     const rememberMeCheckbox = document.getElementById("rememberMe");
     if (rememberMeCheckbox) {
@@ -2314,4 +2322,11 @@ document.addEventListener('DOMContentLoaded', function() {
     if (reportTab) reportTab.addEventListener("click", () => switchMainTab('reports'));
     if (academicsTab) academicsTab.addEventListener("click", () => switchMainTab('academics'));
     if (rewardsTab) rewardsTab.addEventListener("click", () => switchMainTab('rewards'));
+    
+    // Add a global click handler for debugging
+    document.addEventListener('click', function(e) {
+        if (e.target.id === 'cancelMessageBtn') {
+            console.log("Cancel message button clicked via event delegation");
+        }
+    });
 });
