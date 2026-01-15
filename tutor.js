@@ -1779,221 +1779,25 @@ function showBulkSchedulePopup(student, tutor, totalCount = 0) {
  * SECTION 8: DAILY TOPIC & HOMEWORK MANAGEMENT
  ******************************************************************************/
 
-// Helper function to check if topic should be cleared (older than current month)
-function shouldClearTopic(topicDate) {
-    const topicDateObj = new Date(topicDate);
-    const currentDate = new Date();
-    
-    // Check if topic is from previous month (or older)
-    return topicDateObj.getMonth() !== currentDate.getMonth() || 
-           topicDateObj.getFullYear() !== currentDate.getFullYear();
-}
-
-// Fetch and display previous topics for a student
-async function fetchStudentTopics(studentId) {
-    try {
-        const topicsQuery = query(
-            collection(db, "daily_topics"),
-            where("studentId", "==", studentId),
-            orderBy("createdAt", "desc")
-        );
-        
-        const querySnapshot = await getDocs(topicsQuery);
-        const topics = [];
-        
-        // Get current month and year for filtering
-        const currentDate = new Date();
-        const currentMonth = currentDate.getMonth();
-        const currentYear = currentDate.getFullYear();
-        
-        querySnapshot.forEach((doc) => {
-            const topicData = doc.data();
-            const topicDate = topicData.createdAt.toDate();
-            
-            // Only include topics from current month
-            if (topicDate.getMonth() === currentMonth && 
-                topicDate.getFullYear() === currentYear) {
-                topics.push({
-                    id: doc.id,
-                    ...topicData,
-                    formattedDate: topicDate.toLocaleDateString('en-US', {
-                        weekday: 'short',
-                        month: 'short',
-                        day: 'numeric'
-                    })
-                });
-            }
-        });
-        
-        return topics;
-    } catch (error) {
-        console.error("Error fetching topics:", error);
-        return [];
-    }
-}
-
-// Auto-clear old topics function (can be called periodically)
-async function clearOldTopics() {
-    try {
-        const topicsQuery = query(collection(db, "daily_topics"));
-        const querySnapshot = await getDocs(topicsQuery);
-        
-        const batch = writeBatch(db);
-        let clearedCount = 0;
-        
-        querySnapshot.forEach((doc) => {
-            const topicData = doc.data();
-            if (shouldClearTopic(topicData.createdAt)) {
-                batch.delete(doc.ref);
-                clearedCount++;
-            }
-        });
-        
-        if (clearedCount > 0) {
-            await batch.commit();
-            console.log(`Cleared ${clearedCount} old topics from previous months`);
-        }
-        
-        return clearedCount;
-    } catch (error) {
-        console.error("Error clearing old topics:", error);
-        return 0;
-    }
-}
-
-// Call clearOldTopics on app startup
-document.addEventListener('DOMContentLoaded', () => {
-    // Clear old topics when app starts (once per day would be better)
-    const lastClear = localStorage.getItem('lastTopicClear');
-    const today = new Date().toDateString();
-    
-    if (lastClear !== today) {
-        clearOldTopics();
-        localStorage.setItem('lastTopicClear', today);
-    }
-});
-
-// Updated Daily Topic Modal with Previous Topics Dropdown
+// Daily Topic Functions
 function showDailyTopicModal(student) {
     const modalHTML = `
         <div class="modal-overlay">
-            <style>
-                /* Previous Topics Styles - Added inline */
-                .previous-topics-container {
-                    max-height: 200px;
-                    overflow-y: auto;
-                    border: 1px solid #e5e7eb;
-                    border-radius: 0.5rem;
-                    padding: 0.5rem;
-                    background-color: #f9fafb;
-                }
-                
-                .topic-item-btn {
-                    width: 100%;
-                    text-align: left;
-                    padding: 0.5rem 0.75rem;
-                    border-radius: 0.375rem;
-                    border: 1px solid #e5e5e5;
-                    background-color: white;
-                    cursor: pointer;
-                    transition: all 0.2s;
-                    margin-bottom: 0.25rem;
-                    font-size: 0.875rem;
-                }
-                
-                .topic-item-btn:hover {
-                    background-color: #f3f4f6;
-                    border-color: #d1d5db;
-                }
-                
-                .topic-item-btn:active {
-                    background-color: #e5e7eb;
-                }
-                
-                .topic-item-btn.selected {
-                    background-color: #3b82f6 !important;
-                    color: white !important;
-                    border-color: #3b82f6 !important;
-                }
-                
-                .week-header {
-                    border-bottom: 1px solid #e5e7eb;
-                    padding-bottom: 0.25rem;
-                    margin-top: 0.5rem;
-                    margin-bottom: 0.5rem;
-                }
-                
-                .topic-text {
-                    flex: 1;
-                    overflow: hidden;
-                    text-overflow: ellipsis;
-                    white-space: nowrap;
-                }
-                
-                /* Spinner for loading */
-                .spinner {
-                    border: 2px solid #f3f3f3;
-                    border-top: 2px solid #3498db;
-                    border-radius: 50%;
-                    width: 20px;
-                    height: 20px;
-                    animation: spin 1s linear infinite;
-                    display: inline-block;
-                    margin: 0 auto;
-                }
-                
-                @keyframes spin {
-                    0% { transform: rotate(0deg); }
-                    100% { transform: rotate(360deg); }
-                }
-                
-                .week-group {
-                    margin-bottom: 1rem;
-                }
-                
-                .week-group:last-child {
-                    margin-bottom: 0;
-                }
-                
-                .loading-container {
-                    display: flex;
-                    flex-direction: column;
-                    align-items: center;
-                    justify-content: center;
-                    padding: 2rem;
-                }
-            </style>
-            
             <div class="modal-content max-w-lg">
                 <div class="modal-header">
                     <h3 class="modal-title">📚 Today's Topic for ${student.studentName}</h3>
                 </div>
                 <div class="modal-body">
-                    <!-- Previous Topics Section -->
-                    <div class="previous-topics-section mb-4">
-                        <div class="flex items-center justify-between mb-2">
-                            <label class="form-label flex items-center">
-                                <span class="mr-2">📋</span>
-                                Previous Topics (Current Month)
-                            </label>
-                            <span class="text-xs text-gray-500">Click to select</span>
-                        </div>
-                        <div id="previous-topics-container" class="previous-topics-container">
-                            <div class="loading-container">
-                                <div class="spinner"></div>
-                                <p class="mt-2 text-sm text-gray-500">Loading previous topics...</p>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <!-- Add New Topic Section -->
                     <div class="form-group">
                         <label class="form-label">Today's Topics *</label>
+                        <div id="topic-history-container" class="mb-4 hidden">
+                            <h5 class="font-semibold text-sm mb-2">Previous Topics This Month:</h5>
+                            <div id="topic-history" class="topic-history text-sm text-gray-700"></div>
+                        </div>
                         <textarea id="topic-topics" class="form-input form-textarea report-textarea" placeholder="Enter today's topics, one per line or separated by commas..." required></textarea>
                     </div>
                     <div class="mt-2 text-sm text-gray-500">
                         <p>Example: Fractions, Decimals, Basic Algebra</p>
-                        <p class="text-xs mt-1 text-primary-color">Topics are automatically cleared at the end of each month</p>
                     </div>
                 </div>
                 <div class="modal-footer">
@@ -2008,10 +1812,9 @@ function showDailyTopicModal(student) {
     
     const modal = document.createElement('div');
     modal.innerHTML = modalHTML;
+    // Load topic history when modal is opened
+    loadDailyTopicHistory(student.id);
     document.body.appendChild(modal);
-    
-    // Load previous topics
-    loadPreviousTopics(student.id, modal);
     
     document.getElementById('cancel-topic-btn').addEventListener('click', () => modal.remove());
     document.getElementById('save-topic-btn').addEventListener('click', async () => {
@@ -2042,120 +1845,48 @@ function showDailyTopicModal(student) {
     });
 }
 
-// Load previous topics into the modal
-async function loadPreviousTopics(studentId, modal) {
-    const container = modal.querySelector('#previous-topics-container');
+async function loadDailyTopicHistory(studentId) {
+    const topicHistoryContainer = document.getElementById('topic-history-container');
+    const topicHistoryDiv = document.getElementById('topic-history');
+    
+    if (!topicHistoryContainer || !topicHistoryDiv) return;
     
     try {
-        const topics = await fetchStudentTopics(studentId);
+        const now = new Date();
+        const currentMonth = now.getMonth();
+        const currentYear = now.getFullYear();
         
-        if (topics.length === 0) {
-            container.innerHTML = `
-                <div class="text-center py-4 text-gray-500">
-                    <p class="text-sm">No topics added yet this month.</p>
-                    <p class="text-xs mt-1">Topics will be cleared at the end of the month</p>
-                </div>
-            `;
-            return;
+        const topicsQuery = query(
+            collection(db, "daily_topics"),
+            where("studentId", "==", studentId),
+            orderBy("createdAt", "desc") // Order by creation date to get most recent first
+        );
+        
+        const querySnapshot = await getDocs(topicsQuery);
+        let historyHTML = '';
+        let hasTopicsThisMonth = false;
+        
+        querySnapshot.forEach(doc => {
+            const topic = doc.data();
+            const topicDate = topic.createdAt.toDate(); // Convert Firebase Timestamp to Date
+            
+            if (topicDate.getMonth() === currentMonth && topicDate.getFullYear() === currentYear) {
+                hasTopicsThisMonth = true;
+                historyHTML += `<p class="mb-1"><strong>${topicDate.toLocaleDateString()}:</strong> ${topic.topics}</p>`;
+            }
+        });
+        
+        if (hasTopicsThisMonth) {
+            topicHistoryDiv.innerHTML = historyHTML;
+            topicHistoryContainer.classList.remove('hidden');
+        } else {
+            topicHistoryDiv.innerHTML = '<p class="text-gray-500">No topics recorded this month.</p>';
+            topicHistoryContainer.classList.remove('hidden'); // Still show container, but with "no topics" message
         }
-        
-        // Group topics by week for better organization
-        const groupedTopics = groupTopicsByWeek(topics);
-        
-        let html = '';
-        
-        // Create selectable topic buttons
-        Object.keys(groupedTopics).forEach(weekLabel => {
-            html += `
-                <div class="week-group">
-                    <div class="week-header text-xs font-semibold text-gray-600 mb-2">${weekLabel}</div>
-                    <div class="space-y-2">
-            `;
-            
-            groupedTopics[weekLabel].forEach(topic => {
-                html += `
-                    <button class="topic-item-btn" data-topics="${topic.topics.replace(/"/g, '&quot;')}">
-                        <div class="flex justify-between items-center">
-                            <span class="topic-text text-sm">${topic.topics}</span>
-                            <span class="topic-date text-xs text-gray-500 ml-2 whitespace-nowrap">${topic.formattedDate}</span>
-                        </div>
-                    </button>
-                `;
-            });
-            
-            html += `
-                    </div>
-                </div>
-            `;
-        });
-        
-        container.innerHTML = html;
-        
-        // Add click handlers to topic buttons
-        container.querySelectorAll('.topic-item-btn').forEach(btn => {
-            btn.addEventListener('click', () => {
-                const topics = btn.getAttribute('data-topics');
-                const textarea = modal.querySelector('#topic-topics');
-                textarea.value = topics;
-                textarea.focus();
-                
-                // Remove selected class from all buttons
-                container.querySelectorAll('.topic-item-btn').forEach(b => {
-                    b.classList.remove('selected');
-                });
-                
-                // Add selected class to clicked button
-                btn.classList.add('selected');
-            });
-        });
-        
     } catch (error) {
-        console.error("Error loading topics:", error);
-        container.innerHTML = `
-            <div class="text-center py-4">
-                <p class="text-sm text-red-500">Error loading previous topics</p>
-                <p class="text-xs text-gray-500 mt-1">Please try again</p>
-            </div>
-        `;
+        console.error("Error loading daily topic history:", error);
+        topicHistoryDiv.innerHTML = '<p class="text-red-500">Error loading history.</p>';
     }
-}
-
-// Group topics by week for better organization
-function groupTopicsByWeek(topics) {
-    const groups = {};
-    
-    topics.forEach(topic => {
-        const date = topic.createdAt.toDate();
-        const weekNumber = getWeekNumber(date);
-        const weekLabel = `Week ${weekNumber.week} (${weekNumber.start} - ${weekNumber.end})`;
-        
-        if (!groups[weekLabel]) {
-            groups[weekLabel] = [];
-        }
-        groups[weekLabel].push(topic);
-    });
-    
-    return groups;
-}
-
-// Helper function to get week number and date range
-function getWeekNumber(date) {
-    const startDate = new Date(date.getFullYear(), date.getMonth(), 1);
-    const firstDay = startDate.getDay();
-    const offsetDate = date.getDate() + firstDay - 1;
-    const weekNumber = Math.floor(offsetDate / 7) + 1;
-    
-    // Calculate start and end dates for the week
-    const weekStart = new Date(date);
-    weekStart.setDate(date.getDate() - date.getDay());
-    const weekEnd = new Date(weekStart);
-    weekEnd.setDate(weekStart.getDate() + 6);
-    
-    return {
-        week: weekNumber,
-        start: weekStart.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
-        end: weekEnd.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-    };
 }
 
 // Homework Assignment Functions with REAL Cloudinary Upload
@@ -6664,6 +6395,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     }, 500);
 });
+
 
 
 
