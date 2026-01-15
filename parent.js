@@ -277,7 +277,8 @@ function capitalize(str) {
 // Global variables for user data
 let currentUserData = null;
 let userChildren = [];
-let unreadResponsesCount = 0; // Track unread responses
+let studentIdMap = new Map(); // Map student names to their IDs
+let unreadMessagesCount = 0; // Track unread messages
 let realTimeListeners = []; // Track real-time listeners
 
 // -------------------------------------------------------------------
@@ -603,6 +604,91 @@ async function findParentNameFromStudents(parentPhone) {
     }
 }
 
+// Find student IDs for a parent's phone number
+async function findStudentIdsForParent(parentPhone) {
+    try {
+        console.log("Finding student IDs for parent phone:", parentPhone);
+        
+        // Use multi-normalization to get all possible phone versions
+        const normalizedVersions = multiNormalizePhoneNumber(parentPhone);
+        const validVersions = normalizedVersions.filter(v => v.valid && v.normalized);
+        
+        let studentIds = [];
+        let studentNameIdMap = new Map();
+        
+        // Search with each normalized version
+        for (const version of validVersions) {
+            console.log(`🔍 Searching student IDs with: ${version.normalized} (${version.attempt})`);
+            
+            // Search in students collection
+            const studentsSnapshot = await db.collection("students")
+                .where("normalizedParentPhone", "==", version.normalized)
+                .get();
+
+            studentsSnapshot.forEach(doc => {
+                const studentData = doc.data();
+                const studentId = doc.id;
+                const studentName = studentData.studentName;
+                
+                if (studentId && studentName) {
+                    if (!studentIds.includes(studentId)) {
+                        studentIds.push(studentId);
+                    }
+                    studentNameIdMap.set(studentName, studentId);
+                    console.log(`Found student: ${studentName} (ID: ${studentId})`);
+                }
+            });
+
+            // Search in pending_students collection
+            const pendingStudentsSnapshot = await db.collection("pending_students")
+                .where("normalizedParentPhone", "==", version.normalized)
+                .get();
+
+            pendingStudentsSnapshot.forEach(doc => {
+                const studentData = doc.data();
+                const studentId = doc.id;
+                const studentName = studentData.studentName;
+                
+                if (studentId && studentName) {
+                    if (!studentIds.includes(studentId)) {
+                        studentIds.push(studentId);
+                    }
+                    studentNameIdMap.set(studentName, studentId);
+                    console.log(`Found pending student: ${studentName} (ID: ${studentId})`);
+                }
+            });
+
+            // Fallback: search by original phone field
+            const fallbackSnapshot = await db.collection("students")
+                .where("parentPhone", "==", version.normalized)
+                .get();
+
+            fallbackSnapshot.forEach(doc => {
+                const studentData = doc.data();
+                const studentId = doc.id;
+                const studentName = studentData.studentName;
+                
+                if (studentId && studentName && !studentNameIdMap.has(studentName)) {
+                    studentIds.push(studentId);
+                    studentNameIdMap.set(studentName, studentId);
+                    console.log(`Found student (fallback): ${studentName} (ID: ${studentId})`);
+                }
+            });
+        }
+        
+        // Store the mapping globally
+        studentIdMap = studentNameIdMap;
+        
+        console.log("Total student IDs found:", studentIds.length);
+        console.log("Student name to ID mapping:", Object.fromEntries(studentNameIdMap));
+        
+        return { studentIds, studentNameIdMap };
+    } catch (error) {
+        console.error("Error finding student IDs:", error);
+        return { studentIds: [], studentNameIdMap: new Map() };
+    }
+}
+
 // Authentication Functions
 async function handleSignUp() {
     const countryCode = document.getElementById('countryCode').value;
@@ -874,274 +960,699 @@ async function handlePasswordReset() {
     }
 }
 
-// Feedback System Functions
-function showFeedbackModal() {
-    populateStudentDropdown();
-    document.getElementById('feedbackModal').classList.remove('hidden');
+// -------------------------------------------------------------------
+// START: ENHANCED MESSAGING SYSTEM
+// -------------------------------------------------------------------
+
+function showComposeMessageModal() {
+    populateStudentDropdownForMessages();
+    document.getElementById('composeMessageModal').classList.remove('hidden');
 }
 
-function hideFeedbackModal() {
-    document.getElementById('feedbackModal').classList.add('hidden');
+function hideComposeMessageModal() {
+    document.getElementById('composeMessageModal').classList.add('hidden');
     // Reset form
-    document.getElementById('feedbackCategory').value = '';
-    document.getElementById('feedbackPriority').value = '';
-    document.getElementById('feedbackStudent').value = '';
-    document.getElementById('feedbackMessage').value = '';
+    document.getElementById('messageRecipient').value = 'tutor';
+    document.getElementById('messageSubject').value = '';
+    document.getElementById('messageStudent').value = '';
+    document.getElementById('messageContent').value = '';
+    document.getElementById('messageUrgent').checked = false;
 }
 
-function populateStudentDropdown() {
-    const studentDropdown = document.getElementById('feedbackStudent');
-    studentDropdown.innerHTML = '<option value="">Select student</option>';
+function populateStudentDropdownForMessages() {
+    const studentDropdown = document.getElementById('messageStudent');
+    studentDropdown.innerHTML = '<option value="">Select student (optional)</option>';
     
-    // Get student names from the report headers that are already displayed
-    const studentHeaders = document.querySelectorAll('[class*="bg-green-100"] h2');
-    
-    if (studentHeaders.length === 0) {
-        studentDropdown.innerHTML += '<option value="" disabled>No students found - please wait for reports to load</option>';
+    // Get student names from the userChildren array
+    if (userChildren.length === 0) {
+        studentDropdown.innerHTML += '<option value="" disabled>No students found</option>';
         return;
     }
 
-    studentHeaders.forEach(header => {
-        const studentName = header.textContent.trim();
+    userChildren.forEach(studentName => {
         const option = document.createElement('option');
         option.value = studentName;
-        option.textContent = studentName;
+        option.textContent = capitalize(studentName);
         studentDropdown.appendChild(option);
     });
 }
 
-async function submitFeedback() {
-    const category = document.getElementById('feedbackCategory').value;
-    const priority = document.getElementById('feedbackPriority').value;
-    const student = document.getElementById('feedbackStudent').value;
-    const message = document.getElementById('feedbackMessage').value;
+async function submitMessage() {
+    const recipient = document.getElementById('messageRecipient').value;
+    const subject = document.getElementById('messageSubject').value.trim();
+    const student = document.getElementById('messageStudent').value;
+    const content = document.getElementById('messageContent').value.trim();
+    const isUrgent = document.getElementById('messageUrgent').checked;
 
     // Validation
-    if (!category || !priority || !student || !message) {
+    if (!recipient || !subject || !content) {
         showMessage('Please fill in all required fields', 'error');
         return;
     }
 
-    if (message.length < 10) {
+    if (content.length < 10) {
         showMessage('Please provide a more detailed message (at least 10 characters)', 'error');
         return;
     }
 
-    const submitBtn = document.getElementById('submitFeedbackBtn');
+    const submitBtn = document.getElementById('submitMessageBtn');
     submitBtn.disabled = true;
-    document.getElementById('submitFeedbackText').textContent = 'Submitting...';
-    document.getElementById('submitFeedbackSpinner').classList.remove('hidden');
+    document.getElementById('submitMessageText').textContent = 'Sending...';
+    document.getElementById('submitMessageSpinner').classList.remove('hidden');
 
     try {
         const user = auth.currentUser;
         if (!user) {
-            throw new Error('Please sign in to submit feedback');
+            throw new Error('Please sign in to send messages');
         }
 
         // Get user data
         const userDoc = await db.collection('parent_users').doc(user.uid).get();
         const userData = userDoc.data();
 
-        // Create feedback document
-        const feedbackData = {
+        // Determine recipients based on selection
+        let recipients = [];
+        if (recipient === 'tutor') {
+            recipients = ['tutors'];
+        } else if (recipient === 'management') {
+            recipients = ['management'];
+        } else if (recipient === 'both') {
+            recipients = ['tutors', 'management'];
+        }
+
+        // Create message document in tutor_messages collection
+        const messageData = {
             parentName: currentUserData?.parentName || userData.parentName || 'Unknown Parent',
             parentPhone: userData.phone,
             parentEmail: userData.email,
-            studentName: student,
-            category: category,
-            priority: priority,
-            message: message,
-            status: 'New',
+            parentUid: user.uid,
+            studentName: student || 'General',
+            recipients: recipients,
+            subject: subject,
+            content: content,
+            isUrgent: isUrgent,
+            status: 'sent',
             timestamp: firebase.firestore.FieldValue.serverTimestamp(),
-            emailSent: false,
-            parentUid: user.uid, // Add parent UID for querying responses
-            responses: [] // Initialize empty responses array
+            type: 'parent_to_staff',
+            readBy: [] // Track who has read this message
         };
 
         // Save to Firestore
-        await db.collection('parent_feedback').add(feedbackData);
+        await db.collection('tutor_messages').add(messageData);
 
-        showMessage('Thank you! Your feedback has been submitted successfully. We will respond within 24-48 hours.', 'success');
+        showMessage('Message sent successfully! Our team will respond within 24-48 hours.', 'success');
         
         // Close modal and reset form
-        hideFeedbackModal();
+        hideComposeMessageModal();
 
     } catch (error) {
-        console.error('Feedback submission error:', error);
-        showMessage('Failed to submit feedback. Please try again.', 'error');
+        console.error('Message submission error:', error);
+        showMessage('Failed to send message. Please try again.', 'error');
     } finally {
         submitBtn.disabled = false;
-        document.getElementById('submitFeedbackText').textContent = 'Submit Feedback';
-        document.getElementById('submitFeedbackSpinner').classList.add('hidden');
+        document.getElementById('submitMessageText').textContent = 'Send Message';
+        document.getElementById('submitMessageSpinner').classList.add('hidden');
     }
 }
 
-// Admin Responses Functions with Notification Counter
-function showResponsesModal() {
-    document.getElementById('responsesModal').classList.remove('hidden');
-    loadAdminResponses();
-    // Reset notification count when user views responses
-    resetNotificationCount();
-}
+// -------------------------------------------------------------------
+// START: ACADEMICS TAB FUNCTIONS
+// -------------------------------------------------------------------
 
-function hideResponsesModal() {
-    document.getElementById('responsesModal').classList.add('hidden');
-}
-
-async function loadAdminResponses() {
-    const responsesContent = document.getElementById('responsesContent');
-    responsesContent.innerHTML = '<div class="text-center py-8"><div class="loading-spinner mx-auto" style="width: 40px; height: 40px;"></div><p class="text-green-600 font-semibold mt-4">Loading responses...</p></div>';
+async function loadAcademicsData(selectedStudent = null) {
+    const academicsContent = document.getElementById('academicsContent');
+    academicsContent.innerHTML = '<div class="text-center py-8"><div class="loading-spinner mx-auto" style="width: 40px; height: 40px;"></div><p class="text-green-600 font-semibold mt-4">Loading academic data...</p></div>';
 
     try {
         const user = auth.currentUser;
         if (!user) {
-            throw new Error('Please sign in to view responses');
+            throw new Error('Please sign in to view academic data');
         }
 
-        // Query feedback where parentUid matches current user AND responses array exists and is not empty
-        const feedbackSnapshot = await db.collection('parent_feedback')
-            .where('parentUid', '==', user.uid)
-            .get();
+        // Get user data to find phone
+        const userDoc = await db.collection('parent_users').doc(user.uid).get();
+        const userData = userDoc.data();
+        const parentPhone = userData.normalizedPhone || userData.phone;
 
-        if (feedbackSnapshot.empty) {
-            responsesContent.innerHTML = `
+        // Find student IDs for this parent
+        const { studentIds, studentNameIdMap } = await findStudentIdsForParent(parentPhone);
+        
+        if (studentIds.length === 0) {
+            academicsContent.innerHTML = `
                 <div class="text-center py-12">
-                    <div class="text-6xl mb-4">📭</div>
-                    <h3 class="text-xl font-bold text-gray-700 mb-2">No Responses Yet</h3>
-                    <p class="text-gray-500 max-w-md mx-auto">You haven't received any responses from our staff yet. We'll respond to your feedback within 24-48 hours.</p>
+                    <div class="text-6xl mb-4">📚</div>
+                    <h3 class="text-xl font-bold text-gray-700 mb-2">No Academic Data Yet</h3>
+                    <p class="text-gray-500 max-w-md mx-auto">Academic data will appear here once your child's tutor starts adding daily topics and homework assignments.</p>
                 </div>
             `;
             return;
         }
 
-        // Filter feedback that has responses
-        const feedbackWithResponses = [];
-        feedbackSnapshot.forEach(doc => {
-            const feedback = { id: doc.id, ...doc.data() };
-            if (feedback.responses && feedback.responses.length > 0) {
-                feedbackWithResponses.push(feedback);
-            }
-        });
-
-        if (feedbackWithResponses.length === 0) {
-            responsesContent.innerHTML = `
-                <div class="text-center py-12">
-                    <div class="text-6xl mb-4">📭</div>
-                    <h3 class="text-xl font-bold text-gray-700 mb-2">No Responses Yet</h3>
-                    <p class="text-gray-500 max-w-md mx-auto">You haven't received any responses from our staff yet. We'll respond to your feedback within 24-48 hours.</p>
-                </div>
-            `;
-            return;
+        // Determine which student to show
+        let studentsToShow = [];
+        if (selectedStudent && studentNameIdMap.has(selectedStudent)) {
+            studentsToShow = [selectedStudent];
+        } else {
+            studentsToShow = Array.from(studentNameIdMap.keys());
         }
 
-        // Sort by most recent response
-        feedbackWithResponses.sort((a, b) => {
-            const aDate = a.responses[0]?.responseDate?.toDate() || new Date(0);
-            const bDate = b.responses[0]?.responseDate?.toDate() || new Date(0);
-            return bDate - aDate;
-        });
+        let academicsHtml = '';
 
-        responsesContent.innerHTML = '';
+        // Create student selector if multiple students
+        if (studentNameIdMap.size > 1) {
+            academicsHtml += `
+                <div class="mb-6">
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Select Student:</label>
+                    <select id="studentSelector" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500" onchange="onStudentSelected(this.value)">
+                        <option value="">All Students</option>
+            `;
+            
+            Array.from(studentNameIdMap.keys()).forEach(studentName => {
+                const isSelected = selectedStudent === studentName ? 'selected' : '';
+                academicsHtml += `<option value="${studentName}" ${isSelected}>${capitalize(studentName)}</option>`;
+            });
+            
+            academicsHtml += `
+                    </select>
+                </div>
+            `;
+        }
 
-        feedbackWithResponses.forEach((feedback) => {
-            feedback.responses.forEach((response, index) => {
-                const responseDate = response.responseDate?.toDate() || feedback.timestamp?.toDate() || new Date();
-                const formattedDate = responseDate.toLocaleDateString('en-US', {
-                    year: 'numeric',
-                    month: 'long',
-                    day: 'numeric',
-                    hour: '2-digit',
-                    minute: '2-digit'
-                });
+        // Load data for each student
+        for (const studentName of studentsToShow) {
+            const studentId = studentNameIdMap.get(studentName);
+            
+            if (!studentId) continue;
 
-                const responseElement = document.createElement('div');
-                responseElement.className = 'bg-white border border-gray-200 rounded-xl p-6 mb-4';
-                responseElement.innerHTML = `
-                    <div class="flex justify-between items-start mb-4">
-                        <div class="flex flex-wrap gap-2">
-                            <span class="inline-block px-3 py-1 rounded-full text-sm font-semibold ${getCategoryColor(feedback.category)}">
-                                ${feedback.category}
-                            </span>
-                            <span class="inline-block px-3 py-1 rounded-full text-sm font-semibold ${getPriorityColor(feedback.priority)}">
-                                ${feedback.priority} Priority
-                            </span>
-                        </div>
-                        <span class="text-sm text-gray-500">${formattedDate}</span>
-                    </div>
-                    
-                    <div class="mb-4">
-                        <h4 class="font-semibold text-gray-800 mb-2">Regarding: ${feedback.studentName}</h4>
-                        <p class="text-gray-700 bg-gray-50 p-4 rounded-lg border">${feedback.message}</p>
-                    </div>
-                    
-                    <div class="response-bubble">
-                        <div class="response-header">📨 Response from ${response.responderName || 'Admin'}:</div>
-                        <p class="text-gray-700 mt-2">${response.responseText}</p>
-                        <div class="text-sm text-gray-500 mt-2">
-                            Responded by: ${response.responderName || 'Admin Staff'} 
-                            ${response.responderEmail ? `(${response.responderEmail})` : ''}
-                        </div>
+            // Fetch daily topics
+            const dailyTopicsSnapshot = await db.collection('daily_topics')
+                .where('studentId', '==', studentId)
+                .orderBy('date', 'desc')
+                .limit(10)
+                .get();
+
+            // Fetch homework assignments
+            const homeworkSnapshot = await db.collection('homework_assignments')
+                .where('studentId', '==', studentId)
+                .orderBy('dueDate', 'asc')
+                .get();
+
+            const studentHeader = studentsToShow.length > 1 ? `
+                <div class="bg-green-100 border-l-4 border-green-600 p-4 rounded-lg mb-6">
+                    <h2 class="text-xl font-bold text-green-800">${capitalize(studentName)}</h2>
+                    <p class="text-green-600">Academic progress and assignments</p>
+                </div>
+            ` : '';
+
+            academicsHtml += studentHeader;
+
+            // Daily Topics Section
+            academicsHtml += `
+                <div class="mb-8">
+                    <h3 class="text-lg font-semibold text-green-700 mb-4 flex items-center">
+                        <span class="mr-2">📅</span> Daily Topics (Last 10 Sessions)
+                    </h3>
+            `;
+
+            if (dailyTopicsSnapshot.empty) {
+                academicsHtml += `
+                    <div class="bg-gray-50 border border-gray-200 rounded-lg p-6 text-center">
+                        <p class="text-gray-500">No daily topics recorded yet. Check back soon!</p>
                     </div>
                 `;
+            } else {
+                academicsHtml += `<div class="space-y-4">`;
+                
+                dailyTopicsSnapshot.forEach(doc => {
+                    const topicData = doc.data();
+                    const date = topicData.date?.toDate();
+                    const formattedDate = date ? date.toLocaleDateString('en-US', { 
+                        weekday: 'short', 
+                        year: 'numeric', 
+                        month: 'short', 
+                        day: 'numeric' 
+                    }) : 'Unknown date';
+                    
+                    academicsHtml += `
+                        <div class="bg-white border border-gray-200 rounded-lg p-4 shadow-sm hover:shadow-md transition-shadow duration-200">
+                            <div class="flex justify-between items-start mb-2">
+                                <span class="font-medium text-gray-800">${formattedDate}</span>
+                                <span class="text-xs bg-green-100 text-green-800 px-2 py-1 rounded-full">Daily Session</span>
+                            </div>
+                            <div class="text-gray-700">
+                                <p class="whitespace-pre-wrap">${topicData.topics || 'No topics recorded for this session.'}</p>
+                            </div>
+                        </div>
+                    `;
+                });
+                
+                academicsHtml += `</div>`;
+            }
 
-                responsesContent.appendChild(responseElement);
-            });
-        });
+            academicsHtml += `</div>`;
+
+            // Homework Assignments Section
+            academicsHtml += `
+                <div class="mb-8">
+                    <h3 class="text-lg font-semibold text-green-700 mb-4 flex items-center">
+                        <span class="mr-2">📝</span> Homework Assignments
+                    </h3>
+            `;
+
+            if (homeworkSnapshot.empty) {
+                academicsHtml += `
+                    <div class="bg-gray-50 border border-gray-200 rounded-lg p-6 text-center">
+                        <p class="text-gray-500">No homework assignments yet.</p>
+                    </div>
+                `;
+            } else {
+                academicsHtml += `<div class="space-y-4">`;
+                
+                const now = new Date();
+                
+                homeworkSnapshot.forEach(doc => {
+                    const homework = doc.data();
+                    const dueDate = homework.dueDate?.toDate();
+                    const formattedDueDate = dueDate ? dueDate.toLocaleDateString('en-US', { 
+                        weekday: 'short', 
+                        year: 'numeric', 
+                        month: 'short', 
+                        day: 'numeric' 
+                    }) : 'No due date';
+                    
+                    const isOverdue = dueDate && dueDate < now;
+                    const statusColor = isOverdue ? 'bg-red-100 text-red-800' : 'bg-blue-100 text-blue-800';
+                    const statusText = isOverdue ? 'Overdue' : 'Pending';
+                    
+                    academicsHtml += `
+                        <div class="bg-white border ${isOverdue ? 'border-red-200' : 'border-gray-200'} rounded-lg p-4 shadow-sm hover:shadow-md transition-shadow duration-200">
+                            <div class="flex justify-between items-start mb-2">
+                                <span class="font-medium text-gray-800">${homework.title || 'Untitled Assignment'}</span>
+                                <span class="text-xs ${statusColor} px-2 py-1 rounded-full">${statusText}</span>
+                            </div>
+                            <div class="text-gray-700 mb-3">
+                                <p class="whitespace-pre-wrap">${homework.description || 'No description provided.'}</p>
+                            </div>
+                            <div class="flex justify-between items-center">
+                                <span class="text-sm text-gray-500">Due: ${formattedDueDate}</span>
+                                ${homework.fileUrl ? `
+                                    <a href="${homework.fileUrl}" target="_blank" class="text-green-600 hover:text-green-800 font-medium flex items-center">
+                                        <span class="mr-1">📎</span> Download Attachment
+                                    </a>
+                                ` : ''}
+                            </div>
+                        </div>
+                    `;
+                });
+                
+                academicsHtml += `</div>`;
+            }
+
+            academicsHtml += `</div>`;
+        }
+
+        academicsContent.innerHTML = academicsHtml;
 
     } catch (error) {
-        console.error('Error loading responses:', error);
-        responsesContent.innerHTML = `
+        console.error('Error loading academics data:', error);
+        academicsContent.innerHTML = `
             <div class="text-center py-8">
                 <div class="text-4xl mb-4">❌</div>
-                <h3 class="text-xl font-bold text-red-700 mb-2">Error Loading Responses</h3>
-                <p class="text-gray-500">Unable to load responses at this time. Please try again later.</p>
+                <h3 class="text-xl font-bold text-red-700 mb-2">Error Loading Academic Data</h3>
+                <p class="text-gray-500">Unable to load academic data at this time. Please try again later.</p>
             </div>
         `;
     }
 }
 
-// Notification System for Responses
-async function checkForNewResponses() {
+function onStudentSelected(studentName) {
+    loadAcademicsData(studentName || null);
+}
+
+// -------------------------------------------------------------------
+// START: UNIFIED MESSAGING INBOX
+// -------------------------------------------------------------------
+
+function showMessagesModal() {
+    document.getElementById('messagesModal').classList.remove('hidden');
+    loadUnifiedMessages();
+    // Reset notification count when user views messages
+    resetNotificationCount();
+}
+
+function hideMessagesModal() {
+    document.getElementById('messagesModal').classList.add('hidden');
+}
+
+async function loadUnifiedMessages() {
+    const messagesContent = document.getElementById('messagesContent');
+    messagesContent.innerHTML = '<div class="text-center py-8"><div class="loading-spinner mx-auto" style="width: 40px; height: 40px;"></div><p class="text-green-600 font-semibold mt-4">Loading messages...</p></div>';
+
+    try {
+        const user = auth.currentUser;
+        if (!user) {
+            throw new Error('Please sign in to view messages');
+        }
+
+        // Get user data
+        const userDoc = await db.collection('parent_users').doc(user.uid).get();
+        const userData = userDoc.data();
+
+        // Fetch messages from tutor_messages where recipients includes 'parents'
+        const tutorMessagesSnapshot = await db.collection('tutor_messages')
+            .where('recipients', 'array-contains', 'parents')
+            .orderBy('timestamp', 'desc')
+            .get();
+
+        // Fetch responses from parent_feedback
+        const feedbackSnapshot = await db.collection('parent_feedback')
+            .where('parentUid', '==', user.uid)
+            .where('responses', '!=', [])
+            .get();
+
+        const allMessages = [];
+
+        // Process tutor messages
+        tutorMessagesSnapshot.forEach(doc => {
+            const message = doc.data();
+            allMessages.push({
+                id: doc.id,
+                type: 'tutor_message',
+                sender: message.parentName || 'Tutor/Admin',
+                senderRole: message.type === 'parent_to_staff' ? 'You' : 'Staff',
+                subject: message.subject,
+                content: message.type === 'parent_to_staff' ? `You wrote: ${message.content}` : message.content,
+                studentName: message.studentName,
+                isUrgent: message.isUrgent || false,
+                timestamp: message.timestamp,
+                status: message.status || 'sent',
+                isOutgoing: message.type === 'parent_to_staff'
+            });
+        });
+
+        // Process feedback responses
+        feedbackSnapshot.forEach(doc => {
+            const feedback = doc.data();
+            if (feedback.responses && feedback.responses.length > 0) {
+                feedback.responses.forEach((response, index) => {
+                    allMessages.push({
+                        id: `${doc.id}_response_${index}`,
+                        type: 'feedback_response',
+                        sender: response.responderName || 'Admin',
+                        senderRole: 'Admin',
+                        subject: `Re: ${feedback.category} - ${feedback.studentName}`,
+                        content: response.responseText,
+                        studentName: feedback.studentName,
+                        isUrgent: feedback.priority === 'Urgent' || feedback.priority === 'High',
+                        timestamp: response.responseDate || feedback.timestamp,
+                        originalMessage: feedback.message
+                    });
+                });
+            }
+        });
+
+        // Sort all messages by timestamp (newest first)
+        allMessages.sort((a, b) => {
+            const aDate = a.timestamp?.toDate() || new Date(0);
+            const bDate = b.timestamp?.toDate() || new Date(0);
+            return bDate - aDate;
+        });
+
+        if (allMessages.length === 0) {
+            messagesContent.innerHTML = `
+                <div class="text-center py-12">
+                    <div class="text-6xl mb-4">📭</div>
+                    <h3 class="text-xl font-bold text-gray-700 mb-2">No Messages Yet</h3>
+                    <p class="text-gray-500 max-w-md mx-auto">You haven't received any messages from our staff yet. Send a message using the "Compose" button!</p>
+                </div>
+            `;
+            return;
+        }
+
+        messagesContent.innerHTML = '';
+
+        allMessages.forEach((message) => {
+            const messageDate = message.timestamp?.toDate() || new Date();
+            const formattedDate = messageDate.toLocaleDateString('en-US', {
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+
+            const urgentBadge = message.isUrgent ? 
+                '<span class="inline-block ml-2 px-2 py-1 text-xs font-bold bg-red-100 text-red-800 rounded-full animate-pulse">URGENT</span>' : '';
+
+            const outgoingIndicator = message.isOutgoing ? 
+                '<span class="inline-block ml-2 px-2 py-1 text-xs font-bold bg-blue-100 text-blue-800 rounded-full">OUTGOING</span>' : '';
+
+            const studentInfo = message.studentName && message.studentName !== 'General' ? 
+                `<span class="text-sm text-gray-600">Regarding: ${message.studentName}</span>` : '';
+
+            const messageTypeIcon = message.type === 'tutor_message' ? '📨' : '💬';
+
+            const messageElement = document.createElement('div');
+            messageElement.className = `bg-white border ${message.isUrgent ? 'border-red-300' : 'border-gray-200'} rounded-xl p-6 mb-4 hover:shadow-md transition-shadow duration-200`;
+            messageElement.innerHTML = `
+                <div class="flex justify-between items-start mb-4">
+                    <div>
+                        <div class="flex items-center">
+                            <span class="text-xl mr-2">${messageTypeIcon}</span>
+                            <h4 class="font-bold text-gray-800 text-lg">${message.subject}</h4>
+                            ${urgentBadge}
+                            ${outgoingIndicator}
+                        </div>
+                        <div class="flex items-center mt-1">
+                            <span class="text-sm text-gray-700">
+                                From: <span class="font-semibold">${message.sender}</span> (${message.senderRole})
+                            </span>
+                            ${studentInfo ? `<span class="mx-2">•</span>${studentInfo}` : ''}
+                        </div>
+                    </div>
+                    <span class="text-sm text-gray-500">${formattedDate}</span>
+                </div>
+                
+                ${message.originalMessage ? `
+                <div class="mb-4">
+                    <p class="text-gray-600 text-sm mb-1">Your original message:</p>
+                    <p class="text-gray-700 bg-gray-50 p-4 rounded-lg border text-sm">${message.originalMessage}</p>
+                </div>
+                ` : ''}
+                
+                <div class="bg-green-50 border border-green-200 rounded-lg p-4">
+                    <p class="text-gray-700 leading-relaxed">${message.content}</p>
+                </div>
+            `;
+
+            messagesContent.appendChild(messageElement);
+        });
+
+    } catch (error) {
+        console.error('Error loading messages:', error);
+        messagesContent.innerHTML = `
+            <div class="text-center py-8">
+                <div class="text-4xl mb-4">❌</div>
+                <h3 class="text-xl font-bold text-red-700 mb-2">Error Loading Messages</h3>
+                <p class="text-gray-500">Unable to load messages at this time. Please try again later.</p>
+            </div>
+        `;
+    }
+}
+
+// -------------------------------------------------------------------
+// START: ACCORDION SYSTEM FOR REPORTS
+// -------------------------------------------------------------------
+
+function createAccordionReportView(reportsByStudent, chartConfigsToCache) {
+    let html = '';
+    let studentIndex = 0;
+    
+    for (const [studentName, reports] of reportsByStudent) {
+        const fullName = capitalize(studentName);
+        
+        // Create accordion header
+        html += `
+            <div class="accordion-item mb-4">
+                <button onclick="toggleAccordion('student-${studentIndex}')" 
+                        class="accordion-header w-full flex justify-between items-center p-4 bg-green-100 border border-green-300 rounded-lg hover:bg-green-200 transition-all duration-200">
+                    <div class="flex items-center">
+                        <span class="text-xl mr-3">👤</span>
+                        <div class="text-left">
+                            <h3 class="font-bold text-green-800 text-lg">${fullName}</h3>
+                            <p class="text-green-600 text-sm">
+                                ${reports.assessments.length} Assessment(s), ${reports.monthly.length} Monthly Report(s)
+                            </p>
+                        </div>
+                    </div>
+                    <span class="accordion-arrow text-green-600 text-xl">▼</span>
+                </button>
+                <div id="student-${studentIndex}-content" class="accordion-content hidden p-4 bg-white border border-t-0 border-gray-200 rounded-b-lg">
+        `;
+        
+        // Assessment Reports
+        if (reports.assessments.length > 0) {
+            html += `<h4 class="font-semibold text-gray-700 mb-3 mt-2">📊 Assessment Reports</h4>`;
+            
+            let assessmentIndex = 0;
+            for (const [sessionKey, session] of reports.assessments) {
+                html += createAssessmentReportHTML(session, studentIndex, assessmentIndex, fullName);
+                assessmentIndex++;
+            }
+        }
+        
+        // Monthly Reports
+        if (reports.monthly.length > 0) {
+            html += `<h4 class="font-semibold text-gray-700 mb-3 mt-6">📈 Monthly Reports</h4>`;
+            
+            let monthlyIndex = 0;
+            for (const [sessionKey, session] of reports.monthly) {
+                html += createMonthlyReportHTML(session, studentIndex, monthlyIndex, fullName);
+                monthlyIndex++;
+            }
+        }
+        
+        html += `
+                </div>
+            </div>
+        `;
+        
+        studentIndex++;
+    }
+    
+    return html;
+}
+
+function toggleAccordion(studentId) {
+    const content = document.getElementById(`${studentId}-content`);
+    const arrow = document.querySelector(`#${studentId} .accordion-arrow`);
+    
+    if (content.classList.contains('hidden')) {
+        content.classList.remove('hidden');
+        arrow.textContent = '▲';
+    } else {
+        content.classList.add('hidden');
+        arrow.textContent = '▼';
+    }
+}
+
+function createAssessmentReportHTML(session, studentIndex, assessmentIndex, fullName) {
+    const tutorEmail = session[0].tutorEmail || 'N/A';
+    const formattedDate = new Date(session[0].timestamp * 1000).toLocaleString('en-US', {
+        dateStyle: 'long',
+        timeStyle: 'short'
+    });
+    
+    const results = session.map(testResult => {
+        const topics = [...new Set(testResult.answers?.map(a => a.topic).filter(t => t))] || [];
+        return {
+            subject: testResult.subject,
+            correct: testResult.score !== undefined ? testResult.score : 0,
+            total: testResult.totalScoreableQuestions !== undefined ? testResult.totalScoreableQuestions : 0,
+            topics: topics,
+        };
+    });
+    
+    const tableRows = results.map(res => `<tr><td class="border px-2 py-1">${res.subject.toUpperCase()}</td><td class="border px-2 py-1 text-center">${res.correct} / ${res.total}</td></tr>`).join("");
+    
+    return `
+        <div class="border rounded-lg shadow mb-6 p-4 bg-white" id="assessment-block-${studentIndex}-${assessmentIndex}">
+            <div class="flex justify-between items-center mb-3 border-b pb-2">
+                <h5 class="font-medium text-gray-800">Assessment - ${formattedDate}</h5>
+                <button onclick="downloadSessionReport(${studentIndex}, ${assessmentIndex}, '${fullName}', 'assessment')" 
+                        class="text-green-600 hover:text-green-800 font-medium flex items-center text-sm">
+                    <span class="mr-1">📥</span> Download
+                </button>
+            </div>
+            
+            <table class="w-full text-sm mb-3 border border-collapse">
+                <thead class="bg-gray-100"><tr><th class="border px-2 py-1 text-left">Subject</th><th class="border px-2 py-1 text-center">Score</th></tr></thead>
+                <tbody>${tableRows}</tbody>
+            </table>
+            
+            ${results.length > 0 ? `<canvas id="chart-${studentIndex}-${assessmentIndex}" class="w-full h-32 mb-3"></canvas>` : ''}
+        </div>
+    `;
+}
+
+function createMonthlyReportHTML(session, studentIndex, monthlyIndex, fullName) {
+    const formattedDate = new Date(session[0].timestamp * 1000).toLocaleString('en-US', {
+        dateStyle: 'long',
+        timeStyle: 'short'
+    });
+    
+    return `
+        <div class="border rounded-lg shadow mb-6 p-4 bg-white" id="monthly-block-${studentIndex}-${monthlyIndex}">
+            <div class="flex justify-between items-center mb-3 border-b pb-2">
+                <h5 class="font-medium text-gray-800">Monthly Report - ${formattedDate}</h5>
+                <button onclick="downloadMonthlyReport(${studentIndex}, ${monthlyIndex}, '${fullName}')" 
+                        class="text-green-600 hover:text-green-800 font-medium flex items-center text-sm">
+                    <span class="mr-1">📥</span> Download
+                </button>
+            </div>
+            
+            <div class="text-sm text-gray-700">
+                <p class="mb-1"><strong>Tutor:</strong> ${session[0].tutorName || 'N/A'}</p>
+                <p class="mb-2"><strong>Topics Covered:</strong> ${session[0].topics ? session[0].topics.substring(0, 100) + '...' : 'N/A'}</p>
+            </div>
+        </div>
+    `;
+}
+
+// -------------------------------------------------------------------
+// NOTIFICATION SYSTEM
+// -------------------------------------------------------------------
+
+async function checkForNewMessages() {
     try {
         const user = auth.currentUser;
         if (!user) return;
 
-        const feedbackSnapshot = await db.collection('parent_feedback')
-            .where('parentUid', '==', user.uid)
+        let totalUnread = 0;
+        
+        // Check tutor messages
+        const tutorMessagesSnapshot = await db.collection('tutor_messages')
+            .where('recipients', 'array-contains', 'parents')
             .get();
 
-        let totalResponses = 0;
+        totalUnread += tutorMessagesSnapshot.size;
         
+        // Check feedback responses
+        const feedbackSnapshot = await db.collection('parent_feedback')
+            .where('parentUid', '==', user.uid)
+            .where('responses', '!=', [])
+            .get();
+
         feedbackSnapshot.forEach(doc => {
             const feedback = doc.data();
             if (feedback.responses && feedback.responses.length > 0) {
-                totalResponses += feedback.responses.length;
+                totalUnread += feedback.responses.length;
             }
         });
 
         // Update notification badge
-        updateNotificationBadge(totalResponses > 0 ? totalResponses : 0);
+        updateNotificationBadge(totalUnread > 0 ? totalUnread : 0);
         
         // Store for later use
-        unreadResponsesCount = totalResponses;
+        unreadMessagesCount = totalUnread;
 
     } catch (error) {
-        console.error('Error checking for new responses:', error);
+        console.error('Error checking for new messages:', error);
     }
 }
 
 function updateNotificationBadge(count) {
-    let badge = document.getElementById('responseNotificationBadge');
-    const viewResponsesBtn = document.getElementById('viewResponsesBtn');
+    let badge = document.getElementById('messagesNotificationBadge');
+    const viewMessagesBtn = document.getElementById('viewMessagesBtn');
     
-    if (!viewResponsesBtn) return;
+    if (!viewMessagesBtn) return;
     
     if (!badge) {
         badge = document.createElement('span');
-        badge.id = 'responseNotificationBadge';
+        badge.id = 'messagesNotificationBadge';
         badge.className = 'absolute -top-2 -right-2 bg-red-500 text-white rounded-full text-xs w-6 h-6 flex items-center justify-center font-bold animate-pulse';
-        viewResponsesBtn.style.position = 'relative';
-        viewResponsesBtn.appendChild(badge);
+        viewMessagesBtn.style.position = 'relative';
+        viewMessagesBtn.appendChild(badge);
     }
     
     if (count > 0) {
@@ -1153,33 +1664,12 @@ function updateNotificationBadge(count) {
 }
 
 function resetNotificationCount() {
-    // When user views responses, mark them as read and reset counter
     updateNotificationBadge(0);
-    unreadResponsesCount = 0;
+    unreadMessagesCount = 0;
 }
 
-function getCategoryColor(category) {
-    const colors = {
-        'Feedback': 'bg-blue-100 text-blue-800',
-        'Request': 'bg-green-100 text-green-800',
-        'Complaint': 'bg-red-100 text-red-800',
-        'Suggestion': 'bg-purple-100 text-purple-800'
-    };
-    return colors[category] || 'bg-gray-100 text-gray-800';
-}
-
-function getPriorityColor(priority) {
-    const colors = {
-        'Low': 'bg-gray-100 text-gray-800',
-        'Medium': 'bg-yellow-100 text-yellow-800',
-        'High': 'bg-orange-100 text-orange-800',
-        'Urgent': 'bg-red-100 text-red-800'
-    };
-    return colors[priority] || 'bg-gray-100 text-gray-800';
-}
-
-// Add View Responses button to the welcome section with notification badge
-function addViewResponsesButton() {
+// Add Messages button to the welcome section with notification badge
+function addMessagesButton() {
     const welcomeSection = document.querySelector('.bg-green-50');
     if (!welcomeSection) return;
     
@@ -1187,20 +1677,29 @@ function addViewResponsesButton() {
     if (!buttonContainer) return;
     
     // Check if button already exists
-    if (document.getElementById('viewResponsesBtn')) return;
+    if (document.getElementById('viewMessagesBtn')) return;
     
-    const viewResponsesBtn = document.createElement('button');
-    viewResponsesBtn.id = 'viewResponsesBtn';
-    viewResponsesBtn.onclick = showResponsesModal;
-    viewResponsesBtn.className = 'bg-blue-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-blue-700 transition-all duration-200 btn-glow flex items-center justify-center relative';
-    viewResponsesBtn.innerHTML = '<span class="mr-2">📨</span> View Responses';
+    const viewMessagesBtn = document.createElement('button');
+    viewMessagesBtn.id = 'viewMessagesBtn';
+    viewMessagesBtn.onclick = showMessagesModal;
+    viewMessagesBtn.className = 'bg-blue-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-blue-700 transition-all duration-200 btn-glow flex items-center justify-center relative';
+    viewMessagesBtn.innerHTML = '<span class="mr-2">📨</span> Messages';
     
     // Insert before the logout button
-    buttonContainer.insertBefore(viewResponsesBtn, buttonContainer.lastElementChild);
+    buttonContainer.insertBefore(viewMessagesBtn, buttonContainer.lastElementChild);
     
-    // Check for responses to show notification
+    // Add Compose button
+    const composeBtn = document.createElement('button');
+    composeBtn.id = 'composeMessageBtn';
+    composeBtn.onclick = showComposeMessageModal;
+    composeBtn.className = 'bg-green-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-green-700 transition-all duration-200 btn-glow flex items-center justify-center';
+    composeBtn.innerHTML = '<span class="mr-2">✏️</span> Compose';
+    
+    buttonContainer.insertBefore(composeBtn, viewMessagesBtn);
+    
+    // Check for messages to show notification
     setTimeout(() => {
-        checkForNewResponses();
+        checkForNewMessages();
     }, 1000);
 }
 
@@ -1433,6 +1932,58 @@ function setupRealTimeMonitoring(parentPhone, parentEmail, userId) {
         realTimeListeners.push(monthlyListener);
     });
     
+    // Monitor daily topics
+    validVersions.forEach(version => {
+        // First get student IDs, then monitor their daily topics
+        findStudentIdsForParent(parentPhone).then(({ studentIds }) => {
+            studentIds.forEach(studentId => {
+                const dailyTopicsListener = db.collection("daily_topics")
+                    .where("studentId", "==", studentId)
+                    .onSnapshot((snapshot) => {
+                        snapshot.docChanges().forEach((change) => {
+                            if (change.type === "added") {
+                                console.log("🆕 NEW DAILY TOPIC DETECTED!");
+                                showNewReportNotification('daily_topic');
+                            }
+                        });
+                    });
+                realTimeListeners.push(dailyTopicsListener);
+            });
+        });
+    });
+    
+    // Monitor homework assignments
+    validVersions.forEach(version => {
+        findStudentIdsForParent(parentPhone).then(({ studentIds }) => {
+            studentIds.forEach(studentId => {
+                const homeworkListener = db.collection("homework_assignments")
+                    .where("studentId", "==", studentId)
+                    .onSnapshot((snapshot) => {
+                        snapshot.docChanges().forEach((change) => {
+                            if (change.type === "added") {
+                                console.log("🆕 NEW HOMEWORK ASSIGNMENT DETECTED!");
+                                showNewReportNotification('homework');
+                            }
+                        });
+                    });
+                realTimeListeners.push(homeworkListener);
+            });
+        });
+    });
+    
+    // Monitor tutor messages
+    const messagesListener = db.collection("tutor_messages")
+        .where("recipients", "array-contains", "parents")
+        .onSnapshot((snapshot) => {
+            snapshot.docChanges().forEach((change) => {
+                if (change.type === "added") {
+                    console.log("🆕 NEW MESSAGE DETECTED!");
+                    checkForNewMessages();
+                }
+            });
+        });
+    realTimeListeners.push(messagesListener);
+    
     // Also monitor by email if available
     if (parentEmail) {
         const emailAssessmentListener = db.collection("student_results")
@@ -1478,8 +2029,12 @@ function cleanupRealTimeListeners() {
 }
 
 function showNewReportNotification(type) {
-    const reportType = type === 'assessment' ? 'Assessment Report' : 'Monthly Report';
-    showMessage(`New ${reportType} available! Loading now...`, 'success');
+    const reportType = type === 'assessment' ? 'Assessment Report' : 
+                      type === 'monthly' ? 'Monthly Report' :
+                      type === 'daily_topic' ? 'Daily Topic' :
+                      type === 'homework' ? 'Homework Assignment' : 'New Update';
+    
+    showMessage(`New ${reportType} available!`, 'success');
     
     // Add a visual indicator in the UI
     const existingIndicator = document.getElementById('newReportIndicator');
@@ -1554,13 +2109,21 @@ function addManualRefreshButton() {
     buttonContainer.insertBefore(refreshBtn, buttonContainer.lastElementChild);
 }
 
-// MAIN REPORT LOADING FUNCTION - UPDATED WITH HYBRID SYSTEM
+// MAIN REPORT LOADING FUNCTION - UPDATED WITH ACCORDION SYSTEM
 async function loadAllReportsForParent(parentPhone, userId, forceRefresh = false) {
     const reportArea = document.getElementById("reportArea");
     const reportContent = document.getElementById("reportContent");
     const authArea = document.getElementById("authArea");
     const authLoader = document.getElementById("authLoader");
     const welcomeMessage = document.getElementById("welcomeMessage");
+
+    // IMMEDIATELY SHOW DASHBOARD IF USER IS AUTHENTICATED (SESSION PERSISTENCE FIX)
+    const user = auth.currentUser;
+    if (user && authArea && reportArea) {
+        authArea.classList.add("hidden");
+        reportArea.classList.remove("hidden");
+        authLoader.classList.add("hidden");
+    }
 
     authLoader.classList.remove("hidden");
 
@@ -1600,7 +2163,7 @@ async function loadAllReportsForParent(parentPhone, userId, forceRefresh = false
                         reportArea.classList.remove("hidden");
                         
                         // Add buttons to welcome section
-                        addViewResponsesButton();
+                        addMessagesButton();
                         addManualRefreshButton();
                         
                         // Setup real-time monitoring
@@ -1610,6 +2173,9 @@ async function loadAllReportsForParent(parentPhone, userId, forceRefresh = false
                         
                         // Load initial referral data
                         loadReferralRewards(userId);
+                        
+                        // Load academics data
+                        loadAcademicsData();
 
                         return;
                     }
@@ -1695,30 +2261,33 @@ async function loadAllReportsForParent(parentPhone, userId, forceRefresh = false
         if (assessmentResults.length === 0 && monthlyResults.length === 0) {
             // NO REPORTS FOUND - SHOW WAITING STATE
             reportContent.innerHTML = `
-                <div id="childTabsContainer" class="mb-6"></div>
-                <div id="childDataContainer" class="space-y-6">
-                    <div class="text-center py-16">
-                        <div class="text-6xl mb-6">📊</div>
-                        <h2 class="text-2xl font-bold text-gray-800 mb-4">Waiting for Your Child's First Report</h2>
-                        <p class="text-gray-600 max-w-2xl mx-auto mb-6">
-                            No reports found for your account yet...
+                <div class="text-center py-16">
+                    <div class="text-6xl mb-6">📊</div>
+                    <h2 class="text-2xl font-bold text-gray-800 mb-4">Waiting for Your Child's First Report</h2>
+                    <p class="text-gray-600 max-w-2xl mx-auto mb-6">
+                        No reports found for your account yet. This usually means:
+                    </p>
+                    <div class="bg-blue-50 border border-blue-200 rounded-lg p-6 max-w-2xl mx-auto mb-6">
+                        <ul class="text-left text-gray-700 space-y-3">
+                            <li>• Your child's tutor hasn't submitted their first assessment or monthly report yet</li>
+                            <li>• The phone number/email used doesn't match what the tutor has on file</li>
+                            <li>• Reports are being processed and will appear soon</li>
+                        </ul>
+                    </div>
+                    <div class="bg-green-50 border border-green-200 rounded-lg p-6 max-w-2xl mx-auto">
+                        <h3 class="font-semibold text-green-800 mb-2">What happens next?</h3>
+                        <p class="text-green-700 mb-4">
+                            <strong>We're automatically monitoring for new reports!</strong> When your child's tutor submits 
+                            their first report, it will appear here automatically. You don't need to do anything.
                         </p>
-                        ${userChildren.length > 0 ? `
-                        <div class="bg-green-50 border border-green-200 rounded-lg p-6 max-w-2xl mx-auto">
-                            <h3 class="font-semibold text-green-800 mb-4">Your Children:</h3>
-                            <div class="flex flex-wrap gap-3 justify-center">
-                                ${userChildren.map(child => `
-                                    <div class="bg-white p-4 rounded-lg border border-green-200 shadow-sm">
-                                        <div class="text-lg font-medium text-green-800">${child}</div>
-                                        <button onclick="loadChildData('${child}')" 
-                                                class="mt-2 bg-green-100 text-green-700 px-3 py-1 rounded text-sm hover:bg-green-200 transition-colors">
-                                            View Details
-                                        </button>
-                                    </div>
-                                `).join('')}
-                            </div>
+                        <div class="flex flex-col sm:flex-row gap-4 justify-center items-center">
+                            <button onclick="manualRefreshReports()" class="bg-green-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-green-700 transition-all duration-200 flex items-center">
+                                <span class="mr-2">🔄</span> Check Now
+                            </button>
+                            <button onclick="showComposeMessageModal()" class="bg-blue-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-blue-700 transition-all duration-200 flex items-center">
+                                <span class="mr-2">💬</span> Contact Support
+                            </button>
                         </div>
-                        ` : ''}
                     </div>
                 </div>
             `;
@@ -1727,308 +2296,93 @@ async function loadAllReportsForParent(parentPhone, userId, forceRefresh = false
             reportArea.classList.remove("hidden");
             
             // Add buttons to welcome section
-            addViewResponsesButton();
+            addMessagesButton();
             addManualRefreshButton();
             
             // Load initial referral data for the rewards dashboard tab even if no reports
             loadReferralRewards(userId);
+            
+            // Load academics data
+            loadAcademicsData();
 
             return;
         }
         
-        // REPORTS FOUND - DISPLAY THEM
+        // REPORTS FOUND - DISPLAY THEM WITH ACCORDION SYSTEM
         reportContent.innerHTML = "";
         const chartConfigsToCache = [];
 
-        // Group reports by student name and extract parent name
-        const studentsMap = new Map();
+        // Group reports by student name
+        const reportsByStudent = new Map();
 
-        // Process assessment reports
+        // Group assessment reports by student
+        const assessmentGroups = new Map();
         assessmentResults.forEach(result => {
             const studentName = result.studentName;
-            if (!studentsMap.has(studentName)) {
-                studentsMap.set(studentName, { assessments: [], monthly: [] });
+            if (!assessmentGroups.has(studentName)) {
+                assessmentGroups.set(studentName, []);
             }
-            studentsMap.get(studentName).assessments.push(result);
+            assessmentGroups.get(studentName).push(result);
         });
 
-        // Process monthly reports
-        monthlyResults.forEach(report => {
-            const studentName = report.studentName;
-            if (!studentsMap.has(studentName)) {
-                studentsMap.set(studentName, { assessments: [], monthly: [] });
+        // Group assessment reports by session (day)
+        for (const [studentName, assessments] of assessmentGroups) {
+            const sessionGroups = new Map();
+            
+            assessments.forEach(result => {
+                const sessionKey = Math.floor(result.timestamp / 86400); // Group by day
+                if (!sessionGroups.has(sessionKey)) {
+                    sessionGroups.set(sessionKey, []);
+                }
+                sessionGroups.get(sessionKey).push(result);
+            });
+            
+            if (!reportsByStudent.has(studentName)) {
+                reportsByStudent.set(studentName, { assessments: new Map(), monthly: new Map() });
             }
-            studentsMap.get(studentName).monthly.push(report);
+            reportsByStudent.get(studentName).assessments = sessionGroups;
+        }
+
+        // Group monthly reports by student
+        const monthlyGroups = new Map();
+        monthlyResults.forEach(result => {
+            const studentName = result.studentName;
+            if (!monthlyGroups.has(studentName)) {
+                monthlyGroups.set(studentName, []);
+            }
+            monthlyGroups.get(studentName).push(result);
         });
 
-        userChildren = Array.from(studentsMap.keys());
-
-        // ============================================================================
-        // MODIFICATIONS NEEDED IN EXISTING loadAllReportsForParent FUNCTION
-        // ============================================================================
-
-        // Create tabs for children if there are multiple children
-        if (userChildren.length > 1) {
-            createChildTabs(userChildren);
-        } else if (userChildren.length === 1) {
-            // Load data for single child
-            setTimeout(() => loadChildData(userChildren[0]), 100);
+        // Group monthly reports by session (day)
+        for (const [studentName, monthlies] of monthlyGroups) {
+            const sessionGroups = new Map();
+            
+            monthlies.forEach(result => {
+                const sessionKey = Math.floor(result.timestamp / 86400); // Group by day
+                if (!sessionGroups.has(sessionKey)) {
+                    sessionGroups.set(sessionKey, []);
+                }
+                sessionGroups.get(sessionKey).push(result);
+            });
+            
+            if (!reportsByStudent.has(studentName)) {
+                reportsByStudent.set(studentName, { assessments: new Map(), monthly: new Map() });
+            }
+            reportsByStudent.get(studentName).monthly = sessionGroups;
         }
 
-        // Display reports for each student
-        let studentIndex = 0;
-        for (const [studentName, reports] of studentsMap) {
-            const fullName = capitalize(studentName);
-            
-            // Add student header
-            const studentHeader = `
-                <div class="bg-green-100 border-l-4 border-green-600 p-4 rounded-lg mb-6">
-                    <h2 class="text-xl font-bold text-green-800">${fullName}</h2>
-                    <p class="text-green-600">Showing all reports for ${fullName}</p>
-                </div>
-            `;
-            reportContent.innerHTML += studentHeader;
+        userChildren = Array.from(reportsByStudent.keys());
 
-            // Display Assessment Reports for this student - NO DUPLICATES
-            if (reports.assessments.length > 0) {
-                // Group by unique test sessions using timestamp
-                const uniqueSessions = new Map();
-                
-                reports.assessments.forEach((result) => {
-                    const sessionKey = Math.floor(result.timestamp / 86400); // Group by day
-                    if (!uniqueSessions.has(sessionKey)) {
-                        uniqueSessions.set(sessionKey, []);
-                    }
-                    uniqueSessions.get(sessionKey).push(result);
-                });
-
-                let assessmentIndex = 0;
-                for (const [sessionKey, session] of uniqueSessions) {
-                    const tutorEmail = session[0].tutorEmail || 'N/A';
-                    const studentCountry = session[0].studentCountry || 'N/A';
-                    const formattedDate = new Date(session[0].timestamp * 1000).toLocaleString('en-US', {
-                        dateStyle: 'long',
-                        timeStyle: 'short'
-                    });
-
-                    let tutorName = 'N/A';
-                    if (tutorEmail && tutorEmail !== 'N/A') {
-                        try {
-                            const tutorDoc = await db.collection("tutors").doc(tutorEmail).get();
-                            if (tutorDoc.exists) {
-                                tutorName = tutorDoc.data().name;
-                            }
-                        } catch (error) {
-                            // Silent fail - tutor name will remain 'N/A'
-                        }
-                    }
-
-                    const results = session.map(testResult => {
-                        const topics = [...new Set(testResult.answers?.map(a => a.topic).filter(t => t))] || [];
-                        return {
-                            subject: testResult.subject,
-                            correct: testResult.score !== undefined ? testResult.score : 0,
-                            total: testResult.totalScoreableQuestions !== undefined ? testResult.totalScoreableQuestions : 0,
-                            topics: topics,
-                        };
-                    });
-
-                    const tableRows = results.map(res => `<tr><td class="border px-2 py-1">${res.subject.toUpperCase()}</td><td class="border px-2 py-1 text-center">${res.correct} / ${res.total}</td></tr>`).join("");
-                    const topicsTableRows = results.map(res => `<tr><td class="border px-2 py-1 font-semibold">${res.subject.toUpperCase()}</td><td class="border px-2 py-1">${res.topics.join(', ') || 'N/A'}</td></tr>`).join("");
-
-                    const recommendation = generateTemplatedRecommendation(fullName, tutorName, results);
-                    const creativeWritingAnswer = session[0].answers?.find(a => a.type === 'creative-writing');
-                    const tutorReport = creativeWritingAnswer?.tutorReport || 'Pending review.';
-
-                    const assessmentBlock = `
-                        <div class="border rounded-lg shadow mb-8 p-6 bg-white" id="assessment-block-${studentIndex}-${assessmentIndex}">
-                            <div class="text-center mb-6 border-b pb-4">
-                                <img src="https://res.cloudinary.com/dy2hxcyaf/image/upload/v1757700806/newbhlogo_umwqzy.svg" 
-                                     alt="Blooming Kids House Logo" 
-                                     class="h-16 w-auto mx-auto mb-3">
-                                <h2 class="text-2xl font-bold text-green-800">Assessment Report</h2>
-                                <p class="text-gray-600">Date: ${formattedDate}</p>
-                            </div>
-
-                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6 bg-green-50 p-4 rounded-lg">
-                                <div>
-                                    <p><strong>Student's Name:</strong> ${fullName}</p>
-                                    <p><strong>Parent's Phone:</strong> ${session[0].parentPhone || 'N/A'}</p>
-                                    <p><strong>Grade:</strong> ${session[0].grade}</p>
-                                </div>
-                                <div>
-                                    <p><strong>Tutor:</strong> ${tutorName || 'N/A'}</p>
-                                    <p><strong>Location:</strong> ${studentCountry || 'N/A'}</p>
-                                </div>
-                            </div>
-                            
-                            <h3 class="text-lg font-semibold mt-4 mb-2 text-green-700">Performance Summary</h3>
-                            <table class="w-full text-sm mb-4 border border-collapse">
-                                <thead class="bg-gray-100"><tr><th class="border px-2 py-1 text-left">Subject</th><th class="border px-2 py-1 text-center">Score</th></tr></thead>
-                                <tbody>${tableRows}</tbody>
-                            </table>
-                            
-                            <h3 class="text-lg font-semibold mt-4 mb-2 text-green-700">Knowledge & Skill Analysis</h3>
-                            <table class="w-full text-sm mb-4 border border-collapse">
-                                <thead class="bg-gray-100"><tr><th class="border px-2 py-1 text-left">Subject</th><th class="border px-2 py-1 text-left">Topics Covered</th></tr></thead>
-                                <tbody>${topicsTableRows}</tbody>
-                            </table>
-                            
-                            <h3 class="text-lg font-semibold mt-4 mb-2 text-green-700">Tutor's Recommendation</h3>
-                            <p class="mb-2 text-gray-700 leading-relaxed">${recommendation}</p>
-
-                            ${creativeWritingAnswer ? `
-                            <h3 class="text-lg font-semibold mt-4 mb-2 text-green-700">Creative Writing Feedback</h3>
-                            <p class="mb-2 text-gray-700"><strong>Tutor's Report:</strong> ${tutorReport}</p>
-                            ` : ''}
-
-                            ${results.length > 0 ? `
-                            <canvas id="chart-${studentIndex}-${assessmentIndex}" class="w-full h-48 mb-4"></canvas>
-                            ` : ''}
-                            
-                            <div class="bg-yellow-50 p-4 rounded-lg mt-6">
-                                <h3 class="text-lg font-semibold mb-1 text-green-700">Director's Message</h3>
-                                <p class="italic text-sm text-gray-700">At Blooming Kids House, we are committed to helping every child succeed. We believe that with personalized support from our tutors, ${fullName} will unlock their full potential. Keep up the great work!<br/>– Mrs. Yinka Isikalu, Director</p>
-                            </div>
-                            
-                            <div class="mt-6 text-center">
-                                <button onclick="downloadSessionReport(${studentIndex}, ${assessmentIndex}, '${fullName}', 'assessment')" class="bg-green-600 text-white px-6 py-2 rounded-lg font-semibold hover:bg-green-700 transition-all duration-200">
-                                    Download Assessment PDF
-                                </button>
-                            </div>
-                        </div>
-                    `;
-
-                    reportContent.innerHTML += assessmentBlock;
-
-                    if (results.length > 0) {
-                        const ctx = document.getElementById(`chart-${studentIndex}-${assessmentIndex}`);
-                        if (ctx) {
-                            const chartConfig = {
-                                type: 'bar',
-                                data: {
-                                    labels: results.map(r => r.subject.toUpperCase()),
-                                    datasets: [
-                                        { label: 'Correct Answers', data: results.map(s => s.correct), backgroundColor: '#4CAF50' }, 
-                                        { label: 'Incorrect/Unanswered', data: results.map(s => s.total - s.correct), backgroundColor: '#FFCD56' }
-                                    ]
-                                },
-                                options: {
-                                    responsive: true,
-                                    scales: { x: { stacked: true }, y: { stacked: true, beginAtZero: true } },
-                                    plugins: { title: { display: true, text: 'Score Distribution by Subject' } }
-                                }
-                            };
-                            new Chart(ctx, chartConfig);
-                            chartConfigsToCache.push({ canvasId: `chart-${studentIndex}-${assessmentIndex}`, config: chartConfig });
-                        }
-                    }
-                    assessmentIndex++;
-                }
-            }
-            
-            // Display Monthly Reports for this student
-            if (reports.monthly.length > 0) {
-                const groupedMonthly = {};
-                reports.monthly.forEach((result) => {
-                    const sessionKey = Math.floor(result.timestamp / 86400); 
-                    if (!groupedMonthly[sessionKey]) groupedMonthly[sessionKey] = [];
-                    groupedMonthly[sessionKey].push(result);
-                });
-
-                let monthlyIndex = 0;
-                for (const key in groupedMonthly) {
-                    const session = groupedMonthly[key];
-                    const formattedDate = new Date(session[0].timestamp * 1000).toLocaleString('en-US', {
-                        dateStyle: 'long',
-                        timeStyle: 'short'
-                    });
-
-                    session.forEach((monthlyReport, reportIndex) => {
-                        const monthlyBlock = `
-                            <div class="border rounded-lg shadow mb-8 p-6 bg-white" id="monthly-block-${studentIndex}-${monthlyIndex}">
-                                <div class="text-center mb-6 border-b pb-4">
-                                    <img src="https://res.cloudinary.com/dy2hxcyaf/image/upload/v1757700806/newbhlogo_umwqzy.svg" 
-                                         alt="Blooming Kids House Logo" 
-                                         class="h-16 w-auto mx-auto mb-3">
-                                    <h2 class="text-2xl font-bold text-green-800">MONTHLY LEARNING REPORT</h2>
-                                    <p class="text-gray-600">Date: ${formattedDate}</p>
-                                </div>
-                                
-                                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6 bg-green-50 p-4 rounded-lg">
-                                    <div>
-                                        <p><strong>Student's Name:</strong> ${monthlyReport.studentName || 'N/A'}</p>
-                                        <p><strong>Parent's Name:</strong> ${monthlyReport.parentName || 'N/A'}</p>
-                                        <p><strong>Parent's Phone:</strong> ${monthlyReport.parentPhone || 'N/A'}</p>
-                                    </div>
-                                    <div>
-                                        <p><strong>Grade:</strong> ${monthlyReport.grade || 'N/A'}</p>
-                                        <p><strong>Tutor's Name:</strong> ${monthlyReport.tutorName || 'N/A'}</p>
-                                    </div>
-                                </div>
-
-                                ${monthlyReport.introduction ? `
-                                <div class="mb-6">
-                                    <h3 class="text-lg font-semibold text-green-700 mb-2 border-b pb-1">INTRODUCTION</h3>
-                                    <p class="text-gray-700 leading-relaxed preserve-whitespace">${monthlyReport.introduction}</p>
-                                </div>
-                                ` : ''}
-
-                                ${monthlyReport.topics ? `
-                                <div class="mb-6">
-                                    <h3 class="text-lg font-semibold text-green-700 mb-2 border-b pb-1">TOPICS & REMARKS</h3>
-                                    <p class="text-gray-700 leading-relaxed preserve-whitespace">${monthlyReport.topics}</p>
-                                </div>
-                                ` : ''}
-
-                                ${monthlyReport.progress ? `
-                                <div class="mb-6">
-                                    <h3 class="text-lg font-semibold text-green-700 mb-2 border-b pb-1">PROGRESS & ACHIEVEMENTS</h3>
-                                    <p class="text-gray-700 leading-relaxed preserve-whitespace">${monthlyReport.progress}</p>
-                                </div>
-                                ` : ''}
-
-                                ${monthlyReport.strengthsWeaknesses ? `
-                                <div class="mb-6">
-                                    <h3 class="text-lg font-semibold text-green-700 mb-2 border-b pb-1">STRENGTHS AND WEAKNESSES</h3>
-                                    <p class="text-gray-700 leading-relaxed preserve-whitespace">${monthlyReport.strengthsWeaknesses}</p>
-                                </div>
-                                ` : ''}
-
-                                ${monthlyReport.recommendations ? `
-                                <div class="mb-6">
-                                    <h3 class="text-lg font-semibold text-green-700 mb-2 border-b pb-1">RECOMMENDATIONS</h3>
-                                    <p class="text-gray-700 leading-relaxed preserve-whitespace">${monthlyReport.recommendations}</p>
-                                </div>
-                                ` : ''}
-
-                                ${monthlyReport.generalComments ? `
-                                <div class="mb-6">
-                                    <h3 class="text-lg font-semibold text-green-700 mb-2 border-b pb-1">GENERAL TUTOR'S COMMENTS</h3>
-                                    <p class="text-gray-700 leading-relaxed preserve-whitespace">${monthlyReport.generalComments}</p>
-                                </div>
-                                ` : ''}
-
-                                <div class="text-right mt-8 pt-4 border-t">
-                                    <p class="text-gray-600">Best regards,</p>
-                                    <p class="font-semibold text-green-800">${monthlyReport.tutorName || 'N/A'}</p>
-                                </div>
-
-                                <div class="mt-6 text-center">
-                                    <button onclick="downloadMonthlyReport(${studentIndex}, ${monthlyIndex}, '${fullName}')" class="bg-green-600 text-white px-6 py-2 rounded-lg font-semibold hover:bg-green-700 transition-all duration-200">
-                                        Download Monthly Report PDF
-                                    </button>
-                                </div>
-                            </div>
-                        `;
-                        reportContent.innerHTML += monthlyBlock;
-                        monthlyIndex++;
-                    });
-                }
-            }
-            
-            studentIndex++;
-        }
+        // Create accordion view
+        reportContent.innerHTML = createAccordionReportView(reportsByStudent, chartConfigsToCache);
+        
+        // Initialize charts
+        setTimeout(() => {
+            chartConfigsToCache.forEach(chart => {
+                const ctx = document.getElementById(chart.canvasId);
+                if (ctx) new Chart(ctx, chart.config);
+            });
+        }, 100);
         
         // --- CACHE SAVING LOGIC ---
         try {
@@ -2049,11 +2403,14 @@ async function loadAllReportsForParent(parentPhone, userId, forceRefresh = false
         reportArea.classList.remove("hidden");
 
         // Add buttons to welcome section
-        addViewResponsesButton();
+        addMessagesButton();
         addManualRefreshButton();
         
         // Load initial referral data for the rewards dashboard tab
         loadReferralRewards(userId);
+        
+        // Load academics data
+        loadAcademicsData();
 
     } catch (error) {
         console.error("Error loading reports:", error);
@@ -2136,19 +2493,24 @@ function switchTab(tab) {
 
 function switchMainTab(tab) {
     const reportTab = document.getElementById('reportTab');
+    const academicsTab = document.getElementById('academicsTab');
     const rewardsTab = document.getElementById('rewardsTab');
     
     const reportContentArea = document.getElementById('reportContentArea');
+    const academicsContentArea = document.getElementById('academicsContentArea');
     const rewardsContentArea = document.getElementById('rewardsContentArea');
     
     // Deactivate all tabs
     reportTab?.classList.remove('tab-active-main');
     reportTab?.classList.add('tab-inactive-main');
+    academicsTab?.classList.remove('tab-active-main');
+    academicsTab?.classList.add('tab-inactive-main');
     rewardsTab?.classList.remove('tab-active-main');
     rewardsTab?.classList.add('tab-inactive-main');
     
     // Hide all content areas
     reportContentArea?.classList.add('hidden');
+    academicsContentArea?.classList.add('hidden');
     rewardsContentArea?.classList.add('hidden');
     
     // Activate selected tab and show content
@@ -2156,6 +2518,13 @@ function switchMainTab(tab) {
         reportTab?.classList.remove('tab-inactive-main');
         reportTab?.classList.add('tab-active-main');
         reportContentArea?.classList.remove('hidden');
+    } else if (tab === 'academics') {
+        academicsTab?.classList.remove('tab-inactive-main');
+        academicsTab?.classList.add('tab-active-main');
+        academicsContentArea?.classList.remove('hidden');
+        
+        // Load academics data when the tab is clicked
+        loadAcademicsData();
     } else if (tab === 'rewards') {
         rewardsTab?.classList.remove('tab-inactive-main');
         rewardsTab?.classList.add('tab-active-main');
@@ -2169,750 +2538,6 @@ function switchMainTab(tab) {
     }
 }
 
-// ============================================================================
-// CHILD MANAGEMENT FUNCTIONS (ADDED AFTER EXISTING FUNCTIONS)
-// ============================================================================
-
-// Time formatting function (from tutor.js)
-function formatTime(timeString) {
-    if (!timeString) return '';
-    const [hours, minutes] = timeString.split(':').map(Number);
-    const period = hours >= 12 ? 'PM' : 'AM';
-    const formattedHours = hours % 12 || 12;
-    return `${formattedHours}:${minutes.toString().padStart(2, '0')} ${period}`;
-}
-
-// Function to create child tabs dynamically
-function createChildTabs(children) {
-    const reportContent = document.getElementById('reportContent');
-    
-    // Remove existing tabs if any
-    const existingTabsContainer = document.getElementById('childTabsContainer');
-    if (existingTabsContainer) {
-        existingTabsContainer.remove();
-    }
-    
-    // Create tabs container
-    const tabsContainer = document.createElement('div');
-    tabsContainer.id = 'childTabsContainer';
-    tabsContainer.className = 'flex flex-wrap gap-2 mb-6 border-b pb-4';
-    
-    // Create tab for each child
-    children.forEach((child, index) => {
-        const tabButton = document.createElement('button');
-        tabButton.id = `childTab-${index}`;
-        tabButton.className = `px-4 py-2 rounded-lg font-medium transition-all ${index === 0 ? 'bg-green-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`;
-        tabButton.textContent = child;
-        tabButton.onclick = () => switchChildTab(index, child);
-        tabsContainer.appendChild(tabButton);
-    });
-    
-    // Insert tabs at the beginning of report content
-    reportContent.insertBefore(tabsContainer, reportContent.firstChild);
-    
-    // Create content container for child-specific data
-    const childDataContainer = document.createElement('div');
-    childDataContainer.id = 'childDataContainer';
-    childDataContainer.className = 'space-y-8';
-    reportContent.insertBefore(childDataContainer, tabsContainer.nextSibling);
-    
-    // Load data for first child by default
-    if (children.length > 0) {
-        switchChildTab(0, children[0]);
-    }
-}
-
-// Function to switch between child tabs
-function switchChildTab(childIndex, childName) {
-    // Update tab styles
-    document.querySelectorAll('#childTabsContainer button').forEach((btn, index) => {
-        if (index === childIndex) {
-            btn.className = 'px-4 py-2 rounded-lg font-medium bg-green-600 text-white transition-all';
-        } else {
-            btn.className = 'px-4 py-2 rounded-lg font-medium bg-gray-100 text-gray-700 hover:bg-gray-200 transition-all';
-        }
-    });
-    
-    // Clear and reload child data
-    const childDataContainer = document.getElementById('childDataContainer');
-    childDataContainer.innerHTML = '<div class="text-center py-8"><div class="loading-spinner mx-auto"></div><p class="text-green-600 font-semibold mt-4">Loading data...</p></div>';
-    
-    // Load all data for this child
-    loadChildData(childName);
-}
-
-// Main function to load all data for a specific child
-async function loadChildData(childName) {
-    const childDataContainer = document.getElementById('childDataContainer');
-    
-    try {
-        // Get user's phone number for querying
-        const user = auth.currentUser;
-        if (!user) return;
-        
-        const userDoc = await db.collection('parent_users').doc(user.uid).get();
-        const userData = userDoc.data();
-        const parentPhone = userData.normalizedPhone;
-        
-        // Find student ID from students collection
-        const studentQuery = await db.collection('students')
-            .where('studentName', '==', childName)
-            .where('normalizedParentPhone', '==', parentPhone)
-            .limit(1)
-            .get();
-        
-        if (studentQuery.empty) {
-            childDataContainer.innerHTML = `
-                <div class="text-center py-8">
-                    <p class="text-red-500">Student data not found for ${childName}.</p>
-                </div>
-            `;
-            return;
-        }
-        
-        const studentDoc = studentQuery.docs[0];
-        const studentId = studentDoc.id;
-        const studentData = studentDoc.data();
-        
-        // Create collapsible sections container
-        childDataContainer.innerHTML = `
-            <div class="space-y-6">
-                <!-- Today's Topics Section -->
-                <div class="bg-white rounded-xl shadow-lg border border-gray-200">
-                    <div class="p-4 border-b border-gray-200 flex justify-between items-center cursor-pointer hover:bg-gray-50 transition-colors"
-                         onclick="toggleSection('todayTopicsSection')">
-                        <h3 class="text-lg font-bold text-gray-800 flex items-center">
-                            <span class="mr-2">📚</span> Today's Topics & Recent Lessons
-                            <span id="todayTopicsBadge" class="ml-2 bg-green-100 text-green-800 text-xs font-semibold px-2 py-1 rounded-full hidden">0 new</span>
-                        </h3>
-                        <span id="todayTopicsArrow" class="transform transition-transform">▼</span>
-                    </div>
-                    <div id="todayTopicsContent" class="p-4 hidden">
-                        <div id="todayTopicsData" class="space-y-4">
-                            <div class="text-center py-4">
-                                <div class="loading-spinner-small mx-auto"></div>
-                                <p class="text-gray-500 mt-2">Loading topics...</p>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                
-                <!-- Homework Assignments Section -->
-                <div class="bg-white rounded-xl shadow-lg border border-gray-200">
-                    <div class="p-4 border-b border-gray-200 flex justify-between items-center cursor-pointer hover:bg-gray-50 transition-colors"
-                         onclick="toggleSection('homeworkSection')">
-                        <h3 class="text-lg font-bold text-gray-800 flex items-center">
-                            <span class="mr-2">📝</span> Homework Assignments
-                            <span id="homeworkBadge" class="ml-2 bg-red-100 text-red-800 text-xs font-semibold px-2 py-1 rounded-full hidden">0 pending</span>
-                        </h3>
-                        <span id="homeworkArrow" class="transform transition-transform">▼</span>
-                    </div>
-                    <div id="homeworkContent" class="p-4 hidden">
-                        <div id="homeworkData" class="space-y-4">
-                            <div class="text-center py-4">
-                                <div class="loading-spinner-small mx-auto"></div>
-                                <p class="text-gray-500 mt-2">Loading homework...</p>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                
-                <!-- Weekly Schedule Section -->
-                <div class="bg-white rounded-xl shadow-lg border border-gray-200">
-                    <div class="p-4 border-b border-gray-200 flex justify-between items-center cursor-pointer hover:bg-gray-50 transition-colors"
-                         onclick="toggleSection('scheduleSection')">
-                        <h3 class="text-lg font-bold text-gray-800 flex items-center">
-                            <span class="mr-2">📅</span> Weekly Schedule
-                        </h3>
-                        <span id="scheduleArrow" class="transform transition-transform">▼</span>
-                    </div>
-                    <div id="scheduleContent" class="p-4 hidden">
-                        <div id="scheduleData" class="space-y-4">
-                            <div class="text-center py-4">
-                                <div class="loading-spinner-small mx-auto"></div>
-                                <p class="text-gray-500 mt-2">Loading schedule...</p>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        `;
-        
-        // Load all data for this student
-        await Promise.all([
-            loadTodayTopics(studentId, childName),
-            loadHomeworkAssignments(studentId, childName),
-            loadWeeklySchedule(studentId, childName)
-        ]);
-        
-        // Setup real-time listeners for this student
-        setupChildRealTimeListeners(studentId, childName);
-        
-    } catch (error) {
-        console.error('Error loading child data:', error);
-        childDataContainer.innerHTML = `
-            <div class="text-center py-8">
-                <p class="text-red-500">Error loading data for ${childName}.</p>
-            </div>
-        `;
-    }
-}
-
-// Toggle section visibility
-function toggleSection(sectionId) {
-    const content = document.getElementById(sectionId + 'Content');
-    const arrow = document.getElementById(sectionId + 'Arrow');
-    
-    if (content.classList.contains('hidden')) {
-        content.classList.remove('hidden');
-        arrow.classList.remove('rotate-180');
-    } else {
-        content.classList.add('hidden');
-        arrow.classList.add('rotate-180');
-    }
-}
-
-// Load today's topics and recent lessons
-async function loadTodayTopics(studentId, childName) {
-    const todayTopicsData = document.getElementById('todayTopicsData');
-    const badge = document.getElementById('todayTopicsBadge');
-    
-    try {
-        // Get topics from last 7 days
-        const sevenDaysAgo = new Date();
-        sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-        
-        const topicsSnapshot = await db.collection('daily_topics')
-            .where('studentId', '==', studentId)
-            .where('date', '>=', firebase.firestore.Timestamp.fromDate(sevenDaysAgo))
-            .orderBy('date', 'desc')
-            .get();
-        
-        if (topicsSnapshot.empty) {
-            todayTopicsData.innerHTML = `
-                <div class="text-center py-8">
-                    <p class="text-gray-500">No topics recorded for ${childName} in the past 7 days.</p>
-                </div>
-            `;
-            badge.classList.add('hidden');
-            return;
-        }
-        
-        let topicsHTML = '';
-        let today = new Date().toDateString();
-        let todayTopicsCount = 0;
-        
-        topicsSnapshot.forEach(doc => {
-            const topicData = doc.data();
-            const topicDate = topicData.date.toDate();
-            const isToday = topicDate.toDateString() === today;
-            
-            if (isToday) todayTopicsCount++;
-            
-            topicsHTML += `
-                <div class="border border-gray-200 rounded-lg p-4 ${isToday ? 'bg-green-50 border-green-200' : ''}">
-                    <div class="flex justify-between items-start mb-2">
-                        <div>
-                            <h4 class="font-semibold text-gray-800">${topicDate.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</h4>
-                            ${isToday ? '<span class="inline-block bg-green-100 text-green-800 text-xs font-semibold px-2 py-1 rounded-full">Today</span>' : ''}
-                        </div>
-                        <span class="text-sm text-gray-500">${topicData.tutorName || 'Tutor'}</span>
-                    </div>
-                    
-                    <div class="mt-3">
-                        <h5 class="text-sm font-medium text-gray-700 mb-1">Topics Covered:</h5>
-                        <p class="text-gray-600">${topicData.topics || 'No topics listed'}</p>
-                    </div>
-                    
-                    ${topicData.notes ? `
-                    <div class="mt-3">
-                        <h5 class="text-sm font-medium text-gray-700 mb-1">Tutor's Notes:</h5>
-                        <p class="text-gray-600 italic">${topicData.notes}</p>
-                    </div>
-                    ` : ''}
-                    
-                    ${topicData.materials ? `
-                    <div class="mt-3">
-                        <h5 class="text-sm font-medium text-gray-700 mb-1">Learning Materials:</h5>
-                        <p class="text-gray-600">${topicData.materials}</p>
-                    </div>
-                    ` : ''}
-                </div>
-            `;
-        });
-        
-        todayTopicsData.innerHTML = topicsHTML;
-        
-        // Update badge if there are today's topics
-        if (todayTopicsCount > 0) {
-            badge.textContent = `${todayTopicsCount} new`;
-            badge.classList.remove('hidden');
-        } else {
-            badge.classList.add('hidden');
-        }
-        
-    } catch (error) {
-        console.error('Error loading topics:', error);
-        todayTopicsData.innerHTML = `
-            <div class="text-center py-4">
-                <p class="text-red-500">Error loading topics.</p>
-            </div>
-        `;
-    }
-}
-
-// Load homework assignments
-async function loadHomeworkAssignments(studentId, childName) {
-    const homeworkData = document.getElementById('homeworkData');
-    const badge = document.getElementById('homeworkBadge');
-    
-    try {
-        const homeworkSnapshot = await db.collection('homework_assignments')
-            .where('studentId', '==', studentId)
-            .orderBy('dueDate', 'asc')
-            .get();
-        
-        if (homeworkSnapshot.empty) {
-            homeworkData.innerHTML = `
-                <div class="text-center py-8">
-                    <p class="text-gray-500">No homework assigned for ${childName}.</p>
-                </div>
-            `;
-            badge.classList.add('hidden');
-            return;
-        }
-        
-        let homeworkHTML = '';
-        let pendingCount = 0;
-        const now = new Date();
-        
-        homeworkSnapshot.forEach(doc => {
-            const hwData = doc.data();
-            const dueDate = hwData.dueDate.toDate();
-            const isOverdue = dueDate < now && hwData.status !== 'submitted' && hwData.status !== 'graded';
-            const isPending = hwData.status === 'assigned' && dueDate > now;
-            
-            if (isPending) pendingCount++;
-            
-            // Calculate days until due
-            const daysUntilDue = Math.ceil((dueDate - now) / (1000 * 60 * 60 * 24));
-            
-            homeworkHTML += `
-                <div class="border border-gray-200 rounded-lg p-4 ${isOverdue ? 'bg-red-50 border-red-200' : isPending ? 'bg-yellow-50 border-yellow-200' : 'bg-gray-50'}">
-                    <div class="flex justify-between items-start mb-3">
-                        <div>
-                            <h4 class="font-bold text-lg text-gray-800">${hwData.title || 'Untitled Assignment'}</h4>
-                            <div class="flex flex-wrap gap-2 mt-1">
-                                <span class="inline-block px-2 py-1 rounded text-xs font-medium ${getHomeworkStatusColor(hwData.status)}">
-                                    ${hwData.status || 'assigned'}
-                                </span>
-                                ${isOverdue ? '<span class="inline-block px-2 py-1 rounded text-xs font-medium bg-red-100 text-red-800">OVERDUE</span>' : ''}
-                            </div>
-                        </div>
-                        <div class="text-right">
-                            <div class="text-sm font-semibold ${isOverdue ? 'text-red-600' : 'text-gray-600'}">
-                                Due: ${dueDate.toLocaleDateString()} at ${formatTime(hwData.dueTime || '23:59')}
-                            </div>
-                            ${daysUntilDue > 0 ? `
-                                <div class="text-xs text-gray-500">
-                                    ${daysUntilDue} day${daysUntilDue !== 1 ? 's' : ''} remaining
-                                </div>
-                            ` : ''}
-                        </div>
-                    </div>
-                    
-                    <div class="mb-3">
-                        <h5 class="text-sm font-medium text-gray-700 mb-1">Description:</h5>
-                        <p class="text-gray-600">${hwData.description || 'No description provided.'}</p>
-                    </div>
-                    
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-3">
-                        <div>
-                            <h5 class="text-sm font-medium text-gray-700 mb-1">Subject:</h5>
-                            <p class="text-gray-600">${hwData.subject || 'General'}</p>
-                        </div>
-                        <div>
-                            <h5 class="text-sm font-medium text-gray-700 mb-1">Assigned By:</h5>
-                            <p class="text-gray-600">${hwData.tutorName || 'Tutor'}</p>
-                        </div>
-                    </div>
-                    
-                    ${hwData.fileUrl ? `
-                    <div class="mb-3">
-                        <h5 class="text-sm font-medium text-gray-700 mb-1">Attachment:</h5>
-                        <a href="${hwData.fileUrl}" target="_blank" 
-                           class="inline-flex items-center text-blue-600 hover:text-blue-800">
-                            <span class="mr-1">📎</span> Download File
-                        </a>
-                    </div>
-                    ` : ''}
-                    
-                    ${hwData.submissionUrl ? `
-                    <div class="mb-3">
-                        <h5 class="text-sm font-medium text-gray-700 mb-1">Submission:</h5>
-                        <a href="${hwData.submissionUrl}" target="_blank" 
-                           class="inline-flex items-center text-green-600 hover:text-green-800">
-                            <span class="mr-1">📤</span> View Submission
-                        </a>
-                    </div>
-                    ` : ''}
-                    
-                    ${hwData.grade ? `
-                    <div class="mt-3 p-3 bg-blue-50 rounded-lg">
-                        <h5 class="text-sm font-medium text-blue-700 mb-1">Grading:</h5>
-                        <p class="text-blue-800"><strong>Grade:</strong> ${hwData.grade}</p>
-                        ${hwData.feedback ? `<p class="text-blue-800 mt-1"><strong>Feedback:</strong> ${hwData.feedback}</p>` : ''}
-                    </div>
-                    ` : ''}
-                </div>
-            `;
-        });
-        
-        homeworkData.innerHTML = homeworkHTML;
-        
-        // Update badge with pending count
-        if (pendingCount > 0) {
-            badge.textContent = `${pendingCount} pending`;
-            badge.classList.remove('hidden');
-        } else {
-            badge.classList.add('hidden');
-        }
-        
-    } catch (error) {
-        console.error('Error loading homework:', error);
-        homeworkData.innerHTML = `
-            <div class="text-center py-4">
-                <p class="text-red-500">Error loading homework assignments.</p>
-            </div>
-        `;
-    }
-}
-
-// Load weekly schedule
-async function loadWeeklySchedule(studentId, childName) {
-    const scheduleData = document.getElementById('scheduleData');
-    
-    try {
-        const scheduleSnapshot = await db.collection('schedules')
-            .where('studentId', '==', studentId)
-            .limit(1)
-            .get();
-        
-        if (scheduleSnapshot.empty) {
-            scheduleData.innerHTML = `
-                <div class="text-center py-8">
-                    <p class="text-gray-500">No schedule found for ${childName}.</p>
-                </div>
-            `;
-            return;
-        }
-        
-        const scheduleDoc = scheduleSnapshot.docs[0];
-        const schedule = scheduleDoc.data().schedule || [];
-        const tutorInfo = scheduleDoc.data().tutorInfo || {};
-        
-        // Group schedule by day
-        const daysOfWeek = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
-        const scheduleByDay = {};
-        daysOfWeek.forEach(day => scheduleByDay[day] = []);
-        
-        schedule.forEach(session => {
-            if (session.day && scheduleByDay[session.day]) {
-                scheduleByDay[session.day].push(session);
-            }
-        });
-        
-        // Sort each day's sessions by start time
-        daysOfWeek.forEach(day => {
-            scheduleByDay[day].sort((a, b) => {
-                const timeA = a.startTime || '00:00';
-                const timeB = b.startTime || '00:00';
-                return timeA.localeCompare(timeB);
-            });
-        });
-        
-        // Create schedule HTML
-        let scheduleHTML = `
-            <div class="mb-6 bg-blue-50 p-4 rounded-lg">
-                <h4 class="font-bold text-lg text-blue-800 mb-2">Class Schedule for ${childName}</h4>
-                ${tutorInfo.name ? `<p class="text-blue-700"><strong>Tutor:</strong> ${tutorInfo.name}</p>` : ''}
-                ${tutorInfo.phone ? `<p class="text-blue-700"><strong>Contact:</strong> ${tutorInfo.phone}</p>` : ''}
-                ${tutorInfo.email ? `<p class="text-blue-700"><strong>Email:</strong> ${tutorInfo.email}</p>` : ''}
-            </div>
-            
-            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        `;
-        
-        daysOfWeek.forEach(day => {
-            const sessions = scheduleByDay[day];
-            if (sessions.length > 0) {
-                scheduleHTML += `
-                    <div class="border border-gray-200 rounded-lg p-4 bg-white shadow-sm">
-                        <h5 class="font-bold text-lg text-gray-800 mb-3 pb-2 border-b">${day}</h5>
-                        <div class="space-y-3">
-                `;
-                
-                sessions.forEach(session => {
-                    const isOvernight = session.isOvernight || false;
-                    const subjectColor = getSubjectColor(session.subject || 'General');
-                    
-                    scheduleHTML += `
-                        <div class="border-l-4 ${subjectColor.border} p-3 bg-gray-50 rounded-r-lg">
-                            <div class="flex justify-between items-start mb-1">
-                                <span class="font-semibold text-gray-800">${session.subject || 'Class'}</span>
-                                ${isOvernight ? '<span class="text-xs bg-purple-100 text-purple-800 px-2 py-1 rounded-full">Overnight</span>' : ''}
-                            </div>
-                            <div class="text-sm text-gray-600">
-                                ${formatTime(session.startTime || '00:00')} - ${formatTime(session.endTime || '00:00')}
-                            </div>
-                            ${session.location ? `<div class="text-xs text-gray-500 mt-1">📍 ${session.location}</div>` : ''}
-                            ${session.notes ? `<div class="text-xs text-gray-500 mt-1">📝 ${session.notes}</div>` : ''}
-                        </div>
-                    `;
-                });
-                
-                scheduleHTML += `
-                        </div>
-                    </div>
-                `;
-            } else {
-                scheduleHTML += `
-                    <div class="border border-gray-200 rounded-lg p-4 bg-gray-50">
-                        <h5 class="font-bold text-lg text-gray-500 mb-3 pb-2 border-b">${day}</h5>
-                        <p class="text-gray-400 text-center py-4">No classes scheduled</p>
-                    </div>
-                `;
-            }
-        });
-        
-        scheduleHTML += `
-            </div>
-            
-            <div class="mt-6 flex justify-center gap-4">
-                <button onclick="printSchedule('${childName}')" 
-                        class="bg-green-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-green-700 transition-colors flex items-center">
-                    <span class="mr-2">🖨️</span> Print Schedule
-                </button>
-                <button onclick="exportScheduleToPDF('${childName}')" 
-                        class="bg-blue-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-blue-700 transition-colors flex items-center">
-                    <span class="mr-2">📥</span> Export as PDF
-                </button>
-            </div>
-        `;
-        
-        scheduleData.innerHTML = scheduleHTML;
-        
-    } catch (error) {
-        console.error('Error loading schedule:', error);
-        scheduleData.innerHTML = `
-            <div class="text-center py-4">
-                <p class="text-red-500">Error loading schedule.</p>
-            </div>
-        `;
-    }
-}
-
-// Helper function for homework status colors
-function getHomeworkStatusColor(status) {
-    const colors = {
-        'assigned': 'bg-yellow-100 text-yellow-800',
-        'submitted': 'bg-blue-100 text-blue-800',
-        'graded': 'bg-green-100 text-green-800',
-        'overdue': 'bg-red-100 text-red-800'
-    };
-    return colors[status] || 'bg-gray-100 text-gray-800';
-}
-
-// Helper function for subject colors
-function getSubjectColor(subject) {
-    const colorMap = {
-        'Mathematics': { bg: 'bg-blue-50', border: 'border-blue-500' },
-        'English': { bg: 'bg-red-50', border: 'border-red-500' },
-        'Science': { bg: 'bg-green-50', border: 'border-green-500' },
-        'Social Studies': { bg: 'bg-yellow-50', border: 'border-yellow-500' },
-        'History': { bg: 'bg-purple-50', border: 'border-purple-500' },
-        'Geography': { bg: 'bg-indigo-50', border: 'border-indigo-500' },
-        'Physics': { bg: 'bg-pink-50', border: 'border-pink-500' },
-        'Chemistry': { bg: 'bg-teal-50', border: 'border-teal-500' },
-        'Biology': { bg: 'bg-orange-50', border: 'border-orange-500' },
-        'Computer Science': { bg: 'bg-cyan-50', border: 'border-cyan-500' }
-    };
-    return colorMap[subject] || { bg: 'bg-gray-50', border: 'border-gray-500' };
-}
-
-// Setup real-time listeners for child data
-function setupChildRealTimeListeners(studentId, childName) {
-    // Clean up existing listeners
-    const existingListeners = window.childRealTimeListeners || [];
-    existingListeners.forEach(unsubscribe => {
-        if (typeof unsubscribe === 'function') unsubscribe();
-    });
-    
-    window.childRealTimeListeners = [];
-    
-    // Listen for new topics
-    const topicsListener = db.collection('daily_topics')
-        .where('studentId', '==', studentId)
-        .onSnapshot((snapshot) => {
-            snapshot.docChanges().forEach((change) => {
-                if (change.type === 'added') {
-                    showNotification('New topic added for ' + childName, '📚');
-                    loadTodayTopics(studentId, childName);
-                }
-            });
-        });
-    
-    window.childRealTimeListeners.push(topicsListener);
-    
-    // Listen for new homework
-    const homeworkListener = db.collection('homework_assignments')
-        .where('studentId', '==', studentId)
-        .onSnapshot((snapshot) => {
-            snapshot.docChanges().forEach((change) => {
-                if (change.type === 'added') {
-                    showNotification('New homework assigned for ' + childName, '📝');
-                    loadHomeworkAssignments(studentId, childName);
-                }
-                if (change.type === 'modified') {
-                    // Check if status changed to graded
-                    const newData = change.doc.data();
-                    const oldData = change.doc.previous.data();
-                    if (newData.status === 'graded' && oldData.status !== 'graded') {
-                        showNotification('Homework graded for ' + childName, '✅');
-                        loadHomeworkAssignments(studentId, childName);
-                    }
-                }
-            });
-        });
-    
-    window.childRealTimeListeners.push(homeworkListener);
-    
-    // Listen for schedule changes
-    const scheduleListener = db.collection('schedules')
-        .where('studentId', '==', studentId)
-        .onSnapshot((snapshot) => {
-            snapshot.docChanges().forEach((change) => {
-                if (change.type === 'modified') {
-                    showNotification('Schedule updated for ' + childName, '📅');
-                    loadWeeklySchedule(studentId, childName);
-                }
-            });
-        });
-    
-    window.childRealTimeListeners.push(scheduleListener);
-}
-
-// Show notification
-function showNotification(message, emoji) {
-    const notification = document.createElement('div');
-    notification.className = 'fixed bottom-4 right-4 bg-gray-800 text-white p-4 rounded-lg shadow-lg z-50 flex items-center max-w-sm animate-slide-up';
-    notification.innerHTML = `
-        <span class="text-2xl mr-3">${emoji}</span>
-        <div>
-            <p class="font-medium">${message}</p>
-            <p class="text-sm text-gray-300 mt-1">Just now</p>
-        </div>
-    `;
-    
-    document.body.appendChild(notification);
-    
-    setTimeout(() => {
-        notification.classList.add('animate-slide-down');
-        setTimeout(() => notification.remove(), 300);
-    }, 5000);
-}
-
-// Print schedule function
-function printSchedule(childName) {
-    const scheduleContent = document.getElementById('scheduleData').innerHTML;
-    const printWindow = window.open('', '_blank');
-    printWindow.document.write(`
-        <html>
-            <head>
-                <title>Schedule for ${childName}</title>
-                <style>
-                    body { font-family: Arial, sans-serif; padding: 20px; }
-                    .schedule-day { margin-bottom: 20px; border: 1px solid #ddd; padding: 15px; border-radius: 8px; }
-                    .day-header { font-size: 18px; font-weight: bold; margin-bottom: 10px; color: #333; }
-                    .session { background: #f5f5f5; padding: 10px; margin-bottom: 8px; border-left: 4px solid #4CAF50; }
-                    .session-time { font-weight: bold; color: #666; }
-                    .overnight { background: #e8f4fd; }
-                </style>
-            </head>
-            <body>
-                <h1>Class Schedule for ${childName}</h1>
-                <div>Printed on ${new Date().toLocaleDateString()}</div>
-                <hr>
-                ${scheduleContent}
-            </body>
-        </html>
-    `);
-    printWindow.document.close();
-    printWindow.print();
-}
-
-// Export schedule to PDF
-function exportScheduleToPDF(childName) {
-    const element = document.getElementById('scheduleData');
-    const opt = {
-        margin: 0.5,
-        filename: `Schedule_${childName}_${new Date().toISOString().split('T')[0]}.pdf`,
-        image: { type: 'jpeg', quality: 0.98 },
-        html2canvas: { scale: 2, useCORS: true },
-        jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' }
-    };
-    
-    html2pdf().from(element).set(opt).save();
-}
-
-// ============================================================================
-// ADD CSS STYLES TO HEAD
-// ============================================================================
-
-// Add this to your HTML head or create a style tag:
-const styles = `
-<style>
-    .loading-spinner-small {
-        width: 20px;
-        height: 20px;
-        border: 3px solid rgba(0,0,0,0.1);
-        border-radius: 50%;
-        border-top-color: #4CAF50;
-        animation: spin 1s linear infinite;
-    }
-    
-    @keyframes spin {
-        to { transform: rotate(360deg); }
-    }
-    
-    @keyframes slide-up {
-        from { transform: translateY(100px); opacity: 0; }
-        to { transform: translateY(0); opacity: 1; }
-    }
-    
-    @keyframes slide-down {
-        from { transform: translateY(0); opacity: 1; }
-        to { transform: translateY(100px); opacity: 0; }
-    }
-    
-    .animate-slide-up {
-        animation: slide-up 0.3s ease-out;
-    }
-    
-    .animate-slide-down {
-        animation: slide-down 0.3s ease-out;
-    }
-    
-    .preserve-whitespace {
-        white-space: pre-wrap;
-        word-break: break-word;
-    }
-</style>
-`;
-
-// Add styles to document head
-document.head.insertAdjacentHTML('beforeend', styles);
-
 // Initialize the page
 document.addEventListener('DOMContentLoaded', function() {
     // Setup Remember Me
@@ -2921,25 +2546,53 @@ document.addEventListener('DOMContentLoaded', function() {
     // Create country code dropdown when page loads
     createCountryCodeDropdown();
     
-    // Check authentication state
+    // CRITICAL SESSION PERSISTENCE FIX
+    // Check authentication state IMMEDIATELY on page load
     auth.onAuthStateChanged((user) => {
+        const authArea = document.getElementById("authArea");
+        const reportArea = document.getElementById("reportArea");
+        const authLoader = document.getElementById("authLoader");
+        
         if (user) {
-            // User is signed in, load their reports
-            // Get phone from Firestore user document
+            // User is signed in - IMMEDIATELY switch to dashboard
+            console.log("User authenticated, showing dashboard immediately");
+            
+            if (authArea && reportArea) {
+                authArea.classList.add("hidden");
+                reportArea.classList.remove("hidden");
+            }
+            
+            if (authLoader) {
+                authLoader.classList.add("hidden");
+            }
+            
+            // Get phone from Firestore user document and load reports
             db.collection('parent_users').doc(user.uid).get()
                 .then((doc) => {
                     if (doc.exists) {
                         const userPhone = doc.data().phone;
                         const normalizedPhone = doc.data().normalizedPhone;
                         loadAllReportsForParent(normalizedPhone || userPhone, user.uid);
+                        
+                        // Add navigation buttons
+                        setTimeout(() => {
+                            addMessagesButton();
+                            addManualRefreshButton();
+                        }, 500);
                     }
                 })
                 .catch((error) => {
                     console.error('Error getting user data:', error);
                 });
         } else {
-            // User signed out - clean up listeners
+            // User signed out - clean up listeners and show auth
+            console.log("User not authenticated, showing auth form");
             cleanupRealTimeListeners();
+            
+            if (authArea && reportArea) {
+                authArea.classList.remove("hidden");
+                reportArea.classList.add("hidden");
+            }
         }
     });
 
@@ -2947,7 +2600,7 @@ document.addEventListener('DOMContentLoaded', function() {
     document.getElementById("signInBtn").addEventListener("click", handleSignIn);
     document.getElementById("signUpBtn").addEventListener("click", handleSignUp);
     document.getElementById("sendResetBtn").addEventListener("click", handlePasswordReset);
-    document.getElementById("submitFeedbackBtn").addEventListener("click", submitFeedback);
+    document.getElementById("submitMessageBtn").addEventListener("click", submitMessage);
     
     document.getElementById("signInTab").addEventListener("click", () => switchTab('signin'));
     document.getElementById("signUpTab").addEventListener("click", () => switchTab('signup'));
@@ -2959,6 +2612,9 @@ document.addEventListener('DOMContentLoaded', function() {
     document.getElementById("cancelResetBtn").addEventListener("click", () => {
         document.getElementById("passwordResetModal").classList.add("hidden");
     });
+    
+    document.getElementById("cancelMessageBtn").addEventListener("click", hideComposeMessageModal);
+    document.getElementById("cancelMessagesModalBtn").addEventListener("click", hideMessagesModal);
 
     document.getElementById("rememberMe").addEventListener("change", handleRememberMe);
 
@@ -2975,8 +2631,8 @@ document.addEventListener('DOMContentLoaded', function() {
         if (e.key === 'Enter') handlePasswordReset();
     });
     
-    // --- START: NEW MAIN TAB SWITCHING LISTENERS (PHASE 3) ---
+    // Main tab switching listeners
     document.getElementById("reportTab")?.addEventListener("click", () => switchMainTab('reports'));
+    document.getElementById("academicsTab")?.addEventListener("click", () => switchMainTab('academics'));
     document.getElementById("rewardsTab")?.addEventListener("click", () => switchMainTab('rewards'));
-    // --- END: NEW MAIN TAB SWITCHING LISTENERS (PHASE 3) ---
 });
