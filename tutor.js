@@ -390,6 +390,29 @@ style.textContent = `
         background: linear-gradient(135deg, #d97706 0%, #b45309 100%) !important;
     }
 
+    /* Messaging Button Styling */
+    .messaging-btn {
+        background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%) !important;
+        color: white !important;
+        padding: 0.625rem 1.25rem !important;
+        border-radius: var(--radius) !important;
+        border: none !important;
+        cursor: pointer !important;
+        margin: 0.25rem !important;
+        font-weight: 500 !important;
+        transition: all 0.2s ease !important;
+        box-shadow: var(--shadow) !important;
+        display: inline-flex !important;
+        align-items: center !important;
+        gap: 0.5rem !important;
+    }
+
+    .messaging-btn:hover {
+        transform: translateY(-2px) !important;
+        box-shadow: var(--shadow-lg) !important;
+        background: linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%) !important;
+    }
+
     /* Responsive Design */
     @media (max-width: 768px) {
         .hero-section {
@@ -572,8 +595,92 @@ style.textContent = `
         padding-bottom: 0.5rem;
         margin-bottom: 1rem;
     }
+
+    /* Messaging Modal Styles */
+    .message-recipient-options {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 1rem;
+        margin: 1.5rem 0;
+    }
+
+    .recipient-option {
+        border: 2px solid var(--border-color);
+        border-radius: var(--radius);
+        padding: 1rem;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        text-align: center;
+    }
+
+    .recipient-option:hover {
+        border-color: var(--primary-color);
+        background-color: var(--primary-light);
+    }
+
+    .recipient-option.selected {
+        border-color: var(--primary-color);
+        background-color: var(--primary-light);
+        box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.1);
+    }
+
+    .recipient-option input[type="checkbox"] {
+        margin-right: 0.5rem;
+    }
+
+    .recipient-label {
+        font-weight: 600;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.5rem;
+    }
+
+    /* Message History Styles */
+    .message-history {
+        max-height: 300px;
+        overflow-y: auto;
+        border: 1px solid var(--border-color);
+        border-radius: var(--radius);
+        padding: 1rem;
+        margin-top: 1.5rem;
+    }
+
+    .message-item {
+        padding: 0.75rem;
+        margin-bottom: 0.75rem;
+        border-radius: var(--radius);
+        border-left: 3px solid var(--primary-color);
+        background-color: var(--light-color);
+    }
+
+    .message-item.sent {
+        border-left-color: var(--info-color);
+        background-color: #e0f2fe;
+    }
+
+    .message-item.received {
+        border-left-color: var(--success-color);
+        background-color: #dcfce7;
+    }
+
+    .message-meta {
+        font-size: 0.75rem;
+        color: var(--dark-color);
+        opacity: 0.7;
+        margin-top: 0.25rem;
+    }
 `;
 document.head.appendChild(style);
+
+// --- Cloudinary Configuration ---
+const CLOUDINARY_CONFIG = {
+    cloudName: 'dwjq7j5zp',
+    uploadPreset: 'tutor_homework', // You'll need to create this in Cloudinary
+    apiKey: '963245294794452'
+    // Note: API Secret should NEVER be exposed in frontend code
+    // For production, use signed uploads or backend API
+};
 
 // --- Global state to hold report submission status ---
 let isSubmissionEnabled = false;
@@ -1002,7 +1109,7 @@ function showBulkSchedulePopup(student, tutor, totalCount = 0) {
     });
 }
 
-// --- UPDATED: Daily Topic Functions (Simplified) ---
+// --- SIMPLIFIED: Daily Topic Functions ---
 function showDailyTopicModal(student) {
     const modalHTML = `
         <div class="modal-overlay">
@@ -1062,7 +1169,43 @@ function showDailyTopicModal(student) {
     });
 }
 
-// --- UPDATED: Homework Assignment Functions with File Upload ---
+// --- UPDATED: Homework Assignment Functions with REAL Cloudinary Upload ---
+async function uploadToCloudinary(file, studentId) {
+    return new Promise((resolve, reject) => {
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('upload_preset', CLOUDINARY_CONFIG.uploadPreset);
+        formData.append('cloud_name', CLOUDINARY_CONFIG.cloudName);
+        formData.append('folder', 'homework_assignments');
+        formData.append('public_id', `homework_${studentId}_${Date.now()}_${file.name.replace(/\.[^/.]+$/, "")}`);
+        
+        // Create upload URL
+        const uploadUrl = `https://api.cloudinary.com/v1_1/${CLOUDINARY_CONFIG.cloudName}/upload`;
+        
+        fetch(uploadUrl, {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.secure_url) {
+                resolve({
+                    url: data.secure_url,
+                    publicId: data.public_id,
+                    format: data.format,
+                    bytes: data.bytes,
+                    createdAt: data.created_at
+                });
+            } else {
+                reject(new Error('Upload failed: ' + (data.error?.message || 'Unknown error')));
+            }
+        })
+        .catch(error => {
+            reject(error);
+        });
+    });
+}
+
 function showHomeworkModal(student) {
     const nextWeek = new Date();
     nextWeek.setDate(nextWeek.getDate() + 7);
@@ -1226,19 +1369,25 @@ function showHomeworkModal(student) {
         }
         
         try {
-            let fileUrl = '';
+            let fileData = null;
             if (fileInput.files.length > 0) {
-                fileUrl = await uploadHomeworkFile(fileInput.files[0], student.id);
-                hwData.fileUrl = fileUrl;
-                hwData.fileName = fileInput.files[0].name;
-                hwData.fileSize = fileInput.files[0].size;
+                const file = fileInput.files[0];
+                showCustomAlert('📤 Uploading file to Cloudinary...');
+                
+                fileData = await uploadToCloudinary(file, student.id);
+                
+                hwData.fileUrl = fileData.url;
+                hwData.fileName = file.name;
+                hwData.fileSize = file.size;
+                hwData.fileType = file.type;
+                hwData.cloudinaryPublicId = fileData.publicId;
             }
             
             const hwRef = doc(collection(db, "homework_assignments"));
             await setDoc(hwRef, hwData);
             
             if (hwData.sendReminder && hwData.parentEmail) {
-                await scheduleEmailReminder(hwData, fileUrl);
+                await scheduleEmailReminder(hwData, fileData?.url);
             }
             
             modal.remove();
@@ -1247,7 +1396,7 @@ function showHomeworkModal(student) {
             
         } catch (error) {
             console.error("Error assigning homework:", error);
-            showCustomAlert('❌ Error assigning homework. Please try again.');
+            showCustomAlert('❌ Error assigning homework: ' + error.message);
         }
     });
 }
@@ -1258,15 +1407,6 @@ function formatFileSize(bytes) {
     const sizes = ['Bytes', 'KB', 'MB', 'GB'];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
-}
-
-async function uploadHomeworkFile(file, studentId) {
-    return new Promise((resolve) => {
-        setTimeout(() => {
-            const fileName = `homework_${studentId}_${Date.now()}_${file.name}`;
-            resolve(`https://example.com/uploads/${fileName}`);
-        }, 500);
-    });
 }
 
 async function scheduleEmailReminder(hwData, fileUrl = '') {
@@ -1300,6 +1440,145 @@ async function scheduleEmailReminder(hwData, fileUrl = '') {
     } catch (error) {
         console.error("Error scheduling email reminder:", error);
     }
+}
+
+// --- NEW: Messaging Feature ---
+function showMessagingModal() {
+    const modalHTML = `
+        <div class="modal-overlay">
+            <div class="modal-content max-w-2xl">
+                <div class="modal-header">
+                    <h3 class="modal-title">💬 Send Message</h3>
+                </div>
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label class="form-label">Select Recipients</label>
+                        <div class="message-recipient-options">
+                            <div class="recipient-option" data-recipient="management">
+                                <label class="recipient-label">
+                                    <input type="checkbox" id="recipient-management" value="management">
+                                    📋 Management
+                                </label>
+                                <p class="text-xs text-gray-500 mt-1">Send to admin/management team</p>
+                            </div>
+                            <div class="recipient-option" data-recipient="parents">
+                                <label class="recipient-label">
+                                    <input type="checkbox" id="recipient-parents" value="parents">
+                                    👨‍👩‍👧‍👦 Parents
+                                </label>
+                                <p class="text-xs text-gray-500 mt-1">Send to all your students' parents</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label class="form-label">Message Subject</label>
+                        <input type="text" id="message-subject" class="form-input" placeholder="Enter message subject" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label class="form-label">Message *</label>
+                        <textarea id="message-content" class="form-input form-textarea report-textarea" rows="6" placeholder="Type your message here..." required></textarea>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label class="flex items-center space-x-2">
+                            <input type="checkbox" id="urgent-message" class="rounded">
+                            <span class="text-sm font-semibold">Mark as Urgent</span>
+                        </label>
+                        <p class="text-xs text-gray-500 mt-1">Urgent messages will be highlighted</p>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button id="cancel-message-btn" class="btn btn-secondary">Cancel</button>
+                    <button id="send-message-btn" class="btn btn-primary">Send Message</button>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    const modal = document.createElement('div');
+    modal.innerHTML = modalHTML;
+    document.body.appendChild(modal);
+    
+    // Add click handlers for recipient options
+    document.querySelectorAll('.recipient-option').forEach(option => {
+        option.addEventListener('click', (e) => {
+            if (e.target.type !== 'checkbox') {
+                const checkbox = option.querySelector('input[type="checkbox"]');
+                checkbox.checked = !checkbox.checked;
+                option.classList.toggle('selected', checkbox.checked);
+            }
+        });
+    });
+    
+    // Update selected state when checkbox is clicked directly
+    document.querySelectorAll('.recipient-option input[type="checkbox"]').forEach(checkbox => {
+        checkbox.addEventListener('change', (e) => {
+            const option = e.target.closest('.recipient-option');
+            option.classList.toggle('selected', e.target.checked);
+        });
+    });
+    
+    document.getElementById('cancel-message-btn').addEventListener('click', () => modal.remove());
+    document.getElementById('send-message-btn').addEventListener('click', async () => {
+        const subject = document.getElementById('message-subject').value.trim();
+        const content = document.getElementById('message-content').value.trim();
+        const isUrgent = document.getElementById('urgent-message').checked;
+        const recipients = [];
+        
+        // Check which recipients are selected
+        if (document.getElementById('recipient-management').checked) {
+            recipients.push('management');
+        }
+        if (document.getElementById('recipient-parents').checked) {
+            recipients.push('parents');
+        }
+        
+        if (!subject || !content) {
+            showCustomAlert('Please enter both subject and message content.');
+            return;
+        }
+        
+        if (recipients.length === 0) {
+            showCustomAlert('Please select at least one recipient (Management or Parents).');
+            return;
+        }
+        
+        try {
+            const messageData = {
+                tutorId: window.tutorData.id,
+                tutorEmail: window.tutorData.email,
+                tutorName: window.tutorData.name,
+                subject: subject,
+                content: content,
+                recipients: recipients,
+                isUrgent: isUrgent,
+                status: 'sent',
+                createdAt: new Date()
+            };
+            
+            const messageRef = doc(collection(db, "tutor_messages"));
+            await setDoc(messageRef, messageData);
+            
+            modal.remove();
+            
+            let recipientText = '';
+            if (recipients.includes('management') && recipients.includes('parents')) {
+                recipientText = 'to Management and Parents';
+            } else if (recipients.includes('management')) {
+                recipientText = 'to Management';
+            } else {
+                recipientText = 'to Parents';
+            }
+            
+            showCustomAlert(`✅ Message sent ${recipientText}!`);
+            
+        } catch (error) {
+            console.error("Error sending message:", error);
+            showCustomAlert('❌ Error sending message. Please try again.');
+        }
+    });
 }
 
 // --- NEW: View Schedule Calendar for All Students ---
@@ -1884,7 +2163,7 @@ function showTINPopup(tutor) {
                     <p class="text-sm text-gray-600 mb-4">Please provide your TIN for payment processing and tax documentation.</p>
                     <div class="form-group">
                         <label class="form-label">Tax Identification Number (TIN)</label>
-                        <input type="text" id="tin-number" class="form-input" placeholder="Enter your TIN" maxlength="20">
+                            <input type="text" id="tin-number" class="form-input" placeholder="Enter your TIN" maxlength="20">
                     </div>
                 </div>
                 <div class="modal-footer">
@@ -2006,7 +2285,7 @@ onSnapshot(settingsDocRef, (docSnap) => {
 let studentCache = [];
 
 // ##################################################################
-// # ENHANCED TUTOR DASHBOARD - WITH STUDENT ACTIONS MOVED HERE
+// # ENHANCED TUTOR DASHBOARD - WITH MESSAGING FEATURE
 // ##################################################################
 function renderTutorDashboard(container, tutor) {
     // Update active tab
@@ -2016,6 +2295,13 @@ function renderTutorDashboard(container, tutor) {
         <div class="hero-section">
             <h1 class="hero-title">Welcome, ${tutor.name || 'Tutor'}! 👋</h1>
             <p class="hero-subtitle">Manage your students, submit reports, and track progress</p>
+        </div>
+        
+        <!-- Messaging Button -->
+        <div class="text-center mb-6">
+            <button id="messaging-btn" class="messaging-btn">
+                💬 Send Message
+            </button>
         </div>
         
         <div class="student-actions-container">
@@ -2105,6 +2391,9 @@ function renderTutorDashboard(container, tutor) {
         </div>
     `;
 
+    // Add messaging button event listener
+    document.getElementById('messaging-btn').addEventListener('click', showMessagingModal);
+    
     // Load student dropdowns
     loadStudentDropdowns(tutor.email);
 
