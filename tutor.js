@@ -1562,6 +1562,7 @@ let allStudents = [];
 let scheduledStudents = new Set(); // Track students with schedules
 let currentStudentIndex = 0;
 let schedulePopup = null;
+let isFirstScheduleCheck = true; // Track if this is the initial auto-check
 
 async function checkAndShowSchedulePopup(tutor) {
     try {
@@ -1592,11 +1593,23 @@ async function checkAndShowSchedulePopup(tutor) {
         currentStudentIndex = 0;
         
         if (studentsWithoutSchedule.length > 0) {
+            // If there are students to schedule, ALWAYS show the popup
             showBulkSchedulePopup(studentsWithoutSchedule[0], tutor, studentsWithoutSchedule.length);
+            isFirstScheduleCheck = false; // Mark that we've run a check
             return true;
         } else {
-            // Modified: Silently return false if all students are scheduled
-            return false;
+            // If everyone is scheduled...
+            
+            if (isFirstScheduleCheck) {
+                // If this is the FIRST check (Automatic on load), stay silent.
+                console.log("Auto-check: All students scheduled. Staying silent.");
+                isFirstScheduleCheck = false; 
+                return false;
+            } else {
+                // If this is a SUBSEQUENT check (Manual button click), show the success message.
+                showCustomAlert('✅ All students have been scheduled!');
+                return false;
+            }
         }
         
     } catch (error) {
@@ -6395,6 +6408,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     }, 500);
 });
+
 
 
 
