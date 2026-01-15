@@ -2290,22 +2290,28 @@ function initializeFloatingMessagingButton() {
     }
 }
 
-// Update unread message count and display on both buttons
+// Update unread message count - SIMPLIFIED VERSION WITHOUT COMPLEX QUERIES
 async function updateUnreadMessageCount() {
     try {
         const tutorId = window.tutorData?.id;
         if (!tutorId) return;
         
-        // Query unread messages where tutor is recipient and message is not from tutor
+        // SIMPLE QUERY - Only check tutorId to avoid index requirements
         const messagesQuery = query(
             collection(db, "tutor_messages"),
-            where("tutorId", "==", tutorId),
-            where("read", "==", false),
-            where("senderType", "!=", "tutor")
+            where("tutorId", "==", tutorId)
         );
         
         const messagesSnapshot = await getDocs(messagesQuery);
-        unreadMessageCount = messagesSnapshot.size;
+        
+        // Count unread messages manually in JavaScript
+        unreadMessageCount = 0;
+        messagesSnapshot.forEach(doc => {
+            const message = doc.data();
+            if (message.read === false && message.senderType !== 'tutor') {
+                unreadMessageCount++;
+            }
+        });
         
         // Update badges on both buttons
         const updateButtonBadge = (button) => {
@@ -2329,6 +2335,7 @@ async function updateUnreadMessageCount() {
         
     } catch (error) {
         console.error("Error updating unread message count:", error);
+        // Don't show error to user for unread count updates
     }
 }
 
@@ -3731,13 +3738,13 @@ function filterConversations(searchTerm) {
         `${visibleCount} of ${conversationItems.length} conversations`;
 }
 
-// Load enhanced conversations (updated for new message structure)
+// Load enhanced conversations - SIMPLIFIED VERSION
 async function loadEnhancedConversations() {
     try {
         const tutorId = window.tutorData?.id;
         if (!tutorId) return;
         
-        // Load all messages where tutor is involved (sender or recipient)
+        // SIMPLE QUERY - Only check tutorId to avoid index requirements
         const messagesQuery = query(
             collection(db, "tutor_messages"),
             where("tutorId", "==", tutorId)
@@ -3751,7 +3758,7 @@ async function loadEnhancedConversations() {
             const message = { id: doc.id, ...doc.data() };
             messages.push(message);
             
-            // Group by conversation ID or recipient
+            // Group by conversation ID or recipient - FIXED NULL CHECK
             const conversationKey = message.conversationId || 
                                   (message.recipients && message.recipients[0]) || 
                                   'general';
@@ -3791,8 +3798,10 @@ async function loadEnhancedConversations() {
     }
 }
 
-// Get conversation title based on message data
+// Get conversation title based on message data - FIXED NULL CHECK
 function getConversationTitle(message) {
+    if (!message) return 'Conversation';
+    
     if (message.messageType === 'management') {
         return 'Management Team';
     } else if (message.messageType === 'all') {
@@ -3810,11 +3819,11 @@ function getConversationTitle(message) {
     return 'Conversation';
 }
 
-// Render enhanced conversations list
+// Render enhanced conversations list - FIXED NULL CHECK
 function renderEnhancedConversationsList(conversations) {
     const container = document.getElementById('conversations-list');
     
-    if (conversations.length === 0) {
+    if (!conversations || conversations.length === 0) {
         container.innerHTML = `
             <div class="text-center p-8">
                 <div class="text-gray-400 text-4xl mb-3">📭</div>
@@ -3828,15 +3837,24 @@ function renderEnhancedConversationsList(conversations) {
     let html = '';
     
     conversations.sort((a, b) => {
+        if (!a.lastMessage || !b.lastMessage) return 0;
         const timeA = a.lastMessage.createdAt?.toDate ? a.lastMessage.createdAt.toDate() : new Date(a.lastMessage.createdAt);
         const timeB = b.lastMessage.createdAt?.toDate ? b.lastMessage.createdAt.toDate() : new Date(b.lastMessage.createdAt);
         return timeB - timeA; // Most recent first
     });
     
     conversations.forEach(conv => {
+        if (!conv || !conv.lastMessage) return;
+        
         const lastMessageTime = conv.lastMessage.createdAt?.toDate 
             ? conv.lastMessage.createdAt.toDate() 
             : new Date(conv.lastMessage.createdAt);
+        
+        // SAFE ACCESS TO MESSAGE CONTENT
+        const messageContent = conv.lastMessage.content || '';
+        const messageSubject = conv.lastMessage.subject || '';
+        const previewText = messageSubject || messageContent.substring(0, 50);
+        const showEllipsis = messageContent.length > 50;
         
         html += `
             <div class="conversation-item ${conv.unread ? 'unread' : ''}" data-conversation-id="${conv.id}">
@@ -3847,12 +3865,12 @@ function renderEnhancedConversationsList(conversations) {
                     </div>
                     <div class="conversation-details">
                         <div class="conversation-title">
-                            <span>${conv.title}</span>
+                            <span>${conv.title || 'Conversation'}</span>
                             <span class="conversation-time">${formatTime(lastMessageTime)}</span>
                         </div>
                         <p class="conversation-preview">
                             ${conv.lastMessage.senderType === 'tutor' ? 'You: ' : ''}
-                            ${conv.lastMessage.subject || conv.lastMessage.content.substring(0, 50)}${conv.lastMessage.content.length > 50 ? '...' : ''}
+                            ${previewText}${showEllipsis ? '...' : ''}
                             ${conv.unread ? '<span class="new-message-indicator"></span>' : ''}
                         </p>
                     </div>
@@ -3891,7 +3909,7 @@ async function loadEnhancedConversationMessages(conversationId) {
         const tutorId = window.tutorData?.id;
         if (!tutorId) return;
         
-        // Load messages for this conversation
+        // SIMPLE QUERY - Only check tutorId
         const messagesQuery = query(
             collection(db, "tutor_messages"),
             where("tutorId", "==", tutorId)
@@ -3940,12 +3958,23 @@ async function loadEnhancedConversationMessages(conversationId) {
     }
 }
 
-// Render enhanced chat messages
+// Render enhanced chat messages - FIXED NULL CHECK
 function renderEnhancedChatMessages(messages, conversationId) {
     const chatMessages = document.getElementById('chat-messages');
     const chatInputArea = document.getElementById('chat-input-area');
     const chatContainer = document.getElementById('chat-container');
     const chatHeader = chatContainer.querySelector('.chat-header-info');
+    
+    if (!messages || messages.length === 0) {
+        chatMessages.innerHTML = `
+            <div class="text-center p-8">
+                <div class="text-gray-400 text-4xl mb-3">💭</div>
+                <h4 class="font-bold text-gray-600 mb-2">No Messages Yet</h4>
+                <p class="text-gray-500">Start a conversation by sending a message</p>
+            </div>
+        `;
+        return;
+    }
     
     // Get conversation info
     const conversation = messages[0];
@@ -3971,58 +4000,51 @@ function renderEnhancedChatMessages(messages, conversationId) {
     // Clear existing messages
     chatMessages.innerHTML = '';
     
-    if (messages.length === 0) {
-        chatMessages.innerHTML = `
-            <div class="text-center p-8">
-                <div class="text-gray-400 text-4xl mb-3">💭</div>
-                <h4 class="font-bold text-gray-600 mb-2">No Messages Yet</h4>
-                <p class="text-gray-500">Start a conversation by sending a message</p>
+    messages.forEach(message => {
+        const messageTime = message.createdAt?.toDate 
+            ? message.createdAt.toDate() 
+            : new Date(message.createdAt);
+        
+        const isSent = message.senderType === 'tutor';
+        const senderName = isSent ? 'You' : (message.senderName || 'Management');
+        
+        // Check if message has attachments
+        const hasAttachments = message.attachments && message.attachments.length > 0;
+        
+        // SAFE CONTENT ACCESS
+        const messageContent = message.content || '';
+        
+        const messageHTML = `
+            <div class="message-bubble ${isSent ? 'sent' : 'received'}">
+                ${!isSent ? `<div class="message-sender">${senderName}</div>` : ''}
+                ${message.subject && !isSent ? `<div class="message-subject">${message.subject}</div>` : ''}
+                <div class="message-content">${messageContent}</div>
+                
+                ${hasAttachments ? `
+                    <div class="message-attachments mt-2">
+                        ${message.attachments.map(attachment => `
+                            <div class="attachment-item inline-flex items-center gap-1 bg-gray-100 px-2 py-1 rounded text-xs">
+                                <span>📎</span>
+                                <span>${attachment.name || 'Attachment'}</span>
+                            </div>
+                        `).join('')}
+                    </div>
+                ` : ''}
+                
+                ${message.isUrgent ? `<div class="urgent-badge inline-block bg-red-100 text-red-800 text-xs px-2 py-1 rounded ml-2">URGENT</div>` : ''}
+                
+                <div class="message-meta flex justify-between items-center mt-1">
+                    <div class="message-time">${formatTime(messageTime)}</div>
+                    ${isSent ? '<div class="message-status text-xs text-gray-500">✓ Sent</div>' : ''}
+                </div>
             </div>
         `;
-    } else {
-        messages.forEach(message => {
-            const messageTime = message.createdAt?.toDate 
-                ? message.createdAt.toDate() 
-                : new Date(message.createdAt);
-            
-            const isSent = message.senderType === 'tutor';
-            const senderName = isSent ? 'You' : (message.senderName || 'Management');
-            
-            // Check if message has attachments
-            const hasAttachments = message.attachments && message.attachments.length > 0;
-            
-            const messageHTML = `
-                <div class="message-bubble ${isSent ? 'sent' : 'received'}">
-                    ${!isSent ? `<div class="message-sender">${senderName}</div>` : ''}
-                    ${message.subject && !isSent ? `<div class="message-subject">${message.subject}</div>` : ''}
-                    <div class="message-content">${message.content}</div>
-                    
-                    ${hasAttachments ? `
-                        <div class="message-attachments mt-2">
-                            ${message.attachments.map(attachment => `
-                                <div class="attachment-item inline-flex items-center gap-1 bg-gray-100 px-2 py-1 rounded text-xs">
-                                    <span>📎</span>
-                                    <span>${attachment.name}</span>
-                                </div>
-                            `).join('')}
-                        </div>
-                    ` : ''}
-                    
-                    ${message.isUrgent ? `<div class="urgent-badge inline-block bg-red-100 text-red-800 text-xs px-2 py-1 rounded ml-2">URGENT</div>` : ''}
-                    
-                    <div class="message-meta flex justify-between items-center mt-1">
-                        <div class="message-time">${formatTime(messageTime)}</div>
-                        ${isSent ? '<div class="message-status text-xs text-gray-500">✓ Sent</div>' : ''}
-                    </div>
-                </div>
-            `;
-            
-            chatMessages.innerHTML += messageHTML;
-        });
         
-        // Scroll to bottom
-        chatMessages.scrollTop = chatMessages.scrollHeight;
-    }
+        chatMessages.innerHTML += messageHTML;
+    });
+    
+    // Scroll to bottom
+    chatMessages.scrollTop = chatMessages.scrollHeight;
     
     // Setup send message functionality for individual/group conversations
     if (conversation.messageType === 'individual' || conversation.messageType === 'group') {
@@ -4067,17 +4089,17 @@ async function sendReplyMessage(originalConversation) {
             tutorId: tutor.id,
             tutorEmail: tutor.email,
             tutorName: tutor.name,
-            subject: `Re: ${originalConversation.subject || 'Message'}`,
+            subject: `Re: ${originalConversation.lastMessage?.subject || 'Message'}`,
             content: messageContent,
-            messageType: originalConversation.messageType,
+            messageType: originalConversation.lastMessage?.messageType || 'individual',
             recipients: originalConversation.recipients || [],
             recipientDetails: originalConversation.recipientDetails || [],
-            category: originalConversation.category,
+            category: originalConversation.lastMessage?.category,
             isUrgent: false,
             status: 'sent',
             read: true,
             createdAt: new Date(),
-            conversationId: originalConversation.conversationId || 
+            conversationId: originalConversation.id || 
                           `${originalConversation.recipients && originalConversation.recipients[0]}_${Date.now()}`,
             senderType: 'tutor',
             senderName: tutor.name
@@ -6328,3 +6350,4 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     }, 500);
 });
+
