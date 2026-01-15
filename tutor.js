@@ -1792,22 +1792,50 @@ function showBulkSchedulePopup(student, tutor, totalCount = 0) {
  * SECTION 8: DAILY TOPIC & HOMEWORK MANAGEMENT
  ******************************************************************************/
 
+// Store monthly topics data globally
+window.monthlyTopicsCache = {};
+
 // Daily Topic Functions
 function showDailyTopicModal(student) {
+    // Get current month and year for topic filtering
+    const now = new Date();
+    const currentMonth = now.getMonth();
+    const currentYear = now.getFullYear();
+    const monthYearKey = `${currentMonth}-${currentYear}`;
+    
+    // Check if we have cached topics for this month
+    const cachedTopics = window.monthlyTopicsCache[`${student.id}-${monthYearKey}`];
+    
     const modalHTML = `
         <div class="modal-overlay">
-            <div class="modal-content max-w-lg">
+            <div class="modal-content max-w-2xl">
                 <div class="modal-header">
                     <h3 class="modal-title">📚 Today's Topic for ${student.studentName}</h3>
+                    <p class="text-sm text-gray-600 mt-1">Month: ${now.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}</p>
                 </div>
                 <div class="modal-body">
-                    <div class="form-group">
-                        <label class="form-label">Today's Topics *</label>
-                        <div id="topic-history-container" class="mb-4 hidden">
-                            <h5 class="font-semibold text-sm mb-2">Previous Topics This Month:</h5>
-                            <div id="topic-history" class="topic-history text-sm text-gray-700"></div>
+                    <!-- Previous Topics Section - Always Visible -->
+                    <div id="topic-history-container" class="mb-6">
+                        <div class="flex justify-between items-center mb-3">
+                            <h5 class="font-semibold text-sm mb-0">📅 Topics for This Month:</h5>
+                            <span id="topics-count-badge" class="bg-primary-color text-white text-xs px-2 py-1 rounded-full">0 topics</span>
                         </div>
-                        <textarea id="topic-topics" class="form-input form-textarea report-textarea" placeholder="Enter today's topics, one per line or separated by commas..." required></textarea>
+                        <div id="topic-history" class="topic-history text-sm bg-gray-50 p-4 rounded-lg max-h-64 overflow-y-auto">
+                            ${cachedTopics ? generateTopicsListHTML(cachedTopics) : 
+                              '<div class="flex items-center justify-center py-8 text-gray-500">' + 
+                              '<span class="animate-spin mr-2">↻</span>Loading topics...</div>'}
+                        </div>
+                        <div class="mt-3 text-xs text-gray-500">
+                            <p>ⓘ Topics are automatically cleared at the start of each new month</p>
+                        </div>
+                    </div>
+                    
+                    <!-- Input Section -->
+                    <div class="form-group">
+                        <label class="form-label">Add Today's Topics *</label>
+                        <textarea id="topic-topics" class="form-input form-textarea report-textarea" 
+                                  placeholder="Enter today's topics, one per line or separated by commas..." 
+                                  required></textarea>
                     </div>
                     <div class="mt-2 text-sm text-gray-500">
                         <p>Example: Fractions, Decimals, Basic Algebra</p>
@@ -1825,32 +1853,43 @@ function showDailyTopicModal(student) {
     
     const modal = document.createElement('div');
     modal.innerHTML = modalHTML;
-    // Load topic history when modal is opened
-    loadDailyTopicHistory(student.id);
     document.body.appendChild(modal);
+    
+    // Load topic history when modal is opened (even if cached, refresh to get latest)
+    loadDailyTopicHistory(student.id);
     
     document.getElementById('cancel-topic-btn').addEventListener('click', () => modal.remove());
     document.getElementById('save-topic-btn').addEventListener('click', async () => {
+        const topicInput = document.getElementById('topic-topics').value.trim();
+        
+        if (!topicInput) {
+            showCustomAlert('Please enter today\'s topics.');
+            return;
+        }
+        
         const topicData = {
             studentId: student.id,
             studentName: student.studentName,
             tutorEmail: window.tutorData.email,
             tutorName: window.tutorData.name,
-            topics: document.getElementById('topic-topics').value.trim(),
+            topics: topicInput,
             date: new Date().toISOString().split('T')[0],
-            createdAt: new Date()
+            createdAt: new Date(),
+            monthYear: monthYearKey // Store month-year for easy filtering
         };
-        
-        if (!topicData.topics) {
-            showCustomAlert('Please enter today\'s topics.');
-            return;
-        }
         
         try {
             const topicRef = doc(collection(db, "daily_topics"));
             await setDoc(topicRef, topicData);
-            modal.remove();
+            
+            // Update the local cache and UI
+            await loadDailyTopicHistory(student.id, true); // Force refresh
+            
+            // Clear input field
+            document.getElementById('topic-topics').value = '';
+            
             showCustomAlert('✅ Today\'s topic saved successfully!');
+            
         } catch (error) {
             console.error("Error saving topic:", error);
             showCustomAlert('❌ Error saving topic. Please try again.');
@@ -1858,9 +1897,46 @@ function showDailyTopicModal(student) {
     });
 }
 
-async function loadDailyTopicHistory(studentId) {
+// Helper function to generate HTML for topics list
+function generateTopicsListHTML(topics) {
+    if (!topics || topics.length === 0) {
+        return '<div class="text-center py-6 text-gray-500">No topics recorded for this month yet.</div>';
+    }
+    
+    let html = '<div class="space-y-3">';
+    
+    // Sort topics by date (newest first)
+    topics.sort((a, b) => b.createdAt.toDate() - a.createdAt.toDate());
+    
+    topics.forEach((topic, index) => {
+        const topicDate = topic.createdAt.toDate();
+        const dateStr = topicDate.toLocaleDateString('en-US', { 
+            weekday: 'short', 
+            month: 'short', 
+            day: 'numeric' 
+        });
+        
+        html += `
+            <div class="topic-item border-l-4 border-primary-color pl-3 py-2 ${index === 0 ? 'bg-blue-50' : ''}">
+                <div class="flex justify-between items-start">
+                    <div>
+                        <div class="font-medium text-gray-700">${dateStr}</div>
+                        <div class="text-gray-600 mt-1">${topic.topics}</div>
+                    </div>
+                    ${index === 0 ? '<span class="text-xs bg-green-100 text-green-800 px-2 py-1 rounded">Latest</span>' : ''}
+                </div>
+            </div>
+        `;
+    });
+    
+    html += '</div>';
+    return html;
+}
+
+async function loadDailyTopicHistory(studentId, forceRefresh = false) {
     const topicHistoryContainer = document.getElementById('topic-history-container');
     const topicHistoryDiv = document.getElementById('topic-history');
+    const topicsCountBadge = document.getElementById('topics-count-badge');
     
     if (!topicHistoryContainer || !topicHistoryDiv) return;
     
@@ -1868,39 +1944,98 @@ async function loadDailyTopicHistory(studentId) {
         const now = new Date();
         const currentMonth = now.getMonth();
         const currentYear = now.getFullYear();
+        const monthYearKey = `${currentMonth}-${currentYear}`;
+        
+        // Check if we have cached data and don't force refresh
+        const cacheKey = `${studentId}-${monthYearKey}`;
+        if (window.monthlyTopicsCache[cacheKey] && !forceRefresh) {
+            updateTopicsUI(window.monthlyTopicsCache[cacheKey], topicHistoryDiv, topicsCountBadge);
+            return;
+        }
+        
+        // Show loading state
+        topicHistoryDiv.innerHTML = '<div class="flex items-center justify-center py-8 text-gray-500"><span class="animate-spin mr-2">↻</span>Loading topics...</div>';
+        
+        // Query topics for current month and year
+        const startOfMonth = new Date(currentYear, currentMonth, 1);
+        const endOfMonth = new Date(currentYear, currentMonth + 1, 0, 23, 59, 59);
         
         const topicsQuery = query(
             collection(db, "daily_topics"),
             where("studentId", "==", studentId),
-            orderBy("createdAt", "desc") // Order by creation date to get most recent first
+            where("createdAt", ">=", startOfMonth),
+            where("createdAt", "<=", endOfMonth),
+            orderBy("createdAt", "desc")
         );
         
         const querySnapshot = await getDocs(topicsQuery);
-        let historyHTML = '';
-        let hasTopicsThisMonth = false;
+        const topics = [];
         
         querySnapshot.forEach(doc => {
             const topic = doc.data();
-            const topicDate = topic.createdAt.toDate(); // Convert Firebase Timestamp to Date
-            
-            if (topicDate.getMonth() === currentMonth && topicDate.getFullYear() === currentYear) {
-                hasTopicsThisMonth = true;
-                historyHTML += `<p class="mb-1"><strong>${topicDate.toLocaleDateString()}:</strong> ${topic.topics}</p>`;
-            }
+            topic.id = doc.id; // Add document ID
+            topics.push(topic);
         });
         
-        if (hasTopicsThisMonth) {
-            topicHistoryDiv.innerHTML = historyHTML;
-            topicHistoryContainer.classList.remove('hidden');
-        } else {
-            topicHistoryDiv.innerHTML = '<p class="text-gray-500">No topics recorded this month.</p>';
-            topicHistoryContainer.classList.remove('hidden'); // Still show container, but with "no topics" message
-        }
+        // Cache the results
+        window.monthlyTopicsCache[cacheKey] = topics;
+        
+        // Update UI with topics
+        updateTopicsUI(topics, topicHistoryDiv, topicsCountBadge);
+        
     } catch (error) {
         console.error("Error loading daily topic history:", error);
-        topicHistoryDiv.innerHTML = '<p class="text-red-500">Error loading history.</p>';
+        topicHistoryDiv.innerHTML = '<div class="text-center py-6 text-red-500">Error loading topics. Please try again.</div>';
+        if (topicsCountBadge) {
+            topicsCountBadge.textContent = 'Error';
+            topicsCountBadge.className = 'bg-red-500 text-white text-xs px-2 py-1 rounded-full';
+        }
     }
 }
+
+function updateTopicsUI(topics, topicHistoryDiv, topicsCountBadge) {
+    // Update topics list
+    topicHistoryDiv.innerHTML = generateTopicsListHTML(topics);
+    
+    // Update count badge
+    if (topicsCountBadge) {
+        topicsCountBadge.textContent = `${topics.length} ${topics.length === 1 ? 'topic' : 'topics'}`;
+        topicsCountBadge.className = topics.length > 0 
+            ? 'bg-green-500 text-white text-xs px-2 py-1 rounded-full' 
+            : 'bg-gray-400 text-white text-xs px-2 py-1 rounded-full';
+    }
+}
+
+// Function to automatically clear old topics cache at month change
+function setupMonthlyTopicCleanup() {
+    // Clear cache at the start of each month
+    const now = new Date();
+    const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+    const timeUntilNextMonth = nextMonth.getTime() - now.getTime();
+    
+    // Schedule cache cleanup for next month
+    setTimeout(() => {
+        window.monthlyTopicsCache = {}; // Clear all cached topics
+        console.log('Monthly topics cache cleared for new month');
+        
+        // Schedule next cleanup
+        setupMonthlyTopicCleanup();
+    }, timeUntilNextMonth + 1000); // Add 1 second buffer
+    
+    // Also clear cache on page load if month has changed
+    const lastCacheMonth = localStorage.getItem('lastCacheMonth');
+    const currentMonthKey = `${now.getMonth()}-${now.getFullYear()}`;
+    
+    if (lastCacheMonth !== currentMonthKey) {
+        window.monthlyTopicsCache = {};
+        localStorage.setItem('lastCacheMonth', currentMonthKey);
+    }
+}
+
+// Initialize monthly cleanup when the page loads
+document.addEventListener('DOMContentLoaded', () => {
+    setupMonthlyTopicCleanup();
+});
 
 // Homework Assignment Functions with REAL Cloudinary Upload
 async function uploadToCloudinary(file, studentId) {
@@ -6408,6 +6543,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     }, 500);
 });
+
 
 
 
