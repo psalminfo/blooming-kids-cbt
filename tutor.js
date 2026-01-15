@@ -708,6 +708,7 @@ let currentStudentIndex = 0;
 let schedulePopup = null;
 let unreadMessageCount = 0;
 let floatingChatBtn = null;
+let allStudents = [];
 
 // ============================================================================
 // SECTION 4: UTILITY FUNCTIONS
@@ -1451,41 +1452,6 @@ async function sendNotificationToParents(parents, tutor, subject, content) {
 // ============================================================================
 // SECTION 8: SCHEDULE MANAGEMENT
 // ============================================================================
-
-const TIME_SLOTS = [];
-for (let hour = 0; hour < 24; hour++) {
-    for (let minute = 0; minute < 60; minute += 30) {
-        const timeValue = `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
-        let label;
-        
-        if (hour === 0 && minute === 0) {
-            label = "12:00 AM (Midnight)";
-        } else if (hour === 12 && minute === 0) {
-            label = "12:00 PM (Noon)";
-        } else {
-            const period = hour >= 12 ? 'PM' : 'AM';
-            const displayHour = hour % 12 || 12;
-            label = `${displayHour}:${minute.toString().padStart(2, '0')} ${period}`;
-        }
-        
-        TIME_SLOTS.push({ value: timeValue, label: label });
-    }
-}
-
-if (!TIME_SLOTS.find(slot => slot.value === "23:30")) {
-    TIME_SLOTS.push({value: "23:30", label: "11:30 PM"});
-}
-
-TIME_SLOTS.sort((a, b) => {
-    const timeToMinutes = (time) => {
-        const [hours, minutes] = time.split(':').map(Number);
-        return hours * 60 + minutes;
-    };
-    
-    return timeToMinutes(a.value) - timeToMinutes(b.value);
-});
-
-
 function validateScheduleTime(start, end) {
     const timeToMinutes = (time) => {
         const [hours, minutes] = time.split(':').map(Number);
@@ -1531,7 +1497,7 @@ async function checkAndShowSchedulePopup(tutor) {
         );
         const studentsSnapshot = await getDocs(studentsQuery);
         
-        const allStudents = [];
+        allStudents = []; // RESET GLOBAL VARIABLE
         scheduledStudents.clear();
         
         studentsSnapshot.forEach(doc => {
@@ -1567,6 +1533,27 @@ function showBulkSchedulePopup(student, tutor, totalCount = 0) {
         schedulePopup.remove();
     }
     
+    // FIXED: Generate time slots properly
+    const timeSlots = [];
+    for (let hour = 0; hour < 24; hour++) {
+        for (let minute = 0; minute < 60; minute += 30) {
+            const timeValue = `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
+            let label;
+            
+            if (hour === 0 && minute === 0) {
+                label = "12:00 AM (Midnight)";
+            } else if (hour === 12 && minute === 0) {
+                label = "12:00 PM (Noon)";
+            } else {
+                const period = hour >= 12 ? 'PM' : 'AM';
+                const displayHour = hour % 12 || 12;
+                label = `${displayHour}:${minute.toString().padStart(2, '0')} ${period}`;
+            }
+            
+            timeSlots.push({ value: timeValue, label: label });
+        }
+    }
+    
     const popupHTML = `
         <div class="modal-overlay">
             <div class="modal-content max-w-2xl">
@@ -1588,32 +1575,18 @@ function showBulkSchedulePopup(student, tutor, totalCount = 0) {
                                     <label class="form-label">Day of Week</label>
                                     <select class="form-input schedule-day">
                                         ${DAYS_OF_WEEK.map(day => `<option value="${day}">${day}</option>`).join('')}
-                                </select>
+                                    </select>
                                 </div>
                                 <div>
                                     <label class="form-label">Start Time</label>
                                     <select class="form-input schedule-start">
-                                        <option value="00:00">12:00 AM (Midnight)</option>
-                                        ${Array.from({length: 23}, (_, i) => {
-                                            const hour = i + 1;
-                                            const period = hour >= 12 ? 'PM' : 'AM';
-                                            const displayHour = hour % 12 || 12;
-                                            return `<option value="${hour.toString().padStart(2, '0')}:00">${displayHour}:00 ${period}</option>
-                                                    <option value="${hour.toString().padStart(2, '0')}:30">${displayHour}:30 ${period}</option>`;
-                                        }).join('')}
+                                        ${timeSlots.map(slot => `<option value="${slot.value}">${slot.label}</option>`).join('')}
                                     </select>
                                 </div>
                                 <div>
                                     <label class="form-label">End Time</label>
                                     <select class="form-input schedule-end">
-                                        <option value="00:00">12:00 AM (Midnight)</option>
-                                        ${Array.from({length: 23}, (_, i) => {
-                                            const hour = i + 1;
-                                            const period = hour >= 12 ? 'PM' : 'AM';
-                                            const displayHour = hour % 12 || 12;
-                                            return `<option value="${hour.toString().padStart(2, '0')}:00">${displayHour}:00 ${period}</option>
-                                                    <option value="${hour.toString().padStart(2, '0')}:30">${displayHour}:30 ${period}</option>`;
-                                        }).join('')}
+                                        ${timeSlots.map(slot => `<option value="${slot.value}">${slot.label}</option>`).join('')}
                                     </select>
                                 </div>
                             </div>
@@ -1707,6 +1680,7 @@ function showBulkSchedulePopup(student, tutor, totalCount = 0) {
             currentStudentIndex++;
             schedulePopup.remove();
             
+            // FIXED: Use the global allStudents variable
             const studentsWithoutSchedule = allStudents.filter(s => !scheduledStudents.has(s.id));
             
             if (currentStudentIndex < studentsWithoutSchedule.length) {
@@ -1729,6 +1703,7 @@ function showBulkSchedulePopup(student, tutor, totalCount = 0) {
         currentStudentIndex++;
         schedulePopup.remove();
         
+        // FIXED: Use the global allStudents variable
         const studentsWithoutSchedule = allStudents.filter(s => !scheduledStudents.has(s.id));
         
         if (currentStudentIndex < studentsWithoutSchedule.length) {
@@ -1739,420 +1714,6 @@ function showBulkSchedulePopup(student, tutor, totalCount = 0) {
             showCustomAlert('Skipped all remaining students.');
         }
     });
-}
-
-// NEW: Schedule Calendar Modal Functions
-function showScheduleCalendarModal() {
-    const modalHTML = `
-        <div class="modal-overlay">
-            <div class="modal-content max-w-6xl">
-                <div class="modal-header">
-                    <h3 class="modal-title">📅 Weekly Schedule Calendar</h3>
-                    <div class="action-buttons">
-                        <button id="print-calendar-btn" class="btn btn-secondary btn-sm">📄 Print/PDF</button>
-                        <button id="edit-schedule-btn" class="btn btn-primary btn-sm">✏️ Edit Schedules</button>
-                    </div>
-                </div>
-                <div class="modal-body">
-                    <div id="calendar-loading" class="text-center">
-                        <div class="spinner mx-auto mb-2"></div>
-                        <p class="text-gray-500">Loading schedule calendar...</p>
-                    </div>
-                    <div id="calendar-view" class="hidden">
-                        <!-- Calendar will be loaded here -->
-                    </div>
-                </div>
-                <div class="modal-footer">
-                    <button id="close-calendar-btn" class="btn btn-secondary">Close</button>
-                </div>
-            </div>
-        </div>
-    `;
-    
-    const modal = document.createElement('div');
-    modal.innerHTML = modalHTML;
-    document.body.appendChild(modal);
-    
-    loadScheduleCalendar();
-    
-    document.getElementById('print-calendar-btn').addEventListener('click', () => {
-        printCalendar();
-    });
-    
-    document.getElementById('edit-schedule-btn').addEventListener('click', () => {
-        modal.remove();
-        if (window.tutorData) {
-            checkAndShowSchedulePopup(window.tutorData);
-        }
-    });
-    
-    document.getElementById('close-calendar-btn').addEventListener('click', () => {
-        modal.remove();
-    });
-}
-
-async function loadScheduleCalendar() {
-    try {
-        const studentsQuery = query(
-            collection(db, "students"), 
-            where("tutorEmail", "==", window.tutorData.email)
-        );
-        const studentsSnapshot = await getDocs(studentsQuery);
-        
-        const studentsWithSchedule = [];
-        studentsSnapshot.forEach(doc => {
-            const student = { id: doc.id, ...doc.data() };
-            if (!['archived', 'graduated', 'transferred'].includes(student.status) &&
-                student.schedule && student.schedule.length > 0) {
-                studentsWithSchedule.push(student);
-            }
-        });
-        
-        if (studentsWithSchedule.length === 0) {
-            document.getElementById('calendar-view').innerHTML = `
-                <div class="text-center p-8">
-                    <div class="text-gray-400 text-4xl mb-3">📅</div>
-                    <h4 class="font-bold text-gray-600 mb-2">No Schedules Found</h4>
-                    <p class="text-gray-500 mb-4">No students have schedules set up yet.</p>
-                    <button id="setup-schedules-btn" class="btn btn-primary">Set Up Schedules</button>
-                </div>
-            `;
-            
-            document.getElementById('setup-schedules-btn').addEventListener('click', () => {
-                document.querySelector('.modal-overlay').remove();
-                if (window.tutorData) {
-                    checkAndShowSchedulePopup(window.tutorData);
-                }
-            });
-        } else {
-            renderCalendarView(studentsWithSchedule);
-        }
-        
-        document.getElementById('calendar-loading').classList.add('hidden');
-        document.getElementById('calendar-view').classList.remove('hidden');
-        
-    } catch (error) {
-        console.error("Error loading calendar:", error);
-        document.getElementById('calendar-view').innerHTML = `
-            <div class="text-center text-red-600 p-8">
-                <div class="text-4xl mb-3">⚠️</div>
-                <h4 class="font-bold mb-2">Failed to Load Schedule</h4>
-                <p class="text-gray-500">Please try again later.</p>
-            </div>
-        `;
-        document.getElementById('calendar-loading').classList.add('hidden');
-        document.getElementById('calendar-view').classList.remove('hidden');
-    }
-}
-
-function renderCalendarView(students) {
-    const scheduleByDay = {};
-    DAYS_OF_WEEK.forEach(day => {
-        scheduleByDay[day] = [];
-    });
-    
-    students.forEach(student => {
-        student.schedule.forEach(slot => {
-            scheduleByDay[slot.day].push({
-                student: student.studentName,
-                grade: student.grade,
-                start: slot.start,
-                end: slot.end,
-                time: `${formatScheduleTime(slot.start)} - ${formatScheduleTime(slot.end)}`,
-                studentId: student.id,
-                isOvernight: slot.isOvernight || false
-            });
-        });
-    });
-    
-    DAYS_OF_WEEK.forEach(day => {
-        scheduleByDay[day].sort((a, b) => {
-            return a.start.localeCompare(b.start);
-        });
-    });
-    
-    let calendarHTML = `
-        <div class="calendar-view">
-    `;
-    
-    DAYS_OF_WEEK.forEach(day => {
-        const dayEvents = scheduleByDay[day];
-        calendarHTML += `
-            <div class="calendar-day">
-                <div class="calendar-day-header">${day}</div>
-                <div class="calendar-day-events">
-                    ${dayEvents.length === 0 ? 
-                        '<div class="text-sm text-gray-400 text-center mt-4">No classes</div>' : 
-                        dayEvents.map(event => `
-                            <div class="calendar-event">
-                                <div class="font-medium text-xs">${event.student}</div>
-                                <div class="calendar-event-time">${event.time} ${event.isOvernight ? '🌙' : ''}</div>
-                                <div class="text-xs text-gray-500">${event.grade}</div>
-                                <button class="edit-schedule-btn mt-1" data-student-id="${event.studentId}">Edit</button>
-                            </div>
-                        `).join('')
-                    }
-                </div>
-            </div>
-        `;
-    });
-    
-    calendarHTML += `</div>`;
-    
-    calendarHTML += `
-        <div class="mt-6 p-4 bg-gray-50 rounded-lg">
-            <h4 class="font-bold text-lg mb-3">Schedule Summary</h4>
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                    <p class="text-sm"><span class="font-semibold">Total Students with Schedule:</span> ${students.length}</p>
-                    <p class="text-sm"><span class="font-semibold">Total Weekly Classes:</span> ${Object.values(scheduleByDay).reduce((total, day) => total + day.length, 0)}</p>
-                </div>
-                <div>
-                    <p class="text-sm"><span class="font-semibold">Most Scheduled Day:</span> ${getMostScheduledDay(scheduleByDay)}</p>
-                    <p class="text-sm"><span class="font-semibold">Earliest Class:</span> ${getEarliestClass(scheduleByDay)}</p>
-                </div>
-            </div>
-        </div>
-    `;
-    
-    document.getElementById('calendar-view').innerHTML = calendarHTML;
-    
-    document.querySelectorAll('.edit-schedule-btn').forEach(btn => {
-        btn.addEventListener('click', async (e) => {
-            const studentId = e.target.getAttribute('data-student-id');
-            const student = students.find(s => s.id === studentId);
-            if (student) {
-                document.querySelector('.modal-overlay').remove();
-                showEditScheduleModal(student);
-            }
-        });
-    });
-}
-
-function showEditScheduleModal(student) {
-    const modalHTML = `
-        <div class="modal-overlay">
-            <div class="modal-content max-w-2xl">
-                <div class="modal-header">
-                    <h3 class="modal-title">✏️ Edit Schedule for ${student.studentName}</h3>
-                </div>
-                <div class="modal-body">
-                    <div class="mb-4 p-3 bg-blue-50 rounded-lg">
-                        <p class="text-sm text-blue-700">Student: <strong>${student.studentName}</strong> | Grade: ${student.grade}</p>
-                        <p class="text-xs text-blue-500">Note: You can schedule overnight classes (e.g., 11 PM to 1 AM)</p>
-                    </div>
-                    
-                    <div id="schedule-entries" class="space-y-4">
-                        ${student.schedule && student.schedule.length > 0 ? 
-                            student.schedule.map(slot => `
-                                <div class="schedule-entry bg-gray-50 p-4 rounded-lg border">
-                                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                        <div>
-                                            <label class="form-label">Day of Week</label>
-                                            <select class="form-input schedule-day">
-                                                ${DAYS_OF_WEEK.map(day => `<option value="${day}" ${day === slot.day ? 'selected' : ''}>${day}</option>`).join('')}
-                                            </select>
-                                        </div>
-                                        <div>
-                                            <label class="form-label">Start Time</label>
-                                            <select class="form-input schedule-start">
-                                                ${TIME_SLOTS.map(timeSlot => `<option value="${timeSlot.value}" ${timeSlot.value === slot.start ? 'selected' : ''}>${timeSlot.label}</option>`).join('')}
-                                            </select>
-                                        </div>
-                                        <div>
-                                            <label class="form-label">End Time</label>
-                                            <select class="form-input schedule-end">
-                                                ${TIME_SLOTS.map(timeSlot => `<option value="${timeSlot.value}" ${timeSlot.value === slot.end ? 'selected' : ''}>${timeSlot.label}</option>`).join('')}
-                                            </select>
-                                        </div>
-                                    </div>
-                                    <button class="btn btn-danger btn-sm mt-2 remove-schedule-btn">Remove</button>
-                                </div>
-                            `).join('') : 
-                            `<div class="schedule-entry bg-gray-50 p-4 rounded-lg border">
-                                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                    <div>
-                                        <label class="form-label">Day of Week</label>
-                                        <select class="form-input schedule-day">
-                                            ${DAYS_OF_WEEK.map(day => `<option value="${day}">${day}</option>`).join('')}
-                                        </select>
-                                    </div>
-                                    <div>
-                                        <label class="form-label">Start Time</label>
-                                        <select class="form-input schedule-start">
-                                            ${TIME_SLOTS.map(timeSlot => `<option value="${timeSlot.value}">${timeSlot.label}</option>`).join('')}
-                                        </select>
-                                    </div>
-                                    <div>
-                                        <label class="form-label">End Time</label>
-                                        <select class="form-input schedule-end">
-                                            ${TIME_SLOTS.map(timeSlot => `<option value="${timeSlot.value}">${timeSlot.label}</option>`).join('')}
-                                        </select>
-                                    </div>
-                                </div>
-                                <button class="btn btn-danger btn-sm mt-2 remove-schedule-btn hidden">Remove</button>
-                            </div>`
-                                                  }
-                    </div>
-                    
-                    <button id="add-schedule-entry" class="btn btn-secondary btn-sm mt-2">
-                        ＋ Add Another Time Slot
-                    </button>
-                </div>
-                <div class="modal-footer">
-                    <button id="cancel-edit-schedule-btn" class="btn btn-secondary">Cancel</button>
-                    <button id="save-edit-schedule-btn" class="btn btn-primary" data-student-id="${student.id}">
-                        Save Schedule
-                    </button>
-                </div>
-            </div>
-        </div>
-    `;
-    
-    const modal = document.createElement('div');
-    modal.innerHTML = modalHTML;
-    document.body.appendChild(modal);
-    
-    document.getElementById('add-schedule-entry').addEventListener('click', () => {
-        const scheduleEntries = document.getElementById('schedule-entries');
-        const firstEntry = scheduleEntries.querySelector('.schedule-entry');
-        const newEntry = firstEntry.cloneNode(true);
-        newEntry.querySelector('.schedule-day').selectedIndex = 0;
-        newEntry.querySelector('.schedule-start').selectedIndex = 0;
-        newEntry.querySelector('.schedule-end').selectedIndex = 0;
-        newEntry.querySelector('.remove-schedule-btn').classList.remove('hidden');
-        scheduleEntries.appendChild(newEntry);
-    });
-    
-    document.addEventListener('click', (e) => {
-        if (e.target.classList.contains('remove-schedule-btn')) {
-            const scheduleEntries = document.querySelectorAll('.schedule-entry');
-            if (scheduleEntries.length > 1) {
-                e.target.closest('.schedule-entry').remove();
-            } else {
-                showCustomAlert('You must have at least one schedule entry.');
-            }
-        }
-    });
-    
-    document.getElementById('cancel-edit-schedule-btn').addEventListener('click', () => {
-        modal.remove();
-        showScheduleCalendarModal();
-    });
-    
-    document.getElementById('save-edit-schedule-btn').addEventListener('click', async () => {
-        const scheduleEntries = document.querySelectorAll('.schedule-entry');
-        const schedule = [];
-        let hasError = false;
-        
-        for (const entry of scheduleEntries) {
-            const day = entry.querySelector('.schedule-day').value;
-            const start = entry.querySelector('.schedule-start').value;
-            const end = entry.querySelector('.schedule-end').value;
-            
-            const validation = validateScheduleTime(start, end);
-            if (!validation.valid) {
-                showCustomAlert(validation.message);
-                hasError = true;
-                break;
-            }
-            
-            schedule.push({ 
-                day, 
-                start, 
-                end,
-                isOvernight: validation.isOvernight || false,
-                duration: validation.duration
-            });
-        }
-        
-        if (hasError) return;
-        
-        if (schedule.length === 0) {
-            showCustomAlert('Please add at least one schedule entry.');
-            return;
-        }
-        
-        try {
-            const studentRef = doc(db, "students", student.id);
-            await updateDoc(studentRef, { schedule });
-            
-            modal.remove();
-            showCustomAlert('✅ Schedule updated successfully!');
-            
-            setTimeout(() => {
-                showScheduleCalendarModal();
-            }, 500);
-            
-        } catch (error) {
-            console.error("Error updating schedule:", error);
-            showCustomAlert('❌ Error updating schedule. Please try again.');
-        }
-    });
-}
-
-function getMostScheduledDay(scheduleByDay) {
-    let maxDay = '';
-    let maxCount = 0;
-    
-    DAYS_OF_WEEK.forEach(day => {
-        if (scheduleByDay[day].length > maxCount) {
-            maxCount = scheduleByDay[day].length;
-            maxDay = day;
-        }
-    });
-    
-    return maxDay ? `${maxDay} (${maxCount} classes)` : 'None';
-}
-
-function getEarliestClass(scheduleByDay) {
-    let earliestTime = "23:59";
-    let earliestInfo = "";
-    
-    DAYS_OF_WEEK.forEach(day => {
-        scheduleByDay[day].forEach(event => {
-            if (event.start < earliestTime) {
-                earliestTime = event.start;
-                earliestInfo = `${formatScheduleTime(event.start)} (${event.student} - ${day})`;
-            }
-        });
-    });
-    
-    return earliestInfo || "No classes scheduled";
-}
-
-function printCalendar() {
-    const calendarContent = document.getElementById('calendar-view').innerHTML;
-    const printWindow = window.open('', '_blank');
-    printWindow.document.write(`
-        <html>
-            <head>
-                <title>Weekly Schedule Calendar</title>
-                <style>
-                    body { font-family: Arial, sans-serif; padding: 20px; }
-                    .calendar-view { display: grid; grid-template-columns: repeat(7, 1fr); gap: 10px; }
-                    .calendar-day { border: 1px solid #ddd; padding: 10px; min-height: 120px; }
-                    .calendar-day-header { font-weight: bold; border-bottom: 1px solid #ddd; margin-bottom: 5px; }
-                    .calendar-event { background: #f5f5f5; padding: 5px; margin-bottom: 3px; font-size: 11px; }
-                    .edit-schedule-btn { display: none; }
-                    @media print { body { font-size: 12px; } }
-                </style>
-            </head>
-            <body>
-                <h2>Weekly Schedule Calendar</h2>
-                <p>Tutor: ${window.tutorData.name}</p>
-                <p>Generated on: ${new Date().toLocaleDateString()}</p>
-                <hr>
-                ${calendarContent}
-                <script>
-                    window.onload = function() {
-                        window.print();
-                        setTimeout(() => window.close(), 1000);
-                    }
-                </script>
-            </body>
-        </html>
-    `);
 }
 
 // ============================================================================
@@ -2191,12 +1752,13 @@ function showDailyTopicModal(student) {
     
     document.getElementById('cancel-topic-btn').addEventListener('click', () => modal.remove());
     document.getElementById('save-topic-btn').addEventListener('click', async () => {
+        // FIXED: Ensure all required fields are defined
         const topicData = {
             studentId: student.id,
-            studentName: student.studentName,
-            parentEmail: student.parentEmail,
-            parentPhone: student.parentPhone,
-            parentName: student.parentName,
+            studentName: student.studentName || '',
+            parentEmail: student.parentEmail || '',
+            parentPhone: student.parentPhone || '',
+            parentName: student.parentName || '',
             tutorEmail: window.tutorData.email,
             tutorName: window.tutorData.name,
             topics: document.getElementById('topic-topics').value.trim(),
@@ -2382,12 +1944,13 @@ function showHomeworkModal(student) {
     
     document.getElementById('cancel-hw-btn').addEventListener('click', () => modal.remove());
     document.getElementById('save-hw-btn').addEventListener('click', async () => {
+        // FIXED: Ensure all required fields are defined
         const hwData = {
             studentId: student.id,
-            studentName: student.studentName,
-            parentEmail: student.parentEmail,
-            parentPhone: student.parentPhone,
-            parentName: student.parentName,
+            studentName: student.studentName || '',
+            parentEmail: student.parentEmail || '',
+            parentPhone: student.parentPhone || '',
+            parentName: student.parentName || '',
             tutorEmail: window.tutorData.email,
             tutorName: window.tutorData.name,
             title: document.getElementById('hw-title').value.trim(),
@@ -4440,3 +4003,4 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
     }
 });
+
