@@ -1964,9 +1964,9 @@ async function loadDailyTopicHistory(studentId, forceRefresh = false) {
         const startOfMonth = new Date(currentYear, currentMonth, 1);
         const endOfMonth = new Date(currentYear, currentMonth + 1, 0, 23, 59, 59);
         
-        // Check if Firebase functions are available
-        if (!orderBy || !where || !query || !getDocs) {
-            throw new Error('Firebase functions not available');
+        // Check if Firebase functions are available (should be imported globally elsewhere)
+        if (typeof orderBy === 'undefined') {
+            throw new Error('Firebase functions not available. Please ensure Firebase is properly loaded.');
         }
         
         const topicsQuery = query(
@@ -6554,6 +6554,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     }, 500);
 });
+
 
 
 
