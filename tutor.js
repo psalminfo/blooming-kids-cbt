@@ -2105,12 +2105,106 @@ async function scheduleEmailReminder(hwData, fileUrl = '') {
 }
 
 /*******************************************************************************
- * SECTION 9: MESSAGING & INBOX FEATURES
+ * SECTION 9: MESSAGING & INBOX FEATURES (ENHANCED)
  ******************************************************************************/
 
-// Messaging Feature with Inbox
+// Messaging Feature with Floating Button & Enhanced UI
 let unreadMessageCount = 0;
+let messagingFloatingBtn = null;
 
+// Initialize floating messaging button
+function initializeFloatingMessagingButton() {
+    // Remove existing button if it exists
+    const existingBtn = document.querySelector('.floating-messaging-btn');
+    if (existingBtn) {
+        existingBtn.remove();
+    }
+    
+    // Create floating button
+    messagingFloatingBtn = document.createElement('button');
+    messagingFloatingBtn.className = 'floating-messaging-btn';
+    messagingFloatingBtn.innerHTML = `
+        <span class="floating-btn-icon">💬</span>
+        <span class="floating-btn-text">Message</span>
+    `;
+    
+    document.body.appendChild(messagingFloatingBtn);
+    
+    // Add click handler
+    messagingFloatingBtn.addEventListener('click', showEnhancedMessagingModal);
+    
+    // Add CSS for floating button
+    if (!document.querySelector('#floating-btn-styles')) {
+        const floatingBtnStyles = document.createElement('style');
+        floatingBtnStyles.id = 'floating-btn-styles';
+        floatingBtnStyles.textContent = `
+            .floating-messaging-btn {
+                position: fixed;
+                bottom: 30px;
+                right: 30px;
+                background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);
+                color: white;
+                border: none;
+                border-radius: 50px;
+                padding: 16px 24px;
+                font-size: 16px;
+                font-weight: 600;
+                box-shadow: 0 8px 25px rgba(139, 92, 246, 0.3);
+                cursor: pointer;
+                display: flex;
+                align-items: center;
+                gap: 10px;
+                transition: all 0.3s ease;
+                z-index: 1000;
+                animation: floatAnimation 3s ease-in-out infinite;
+            }
+            
+            .floating-messaging-btn:hover {
+                transform: translateY(-5px);
+                box-shadow: 0 15px 30px rgba(139, 92, 246, 0.4);
+                background: linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%);
+            }
+            
+            .floating-messaging-btn:active {
+                transform: translateY(-2px);
+            }
+            
+            .floating-btn-icon {
+                font-size: 20px;
+            }
+            
+            .floating-btn-text {
+                display: inline-block;
+            }
+            
+            @keyframes floatAnimation {
+                0%, 100% {
+                    transform: translateY(0);
+                }
+                50% {
+                    transform: translateY(-10px);
+                }
+            }
+            
+            /* Responsive design */
+            @media (max-width: 768px) {
+                .floating-messaging-btn {
+                    bottom: 20px;
+                    right: 20px;
+                    padding: 14px 20px;
+                    font-size: 14px;
+                }
+                
+                .floating-btn-text {
+                    display: none;
+                }
+            }
+        `;
+        document.head.appendChild(floatingBtnStyles);
+    }
+}
+
+// Update unread message count
 async function updateUnreadMessageCount() {
     try {
         const tutorId = window.tutorData?.id;
@@ -2125,75 +2219,209 @@ async function updateUnreadMessageCount() {
         const messagesSnapshot = await getDocs(messagesQuery);
         unreadMessageCount = messagesSnapshot.size;
         
-        // Update inbox button badge
-        const inboxBtn = document.getElementById('inbox-btn');
-        if (inboxBtn) {
-            const existingBadge = inboxBtn.querySelector('.inbox-badge');
+        // Update floating button badge
+        if (messagingFloatingBtn) {
+            const existingBadge = messagingFloatingBtn.querySelector('.unread-badge');
             if (existingBadge) {
                 existingBadge.remove();
             }
             
             if (unreadMessageCount > 0) {
                 const badge = document.createElement('span');
-                badge.className = 'inbox-badge';
+                badge.className = 'unread-badge';
                 badge.textContent = unreadMessageCount > 99 ? '99+' : unreadMessageCount;
-                inboxBtn.appendChild(badge);
+                messagingFloatingBtn.appendChild(badge);
+                
+                // Add badge styles if not already added
+                if (!document.querySelector('#badge-styles')) {
+                    const badgeStyles = document.createElement('style');
+                    badgeStyles.id = 'badge-styles';
+                    badgeStyles.textContent = `
+                        .unread-badge {
+                            position: absolute;
+                            top: -5px;
+                            right: -5px;
+                            background-color: #ef4444;
+                            color: white;
+                            border-radius: 50%;
+                            width: 22px;
+                            height: 22px;
+                            display: flex;
+                            align-items: center;
+                            justify-content: center;
+                            font-size: 0.7rem;
+                            font-weight: bold;
+                            border: 2px solid white;
+                            animation: pulse 2s infinite;
+                        }
+                        
+                        @keyframes pulse {
+                            0% {
+                                box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7);
+                            }
+                            70% {
+                                box-shadow: 0 0 0 10px rgba(239, 68, 68, 0);
+                            }
+                            100% {
+                                box-shadow: 0 0 0 0 rgba(239, 68, 68, 0);
+                            }
+                        }
+                    `;
+                    document.head.appendChild(badgeStyles);
+                }
             }
         }
+        
     } catch (error) {
         console.error("Error updating unread message count:", error);
     }
 }
 
-function showMessagingModal() {
+// Enhanced Messaging Modal with Beautiful UI
+function showEnhancedMessagingModal() {
     const modalHTML = `
-        <div class="modal-overlay">
-            <div class="modal-content max-w-2xl">
+        <div class="modal-overlay enhanced-messaging-modal">
+            <div class="modal-content max-w-4xl messaging-modal-content">
                 <div class="modal-header">
-                    <h3 class="modal-title">💬 Send Message</h3>
+                    <h3 class="modal-title flex items-center gap-3">
+                        <span class="text-2xl">💬</span>
+                        <span>Send Message</span>
+                    </h3>
+                    <button class="close-modal-btn text-gray-400 hover:text-gray-600 text-xl">
+                        &times;
+                    </button>
                 </div>
                 <div class="modal-body">
-                    <div class="form-group">
-                        <label class="form-label">Select Recipients</label>
-                        <div class="message-recipient-options">
-                            <div class="recipient-option" data-recipient="management">
-                                <label class="recipient-label">
-                                    <input type="checkbox" id="recipient-management" value="management">
-                                    📋 Management
-                                </label>
-                                <p class="text-xs text-gray-500 mt-1">Send to admin/management team</p>
+                    <!-- Message Type Selection -->
+                    <div class="message-type-selection mb-6">
+                        <h4 class="font-semibold text-gray-700 mb-3">Select Message Type</h4>
+                        <div class="grid grid-cols-1 md:grid-cols-4 gap-3">
+                            <div class="message-type-option" data-type="individual">
+                                <div class="type-icon">👤</div>
+                                <div class="type-title">Individual</div>
+                                <div class="type-desc">Message to one parent</div>
                             </div>
-                            <div class="recipient-option" data-recipient="parents">
-                                <label class="recipient-label">
-                                    <input type="checkbox" id="recipient-parents" value="parents">
-                                    👨‍👩‍👧‍👦 Parents
-                                </label>
-                                <p class="text-xs text-gray-500 mt-1">Send to all your students' parents</p>
+                            <div class="message-type-option" data-type="group">
+                                <div class="type-icon">👨‍👩‍👧‍👦</div>
+                                <div class="type-title">Group</div>
+                                <div class="type-desc">Selected parents</div>
+                            </div>
+                            <div class="message-type-option" data-type="management">
+                                <div class="type-icon">📋</div>
+                                <div class="type-title">Management</div>
+                                <div class="type-desc">Admin team</div>
+                            </div>
+                            <div class="message-type-option" data-type="all">
+                                <div class="type-icon">📢</div>
+                                <div class="type-title">All Parents</div>
+                                <div class="type-desc">Bulk message</div>
                             </div>
                         </div>
                     </div>
                     
-                    <div class="form-group">
-                        <label class="form-label">Message Subject</label>
-                        <input type="text" id="message-subject" class="form-input" placeholder="Enter message subject" required>
+                    <!-- Recipient Selection (Dynamic based on type) -->
+                    <div class="recipient-section mb-6 hidden">
+                        <h4 class="font-semibold text-gray-700 mb-3">Select Recipients</h4>
+                        <div id="individual-recipient-container" class="hidden">
+                            <select id="individual-parent-select" class="form-input">
+                                <option value="">Select a parent...</option>
+                            </select>
+                            <div id="student-selection-container" class="mt-3 hidden">
+                                <label class="form-label">Related Student (Optional)</label>
+                                <select id="student-select" class="form-input">
+                                    <option value="">Select a student...</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div id="group-recipient-container" class="hidden">
+                            <div class="students-list-container max-h-60 overflow-y-auto border rounded-lg p-3 bg-gray-50">
+                                <div class="text-center py-4">
+                                    <div class="spinner mx-auto mb-2"></div>
+                                    <p class="text-gray-500">Loading students...</p>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                     
-                    <div class="form-group">
-                        <label class="form-label">Message *</label>
-                        <textarea id="message-content" class="form-input form-textarea report-textarea" rows="6" placeholder="Type your message here..." required></textarea>
-                    </div>
-                    
-                    <div class="form-group">
-                        <label class="flex items-center space-x-2">
-                            <input type="checkbox" id="urgent-message" class="rounded">
-                            <span class="text-sm font-semibold">Mark as Urgent</span>
-                        </label>
-                        <p class="text-xs text-gray-500 mt-1">Urgent messages will be highlighted</p>
+                    <!-- Message Details -->
+                    <div class="message-details-section">
+                        <div class="form-group">
+                            <label class="form-label">Subject</label>
+                            <input type="text" id="message-subject" class="form-input" placeholder="Enter message subject" required>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label class="form-label">Message</label>
+                            <div class="message-editor-container">
+                                <textarea id="message-content" class="form-input form-textarea message-editor" rows="6" placeholder="Type your message here..." required></textarea>
+                                <div class="editor-tools mt-2 flex gap-2">
+                                    <button type="button" class="editor-tool-btn" data-tool="bold" title="Bold">B</button>
+                                    <button type="button" class="editor-tool-btn" data-tool="italic" title="Italic">I</button>
+                                    <button type="button" class="editor-tool-btn" data-tool="underline" title="Underline">U</button>
+                                    <button type="button" class="editor-tool-btn" data-tool="list" title="Bullet List">•</button>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Message Category -->
+                        <div class="form-group">
+                            <label class="form-label">Category (Optional)</label>
+                            <select id="message-category" class="form-input">
+                                <option value="">Select category...</option>
+                                <option value="homework">Homework</option>
+                                <option value="progress">Progress Report</option>
+                                <option value="schedule">Schedule Change</option>
+                                <option value="payment">Payment</option>
+                                <option value="general">General Inquiry</option>
+                                <option value="urgent">Urgent</option>
+                            </select>
+                        </div>
+                        
+                        <!-- File Attachment -->
+                        <div class="form-group">
+                            <label class="form-label">Attachments (Optional)</label>
+                            <div class="file-upload-container" id="message-file-upload">
+                                <input type="file" id="message-attachment" class="hidden" multiple accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.txt">
+                                <label for="message-attachment" class="file-upload-label">
+                                    <div class="file-upload-icon">📎</div>
+                                    <div>
+                                        <span class="text-sm font-medium text-primary-color">Click to add attachments</span>
+                                        <span class="text-xs text-gray-500 block mt-1">PDF, DOC, JPG, PNG, TXT (Max 5MB each)</span>
+                                    </div>
+                                </label>
+                                <div id="attachment-preview" class="attachment-preview hidden"></div>
+                            </div>
+                        </div>
+                        
+                        <!-- Urgent Toggle -->
+                        <div class="form-group">
+                            <label class="flex items-center space-x-3 cursor-pointer">
+                                <div class="relative">
+                                    <input type="checkbox" id="urgent-message" class="sr-only">
+                                    <div class="toggle-bg bg-gray-200 border-2 border-gray-200 h-6 w-11 rounded-full"></div>
+                                    <div class="toggle-dot absolute left-1 top-1 bg-white h-4 w-4 rounded-full transition"></div>
+                                </div>
+                                <div>
+                                    <span class="text-sm font-semibold text-gray-700">Mark as Urgent</span>
+                                    <p class="text-xs text-gray-500">Urgent messages will be highlighted and prioritized</p>
+                                </div>
+                            </label>
+                        </div>
+                        
+                        <!-- Preview Button -->
+                        <div class="flex justify-end mb-4">
+                            <button type="button" id="preview-message-btn" class="btn btn-secondary">
+                                👁️ Preview Message
+                            </button>
+                        </div>
                     </div>
                 </div>
                 <div class="modal-footer">
                     <button id="cancel-message-btn" class="btn btn-secondary">Cancel</button>
-                    <button id="send-message-btn" class="btn btn-primary">Send Message</button>
+                    <button id="send-message-btn" class="btn btn-primary">
+                        <span class="send-icon">📤</span>
+                        Send Message
+                    </button>
                 </div>
             </div>
         </div>
@@ -2203,88 +2431,759 @@ function showMessagingModal() {
     modal.innerHTML = modalHTML;
     document.body.appendChild(modal);
     
-    // Add click handlers for recipient options
-    document.querySelectorAll('.recipient-option').forEach(option => {
-        option.addEventListener('click', (e) => {
-            if (e.target.type !== 'checkbox') {
-                const checkbox = option.querySelector('input[type="checkbox"]');
-                checkbox.checked = !checkbox.checked;
-                option.classList.toggle('selected', checkbox.checked);
-            }
-        });
-    });
+    // Add enhanced messaging modal styles
+    addEnhancedMessagingStyles();
     
-    // Update selected state when checkbox is clicked directly
-    document.querySelectorAll('.recipient-option input[type="checkbox"]').forEach(checkbox => {
-        checkbox.addEventListener('change', (e) => {
-            const option = e.target.closest('.recipient-option');
-            option.classList.toggle('selected', e.target.checked);
-        });
-    });
+    // Initialize message type selection
+    initializeMessageTypeSelection();
     
-    document.getElementById('cancel-message-btn').addEventListener('click', () => modal.remove());
-    document.getElementById('send-message-btn').addEventListener('click', async () => {
-        const subject = document.getElementById('message-subject').value.trim();
-        const content = document.getElementById('message-content').value.trim();
-        const isUrgent = document.getElementById('urgent-message').checked;
-        const recipients = [];
-        
-        // Check which recipients are selected
-        if (document.getElementById('recipient-management').checked) {
-            recipients.push('management');
-        }
-        if (document.getElementById('recipient-parents').checked) {
-            recipients.push('parents');
-        }
-        
-        if (!subject || !content) {
-            showCustomAlert('Please enter both subject and message content.');
-            return;
-        }
-        
-        if (recipients.length === 0) {
-            showCustomAlert('Please select at least one recipient (Management or Parents).');
-            return;
-        }
-        
-        try {
-            const messageData = {
-                tutorId: window.tutorData.id,
-                tutorEmail: window.tutorData.email,
-                tutorName: window.tutorData.name,
-                subject: subject,
-                content: content,
-                recipients: recipients,
-                isUrgent: isUrgent,
-                status: 'sent',
-                read: false,
-                createdAt: new Date()
-            };
-            
-            const messageRef = doc(collection(db, "tutor_messages"));
-            await setDoc(messageRef, messageData);
-            
+    // Load recipients data
+    loadRecipientsData();
+    
+    // Setup event listeners
+    setupMessagingModalEvents(modal);
+    
+    // Close modal handlers
+    modal.querySelector('.close-modal-btn').addEventListener('click', () => modal.remove());
+    modal.addEventListener('click', (e) => {
+        if (e.target.classList.contains('modal-overlay')) {
             modal.remove();
-            
-            let recipientText = '';
-            if (recipients.includes('management') && recipients.includes('parents')) {
-                recipientText = 'to Management and Parents';
-            } else if (recipients.includes('management')) {
-                recipientText = 'to Management';
-            } else {
-                recipientText = 'to Parents';
-            }
-            
-            showCustomAlert(`✅ Message sent ${recipientText}!`);
-            
-        } catch (error) {
-            console.error("Error sending message:", error);
-            showCustomAlert('❌ Error sending message. Please try again.');
         }
     });
 }
 
-// Inbox Feature with WhatsApp-like UI
+// Add enhanced messaging styles
+function addEnhancedMessagingStyles() {
+    if (document.querySelector('#enhanced-messaging-styles')) return;
+    
+    const styles = document.createElement('style');
+    styles.id = 'enhanced-messaging-styles';
+    styles.textContent = `
+        /* Enhanced Messaging Modal Styles */
+        .messaging-modal-content {
+            max-height: 85vh;
+            overflow-y: auto;
+        }
+        
+        .message-type-selection {
+            background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+            border-radius: 12px;
+            padding: 1.5rem;
+        }
+        
+        .message-type-option {
+            background: white;
+            border: 2px solid #e2e8f0;
+            border-radius: 10px;
+            padding: 1rem;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        
+        .message-type-option:hover {
+            transform: translateY(-2px);
+            border-color: #8b5cf6;
+            box-shadow: 0 5px 15px rgba(139, 92, 246, 0.1);
+        }
+        
+        .message-type-option.selected {
+            border-color: #8b5cf6;
+            background: linear-gradient(135deg, #f5f3ff 0%, #ede9fe 100%);
+            box-shadow: 0 5px 15px rgba(139, 92, 246, 0.15);
+        }
+        
+        .type-icon {
+            font-size: 2rem;
+            margin-bottom: 0.5rem;
+        }
+        
+        .type-title {
+            font-weight: 600;
+            color: #1e293b;
+        }
+        
+        .type-desc {
+            font-size: 0.8rem;
+            color: #64748b;
+        }
+        
+        /* Editor Tools */
+        .editor-tools {
+            display: flex;
+            gap: 0.5rem;
+        }
+        
+        .editor-tool-btn {
+            background: #f1f5f9;
+            border: 1px solid #cbd5e1;
+            border-radius: 4px;
+            padding: 0.25rem 0.75rem;
+            font-size: 0.875rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        
+        .editor-tool-btn:hover {
+            background: #e2e8f0;
+            border-color: #94a3b8;
+        }
+        
+        .editor-tool-btn.active {
+            background: #8b5cf6;
+            color: white;
+            border-color: #8b5cf6;
+        }
+        
+        /* Attachment Preview */
+        .attachment-preview {
+            margin-top: 1rem;
+            padding: 1rem;
+            background: #f8fafc;
+            border-radius: 8px;
+            border: 1px dashed #cbd5e1;
+        }
+        
+        .attachment-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0.5rem;
+            background: white;
+            border-radius: 6px;
+            margin-bottom: 0.5rem;
+            border: 1px solid #e2e8f0;
+        }
+        
+        .attachment-info {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+        
+        .attachment-icon {
+            font-size: 1.5rem;
+            color: #8b5cf6;
+        }
+        
+        .attachment-name {
+            font-size: 0.875rem;
+            font-weight: 500;
+            color: #1e293b;
+        }
+        
+        .attachment-size {
+            font-size: 0.75rem;
+            color: #64748b;
+        }
+        
+        /* Toggle Switch */
+        .toggle-bg {
+            transition: background 0.2s ease;
+        }
+        
+        input:checked + .toggle-bg {
+            background: #10b981;
+            border-color: #10b981;
+        }
+        
+        input:checked + .toggle-bg + .toggle-dot {
+            transform: translateX(100%);
+            background: white;
+        }
+        
+        /* Student Selection Items */
+        .student-select-item {
+            display: flex;
+            align-items: center;
+            padding: 0.75rem;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            margin-bottom: 0.5rem;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        
+        .student-select-item:hover {
+            background: #f8fafc;
+            border-color: #cbd5e1;
+        }
+        
+        .student-select-item.selected {
+            background: #f0f9ff;
+            border-color: #0ea5e9;
+        }
+        
+        .student-select-item input[type="checkbox"] {
+            margin-right: 0.75rem;
+        }
+        
+        .student-info {
+            flex: 1;
+        }
+        
+        .student-name {
+            font-weight: 500;
+            color: #1e293b;
+        }
+        
+        .student-details {
+            font-size: 0.75rem;
+            color: #64748b;
+            margin-top: 0.25rem;
+        }
+        
+        /* Send Button Icon */
+        .send-icon {
+            animation: sendPulse 2s infinite;
+        }
+        
+        @keyframes sendPulse {
+            0%, 100% {
+                transform: scale(1);
+            }
+            50% {
+                transform: scale(1.1);
+            }
+        }
+    `;
+    document.head.appendChild(styles);
+}
+
+// Initialize message type selection
+function initializeMessageTypeSelection() {
+    const messageTypeOptions = document.querySelectorAll('.message-type-option');
+    
+    messageTypeOptions.forEach(option => {
+        option.addEventListener('click', () => {
+            // Remove selected class from all options
+            messageTypeOptions.forEach(opt => opt.classList.remove('selected'));
+            
+            // Add selected class to clicked option
+            option.classList.add('selected');
+            
+            // Show/hide recipient sections based on type
+            const messageType = option.getAttribute('data-type');
+            showRecipientSection(messageType);
+        });
+    });
+    
+    // Select "Individual" by default
+    document.querySelector('.message-type-option[data-type="individual"]')?.classList.add('selected');
+    showRecipientSection('individual');
+}
+
+// Show appropriate recipient section based on message type
+function showRecipientSection(messageType) {
+    // Hide all recipient containers
+    const recipientContainers = [
+        'individual-recipient-container',
+        'group-recipient-container'
+    ];
+    
+    recipientContainers.forEach(containerId => {
+        const container = document.getElementById(containerId);
+        if (container) container.classList.add('hidden');
+    });
+    
+    // Show recipient section
+    const recipientSection = document.querySelector('.recipient-section');
+    if (recipientSection) recipientSection.classList.remove('hidden');
+    
+    // Show specific container based on type
+    switch(messageType) {
+        case 'individual':
+            document.getElementById('individual-recipient-container')?.classList.remove('hidden');
+            break;
+        case 'group':
+            document.getElementById('group-recipient-container')?.classList.remove('hidden');
+            loadStudentsForGroupSelection();
+            break;
+        case 'management':
+        case 'all':
+            // No recipient selection needed for these types
+            recipientSection.classList.add('hidden');
+            break;
+    }
+}
+
+// Load recipients data
+async function loadRecipientsData() {
+    try {
+        const tutorEmail = window.tutorData?.email;
+        if (!tutorEmail) return;
+        
+        // Query students assigned to this tutor
+        const studentsQuery = query(
+            collection(db, "students"),
+            where("tutorEmail", "==", tutorEmail)
+        );
+        
+        const studentsSnapshot = await getDocs(studentsQuery);
+        const students = [];
+        
+        studentsSnapshot.forEach(doc => {
+            const student = { id: doc.id, ...doc.data() };
+            if (!['archived', 'graduated', 'transferred'].includes(student.status)) {
+                students.push(student);
+            }
+        });
+        
+        populateRecipientDropdowns(students);
+        
+    } catch (error) {
+        console.error("Error loading recipients data:", error);
+    }
+}
+
+// Populate recipient dropdowns with student data
+function populateRecipientDropdowns(students) {
+    const parentSelect = document.getElementById('individual-parent-select');
+    const studentSelect = document.getElementById('student-select');
+    
+    if (parentSelect) {
+        // Clear existing options except first one
+        while (parentSelect.options.length > 1) {
+            parentSelect.remove(1);
+        }
+        
+        // Add parent options
+        students.forEach(student => {
+            const option = document.createElement('option');
+            option.value = student.parentPhone || student.id;
+            option.textContent = `${student.parentName} (${student.studentName})`;
+            option.setAttribute('data-student-id', student.id);
+            parentSelect.appendChild(option);
+        });
+        
+        // Add event listener to show student selection when parent is selected
+        parentSelect.addEventListener('change', (e) => {
+            const studentSelectionContainer = document.getElementById('student-selection-container');
+            if (e.target.value) {
+                studentSelectionContainer?.classList.remove('hidden');
+                
+                // Populate student select
+                if (studentSelect) {
+                    while (studentSelect.options.length > 1) {
+                        studentSelect.remove(1);
+                    }
+                    
+                    const selectedStudentId = e.target.options[e.target.selectedIndex].getAttribute('data-student-id');
+                    const student = students.find(s => s.id === selectedStudentId);
+                    
+                    if (student) {
+                        const studentOption = document.createElement('option');
+                        studentOption.value = student.id;
+                        studentOption.textContent = `${student.studentName} (${student.grade})`;
+                        studentSelect.appendChild(studentOption);
+                    }
+                }
+            } else {
+                studentSelectionContainer?.classList.add('hidden');
+            }
+        });
+    }
+}
+
+// Load students for group selection
+async function loadStudentsForGroupSelection() {
+    const container = document.querySelector('.students-list-container');
+    if (!container) return;
+    
+    try {
+        const tutorEmail = window.tutorData?.email;
+        if (!tutorEmail) return;
+        
+        const studentsQuery = query(
+            collection(db, "students"),
+            where("tutorEmail", "==", tutorEmail)
+        );
+        
+        const studentsSnapshot = await getDocs(studentsQuery);
+        let html = '';
+        
+        studentsSnapshot.forEach(doc => {
+            const student = doc.data();
+            if (!['archived', 'graduated', 'transferred'].includes(student.status)) {
+                html += `
+                    <div class="student-select-item">
+                        <input type="checkbox" id="student-${doc.id}" value="${student.parentPhone || doc.id}" 
+                               data-student-id="${doc.id}" data-student-name="${student.studentName}">
+                        <div class="student-info">
+                            <div class="student-name">${student.parentName}</div>
+                            <div class="student-details">
+                                Student: ${student.studentName} • Grade: ${student.grade}
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
+        });
+        
+        container.innerHTML = html || '<p class="text-gray-500 text-center py-4">No students found</p>';
+        
+    } catch (error) {
+        console.error("Error loading students for group selection:", error);
+        container.innerHTML = '<p class="text-red-500 text-center py-4">Error loading students</p>';
+    }
+}
+
+// Setup messaging modal event listeners
+function setupMessagingModalEvents(modal) {
+    // Editor tools
+    const editorTools = modal.querySelectorAll('.editor-tool-btn');
+    editorTools.forEach(tool => {
+        tool.addEventListener('click', (e) => {
+            e.preventDefault();
+            const toolType = tool.getAttribute('data-tool');
+            applyTextFormatting(toolType);
+            tool.classList.toggle('active');
+        });
+    });
+    
+    // File attachment
+    const fileInput = modal.querySelector('#message-attachment');
+    const attachmentPreview = modal.querySelector('#attachment-preview');
+    
+    if (fileInput) {
+        fileInput.addEventListener('change', (e) => {
+            handleFileAttachments(e.target.files, attachmentPreview);
+        });
+    }
+    
+    // Preview message
+    const previewBtn = modal.querySelector('#preview-message-btn');
+    if (previewBtn) {
+        previewBtn.addEventListener('click', previewMessage);
+    }
+    
+    // Send message
+    const sendBtn = modal.querySelector('#send-message-btn');
+    if (sendBtn) {
+        sendBtn.addEventListener('click', () => sendEnhancedMessage(modal));
+    }
+    
+    // Cancel button
+    const cancelBtn = modal.querySelector('#cancel-message-btn');
+    if (cancelBtn) {
+        cancelBtn.addEventListener('click', () => modal.remove());
+    }
+}
+
+// Apply text formatting in message editor
+function applyTextFormatting(toolType) {
+    const textarea = document.getElementById('message-content');
+    if (!textarea) return;
+    
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+    const selectedText = textarea.value.substring(start, end);
+    let formattedText = '';
+    
+    switch(toolType) {
+        case 'bold':
+            formattedText = `**${selectedText}**`;
+            break;
+        case 'italic':
+            formattedText = `*${selectedText}*`;
+            break;
+        case 'underline':
+            formattedText = `__${selectedText}__`;
+            break;
+        case 'list':
+            formattedText = `• ${selectedText}`;
+            break;
+    }
+    
+    if (formattedText) {
+        textarea.value = textarea.value.substring(0, start) + formattedText + textarea.value.substring(end);
+        textarea.focus();
+        textarea.setSelectionRange(start + formattedText.length, start + formattedText.length);
+    }
+}
+
+// Handle file attachments
+function handleFileAttachments(files, previewContainer) {
+    if (!files.length) return;
+    
+    let html = '';
+    for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        if (file.size > 5 * 1024 * 1024) { // 5MB limit
+            showCustomAlert(`File "${file.name}" exceeds 5MB limit`);
+            continue;
+        }
+        
+        html += `
+            <div class="attachment-item" data-index="${i}">
+                <div class="attachment-info">
+                    <div class="attachment-icon">📎</div>
+                    <div>
+                        <div class="attachment-name">${file.name}</div>
+                        <div class="attachment-size">${formatFileSize(file.size)}</div>
+                    </div>
+                </div>
+                <button type="button" class="btn btn-danger btn-sm remove-attachment-btn" data-index="${i}">
+                    Remove
+                </button>
+            </div>
+        `;
+    }
+    
+    previewContainer.innerHTML = html;
+    previewContainer.classList.remove('hidden');
+    
+    // Add remove button event listeners
+    previewContainer.querySelectorAll('.remove-attachment-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.preventDefault();
+            const index = btn.getAttribute('data-index');
+            removeAttachment(index);
+        });
+    });
+}
+
+// Remove attachment
+function removeAttachment(index) {
+    const fileInput = document.getElementById('message-attachment');
+    const dt = new DataTransfer();
+    const files = Array.from(fileInput.files);
+    
+    files.forEach((file, i) => {
+        if (i != index) {
+            dt.items.add(file);
+        }
+    });
+    
+    fileInput.files = dt.files;
+    handleFileAttachments(fileInput.files, document.getElementById('attachment-preview'));
+}
+
+// Preview message
+function previewMessage() {
+    const subject = document.getElementById('message-subject').value;
+    const content = document.getElementById('message-content').value;
+    const category = document.getElementById('message-category').value;
+    const isUrgent = document.getElementById('urgent-message').checked;
+    
+    if (!subject || !content) {
+        showCustomAlert('Please enter subject and message content');
+        return;
+    }
+    
+    const previewHTML = `
+        <div class="modal-overlay">
+            <div class="modal-content max-w-2xl">
+                <div class="modal-header">
+                    <h3 class="modal-title">👁️ Message Preview</h3>
+                </div>
+                <div class="modal-body">
+                    <div class="bg-gray-50 p-4 rounded-lg mb-4">
+                        <div class="flex justify-between items-center mb-2">
+                            <h4 class="font-bold text-lg">${subject}</h4>
+                            ${isUrgent ? '<span class="badge badge-danger">URGENT</span>' : ''}
+                        </div>
+                        ${category ? `<p class="text-sm text-gray-600">Category: ${category}</p>` : ''}
+                    </div>
+                    
+                    <div class="message-preview-content bg-white p-4 rounded border">
+                        ${content.replace(/\n/g, '<br>')}
+                    </div>
+                    
+                    <div class="mt-4 text-sm text-gray-500">
+                        <p>Recipients will be shown after sending.</p>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button id="close-preview-btn" class="btn btn-secondary">Close Preview</button>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    const previewModal = document.createElement('div');
+    previewModal.innerHTML = previewHTML;
+    document.body.appendChild(previewModal);
+    
+    previewModal.querySelector('#close-preview-btn').addEventListener('click', () => {
+        previewModal.remove();
+    });
+    
+    previewModal.addEventListener('click', (e) => {
+        if (e.target.classList.contains('modal-overlay')) {
+            previewModal.remove();
+        }
+    });
+}
+
+// Send enhanced message
+async function sendEnhancedMessage(modal) {
+    try {
+        const tutor = window.tutorData;
+        if (!tutor) {
+            showCustomAlert('Tutor information not found');
+            return;
+        }
+        
+        // Get message type
+        const selectedType = document.querySelector('.message-type-option.selected');
+        if (!selectedType) {
+            showCustomAlert('Please select a message type');
+            return;
+        }
+        const messageType = selectedType.getAttribute('data-type');
+        
+        // Get recipients based on message type
+        let recipients = [];
+        let recipientDetails = [];
+        
+        switch(messageType) {
+            case 'individual':
+                const parentSelect = document.getElementById('individual-parent-select');
+                const parentPhone = parentSelect?.value;
+                const studentId = document.getElementById('student-select')?.value;
+                
+                if (!parentPhone) {
+                    showCustomAlert('Please select a parent');
+                    return;
+                }
+                
+                recipients = [parentPhone];
+                recipientDetails = [{
+                    parentPhone: parentPhone,
+                    studentId: studentId || '',
+                    studentName: studentId ? document.getElementById('student-select')?.options[document.getElementById('student-select').selectedIndex]?.textContent : ''
+                }];
+                break;
+                
+            case 'group':
+                const selectedCheckboxes = document.querySelectorAll('.student-select-item input[type="checkbox"]:checked');
+                if (selectedCheckboxes.length === 0) {
+                    showCustomAlert('Please select at least one parent');
+                    return;
+                }
+                
+                selectedCheckboxes.forEach(checkbox => {
+                    recipients.push(checkbox.value);
+                    recipientDetails.push({
+                        parentPhone: checkbox.value,
+                        studentId: checkbox.getAttribute('data-student-id'),
+                        studentName: checkbox.getAttribute('data-student-name')
+                    });
+                });
+                break;
+                
+            case 'management':
+                recipients = ['management'];
+                recipientDetails = [{ recipientType: 'management' }];
+                break;
+                
+            case 'all':
+                // Get all parents from students
+                const allStudentsQuery = query(
+                    collection(db, "students"),
+                    where("tutorEmail", "==", tutor.email)
+                );
+                const allStudentsSnapshot = await getDocs(allStudentsQuery);
+                
+                allStudentsSnapshot.forEach(doc => {
+                    const student = doc.data();
+                    if (student.parentPhone && !['archived', 'graduated', 'transferred'].includes(student.status)) {
+                        recipients.push(student.parentPhone);
+                        recipientDetails.push({
+                            parentPhone: student.parentPhone,
+                            studentId: doc.id,
+                            studentName: student.studentName
+                        });
+                    }
+                });
+                
+                if (recipients.length === 0) {
+                    showCustomAlert('No parents found to send message to');
+                    return;
+                }
+                break;
+        }
+        
+        // Get message data
+        const subject = document.getElementById('message-subject').value.trim();
+        const content = document.getElementById('message-content').value.trim();
+        const category = document.getElementById('message-category').value;
+        const isUrgent = document.getElementById('urgent-message').checked;
+        
+        if (!subject || !content) {
+            showCustomAlert('Please enter both subject and message content');
+            return;
+        }
+        
+        // Get attachments
+        const fileInput = document.getElementById('message-attachment');
+        const attachments = [];
+        
+        if (fileInput.files.length > 0) {
+            for (let i = 0; i < fileInput.files.length; i++) {
+                const file = fileInput.files[i];
+                attachments.push({
+                    name: file.name,
+                    size: file.size,
+                    type: file.type
+                });
+            }
+        }
+        
+        // Create message data
+        const messageData = {
+            tutorId: tutor.id,
+            tutorEmail: tutor.email,
+            tutorName: tutor.name,
+            subject: subject,
+            content: content,
+            messageType: messageType,
+            recipients: recipients,
+            recipientDetails: recipientDetails,
+            category: category || null,
+            isUrgent: isUrgent,
+            attachments: attachments.length > 0 ? attachments : null,
+            status: 'sent',
+            read: false,
+            createdAt: new Date(),
+            // For two-way communication, we need to store this in tutor_messages collection
+            // so both tutor and recipients can see the conversation
+            conversationId: `${tutor.id}_${Date.now()}`,
+            senderType: 'tutor',
+            senderName: tutor.name
+        };
+        
+        // Save message to Firestore
+        const messageRef = doc(collection(db, "tutor_messages"));
+        await setDoc(messageRef, messageData);
+        
+        // Show success message
+        let successMessage = '✅ Message sent successfully!';
+        if (messageType === 'all') {
+            successMessage = `✅ Message sent to all ${recipients.length} parents!`;
+        } else if (messageType === 'group') {
+            successMessage = `✅ Message sent to ${recipients.length} selected parent(s)!`;
+        }
+        
+        modal.remove();
+        showCustomAlert(successMessage);
+        
+        // Update unread count (though this is a sent message, not received)
+        await updateUnreadMessageCount();
+        
+    } catch (error) {
+        console.error("Error sending message:", error);
+        showCustomAlert('❌ Error sending message. Please try again.');
+    }
+}
+
+// Inbox Feature with WhatsApp-like UI (Remains mostly the same, but updated for new message structure)
 function showInboxModal() {
     const modalHTML = `
         <div class="modal-overlay">
@@ -2313,7 +3212,7 @@ function showInboxModal() {
                                         <div class="chat-avatar">💬</div>
                                         <div class="chat-header-text">
                                             <h4>Select a conversation</h4>
-                                            <p>Choose a conversation to start messaging</p>
+                                            <p>Choose a conversation to view messages</p>
                                         </div>
                                     </div>
                                 </div>
@@ -2341,11 +3240,11 @@ function showInboxModal() {
     document.body.appendChild(modal);
     
     // Load conversations
-    loadConversations();
+    loadEnhancedConversations();
     
     document.getElementById('new-message-btn').addEventListener('click', () => {
         modal.remove();
-        showMessagingModal();
+        showEnhancedMessagingModal();
     });
     
     // Close modal when clicking outside
@@ -2356,12 +3255,13 @@ function showInboxModal() {
     });
 }
 
-async function loadConversations() {
+// Load enhanced conversations (updated for new message structure)
+async function loadEnhancedConversations() {
     try {
         const tutorId = window.tutorData?.id;
         if (!tutorId) return;
         
-        // Load messages where tutor is recipient
+        // Load all messages where tutor is involved (sender or recipient)
         const messagesQuery = query(
             collection(db, "tutor_messages"),
             where("tutorId", "==", tutorId)
@@ -2375,28 +3275,33 @@ async function loadConversations() {
             const message = { id: doc.id, ...doc.data() };
             messages.push(message);
             
-            // Group by sender (management or parent)
-            const senderKey = message.senderType || 'management';
-            if (!conversations[senderKey]) {
-                conversations[senderKey] = {
-                    id: senderKey,
-                    title: senderKey === 'management' ? 'Management Team' : 'Parents',
+            // Group by conversation ID or recipient
+            const conversationKey = message.conversationId || 
+                                  (message.recipients && message.recipients[0]) || 
+                                  'general';
+            
+            if (!conversations[conversationKey]) {
+                conversations[conversationKey] = {
+                    id: conversationKey,
+                    title: getConversationTitle(message),
                     lastMessage: message,
-                    unread: message.read === false,
-                    messages: [message]
+                    unread: message.read === false && message.senderType !== 'tutor',
+                    messages: [message],
+                    recipients: message.recipients || [],
+                    recipientDetails: message.recipientDetails || []
                 };
             } else {
-                conversations[senderKey].messages.push(message);
-                if (message.createdAt > conversations[senderKey].lastMessage.createdAt) {
-                    conversations[senderKey].lastMessage = message;
+                conversations[conversationKey].messages.push(message);
+                if (message.createdAt > conversations[conversationKey].lastMessage.createdAt) {
+                    conversations[conversationKey].lastMessage = message;
                 }
-                if (message.read === false) {
-                    conversations[senderKey].unread = true;
+                if (message.read === false && message.senderType !== 'tutor') {
+                    conversations[conversationKey].unread = true;
                 }
             }
         });
         
-        renderConversationsList(Object.values(conversations));
+        renderEnhancedConversationsList(Object.values(conversations));
         
     } catch (error) {
         console.error("Error loading conversations:", error);
@@ -2410,7 +3315,27 @@ async function loadConversations() {
     }
 }
 
-function renderConversationsList(conversations) {
+// Get conversation title based on message data
+function getConversationTitle(message) {
+    if (message.messageType === 'management') {
+        return 'Management Team';
+    } else if (message.messageType === 'all') {
+        return 'All Parents';
+    } else if (message.recipientDetails && message.recipientDetails.length > 0) {
+        if (message.recipientDetails.length === 1) {
+            const detail = message.recipientDetails[0];
+            return detail.studentName ? 
+                `${detail.studentName}'s Parent` : 
+                'Parent';
+        } else {
+            return `${message.recipientDetails.length} Parents`;
+        }
+    }
+    return 'Conversation';
+}
+
+// Render enhanced conversations list
+function renderEnhancedConversationsList(conversations) {
     const container = document.getElementById('conversations-list');
     
     if (conversations.length === 0) {
@@ -2435,7 +3360,7 @@ function renderConversationsList(conversations) {
             <div class="conversation-item" data-conversation-id="${conv.id}">
                 <div class="conversation-info">
                     <div class="conversation-avatar">
-                        ${conv.id === 'management' ? '👔' : '👨‍👩‍👧‍👦'}
+                        ${conv.lastMessage.messageType === 'management' ? '👔' : '👨‍👩‍👧‍👦'}
                     </div>
                     <div class="conversation-details">
                         <div class="conversation-title">
@@ -2443,6 +3368,7 @@ function renderConversationsList(conversations) {
                             <span class="conversation-time">${formatTime(lastMessageTime)}</span>
                         </div>
                         <p class="conversation-preview">
+                            ${conv.lastMessage.senderType === 'tutor' ? 'You: ' : ''}
                             ${conv.lastMessage.content.substring(0, 50)}${conv.lastMessage.content.length > 50 ? '...' : ''}
                             ${conv.unread ? '<span class="new-message-indicator"></span>' : ''}
                         </p>
@@ -2468,12 +3394,13 @@ function renderConversationsList(conversations) {
             item.classList.add('active');
             
             // Load conversation messages
-            await loadConversationMessages(conversationId);
+            await loadEnhancedConversationMessages(conversationId);
         });
     });
 }
 
-async function loadConversationMessages(conversationId) {
+// Load enhanced conversation messages
+async function loadEnhancedConversationMessages(conversationId) {
     try {
         const tutorId = window.tutorData?.id;
         if (!tutorId) return;
@@ -2489,13 +3416,15 @@ async function loadConversationMessages(conversationId) {
         
         messagesSnapshot.forEach(doc => {
             const message = { id: doc.id, ...doc.data() };
-            const senderType = message.senderType || 'management';
+            const msgConversationId = message.conversationId || 
+                                    (message.recipients && message.recipients[0]) || 
+                                    'general';
             
-            if (senderType === conversationId) {
+            if (msgConversationId === conversationId) {
                 messages.push(message);
                 
-                // Mark as read
-                if (!message.read) {
+                // Mark as read if not already read and not sent by tutor
+                if (!message.read && message.senderType !== 'tutor') {
                     updateDoc(doc.ref, { read: true });
                 }
             }
@@ -2508,7 +3437,7 @@ async function loadConversationMessages(conversationId) {
             return timeA - timeB;
         });
         
-        renderChatMessages(messages, conversationId);
+        renderEnhancedChatMessages(messages, conversationId);
         
         // Update unread count
         await updateUnreadMessageCount();
@@ -2525,24 +3454,32 @@ async function loadConversationMessages(conversationId) {
     }
 }
 
-function renderChatMessages(messages, conversationId) {
+// Render enhanced chat messages
+function renderEnhancedChatMessages(messages, conversationId) {
     const chatMessages = document.getElementById('chat-messages');
     const chatInputArea = document.getElementById('chat-input-area');
     const chatContainer = document.getElementById('chat-container');
     const chatHeader = chatContainer.querySelector('.chat-header-info');
     
+    // Get conversation info
+    const conversation = messages[0];
+    const title = getConversationTitle(conversation);
+    
     // Update chat header
-    const title = conversationId === 'management' ? 'Management Team' : 'Parents';
     chatHeader.innerHTML = `
-        <div class="chat-avatar">${conversationId === 'management' ? '👔' : '👨‍👩‍👧‍👦'}</div>
+        <div class="chat-avatar">${conversation.messageType === 'management' ? '👔' : '👨‍👩‍👧‍👦'}</div>
         <div class="chat-header-text">
             <h4>${title}</h4>
             <p>${messages.length} messages</p>
         </div>
     `;
     
-    // Show chat input
-    chatInputArea.classList.remove('hidden');
+    // Show chat input (only for individual conversations)
+    if (conversation.messageType === 'individual' || conversation.messageType === 'group') {
+        chatInputArea.classList.remove('hidden');
+    } else {
+        chatInputArea.classList.add('hidden');
+    }
     
     // Clear existing messages
     chatMessages.innerHTML = '';
@@ -2561,13 +3498,35 @@ function renderChatMessages(messages, conversationId) {
                 ? message.createdAt.toDate() 
                 : new Date(message.createdAt);
             
-            const isSent = message.tutorId === window.tutorData?.id;
+            const isSent = message.senderType === 'tutor';
+            const senderName = isSent ? 'You' : (message.senderName || 'Management');
+            
+            // Check if message has attachments
+            const hasAttachments = message.attachments && message.attachments.length > 0;
             
             const messageHTML = `
                 <div class="message-bubble ${isSent ? 'sent' : 'received'}">
-                    ${!isSent ? `<div class="message-sender">${message.senderName || 'Management'}</div>` : ''}
+                    ${!isSent ? `<div class="message-sender">${senderName}</div>` : ''}
+                    ${message.subject && !isSent ? `<div class="message-subject">${message.subject}</div>` : ''}
                     <div class="message-content">${message.content}</div>
-                    <div class="message-time">${formatTime(messageTime)}</div>
+                    
+                    ${hasAttachments ? `
+                        <div class="message-attachments mt-2">
+                            ${message.attachments.map(attachment => `
+                                <div class="attachment-item inline-flex items-center gap-1 bg-gray-100 px-2 py-1 rounded text-xs">
+                                    <span>📎</span>
+                                    <span>${attachment.name}</span>
+                                </div>
+                            `).join('')}
+                        </div>
+                    ` : ''}
+                    
+                    ${message.isUrgent ? `<div class="urgent-badge inline-block bg-red-100 text-red-800 text-xs px-2 py-1 rounded ml-2">URGENT</div>` : ''}
+                    
+                    <div class="message-meta flex justify-between items-center mt-1">
+                        <div class="message-time">${formatTime(messageTime)}</div>
+                        ${isSent ? '<div class="message-status text-xs text-gray-500">✓ Sent</div>' : ''}
+                    </div>
                 </div>
             `;
             
@@ -2578,30 +3537,33 @@ function renderChatMessages(messages, conversationId) {
         chatMessages.scrollTop = chatMessages.scrollHeight;
     }
     
-    // Setup send message functionality
-    const sendBtn = document.getElementById('send-chat-btn');
-    const chatInput = document.getElementById('chat-input');
-    
-    // Clear existing event listeners
-    const newSendBtn = sendBtn.cloneNode(true);
-    sendBtn.parentNode.replaceChild(newSendBtn, sendBtn);
-    
-    const newChatInput = chatInput.cloneNode(true);
-    chatInput.parentNode.replaceChild(newChatInput, chatInput);
-    
-    // Add new event listener
-    document.getElementById('send-chat-btn').addEventListener('click', async () => {
-        await sendChatMessage(conversationId);
-    });
-    
-    document.getElementById('chat-input').addEventListener('keypress', async (e) => {
-        if (e.key === 'Enter') {
-            await sendChatMessage(conversationId);
-        }
-    });
+    // Setup send message functionality for individual/group conversations
+    if (conversation.messageType === 'individual' || conversation.messageType === 'group') {
+        const sendBtn = document.getElementById('send-chat-btn');
+        const chatInput = document.getElementById('chat-input');
+        
+        // Clear existing event listeners
+        const newSendBtn = sendBtn.cloneNode(true);
+        sendBtn.parentNode.replaceChild(newSendBtn, sendBtn);
+        
+        const newChatInput = chatInput.cloneNode(true);
+        chatInput.parentNode.replaceChild(newChatInput, chatInput);
+        
+        // Add new event listener
+        document.getElementById('send-chat-btn').addEventListener('click', async () => {
+            await sendReplyMessage(conversation);
+        });
+        
+        document.getElementById('chat-input').addEventListener('keypress', async (e) => {
+            if (e.key === 'Enter') {
+                await sendReplyMessage(conversation);
+            }
+        });
+    }
 }
 
-async function sendChatMessage(conversationId) {
+// Send reply message
+async function sendReplyMessage(originalConversation) {
     const chatInput = document.getElementById('chat-input');
     const messageContent = chatInput.value.trim();
     
@@ -2611,18 +3573,30 @@ async function sendChatMessage(conversationId) {
     }
     
     try {
+        const tutor = window.tutorData;
+        
+        // Create reply message data
         const messageData = {
-            tutorId: window.tutorData.id,
-            tutorEmail: window.tutorData.email,
-            tutorName: window.tutorData.name,
+            tutorId: tutor.id,
+            tutorEmail: tutor.email,
+            tutorName: tutor.name,
+            subject: `Re: ${originalConversation.subject || 'Message'}`,
             content: messageContent,
-            senderType: conversationId,
-            recipients: [conversationId],
+            messageType: originalConversation.messageType,
+            recipients: originalConversation.recipients || [],
+            recipientDetails: originalConversation.recipientDetails || [],
+            category: originalConversation.category,
+            isUrgent: false,
             status: 'sent',
             read: true,
-            createdAt: new Date()
+            createdAt: new Date(),
+            conversationId: originalConversation.conversationId || 
+                          `${originalConversation.recipients && originalConversation.recipients[0]}_${Date.now()}`,
+            senderType: 'tutor',
+            senderName: tutor.name
         };
         
+        // Save message to Firestore
         const messageRef = doc(collection(db, "tutor_messages"));
         await setDoc(messageRef, messageData);
         
@@ -2630,10 +3604,10 @@ async function sendChatMessage(conversationId) {
         chatInput.value = '';
         
         // Reload messages
-        await loadConversationMessages(conversationId);
+        await loadEnhancedConversationMessages(messageData.conversationId);
         
     } catch (error) {
-        console.error("Error sending message:", error);
+        console.error("Error sending reply message:", error);
         showCustomAlert('❌ Error sending message. Please try again.');
     }
 }
@@ -3046,18 +4020,6 @@ function renderTutorDashboard(container, tutor) {
             <p class="hero-subtitle">Manage your students, submit reports, and track progress</p>
         </div>
         
-        <!-- Messaging & Inbox Buttons -->
-        <div class="text-center mb-6">
-            <div class="action-buttons justify-center">
-                <button id="messaging-btn" class="messaging-btn">
-                    💬 Send Message
-                </button>
-                <button id="inbox-btn" class="inbox-btn">
-                    📨 Inbox
-                </button>
-            </div>
-        </div>
-        
         <div class="student-actions-container">
             <div class="student-action-card">
                 <h3 class="font-bold text-lg mb-3">📅 Schedule Management</h3>
@@ -3145,15 +4107,6 @@ function renderTutorDashboard(container, tutor) {
         </div>
     `;
 
-    // Update unread message count
-    updateUnreadMessageCount();
-    
-    // Add messaging button event listener
-    document.getElementById('messaging-btn').addEventListener('click', showMessagingModal);
-    
-    // Add inbox button event listener
-    document.getElementById('inbox-btn').addEventListener('click', showInboxModal);
-    
     // Load student dropdowns
     loadStudentDropdowns(tutor.email);
 
@@ -4756,7 +5709,7 @@ onSnapshot(settingsDocRef, (docSnap) => {
 });
 
 /*******************************************************************************
- * SECTION 15: MAIN APP INITIALIZATION
+ * SECTION 15: MAIN APP INITIALIZATION (UPDATED)
  ******************************************************************************/
 
 // Main App Initialization
@@ -4799,6 +5752,12 @@ document.addEventListener('DOMContentLoaded', async () => {
                 
                 renderTutorDashboard(document.getElementById('mainContent'), tutorData);
                 
+                // Initialize floating messaging button
+                setTimeout(() => {
+                    initializeFloatingMessagingButton();
+                    updateUnreadMessageCount(); // Check for unread messages
+                }, 1000);
+                
                 setTimeout(async () => {
                     await checkAndShowSchedulePopup(tutorData);
                 }, 2000);
@@ -4835,6 +5794,13 @@ document.addEventListener('DOMContentLoaded', async () => {
         navDashboard.addEventListener('click', () => {
             if (window.tutorData) {
                 renderTutorDashboard(document.getElementById('mainContent'), window.tutorData);
+                // Ensure floating button stays visible
+                setTimeout(() => {
+                    if (!document.querySelector('.floating-messaging-btn')) {
+                        initializeFloatingMessagingButton();
+                    }
+                    updateUnreadMessageCount();
+                }, 100);
             }
         });
     }
@@ -4844,6 +5810,13 @@ document.addEventListener('DOMContentLoaded', async () => {
         navStudentDatabase.addEventListener('click', () => {
             if (window.tutorData) {
                 renderStudentDatabase(document.getElementById('mainContent'), window.tutorData);
+                // Ensure floating button stays visible
+                setTimeout(() => {
+                    if (!document.querySelector('.floating-messaging-btn')) {
+                        initializeFloatingMessagingButton();
+                    }
+                    updateUnreadMessageCount();
+                }, 100);
             }
         });
     }
@@ -4853,6 +5826,13 @@ document.addEventListener('DOMContentLoaded', async () => {
         navAutoStudents.addEventListener('click', () => {
             if (window.tutorData) {
                 renderAutoRegisteredStudents(document.getElementById('mainContent'), window.tutorData);
+                // Ensure floating button stays visible
+                setTimeout(() => {
+                    if (!document.querySelector('.floating-messaging-btn')) {
+                        initializeFloatingMessagingButton();
+                    }
+                    updateUnreadMessageCount();
+                }, 100);
             }
         });
     }
