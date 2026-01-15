@@ -1,9 +1,16 @@
+/*******************************************************************************
+ * SECTION 1: IMPORTS & INITIAL SETUP
+ ******************************************************************************/
+
 import { auth, db } from './firebaseConfig.js';
 import { collection, getDocs, doc, updateDoc, getDoc, where, query, addDoc, writeBatch, deleteDoc, setDoc } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
 import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-auth.js";
 import { onSnapshot } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
 
-// --- Enhanced CSS for modern UI ---
+/*******************************************************************************
+ * SECTION 2: STYLES & CSS
+ ******************************************************************************/
+
 const style = document.createElement('style');
 style.textContent = `
     /* Modern UI Styles */
@@ -928,14 +935,18 @@ style.textContent = `
 `;
 document.head.appendChild(style);
 
-// --- Cloudinary Configuration ---
+/*******************************************************************************
+ * SECTION 3: CONFIGURATION & CONSTANTS
+ ******************************************************************************/
+
+// Cloudinary Configuration
 const CLOUDINARY_CONFIG = {
     cloudName: 'dwjq7j5zp',
     uploadPreset: 'tutor_homework',
     apiKey: '963245294794452'
 };
 
-// --- Global state to hold report submission status ---
+// Global state to hold report submission status
 let isSubmissionEnabled = false;
 let isTutorAddEnabled = false;
 let isSummerBreakEnabled = false;
@@ -943,7 +954,7 @@ let isBypassApprovalEnabled = false;
 let showStudentFees = false;
 let showEditDeleteButtons = false;
 
-// --- Pay Scheme Configuration ---
+// Pay Scheme Configuration
 const PAY_SCHEMES = {
     NEW_TUTOR: {
         academic: {
@@ -1032,14 +1043,14 @@ const PAY_SCHEMES = {
     }
 };
 
-// --- Subject Categorization ---
+// Subject Categorization
 const SUBJECT_CATEGORIES = {
     "Native Language": ["Yoruba", "Igbo", "Hausa"],
     "Foreign Language": ["French", "German", "Spanish", "Arabic"],
     "Specialized": ["Music", "Coding","ICT", "Chess", "Public Speaking", "English Proficiency", "Counseling Programs"]
 };
 
-// --- UPDATED: Schedule Days and Times with 24-hour support ---
+// Schedule Days and Times with 24-hour support
 const DAYS_OF_WEEK = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 
 // Create time slots from 00:00 to 23:30 in 30-minute intervals
@@ -1078,7 +1089,11 @@ TIME_SLOTS.sort((a, b) => {
     return timeToMinutes(a.value) - timeToMinutes(b.value);
 });
 
-// --- Phone Number Normalization Function ---
+/*******************************************************************************
+ * SECTION 4: UTILITY FUNCTIONS
+ ******************************************************************************/
+
+// Phone Number Normalization Function
 function normalizePhoneNumber(phone) {
     if (!phone) return '';
     
@@ -1118,7 +1133,431 @@ function normalizePhoneNumber(phone) {
     return cleaned;
 }
 
-// --- FIXED: Schedule Management Functions - Track scheduled students ---
+// Time validation to allow 12 AM to 1 AM and overnight classes
+function validateScheduleTime(start, end) {
+    const timeToMinutes = (time) => {
+        const [hours, minutes] = time.split(':').map(Number);
+        return hours * 60 + minutes;
+    };
+    
+    const startMinutes = timeToMinutes(start);
+    const endMinutes = timeToMinutes(end);
+    
+    // Allow overnight classes (e.g., 11 PM to 1 AM)
+    if (endMinutes < startMinutes) {
+        // This is an overnight class (e.g., 23:00 to 01:00)
+        // End time is actually the next day
+        const adjustedEndMinutes = endMinutes + (24 * 60);
+        const duration = adjustedEndMinutes - startMinutes;
+        
+        // Ensure minimum duration (e.g., at least 30 minutes)
+        if (duration < 30) {
+            return { valid: false, message: 'Class must be at least 30 minutes long' };
+        }
+        
+        // Ensure maximum duration (e.g., no more than 4 hours)
+        if (duration > 4 * 60) {
+            return { valid: false, message: 'Class cannot exceed 4 hours' };
+        }
+        
+        return { valid: true, isOvernight: true, duration: duration };
+    }
+    
+    // Normal daytime class
+    const duration = endMinutes - startMinutes;
+    
+    if (duration < 30) {
+        return { valid: false, message: 'Class must be at least 30 minutes long' };
+    }
+    
+    if (duration > 4 * 60) {
+        return { valid: false, message: 'Class cannot exceed 4 hours' };
+    }
+    
+    return { valid: true, isOvernight: false, duration: duration };
+}
+
+// Format file size
+function formatFileSize(bytes) {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+}
+
+// Format schedule time for display
+function formatScheduleTime(timeString) {
+    const [hour, minute] = timeString.split(':').map(Number);
+    
+    if (hour === 0 && minute === 0) {
+        return "12:00 AM (Midnight)";
+    }
+    
+    const period = hour >= 12 ? 'PM' : 'AM';
+    const displayHour = hour % 12 || 12;
+    return `${displayHour}:${minute.toString().padStart(2, '0')} ${period}`;
+}
+
+// Format time for chat display
+function formatTime(date) {
+    const now = new Date();
+    const diff = now - date;
+    
+    if (diff < 24 * 60 * 60 * 1000) {
+        // Today
+        return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    } else if (diff < 7 * 24 * 60 * 60 * 1000) {
+        // This week
+        return date.toLocaleDateString([], { weekday: 'short' });
+    } else {
+        // Older
+        return date.toLocaleDateString([], { month: 'short', day: 'numeric' });
+    }
+}
+
+// Clean grade string
+function cleanGradeString(grade) {
+    if (grade && grade.toLowerCase().includes("grade")) {
+        return grade;
+    } else {
+        return `Grade ${grade}`;
+    }
+}
+
+// Get current month and year
+function getCurrentMonthYear() {
+    const now = new Date();
+    return now.toLocaleString('default', { month: 'long', year: 'numeric' });
+}
+
+// Get most scheduled day from schedule data
+function getMostScheduledDay(scheduleByDay) {
+    let maxDay = '';
+    let maxCount = 0;
+    
+    DAYS_OF_WEEK.forEach(day => {
+        if (scheduleByDay[day].length > maxCount) {
+            maxCount = scheduleByDay[day].length;
+            maxDay = day;
+        }
+    });
+    
+    return maxDay ? `${maxDay} (${maxCount} classes)` : 'None';
+}
+
+// Get earliest class from schedule data
+function getEarliestClass(scheduleByDay) {
+    let earliestTime = "23:59";
+    let earliestInfo = "";
+    
+    DAYS_OF_WEEK.forEach(day => {
+        scheduleByDay[day].forEach(event => {
+            if (event.start < earliestTime) {
+                earliestTime = event.start;
+                earliestInfo = `${formatScheduleTime(event.start)} (${event.student} - ${day})`;
+            }
+        });
+    });
+    
+    return earliestInfo || "No classes scheduled";
+}
+
+// Find specialized subject
+function findSpecializedSubject(subjects) {
+    for (const [category, subjectList] of Object.entries(SUBJECT_CATEGORIES)) {
+        for (const subject of subjects) {
+            if (subjectList.includes(subject)) {
+                return { category, subject };
+            }
+        }
+    }
+    return null;
+}
+
+// Get tutor pay scheme based on employment date
+function getTutorPayScheme(tutor) {
+    if (tutor.isManagementStaff) return PAY_SCHEMES.MANAGEMENT;
+    
+    if (!tutor.employmentDate) return PAY_SCHEMES.NEW_TUTOR;
+    
+    const employmentDate = new Date(tutor.employmentDate + '-01');
+    const currentDate = new Date();
+    const monthsDiff = (currentDate.getFullYear() - employmentDate.getFullYear()) * 12 + 
+                      (currentDate.getMonth() - employmentDate.getMonth());
+    
+    return monthsDiff >= 12 ? PAY_SCHEMES.OLD_TUTOR : PAY_SCHEMES.NEW_TUTOR;
+}
+
+// Calculate suggested fee based on student and pay scheme
+function calculateSuggestedFee(student, payScheme) {
+    const grade = student.grade;
+    const days = parseInt(student.days) || 0;
+    const subjects = student.subjects || [];
+    
+    const specializedSubject = findSpecializedSubject(subjects);
+    if (specializedSubject) {
+        const isGroupClass = student.groupClass || false;
+        const feeType = isGroupClass ? 'group' : 'individual';
+        return payScheme.specialized[feeType][specializedSubject.category] || 0;
+    }
+    
+    let gradeCategory = "Grade 3-8";
+    
+    if (grade === "Preschool" || grade === "Kindergarten" || grade.includes("Grade 1") || grade.includes("Grade 2")) {
+        gradeCategory = "Preschool-Grade 2";
+    } else if (parseInt(grade.replace('Grade ', '')) >= 9) {
+        return 0;
+    }
+    
+    const isSubjectTeacher = subjects.some(subj => ["Math", "English", "Science"].includes(subj)) && 
+                            parseInt(grade.replace('Grade ', '')) >= 5;
+    
+    if (isSubjectTeacher) {
+        return payScheme.academic["Subject Teachers"][days] || 0;
+    } else {
+        return payScheme.academic[gradeCategory][days] || 0;
+    }
+}
+
+// Show custom alert
+function showCustomAlert(message) {
+    const alertModal = document.createElement('div');
+    alertModal.className = 'modal-overlay';
+    alertModal.innerHTML = `
+        <div class="modal-content max-w-sm">
+            <div class="modal-body">
+                <p class="mb-4 text-center">${message}</p>
+                <div class="flex justify-center">
+                    <button id="alert-ok-btn" class="btn btn-primary">OK</button>
+                </div>
+            </div>
+        </div>`;
+    document.body.appendChild(alertModal);
+    document.getElementById('alert-ok-btn').addEventListener('click', () => alertModal.remove());
+}
+
+// Update active tab
+function updateActiveTab(activeTabId) {
+    const navTabs = ['navDashboard', 'navStudentDatabase', 'navAutoStudents'];
+    navTabs.forEach(tabId => {
+        const tab = document.getElementById(tabId);
+        if (tab) {
+            if (tabId === activeTabId) {
+                tab.classList.add('active');
+            } else {
+                tab.classList.remove('active');
+            }
+        }
+    });
+}
+
+/*******************************************************************************
+ * SECTION 5: STORAGE MANAGEMENT (Firestore & LocalStorage)
+ ******************************************************************************/
+
+// Firestore Functions for Report Persistence
+async function saveReportsToFirestore(tutorEmail, reports) {
+    try {
+        const reportRef = doc(db, "tutor_saved_reports", tutorEmail);
+        await setDoc(reportRef, {
+            reports: reports,
+            lastUpdated: new Date()
+        }, { merge: true });
+    } catch (error) {
+        console.warn('Error saving to Firestore:', error);
+        saveReportsToLocalStorage(tutorEmail, reports);
+    }
+}
+
+async function loadReportsFromFirestore(tutorEmail) {
+    try {
+        const reportRef = doc(db, "tutor_saved_reports", tutorEmail);
+        const docSnap = await getDoc(reportRef);
+        
+        if (docSnap.exists()) {
+            const data = docSnap.data();
+            return data.reports || {};
+        } else {
+            return loadReportsFromLocalStorage(tutorEmail);
+        }
+    } catch (error) {
+        console.warn('Error loading from Firestore, using localStorage:', error);
+        return loadReportsFromLocalStorage(tutorEmail);
+    }
+}
+
+async function clearAllReportsFromFirestore(tutorEmail) {
+    try {
+        const reportRef = doc(db, "tutor_saved_reports", tutorEmail);
+        await updateDoc(reportRef, {
+            reports: {},
+            lastUpdated: new Date()
+        });
+    } catch (error) {
+        console.warn('Error clearing Firestore reports:', error);
+        clearAllReportsFromLocalStorage(tutorEmail);
+    }
+}
+
+// Local Storage Functions
+const getLocalReportsKey = (tutorEmail) => `savedReports_${tutorEmail}`;
+
+function saveReportsToLocalStorage(tutorEmail, reports) {
+    try {
+        const key = getLocalReportsKey(tutorEmail);
+        localStorage.setItem(key, JSON.stringify(reports));
+    } catch (error) {
+        console.warn('Error saving to local storage:', error);
+    }
+}
+
+function loadReportsFromLocalStorage(tutorEmail) {
+    try {
+        const key = getLocalReportsKey(tutorEmail);
+        const saved = localStorage.getItem(key);
+        return saved ? JSON.parse(saved) : {};
+    } catch (error) {
+        console.warn('Error loading from local storage, using empty object:', error);
+        return {};
+    }
+}
+
+function clearAllReportsFromLocalStorage(tutorEmail) {
+    try {
+        const key = getLocalReportsKey(tutorEmail);
+        localStorage.removeItem(key);
+    } catch (error) {
+        console.warn('Error clearing local storage:', error);
+    }
+}
+
+/*******************************************************************************
+ * SECTION 6: EMPLOYMENT & TIN MANAGEMENT
+ ******************************************************************************/
+
+// Employment Date Functions
+function shouldShowEmploymentPopup(tutor) {
+    if (tutor.employmentDate) return false;
+    
+    const lastPopupShown = localStorage.getItem(`employmentPopup_${tutor.email}`);
+    const currentMonth = new Date().toISOString().slice(0, 7);
+    
+    return !lastPopupShown || lastPopupShown !== currentMonth;
+}
+
+function showEmploymentDatePopup(tutor) {
+    const popupHTML = `
+        <div class="modal-overlay">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3 class="modal-title">📋 Employment Information</h3>
+                </div>
+                <div class="modal-body">
+                    <p class="text-sm text-gray-600 mb-4">Please provide your employment start date to help us calculate your payments accurately.</p>
+                    <div class="form-group">
+                        <label class="form-label">Month & Year of Employment</label>
+                        <input type="month" id="employment-date" class="form-input" max="${new Date().toISOString().slice(0, 7)}">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button id="save-employment-btn" class="btn btn-primary">Save</button>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    const popup = document.createElement('div');
+    popup.innerHTML = popupHTML;
+    document.body.appendChild(popup);
+
+    document.getElementById('save-employment-btn').addEventListener('click', async () => {
+        const employmentDate = document.getElementById('employment-date').value;
+        if (!employmentDate) {
+            showCustomAlert('Please select your employment month and year.');
+            return;
+        }
+
+        try {
+            const tutorRef = doc(db, "tutors", tutor.id);
+            await updateDoc(tutorRef, { employmentDate: employmentDate });
+            localStorage.setItem(`employmentPopup_${tutor.email}`, new Date().toISOString().slice(0, 7));
+            popup.remove();
+            showCustomAlert('✅ Employment date saved successfully!');
+            window.tutorData.employmentDate = employmentDate;
+        } catch (error) {
+            console.error("Error saving employment date:", error);
+            showCustomAlert('❌ Error saving employment date. Please try again.');
+        }
+    });
+}
+
+// TIN Functions
+function shouldShowTINPopup(tutor) {
+    if (tutor.tinNumber) return false;
+    
+    const lastPopupShown = localStorage.getItem(`tinPopup_${tutor.email}`);
+    const currentMonth = new Date().toISOString().slice(0, 7);
+    
+    return !lastPopupShown || lastPopupShown !== currentMonth;
+}
+
+function showTINPopup(tutor) {
+    const popupHTML = `
+        <div class="modal-overlay">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3 class="modal-title">📋 Tax Identification Number (TIN)</h3>
+                </div>
+                <div class="modal-body">
+                    <p class="text-sm text-gray-600 mb-4">Please provide your TIN for payment processing and tax documentation.</p>
+                    <div class="form-group">
+                        <label class="form-label">Tax Identification Number (TIN)</label>
+                            <input type="text" id="tin-number" class="form-input" placeholder="Enter your TIN" maxlength="20">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button id="no-tin-btn" class="btn btn-secondary">I don't have TIN</button>
+                    <button id="save-tin-btn" class="btn btn-primary">Save TIN</button>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    const popup = document.createElement('div');
+    popup.innerHTML = popupHTML;
+    document.body.appendChild(popup);
+
+    document.getElementById('no-tin-btn').addEventListener('click', () => {
+        localStorage.setItem(`tinPopup_${tutor.email}`, new Date().toISOString().slice(0, 7));
+        popup.remove();
+    });
+
+    document.getElementById('save-tin-btn').addEventListener('click', async () => {
+        const tinNumber = document.getElementById('tin-number').value.trim();
+        if (!tinNumber) {
+            showCustomAlert('Please enter your TIN or click "I don\'t have TIN".');
+            return;
+        }
+
+        try {
+            const tutorRef = doc(db, "tutors", tutor.id);
+            await updateDoc(tutorRef, { tinNumber: tinNumber });
+            popup.remove();
+            showCustomAlert('✅ TIN saved successfully!');
+            window.tutorData.tinNumber = tinNumber;
+        } catch (error) {
+            console.error("Error saving TIN:", error);
+            showCustomAlert('❌ Error saving TIN. Please try again.');
+        }
+    });
+}
+
+/*******************************************************************************
+ * SECTION 7: SCHEDULE MANAGEMENT
+ ******************************************************************************/
+
+// Schedule Management Functions - Track scheduled students
 let allStudents = [];
 let scheduledStudents = new Set(); // Track students with schedules
 let currentStudentIndex = 0;
@@ -1165,50 +1604,6 @@ async function checkAndShowSchedulePopup(tutor) {
         showCustomAlert('Error loading students. Please try again.');
         return false;
     }
-}
-
-// --- FIXED: Time validation to allow 12 AM to 1 AM and overnight classes ---
-function validateScheduleTime(start, end) {
-    const timeToMinutes = (time) => {
-        const [hours, minutes] = time.split(':').map(Number);
-        return hours * 60 + minutes;
-    };
-    
-    const startMinutes = timeToMinutes(start);
-    const endMinutes = timeToMinutes(end);
-    
-    // Allow overnight classes (e.g., 11 PM to 1 AM)
-    if (endMinutes < startMinutes) {
-        // This is an overnight class (e.g., 23:00 to 01:00)
-        // End time is actually the next day
-        const adjustedEndMinutes = endMinutes + (24 * 60);
-        const duration = adjustedEndMinutes - startMinutes;
-        
-        // Ensure minimum duration (e.g., at least 30 minutes)
-        if (duration < 30) {
-            return { valid: false, message: 'Class must be at least 30 minutes long' };
-        }
-        
-        // Ensure maximum duration (e.g., no more than 4 hours)
-        if (duration > 4 * 60) {
-            return { valid: false, message: 'Class cannot exceed 4 hours' };
-        }
-        
-        return { valid: true, isOvernight: true, duration: duration };
-    }
-    
-    // Normal daytime class
-    const duration = endMinutes - startMinutes;
-    
-    if (duration < 30) {
-        return { valid: false, message: 'Class must be at least 30 minutes long' };
-    }
-    
-    if (duration > 4 * 60) {
-        return { valid: false, message: 'Class cannot exceed 4 hours' };
-    }
-    
-    return { valid: true, isOvernight: false, duration: duration };
 }
 
 function showBulkSchedulePopup(student, tutor, totalCount = 0) {
@@ -1380,7 +1775,11 @@ function showBulkSchedulePopup(student, tutor, totalCount = 0) {
     });
 }
 
-// --- SIMPLIFIED: Daily Topic Functions ---
+/*******************************************************************************
+ * SECTION 8: DAILY TOPIC & HOMEWORK MANAGEMENT
+ ******************************************************************************/
+
+// Daily Topic Functions
 function showDailyTopicModal(student) {
     const modalHTML = `
         <div class="modal-overlay">
@@ -1440,7 +1839,7 @@ function showDailyTopicModal(student) {
     });
 }
 
-// --- UPDATED: Homework Assignment Functions with REAL Cloudinary Upload ---
+// Homework Assignment Functions with REAL Cloudinary Upload
 async function uploadToCloudinary(file, studentId) {
     return new Promise((resolve, reject) => {
         const formData = new FormData();
@@ -1672,14 +2071,6 @@ function showHomeworkModal(student) {
     });
 }
 
-function formatFileSize(bytes) {
-    if (bytes === 0) return '0 Bytes';
-    const k = 1024;
-    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
-}
-
 async function scheduleEmailReminder(hwData, fileUrl = '') {
     try {
         const dueDate = new Date(hwData.dueDate);
@@ -1713,7 +2104,11 @@ async function scheduleEmailReminder(hwData, fileUrl = '') {
     }
 }
 
-// --- ENHANCED: Messaging Feature with Inbox ---
+/*******************************************************************************
+ * SECTION 9: MESSAGING & INBOX FEATURES
+ ******************************************************************************/
+
+// Messaging Feature with Inbox
 let unreadMessageCount = 0;
 
 async function updateUnreadMessageCount() {
@@ -1889,7 +2284,7 @@ function showMessagingModal() {
     });
 }
 
-// --- NEW: Inbox Feature with WhatsApp-like UI ---
+// Inbox Feature with WhatsApp-like UI
 function showInboxModal() {
     const modalHTML = `
         <div class="modal-overlay">
@@ -2243,23 +2638,11 @@ async function sendChatMessage(conversationId) {
     }
 }
 
-function formatTime(date) {
-    const now = new Date();
-    const diff = now - date;
-    
-    if (diff < 24 * 60 * 60 * 1000) {
-        // Today
-        return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    } else if (diff < 7 * 24 * 60 * 60 * 1000) {
-        // This week
-        return date.toLocaleDateString([], { weekday: 'short' });
-    } else {
-        // Older
-        return date.toLocaleDateString([], { month: 'short', day: 'numeric' });
-    }
-}
+/*******************************************************************************
+ * SECTION 10: SCHEDULE CALENDAR VIEW
+ ******************************************************************************/
 
-// --- NEW: View Schedule Calendar for All Students ---
+// View Schedule Calendar for All Students
 function showScheduleCalendarModal() {
     const modalHTML = `
         <div class="modal-overlay">
@@ -2448,7 +2831,7 @@ function renderCalendarView(students) {
     });
 }
 
-// --- FIXED: Edit schedule modal with proper time validation ---
+// Edit Schedule Modal
 function showEditScheduleModal(student) {
     const modalHTML = `
         <div class="modal-overlay">
@@ -2511,8 +2894,7 @@ function showEditScheduleModal(student) {
                                     </div>
                                 </div>
                                 <button class="btn btn-danger btn-sm mt-2 remove-schedule-btn hidden">Remove</button>
-                            </div>`
-                                                  }
+                            </div>`}
                     </div>
                     
                     <button id="add-schedule-entry" class="btn btn-secondary btn-sm mt-2">
@@ -2612,36 +2994,6 @@ function showEditScheduleModal(student) {
     });
 }
 
-function getMostScheduledDay(scheduleByDay) {
-    let maxDay = '';
-    let maxCount = 0;
-    
-    DAYS_OF_WEEK.forEach(day => {
-        if (scheduleByDay[day].length > maxCount) {
-            maxCount = scheduleByDay[day].length;
-            maxDay = day;
-        }
-    });
-    
-    return maxDay ? `${maxDay} (${maxCount} classes)` : 'None';
-}
-
-function getEarliestClass(scheduleByDay) {
-    let earliestTime = "23:59";
-    let earliestInfo = "";
-    
-    DAYS_OF_WEEK.forEach(day => {
-        scheduleByDay[day].forEach(event => {
-            if (event.start < earliestTime) {
-                earliestTime = event.start;
-                earliestInfo = `${formatScheduleTime(event.start)} (${event.student} - ${day})`;
-            }
-        });
-    });
-    
-    return earliestInfo || "No classes scheduled";
-}
-
 function printCalendar() {
     const calendarContent = document.getElementById('calendar-view').innerHTML;
     const printWindow = window.open('', '_blank');
@@ -2676,295 +3028,14 @@ function printCalendar() {
     `);
 }
 
-function formatScheduleTime(timeString) {
-    const [hour, minute] = timeString.split(':').map(Number);
-    
-    if (hour === 0 && minute === 0) {
-        return "12:00 AM (Midnight)";
-    }
-    
-    const period = hour >= 12 ? 'PM' : 'AM';
-    const displayHour = hour % 12 || 12;
-    return `${displayHour}:${minute.toString().padStart(2, '0')} ${period}`;
-}
-
-// --- Firestore Functions for Report Persistence ---
-async function saveReportsToFirestore(tutorEmail, reports) {
-    try {
-        const reportRef = doc(db, "tutor_saved_reports", tutorEmail);
-        await setDoc(reportRef, {
-            reports: reports,
-            lastUpdated: new Date()
-        }, { merge: true });
-    } catch (error) {
-        console.warn('Error saving to Firestore:', error);
-        saveReportsToLocalStorage(tutorEmail, reports);
-    }
-}
-
-async function loadReportsFromFirestore(tutorEmail) {
-    try {
-        const reportRef = doc(db, "tutor_saved_reports", tutorEmail);
-        const docSnap = await getDoc(reportRef);
-        
-        if (docSnap.exists()) {
-            const data = docSnap.data();
-            return data.reports || {};
-        } else {
-            return loadReportsFromLocalStorage(tutorEmail);
-        }
-    } catch (error) {
-        console.warn('Error loading from Firestore, using localStorage:', error);
-        return loadReportsFromLocalStorage(tutorEmail);
-    }
-}
-
-async function clearAllReportsFromFirestore(tutorEmail) {
-    try {
-        const reportRef = doc(db, "tutor_saved_reports", tutorEmail);
-        await updateDoc(reportRef, {
-            reports: {},
-            lastUpdated: new Date()
-        });
-    } catch (error) {
-        console.warn('Error clearing Firestore reports:', error);
-        clearAllReportsFromLocalStorage(tutorEmail);
-    }
-}
-
-// --- Local Storage Functions ---
-const getLocalReportsKey = (tutorEmail) => `savedReports_${tutorEmail}`;
-
-function saveReportsToLocalStorage(tutorEmail, reports) {
-    try {
-        const key = getLocalReportsKey(tutorEmail);
-        localStorage.setItem(key, JSON.stringify(reports));
-    } catch (error) {
-        console.warn('Error saving to local storage:', error);
-    }
-}
-
-function loadReportsFromLocalStorage(tutorEmail) {
-    try {
-        const key = getLocalReportsKey(tutorEmail);
-        const saved = localStorage.getItem(key);
-        return saved ? JSON.parse(saved) : {};
-    } catch (error) {
-        console.warn('Error loading from local storage, using empty object:', error);
-        return {};
-    }
-}
-
-function clearAllReportsFromLocalStorage(tutorEmail) {
-    try {
-        const key = getLocalReportsKey(tutorEmail);
-        localStorage.removeItem(key);
-    } catch (error) {
-        console.warn('Error clearing local storage:', error);
-    }
-}
-
-// --- Employment Date Functions ---
-function shouldShowEmploymentPopup(tutor) {
-    if (tutor.employmentDate) return false;
-    
-    const lastPopupShown = localStorage.getItem(`employmentPopup_${tutor.email}`);
-    const currentMonth = new Date().toISOString().slice(0, 7);
-    
-    return !lastPopupShown || lastPopupShown !== currentMonth;
-}
-
-function showEmploymentDatePopup(tutor) {
-    const popupHTML = `
-        <div class="modal-overlay">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h3 class="modal-title">📋 Employment Information</h3>
-                </div>
-                <div class="modal-body">
-                    <p class="text-sm text-gray-600 mb-4">Please provide your employment start date to help us calculate your payments accurately.</p>
-                    <div class="form-group">
-                        <label class="form-label">Month & Year of Employment</label>
-                        <input type="month" id="employment-date" class="form-input" max="${new Date().toISOString().slice(0, 7)}">
-                    </div>
-                </div>
-                <div class="modal-footer">
-                    <button id="save-employment-btn" class="btn btn-primary">Save</button>
-                </div>
-            </div>
-        </div>
-    `;
-    
-    const popup = document.createElement('div');
-    popup.innerHTML = popupHTML;
-    document.body.appendChild(popup);
-
-    document.getElementById('save-employment-btn').addEventListener('click', async () => {
-        const employmentDate = document.getElementById('employment-date').value;
-        if (!employmentDate) {
-            showCustomAlert('Please select your employment month and year.');
-            return;
-        }
-
-        try {
-            const tutorRef = doc(db, "tutors", tutor.id);
-            await updateDoc(tutorRef, { employmentDate: employmentDate });
-            localStorage.setItem(`employmentPopup_${tutor.email}`, new Date().toISOString().slice(0, 7));
-            popup.remove();
-            showCustomAlert('✅ Employment date saved successfully!');
-            window.tutorData.employmentDate = employmentDate;
-        } catch (error) {
-            console.error("Error saving employment date:", error);
-            showCustomAlert('❌ Error saving employment date. Please try again.');
-        }
-    });
-}
-
-// --- TIN Functions ---
-function shouldShowTINPopup(tutor) {
-    if (tutor.tinNumber) return false;
-    
-    const lastPopupShown = localStorage.getItem(`tinPopup_${tutor.email}`);
-    const currentMonth = new Date().toISOString().slice(0, 7);
-    
-    return !lastPopupShown || lastPopupShown !== currentMonth;
-}
-
-function showTINPopup(tutor) {
-    const popupHTML = `
-        <div class="modal-overlay">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h3 class="modal-title">📋 Tax Identification Number (TIN)</h3>
-                </div>
-                <div class="modal-body">
-                    <p class="text-sm text-gray-600 mb-4">Please provide your TIN for payment processing and tax documentation.</p>
-                    <div class="form-group">
-                        <label class="form-label">Tax Identification Number (TIN)</label>
-                            <input type="text" id="tin-number" class="form-input" placeholder="Enter your TIN" maxlength="20">
-                    </div>
-                </div>
-                <div class="modal-footer">
-                    <button id="no-tin-btn" class="btn btn-secondary">I don't have TIN</button>
-                    <button id="save-tin-btn" class="btn btn-primary">Save TIN</button>
-                </div>
-            </div>
-        </div>
-    `;
-    
-    const popup = document.createElement('div');
-    popup.innerHTML = popupHTML;
-    document.body.appendChild(popup);
-
-    document.getElementById('no-tin-btn').addEventListener('click', () => {
-        localStorage.setItem(`tinPopup_${tutor.email}`, new Date().toISOString().slice(0, 7));
-        popup.remove();
-    });
-
-    document.getElementById('save-tin-btn').addEventListener('click', async () => {
-        const tinNumber = document.getElementById('tin-number').value.trim();
-        if (!tinNumber) {
-            showCustomAlert('Please enter your TIN or click "I don\'t have TIN".');
-            return;
-        }
-
-        try {
-            const tutorRef = doc(db, "tutors", tutor.id);
-            await updateDoc(tutorRef, { tinNumber: tinNumber });
-            popup.remove();
-            showCustomAlert('✅ TIN saved successfully!');
-            window.tutorData.tinNumber = tinNumber;
-        } catch (error) {
-            console.error("Error saving TIN:", error);
-            showCustomAlert('❌ Error saving TIN. Please try again.');
-        }
-    });
-}
-
-function getTutorPayScheme(tutor) {
-    if (tutor.isManagementStaff) return PAY_SCHEMES.MANAGEMENT;
-    
-    if (!tutor.employmentDate) return PAY_SCHEMES.NEW_TUTOR;
-    
-    const employmentDate = new Date(tutor.employmentDate + '-01');
-    const currentDate = new Date();
-    const monthsDiff = (currentDate.getFullYear() - employmentDate.getFullYear()) * 12 + 
-                      (currentDate.getMonth() - employmentDate.getMonth());
-    
-    return monthsDiff >= 12 ? PAY_SCHEMES.OLD_TUTOR : PAY_SCHEMES.NEW_TUTOR;
-}
-
-function calculateSuggestedFee(student, payScheme) {
-    const grade = student.grade;
-    const days = parseInt(student.days) || 0;
-    const subjects = student.subjects || [];
-    
-    const specializedSubject = findSpecializedSubject(subjects);
-    if (specializedSubject) {
-        const isGroupClass = student.groupClass || false;
-        const feeType = isGroupClass ? 'group' : 'individual';
-        return payScheme.specialized[feeType][specializedSubject.category] || 0;
-    }
-    
-    let gradeCategory = "Grade 3-8";
-    
-    if (grade === "Preschool" || grade === "Kindergarten" || grade.includes("Grade 1") || grade.includes("Grade 2")) {
-        gradeCategory = "Preschool-Grade 2";
-    } else if (parseInt(grade.replace('Grade ', '')) >= 9) {
-        return 0;
-    }
-    
-    const isSubjectTeacher = subjects.some(subj => ["Math", "English", "Science"].includes(subj)) && 
-                            parseInt(grade.replace('Grade ', '')) >= 5;
-    
-    if (isSubjectTeacher) {
-        return payScheme.academic["Subject Teachers"][days] || 0;
-    } else {
-        return payScheme.academic[gradeCategory][days] || 0;
-    }
-}
-
-function findSpecializedSubject(subjects) {
-    for (const [category, subjectList] of Object.entries(SUBJECT_CATEGORIES)) {
-        for (const subject of subjects) {
-            if (subjectList.includes(subject)) {
-                return { category, subject };
-            }
-        }
-    }
-    return null;
-}
-
-function getCurrentMonthYear() {
-    const now = new Date();
-    return now.toLocaleString('default', { month: 'long', year: 'numeric' });
-}
-
-// Listen for changes to admin settings
-const settingsDocRef = doc(db, "settings", "global_settings");
-onSnapshot(settingsDocRef, (docSnap) => {
-    if (docSnap.exists()) {
-        const data = docSnap.data();
-        isSubmissionEnabled = data.isReportEnabled;
-        isTutorAddEnabled = data.isTutorAddEnabled;
-        isSummerBreakEnabled = data.isSummerBreakEnabled;
-        isBypassApprovalEnabled = data.bypassPendingApproval;
-        showStudentFees = data.showStudentFees;
-        showEditDeleteButtons = data.showEditDeleteButtons;
-
-        const mainContent = document.getElementById('mainContent');
-        if (mainContent.querySelector('#student-list-view')) {
-            renderStudentDatabase(mainContent, window.tutorData);
-        }
-    }
-});
+/*******************************************************************************
+ * SECTION 11: TUTOR DASHBOARD
+ ******************************************************************************/
 
 // Cache for students
 let studentCache = [];
 
-// ##################################################################
-// # ENHANCED TUTOR DASHBOARD - WITH MESSAGING & INBOX FEATURES
-// ##################################################################
+// Enhanced Tutor Dashboard - WITH MESSAGING & INBOX FEATURES
 function renderTutorDashboard(container, tutor) {
     // Update active tab
     updateActiveTab('navDashboard');
@@ -3528,9 +3599,11 @@ async function loadTutorReports(tutorEmail, parentName = null, statusFilter = nu
     }
 }
 
-// ##################################################################
-// # ENHANCED STUDENT DATABASE
-// ##################################################################
+/*******************************************************************************
+ * SECTION 12: STUDENT DATABASE MANAGEMENT
+ ******************************************************************************/
+
+// Enhanced Student Database
 function getNewStudentFormFields() {
     const gradeOptions = `
         <option value="">Select Grade</option>
@@ -3613,14 +3686,6 @@ function getNewStudentFormFields() {
             </label>
         </div>
     `;
-}
-
-function cleanGradeString(grade) {
-    if (grade && grade.toLowerCase().includes("grade")) {
-        return grade;
-    } else {
-        return `Grade ${grade}`;
-    }
 }
 
 function showEditStudentModal(student) {
@@ -4525,9 +4590,11 @@ async function renderStudentDatabase(container, tutor) {
     renderUI();
 }
 
-// ##################################################################
-// # AUTO-REGISTERED STUDENTS FUNCTIONS
-// ##################################################################
+/*******************************************************************************
+ * SECTION 13: AUTO-REGISTERED STUDENTS MANAGEMENT
+ ******************************************************************************/
+
+// Auto-Registered Students Functions
 function renderAutoRegisteredStudents(container, tutor) {
     container.innerHTML = `
         <div class="card">
@@ -4665,41 +4732,34 @@ function renderAutoStudentsList(students) {
     });
 }
 
-// Utility function for updating active tab
-function updateActiveTab(activeTabId) {
-    const navTabs = ['navDashboard', 'navStudentDatabase', 'navAutoStudents'];
-    navTabs.forEach(tabId => {
-        const tab = document.getElementById(tabId);
-        if (tab) {
-            if (tabId === activeTabId) {
-                tab.classList.add('active');
-            } else {
-                tab.classList.remove('active');
-            }
+/*******************************************************************************
+ * SECTION 14: ADMIN SETTINGS LISTENER
+ ******************************************************************************/
+
+// Listen for changes to admin settings
+const settingsDocRef = doc(db, "settings", "global_settings");
+onSnapshot(settingsDocRef, (docSnap) => {
+    if (docSnap.exists()) {
+        const data = docSnap.data();
+        isSubmissionEnabled = data.isReportEnabled;
+        isTutorAddEnabled = data.isTutorAddEnabled;
+        isSummerBreakEnabled = data.isSummerBreakEnabled;
+        isBypassApprovalEnabled = data.bypassPendingApproval;
+        showStudentFees = data.showStudentFees;
+        showEditDeleteButtons = data.showEditDeleteButtons;
+
+        const mainContent = document.getElementById('mainContent');
+        if (mainContent.querySelector('#student-list-view')) {
+            renderStudentDatabase(mainContent, window.tutorData);
         }
-    });
-}
+    }
+});
 
-// Utility function for showing custom alerts
-function showCustomAlert(message) {
-    const alertModal = document.createElement('div');
-    alertModal.className = 'modal-overlay';
-    alertModal.innerHTML = `
-        <div class="modal-content max-w-sm">
-            <div class="modal-body">
-                <p class="mb-4 text-center">${message}</p>
-                <div class="flex justify-center">
-                    <button id="alert-ok-btn" class="btn btn-primary">OK</button>
-                </div>
-            </div>
-        </div>`;
-    document.body.appendChild(alertModal);
-    document.getElementById('alert-ok-btn').addEventListener('click', () => alertModal.remove());
-}
+/*******************************************************************************
+ * SECTION 15: MAIN APP INITIALIZATION
+ ******************************************************************************/
 
-// ##################################################################
-// # MAIN APP INITIALIZATION
-// ##################################################################
+// Main App Initialization
 document.addEventListener('DOMContentLoaded', async () => {
     onAuthStateChanged(auth, async (user) => {
         if (user) {
@@ -4797,4 +4857,3 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
     }
 });
-
