@@ -192,10 +192,9 @@ async function loadReferralRewards(parentUid) {
         const referralCode = userData.referralCode || 'N/A';
         const totalEarnings = userData.referralEarnings || 0;
         
-        // Query referral transactions
+        // Query referral transactions - NO COMPOSITE INDEX NEEDED
         const transactionsSnapshot = await db.collection('referral_transactions')
             .where('ownerUid', '==', parentUid)
-            .orderBy('timestamp', 'desc')
             .get();
 
         let referralsHtml = '';
@@ -208,8 +207,16 @@ async function loadReferralRewards(parentUid) {
                 <tr><td colspan="4" class="text-center py-4 text-gray-500">No one has used your referral code yet.</td></tr>
             `;
         } else {
-            transactionsSnapshot.forEach(doc => {
-                const data = doc.data();
+            const transactions = transactionsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            
+            // Sort manually by timestamp descending
+            transactions.sort((a, b) => {
+                const aTime = a.timestamp?.toDate?.() || new Date(0);
+                const bTime = b.timestamp?.toDate?.() || new Date(0);
+                return bTime - aTime;
+            });
+            
+            transactions.forEach(data => {
                 const status = data.status || 'pending';
                 const statusColor = status === 'paid' ? 'bg-green-100 text-green-800' : 
                                     status === 'approved' ? 'bg-blue-100 text-blue-800' : 
@@ -221,7 +228,7 @@ async function loadReferralRewards(parentUid) {
 
                 const referredName = capitalize(data.referredStudentName || data.referredStudentPhone);
                 const rewardAmount = data.rewardAmount ? `₦${data.rewardAmount.toLocaleString()}` : '₦5,000';
-                const referralDate = data.timestamp?.toDate().toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }) || 'N/A';
+                const referralDate = data.timestamp?.toDate?.().toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }) || 'N/A';
 
                 referralsHtml += `
                     <tr class="hover:bg-gray-50">
@@ -363,7 +370,7 @@ async function findParentNameFromStudents(parentPhone) {
     }
 }
 
-// Find student IDs for a parent's phone number
+// Find student IDs for a parent's phone number - FIXED TO SHOW ALL STUDENTS
 async function findStudentIdsForParent(parentPhone) {
     try {
         console.log("Finding student IDs for parent phone:", parentPhone);
@@ -372,11 +379,12 @@ async function findStudentIdsForParent(parentPhone) {
         const normalizedPhone = normalizePhoneNumber(parentPhone);
         if (!normalizedPhone.valid) {
             console.log("Invalid phone number format");
-            return { studentIds: [], studentNameIdMap: new Map() };
+            return { studentIds: [], studentNameIdMap: new Map(), allStudentData: [] };
         }
 
         let studentIds = [];
         let studentNameIdMap = new Map();
+        let allStudentData = [];
         
         // Search in students collection
         const studentsSnapshot = await db.collection("students")
@@ -393,6 +401,7 @@ async function findStudentIdsForParent(parentPhone) {
                     studentIds.push(studentId);
                 }
                 studentNameIdMap.set(studentName, studentId);
+                allStudentData.push({ id: studentId, name: studentName, data: studentData });
                 console.log(`Found student: ${studentName} (ID: ${studentId})`);
             }
         });
@@ -412,6 +421,7 @@ async function findStudentIdsForParent(parentPhone) {
                     studentIds.push(studentId);
                 }
                 studentNameIdMap.set(studentName, studentId);
+                allStudentData.push({ id: studentId, name: studentName, data: studentData, isPending: true });
                 console.log(`Found pending student: ${studentName} (ID: ${studentId})`);
             }
         });
@@ -422,10 +432,10 @@ async function findStudentIdsForParent(parentPhone) {
         console.log("Total student IDs found:", studentIds.length);
         console.log("Student name to ID mapping:", Object.fromEntries(studentNameIdMap));
         
-        return { studentIds, studentNameIdMap };
+        return { studentIds, studentNameIdMap, allStudentData };
     } catch (error) {
         console.error("Error finding student IDs:", error);
-        return { studentIds: [], studentNameIdMap: new Map() };
+        return { studentIds: [], studentNameIdMap: new Map(), allStudentData: [] };
     }
 }
 
@@ -687,7 +697,7 @@ async function handlePasswordReset() {
 }
 
 // -------------------------------------------------------------------
-// ENHANCED MESSAGING SYSTEM
+// ENHANCED MESSAGING SYSTEM - FIXED FOR NO INDEXES
 // -------------------------------------------------------------------
 
 function showComposeMessageModal() {
@@ -802,7 +812,7 @@ async function submitMessage() {
 }
 
 // -------------------------------------------------------------------
-// ACADEMICS TAB FUNCTIONS
+// ACADEMICS TAB FUNCTIONS - FIXED DATE ERROR
 // -------------------------------------------------------------------
 
 async function loadAcademicsData(selectedStudent = null) {
@@ -820,15 +830,15 @@ async function loadAcademicsData(selectedStudent = null) {
         const userData = userDoc.data();
         const parentPhone = userData.normalizedPhone || userData.phone;
 
-        // Find student IDs for this parent
-        const { studentIds, studentNameIdMap } = await findStudentIdsForParent(parentPhone);
+        // Find student IDs for this parent - INCLUDES ALL STUDENTS
+        const { studentIds, studentNameIdMap, allStudentData } = await findStudentIdsForParent(parentPhone);
         
         if (studentIds.length === 0) {
             academicsContent.innerHTML = `
                 <div class="text-center py-12">
                     <div class="text-6xl mb-4">📚</div>
-                    <h3 class="text-xl font-bold text-gray-700 mb-2">No Academic Data Yet</h3>
-                    <p class="text-gray-500 max-w-md mx-auto">Academic data will appear here once your child's tutor starts adding daily topics and homework assignments.</p>
+                    <h3 class="text-xl font-bold text-gray-700 mb-2">No Students Found</h3>
+                    <p class="text-gray-500 max-w-md mx-auto">No students are currently assigned to your account. Please contact administration if you believe this is an error.</p>
                 </div>
             `;
             return;
@@ -855,7 +865,8 @@ async function loadAcademicsData(selectedStudent = null) {
             
             Array.from(studentNameIdMap.keys()).forEach(studentName => {
                 const isSelected = selectedStudent === studentName ? 'selected' : '';
-                academicsHtml += `<option value="${studentName}" ${isSelected}>${capitalize(studentName)}</option>`;
+                const studentStatus = allStudentData.find(s => s.name === studentName)?.isPending ? ' (Pending Registration)' : '';
+                academicsHtml += `<option value="${studentName}" ${isSelected}>${capitalize(studentName)}${studentStatus}</option>`;
             });
             
             academicsHtml += `
@@ -867,72 +878,123 @@ async function loadAcademicsData(selectedStudent = null) {
         // Load data for each student
         for (const studentName of studentsToShow) {
             const studentId = studentNameIdMap.get(studentName);
+            const studentData = allStudentData.find(s => s.name === studentName);
             
             if (!studentId) continue;
 
-            // Fetch daily topics
-            const dailyTopicsSnapshot = await db.collection('daily_topics')
-                .where('studentId', '==', studentId)
-                .orderBy('date', 'desc')
-                .limit(10)
-                .get();
-
-            // Fetch homework assignments
-            const homeworkSnapshot = await db.collection('homework_assignments')
-                .where('studentId', '==', studentId)
-                .orderBy('dueDate', 'asc')
-                .get();
-
             const studentHeader = studentsToShow.length > 1 ? `
                 <div class="bg-green-100 border-l-4 border-green-600 p-4 rounded-lg mb-6">
-                    <h2 class="text-xl font-bold text-green-800">${capitalize(studentName)}</h2>
+                    <h2 class="text-xl font-bold text-green-800">${capitalize(studentName)}${studentData?.isPending ? ' (Pending Registration)' : ''}</h2>
                     <p class="text-green-600">Academic progress and assignments</p>
                 </div>
             ` : '';
 
             academicsHtml += studentHeader;
 
-            // Daily Topics Section
+            // Student Information Section
             academicsHtml += `
                 <div class="mb-8">
                     <h3 class="text-lg font-semibold text-green-700 mb-4 flex items-center">
-                        <span class="mr-2">📅</span> Daily Topics (Last 10 Sessions)
+                        <span class="mr-2">👤</span> Student Information
+                    </h3>
+                    <div class="bg-white border border-gray-200 rounded-lg p-4 shadow-sm">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <p class="text-sm text-gray-500">Status</p>
+                                <p class="font-medium">${studentData?.isPending ? 'Pending Registration' : 'Active'}</p>
+                            </div>
+                            <div>
+                                <p class="text-sm text-gray-500">Assigned Tutor</p>
+                                <p class="font-medium">${studentData?.data?.tutorName || 'Not yet assigned'}</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            // Daily Topics Section - FIXED DATE HANDLING
+            academicsHtml += `
+                <div class="mb-8">
+                    <h3 class="text-lg font-semibold text-green-700 mb-4 flex items-center">
+                        <span class="mr-2">📅</span> Daily Topics
                     </h3>
             `;
 
-            if (dailyTopicsSnapshot.empty) {
-                academicsHtml += `
-                    <div class="bg-gray-50 border border-gray-200 rounded-lg p-6 text-center">
-                        <p class="text-gray-500">No daily topics recorded yet. Check back soon!</p>
-                    </div>
-                `;
-            } else {
-                academicsHtml += `<div class="space-y-4">`;
-                
-                dailyTopicsSnapshot.forEach(doc => {
-                    const topicData = doc.data();
-                    const date = topicData.date?.toDate();
-                    const formattedDate = date ? date.toLocaleDateString('en-US', { 
-                        weekday: 'short', 
-                        year: 'numeric', 
-                        month: 'short', 
-                        day: 'numeric' 
-                    }) : 'Unknown date';
-                    
+            try {
+                // Fetch daily topics - NO ORDER BY TO AVOID INDEX
+                const dailyTopicsSnapshot = await db.collection('daily_topics')
+                    .where('studentId', '==', studentId)
+                    .get();
+
+                if (dailyTopicsSnapshot.empty) {
                     academicsHtml += `
-                        <div class="bg-white border border-gray-200 rounded-lg p-4 shadow-sm hover:shadow-md transition-shadow duration-200">
-                            <div class="flex justify-between items-start mb-2">
-                                <span class="font-medium text-gray-800">${formattedDate}</span>
-                                <span class="text-xs bg-green-100 text-green-800 px-2 py-1 rounded-full">Daily Session</span>
-                            </div>
-                            <div class="text-gray-700">
-                                <p class="whitespace-pre-wrap">${topicData.topics || 'No topics recorded for this session.'}</p>
-                            </div>
+                        <div class="bg-gray-50 border border-gray-200 rounded-lg p-6 text-center">
+                            <p class="text-gray-500">No daily topics recorded yet. Check back after your child's first session!</p>
                         </div>
                     `;
-                });
-                
-                academicsHtml += `</div>`;
+                } else {
+                    const topics = dailyTopicsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                    
+                    // Sort manually by date descending (most recent first)
+                    topics.sort((a, b) => {
+                        // Handle both Firestore Timestamp and string dates
+                        let aDate = a.date;
+                        let bDate = b.date;
+                        
+                        if (a.date?.toDate) {
+                            aDate = a.date.toDate();
+                        } else if (typeof a.date === 'string') {
+                            aDate = new Date(a.date);
+                        }
+                        
+                        if (b.date?.toDate) {
+                            bDate = b.date.toDate();
+                        } else if (typeof b.date === 'string') {
+                            bDate = new Date(b.date);
+                        }
+                        
+                        return (bDate || new Date(0)) - (aDate || new Date(0));
+                    }).slice(0, 10); // Limit to 10 most recent
+                    
+                    academicsHtml += `<div class="space-y-4">`;
+                    
+                    topics.forEach(topicData => {
+                        let date = topicData.date;
+                        if (date?.toDate) {
+                            date = date.toDate();
+                        } else if (typeof date === 'string') {
+                            date = new Date(date);
+                        }
+                        
+                        const formattedDate = date instanceof Date ? date.toLocaleDateString('en-US', { 
+                            weekday: 'short', 
+                            year: 'numeric', 
+                            month: 'short', 
+                            day: 'numeric' 
+                        }) : 'Unknown date';
+                        
+                        academicsHtml += `
+                            <div class="bg-white border border-gray-200 rounded-lg p-4 shadow-sm hover:shadow-md transition-shadow duration-200">
+                                <div class="flex justify-between items-start mb-2">
+                                    <span class="font-medium text-gray-800">${formattedDate}</span>
+                                    <span class="text-xs bg-green-100 text-green-800 px-2 py-1 rounded-full">Daily Session</span>
+                                </div>
+                                <div class="text-gray-700">
+                                    <p class="whitespace-pre-wrap">${topicData.topics || 'No topics recorded for this session.'}</p>
+                                </div>
+                            </div>
+                        `;
+                    });
+                    
+                    academicsHtml += `</div>`;
+                }
+            } catch (error) {
+                console.error('Error loading daily topics:', error);
+                academicsHtml += `
+                    <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                        <p class="text-yellow-700">Unable to load daily topics at this time.</p>
+                    </div>
+                `;
             }
 
             academicsHtml += `</div>`;
@@ -945,53 +1007,93 @@ async function loadAcademicsData(selectedStudent = null) {
                     </h3>
             `;
 
-            if (homeworkSnapshot.empty) {
-                academicsHtml += `
-                    <div class="bg-gray-50 border border-gray-200 rounded-lg p-6 text-center">
-                        <p class="text-gray-500">No homework assignments yet.</p>
-                    </div>
-                `;
-            } else {
-                academicsHtml += `<div class="space-y-4">`;
-                
-                const now = new Date();
-                
-                homeworkSnapshot.forEach(doc => {
-                    const homework = doc.data();
-                    const dueDate = homework.dueDate?.toDate();
-                    const formattedDueDate = dueDate ? dueDate.toLocaleDateString('en-US', { 
-                        weekday: 'short', 
-                        year: 'numeric', 
-                        month: 'short', 
-                        day: 'numeric' 
-                    }) : 'No due date';
-                    
-                    const isOverdue = dueDate && dueDate < now;
-                    const statusColor = isOverdue ? 'bg-red-100 text-red-800' : 'bg-blue-100 text-blue-800';
-                    const statusText = isOverdue ? 'Overdue' : 'Pending';
-                    
+            try {
+                // Fetch homework assignments - NO ORDER BY TO AVOID INDEX
+                const homeworkSnapshot = await db.collection('homework_assignments')
+                    .where('studentId', '==', studentId)
+                    .get();
+
+                if (homeworkSnapshot.empty) {
                     academicsHtml += `
-                        <div class="bg-white border ${isOverdue ? 'border-red-200' : 'border-gray-200'} rounded-lg p-4 shadow-sm hover:shadow-md transition-shadow duration-200">
-                            <div class="flex justify-between items-start mb-2">
-                                <span class="font-medium text-gray-800">${homework.title || 'Untitled Assignment'}</span>
-                                <span class="text-xs ${statusColor} px-2 py-1 rounded-full">${statusText}</span>
-                            </div>
-                            <div class="text-gray-700 mb-3">
-                                <p class="whitespace-pre-wrap">${homework.description || 'No description provided.'}</p>
-                            </div>
-                            <div class="flex justify-between items-center">
-                                <span class="text-sm text-gray-500">Due: ${formattedDueDate}</span>
-                                ${homework.fileUrl ? `
-                                    <a href="${homework.fileUrl}" target="_blank" class="text-green-600 hover:text-green-800 font-medium flex items-center">
-                                        <span class="mr-1">📎</span> Download Attachment
-                                    </a>
-                                ` : ''}
-                            </div>
+                        <div class="bg-gray-50 border border-gray-200 rounded-lg p-6 text-center">
+                            <p class="text-gray-500">No homework assignments yet.</p>
                         </div>
                     `;
-                });
-                
-                academicsHtml += `</div>`;
+                } else {
+                    const homeworkList = homeworkSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                    const now = new Date();
+                    
+                    // Sort manually by due date
+                    homeworkList.sort((a, b) => {
+                        let aDate = a.dueDate;
+                        let bDate = b.dueDate;
+                        
+                        if (a.dueDate?.toDate) {
+                            aDate = a.dueDate.toDate();
+                        } else if (typeof a.dueDate === 'string') {
+                            aDate = new Date(a.dueDate);
+                        }
+                        
+                        if (b.dueDate?.toDate) {
+                            bDate = b.dueDate.toDate();
+                        } else if (typeof b.dueDate === 'string') {
+                            bDate = new Date(b.dueDate);
+                        }
+                        
+                        return (aDate || new Date(0)) - (bDate || new Date(0));
+                    });
+                    
+                    academicsHtml += `<div class="space-y-4">`;
+                    
+                    homeworkList.forEach(homework => {
+                        let dueDate = homework.dueDate;
+                        if (dueDate?.toDate) {
+                            dueDate = dueDate.toDate();
+                        } else if (typeof dueDate === 'string') {
+                            dueDate = new Date(dueDate);
+                        }
+                        
+                        const formattedDueDate = dueDate instanceof Date ? dueDate.toLocaleDateString('en-US', { 
+                            weekday: 'short', 
+                            year: 'numeric', 
+                            month: 'short', 
+                            day: 'numeric' 
+                        }) : 'No due date';
+                        
+                        const isOverdue = dueDate instanceof Date && dueDate < now;
+                        const statusColor = isOverdue ? 'bg-red-100 text-red-800' : 'bg-blue-100 text-blue-800';
+                        const statusText = isOverdue ? 'Overdue' : 'Pending';
+                        
+                        academicsHtml += `
+                            <div class="bg-white border ${isOverdue ? 'border-red-200' : 'border-gray-200'} rounded-lg p-4 shadow-sm hover:shadow-md transition-shadow duration-200">
+                                <div class="flex justify-between items-start mb-2">
+                                    <span class="font-medium text-gray-800">${homework.title || 'Untitled Assignment'}</span>
+                                    <span class="text-xs ${statusColor} px-2 py-1 rounded-full">${statusText}</span>
+                                </div>
+                                <div class="text-gray-700 mb-3">
+                                    <p class="whitespace-pre-wrap">${homework.description || 'No description provided.'}</p>
+                                </div>
+                                <div class="flex justify-between items-center">
+                                    <span class="text-sm text-gray-500">Due: ${formattedDueDate}</span>
+                                    ${homework.fileUrl ? `
+                                        <a href="${homework.fileUrl}" target="_blank" class="text-green-600 hover:text-green-800 font-medium flex items-center">
+                                            <span class="mr-1">📎</span> Download Attachment
+                                        </a>
+                                    ` : ''}
+                                </div>
+                            </div>
+                        `;
+                    });
+                    
+                    academicsHtml += `</div>`;
+                }
+            } catch (error) {
+                console.error('Error loading homework:', error);
+                academicsHtml += `
+                    <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                        <p class="text-yellow-700">Unable to load homework assignments at this time.</p>
+                    </div>
+                `;
             }
 
             academicsHtml += `</div>`;
@@ -1006,6 +1108,9 @@ async function loadAcademicsData(selectedStudent = null) {
                 <div class="text-4xl mb-4">❌</div>
                 <h3 class="text-xl font-bold text-red-700 mb-2">Error Loading Academic Data</h3>
                 <p class="text-gray-500">Unable to load academic data at this time. Please try again later.</p>
+                <button onclick="loadAcademicsData()" class="mt-4 bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700">
+                    Try Again
+                </button>
             </div>
         `;
     }
@@ -1016,7 +1121,7 @@ function onStudentSelected(studentName) {
 }
 
 // -------------------------------------------------------------------
-// UNIFIED MESSAGING INBOX
+// UNIFIED MESSAGING INBOX - FIXED FOR NO INDEXES
 // -------------------------------------------------------------------
 
 function showMessagesModal() {
@@ -1044,16 +1149,14 @@ async function loadUnifiedMessages() {
         const userDoc = await db.collection('parent_users').doc(user.uid).get();
         const userData = userDoc.data();
 
-        // Fetch messages from tutor_messages
+        // Fetch messages from tutor_messages - NO ORDER BY TO AVOID INDEX
         const tutorMessagesSnapshot = await db.collection('tutor_messages')
             .where('parentUid', '==', user.uid)
-            .orderBy('timestamp', 'desc')
             .get();
 
-        // Fetch responses from parent_feedback
+        // Fetch all feedback and filter client-side
         const feedbackSnapshot = await db.collection('parent_feedback')
             .where('parentUid', '==', user.uid)
-            .where('responses', '!=', [])
             .get();
 
         const allMessages = [];
@@ -1076,10 +1179,10 @@ async function loadUnifiedMessages() {
             });
         });
 
-        // Process feedback responses
+        // Process feedback responses - filter client-side for responses
         feedbackSnapshot.forEach(doc => {
             const feedback = doc.data();
-            if (feedback.responses && feedback.responses.length > 0) {
+            if (feedback.responses && Array.isArray(feedback.responses) && feedback.responses.length > 0) {
                 feedback.responses.forEach((response, index) => {
                     allMessages.push({
                         id: `${doc.id}_response_${index}`,
@@ -1097,10 +1200,10 @@ async function loadUnifiedMessages() {
             }
         });
 
-        // Sort all messages by timestamp (newest first)
+        // Sort all messages by timestamp (newest first) - client-side sorting
         allMessages.sort((a, b) => {
-            const aDate = a.timestamp?.toDate() || new Date(0);
-            const bDate = b.timestamp?.toDate() || new Date(0);
+            const aDate = a.timestamp?.toDate?.() || new Date(0);
+            const bDate = b.timestamp?.toDate?.() || new Date(0);
             return bDate - aDate;
         });
 
@@ -1110,6 +1213,9 @@ async function loadUnifiedMessages() {
                     <div class="text-6xl mb-4">📭</div>
                     <h3 class="text-xl font-bold text-gray-700 mb-2">No Messages Yet</h3>
                     <p class="text-gray-500 max-w-md mx-auto">You haven't received any messages from our staff yet. Send a message using the "Compose" button!</p>
+                    <button onclick="showComposeMessageModal()" class="mt-4 bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700">
+                        Compose Message
+                    </button>
                 </div>
             `;
             return;
@@ -1118,7 +1224,7 @@ async function loadUnifiedMessages() {
         messagesContent.innerHTML = '';
 
         allMessages.forEach((message) => {
-            const messageDate = message.timestamp?.toDate() || new Date();
+            const messageDate = message.timestamp?.toDate?.() || new Date();
             const formattedDate = messageDate.toLocaleDateString('en-US', {
                 year: 'numeric',
                 month: 'long',
@@ -1181,13 +1287,16 @@ async function loadUnifiedMessages() {
                 <div class="text-4xl mb-4">❌</div>
                 <h3 class="text-xl font-bold text-red-700 mb-2">Error Loading Messages</h3>
                 <p class="text-gray-500">Unable to load messages at this time. Please try again later.</p>
+                <button onclick="loadUnifiedMessages()" class="mt-4 bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700">
+                    Try Again
+                </button>
             </div>
         `;
     }
 }
 
 // -------------------------------------------------------------------
-// NOTIFICATION SYSTEM
+// NOTIFICATION SYSTEM - FIXED FOR NO INDEXES
 // -------------------------------------------------------------------
 
 async function checkForNewMessages() {
@@ -1197,22 +1306,21 @@ async function checkForNewMessages() {
 
         let totalUnread = 0;
         
-        // Check tutor messages
+        // Check tutor messages - simple query, no composite index
         const tutorMessagesSnapshot = await db.collection('tutor_messages')
             .where('parentUid', '==', user.uid)
             .get();
 
         totalUnread += tutorMessagesSnapshot.size;
         
-        // Check feedback responses
+        // Check feedback responses - filter client-side
         const feedbackSnapshot = await db.collection('parent_feedback')
             .where('parentUid', '==', user.uid)
-            .where('responses', '!=', [])
             .get();
 
         feedbackSnapshot.forEach(doc => {
             const feedback = doc.data();
-            if (feedback.responses && feedback.responses.length > 0) {
+            if (feedback.responses && Array.isArray(feedback.responses) && feedback.responses.length > 0) {
                 totalUnread += feedback.responses.length;
             }
         });
@@ -1225,6 +1333,7 @@ async function checkForNewMessages() {
 
     } catch (error) {
         console.error('Error checking for new messages:', error);
+        // Silently fail - don't show error to user for background check
     }
 }
 
@@ -1405,7 +1514,7 @@ function setupRealTimeMonitoring(parentPhone, userId) {
         });
     realTimeListeners.push(assessmentListener);
     
-    // Monitor tutor messages
+    // Monitor tutor messages - simple query
     const messagesListener = db.collection("tutor_messages")
         .where("parentUid", "==", userId)
         .onSnapshot((snapshot) => {
@@ -1451,6 +1560,167 @@ function showNewReportNotification(type) {
     setTimeout(() => {
         indicator.remove();
     }, 5000);
+}
+
+// -------------------------------------------------------------------
+// ACCORDION SYSTEM FUNCTIONS (RESTORED)
+// -------------------------------------------------------------------
+
+function createAccordionReportView(reportsByStudent) {
+    let html = '';
+    let studentIndex = 0;
+    
+    for (const [studentName, reports] of reportsByStudent) {
+        const fullName = capitalize(studentName);
+        
+        // Create accordion header
+        html += `
+            <div class="accordion-item mb-4">
+                <button onclick="toggleAccordion('student-${studentIndex}')" 
+                        class="accordion-header w-full flex justify-between items-center p-4 bg-green-100 border border-green-300 rounded-lg hover:bg-green-200 transition-all duration-200">
+                    <div class="flex items-center">
+                        <span class="text-xl mr-3">👤</span>
+                        <div class="text-left">
+                            <h3 class="font-bold text-green-800 text-lg">${fullName}</h3>
+                            <p class="text-green-600 text-sm">
+                                ${reports.assessments.length} Assessment(s), ${reports.monthly.length} Monthly Report(s)
+                            </p>
+                        </div>
+                    </div>
+                    <span class="accordion-arrow text-green-600 text-xl">▼</span>
+                </button>
+                <div id="student-${studentIndex}-content" class="accordion-content hidden p-4 bg-white border border-t-0 border-gray-200 rounded-b-lg">
+        `;
+        
+        // Assessment Reports
+        if (reports.assessments.length > 0) {
+            html += `<h4 class="font-semibold text-gray-700 mb-3 mt-2">📊 Assessment Reports</h4>`;
+            
+            let assessmentIndex = 0;
+            for (const [sessionKey, session] of reports.assessments) {
+                html += createAssessmentReportHTML(session, studentIndex, assessmentIndex, fullName);
+                assessmentIndex++;
+            }
+        } else {
+            html += `<div class="bg-gray-50 border border-gray-200 rounded-lg p-6 text-center mb-4">
+                <p class="text-gray-500">No assessment reports yet for ${fullName}.</p>
+            </div>`;
+        }
+        
+        // Monthly Reports
+        if (reports.monthly.length > 0) {
+            html += `<h4 class="font-semibold text-gray-700 mb-3 mt-6">📈 Monthly Reports</h4>`;
+            
+            let monthlyIndex = 0;
+            for (const [sessionKey, session] of reports.monthly) {
+                html += createMonthlyReportHTML(session, studentIndex, monthlyIndex, fullName);
+                monthlyIndex++;
+            }
+        } else {
+            html += `<div class="bg-gray-50 border border-gray-200 rounded-lg p-6 text-center">
+                <p class="text-gray-500">No monthly reports yet for ${fullName}.</p>
+            </div>`;
+        }
+        
+        html += `
+                </div>
+            </div>
+        `;
+        
+        studentIndex++;
+    }
+    
+    return html;
+}
+
+function toggleAccordion(studentId) {
+    const content = document.getElementById(`${studentId}-content`);
+    const arrow = document.querySelector(`#${studentId} .accordion-arrow`);
+    
+    if (content.classList.contains('hidden')) {
+        content.classList.remove('hidden');
+        arrow.textContent = '▲';
+    } else {
+        content.classList.add('hidden');
+        arrow.textContent = '▼';
+    }
+}
+
+function createAssessmentReportHTML(session, studentIndex, assessmentIndex, fullName) {
+    const tutorEmail = session[0].tutorEmail || 'N/A';
+    const formattedDate = new Date(session[0].timestamp * 1000).toLocaleString('en-US', {
+        dateStyle: 'long',
+        timeStyle: 'short'
+    });
+    
+    const results = session.map(testResult => {
+        const topics = [...new Set(testResult.answers?.map(a => a.topic).filter(t => t))] || [];
+        return {
+            subject: testResult.subject,
+            correct: testResult.score !== undefined ? testResult.score : 0,
+            total: testResult.totalScoreableQuestions !== undefined ? testResult.totalScoreableQuestions : 0,
+            topics: topics,
+        };
+    });
+    
+    const tableRows = results.map(res => `<tr><td class="border px-2 py-1">${res.subject.toUpperCase()}</td><td class="border px-2 py-1 text-center">${res.correct} / ${res.total}</td></tr>`).join("");
+    
+    return `
+        <div class="border rounded-lg shadow mb-6 p-4 bg-white" id="assessment-block-${studentIndex}-${assessmentIndex}">
+            <div class="flex justify-between items-center mb-3 border-b pb-2">
+                <h5 class="font-medium text-gray-800">Assessment - ${formattedDate}</h5>
+                <button onclick="downloadSessionReport(${studentIndex}, ${assessmentIndex}, '${fullName}', 'assessment')" 
+                        class="text-green-600 hover:text-green-800 font-medium flex items-center text-sm">
+                    <span class="mr-1">📥</span> Download
+                </button>
+            </div>
+            
+            <table class="w-full text-sm mb-3 border border-collapse">
+                <thead class="bg-gray-100"><tr><th class="border px-2 py-1 text-left">Subject</th><th class="border px-2 py-1 text-center">Score</th></tr></thead>
+                <tbody>${tableRows}</tbody>
+            </table>
+        </div>
+    `;
+}
+
+function createMonthlyReportHTML(session, studentIndex, monthlyIndex, fullName) {
+    const formattedDate = new Date(session[0].timestamp * 1000).toLocaleString('en-US', {
+        dateStyle: 'long',
+        timeStyle: 'short'
+    });
+    
+    return `
+        <div class="border rounded-lg shadow mb-6 p-4 bg-white" id="monthly-block-${studentIndex}-${monthlyIndex}">
+            <div class="flex justify-between items-center mb-3 border-b pb-2">
+                <h5 class="font-medium text-gray-800">Monthly Report - ${formattedDate}</h5>
+                <button onclick="downloadMonthlyReport(${studentIndex}, ${monthlyIndex}, '${fullName}')" 
+                        class="text-green-600 hover:text-green-800 font-medium flex items-center text-sm">
+                    <span class="mr-1">📥</span> Download
+                </button>
+            </div>
+            
+            <div class="text-sm text-gray-700">
+                <p class="mb-1"><strong>Tutor:</strong> ${session[0].tutorName || 'N/A'}</p>
+                <p class="mb-2"><strong>Topics Covered:</strong> ${session[0].topics ? session[0].topics.substring(0, 100) + '...' : 'N/A'}</p>
+            </div>
+        </div>
+    `;
+}
+
+function downloadSessionReport(studentIndex, sessionIndex, studentName, type) {
+    const element = document.getElementById(`${type}-block-${studentIndex}-${sessionIndex}`);
+    if (!element) {
+        showMessage('Report element not found for download', 'error');
+        return;
+    }
+    const safeStudentName = studentName.replace(/ /g, '_');
+    const fileName = `${type === 'assessment' ? 'Assessment' : 'Monthly'}_Report_${safeStudentName}.pdf`;
+    const opt = { margin: 0.5, filename: fileName, image: { type: 'jpeg', quality: 0.98 }, html2canvas: { scale: 2, useCORS: true }, jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' } };
+    html2pdf().from(element).set(opt).save();
+}
+
+function downloadMonthlyReport(studentIndex, monthlyIndex, studentName) {
+    downloadSessionReport(studentIndex, monthlyIndex, studentName, 'monthly');
 }
 
 // MANUAL REFRESH FUNCTION
@@ -1508,7 +1778,7 @@ function addManualRefreshButton() {
     buttonContainer.insertBefore(refreshBtn, buttonContainer.lastElementChild);
 }
 
-// MAIN REPORT LOADING FUNCTION
+// MAIN REPORT LOADING FUNCTION WITH ACCORDION SYSTEM
 async function loadAllReportsForParent(parentPhone, userId, forceRefresh = false) {
     const reportArea = document.getElementById("reportArea");
     const reportContent = document.getElementById("reportContent");
@@ -1641,65 +1911,23 @@ async function loadAllReportsForParent(parentPhone, userId, forceRefresh = false
 
         // --- USE SIMPLIFIED SEARCH SYSTEM ---
         const { assessmentResults, monthlyResults } = await searchReportsByParentPhone(parentPhone);
+        
+        // --- GET ALL STUDENTS ASSIGNED TO THIS PARENT ---
+        const { studentIds, studentNameIdMap, allStudentData } = await findStudentIdsForParent(parentPhone);
+        
+        // Store student names globally
+        userChildren = Array.from(studentNameIdMap.keys());
 
         // SETUP REAL-TIME MONITORING
         setupRealTimeMonitoring(parentPhone, userId);
 
-        if (assessmentResults.length === 0 && monthlyResults.length === 0) {
-            // NO REPORTS FOUND - SHOW WAITING STATE
-            reportContent.innerHTML = `
-                <div class="text-center py-16">
-                    <div class="text-6xl mb-6">📊</div>
-                    <h2 class="text-2xl font-bold text-gray-800 mb-4">Waiting for Your Child's First Report</h2>
-                    <p class="text-gray-600 max-w-2xl mx-auto mb-6">
-                        No reports found for your account yet. This usually means:
-                    </p>
-                    <div class="bg-blue-50 border border-blue-200 rounded-lg p-6 max-w-2xl mx-auto mb-6">
-                        <ul class="text-left text-gray-700 space-y-3">
-                            <li>• Your child's tutor hasn't submitted their first assessment or monthly report yet</li>
-                            <li>• The phone number used doesn't match what the tutor has on file</li>
-                            <li>• Reports are being processed and will appear soon</li>
-                        </ul>
-                    </div>
-                    <div class="bg-green-50 border border-green-200 rounded-lg p-6 max-w-2xl mx-auto">
-                        <h3 class="font-semibold text-green-800 mb-2">What happens next?</h3>
-                        <p class="text-green-700 mb-4">
-                            <strong>We're automatically monitoring for new reports!</strong> When your child's tutor submits 
-                            their first report, it will appear here automatically. You don't need to do anything.
-                        </p>
-                        <div class="flex flex-col sm:flex-row gap-4 justify-center items-center">
-                            <button onclick="manualRefreshReports()" class="bg-green-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-green-700 transition-all duration-200 flex items-center">
-                                <span class="mr-2">🔄</span> Check Now
-                            </button>
-                            <button onclick="showComposeMessageModal()" class="bg-blue-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-blue-700 transition-all duration-200 flex items-center">
-                                <span class="mr-2">💬</span> Contact Support
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            `;
-            
-            authArea.classList.add("hidden");
-            reportArea.classList.remove("hidden");
-            
-            // Add buttons to welcome section
-            addMessagesButton();
-            addManualRefreshButton();
-            
-            // Load initial referral data for the rewards dashboard tab even if no reports
-            loadReferralRewards(userId);
-            
-            // Load academics data
-            loadAcademicsData();
-
-            return;
-        }
-        
-        // REPORTS FOUND - DISPLAY THEM
-        reportContent.innerHTML = "";
-
         // Group reports by student name
         const reportsByStudent = new Map();
+
+        // Initialize all students in the map (even those without reports)
+        for (const studentName of userChildren) {
+            reportsByStudent.set(studentName, { assessments: new Map(), monthly: new Map() });
+        }
 
         // Group assessment reports by student
         const assessmentGroups = new Map();
@@ -1711,6 +1939,23 @@ async function loadAllReportsForParent(parentPhone, userId, forceRefresh = false
             assessmentGroups.get(studentName).push(result);
         });
 
+        // Group assessment reports by session (day)
+        for (const [studentName, assessments] of assessmentGroups) {
+            const sessionGroups = new Map();
+            
+            assessments.forEach(result => {
+                const sessionKey = Math.floor(result.timestamp / 86400); // Group by day
+                if (!sessionGroups.has(sessionKey)) {
+                    sessionGroups.set(sessionKey, []);
+                }
+                sessionGroups.get(sessionKey).push(result);
+            });
+            
+            if (reportsByStudent.has(studentName)) {
+                reportsByStudent.get(studentName).assessments = sessionGroups;
+            }
+        }
+
         // Group monthly reports by student
         const monthlyGroups = new Map();
         monthlyResults.forEach(result => {
@@ -1721,75 +1966,26 @@ async function loadAllReportsForParent(parentPhone, userId, forceRefresh = false
             monthlyGroups.get(studentName).push(result);
         });
 
-        // Create simple report display
-        let reportHtml = '<div class="space-y-6">';
-        
-        // Display assessment reports
-        if (assessmentResults.length > 0) {
-            reportHtml += `<h3 class="text-xl font-bold text-gray-800 mb-4">Assessment Reports</h3>`;
+        // Group monthly reports by session (day)
+        for (const [studentName, monthlies] of monthlyGroups) {
+            const sessionGroups = new Map();
             
-            for (const [studentName, assessments] of assessmentGroups) {
-                reportHtml += `
-                    <div class="bg-white border border-gray-200 rounded-lg p-6 shadow-sm">
-                        <h4 class="font-bold text-green-700 text-lg mb-4">${capitalize(studentName)}</h4>
-                        <div class="space-y-4">
-                `;
-                
-                assessments.forEach((result, index) => {
-                    const date = new Date(result.timestamp * 1000).toLocaleDateString('en-US', {
-                        dateStyle: 'long',
-                        timeStyle: 'short'
-                    });
-                    
-                    reportHtml += `
-                        <div class="border-l-4 border-green-500 pl-4 py-2">
-                            <p class="font-medium text-gray-800">Assessment #${index + 1} - ${date}</p>
-                            <p class="text-gray-600">Subject: ${result.subject || 'N/A'}</p>
-                            <p class="text-gray-600">Score: ${result.score || 0} / ${result.totalScoreableQuestions || 0}</p>
-                        </div>
-                    `;
-                });
-                
-                reportHtml += `</div></div>`;
+            monthlies.forEach(result => {
+                const sessionKey = Math.floor(result.timestamp / 86400); // Group by day
+                if (!sessionGroups.has(sessionKey)) {
+                    sessionGroups.set(sessionKey, []);
+                }
+                sessionGroups.get(sessionKey).push(result);
+            });
+            
+            if (reportsByStudent.has(studentName)) {
+                reportsByStudent.get(studentName).monthly = sessionGroups;
             }
         }
 
-        // Display monthly reports
-        if (monthlyResults.length > 0) {
-            reportHtml += `<h3 class="text-xl font-bold text-gray-800 mb-4 mt-8">Monthly Reports</h3>`;
-            
-            for (const [studentName, monthlies] of monthlyGroups) {
-                reportHtml += `
-                    <div class="bg-white border border-gray-200 rounded-lg p-6 shadow-sm">
-                        <h4 class="font-bold text-blue-700 text-lg mb-4">${capitalize(studentName)}</h4>
-                        <div class="space-y-4">
-                `;
-                
-                monthlies.forEach((result, index) => {
-                    const date = new Date(result.timestamp * 1000).toLocaleDateString('en-US', {
-                        dateStyle: 'long',
-                        timeStyle: 'short'
-                    });
-                    
-                    reportHtml += `
-                        <div class="border-l-4 border-blue-500 pl-4 py-2">
-                            <p class="font-medium text-gray-800">Monthly Report #${index + 1} - ${date}</p>
-                            <p class="text-gray-600">Tutor: ${result.tutorName || 'N/A'}</p>
-                            <p class="text-gray-600">Topics: ${result.topics ? result.topics.substring(0, 100) + '...' : 'N/A'}</p>
-                        </div>
-                    `;
-                });
-                
-                reportHtml += `</div></div>`;
-            }
-        }
+        // Create accordion view
+        reportContent.innerHTML = createAccordionReportView(reportsByStudent);
         
-        reportHtml += '</div>';
-        reportContent.innerHTML = reportHtml;
-        
-        // Store student names
-        userChildren = Array.from(new Set([...assessmentGroups.keys(), ...monthlyGroups.keys()]));
-
         // --- CACHE SAVING LOGIC ---
         try {
             const dataToCache = {
@@ -1819,7 +2015,23 @@ async function loadAllReportsForParent(parentPhone, userId, forceRefresh = false
 
     } catch (error) {
         console.error("Error loading reports:", error);
-        showMessage("Sorry, there was an error loading the reports. Please try again.", "error");
+        reportContent.innerHTML = `
+            <div class="text-center py-16">
+                <div class="text-6xl mb-6">❌</div>
+                <h2 class="text-2xl font-bold text-red-800 mb-4">Error Loading Reports</h2>
+                <p class="text-gray-600 max-w-2xl mx-auto mb-6">
+                    Sorry, there was an error loading your reports. Please try again.
+                </p>
+                <div class="flex flex-col sm:flex-row gap-4 justify-center items-center">
+                    <button onclick="window.location.reload()" class="bg-green-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-green-700 transition-all duration-200 flex items-center">
+                        <span class="mr-2">🔄</span> Reload Page
+                    </button>
+                    <button onclick="showComposeMessageModal()" class="bg-blue-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-blue-700 transition-all duration-200 flex items-center">
+                        <span class="mr-2">💬</span> Contact Support
+                    </button>
+                </div>
+            </div>
+        `;
     } finally {
         authLoader.classList.add("hidden");
     }
