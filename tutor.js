@@ -3754,7 +3754,7 @@ async function loadEnhancedConversations() {
         const messages = [];
         const conversations = {};
         
-        messagesSnapshot.forEach(doc => {
+        messagesSnapshot.docs.forEach(doc => {
             const message = { id: doc.id, ...doc.data() };
             messages.push(message);
             
@@ -3783,7 +3783,7 @@ async function loadEnhancedConversations() {
                 }
             }
         });
-        
+
         renderEnhancedConversationsList(Object.values(conversations));
         
     } catch (error) {
@@ -3803,7 +3803,7 @@ function getConversationTitle(message) {
     if (!message) return 'Conversation';
     
     if (message.messageType === 'management') {
-        return 'Management Team';
+        return 'Management';
     } else if (message.messageType === 'all') {
         return 'All Parents';
     } else if (message.recipientDetails && message.recipientDetails.length > 0) {
@@ -3845,7 +3845,7 @@ function renderEnhancedConversationsList(conversations) {
     
     conversations.forEach(conv => {
         if (!conv || !conv.lastMessage) return;
-        
+
         const lastMessageTime = conv.lastMessage.createdAt?.toDate 
             ? conv.lastMessage.createdAt.toDate() 
             : new Date(conv.lastMessage.createdAt);
@@ -3859,8 +3859,8 @@ function renderEnhancedConversationsList(conversations) {
         html += `
             <div class="conversation-item ${conv.unread ? 'unread' : ''}" data-conversation-id="${conv.id}">
                 <div class="conversation-info">
-                    <div class="conversation-avatar">
-                        ${conv.lastMessage.messageType === 'management' ? '👔' : 
+                    <div class="conversation-avatar" style="background: ${conv.lastMessage.messageType === 'management' ? '#10b981' : conv.lastMessage.messageType === 'all' ? '#f59e0b' : '#8b5cf6'};">
+                        ${conv.lastMessage.messageType === 'management' ? '💼' : 
                           conv.lastMessage.messageType === 'all' ? '📢' : '👨‍👩‍👧‍👦'}
                     </div>
                     <div class="conversation-details">
@@ -3919,7 +3919,7 @@ async function loadEnhancedConversationMessages(conversationId) {
         const messages = [];
         
         messagesSnapshot.forEach(doc => {
-            const message = { id: doc.id, ...doc.data() };
+            const message = { id: doc.id, ...doc.data(), createdAt: doc.data().createdAt.toDate() }; // Convert Timestamp to Date
             const msgConversationId = message.conversationId || 
                                     (message.recipients && message.recipients[0]) || 
                                     'general';
@@ -3935,11 +3935,7 @@ async function loadEnhancedConversationMessages(conversationId) {
         });
         
         // Sort messages by date
-        messages.sort((a, b) => {
-            const timeA = a.createdAt?.toDate ? a.createdAt.toDate() : new Date(a.createdAt);
-            const timeB = b.createdAt?.toDate ? b.createdAt.toDate() : new Date(b.createdAt);
-            return timeA - timeB;
-        });
+        messages.sort((a, b) => a.createdAt - b.createdAt);
         
         renderEnhancedChatMessages(messages, conversationId);
         
@@ -3977,13 +3973,14 @@ function renderEnhancedChatMessages(messages, conversationId) {
     }
     
     // Get conversation info
-    const conversation = messages[0];
-    const title = getConversationTitle(conversation);
+    const firstMessage = messages[0];
+    const title = getConversationTitle(firstMessage);
     
     // Update chat header
     chatHeader.innerHTML = `
-        <div class="chat-avatar">${conversation.messageType === 'management' ? '👔' : 
-                                   conversation.messageType === 'all' ? '📢' : '👨‍👩‍👧‍👦'}</div>
+        <div class="chat-avatar" style="background: ${firstMessage.messageType === 'management' ? '#10b981' : firstMessage.messageType === 'all' ? '#f59e0b' : '#8b5cf6'};">
+            ${firstMessage.messageType === 'management' ? '💼' : firstMessage.messageType === 'all' ? '📢' : '👨‍👩‍👧‍👦'}
+        </div>
         <div class="chat-header-text">
             <h4>${title}</h4>
             <p>${messages.length} messages</p>
@@ -3991,7 +3988,7 @@ function renderEnhancedChatMessages(messages, conversationId) {
     `;
     
     // Show chat input (only for individual conversations)
-    if (conversation.messageType === 'individual' || conversation.messageType === 'group') {
+    if (firstMessage.messageType === 'individual' || firstMessage.messageType === 'group') {
         chatInputArea.classList.remove('hidden');
     } else {
         chatInputArea.classList.add('hidden');
@@ -4001,9 +3998,7 @@ function renderEnhancedChatMessages(messages, conversationId) {
     chatMessages.innerHTML = '';
     
     messages.forEach(message => {
-        const messageTime = message.createdAt?.toDate 
-            ? message.createdAt.toDate() 
-            : new Date(message.createdAt);
+        const messageTime = message.createdAt;
         
         const isSent = message.senderType === 'tutor';
         const senderName = isSent ? 'You' : (message.senderName || 'Management');
@@ -4047,7 +4042,7 @@ function renderEnhancedChatMessages(messages, conversationId) {
     chatMessages.scrollTop = chatMessages.scrollHeight;
     
     // Setup send message functionality for individual/group conversations
-    if (conversation.messageType === 'individual' || conversation.messageType === 'group') {
+    if (firstMessage.messageType === 'individual' || firstMessage.messageType === 'group') {
         const sendBtn = document.getElementById('send-chat-btn');
         const chatInput = document.getElementById('chat-input');
         
@@ -4060,12 +4055,12 @@ function renderEnhancedChatMessages(messages, conversationId) {
         
         // Add new event listener
         document.getElementById('send-chat-btn').addEventListener('click', async () => {
-            await sendReplyMessage(conversation);
+            await sendReplyMessage(firstMessage);
         });
         
         document.getElementById('chat-input').addEventListener('keypress', async (e) => {
             if (e.key === 'Enter') {
-                await sendReplyMessage(conversation);
+                await sendReplyMessage(firstMessage);
             }
         });
     }
@@ -4089,12 +4084,12 @@ async function sendReplyMessage(originalConversation) {
             tutorId: tutor.id,
             tutorEmail: tutor.email,
             tutorName: tutor.name,
-            subject: `Re: ${originalConversation.lastMessage?.subject || 'Message'}`,
+            subject: `Re: ${originalConversation.subject || 'Message'}`,
             content: messageContent,
-            messageType: originalConversation.lastMessage?.messageType || 'individual',
+            messageType: originalConversation.messageType || 'individual',
             recipients: originalConversation.recipients || [],
             recipientDetails: originalConversation.recipientDetails || [],
-            category: originalConversation.lastMessage?.category,
+            category: originalConversation.category,
             isUrgent: false,
             status: 'sent',
             read: true,
