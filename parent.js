@@ -96,177 +96,41 @@ function createCountryCodeDropdown() {
     phoneInputContainer.appendChild(container);
 }
 
-// ENHANCED MULTI-NORMALIZATION FUNCTION FOR ALL COUNTRIES
-function multiNormalizePhoneNumber(phone) {
+// SIMPLIFIED PHONE NORMALIZATION FUNCTION
+function normalizePhoneNumber(phone) {
     if (!phone || typeof phone !== 'string') {
-        return { normalized: null, country: null, valid: false, error: 'Invalid input' };
+        return { normalized: null, valid: false, error: 'Invalid input' };
     }
 
-    console.log("🔧 Starting multi-normalization for:", phone);
-    
-    const normalizationAttempts = [];
+    console.log("🔧 Normalizing phone:", phone);
     
     try {
         // Clean the phone number - remove all non-digit characters except +
         let cleaned = phone.replace(/[^\d+]/g, '');
         
-        // ATTEMPT 1: Standard normalization (current logic)
-        let attempt1 = null;
-        try {
-            const parsed1 = libphonenumber.parsePhoneNumberFromString(cleaned);
-            if (parsed1 && parsed1.isValid()) {
-                attempt1 = {
-                    normalized: parsed1.format('E.164'),
-                    country: parsed1.country,
-                    valid: true,
-                    attempt: 'standard'
-                };
-                normalizationAttempts.push(attempt1);
-                console.log("🔧 Attempt 1 (Standard):", attempt1.normalized);
-            }
-        } catch (e) {
-            console.log("🔧 Attempt 1 failed:", e.message);
+        // Remove leading zeros if present
+        cleaned = cleaned.replace(/^0+/, '');
+        
+        // If no country code, add +1 as default
+        if (!cleaned.startsWith('+')) {
+            cleaned = '+1' + cleaned;
         }
-
-        // ATTEMPT 2: Country code correction for common patterns
-        let attempt2 = null;
-        try {
-            // US/Canada patterns
-            if (cleaned.match(/^(1)?(469|214|972|713|281|832|210|817)/) && !cleaned.startsWith('+')) {
-                const usNumber = '+1' + cleaned.replace(/^1/, '');
-                const parsed2 = libphonenumber.parsePhoneNumberFromString(usNumber);
-                if (parsed2 && parsed2.isValid()) {
-                    attempt2 = {
-                        normalized: parsed2.format('E.164'),
-                        country: parsed2.country,
-                        valid: true,
-                        attempt: 'us_correction'
-                    };
-                    normalizationAttempts.push(attempt2);
-                    console.log("🔧 Attempt 2 (US Correction):", attempt2.normalized);
-                }
-            }
-            
-            // UK patterns
-            if (cleaned.match(/^(44)?(20|7|1|2|3|8|9)/) && !cleaned.startsWith('+')) {
-                const ukNumber = '+44' + cleaned.replace(/^44/, '');
-                const parsed2 = libphonenumber.parsePhoneNumberFromString(ukNumber);
-                if (parsed2 && parsed2.isValid()) {
-                    attempt2 = {
-                        normalized: parsed2.format('E.164'),
-                        country: parsed2.country,
-                        valid: true,
-                        attempt: 'uk_correction'
-                    };
-                    normalizationAttempts.push(attempt2);
-                    console.log("🔧 Attempt 2 (UK Correction):", attempt2.normalized);
-                }
-            }
-            
-            // Nigeria patterns
-            if (cleaned.match(/^(234)?(80|70|81|90|91)/) && !cleaned.startsWith('+')) {
-                const ngNumber = '+234' + cleaned.replace(/^234/, '');
-                const parsed2 = libphonenumber.parsePhoneNumberFromString(ngNumber);
-                if (parsed2 && parsed2.isValid()) {
-                    attempt2 = {
-                        normalized: parsed2.format('E.164'),
-                        country: parsed2.country,
-                        valid: true,
-                        attempt: 'nigeria_correction'
-                    };
-                    normalizationAttempts.push(attempt2);
-                    console.log("🔧 Attempt 2 (Nigeria Correction):", attempt2.normalized);
-                }
-            }
-        } catch (e) {
-            console.log("🔧 Attempt 2 failed:", e.message);
-        }
-
-        // ATTEMPT 3: Area code only (for numbers that lost country code)
-        let attempt3 = null;
-        try {
-            // Common area codes that might be missing country codes
-            const areaCodePatterns = [
-                { code: '1', patterns: [/^(469|214|972|713|281|832|210|817)/] }, // US
-                { code: '44', patterns: [/^(20|7|1|2|3|8|9)/] }, // UK
-                { code: '234', patterns: [/^(80|70|81|90|91)/] }, // Nigeria
-                { code: '33', patterns: [/^(1|2|3|4|5)/] }, // France
-                { code: '49', patterns: [/^(15|16|17|17)/] }, // Germany
-                { code: '91', patterns: [/^(98|99|90|80)/] }, // India
-            ];
-            
-            for (const country of areaCodePatterns) {
-                for (const pattern of country.patterns) {
-                    if (pattern.test(cleaned) && !cleaned.startsWith('+')) {
-                        const correctedNumber = '+' + country.code + cleaned;
-                        const parsed3 = libphonenumber.parsePhoneNumberFromString(correctedNumber);
-                        if (parsed3 && parsed3.isValid()) {
-                            attempt3 = {
-                                normalized: parsed3.format('E.164'),
-                                country: parsed3.country,
-                                valid: true,
-                                attempt: 'area_code_correction'
-                            };
-                            normalizationAttempts.push(attempt3);
-                            console.log("🔧 Attempt 3 (Area Code Correction):", attempt3.normalized);
-                            break;
-                        }
-                    }
-                }
-                if (attempt3) break;
-            }
-        } catch (e) {
-            console.log("🔧 Attempt 3 failed:", e.message);
-        }
-
-        // ATTEMPT 4: Digits only (fallback)
-        let attempt4 = null;
-        try {
-            const digitsOnly = cleaned.replace(/\D/g, '');
-            if (digitsOnly.length >= 8 && digitsOnly.length <= 15) {
-                attempt4 = {
-                    normalized: digitsOnly,
-                    country: null,
-                    valid: true,
-                    attempt: 'digits_only'
-                };
-                normalizationAttempts.push(attempt4);
-                console.log("🔧 Attempt 4 (Digits Only):", attempt4.normalized);
-            }
-        } catch (e) {
-            console.log("🔧 Attempt 4 failed:", e.message);
-        }
-
-        // Return all valid normalization attempts
-        if (normalizationAttempts.length > 0) {
-            console.log("🎯 Multi-normalization results:", normalizationAttempts.map(a => a.normalized));
-            return normalizationAttempts;
-        }
-
-        return [{ 
-            normalized: null, 
-            country: null, 
-            valid: false, 
-            error: 'No valid normalization found',
-            attempt: 'failed'
-        }];
+        
+        // Ensure format is correct
+        return {
+            normalized: cleaned,
+            valid: true,
+            error: null
+        };
         
     } catch (error) {
-        console.error("❌ Multi-normalization error:", error);
-        return [{ 
+        console.error("❌ Phone normalization error:", error);
+        return { 
             normalized: null, 
-            country: null, 
             valid: false, 
-            error: error.message,
-            attempt: 'error'
-        }];
+            error: error.message
+        };
     }
-}
-
-// Simple phone cleaning - fallback if library not loaded
-function cleanPhoneNumber(phone) {
-    if (!phone) return '';
-    return phone.trim();
 }
 
 function capitalize(str) {
@@ -277,18 +141,16 @@ function capitalize(str) {
 // Global variables for user data
 let currentUserData = null;
 let userChildren = [];
-let studentIdMap = new Map(); // Map student names to their IDs
-let unreadMessagesCount = 0; // Track unread messages
-let realTimeListeners = []; // Track real-time listeners
+let studentIdMap = new Map();
+let unreadMessagesCount = 0;
+let realTimeListeners = [];
 
 // -------------------------------------------------------------------
-// START: NEW REFERRAL SYSTEM FUNCTIONS (PHASE 1 & 3)
+// REFERRAL SYSTEM FUNCTIONS
 // -------------------------------------------------------------------
 
 /**
  * Generates a unique, alphanumeric referral code prefixed with 'BKH'.
- * Checks for uniqueness in the parent_users collection.
- * @returns {string} A unique referral code (e.g., BKH7A3X9M)
  */
 async function generateReferralCode() {
     const chars = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ';
@@ -314,14 +176,13 @@ async function generateReferralCode() {
 
 /**
  * Loads the parent's referral data for the Rewards Dashboard.
- * @param {string} parentUid The UID of the current parent user.
  */
 async function loadReferralRewards(parentUid) {
     const rewardsContent = document.getElementById('rewardsContent');
     rewardsContent.innerHTML = '<div class="text-center py-8"><div class="loading-spinner mx-auto" style="width: 40px; height: 40px;"></div><p class="text-green-600 font-semibold mt-4">Loading rewards data...</p></div>';
 
     try {
-        // 1. Get the parent's referral code and current earnings
+        // Get the parent's referral code and current earnings
         const userDoc = await db.collection('parent_users').doc(parentUid).get();
         if (!userDoc.exists) {
             rewardsContent.innerHTML = '<p class="text-red-500 text-center py-8">User data not found. Please sign in again.</p>';
@@ -331,7 +192,7 @@ async function loadReferralRewards(parentUid) {
         const referralCode = userData.referralCode || 'N/A';
         const totalEarnings = userData.referralEarnings || 0;
         
-        // 2. Query the referral_transactions collection for all transactions belonging to this code owner
+        // Query referral transactions
         const transactionsSnapshot = await db.collection('referral_transactions')
             .where('ownerUid', '==', parentUid)
             .orderBy('timestamp', 'desc')
@@ -424,10 +285,6 @@ async function loadReferralRewards(parentUid) {
     }
 }
 
-// -------------------------------------------------------------------
-// END: NEW REFERRAL SYSTEM FUNCTIONS
-// -------------------------------------------------------------------
-
 // Remember Me Functionality
 function setupRememberMe() {
     const rememberMe = localStorage.getItem('rememberMe');
@@ -452,151 +309,53 @@ function handleRememberMe() {
     }
 }
 
-/**
- * Generates a unique, personalized recommendation using a smart template.
- * It summarizes performance instead of just listing topics.
- * @param {string} studentName The name of the student.
- * @param {string} tutorName The name of the tutor.
- * @param {Array} results The student's test results.
- * @returns {string} A personalized recommendation string.
- */
-function generateTemplatedRecommendation(studentName, tutorName, results) {
-    const strengths = [];
-    const weaknesses = [];
-    results.forEach(res => {
-        const percentage = res.total > 0 ? (res.correct / res.total) * 100 : 0;
-        const topicList = res.topics.length > 0 ? res.topics : [res.subject];
-        if (percentage >= 75) {
-            strengths.push(...topicList);
-        } else if (percentage < 50) {
-            weaknesses.push(...topicList);
-        }
-    });
-
-    const uniqueStrengths = [...new Set(strengths)];
-    const uniqueWeaknesses = [...new Set(weaknesses)];
-
-    let praiseClause = "";
-    if (uniqueStrengths.length > 2) {
-        praiseClause = `It was great to see ${studentName} demonstrate a solid understanding of several key concepts, particularly in areas like ${uniqueStrengths[0]} and ${uniqueStrengths[1]}. `;
-    } else if (uniqueStrengths.length > 0) {
-        praiseClause = `${studentName} showed strong potential, especially in the topic of ${uniqueStrengths.join(', ')}. `;
-    } else {
-        praiseClause = `${studentName} has put in a commendable effort on this initial assessment. `;
-    }
-
-    let improvementClause = "";
-    if (uniqueWeaknesses.length > 2) {
-        improvementClause = `Our next step will be to focus on building more confidence in a few areas, such as ${uniqueWeaknesses[0]} and ${uniqueWeaknesses[1]}. `;
-    } else if (uniqueWeaknesses.length > 0) {
-        improvementClause = `To continue this positive progress, our focus will be on the topic of ${uniqueWeaknesses.join(', ')}. `;
-    } else {
-        improvementClause = "We will continue to build on these fantastic results and explore more advanced topics. ";
-    }
-
-    const closingStatement = `With personalized support from their tutor, ${tutorName}, at Blooming Kids House, we are very confident that ${studentName} will master these skills and unlock their full potential.`;
-
-    return praiseClause + improvementClause + closingStatement;
-}
-
-/**
- * Checks if the search name matches the stored name, allowing for extra names added by tutors
- * @param {string} storedName The name stored in the database
- * @param {string} searchName The name entered by the parent
- * @returns {boolean} True if names match (case insensitive and allows extra names)
- */
-function nameMatches(storedName, searchName) {
-    if (!storedName || !searchName) return false;
-    
-    const storedLower = storedName.toLowerCase().trim();
-    const searchLower = searchName.toLowerCase().trim();
-    
-    // Exact match
-    if (storedLower === searchLower) return true;
-    
-    // If stored name contains the search name (tutor added extra names)
-    if (storedLower.includes(searchLower)) return true;
-    
-    // If search name contains the stored name (parent entered full name but stored has partial)
-    if (searchLower.includes(storedLower)) return true;
-    
-    // Split into words and check if all search words are in stored name
-    const searchWords = searchLower.split(/\s+/).filter(word => word.length > 1);
-    const storedWords = storedLower.split(/\s+/);
-    
-    if (searchWords.length > 0) {
-        return searchWords.every(word => storedWords.some(storedWord => storedWord.includes(word)));
-    }
-    
-    return false;
-}
-
-// Find parent name from students collection (SAME AS TUTOR.JS)
+// Find parent name from students collection
 async function findParentNameFromStudents(parentPhone) {
     try {
         console.log("Searching for parent name with phone:", parentPhone);
         
-        // Use multi-normalization to get all possible phone versions
-        const normalizedVersions = multiNormalizePhoneNumber(parentPhone);
-        const validVersions = normalizedVersions.filter(v => v.valid && v.normalized);
-        
-        // Search with each normalized version
-        for (const version of validVersions) {
-            console.log(`🔍 Searching parent name with: ${version.normalized} (${version.attempt})`);
+        // Normalize the phone number
+        const normalizedPhone = normalizePhoneNumber(parentPhone);
+        if (!normalizedPhone.valid) {
+            console.log("Invalid phone number format");
+            return null;
+        }
+
+        // Search in students collection
+        const studentsSnapshot = await db.collection("students")
+            .where("parentPhone", "==", normalizedPhone.normalized)
+            .limit(1)
+            .get();
+
+        if (!studentsSnapshot.empty) {
+            const studentDoc = studentsSnapshot.docs[0];
+            const studentData = studentDoc.data();
+            const parentName = studentData.parentName;
             
-            // PRIMARY SEARCH: students collection
-            const studentsSnapshot = await db.collection("students")
-                .where("normalizedParentPhone", "==", version.normalized)
-                .limit(1)
-                .get();
-
-            if (!studentsSnapshot.empty) {
-                const studentDoc = studentsSnapshot.docs[0];
-                const studentData = studentDoc.data();
-                const parentName = studentData.parentName;
-                
-                if (parentName) {
-                    console.log("Found parent name in students collection:", parentName);
-                    return parentName;
-                }
-            }
-
-            // SECONDARY SEARCH: pending_students collection
-            const pendingStudentsSnapshot = await db.collection("pending_students")
-                .where("normalizedParentPhone", "==", version.normalized)
-                .limit(1)
-                .get();
-
-            if (!pendingStudentsSnapshot.empty) {
-                const pendingStudentDoc = pendingStudentsSnapshot.docs[0];
-                const pendingStudentData = pendingStudentDoc.data();
-                const parentName = pendingStudentData.parentName;
-                
-                if (parentName) {
-                    console.log("Found parent name in pending_students collection:", parentName);
-                    return parentName;
-                }
-            }
-
-            // FALLBACK SEARCH: original phone fields
-            const fallbackStudentsSnapshot = await db.collection("students")
-                .where("parentPhone", "==", version.normalized)
-                .limit(1)
-                .get();
-
-            if (!fallbackStudentsSnapshot.empty) {
-                const studentDoc = fallbackStudentsSnapshot.docs[0];
-                const studentData = studentDoc.data();
-                const parentName = studentData.parentName;
-                
-                if (parentName) {
-                    console.log("Found parent name in students collection (fallback):", parentName);
-                    return parentName;
-                }
+            if (parentName) {
+                console.log("Found parent name in students collection:", parentName);
+                return parentName;
             }
         }
 
-        console.log("No parent name found in any collection with any normalization");
+        // Search in pending_students collection
+        const pendingStudentsSnapshot = await db.collection("pending_students")
+            .where("parentPhone", "==", normalizedPhone.normalized)
+            .limit(1)
+            .get();
+
+        if (!pendingStudentsSnapshot.empty) {
+            const pendingStudentDoc = pendingStudentsSnapshot.docs[0];
+            const pendingStudentData = pendingStudentDoc.data();
+            const parentName = pendingStudentData.parentName;
+            
+            if (parentName) {
+                console.log("Found parent name in pending_students collection:", parentName);
+                return parentName;
+            }
+        }
+
+        console.log("No parent name found");
         return null;
     } catch (error) {
         console.error("Error finding parent name:", error);
@@ -609,73 +368,54 @@ async function findStudentIdsForParent(parentPhone) {
     try {
         console.log("Finding student IDs for parent phone:", parentPhone);
         
-        // Use multi-normalization to get all possible phone versions
-        const normalizedVersions = multiNormalizePhoneNumber(parentPhone);
-        const validVersions = normalizedVersions.filter(v => v.valid && v.normalized);
-        
+        // Normalize the phone number
+        const normalizedPhone = normalizePhoneNumber(parentPhone);
+        if (!normalizedPhone.valid) {
+            console.log("Invalid phone number format");
+            return { studentIds: [], studentNameIdMap: new Map() };
+        }
+
         let studentIds = [];
         let studentNameIdMap = new Map();
         
-        // Search with each normalized version
-        for (const version of validVersions) {
-            console.log(`🔍 Searching student IDs with: ${version.normalized} (${version.attempt})`);
+        // Search in students collection
+        const studentsSnapshot = await db.collection("students")
+            .where("parentPhone", "==", normalizedPhone.normalized)
+            .get();
+
+        studentsSnapshot.forEach(doc => {
+            const studentData = doc.data();
+            const studentId = doc.id;
+            const studentName = studentData.studentName;
             
-            // Search in students collection
-            const studentsSnapshot = await db.collection("students")
-                .where("normalizedParentPhone", "==", version.normalized)
-                .get();
-
-            studentsSnapshot.forEach(doc => {
-                const studentData = doc.data();
-                const studentId = doc.id;
-                const studentName = studentData.studentName;
-                
-                if (studentId && studentName) {
-                    if (!studentIds.includes(studentId)) {
-                        studentIds.push(studentId);
-                    }
-                    studentNameIdMap.set(studentName, studentId);
-                    console.log(`Found student: ${studentName} (ID: ${studentId})`);
-                }
-            });
-
-            // Search in pending_students collection
-            const pendingStudentsSnapshot = await db.collection("pending_students")
-                .where("normalizedParentPhone", "==", version.normalized)
-                .get();
-
-            pendingStudentsSnapshot.forEach(doc => {
-                const studentData = doc.data();
-                const studentId = doc.id;
-                const studentName = studentData.studentName;
-                
-                if (studentId && studentName) {
-                    if (!studentIds.includes(studentId)) {
-                        studentIds.push(studentId);
-                    }
-                    studentNameIdMap.set(studentName, studentId);
-                    console.log(`Found pending student: ${studentName} (ID: ${studentId})`);
-                }
-            });
-
-            // Fallback: search by original phone field
-            const fallbackSnapshot = await db.collection("students")
-                .where("parentPhone", "==", version.normalized)
-                .get();
-
-            fallbackSnapshot.forEach(doc => {
-                const studentData = doc.data();
-                const studentId = doc.id;
-                const studentName = studentData.studentName;
-                
-                if (studentId && studentName && !studentNameIdMap.has(studentName)) {
+            if (studentId && studentName) {
+                if (!studentIds.includes(studentId)) {
                     studentIds.push(studentId);
-                    studentNameIdMap.set(studentName, studentId);
-                    console.log(`Found student (fallback): ${studentName} (ID: ${studentId})`);
                 }
-            });
-        }
-        
+                studentNameIdMap.set(studentName, studentId);
+                console.log(`Found student: ${studentName} (ID: ${studentId})`);
+            }
+        });
+
+        // Search in pending_students collection
+        const pendingStudentsSnapshot = await db.collection("pending_students")
+            .where("parentPhone", "==", normalizedPhone.normalized)
+            .get();
+
+        pendingStudentsSnapshot.forEach(doc => {
+            const studentData = doc.data();
+            const studentId = doc.id;
+            const studentName = studentData.studentName;
+            
+            if (studentId && studentName) {
+                if (!studentIds.includes(studentId)) {
+                    studentIds.push(studentId);
+                }
+                studentNameIdMap.set(studentName, studentId);
+                console.log(`Found pending student: ${studentName} (ID: ${studentId})`);
+            }
+        });
+
         // Store the mapping globally
         studentIdMap = studentNameIdMap;
         
@@ -716,17 +456,13 @@ async function handleSignUp() {
     // Combine country code with local phone number
     const fullPhoneNumber = countryCode + localPhone.replace(/\D/g, '');
     
-    // Use multi-normalization for phone validation
-    const phoneValidations = multiNormalizePhoneNumber(fullPhoneNumber);
-    const validVersions = phoneValidations.filter(v => v.valid && v.normalized);
+    // Normalize phone
+    const normalizedPhone = normalizePhoneNumber(fullPhoneNumber);
     
-    if (validVersions.length === 0) {
+    if (!normalizedPhone.valid) {
         showMessage('Invalid phone number format. Please check your phone number.', 'error');
         return;
     }
-
-    // Use the first valid normalized version
-    const normalizedPhone = validVersions[0].normalized;
 
     const signUpBtn = document.getElementById('signUpBtn');
     const authLoader = document.getElementById('authLoader');
@@ -741,18 +477,18 @@ async function handleSignUp() {
         const userCredential = await auth.createUserWithEmailAndPassword(email, password);
         const user = userCredential.user;
 
-        // Find parent name from existing data (SAME SOURCE AS TUTOR.JS)
-        const parentName = await findParentNameFromStudents(normalizedPhone);
+        // Find parent name from existing data
+        const parentName = await findParentNameFromStudents(normalizedPhone.normalized);
         
         // Generate referral code
         const referralCode = await generateReferralCode();
 
         // Store user data in Firestore for easy retrieval
         await db.collection('parent_users').doc(user.uid).set({
-            phone: fullPhoneNumber, // Store full number with country code
-            normalizedPhone: normalizedPhone, // Store normalized version
-            countryCode: countryCode, // Store selected country code
-            localPhone: localPhone, // Store local number part
+            phone: fullPhoneNumber,
+            normalizedPhone: normalizedPhone.normalized,
+            countryCode: countryCode,
+            localPhone: localPhone,
             email: email,
             parentName: parentName || 'Parent',
             createdAt: firebase.firestore.FieldValue.serverTimestamp(),
@@ -763,7 +499,7 @@ async function handleSignUp() {
         showMessage('Account created successfully!', 'success');
         
         // Automatically load reports after signup
-        await loadAllReportsForParent(normalizedPhone, user.uid);
+        await loadAllReportsForParent(normalizedPhone.normalized, user.uid);
 
     } catch (error) {
         console.error('Sign up error:', error);
@@ -828,35 +564,26 @@ async function handleSignIn() {
                 normalizedPhone = userData.normalizedPhone;
             }
         } else {
-            // Sign in with phone - use multi-normalization
-            const phoneValidations = multiNormalizePhoneNumber(identifier);
-            const validVersions = phoneValidations.filter(v => v.valid && v.normalized);
-            
-            if (validVersions.length === 0) {
+            // Sign in with phone - normalize the input
+            const phoneValidation = normalizePhoneNumber(identifier);
+            if (!phoneValidation.valid) {
                 throw new Error(`Invalid phone number format. Please try with country code (like +1234567890) or local format`);
             }
             
-            normalizedPhone = validVersions[0].normalized;
+            normalizedPhone = phoneValidation.normalized;
             
-            // Find user by any normalized phone version
-            let userFound = false;
-            for (const version of validVersions) {
-                const userQuery = await db.collection('parent_users')
-                    .where('normalizedPhone', '==', version.normalized)
-                    .limit(1)
-                    .get();
+            // Find user by phone
+            const userQuery = await db.collection('parent_users')
+                .where('normalizedPhone', '==', normalizedPhone)
+                .limit(1)
+                .get();
 
-                if (!userQuery.empty) {
-                    const userData = userQuery.docs[0].data();
-                    userCredential = await auth.signInWithEmailAndPassword(userData.email, password);
-                    userPhone = userData.phone;
-                    userId = userCredential.user.uid;
-                    userFound = true;
-                    break;
-                }
-            }
-
-            if (!userFound) {
+            if (!userQuery.empty) {
+                const userData = userQuery.docs[0].data();
+                userCredential = await auth.signInWithEmailAndPassword(userData.email, password);
+                userPhone = userData.phone;
+                userId = userCredential.user.uid;
+            } else {
                 // Fallback: search by original phone field
                 const fallbackQuery = await db.collection('parent_users')
                     .where('phone', '==', identifier)
@@ -876,10 +603,9 @@ async function handleSignIn() {
 
         if (!normalizedPhone && userPhone) {
             // Normalize the phone if we have it
-            const phoneValidations = multiNormalizePhoneNumber(userPhone);
-            const validVersions = phoneValidations.filter(v => v.valid && v.normalized);
-            if (validVersions.length > 0) {
-                normalizedPhone = validVersions[0].normalized;
+            const phoneValidation = normalizePhoneNumber(userPhone);
+            if (phoneValidation.valid) {
+                normalizedPhone = phoneValidation.normalized;
             }
         }
 
@@ -961,7 +687,7 @@ async function handlePasswordReset() {
 }
 
 // -------------------------------------------------------------------
-// START: ENHANCED MESSAGING SYSTEM
+// ENHANCED MESSAGING SYSTEM
 // -------------------------------------------------------------------
 
 function showComposeMessageModal() {
@@ -1054,7 +780,7 @@ async function submitMessage() {
             status: 'sent',
             timestamp: firebase.firestore.FieldValue.serverTimestamp(),
             type: 'parent_to_staff',
-            readBy: [] // Track who has read this message
+            readBy: []
         };
 
         // Save to Firestore
@@ -1076,7 +802,7 @@ async function submitMessage() {
 }
 
 // -------------------------------------------------------------------
-// START: ACADEMICS TAB FUNCTIONS
+// ACADEMICS TAB FUNCTIONS
 // -------------------------------------------------------------------
 
 async function loadAcademicsData(selectedStudent = null) {
@@ -1290,7 +1016,7 @@ function onStudentSelected(studentName) {
 }
 
 // -------------------------------------------------------------------
-// START: UNIFIED MESSAGING INBOX
+// UNIFIED MESSAGING INBOX
 // -------------------------------------------------------------------
 
 function showMessagesModal() {
@@ -1318,9 +1044,9 @@ async function loadUnifiedMessages() {
         const userDoc = await db.collection('parent_users').doc(user.uid).get();
         const userData = userDoc.data();
 
-        // Fetch messages from tutor_messages where recipients includes 'parents'
+        // Fetch messages from tutor_messages
         const tutorMessagesSnapshot = await db.collection('tutor_messages')
-            .where('recipients', 'array-contains', 'parents')
+            .where('parentUid', '==', user.uid)
             .orderBy('timestamp', 'desc')
             .get();
 
@@ -1461,145 +1187,6 @@ async function loadUnifiedMessages() {
 }
 
 // -------------------------------------------------------------------
-// START: ACCORDION SYSTEM FOR REPORTS
-// -------------------------------------------------------------------
-
-function createAccordionReportView(reportsByStudent, chartConfigsToCache) {
-    let html = '';
-    let studentIndex = 0;
-    
-    for (const [studentName, reports] of reportsByStudent) {
-        const fullName = capitalize(studentName);
-        
-        // Create accordion header
-        html += `
-            <div class="accordion-item mb-4">
-                <button onclick="toggleAccordion('student-${studentIndex}')" 
-                        class="accordion-header w-full flex justify-between items-center p-4 bg-green-100 border border-green-300 rounded-lg hover:bg-green-200 transition-all duration-200">
-                    <div class="flex items-center">
-                        <span class="text-xl mr-3">👤</span>
-                        <div class="text-left">
-                            <h3 class="font-bold text-green-800 text-lg">${fullName}</h3>
-                            <p class="text-green-600 text-sm">
-                                ${reports.assessments.length} Assessment(s), ${reports.monthly.length} Monthly Report(s)
-                            </p>
-                        </div>
-                    </div>
-                    <span class="accordion-arrow text-green-600 text-xl">▼</span>
-                </button>
-                <div id="student-${studentIndex}-content" class="accordion-content hidden p-4 bg-white border border-t-0 border-gray-200 rounded-b-lg">
-        `;
-        
-        // Assessment Reports
-        if (reports.assessments.length > 0) {
-            html += `<h4 class="font-semibold text-gray-700 mb-3 mt-2">📊 Assessment Reports</h4>`;
-            
-            let assessmentIndex = 0;
-            for (const [sessionKey, session] of reports.assessments) {
-                html += createAssessmentReportHTML(session, studentIndex, assessmentIndex, fullName);
-                assessmentIndex++;
-            }
-        }
-        
-        // Monthly Reports
-        if (reports.monthly.length > 0) {
-            html += `<h4 class="font-semibold text-gray-700 mb-3 mt-6">📈 Monthly Reports</h4>`;
-            
-            let monthlyIndex = 0;
-            for (const [sessionKey, session] of reports.monthly) {
-                html += createMonthlyReportHTML(session, studentIndex, monthlyIndex, fullName);
-                monthlyIndex++;
-            }
-        }
-        
-        html += `
-                </div>
-            </div>
-        `;
-        
-        studentIndex++;
-    }
-    
-    return html;
-}
-
-function toggleAccordion(studentId) {
-    const content = document.getElementById(`${studentId}-content`);
-    const arrow = document.querySelector(`#${studentId} .accordion-arrow`);
-    
-    if (content.classList.contains('hidden')) {
-        content.classList.remove('hidden');
-        arrow.textContent = '▲';
-    } else {
-        content.classList.add('hidden');
-        arrow.textContent = '▼';
-    }
-}
-
-function createAssessmentReportHTML(session, studentIndex, assessmentIndex, fullName) {
-    const tutorEmail = session[0].tutorEmail || 'N/A';
-    const formattedDate = new Date(session[0].timestamp * 1000).toLocaleString('en-US', {
-        dateStyle: 'long',
-        timeStyle: 'short'
-    });
-    
-    const results = session.map(testResult => {
-        const topics = [...new Set(testResult.answers?.map(a => a.topic).filter(t => t))] || [];
-        return {
-            subject: testResult.subject,
-            correct: testResult.score !== undefined ? testResult.score : 0,
-            total: testResult.totalScoreableQuestions !== undefined ? testResult.totalScoreableQuestions : 0,
-            topics: topics,
-        };
-    });
-    
-    const tableRows = results.map(res => `<tr><td class="border px-2 py-1">${res.subject.toUpperCase()}</td><td class="border px-2 py-1 text-center">${res.correct} / ${res.total}</td></tr>`).join("");
-    
-    return `
-        <div class="border rounded-lg shadow mb-6 p-4 bg-white" id="assessment-block-${studentIndex}-${assessmentIndex}">
-            <div class="flex justify-between items-center mb-3 border-b pb-2">
-                <h5 class="font-medium text-gray-800">Assessment - ${formattedDate}</h5>
-                <button onclick="downloadSessionReport(${studentIndex}, ${assessmentIndex}, '${fullName}', 'assessment')" 
-                        class="text-green-600 hover:text-green-800 font-medium flex items-center text-sm">
-                    <span class="mr-1">📥</span> Download
-                </button>
-            </div>
-            
-            <table class="w-full text-sm mb-3 border border-collapse">
-                <thead class="bg-gray-100"><tr><th class="border px-2 py-1 text-left">Subject</th><th class="border px-2 py-1 text-center">Score</th></tr></thead>
-                <tbody>${tableRows}</tbody>
-            </table>
-            
-            ${results.length > 0 ? `<canvas id="chart-${studentIndex}-${assessmentIndex}" class="w-full h-32 mb-3"></canvas>` : ''}
-        </div>
-    `;
-}
-
-function createMonthlyReportHTML(session, studentIndex, monthlyIndex, fullName) {
-    const formattedDate = new Date(session[0].timestamp * 1000).toLocaleString('en-US', {
-        dateStyle: 'long',
-        timeStyle: 'short'
-    });
-    
-    return `
-        <div class="border rounded-lg shadow mb-6 p-4 bg-white" id="monthly-block-${studentIndex}-${monthlyIndex}">
-            <div class="flex justify-between items-center mb-3 border-b pb-2">
-                <h5 class="font-medium text-gray-800">Monthly Report - ${formattedDate}</h5>
-                <button onclick="downloadMonthlyReport(${studentIndex}, ${monthlyIndex}, '${fullName}')" 
-                        class="text-green-600 hover:text-green-800 font-medium flex items-center text-sm">
-                    <span class="mr-1">📥</span> Download
-                </button>
-            </div>
-            
-            <div class="text-sm text-gray-700">
-                <p class="mb-1"><strong>Tutor:</strong> ${session[0].tutorName || 'N/A'}</p>
-                <p class="mb-2"><strong>Topics Covered:</strong> ${session[0].topics ? session[0].topics.substring(0, 100) + '...' : 'N/A'}</p>
-            </div>
-        </div>
-    `;
-}
-
-// -------------------------------------------------------------------
 // NOTIFICATION SYSTEM
 // -------------------------------------------------------------------
 
@@ -1612,7 +1199,7 @@ async function checkForNewMessages() {
         
         // Check tutor messages
         const tutorMessagesSnapshot = await db.collection('tutor_messages')
-            .where('recipients', 'array-contains', 'parents')
+            .where('parentUid', '==', user.uid)
             .get();
 
         totalUnread += tutorMessagesSnapshot.size;
@@ -1703,277 +1290,124 @@ function addMessagesButton() {
     }, 1000);
 }
 
-// ENHANCED MULTI-LAYER SEARCH SYSTEM FOR ALL COUNTRIES
-async function performMultiLayerSearch(parentPhone, parentEmail, userId) {
-    console.log("🔍 Starting multi-layer search for:", parentPhone);
+// SIMPLIFIED SEARCH SYSTEM - ONLY SEARCHES BY PARENTPHONE IN TUTOR_SUBMISSIONS
+async function searchReportsByParentPhone(parentPhone) {
+    console.log("🔍 Searching reports for parent phone:", parentPhone);
     
     let assessmentResults = [];
     let monthlyResults = [];
     
     try {
-        // Get multiple normalized versions of the phone number
-        const normalizedVersions = multiNormalizePhoneNumber(parentPhone);
-        const validVersions = normalizedVersions.filter(v => v.valid && v.normalized);
+        // Normalize phone
+        const normalizedPhone = normalizePhoneNumber(parentPhone);
+        if (!normalizedPhone.valid) {
+            console.log("Invalid phone number format");
+            return { assessmentResults, monthlyResults };
+        }
+
+        // --- MONTHLY REPORTS SEARCH (tutor_submissions) ---
+        console.log("📈 MONTHLY REPORTS SEARCH - Looking in tutor_submissions");
         
-        console.log(`🎯 Searching with ${validVersions.length} normalized versions:`, validVersions.map(v => v.normalized));
-
-        // --- ASSESSMENT REPORTS SEARCH ---
-        for (const version of validVersions) {
-            console.log(`📊 ASSESSMENT SEARCH - Attempt with: ${version.normalized} (${version.attempt})`);
-            
-            // Layer 1: Normalized phone search
-            let assessmentSnapshot = await db.collection("student_results")
-                .where("normalizedParentPhone", "==", version.normalized)
-                .get();
-            
-            if (!assessmentSnapshot.empty) {
-                console.log(`✅ Assessment FOUND with version: ${version.normalized}`);
-                assessmentSnapshot.forEach(doc => {
-                    const data = doc.data();
-                    // Check if we already have this result to avoid duplicates
-                    if (!assessmentResults.some(r => r.id === doc.id)) {
-                        assessmentResults.push({ 
-                            id: doc.id,
-                            ...data,
-                            timestamp: data.submittedAt?.seconds || Date.now() / 1000,
-                            type: 'assessment',
-                            foundWith: version.normalized
-                        });
-                    }
-                });
-                break; // Stop searching if we found results
-            }
-        }
-
-        // If no results from normalized search, try original fields
-        if (assessmentResults.length === 0) {
-            console.log("📊 ASSESSMENT SEARCH - Layer 2: Original phone fields");
-            for (const version of validVersions) {
-                let assessmentSnapshot = await db.collection("student_results")
-                    .where("parentPhone", "==", version.normalized)
-                    .get();
-                
-                if (!assessmentSnapshot.empty) {
-                    console.log(`✅ Assessment FOUND in original fields with: ${version.normalized}`);
-                    assessmentSnapshot.forEach(doc => {
-                        const data = doc.data();
-                        if (!assessmentResults.some(r => r.id === doc.id)) {
-                            assessmentResults.push({ 
-                                id: doc.id,
-                                ...data,
-                                timestamp: data.submittedAt?.seconds || Date.now() / 1000,
-                                type: 'assessment',
-                                foundWith: version.normalized
-                            });
-                        }
+        const monthlySnapshot = await db.collection("tutor_submissions")
+            .where("parentPhone", "==", normalizedPhone.normalized)
+            .get();
+        
+        if (!monthlySnapshot.empty) {
+            console.log(`✅ Monthly reports FOUND: ${monthlySnapshot.size} results`);
+            monthlySnapshot.forEach(doc => {
+                const data = doc.data();
+                if (!monthlyResults.some(r => r.id === doc.id)) {
+                    monthlyResults.push({ 
+                        id: doc.id,
+                        ...data,
+                        timestamp: data.submittedAt?.seconds || Date.now() / 1000,
+                        type: 'monthly'
                     });
-                    break;
                 }
-            }
+            });
         }
 
-        // If still no results, try email search
-        if (assessmentResults.length === 0 && parentEmail) {
-            console.log("📊 ASSESSMENT SEARCH - Layer 3: Email search");
-            let assessmentSnapshot = await db.collection("student_results")
-                .where("parentEmail", "==", parentEmail)
-                .get();
-            
-            if (!assessmentSnapshot.empty) {
-                console.log("✅ Assessment FOUND with email");
-                assessmentSnapshot.forEach(doc => {
-                    const data = doc.data();
-                    if (!assessmentResults.some(r => r.id === doc.id)) {
-                        assessmentResults.push({ 
-                            id: doc.id,
-                            ...data,
-                            timestamp: data.submittedAt?.seconds || Date.now() / 1000,
-                            type: 'assessment',
-                            foundWith: 'email'
-                        });
-                    }
-                });
-            }
-        }
-
-        // --- MONTHLY REPORTS SEARCH ---
-        for (const version of validVersions) {
-            console.log(`📈 MONTHLY REPORTS SEARCH - Attempt with: ${version.normalized} (${version.attempt})`);
-            
-            // Layer 1: Normalized phone search
-            let monthlySnapshot = await db.collection("tutor_submissions")
-                .where("normalizedParentPhone", "==", version.normalized)
-                .get();
-            
-            if (!monthlySnapshot.empty) {
-                console.log(`✅ Monthly reports FOUND with version: ${version.normalized}`);
-                monthlySnapshot.forEach(doc => {
-                    const data = doc.data();
-                    if (!monthlyResults.some(r => r.id === doc.id)) {
-                        monthlyResults.push({ 
-                            id: doc.id,
-                            ...data,
-                            timestamp: data.submittedAt?.seconds || Date.now() / 1000,
-                            type: 'monthly',
-                            foundWith: version.normalized
-                        });
-                    }
-                });
-                break;
-            }
-        }
-
-        // If no results from normalized search, try original fields
-        if (monthlyResults.length === 0) {
-            console.log("📈 MONTHLY REPORTS SEARCH - Layer 2: Original phone fields");
-            for (const version of validVersions) {
-                let monthlySnapshot = await db.collection("tutor_submissions")
-                    .where("parentPhone", "==", version.normalized)
-                    .get();
-                
-                if (!monthlySnapshot.empty) {
-                    console.log(`✅ Monthly reports FOUND in original fields with: ${version.normalized}`);
-                    monthlySnapshot.forEach(doc => {
-                        const data = doc.data();
-                        if (!monthlyResults.some(r => r.id === doc.id)) {
-                            monthlyResults.push({ 
-                                id: doc.id,
-                                ...data,
-                                timestamp: data.submittedAt?.seconds || Date.now() / 1000,
-                                type: 'monthly',
-                                foundWith: version.normalized
-                            });
-                        }
+        // --- ASSESSMENT REPORTS SEARCH (student_results) ---
+        console.log("📊 ASSESSMENT SEARCH - Looking in student_results");
+        
+        const assessmentSnapshot = await db.collection("student_results")
+            .where("parentPhone", "==", normalizedPhone.normalized)
+            .get();
+        
+        if (!assessmentSnapshot.empty) {
+            console.log(`✅ Assessment reports FOUND: ${assessmentSnapshot.size} results`);
+            assessmentSnapshot.forEach(doc => {
+                const data = doc.data();
+                if (!assessmentResults.some(r => r.id === doc.id)) {
+                    assessmentResults.push({ 
+                        id: doc.id,
+                        ...data,
+                        timestamp: data.submittedAt?.seconds || Date.now() / 1000,
+                        type: 'assessment'
                     });
-                    break;
                 }
-            }
-        }
-
-        // If still no results, try email search
-        if (monthlyResults.length === 0 && parentEmail) {
-            console.log("📈 MONTHLY REPORTS SEARCH - Layer 3: Email search");
-            let monthlySnapshot = await db.collection("tutor_submissions")
-                .where("parentEmail", "==", parentEmail)
-                .get();
-            
-            if (!monthlySnapshot.empty) {
-                console.log("✅ Monthly reports FOUND with email");
-                monthlySnapshot.forEach(doc => {
-                    const data = doc.data();
-                    if (!monthlyResults.some(r => r.id === doc.id)) {
-                        monthlyResults.push({ 
-                            id: doc.id,
-                            ...data,
-                            timestamp: data.submittedAt?.seconds || Date.now() / 1000,
-                            type: 'monthly',
-                            foundWith: 'email'
-                        });
-                    }
-                });
-            }
+            });
         }
 
         console.log("🎯 SEARCH SUMMARY - Assessments:", assessmentResults.length, "Monthly:", monthlyResults.length);
         
     } catch (error) {
-        console.error("❌ Error during multi-layer search:", error);
+        console.error("❌ Error during search:", error);
     }
     
     return { assessmentResults, monthlyResults };
 }
 
-// HYBRID REAL-TIME MONITORING SYSTEM
-function setupRealTimeMonitoring(parentPhone, parentEmail, userId) {
+// REAL-TIME MONITORING SYSTEM
+function setupRealTimeMonitoring(parentPhone, userId) {
     // Clear any existing listeners
     cleanupRealTimeListeners();
     
     console.log("🔍 Setting up real-time monitoring for:", parentPhone);
     
-    // Get normalized phone versions for monitoring
-    const normalizedVersions = multiNormalizePhoneNumber(parentPhone);
-    const validVersions = normalizedVersions.filter(v => v.valid && v.normalized);
-    
-    // Monitor assessment reports
-    validVersions.forEach(version => {
-        const assessmentListener = db.collection("student_results")
-            .where("normalizedParentPhone", "==", version.normalized)
-            .onSnapshot((snapshot) => {
-                snapshot.docChanges().forEach((change) => {
-                    if (change.type === "added") {
-                        console.log("🆕 NEW ASSESSMENT REPORT DETECTED!");
-                        showNewReportNotification('assessment');
-                        // Reload reports after a short delay
-                        setTimeout(() => {
-                            loadAllReportsForParent(parentPhone, userId);
-                        }, 2000);
-                    }
-                });
-            });
-        realTimeListeners.push(assessmentListener);
-    });
+    // Normalize phone
+    const normalizedPhone = normalizePhoneNumber(parentPhone);
+    if (!normalizedPhone.valid) {
+        console.log("Invalid phone number for monitoring");
+        return;
+    }
     
     // Monitor monthly reports
-    validVersions.forEach(version => {
-        const monthlyListener = db.collection("tutor_submissions")
-            .where("normalizedParentPhone", "==", version.normalized)
-            .onSnapshot((snapshot) => {
-                snapshot.docChanges().forEach((change) => {
-                    if (change.type === "added") {
-                        console.log("🆕 NEW MONTHLY REPORT DETECTED!");
-                        showNewReportNotification('monthly');
-                        // Reload reports after a short delay
-                        setTimeout(() => {
-                            loadAllReportsForParent(parentPhone, userId);
-                        }, 2000);
-                    }
-                });
-            });
-        realTimeListeners.push(monthlyListener);
-    });
-    
-    // Monitor daily topics
-    validVersions.forEach(version => {
-        // First get student IDs, then monitor their daily topics
-        findStudentIdsForParent(parentPhone).then(({ studentIds }) => {
-            studentIds.forEach(studentId => {
-                const dailyTopicsListener = db.collection("daily_topics")
-                    .where("studentId", "==", studentId)
-                    .onSnapshot((snapshot) => {
-                        snapshot.docChanges().forEach((change) => {
-                            if (change.type === "added") {
-                                console.log("🆕 NEW DAILY TOPIC DETECTED!");
-                                showNewReportNotification('daily_topic');
-                            }
-                        });
-                    });
-                realTimeListeners.push(dailyTopicsListener);
+    const monthlyListener = db.collection("tutor_submissions")
+        .where("parentPhone", "==", normalizedPhone.normalized)
+        .onSnapshot((snapshot) => {
+            snapshot.docChanges().forEach((change) => {
+                if (change.type === "added") {
+                    console.log("🆕 NEW MONTHLY REPORT DETECTED!");
+                    showNewReportNotification('monthly');
+                    // Reload reports after a short delay
+                    setTimeout(() => {
+                        loadAllReportsForParent(parentPhone, userId);
+                    }, 2000);
+                }
             });
         });
-    });
+    realTimeListeners.push(monthlyListener);
     
-    // Monitor homework assignments
-    validVersions.forEach(version => {
-        findStudentIdsForParent(parentPhone).then(({ studentIds }) => {
-            studentIds.forEach(studentId => {
-                const homeworkListener = db.collection("homework_assignments")
-                    .where("studentId", "==", studentId)
-                    .onSnapshot((snapshot) => {
-                        snapshot.docChanges().forEach((change) => {
-                            if (change.type === "added") {
-                                console.log("🆕 NEW HOMEWORK ASSIGNMENT DETECTED!");
-                                showNewReportNotification('homework');
-                            }
-                        });
-                    });
-                realTimeListeners.push(homeworkListener);
+    // Monitor assessment reports
+    const assessmentListener = db.collection("student_results")
+        .where("parentPhone", "==", normalizedPhone.normalized)
+        .onSnapshot((snapshot) => {
+            snapshot.docChanges().forEach((change) => {
+                if (change.type === "added") {
+                    console.log("🆕 NEW ASSESSMENT REPORT DETECTED!");
+                    showNewReportNotification('assessment');
+                    setTimeout(() => {
+                        loadAllReportsForParent(parentPhone, userId);
+                    }, 2000);
+                }
             });
         });
-    });
+    realTimeListeners.push(assessmentListener);
     
     // Monitor tutor messages
     const messagesListener = db.collection("tutor_messages")
-        .where("recipients", "array-contains", "parents")
+        .where("parentUid", "==", userId)
         .onSnapshot((snapshot) => {
             snapshot.docChanges().forEach((change) => {
                 if (change.type === "added") {
@@ -1983,39 +1417,6 @@ function setupRealTimeMonitoring(parentPhone, parentEmail, userId) {
             });
         });
     realTimeListeners.push(messagesListener);
-    
-    // Also monitor by email if available
-    if (parentEmail) {
-        const emailAssessmentListener = db.collection("student_results")
-            .where("parentEmail", "==", parentEmail)
-            .onSnapshot((snapshot) => {
-                snapshot.docChanges().forEach((change) => {
-                    if (change.type === "added") {
-                        console.log("🆕 NEW ASSESSMENT REPORT DETECTED VIA EMAIL!");
-                        showNewReportNotification('assessment');
-                        setTimeout(() => {
-                            loadAllReportsForParent(parentPhone, userId);
-                        }, 2000);
-                    }
-                });
-            });
-        realTimeListeners.push(emailAssessmentListener);
-        
-        const emailMonthlyListener = db.collection("tutor_submissions")
-            .where("parentEmail", "==", parentEmail)
-            .onSnapshot((snapshot) => {
-                snapshot.docChanges().forEach((change) => {
-                    if (change.type === "added") {
-                        console.log("🆕 NEW MONTHLY REPORT DETECTED VIA EMAIL!");
-                        showNewReportNotification('monthly');
-                        setTimeout(() => {
-                            loadAllReportsForParent(parentPhone, userId);
-                        }, 2000);
-                    }
-                });
-            });
-        realTimeListeners.push(emailMonthlyListener);
-    }
 }
 
 function cleanupRealTimeListeners() {
@@ -2030,9 +1431,7 @@ function cleanupRealTimeListeners() {
 
 function showNewReportNotification(type) {
     const reportType = type === 'assessment' ? 'Assessment Report' : 
-                      type === 'monthly' ? 'Monthly Report' :
-                      type === 'daily_topic' ? 'Daily Topic' :
-                      type === 'homework' ? 'Homework Assignment' : 'New Update';
+                      type === 'monthly' ? 'Monthly Report' : 'New Update';
     
     showMessage(`New ${reportType} available!`, 'success');
     
@@ -2073,7 +1472,7 @@ async function manualRefreshReports() {
             const userData = userDoc.data();
             const userPhone = userData.normalizedPhone || userData.phone;
             
-            // Force reload reports (bypass cache)
+            // Force reload reports
             await loadAllReportsForParent(userPhone, user.uid, true);
             
             showMessage('Reports refreshed successfully!', 'success');
@@ -2109,7 +1508,7 @@ function addManualRefreshButton() {
     buttonContainer.insertBefore(refreshBtn, buttonContainer.lastElementChild);
 }
 
-// MAIN REPORT LOADING FUNCTION - UPDATED WITH ACCORDION SYSTEM
+// MAIN REPORT LOADING FUNCTION
 async function loadAllReportsForParent(parentPhone, userId, forceRefresh = false) {
     const reportArea = document.getElementById("reportArea");
     const reportContent = document.getElementById("reportContent");
@@ -2117,7 +1516,7 @@ async function loadAllReportsForParent(parentPhone, userId, forceRefresh = false
     const authLoader = document.getElementById("authLoader");
     const welcomeMessage = document.getElementById("welcomeMessage");
 
-    // IMMEDIATELY SHOW DASHBOARD IF USER IS AUTHENTICATED (SESSION PERSISTENCE FIX)
+    // SHOW DASHBOARD IF USER IS AUTHENTICATED
     const user = auth.currentUser;
     if (user && authArea && reportArea) {
         authArea.classList.add("hidden");
@@ -2136,7 +1535,7 @@ async function loadAllReportsForParent(parentPhone, userId, forceRefresh = false
             try {
                 const cachedItem = localStorage.getItem(cacheKey);
                 if (cachedItem) {
-                    const { timestamp, html, chartConfigs, userData } = JSON.parse(cachedItem);
+                    const { timestamp, html, userData } = JSON.parse(cachedItem);
                     if (Date.now() - timestamp < twoWeeksInMillis) {
                         console.log("Loading reports from cache.");
                         reportContent.innerHTML = html;
@@ -2147,16 +1546,6 @@ async function loadAllReportsForParent(parentPhone, userId, forceRefresh = false
                             currentUserData = userData;
                         } else {
                             welcomeMessage.textContent = `Welcome!`;
-                        }
-                        
-                        // Re-initialize charts from cached configuration
-                        if (chartConfigs && chartConfigs.length > 0) {
-                            setTimeout(() => {
-                                chartConfigs.forEach(chart => {
-                                    const ctx = document.getElementById(chart.canvasId);
-                                    if (ctx) new Chart(ctx, chart.config);
-                                });
-                            }, 0);
                         }
 
                         authArea.classList.add("hidden");
@@ -2169,7 +1558,7 @@ async function loadAllReportsForParent(parentPhone, userId, forceRefresh = false
                         // Setup real-time monitoring
                         const userDoc = await db.collection('parent_users').doc(userId).get();
                         const userData = userDoc.data();
-                        setupRealTimeMonitoring(parentPhone, userData.email, userId);
+                        setupRealTimeMonitoring(parentPhone, userId);
                         
                         // Load initial referral data
                         loadReferralRewards(userId);
@@ -2187,23 +1576,22 @@ async function loadAllReportsForParent(parentPhone, userId, forceRefresh = false
         }
         // --- END CACHE IMPLEMENTATION ---
 
-        // FIND PARENT NAME FROM SAME SOURCES AS TUTOR.JS
+        // FIND PARENT NAME
         let parentName = await findParentNameFromStudents(parentPhone);
         
         // Get parent's email and latest user data from their account document
         const userDocRef = db.collection('parent_users').doc(userId);
         let userDoc = await userDocRef.get();
         let userData = userDoc.data();
-        const parentEmail = userData.email;
 
-        // --- START: REFERRAL CODE CHECK/GENERATION FOR EXISTING USERS (FIX) ---
+        // REFERRAL CODE CHECK/GENERATION FOR EXISTING USERS
         if (!userData.referralCode) {
             console.log("Existing user detected without a referral code. Generating and assigning now.");
             try {
                 const newReferralCode = await generateReferralCode();
                 await userDocRef.update({
                     referralCode: newReferralCode,
-                    referralEarnings: userData.referralEarnings || 0 // Initialize if missing
+                    referralEarnings: userData.referralEarnings || 0
                 });
                 
                 // Re-fetch updated user data
@@ -2216,7 +1604,6 @@ async function loadAllReportsForParent(parentPhone, userId, forceRefresh = false
                 // Non-critical failure, continue loading reports
             }
         }
-        // --- END: REFERRAL CODE CHECK/GENERATION FOR EXISTING USERS (FIX) ---
 
         // If not found in students collections, use name from user document
         if (!parentName && userId) {
@@ -2250,13 +1637,13 @@ async function loadAllReportsForParent(parentPhone, userId, forceRefresh = false
             }
         }
 
-        console.log("🔍 Starting enhanced multi-layer search for:", parentPhone);
+        console.log("🔍 Starting search for reports with parent phone:", parentPhone);
 
-        // --- USE ENHANCED MULTI-LAYER SEARCH SYSTEM ---
-        const { assessmentResults, monthlyResults } = await performMultiLayerSearch(parentPhone, parentEmail, userId);
+        // --- USE SIMPLIFIED SEARCH SYSTEM ---
+        const { assessmentResults, monthlyResults } = await searchReportsByParentPhone(parentPhone);
 
-        // SETUP REAL-TIME MONITORING (whether reports exist or not)
-        setupRealTimeMonitoring(parentPhone, parentEmail, userId);
+        // SETUP REAL-TIME MONITORING
+        setupRealTimeMonitoring(parentPhone, userId);
 
         if (assessmentResults.length === 0 && monthlyResults.length === 0) {
             // NO REPORTS FOUND - SHOW WAITING STATE
@@ -2270,7 +1657,7 @@ async function loadAllReportsForParent(parentPhone, userId, forceRefresh = false
                     <div class="bg-blue-50 border border-blue-200 rounded-lg p-6 max-w-2xl mx-auto mb-6">
                         <ul class="text-left text-gray-700 space-y-3">
                             <li>• Your child's tutor hasn't submitted their first assessment or monthly report yet</li>
-                            <li>• The phone number/email used doesn't match what the tutor has on file</li>
+                            <li>• The phone number used doesn't match what the tutor has on file</li>
                             <li>• Reports are being processed and will appear soon</li>
                         </ul>
                     </div>
@@ -2308,9 +1695,8 @@ async function loadAllReportsForParent(parentPhone, userId, forceRefresh = false
             return;
         }
         
-        // REPORTS FOUND - DISPLAY THEM WITH ACCORDION SYSTEM
+        // REPORTS FOUND - DISPLAY THEM
         reportContent.innerHTML = "";
-        const chartConfigsToCache = [];
 
         // Group reports by student name
         const reportsByStudent = new Map();
@@ -2325,24 +1711,6 @@ async function loadAllReportsForParent(parentPhone, userId, forceRefresh = false
             assessmentGroups.get(studentName).push(result);
         });
 
-        // Group assessment reports by session (day)
-        for (const [studentName, assessments] of assessmentGroups) {
-            const sessionGroups = new Map();
-            
-            assessments.forEach(result => {
-                const sessionKey = Math.floor(result.timestamp / 86400); // Group by day
-                if (!sessionGroups.has(sessionKey)) {
-                    sessionGroups.set(sessionKey, []);
-                }
-                sessionGroups.get(sessionKey).push(result);
-            });
-            
-            if (!reportsByStudent.has(studentName)) {
-                reportsByStudent.set(studentName, { assessments: new Map(), monthly: new Map() });
-            }
-            reportsByStudent.get(studentName).assessments = sessionGroups;
-        }
-
         // Group monthly reports by student
         const monthlyGroups = new Map();
         monthlyResults.forEach(result => {
@@ -2353,43 +1721,80 @@ async function loadAllReportsForParent(parentPhone, userId, forceRefresh = false
             monthlyGroups.get(studentName).push(result);
         });
 
-        // Group monthly reports by session (day)
-        for (const [studentName, monthlies] of monthlyGroups) {
-            const sessionGroups = new Map();
+        // Create simple report display
+        let reportHtml = '<div class="space-y-6">';
+        
+        // Display assessment reports
+        if (assessmentResults.length > 0) {
+            reportHtml += `<h3 class="text-xl font-bold text-gray-800 mb-4">Assessment Reports</h3>`;
             
-            monthlies.forEach(result => {
-                const sessionKey = Math.floor(result.timestamp / 86400); // Group by day
-                if (!sessionGroups.has(sessionKey)) {
-                    sessionGroups.set(sessionKey, []);
-                }
-                sessionGroups.get(sessionKey).push(result);
-            });
-            
-            if (!reportsByStudent.has(studentName)) {
-                reportsByStudent.set(studentName, { assessments: new Map(), monthly: new Map() });
+            for (const [studentName, assessments] of assessmentGroups) {
+                reportHtml += `
+                    <div class="bg-white border border-gray-200 rounded-lg p-6 shadow-sm">
+                        <h4 class="font-bold text-green-700 text-lg mb-4">${capitalize(studentName)}</h4>
+                        <div class="space-y-4">
+                `;
+                
+                assessments.forEach((result, index) => {
+                    const date = new Date(result.timestamp * 1000).toLocaleDateString('en-US', {
+                        dateStyle: 'long',
+                        timeStyle: 'short'
+                    });
+                    
+                    reportHtml += `
+                        <div class="border-l-4 border-green-500 pl-4 py-2">
+                            <p class="font-medium text-gray-800">Assessment #${index + 1} - ${date}</p>
+                            <p class="text-gray-600">Subject: ${result.subject || 'N/A'}</p>
+                            <p class="text-gray-600">Score: ${result.score || 0} / ${result.totalScoreableQuestions || 0}</p>
+                        </div>
+                    `;
+                });
+                
+                reportHtml += `</div></div>`;
             }
-            reportsByStudent.get(studentName).monthly = sessionGroups;
         }
 
-        userChildren = Array.from(reportsByStudent.keys());
+        // Display monthly reports
+        if (monthlyResults.length > 0) {
+            reportHtml += `<h3 class="text-xl font-bold text-gray-800 mb-4 mt-8">Monthly Reports</h3>`;
+            
+            for (const [studentName, monthlies] of monthlyGroups) {
+                reportHtml += `
+                    <div class="bg-white border border-gray-200 rounded-lg p-6 shadow-sm">
+                        <h4 class="font-bold text-blue-700 text-lg mb-4">${capitalize(studentName)}</h4>
+                        <div class="space-y-4">
+                `;
+                
+                monthlies.forEach((result, index) => {
+                    const date = new Date(result.timestamp * 1000).toLocaleDateString('en-US', {
+                        dateStyle: 'long',
+                        timeStyle: 'short'
+                    });
+                    
+                    reportHtml += `
+                        <div class="border-l-4 border-blue-500 pl-4 py-2">
+                            <p class="font-medium text-gray-800">Monthly Report #${index + 1} - ${date}</p>
+                            <p class="text-gray-600">Tutor: ${result.tutorName || 'N/A'}</p>
+                            <p class="text-gray-600">Topics: ${result.topics ? result.topics.substring(0, 100) + '...' : 'N/A'}</p>
+                        </div>
+                    `;
+                });
+                
+                reportHtml += `</div></div>`;
+            }
+        }
+        
+        reportHtml += '</div>';
+        reportContent.innerHTML = reportHtml;
+        
+        // Store student names
+        userChildren = Array.from(new Set([...assessmentGroups.keys(), ...monthlyGroups.keys()]));
 
-        // Create accordion view
-        reportContent.innerHTML = createAccordionReportView(reportsByStudent, chartConfigsToCache);
-        
-        // Initialize charts
-        setTimeout(() => {
-            chartConfigsToCache.forEach(chart => {
-                const ctx = document.getElementById(chart.canvasId);
-                if (ctx) new Chart(ctx, chart.config);
-            });
-        }, 100);
-        
         // --- CACHE SAVING LOGIC ---
         try {
             const dataToCache = {
                 timestamp: Date.now(),
                 html: reportContent.innerHTML,
-                chartConfigs: chartConfigsToCache,
                 userData: currentUserData
             };
             localStorage.setItem(cacheKey, JSON.stringify(dataToCache));
@@ -2418,18 +1823,6 @@ async function loadAllReportsForParent(parentPhone, userId, forceRefresh = false
     } finally {
         authLoader.classList.add("hidden");
     }
-}
-
-function downloadSessionReport(studentIndex, sessionIndex, studentName, type) {
-    const element = document.getElementById(`${type}-block-${studentIndex}-${sessionIndex}`);
-    const safeStudentName = studentName.replace(/ /g, '_');
-    const fileName = `${type === 'assessment' ? 'Assessment' : 'Monthly'}_Report_${safeStudentName}.pdf`;
-    const opt = { margin: 0.5, filename: fileName, image: { type: 'jpeg', quality: 0.98 }, html2canvas: { scale: 2, useCORS: true }, jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' } };
-    html2pdf().from(element).set(opt).save();
-}
-
-function downloadMonthlyReport(studentIndex, monthlyIndex, studentName) {
-    downloadSessionReport(studentIndex, monthlyIndex, studentName, 'monthly');
 }
 
 function logout() {
