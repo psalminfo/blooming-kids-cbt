@@ -1792,17 +1792,6 @@ function showBulkSchedulePopup(student, tutor, totalCount = 0) {
  * SECTION 8: DAILY TOPIC & HOMEWORK MANAGEMENT
  ******************************************************************************/
 
-// Import Firebase functions needed for this section
-const { 
-    collection, 
-    doc, 
-    setDoc, 
-    query, 
-    where, 
-    orderBy,
-    getDocs 
-} = window.firebaseFirestore || {};
-
 // Store monthly topics data globally
 window.monthlyTopicsCache = {};
 
@@ -6565,6 +6554,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     }, 500);
 });
+
 
 
 
