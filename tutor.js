@@ -2111,33 +2111,44 @@ async function scheduleEmailReminder(hwData, fileUrl = '') {
 // Messaging Feature with Floating Button & Enhanced UI
 let unreadMessageCount = 0;
 let messagingFloatingBtn = null;
+let inboxFloatingBtn = null;
 
-// Initialize floating messaging button
+// Initialize floating messaging and inbox buttons
 function initializeFloatingMessagingButton() {
-    // Remove existing button if it exists
-    const existingBtn = document.querySelector('.floating-messaging-btn');
-    if (existingBtn) {
-        existingBtn.remove();
-    }
+    // Remove existing buttons if they exist
+    const existingBtns = document.querySelectorAll('.floating-messaging-btn, .floating-inbox-btn');
+    existingBtns.forEach(btn => btn.remove());
     
-    // Create floating button
+    // Create messaging floating button
     messagingFloatingBtn = document.createElement('button');
     messagingFloatingBtn.className = 'floating-messaging-btn';
     messagingFloatingBtn.innerHTML = `
         <span class="floating-btn-icon">💬</span>
-        <span class="floating-btn-text">Message</span>
+        <span class="floating-btn-text">New Message</span>
     `;
-    
+    messagingFloatingBtn.title = "Send New Message";
     document.body.appendChild(messagingFloatingBtn);
     
-    // Add click handler
-    messagingFloatingBtn.addEventListener('click', showEnhancedMessagingModal);
+    // Create inbox floating button
+    inboxFloatingBtn = document.createElement('button');
+    inboxFloatingBtn.className = 'floating-inbox-btn';
+    inboxFloatingBtn.innerHTML = `
+        <span class="floating-btn-icon">📨</span>
+        <span class="floating-btn-text">Inbox</span>
+    `;
+    inboxFloatingBtn.title = "View Inbox";
+    document.body.appendChild(inboxFloatingBtn);
     
-    // Add CSS for floating button
+    // Add click handlers
+    messagingFloatingBtn.addEventListener('click', showEnhancedMessagingModal);
+    inboxFloatingBtn.addEventListener('click', showInboxModal);
+    
+    // Add CSS for floating buttons
     if (!document.querySelector('#floating-btn-styles')) {
         const floatingBtnStyles = document.createElement('style');
         floatingBtnStyles.id = 'floating-btn-styles';
         floatingBtnStyles.textContent = `
+            /* Messaging Button */
             .floating-messaging-btn {
                 position: fixed;
                 bottom: 30px;
@@ -2159,13 +2170,44 @@ function initializeFloatingMessagingButton() {
                 animation: floatAnimation 3s ease-in-out infinite;
             }
             
-            .floating-messaging-btn:hover {
-                transform: translateY(-5px);
-                box-shadow: 0 15px 30px rgba(139, 92, 246, 0.4);
-                background: linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%);
+            /* Inbox Button */
+            .floating-inbox-btn {
+                position: fixed;
+                bottom: 30px;
+                right: 170px;
+                background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+                color: white;
+                border: none;
+                border-radius: 50px;
+                padding: 16px 24px;
+                font-size: 16px;
+                font-weight: 600;
+                box-shadow: 0 8px 25px rgba(16, 185, 129, 0.3);
+                cursor: pointer;
+                display: flex;
+                align-items: center;
+                gap: 10px;
+                transition: all 0.3s ease;
+                z-index: 1000;
+                animation: floatAnimation 3s ease-in-out infinite;
             }
             
-            .floating-messaging-btn:active {
+            .floating-messaging-btn:hover, .floating-inbox-btn:hover {
+                transform: translateY(-5px);
+                box-shadow: 0 15px 30px rgba(139, 92, 246, 0.4);
+            }
+            
+            .floating-messaging-btn:hover {
+                background: linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%);
+                box-shadow: 0 15px 30px rgba(139, 92, 246, 0.4);
+            }
+            
+            .floating-inbox-btn:hover {
+                background: linear-gradient(135deg, #059669 0%, #047857 100%);
+                box-shadow: 0 15px 30px rgba(16, 185, 129, 0.4);
+            }
+            
+            .floating-messaging-btn:active, .floating-inbox-btn:active {
                 transform: translateY(-2px);
             }
             
@@ -2186,17 +2228,61 @@ function initializeFloatingMessagingButton() {
                 }
             }
             
+            /* Badge styles for both buttons */
+            .unread-badge {
+                position: absolute;
+                top: -5px;
+                right: -5px;
+                background-color: #ef4444;
+                color: white;
+                border-radius: 50%;
+                width: 22px;
+                height: 22px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                font-size: 0.7rem;
+                font-weight: bold;
+                border: 2px solid white;
+                animation: pulse 2s infinite;
+            }
+            
+            @keyframes pulse {
+                0% {
+                    box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7);
+                }
+                70% {
+                    box-shadow: 0 0 0 10px rgba(239, 68, 68, 0);
+                }
+                100% {
+                    box-shadow: 0 0 0 0 rgba(239, 68, 68, 0);
+                }
+            }
+            
             /* Responsive design */
             @media (max-width: 768px) {
-                .floating-messaging-btn {
+                .floating-messaging-btn, .floating-inbox-btn {
                     bottom: 20px;
-                    right: 20px;
                     padding: 14px 20px;
                     font-size: 14px;
                 }
                 
+                .floating-messaging-btn {
+                    right: 20px;
+                }
+                
+                .floating-inbox-btn {
+                    right: 130px;
+                }
+                
                 .floating-btn-text {
                     display: none;
+                }
+            }
+            
+            @media (max-width: 480px) {
+                .floating-inbox-btn {
+                    right: 110px;
                 }
             }
         `;
@@ -2204,24 +2290,28 @@ function initializeFloatingMessagingButton() {
     }
 }
 
-// Update unread message count
+// Update unread message count and display on both buttons
 async function updateUnreadMessageCount() {
     try {
         const tutorId = window.tutorData?.id;
         if (!tutorId) return;
         
+        // Query unread messages where tutor is recipient and message is not from tutor
         const messagesQuery = query(
             collection(db, "tutor_messages"),
             where("tutorId", "==", tutorId),
-            where("read", "==", false)
+            where("read", "==", false),
+            where("senderType", "!=", "tutor")
         );
         
         const messagesSnapshot = await getDocs(messagesQuery);
         unreadMessageCount = messagesSnapshot.size;
         
-        // Update floating button badge
-        if (messagingFloatingBtn) {
-            const existingBadge = messagingFloatingBtn.querySelector('.unread-badge');
+        // Update badges on both buttons
+        const updateButtonBadge = (button) => {
+            if (!button) return;
+            
+            const existingBadge = button.querySelector('.unread-badge');
             if (existingBadge) {
                 existingBadge.remove();
             }
@@ -2230,47 +2320,12 @@ async function updateUnreadMessageCount() {
                 const badge = document.createElement('span');
                 badge.className = 'unread-badge';
                 badge.textContent = unreadMessageCount > 99 ? '99+' : unreadMessageCount;
-                messagingFloatingBtn.appendChild(badge);
-                
-                // Add badge styles if not already added
-                if (!document.querySelector('#badge-styles')) {
-                    const badgeStyles = document.createElement('style');
-                    badgeStyles.id = 'badge-styles';
-                    badgeStyles.textContent = `
-                        .unread-badge {
-                            position: absolute;
-                            top: -5px;
-                            right: -5px;
-                            background-color: #ef4444;
-                            color: white;
-                            border-radius: 50%;
-                            width: 22px;
-                            height: 22px;
-                            display: flex;
-                            align-items: center;
-                            justify-content: center;
-                            font-size: 0.7rem;
-                            font-weight: bold;
-                            border: 2px solid white;
-                            animation: pulse 2s infinite;
-                        }
-                        
-                        @keyframes pulse {
-                            0% {
-                                box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7);
-                            }
-                            70% {
-                                box-shadow: 0 0 0 10px rgba(239, 68, 68, 0);
-                            }
-                            100% {
-                                box-shadow: 0 0 0 0 rgba(239, 68, 68, 0);
-                            }
-                        }
-                    `;
-                    document.head.appendChild(badgeStyles);
-                }
+                button.appendChild(badge);
             }
-        }
+        };
+        
+        updateButtonBadge(messagingFloatingBtn);
+        updateButtonBadge(inboxFloatingBtn);
         
     } catch (error) {
         console.error("Error updating unread message count:", error);
@@ -3152,8 +3207,6 @@ async function sendEnhancedMessage(modal) {
             status: 'sent',
             read: false,
             createdAt: new Date(),
-            // For two-way communication, we need to store this in tutor_messages collection
-            // so both tutor and recipients can see the conversation
             conversationId: `${tutor.id}_${Date.now()}`,
             senderType: 'tutor',
             senderName: tutor.name
@@ -3174,7 +3227,7 @@ async function sendEnhancedMessage(modal) {
         modal.remove();
         showCustomAlert(successMessage);
         
-        // Update unread count (though this is a sent message, not received)
+        // Update unread count
         await updateUnreadMessageCount();
         
     } catch (error) {
@@ -3183,20 +3236,42 @@ async function sendEnhancedMessage(modal) {
     }
 }
 
-// Inbox Feature with WhatsApp-like UI (Remains mostly the same, but updated for new message structure)
+// Enhanced Inbox Feature with WhatsApp-like UI
 function showInboxModal() {
     const modalHTML = `
         <div class="modal-overlay">
-            <div class="modal-content max-w-6xl" style="height: 80vh;">
+            <div class="modal-content max-w-6xl" style="height: 85vh;">
                 <div class="modal-header">
-                    <h3 class="modal-title">📨 Inbox</h3>
-                    <button id="new-message-btn" class="btn btn-primary btn-sm">💬 New Message</button>
+                    <h3 class="modal-title flex items-center gap-2">
+                        <span class="text-2xl">📨</span>
+                        <span>My Inbox</span>
+                        ${unreadMessageCount > 0 ? `<span class="badge badge-danger ml-2">${unreadMessageCount} unread</span>` : ''}
+                    </h3>
+                    <div class="flex gap-2">
+                        <button id="refresh-inbox-btn" class="btn btn-secondary btn-sm" title="Refresh Inbox">
+                            🔄 Refresh
+                        </button>
+                        <button id="new-message-btn" class="btn btn-primary btn-sm">
+                            💬 New Message
+                        </button>
+                        <button class="close-modal-btn text-gray-400 hover:text-gray-600 text-xl">
+                            &times;
+                        </button>
+                    </div>
                 </div>
                 <div class="modal-body" style="padding: 0; flex: 1;">
                     <div class="inbox-container">
                         <div class="conversations-sidebar">
                             <div class="conversations-header">
-                                Conversations
+                                <div class="flex justify-between items-center mb-2">
+                                    <h4 class="font-semibold">Conversations</h4>
+                                    <span class="text-xs text-gray-500" id="conversation-count"></span>
+                                </div>
+                                <div class="search-conversations mb-3">
+                                    <input type="text" id="search-conversations" 
+                                           class="form-input form-input-sm" 
+                                           placeholder="Search conversations...">
+                                </div>
                             </div>
                             <div class="conversations-list" id="conversations-list">
                                 <div class="text-center p-4">
@@ -3224,12 +3299,22 @@ function showInboxModal() {
                                     </div>
                                 </div>
                                 <div class="chat-input-area hidden" id="chat-input-area">
-                                    <input type="text" id="chat-input" class="chat-input" placeholder="Type a message...">
-                                    <button id="send-chat-btn" class="send-message-btn">📤</button>
+                                    <div class="flex gap-2">
+                                        <input type="text" id="chat-input" class="chat-input flex-1" 
+                                               placeholder="Type a message... (Press Enter to send)">
+                                        <button id="send-chat-btn" class="send-message-btn">
+                                            <span class="text-xl">📤</span>
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
                         </div>
                     </div>
+                </div>
+                <div class="modal-footer">
+                    <p class="text-sm text-gray-500">
+                        💡 <strong>Tip:</strong> You can reply directly to individual and group conversations.
+                    </p>
                 </div>
             </div>
         </div>
@@ -3239,20 +3324,411 @@ function showInboxModal() {
     modal.innerHTML = modalHTML;
     document.body.appendChild(modal);
     
+    // Add inbox-specific styles
+    addInboxStyles();
+    
     // Load conversations
     loadEnhancedConversations();
+    
+    // Event listeners for inbox buttons
+    document.getElementById('refresh-inbox-btn').addEventListener('click', () => {
+        loadEnhancedConversations();
+    });
     
     document.getElementById('new-message-btn').addEventListener('click', () => {
         modal.remove();
         showEnhancedMessagingModal();
     });
     
-    // Close modal when clicking outside
+    // Search conversations
+    const searchInput = document.getElementById('search-conversations');
+    searchInput.addEventListener('input', debounce((e) => {
+        filterConversations(e.target.value);
+    }, 300));
+    
+    // Close modal when clicking outside or on close button
+    modal.querySelector('.close-modal-btn').addEventListener('click', () => modal.remove());
     modal.addEventListener('click', (e) => {
         if (e.target.classList.contains('modal-overlay')) {
             modal.remove();
         }
     });
+}
+
+// Add inbox-specific styles
+function addInboxStyles() {
+    if (document.querySelector('#inbox-styles')) return;
+    
+    const styles = document.createElement('style');
+    styles.id = 'inbox-styles';
+    styles.textContent = `
+        /* Inbox Container */
+        .inbox-container {
+            display: flex;
+            height: 100%;
+            border-radius: 8px;
+            overflow: hidden;
+            border: 1px solid #e2e8f0;
+        }
+        
+        /* Conversations Sidebar */
+        .conversations-sidebar {
+            width: 320px;
+            background: #f8fafc;
+            border-right: 1px solid #e2e8f0;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        
+        .conversations-header {
+            padding: 1rem;
+            background: #fff;
+            border-bottom: 1px solid #e2e8f0;
+        }
+        
+        .conversations-list {
+            flex: 1;
+            overflow-y: auto;
+            padding: 0.5rem;
+        }
+        
+        /* Conversation Items */
+        .conversation-item {
+            padding: 0.75rem;
+            border-radius: 8px;
+            margin-bottom: 0.5rem;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            background: white;
+            border: 1px solid #e2e8f0;
+        }
+        
+        .conversation-item:hover {
+            background: #f0f9ff;
+            border-color: #0ea5e9;
+            transform: translateY(-1px);
+        }
+        
+        .conversation-item.active {
+            background: #f0f9ff;
+            border-color: #0ea5e9;
+            box-shadow: 0 2px 8px rgba(14, 165, 233, 0.15);
+        }
+        
+        .conversation-item.unread {
+            background: #fef3c7;
+            border-color: #f59e0b;
+        }
+        
+        .conversation-info {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+        
+        .conversation-avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 1.25rem;
+        }
+        
+        .conversation-details {
+            flex: 1;
+            min-width: 0;
+        }
+        
+        .conversation-title {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 0.25rem;
+        }
+        
+        .conversation-title span:first-child {
+            font-weight: 600;
+            color: #1e293b;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        
+        .conversation-time {
+            font-size: 0.75rem;
+            color: #64748b;
+            white-space: nowrap;
+        }
+        
+        .conversation-preview {
+            font-size: 0.875rem;
+            color: #64748b;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .new-message-indicator {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #ef4444;
+            display: inline-block;
+            margin-left: 0.5rem;
+            animation: pulse 2s infinite;
+        }
+        
+        /* Chat Main Area */
+        .chat-main {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            background: #f0f2f5;
+        }
+        
+        .whatsapp-chat-container {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .chat-header {
+            background: #f0f2f5;
+            padding: 1rem;
+            border-bottom: 1px solid #e2e8f0;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        
+        .chat-header-info {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+        
+        .chat-avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 1.25rem;
+        }
+        
+        .chat-header-text h4 {
+            font-weight: 600;
+            color: #1e293b;
+            margin: 0;
+        }
+        
+        .chat-header-text p {
+            font-size: 0.875rem;
+            color: #64748b;
+            margin: 0;
+        }
+        
+        /* Chat Messages Area */
+        .chat-messages {
+            flex: 1;
+            padding: 1rem;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+        }
+        
+        /* Message Bubbles */
+        .message-bubble {
+            max-width: 70%;
+            padding: 0.75rem 1rem;
+            border-radius: 18px;
+            position: relative;
+            word-wrap: break-word;
+        }
+        
+        .message-bubble.sent {
+            background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);
+            color: white;
+            align-self: flex-end;
+            border-bottom-right-radius: 4px;
+        }
+        
+        .message-bubble.received {
+            background: white;
+            color: #1e293b;
+            align-self: flex-start;
+            border-bottom-left-radius: 4px;
+            border: 1px solid #e2e8f0;
+        }
+        
+        .message-sender {
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: #8b5cf6;
+            margin-bottom: 0.25rem;
+        }
+        
+        .message-subject {
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: #64748b;
+            margin-bottom: 0.25rem;
+        }
+        
+        .message-content {
+            font-size: 0.9375rem;
+            line-height: 1.4;
+        }
+        
+        .message-meta {
+            font-size: 0.75rem;
+            opacity: 0.8;
+        }
+        
+        .urgent-badge {
+            font-size: 0.7rem !important;
+            font-weight: bold !important;
+            margin-top: 0.25rem;
+        }
+        
+        /* Chat Input Area */
+        .chat-input-area {
+            padding: 1rem;
+            background: #f0f2f5;
+            border-top: 1px solid #e2e8f0;
+        }
+        
+        .chat-input {
+            padding: 0.75rem 1rem;
+            border-radius: 24px;
+            border: 1px solid #cbd5e1;
+            background: white;
+            font-size: 0.9375rem;
+            transition: all 0.2s ease;
+        }
+        
+        .chat-input:focus {
+            outline: none;
+            border-color: #8b5cf6;
+            box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.1);
+        }
+        
+        .send-message-btn {
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);
+            color: white;
+            border: none;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        
+        .send-message-btn:hover {
+            transform: scale(1.05);
+            box-shadow: 0 4px 12px rgba(139, 92, 246, 0.3);
+        }
+        
+        /* Loading States */
+        .spinner {
+            width: 24px;
+            height: 24px;
+            border: 3px solid #e2e8f0;
+            border-top-color: #8b5cf6;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+        
+        /* Responsive Design */
+        @media (max-width: 1024px) {
+            .conversations-sidebar {
+                width: 280px;
+            }
+        }
+        
+        @media (max-width: 768px) {
+            .inbox-container {
+                flex-direction: column;
+            }
+            
+            .conversations-sidebar {
+                width: 100%;
+                height: 200px;
+                border-right: none;
+                border-bottom: 1px solid #e2e8f0;
+            }
+            
+            .chat-main {
+                height: calc(100% - 200px);
+            }
+        }
+    `;
+    document.head.appendChild(styles);
+}
+
+// Debounce utility function
+function debounce(func, wait) {
+    let timeout;
+    return function executedFunction(...args) {
+        const later = () => {
+            clearTimeout(timeout);
+            func(...args);
+        };
+        clearTimeout(timeout);
+        timeout = setTimeout(later, wait);
+    };
+}
+
+// Filter conversations based on search
+function filterConversations(searchTerm) {
+    const conversationItems = document.querySelectorAll('.conversation-item');
+    const term = searchTerm.toLowerCase().trim();
+    
+    if (!term) {
+        conversationItems.forEach(item => {
+            item.style.display = 'block';
+        });
+        document.getElementById('conversation-count').textContent = 
+            `${conversationItems.length} conversations`;
+        return;
+    }
+    
+    let visibleCount = 0;
+    conversationItems.forEach(item => {
+        const title = item.querySelector('.conversation-title span:first-child').textContent.toLowerCase();
+        const preview = item.querySelector('.conversation-preview').textContent.toLowerCase();
+        
+        if (title.includes(term) || preview.includes(term)) {
+            item.style.display = 'block';
+            visibleCount++;
+        } else {
+            item.style.display = 'none';
+        }
+    });
+    
+    document.getElementById('conversation-count').textContent = 
+        `${visibleCount} of ${conversationItems.length} conversations`;
 }
 
 // Load enhanced conversations (updated for new message structure)
@@ -3351,16 +3827,23 @@ function renderEnhancedConversationsList(conversations) {
     
     let html = '';
     
+    conversations.sort((a, b) => {
+        const timeA = a.lastMessage.createdAt?.toDate ? a.lastMessage.createdAt.toDate() : new Date(a.lastMessage.createdAt);
+        const timeB = b.lastMessage.createdAt?.toDate ? b.lastMessage.createdAt.toDate() : new Date(b.lastMessage.createdAt);
+        return timeB - timeA; // Most recent first
+    });
+    
     conversations.forEach(conv => {
         const lastMessageTime = conv.lastMessage.createdAt?.toDate 
             ? conv.lastMessage.createdAt.toDate() 
             : new Date(conv.lastMessage.createdAt);
         
         html += `
-            <div class="conversation-item" data-conversation-id="${conv.id}">
+            <div class="conversation-item ${conv.unread ? 'unread' : ''}" data-conversation-id="${conv.id}">
                 <div class="conversation-info">
                     <div class="conversation-avatar">
-                        ${conv.lastMessage.messageType === 'management' ? '👔' : '👨‍👩‍👧‍👦'}
+                        ${conv.lastMessage.messageType === 'management' ? '👔' : 
+                          conv.lastMessage.messageType === 'all' ? '📢' : '👨‍👩‍👧‍👦'}
                     </div>
                     <div class="conversation-details">
                         <div class="conversation-title">
@@ -3369,7 +3852,7 @@ function renderEnhancedConversationsList(conversations) {
                         </div>
                         <p class="conversation-preview">
                             ${conv.lastMessage.senderType === 'tutor' ? 'You: ' : ''}
-                            ${conv.lastMessage.content.substring(0, 50)}${conv.lastMessage.content.length > 50 ? '...' : ''}
+                            ${conv.lastMessage.subject || conv.lastMessage.content.substring(0, 50)}${conv.lastMessage.content.length > 50 ? '...' : ''}
                             ${conv.unread ? '<span class="new-message-indicator"></span>' : ''}
                         </p>
                     </div>
@@ -3379,6 +3862,9 @@ function renderEnhancedConversationsList(conversations) {
     });
     
     container.innerHTML = html;
+    
+    // Update conversation count
+    document.getElementById('conversation-count').textContent = `${conversations.length} conversations`;
     
     // Add click listeners
     document.querySelectorAll('.conversation-item').forEach(item => {
@@ -3467,7 +3953,8 @@ function renderEnhancedChatMessages(messages, conversationId) {
     
     // Update chat header
     chatHeader.innerHTML = `
-        <div class="chat-avatar">${conversation.messageType === 'management' ? '👔' : '👨‍👩‍👧‍👦'}</div>
+        <div class="chat-avatar">${conversation.messageType === 'management' ? '👔' : 
+                                   conversation.messageType === 'all' ? '📢' : '👨‍👩‍👧‍👦'}</div>
         <div class="chat-header-text">
             <h4>${title}</h4>
             <p>${messages.length} messages</p>
@@ -5725,7 +6212,6 @@ document.addEventListener('DOMContentLoaded', async () => {
                 
                 // Check if tutor is inactive (block access)
                 if (tutorData.status === 'inactive') {
-                    // Sign out the user and show message
                     await signOut(auth);
                     document.getElementById('mainContent').innerHTML = `
                         <div class="card">
@@ -5752,10 +6238,13 @@ document.addEventListener('DOMContentLoaded', async () => {
                 
                 renderTutorDashboard(document.getElementById('mainContent'), tutorData);
                 
-                // Initialize floating messaging button
+                // Initialize floating messaging and inbox buttons
                 setTimeout(() => {
                     initializeFloatingMessagingButton();
                     updateUnreadMessageCount(); // Check for unread messages
+                    
+                    // Set up periodic refresh of unread count (every 30 seconds)
+                    setInterval(updateUnreadMessageCount, 30000);
                 }, 1000);
                 
                 setTimeout(async () => {
@@ -5777,6 +6266,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     });
 
+    // Logout button
     const logoutBtn = document.getElementById('logoutBtn');
     if (logoutBtn) {
         logoutBtn.addEventListener('click', () => {
@@ -5789,51 +6279,52 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
     }
 
-    const navDashboard = document.getElementById('navDashboard');
-    if (navDashboard) {
-        navDashboard.addEventListener('click', () => {
-            if (window.tutorData) {
-                renderTutorDashboard(document.getElementById('mainContent'), window.tutorData);
-                // Ensure floating button stays visible
-                setTimeout(() => {
-                    if (!document.querySelector('.floating-messaging-btn')) {
-                        initializeFloatingMessagingButton();
-                    }
-                    updateUnreadMessageCount();
-                }, 100);
-            }
-        });
-    }
+    // Navigation event listeners
+    const addNavListener = (id, renderFunction) => {
+        const element = document.getElementById(id);
+        if (element) {
+            element.addEventListener('click', () => {
+                if (window.tutorData) {
+                    renderFunction(document.getElementById('mainContent'), window.tutorData);
+                    // Ensure floating buttons stay visible
+                    setTimeout(() => {
+                        if (!document.querySelector('.floating-messaging-btn')) {
+                            initializeFloatingMessagingButton();
+                        }
+                        updateUnreadMessageCount();
+                    }, 100);
+                }
+            });
+        }
+    };
 
-    const navStudentDatabase = document.getElementById('navStudentDatabase');
-    if (navStudentDatabase) {
-        navStudentDatabase.addEventListener('click', () => {
-            if (window.tutorData) {
-                renderStudentDatabase(document.getElementById('mainContent'), window.tutorData);
-                // Ensure floating button stays visible
-                setTimeout(() => {
-                    if (!document.querySelector('.floating-messaging-btn')) {
-                        initializeFloatingMessagingButton();
+    addNavListener('navDashboard', renderTutorDashboard);
+    addNavListener('navStudentDatabase', renderStudentDatabase);
+    addNavListener('navAutoStudents', renderAutoRegisteredStudents);
+    
+    // Add inbox navigation to the sidebar if it exists
+    setTimeout(() => {
+        const navInbox = document.getElementById('navInbox');
+        if (!navInbox) {
+            // Create inbox navigation item if it doesn't exist
+            const sidebar = document.querySelector('.sidebar-nav');
+            if (sidebar) {
+                const inboxNav = document.createElement('li');
+                inboxNav.id = 'navInbox';
+                inboxNav.innerHTML = `
+                    <a href="#" class="nav-link flex items-center gap-3 px-4 py-3 text-gray-700 hover:bg-gray-100 rounded-lg transition-colors">
+                        <span class="text-xl">📨</span>
+                        <span>Inbox</span>
+                    </a>
+                `;
+                sidebar.appendChild(inboxNav);
+                
+                inboxNav.addEventListener('click', () => {
+                    if (window.tutorData) {
+                        showInboxModal();
                     }
-                    updateUnreadMessageCount();
-                }, 100);
+                });
             }
-        });
-    }
-
-    const navAutoStudents = document.getElementById('navAutoStudents');
-    if (navAutoStudents) {
-        navAutoStudents.addEventListener('click', () => {
-            if (window.tutorData) {
-                renderAutoRegisteredStudents(document.getElementById('mainContent'), window.tutorData);
-                // Ensure floating button stays visible
-                setTimeout(() => {
-                    if (!document.querySelector('.floating-messaging-btn')) {
-                        initializeFloatingMessagingButton();
-                    }
-                    updateUnreadMessageCount();
-                }, 100);
-            }
-        });
-    }
+        }
+    }, 500);
 });
