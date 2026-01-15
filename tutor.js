@@ -1559,28 +1559,16 @@ function showTINPopup(tutor) {
 
 // Schedule Management Functions - Track scheduled students
 let allStudents = [];
-let scheduledStudents = new Set();
+let scheduledStudents = new Set(); // Track students with schedules
 let currentStudentIndex = 0;
 let schedulePopup = null;
-let isProcessingSchedules = false;
-let scheduleCompleted = false; // NEW: Track if scheduling has been completed
+let isSchedulingComplete = false; // NEW: Flag to track if scheduling is done
 
 async function checkAndShowSchedulePopup(tutor) {
-    // NEW: Check if scheduling has already been completed
-    if (scheduleCompleted) {
-        console.log("Schedule management already completed for this session");
-        showCustomAlert('✅ All students have already been scheduled!');
-        return false;
-    }
-    
-    // Prevent multiple simultaneous schedule processing
-    if (isProcessingSchedules) {
-        console.log("Schedule processing already in progress");
-        return false;
-    }
+    // Reset completion flag when starting new scheduling session
+    isSchedulingComplete = false;
     
     try {
-        isProcessingSchedules = true;
         const studentsQuery = query(
             collection(db, "students"), 
             where("tutorEmail", "==", tutor.email)
@@ -1588,35 +1576,40 @@ async function checkAndShowSchedulePopup(tutor) {
         const studentsSnapshot = await getDocs(studentsQuery);
         
         allStudents = [];
-        scheduledStudents.clear();
+        scheduledStudents.clear(); // Reset scheduled students
         
         studentsSnapshot.forEach(doc => {
             const student = { id: doc.id, ...doc.data() };
+            // Filter out archived students
             if (!['archived', 'graduated', 'transferred'].includes(student.status)) {
                 allStudents.push(student);
+                // Check if student already has a schedule
                 if (student.schedule && student.schedule.length > 0) {
                     scheduledStudents.add(student.id);
                 }
             }
         });
         
+        // Filter students that don't have schedules yet
         const studentsWithoutSchedule = allStudents.filter(student => !scheduledStudents.has(student.id));
+        
         currentStudentIndex = 0;
         
         if (studentsWithoutSchedule.length > 0) {
             showBulkSchedulePopup(studentsWithoutSchedule[0], tutor, studentsWithoutSchedule.length);
             return true;
         } else {
-            scheduleCompleted = true; // NEW: Mark as completed
-            isProcessingSchedules = false;
-            showCustomAlert('✅ All students have been scheduled!');
+            // Only show the alert once if there are no students to schedule
+            if (!isSchedulingComplete) {
+                isSchedulingComplete = true;
+                showCustomAlert('✅ All students have been scheduled!');
+            }
             return false;
         }
         
     } catch (error) {
         console.error("Error checking schedules:", error);
         showCustomAlert('Error loading students. Please try again.');
-        isProcessingSchedules = false;
         return false;
     }
 }
@@ -1748,10 +1741,12 @@ function showBulkSchedulePopup(student, tutor, totalCount = 0) {
             
             showCustomAlert('✅ Schedule saved!');
             
+            // Add student to scheduled set
             scheduledStudents.add(student.id);
             currentStudentIndex++;
             schedulePopup.remove();
             
+            // Get remaining students without schedule
             const studentsWithoutSchedule = allStudents.filter(s => !scheduledStudents.has(s.id));
             
             if (currentStudentIndex < studentsWithoutSchedule.length) {
@@ -1759,11 +1754,13 @@ function showBulkSchedulePopup(student, tutor, totalCount = 0) {
                     showBulkSchedulePopup(studentsWithoutSchedule[currentStudentIndex], tutor, studentsWithoutSchedule.length);
                 }, 500);
             } else {
-                scheduleCompleted = true; // NEW: Mark as completed
-                isProcessingSchedules = false;
-                setTimeout(() => {
-                    showCustomAlert('🎉 All students have been scheduled!');
-                }, 500);
+                // All students are scheduled - mark as complete
+                isSchedulingComplete = true;
+                if (studentsWithoutSchedule.length > 0) {
+                    setTimeout(() => {
+                        showCustomAlert('🎉 All students have been scheduled!');
+                    }, 500);
+                }
             }
             
         } catch (error) {
@@ -1773,9 +1770,11 @@ function showBulkSchedulePopup(student, tutor, totalCount = 0) {
     });
     
     document.getElementById('skip-schedule-btn').addEventListener('click', () => {
+        // Skip this student (don't mark as scheduled)
         currentStudentIndex++;
         schedulePopup.remove();
         
+        // Get remaining students without schedule
         const studentsWithoutSchedule = allStudents.filter(s => !scheduledStudents.has(s.id));
         
         if (currentStudentIndex < studentsWithoutSchedule.length) {
@@ -1783,20 +1782,11 @@ function showBulkSchedulePopup(student, tutor, totalCount = 0) {
                 showBulkSchedulePopup(studentsWithoutSchedule[currentStudentIndex], tutor, studentsWithoutSchedule.length);
             }, 500);
         } else {
-            scheduleCompleted = true; // NEW: Mark as completed
-            isProcessingSchedules = false;
+            // No more students to schedule
+            isSchedulingComplete = true;
             showCustomAlert('Skipped all remaining students.');
         }
     });
-}
-
-// NEW: Reset function if you need to start over
-function resetScheduleManagement() {
-    scheduleCompleted = false;
-    isProcessingSchedules = false;
-    currentStudentIndex = 0;
-    allStudents = [];
-    scheduledStudents.clear();
 }
 
 /*******************************************************************************
@@ -6419,6 +6409,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     }, 500);
 });
+
 
 
 
