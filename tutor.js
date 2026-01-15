@@ -1792,59 +1792,51 @@ function showBulkSchedulePopup(student, tutor, totalCount = 0) {
  * SECTION 8: DAILY TOPIC & HOMEWORK MANAGEMENT
  ******************************************************************************/
 
-// Store monthly topics data globally
-window.monthlyTopicsCache = {};
+// ==========================================
+// 1. DAILY TOPIC FUNCTIONS
+// ==========================================
 
-// Daily Topic Functions
 function showDailyTopicModal(student) {
-    // Get current month and year for topic filtering
-    const now = new Date();
-    const currentMonth = now.getMonth();
-    const currentYear = now.getFullYear();
-    const monthYearKey = `${currentMonth}-${currentYear}`;
-    
-    // Check if we have cached topics for this month
-    const cachedTopics = window.monthlyTopicsCache[`${student.id}-${monthYearKey}`];
-    
+    // We get the current month name for the header
+    const date = new Date();
+    const monthName = date.toLocaleString('default', { month: 'long' });
+
     const modalHTML = `
         <div class="modal-overlay">
-            <div class="modal-content max-w-2xl">
+            <div class="modal-content max-w-lg">
                 <div class="modal-header">
-                    <h3 class="modal-title">📚 Today's Topic for ${student.studentName}</h3>
-                    <p class="text-sm text-gray-600 mt-1">Month: ${now.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}</p>
+                    <h3 class="modal-title">📚 Daily Topic: ${student.studentName}</h3>
                 </div>
                 <div class="modal-body">
-                    <!-- Previous Topics Section - Always Visible -->
-                    <div id="topic-history-container" class="mb-6">
-                        <div class="flex justify-between items-center mb-3">
-                            <h5 class="font-semibold text-sm mb-0">📅 Topics for This Month:</h5>
-                            <span id="topics-count-badge" class="bg-primary-color text-white text-xs px-2 py-1 rounded-full">0 topics</span>
-                        </div>
-                        <div id="topic-history" class="topic-history text-sm bg-gray-50 p-4 rounded-lg max-h-64 overflow-y-auto">
-                            ${cachedTopics ? generateTopicsListHTML(cachedTopics) : 
-                              '<div class="flex items-center justify-center py-8 text-gray-500">' + 
-                              '<span class="animate-spin mr-2">↻</span>Loading topics...</div>'}
-                        </div>
-                        <div class="mt-3 text-xs text-gray-500">
-                            <p>ⓘ Topics are automatically cleared at the start of each new month</p>
-                        </div>
-                    </div>
                     
-                    <!-- Input Section -->
-                    <div class="form-group">
-                        <label class="form-label">Add Today's Topics *</label>
-                        <textarea id="topic-topics" class="form-input form-textarea report-textarea" 
-                                  placeholder="Enter today's topics, one per line or separated by commas..." 
-                                  required></textarea>
+                    <div id="topic-history-container" class="mb-5 bg-blue-50 p-3 rounded-lg border border-blue-100 hidden">
+                        <div class="flex justify-between items-center mb-2">
+                            <h5 class="font-bold text-blue-800 text-sm">
+                                📅 Topics Covered in ${monthName}
+                            </h5>
+                            <span id="topic-count-badge" class="bg-blue-200 text-blue-800 text-xs px-2 py-0.5 rounded-full font-bold">0</span>
+                        </div>
+                        <div id="topic-history" class="topic-history text-sm text-gray-700 max-h-40 overflow-y-auto custom-scrollbar">
+                            <div class="flex justify-center p-2">
+                                <div class="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-700"></div>
+                            </div>
+                        </div>
                     </div>
-                    <div class="mt-2 text-sm text-gray-500">
-                        <p>Example: Fractions, Decimals, Basic Algebra</p>
+
+                    <div class="form-group">
+                        <label class="form-label">Enter Today's Topic *</label>
+                        <textarea id="topic-topics" class="form-input form-textarea report-textarea" 
+                            placeholder="e.g. Long Division, Introduction to Photosynthesis..." required></textarea>
+                    </div>
+                    <div class="mt-2 text-xs text-gray-500 flex justify-between">
+                        <span>One topic per line recommended.</span>
+                        <span>Date: ${new Date().toLocaleDateString()}</span>
                     </div>
                 </div>
                 <div class="modal-footer">
-                    <button id="cancel-topic-btn" class="btn btn-secondary">Cancel</button>
+                    <button id="cancel-topic-btn" class="btn btn-secondary">Close</button>
                     <button id="save-topic-btn" class="btn btn-primary" data-student-id="${student.id}">
-                        Save Today's Topic
+                        Save Topic
                     </button>
                 </div>
             </div>
@@ -1855,200 +1847,134 @@ function showDailyTopicModal(student) {
     modal.innerHTML = modalHTML;
     document.body.appendChild(modal);
     
-    // Load topic history when modal is opened (even if cached, refresh to get latest)
+    // Load history immediately
     loadDailyTopicHistory(student.id);
     
+    // Focus the textarea
+    setTimeout(() => document.getElementById('topic-topics').focus(), 100);
+
     document.getElementById('cancel-topic-btn').addEventListener('click', () => modal.remove());
+    
     document.getElementById('save-topic-btn').addEventListener('click', async () => {
-        const topicInput = document.getElementById('topic-topics').value.trim();
-        
-        if (!topicInput) {
-            showCustomAlert('Please enter today\'s topics.');
+        const topicInput = document.getElementById('topic-topics');
+        const content = topicInput.value.trim();
+
+        if (!content) {
+            showCustomAlert('⚠️ Please enter a topic before saving.');
             return;
         }
         
+        const saveBtn = document.getElementById('save-topic-btn');
+        const originalBtnText = saveBtn.innerText;
+        saveBtn.disabled = true;
+        saveBtn.innerText = "Saving...";
+
         const topicData = {
             studentId: student.id,
             studentName: student.studentName,
             tutorEmail: window.tutorData.email,
             tutorName: window.tutorData.name,
-            topics: topicInput,
-            date: new Date().toISOString().split('T')[0],
-            createdAt: new Date(),
-            monthYear: monthYearKey // Store month-year for easy filtering
+            topics: content,
+            date: new Date().toISOString().split('T')[0], // YYYY-MM-DD for simple sorting
+            createdAt: new Date() // Full timestamp
         };
         
         try {
             const topicRef = doc(collection(db, "daily_topics"));
             await setDoc(topicRef, topicData);
             
-            // Update the local cache and UI
-            await loadDailyTopicHistory(student.id, true); // Force refresh
-            
-            // Clear input field
-            document.getElementById('topic-topics').value = '';
-            
-            showCustomAlert('✅ Today\'s topic saved successfully!');
-            
+            modal.remove();
+            showCustomAlert('✅ Topic saved successfully!');
         } catch (error) {
             console.error("Error saving topic:", error);
             showCustomAlert('❌ Error saving topic. Please try again.');
+            saveBtn.disabled = false;
+            saveBtn.innerText = originalBtnText;
         }
     });
 }
 
-// Helper function to generate HTML for topics list
-function generateTopicsListHTML(topics) {
-    if (!topics || topics.length === 0) {
-        return '<div class="text-center py-6 text-gray-500">No topics recorded for this month yet.</div>';
-    }
-    
-    let html = '<div class="space-y-3">';
-    
-    // Sort topics by date (newest first)
-    topics.sort((a, b) => {
-        const dateA = a.createdAt?.toDate ? a.createdAt.toDate() : new Date(a.createdAt);
-        const dateB = b.createdAt?.toDate ? b.createdAt.toDate() : new Date(b.createdAt);
-        return dateB - dateA;
-    });
-    
-    topics.forEach((topic, index) => {
-        const topicDate = topic.createdAt?.toDate ? topic.createdAt.toDate() : new Date(topic.createdAt);
-        const dateStr = topicDate.toLocaleDateString('en-US', { 
-            weekday: 'short', 
-            month: 'short', 
-            day: 'numeric' 
-        });
-        
-        html += `
-            <div class="topic-item border-l-4 border-primary-color pl-3 py-2 ${index === 0 ? 'bg-blue-50' : ''}">
-                <div class="flex justify-between items-start">
-                    <div>
-                        <div class="font-medium text-gray-700">${dateStr}</div>
-                        <div class="text-gray-600 mt-1">${topic.topics}</div>
-                    </div>
-                    ${index === 0 ? '<span class="text-xs bg-green-100 text-green-800 px-2 py-1 rounded">Latest</span>' : ''}
-                </div>
-            </div>
-        `;
-    });
-    
-    html += '</div>';
-    return html;
-}
-
-async function loadDailyTopicHistory(studentId, forceRefresh = false) {
+// UPDATED: Logic to fetch and filter only current month's topics
+async function loadDailyTopicHistory(studentId) {
     const topicHistoryContainer = document.getElementById('topic-history-container');
     const topicHistoryDiv = document.getElementById('topic-history');
-    const topicsCountBadge = document.getElementById('topics-count-badge');
+    const countBadge = document.getElementById('topic-count-badge');
     
     if (!topicHistoryContainer || !topicHistoryDiv) return;
     
     try {
         const now = new Date();
-        const currentMonth = now.getMonth();
+        const currentMonth = now.getMonth(); // 0 = Jan, 1 = Feb, etc.
         const currentYear = now.getFullYear();
-        const monthYearKey = `${currentMonth}-${currentYear}`;
-        
-        // Check if we have cached data and don't force refresh
-        const cacheKey = `${studentId}-${monthYearKey}`;
-        if (window.monthlyTopicsCache[cacheKey] && !forceRefresh) {
-            updateTopicsUI(window.monthlyTopicsCache[cacheKey], topicHistoryDiv, topicsCountBadge);
-            return;
-        }
-        
-        // Show loading state
-        topicHistoryDiv.innerHTML = '<div class="flex items-center justify-center py-8 text-gray-500"><span class="animate-spin mr-2">↻</span>Loading topics...</div>';
-        
-        // Query topics for current month and year
-        const startOfMonth = new Date(currentYear, currentMonth, 1);
-        const endOfMonth = new Date(currentYear, currentMonth + 1, 0, 23, 59, 59);
-        
-        // Check if Firebase functions are available (should be imported globally elsewhere)
-        if (typeof orderBy === 'undefined') {
-            throw new Error('Firebase functions not available. Please ensure Firebase is properly loaded.');
-        }
-        
+
+        // Query all topics for this student, ordered by newest first
+        // We filter by month in Javascript to avoid complex Firestore composite indexes
         const topicsQuery = query(
             collection(db, "daily_topics"),
             where("studentId", "==", studentId),
-            where("createdAt", ">=", startOfMonth),
-            where("createdAt", "<=", endOfMonth),
             orderBy("createdAt", "desc")
         );
         
         const querySnapshot = await getDocs(topicsQuery);
-        const topics = [];
+        let historyHTML = '<ul class="space-y-2">';
+        let count = 0;
         
         querySnapshot.forEach(doc => {
-            const topic = doc.data();
-            topic.id = doc.id; // Add document ID
-            topics.push(topic);
+            const data = doc.data();
+            
+            // Handle Firestore Timestamp or standard Date string
+            let topicDate;
+            if (data.createdAt && typeof data.createdAt.toDate === 'function') {
+                topicDate = data.createdAt.toDate();
+            } else if (data.createdAt) {
+                topicDate = new Date(data.createdAt);
+            } else {
+                return; // Skip if no valid date
+            }
+
+            // FILTER: Only show topics if they match CURRENT Month and Year
+            if (topicDate.getMonth() === currentMonth && topicDate.getFullYear() === currentYear) {
+                count++;
+                const formattedDate = topicDate.toLocaleDateString(undefined, { 
+                    month: 'short', 
+                    day: 'numeric' 
+                });
+                
+                historyHTML += `
+                    <li class="flex items-start border-b border-blue-100 last:border-0 pb-1">
+                        <span class="font-bold text-blue-600 min-w-[60px] text-xs mt-0.5">${formattedDate}:</span>
+                        <span class="text-gray-800 break-words flex-1">${data.topics}</span>
+                    </li>
+                `;
+            }
         });
         
-        // Cache the results
-        window.monthlyTopicsCache[cacheKey] = topics;
+        historyHTML += '</ul>';
         
-        // Update UI with topics
-        updateTopicsUI(topics, topicHistoryDiv, topicsCountBadge);
-        
+        if (count > 0) {
+            topicHistoryDiv.innerHTML = historyHTML;
+            countBadge.textContent = count;
+            topicHistoryContainer.classList.remove('hidden');
+        } else {
+            // If it's a new month (or no data yet), we show this message
+            topicHistoryDiv.innerHTML = `<p class="text-gray-500 italic text-center">No topics recorded for ${now.toLocaleString('default', { month: 'long' })} yet.</p>`;
+            countBadge.textContent = '0';
+            topicHistoryContainer.classList.remove('hidden');
+        }
     } catch (error) {
         console.error("Error loading daily topic history:", error);
-        topicHistoryDiv.innerHTML = '<div class="text-center py-6 text-red-500">Error loading topics. Please try again.</div>';
-        if (topicsCountBadge) {
-            topicsCountBadge.textContent = 'Error';
-            topicsCountBadge.className = 'bg-red-500 text-white text-xs px-2 py-1 rounded-full';
-        }
+        // If the specific index is missing, the query might fail. 
+        // Fallback: Show a simple error or empty state without crashing
+        topicHistoryDiv.innerHTML = '<p class="text-xs text-red-400">Could not load history. (Check console)</p>';
+        topicHistoryContainer.classList.remove('hidden');
     }
 }
 
-function updateTopicsUI(topics, topicHistoryDiv, topicsCountBadge) {
-    // Update topics list
-    topicHistoryDiv.innerHTML = generateTopicsListHTML(topics);
-    
-    // Update count badge
-    if (topicsCountBadge) {
-        topicsCountBadge.textContent = `${topics.length} ${topics.length === 1 ? 'topic' : 'topics'}`;
-        topicsCountBadge.className = topics.length > 0 
-            ? 'bg-green-500 text-white text-xs px-2 py-1 rounded-full' 
-            : 'bg-gray-400 text-white text-xs px-2 py-1 rounded-full';
-    }
-}
 
-// Function to automatically clear old topics cache at month change
-function setupMonthlyTopicCleanup() {
-    // Clear cache at the start of each month
-    const now = new Date();
-    const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
-    const timeUntilNextMonth = nextMonth.getTime() - now.getTime();
-    
-    // Schedule cache cleanup for next month
-    setTimeout(() => {
-        window.monthlyTopicsCache = {}; // Clear all cached topics
-        console.log('Monthly topics cache cleared for new month');
-        
-        // Schedule next cleanup
-        setupMonthlyTopicCleanup();
-    }, timeUntilNextMonth + 1000); // Add 1 second buffer
-    
-    // Also clear cache on page load if month has changed
-    const lastCacheMonth = localStorage.getItem('lastCacheMonth');
-    const currentMonthKey = `${now.getMonth()}-${now.getFullYear()}`;
-    
-    if (lastCacheMonth !== currentMonthKey) {
-        window.monthlyTopicsCache = {};
-        localStorage.setItem('lastCacheMonth', currentMonthKey);
-    }
-}
+// ==========================================
+// 2. HOMEWORK ASSIGNMENT FUNCTIONS
+// ==========================================
 
-// Initialize monthly cleanup when the page loads
-if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', setupMonthlyTopicCleanup);
-} else {
-    setupMonthlyTopicCleanup();
-}
-
-// Homework Assignment Functions with REAL Cloudinary Upload
 async function uploadToCloudinary(file, studentId) {
     return new Promise((resolve, reject) => {
         const formData = new FormData();
@@ -2237,7 +2163,11 @@ function showHomeworkModal(student) {
         const maxDueDate = new Date(today);
         maxDueDate.setDate(maxDueDate.getDate() + 7);
         
-        if (dueDate < today) {
+        // Normalize time to compare dates correctly
+        const todayDateOnly = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+        const dueDateOnly = new Date(dueDate.getFullYear(), dueDate.getMonth(), dueDate.getDate());
+
+        if (dueDateOnly < todayDateOnly) {
             showCustomAlert('Due date cannot be in the past.');
             return;
         }
@@ -6554,6 +6484,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     }, 500);
 });
+
 
 
 
