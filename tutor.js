@@ -1792,6 +1792,17 @@ function showBulkSchedulePopup(student, tutor, totalCount = 0) {
  * SECTION 8: DAILY TOPIC & HOMEWORK MANAGEMENT
  ******************************************************************************/
 
+// Import Firebase functions needed for this section
+const { 
+    collection, 
+    doc, 
+    setDoc, 
+    query, 
+    where, 
+    orderBy,
+    getDocs 
+} = window.firebaseFirestore || {};
+
 // Store monthly topics data globally
 window.monthlyTopicsCache = {};
 
@@ -1906,10 +1917,14 @@ function generateTopicsListHTML(topics) {
     let html = '<div class="space-y-3">';
     
     // Sort topics by date (newest first)
-    topics.sort((a, b) => b.createdAt.toDate() - a.createdAt.toDate());
+    topics.sort((a, b) => {
+        const dateA = a.createdAt?.toDate ? a.createdAt.toDate() : new Date(a.createdAt);
+        const dateB = b.createdAt?.toDate ? b.createdAt.toDate() : new Date(b.createdAt);
+        return dateB - dateA;
+    });
     
     topics.forEach((topic, index) => {
-        const topicDate = topic.createdAt.toDate();
+        const topicDate = topic.createdAt?.toDate ? topic.createdAt.toDate() : new Date(topic.createdAt);
         const dateStr = topicDate.toLocaleDateString('en-US', { 
             weekday: 'short', 
             month: 'short', 
@@ -1959,6 +1974,11 @@ async function loadDailyTopicHistory(studentId, forceRefresh = false) {
         // Query topics for current month and year
         const startOfMonth = new Date(currentYear, currentMonth, 1);
         const endOfMonth = new Date(currentYear, currentMonth + 1, 0, 23, 59, 59);
+        
+        // Check if Firebase functions are available
+        if (!orderBy || !where || !query || !getDocs) {
+            throw new Error('Firebase functions not available');
+        }
         
         const topicsQuery = query(
             collection(db, "daily_topics"),
@@ -2033,9 +2053,11 @@ function setupMonthlyTopicCleanup() {
 }
 
 // Initialize monthly cleanup when the page loads
-document.addEventListener('DOMContentLoaded', () => {
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', setupMonthlyTopicCleanup);
+} else {
     setupMonthlyTopicCleanup();
-});
+}
 
 // Homework Assignment Functions with REAL Cloudinary Upload
 async function uploadToCloudinary(file, studentId) {
@@ -6543,6 +6565,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     }, 500);
 });
+
 
 
 
