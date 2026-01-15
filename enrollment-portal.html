@@ -2697,291 +2697,309 @@
             }
 
             // ==============================================
-            // UPDATED FEE CALCULATION LOGIC WITH FIXED PRORATION
-            // ==============================================
-            
-            getOrdinalSuffix(n) {
-                if (n > 3 && n < 21) return 'th';
-                switch (n % 10) {
-                    case 1: return "st";
-                    case 2: return "nd";
-                    case 3: return "rd";
-                    default: return "th";
-                }
-            }
-            
-            // FIXED: 1st of month = full fee always
-            calculateProratedAmount(actualMonthlyFee, startDate, selectedDays = []) {
-                if (!startDate || actualMonthlyFee === 0 || selectedDays.length === 0) {
-                    return {
-                        toPay: actualMonthlyFee,
-                        deduction: 0,
-                        daysInMonth: 0,
-                        daysRemaining: 0,
-                        dayOfMonth: 0,
-                        explanation: "Full month fee"
-                    };
-                }
-                
-                try {
-                    const start = new Date(startDate);
-                    const dayOfMonth = start.getDate();
-                    
-                    // FIXED: 1st of ANY month = ALWAYS full fee
-                    if (dayOfMonth === 1) {
-                        return {
-                            toPay: actualMonthlyFee,
-                            deduction: 0,
-                            daysInMonth: 0,
-                            daysRemaining: 0,
-                            dayOfMonth: dayOfMonth,
-                            explanation: "Full month fee (Starting on 1st of the month)"
-                        };
-                    }
-                    
-                    // Check threshold: if starting between 2nd-6th, full fee
-                    if (dayOfMonth >= 2 && dayOfMonth <= 6) {
-                        return {
-                            toPay: actualMonthlyFee,
-                            deduction: 0,
-                            daysInMonth: 0,
-                            daysRemaining: 0,
-                            dayOfMonth: dayOfMonth,
-                            explanation: `Full month fee (Starting on ${dayOfMonth}${this.getOrdinalSuffix(dayOfMonth)})`
-                        };
-                    }
-                    
-                    // Starting from 7th onward: Calculate proration
-                    const year = start.getFullYear();
-                    const month = start.getMonth();
-                    const daysInMonth = new Date(year, month + 1, 0).getDate();
-                    
-                    // Calculate days remaining from start date to end of month (inclusive)
-                    const daysRemainingInMonth = daysInMonth - dayOfMonth + 1;
-                    
-                    // Calculate actual class days remaining based on selected days per week
-                    const daysPerWeek = selectedDays.length;
-                    const weeksRemaining = Math.ceil(daysRemainingInMonth / 7);
-                    const actualClassDaysRemaining = daysPerWeek * weeksRemaining;
-                    
-                    // Calculate total class days in full month (if started on 1st)
-                    const totalWeeksInMonth = Math.ceil(daysInMonth / 7);
-                    const totalClassDaysInMonth = daysPerWeek * totalWeeksInMonth;
-                    
-                    // Calculate daily rate: actual fee ÷ total class days in full month
-                    const dailyRate = actualMonthlyFee / totalClassDaysInMonth;
-                    
-                    // Calculate amount to pay for remaining class days
-                    const proratedAmountToPay = Math.round(dailyRate * actualClassDaysRemaining);
-                    
-                    // Calculate deduction (what they won't pay)
-                    const deductionAmount = actualMonthlyFee - proratedAmountToPay;
-                    
-                    // Generate explanation
-                    let explanation = `Starting on ${dayOfMonth}${this.getOrdinalSuffix(dayOfMonth)}. ${daysPerWeek} days/week × ${weeksRemaining} weeks = ${actualClassDaysRemaining} class days. Prorated from ₦${actualMonthlyFee.toLocaleString()}`;
-                    
-                    return {
-                        toPay: proratedAmountToPay,
-                        deduction: deductionAmount,
-                        daysInMonth: daysInMonth,
-                        daysRemaining: actualClassDaysRemaining,
-                        dayOfMonth: dayOfMonth,
-                        explanation: explanation
-                    };
-                } catch (error) {
-                    console.error('Proration calculation error:', error);
-                    return {
-                        toPay: actualMonthlyFee,
-                        deduction: 0,
-                        daysInMonth: 0,
-                        daysRemaining: 0,
-                        dayOfMonth: 0,
-                        explanation: "Error in calculation"
-                    };
-                }
-            }
-            
-            updateSummary() {
-                if (this.isLoadingSavedData) return;
-                
-                let academicBaseTotal = 0;
-                let additionalSubjectsTotal = 0;
-                let extracurricularTotal = 0;
-                let testPrepTotal = 0;
-                let hasAcademicSelection = false;
-                let earliestStartDate = null;
-                let totalActualAcademicFee = 0;
-                let selectedDaysPerWeek = 0;
-                
-                const studentEntries = document.querySelectorAll('.student-entry');
-                const breakdownContainer = document.getElementById('fee-details');
-                breakdownContainer.innerHTML = '';
-                
-                if (studentEntries.length === 0) {
-                    breakdownContainer.innerHTML = '<p class="student-fee">No students added yet</p>';
-                    this.updateSummaryDisplay(0, 0, 0, 0, 0, 0, 0);
-                    return;
-                }
+// UPDATED FEE CALCULATION LOGIC - FIXED FOR ALL SECTIONS
+// ==============================================
 
-                studentEntries.forEach((entry, index) => {
-                    let studentSubtotal = 0;
-                    let studentActualAcademicFee = 0;
-                    
-                    const grade = entry.querySelector('.student-grade').value;
-                    const startDate = entry.querySelector('.student-start-date').value;
-                    const name = entry.querySelector('.student-name').value || `Student ${index + 1}`;
-                    
-                    // Get selected academic sessions
-                    const selectedSession = entry.querySelector('.session-option.selected');
-                    const sessions = selectedSession ? selectedSession.dataset.sessions : null;
-                    
-                    // Get selected academic days for this student
-                    const selectedDays = Array.from(entry.querySelectorAll('.academic-day-btn.selected')).map(btn => btn.dataset.day);
-                    
-                    // Track earliest start date for proration
-                    if (startDate) {
-                        if (!earliestStartDate || new Date(startDate) < new Date(earliestStartDate)) {
-                            earliestStartDate = startDate;
-                            selectedDaysPerWeek = selectedDays.length;
-                        }
-                    }
-                    
-                    // 1. Academic Calculation - UPDATED WITH SESSIONS
-                    const selectedSubjects = Array.from(entry.querySelectorAll('.subject-option.selected'));
-                    
-                    if (grade && sessions && CONFIG.ACADEMIC_FEES[grade] && CONFIG.ACADEMIC_FEES[grade][sessions] && selectedSubjects.length > 0) {
-                        hasAcademicSelection = true;
-                        const baseFee = CONFIG.ACADEMIC_FEES[grade][sessions];
-                        academicBaseTotal += baseFee;
-                        studentSubtotal += baseFee;
-                        studentActualAcademicFee += baseFee;
-                        
-                        const extraCount = Math.max(0, selectedSubjects.length - CONFIG.CONSTANTS.BASE_SUBJECTS_INCLUDED);
-                        const extraFee = extraCount * CONFIG.CONSTANTS.ADDITIONAL_SUBJECT_FEE;
-                        additionalSubjectsTotal += extraFee;
-                        studentSubtotal += extraFee;
-                        studentActualAcademicFee += extraFee;
-                        
-                        totalActualAcademicFee += studentActualAcademicFee;
-                    }
-                    
-                    // 2. Extracurricular - UPDATED LOGIC (1-2 days per week)
-                    entry.querySelectorAll('.extracurricular-card.selected').forEach(card => {
-                        const activity = CONFIG.EXTRACURRICULAR_FEES.find(a => a.id === card.dataset.activityId);
-                        if (activity) {
-                            // Count selected days for this activity
-                            const selectedDays = Array.from(card.querySelectorAll('.extracurricular-day-btn.selected'));
-                            const numberOfDays = selectedDays.length;
-                            
-                            let fee = 0;
-                            
-                            if (activity.id === 'global_discovery') {
-                                // Global Discovery is once per week (Saturday only) - flat monthly fee
-                                fee = activity.ratePerSession;
-                            } else {
-                                // Regular activities: 1 day = weekly rate, 2 days = weekly rate × 2
-                                // Cap at 2 days maximum
-                                fee = activity.ratePerSession * Math.min(numberOfDays, 2);
-                                
-                                // If frequency is "twice", double the fee for the selected days
-                                const freqBtn = card.querySelector('.frequency-btn.selected');
-                                if (freqBtn && freqBtn.dataset.frequency === 'twice') {
-                                    fee *= 2;
-                                }
-                            }
-                            
-                            extracurricularTotal += fee;
-                            studentSubtotal += fee;
-                        }
-                    });
-                    
-                    // 3. Test Prep - UPDATED LOGIC (hours × days × weeks)
-                    entry.querySelectorAll('.test-prep-card.active').forEach(card => {
-                        const test = CONFIG.TEST_PREP_FEES.find(t => t.id === card.dataset.testId);
-                        const hours = parseFloat(card.querySelector('.test-prep-hours').value) || 0;
-                        
-                        if (test && hours > 0) {
-                            // Count selected days for this test prep
-                            const selectedDays = Array.from(card.querySelectorAll('.test-prep-day-btn.selected'));
-                            const numberOfDays = selectedDays.length;
-                            
-                            if (numberOfDays > 0) {
-                                // Calculate fee: (hours per session) × (rate per hour) × (days per week) × (4 weeks per month)
-                                // Example: 2 hours/day × ₦17,000/hour × 3 days/week × 4 weeks = ₦408,000/month
-                                const weeklyHours = hours * numberOfDays;
-                                const monthlyHours = weeklyHours * CONFIG.CONSTANTS.WEEKS_PER_MONTH;
-                                const fee = monthlyHours * test.rate;
-                                
-                                testPrepTotal += fee;
-                                studentSubtotal += fee;
-                            }
-                        }
-                    });
+getOrdinalSuffix(n) {
+    if (n > 3 && n < 21) return 'th';
+    switch (n % 10) {
+        case 1: return "st";
+        case 2: return "nd";
+        case 3: return "rd";
+        default: return "th";
+    }
+}
 
-                    // Add to breakdown list
-                    const breakdownItem = document.createElement('div');
-                    breakdownItem.className = 'student-fee';
-                    breakdownItem.innerHTML = `
-                        <div>
-                            <strong>${name}</strong><br>
-                            <small style="color: #666;">Grade: ${grade || 'None'} | Sessions: ${sessions || 'None'}</small>
-                        </div>
-                        <div style="text-align: right;">
-                            <div>₦${studentSubtotal.toLocaleString()}</div>
-                            <small style="color: #28A745;">Subtotal</small>
-                        </div>
-                    `;
-                    breakdownContainer.appendChild(breakdownItem);
-                });
+// NEW: Calculate proration for any monthly fee
+calculateProratedMonthlyFee(actualMonthlyFee, startDate, selectedDays = []) {
+    if (!startDate || actualMonthlyFee === 0) {
+        return {
+            toPay: actualMonthlyFee,
+            deduction: 0,
+            explanation: "Full month fee"
+        };
+    }
+    
+    try {
+        const start = new Date(startDate);
+        const dayOfMonth = start.getDate();
+        
+        // FIXED: 1st of ANY month = ALWAYS full fee
+        if (dayOfMonth === 1) {
+            return {
+                toPay: actualMonthlyFee,
+                deduction: 0,
+                dayOfMonth: dayOfMonth,
+                explanation: "Full month fee (Starting on 1st of the month)"
+            };
+        }
+        
+        // Check threshold: if starting between 2nd-6th, full fee
+        if (dayOfMonth >= 2 && dayOfMonth <= 6) {
+            return {
+                toPay: actualMonthlyFee,
+                deduction: 0,
+                dayOfMonth: dayOfMonth,
+                explanation: `Full month fee (Starting on ${dayOfMonth}${this.getOrdinalSuffix(dayOfMonth)})`
+            };
+        }
+        
+        // Starting from 7th onward: Calculate proration
+        const year = start.getFullYear();
+        const month = start.getMonth();
+        const daysInMonth = new Date(year, month + 1, 0).getDate();
+        
+        // Calculate days remaining from start date to end of month (inclusive)
+        const daysRemainingInMonth = daysInMonth - dayOfMonth + 1;
+        
+        // For monthly fees without specific days per week, prorate by actual days
+        const proratedAmount = Math.round((actualMonthlyFee / daysInMonth) * daysRemainingInMonth);
+        const deduction = actualMonthlyFee - proratedAmount;
+        
+        let explanation = `Starting on ${dayOfMonth}${this.getOrdinalSuffix(dayOfMonth)}. Prorated from ₦${actualMonthlyFee.toLocaleString()} for ${daysRemainingInMonth}/${daysInMonth} days`;
+        
+        return {
+            toPay: proratedAmount,
+            deduction: deduction,
+            daysInMonth: daysInMonth,
+            daysRemaining: daysRemainingInMonth,
+            dayOfMonth: dayOfMonth,
+            explanation: explanation
+        };
+    } catch (error) {
+        console.error('Proration calculation error:', error);
+        return {
+            toPay: actualMonthlyFee,
+            deduction: 0,
+            explanation: "Error in calculation"
+        };
+    }
+}
+
+// NEW: Calculate test prep fee with proration
+calculateTestPrepFee(hoursPerSession, ratePerHour, selectedDays, startDate) {
+    if (hoursPerSession <= 0 || selectedDays.length === 0) return 0;
+    
+    const daysPerWeek = selectedDays.length;
+    const weeklyHours = hoursPerSession * daysPerWeek;
+    const monthlyHours = weeklyHours * CONFIG.CONSTANTS.WEEKS_PER_MONTH;
+    const fullMonthFee = monthlyHours * ratePerHour;
+    
+    // Apply proration if starting mid-month
+    if (startDate) {
+        const proration = this.calculateProratedMonthlyFee(fullMonthFee, startDate);
+        return proration.toPay;
+    }
+    
+    return fullMonthFee;
+}
+
+// NEW: Calculate extracurricular fee with proration - FIXED VERSION
+calculateExtracurricularFee(activity, frequency, selectedDays, startDate) {
+    if (selectedDays.length === 0) return 0;
+    
+    let baseFee = 0;
+    
+    // Global Discovery is always flat monthly fee (Saturday only)
+    if (activity.id === 'global_discovery') {
+        baseFee = activity.fee; // Already monthly fee
+    } else {
+        // For regular extracurricular activities:
+        // Once weekly = Monthly fee as shown in config
+        // Twice weekly = Monthly fee × 2
+        
+        if (frequency === 'once') {
+            baseFee = activity.fee; // Monthly fee for once weekly
+        } else if (frequency === 'twice') {
+            baseFee = activity.fee * 2; // Double the monthly fee for twice weekly
+        } else {
+            baseFee = activity.fee; // Default to once weekly
+        }
+        
+        // Note: The number of days selected (1-2) doesn't change the fee
+        // It's about frequency (once or twice per week)
+    }
+    
+    // Apply proration if starting mid-month
+    if (startDate) {
+        const proration = this.calculateProratedMonthlyFee(baseFee, startDate);
+        return proration.toPay;
+    }
+    
+    return baseFee;
+}
+
+updateSummary() {
+    if (this.isLoadingSavedData) return;
+    
+    let academicBaseTotal = 0;
+    let additionalSubjectsTotal = 0;
+    let extracurricularTotal = 0;
+    let testPrepTotal = 0;
+    let hasAcademicSelection = false;
+    let earliestStartDate = null;
+    let totalActualAcademicFee = 0;
+    let selectedDaysPerWeek = 0;
+    
+    const studentEntries = document.querySelectorAll('.student-entry');
+    const breakdownContainer = document.getElementById('fee-details');
+    breakdownContainer.innerHTML = '';
+    
+    if (studentEntries.length === 0) {
+        breakdownContainer.innerHTML = '<p class="student-fee">No students added yet</p>';
+        this.updateSummaryDisplay(0, 0, 0, 0, 0, 0, 0);
+        return;
+    }
+
+    studentEntries.forEach((entry, index) => {
+        let studentSubtotal = 0;
+        let studentActualAcademicFee = 0;
+        
+        const grade = entry.querySelector('.student-grade').value;
+        const startDate = entry.querySelector('.student-start-date').value;
+        const name = entry.querySelector('.student-name').value || `Student ${index + 1}`;
+        
+        // Get selected academic sessions
+        const selectedSession = entry.querySelector('.session-option.selected');
+        const sessions = selectedSession ? selectedSession.dataset.sessions : null;
+        
+        // Get selected academic days for this student
+        const selectedAcademicDays = Array.from(entry.querySelectorAll('.academic-day-btn.selected')).map(btn => btn.dataset.day);
+        
+        // Track earliest start date for proration
+        if (startDate) {
+            if (!earliestStartDate || new Date(startDate) < new Date(earliestStartDate)) {
+                earliestStartDate = startDate;
+                selectedDaysPerWeek = selectedAcademicDays.length;
+            }
+        }
+        
+        // 1. Academic Calculation - WITH PRORATION
+        const selectedSubjects = Array.from(entry.querySelectorAll('.subject-option.selected'));
+        
+        if (grade && sessions && CONFIG.ACADEMIC_FEES[grade] && CONFIG.ACADEMIC_FEES[grade][sessions] && selectedSubjects.length > 0) {
+            hasAcademicSelection = true;
+            const baseFee = CONFIG.ACADEMIC_FEES[grade][sessions];
+            academicBaseTotal += baseFee;
+            studentSubtotal += baseFee;
+            studentActualAcademicFee += baseFee;
+            
+            const extraCount = Math.max(0, selectedSubjects.length - CONFIG.CONSTANTS.BASE_SUBJECTS_INCLUDED);
+            const extraFee = extraCount * CONFIG.CONSTANTS.ADDITIONAL_SUBJECT_FEE;
+            additionalSubjectsTotal += extraFee;
+            studentSubtotal += extraFee;
+            studentActualAcademicFee += extraFee;
+            
+            totalActualAcademicFee += studentActualAcademicFee;
+        }
+        
+        // 2. Extracurricular - UPDATED WITH PRORATION (FIXED)
+        entry.querySelectorAll('.extracurricular-card.selected').forEach(card => {
+            const activity = CONFIG.EXTRACURRICULAR_FEES.find(a => a.id === card.dataset.activityId);
+            if (activity) {
+                const selectedDays = Array.from(card.querySelectorAll('.extracurricular-day-btn.selected')).map(btn => btn.dataset.day);
+                const frequencyBtn = card.querySelector('.frequency-btn.selected');
+                const frequency = frequencyBtn ? frequencyBtn.dataset.frequency : 'once';
                 
-                // Calculations
-                const totalAcademicFee = academicBaseTotal + additionalSubjectsTotal;
-                
-                let discount = 0;
-                if (studentEntries.length >= 2 && hasAcademicSelection) {
-                    discount = CONFIG.CONSTANTS.SIBLING_DISCOUNT;
-                }
-                
-                let proratedAmountToPay = totalAcademicFee;
-                let prorationDeduction = 0;
-                let prorationExplanation = '';
-                
-                if (hasAcademicSelection && earliestStartDate && selectedDaysPerWeek > 0) {
-                    const prorationResult = this.calculateProratedAmount(
-                        totalActualAcademicFee, 
-                        earliestStartDate, 
-                        Array.from({length: selectedDaysPerWeek}, (_, i) => `Day${i+1}`)
-                    );
-                    
-                    proratedAmountToPay = prorationResult.toPay || 0;
-                    prorationDeduction = prorationResult.deduction || 0;
-                    
-                    if (prorationResult.explanation) {
-                        prorationExplanation = prorationResult.explanation;
+                // Validate days selection based on frequency
+                if (frequency === 'once' && selectedDays.length > 1) {
+                    // If frequency is "once" but more than 1 day selected, use only first day
+                    selectedDays.length = 1;
+                } else if (frequency === 'twice' && selectedDays.length < 2) {
+                    // If frequency is "twice" but less than 2 days selected, can't calculate
+                    // We'll still calculate but show warning
+                    if (selectedDays.length === 0) {
+                        return; // Skip if no days selected
                     }
                 }
                 
-                // CORRECTED: Total payable calculation
-                const totalPayable = Math.max(0, 
-                    proratedAmountToPay + // Use prorated amount for academic
-                    extracurricularTotal + 
-                    testPrepTotal - 
-                    discount
-                );
-                
-                // Update DOM
-                this.updateSummaryDisplay(
-                    academicBaseTotal,
-                    additionalSubjectsTotal,
-                    totalAcademicFee,
-                    extracurricularTotal,
-                    testPrepTotal,
-                    discount,
-                    prorationDeduction,
-                    totalPayable,
-                    prorationExplanation
-                );
+                const fee = this.calculateExtracurricularFee(activity, frequency, selectedDays, startDate);
+                extracurricularTotal += fee;
+                studentSubtotal += fee;
             }
+        });
+        
+        // 3. Test Prep - UPDATED WITH PRORATION
+        entry.querySelectorAll('.test-prep-card.active').forEach(card => {
+            const test = CONFIG.TEST_PREP_FEES.find(t => t.id === card.dataset.testId);
+            const hours = parseFloat(card.querySelector('.test-prep-hours').value) || 0;
+            
+            if (test && hours > 0) {
+                const selectedDays = Array.from(card.querySelectorAll('.test-prep-day-btn.selected')).map(btn => btn.dataset.day);
+                
+                if (selectedDays.length > 0) {
+                    const fee = this.calculateTestPrepFee(hours, test.rate, selectedDays, startDate);
+                    testPrepTotal += fee;
+                    studentSubtotal += fee;
+                }
+            }
+        });
+
+        // Add to breakdown list
+        const breakdownItem = document.createElement('div');
+        breakdownItem.className = 'student-fee';
+        breakdownItem.innerHTML = `
+            <div>
+                <strong>${name}</strong><br>
+                <small style="color: #666;">Grade: ${grade || 'None'} | Sessions: ${sessions || 'None'}</small>
+            </div>
+            <div style="text-align: right;">
+                <div>₦${studentSubtotal.toLocaleString()}</div>
+                <small style="color: #28A745;">Subtotal</small>
+            </div>
+        `;
+        breakdownContainer.appendChild(breakdownItem);
+    });
+    
+    // Calculate totals
+    const totalAcademicFee = academicBaseTotal + additionalSubjectsTotal;
+    
+    let discount = 0;
+    if (studentEntries.length >= 2 && hasAcademicSelection) {
+        discount = CONFIG.CONSTANTS.SIBLING_DISCOUNT;
+    }
+    
+    let proratedAmountToPay = totalAcademicFee;
+    let prorationDeduction = 0;
+    let prorationExplanation = '';
+    
+    // Apply proration to academic fees if applicable
+    if (hasAcademicSelection && earliestStartDate && selectedDaysPerWeek > 0) {
+        const prorationResult = this.calculateProratedMonthlyFee(
+            totalActualAcademicFee, 
+            earliestStartDate, 
+            Array.from({length: selectedDaysPerWeek}, (_, i) => `Day${i+1}`)
+        );
+        
+        proratedAmountToPay = prorationResult.toPay || 0;
+        prorationDeduction = prorationResult.deduction || 0;
+        
+        if (prorationResult.explanation) {
+            prorationExplanation = prorationResult.explanation;
+        }
+    }
+    
+    // CORRECTED: Total payable calculation (proration already applied to individual fees)
+    const totalPayable = Math.max(0, 
+        proratedAmountToPay + // Use prorated amount for academic
+        extracurricularTotal + // Already prorated
+        testPrepTotal - // Already prorated
+        discount
+    );
+    
+    // Update DOM
+    this.updateSummaryDisplay(
+        academicBaseTotal,
+        additionalSubjectsTotal,
+        totalAcademicFee,
+        extracurricularTotal,
+        testPrepTotal,
+        discount,
+        prorationDeduction,
+        totalPayable,
+        prorationExplanation
+    );
+}
             
             updateSummaryDisplay(academicBaseTotal, additionalSubjectsTotal, totalAcademicFee, 
                                extracurricularTotal, testPrepTotal, discount, 
